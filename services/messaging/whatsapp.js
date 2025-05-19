@@ -8,7 +8,7 @@ import { EventEmitter } from "events";
 import { getWhatsAppMessages, updateWhatsAppStatus, getWhatsAppDeliveryStatus, updateWhatsAppDeliveryStatus } from "../database/queries/messaging-queries.js";
 import messageState from '../state/messageState.js';
 
-const { Client, LocalAuth } = whatsapp;
+const { Client, LocalAuth  } = whatsapp;
 
 class WhatsAppService extends EventEmitter {
   constructor() {
@@ -660,87 +660,9 @@ class WhatsAppService extends EventEmitter {
   }
 }
 
+
+
 // Export a singleton instance
 export default new WhatsAppService();
 
-// Add these backward compatibility exports to the end of services/messaging/whatsapp.js
 
-/**
- * Legacy compatibility function for sending images
- * @param {string} number - Recipient phone number
- * @param {string} base64Image - Base64-encoded image data
- * @returns {Promise<string>} - "OK" if successful, "ERROR" otherwise
- */
-export async function sendImg_(number, base64Image) {
-  try {
-    // Create a message media object
-    const media = new MessageMedia("image/png", base64Image);
-    
-    // Use the service's queue operation functionality
-    return WhatsAppService.queueOperation(async (client) => {
-      try {
-        // Validate number format
-        let targetNumber = number;
-        if (!targetNumber.includes('@c.us')) {
-          const numberDetails = await client.getNumberId(targetNumber);
-          if (!numberDetails) {
-            console.log(targetNumber, "Mobile number is not registered");
-            return "ERROR";
-          }
-          targetNumber = numberDetails._serialized;
-        }
-        
-        // Send the message
-        await client.sendMessage(targetNumber, media);
-        return "OK";
-      } catch (error) {
-        console.error("Error sending image:", error);
-        return "ERROR";
-      }
-    });
-  } catch (error) {
-    console.error("Error in sendImg_:", error);
-    return "ERROR";
-  }
-}
-
-/**
- * Legacy compatibility function for sending X-ray files
- * @param {string} number - Recipient phone number
- * @param {string} file - Path to the file
- * @returns {Promise<Object>} - Result object { result: "OK" } or { result: "ERROR", error: "message" }
- */
-export async function sendXray_(number, file) {
-  try {
-    return WhatsAppService.queueOperation(async (client) => {
-      try {
-        // Create message media from file
-        const media = MessageMedia.fromFilePath(file);
-        
-        // Validate number format
-        let targetNumber = number;
-        if (!targetNumber.includes('@c.us')) {
-          const numberDetails = await client.getNumberId(targetNumber);
-          if (!numberDetails) {
-            console.log(targetNumber, "Mobile number is not registered");
-            return { "result": "ERROR", "error": "Mobile number is not registered" };
-          }
-          targetNumber = numberDetails._serialized;
-        }
-        
-        // Send the message
-        await client.sendMessage(targetNumber, media);
-        return { "result": "OK" };
-      } catch (error) {
-        console.error("Error sending X-ray:", error);
-        return { "result": "ERROR", "error": error.message };
-      }
-    });
-  } catch (error) {
-    console.error("Error in sendXray_:", error);
-    return { "result": "ERROR", "error": error.message };
-  }
-}
-
-// Export the client for backward compatibility
-export const client = WhatsAppService.client;

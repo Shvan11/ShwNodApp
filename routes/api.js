@@ -5,7 +5,7 @@ import express from 'express';
 
 import * as database from '../services/database/queries/index.js';
 import whatsapp from '../services/messaging/whatsapp.js';
-import { sendImg_, client as senderClient, sendXray_ } from '../services/messaging/whatsapp.js';
+import { sendImg_, sendXray_ } from '../services/messaging/whatsapp-api.js';
 
 import sms from '../services/messaging/sms.js';
 import * as imaging from '../services/imaging/index.js';
