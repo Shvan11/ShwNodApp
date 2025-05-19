@@ -1,0 +1,109 @@
+/* pages/appointments.css - Styles specific to the appointments pages */
+
+html {
+  height: 100%;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  font-family: sans-serif;
+  font-weight: normal;
+}
+
+/* Page title */
+#title {
+  text-align: center;
+}
+
+/* Layout containers specific to appointments */
+.container {
+  display: flex;
+  margin: 0.5cm;
+  background: linear-gradient(45deg, #9cc4c2, #ffffff);
+  align-items: flex-start;
+  justify-content: space-evenly;
+}
+
+.container2 {
+  display: flex;
+  margin: 0.5cm;
+  background: linear-gradient(45deg, #aedfd0, #ffffff);
+}
+
+/* Latest visit box */
+#latestVisit {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Canvas for clock */
+#canvas {
+  margin-left: auto;
+  border: 1px solid #000000;
+  max-height: 600px;
+  float: left;
+  margin: 10px;
+}
+
+/* Sidebar content */
+#subcont {
+  align-self: flex-end;
+}
+
+/* Appointment images */
+.img {
+  max-width: 30%;
+}
+
+/* Statistics list */
+#subcont ul {
+  font-size: larger;
+  color: rgb(23, 5, 85);
+}
+
+#subcont li {
+  padding: 10px;
+}
+
+.nums {
+  display: inline;
+  color: red;
+  font-weight: bolder;
+}
+
+#waitingli {
+  background-color: antiquewhite;
+}
+
+/* Fullscreen button */
+#button {
+  font-size: x-large;
+  height: 50px;
+  background-color: #4CAF50;
+  color: white;
+  position: fixed;
+  left: 40%;
+}
+
+/* Table styling */
+table {
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+}
+
+th, td {
+  padding: 3px 6px 3px 6px; 
+  background-color: rgba(231, 218, 218, 0.2);
+  color: rgb(0, 0, 0);
+  font-size: large;
+}
+
+th {
+  text-align: left;
+  background-color: #fff9f5;
+}
+
+/* Footer */
+footer {
+  text-align: center;
+}

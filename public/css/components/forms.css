@@ -1,0 +1,124 @@
+/* forms.css - Form inputs, selects, etc. */
+/* Form groups */
+.form-group {
+    margin-bottom: 1rem;
+    width: 100%;
+  }
+  
+  /* Form labels */
+  .form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+  
+  /* Form controls */
+  .form-control {
+    display: block;
+    width: 100%;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--text-color);
+    background-color: var(--background-light);
+    background-clip: padding-box;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  }
+  
+  .form-control:focus {
+    color: var(--text-color);
+    background-color: var(--background-light);
+    border-color: var(--primary-color);
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  }
+  
+  /* Your application's input styles */
+  .wainput {
+    width: 82%;
+    padding: 10px;
+    margin-top: 30px;
+    border: 1px solid #ccc;
+    padding-left: 40px;
+    font-size: 16px;
+  }
+  
+  /* Select inputs */
+  select.form-control {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 12px;
+  }
+  
+  .selections {
+    border: 1px solid #000000;
+    padding: 8px;
+    border-radius: 2px;
+    font-size: 12px;
+  }
+  
+  .selections:hover {
+    background-color: antiquewhite;
+  }
+  
+  /* Checkboxes and radios */
+  .form-check {
+    position: relative;
+    display: block;
+    padding-left: 1.25rem;
+  }
+  
+  .form-check-input {
+    position: absolute;
+    margin-top: 0.3rem;
+    margin-left: -1.25rem;
+  }
+  
+  .form-check-label {
+    margin-bottom: 0;
+  }
+  
+  /* Text areas */
+  textarea.form-control {
+    height: auto;
+  }
+  
+  /* File inputs */
+  .form-control-file {
+    display: block;
+    width: 100%;
+  }
+  
+  /* Validation states */
+  .is-valid {
+    border-color: var(--success-color);
+  }
+  
+  .is-invalid {
+    border-color: var(--error-color);
+  }
+  
+  .form-error {
+    color: var(--error-color);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+  }
+  
+  /* Progress bar (from your original CSS) */
+  #emptyBar {
+    width: 100%;
+    background-color: grey;
+    display: none;
+  }
+  
+  #filledBar {
+    width: 1%;
+    height: 30px;
+    background-color: green;
+    color: white;
+    display: none;
+  }

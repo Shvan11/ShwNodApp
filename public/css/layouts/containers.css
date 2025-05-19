@@ -1,0 +1,90 @@
+/* containers.css - Container styles */
+/* Main content containers based on your existing CSS */
+.content-container {
+    display: flex;
+    margin: 0.5rem;
+    background: var(--gradient-primary);
+    align-items: flex-start;
+    justify-content: space-evenly;
+    padding: 1rem;
+  }
+  
+  .container-secondary {
+    display: flex;
+    margin: 0.5rem;
+    background: var(--gradient-secondary);
+    padding: 1rem;
+  }
+  
+  .container-accent {
+    margin: 0.5rem;
+    background: var(--gradient-accent);
+    color: white;
+    padding: 1rem;
+  }
+  
+  /* Panel containers */
+  .panel {
+    background-color: var(--background-light);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  /* Form containers */
+  .form-container {
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 1rem;
+  }
+  
+  /* Image container from your existing styles */
+  .img-container {
+    width: 90px;
+    margin: 5px;
+    display: block;
+    flex-shrink: 0;
+  }
+  
+  /* Box container with shadow */
+  .box {
+    background-color: var(--background-light);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  /* Sidebar container */
+  .sidebar {
+    padding: 1rem;
+    background-color: var(--background-light);
+    border-radius: var(--radius-md);
+  }
+  
+  /* Container spacing utilities */
+  .p-0 { padding: 0; }
+  .p-1 { padding: var(--spacing-sm); }
+  .p-2 { padding: var(--spacing-md); }
+  .p-3 { padding: var(--spacing-lg); }
+  
+  .m-0 { margin: 0; }
+  .m-1 { margin: var(--spacing-sm); }
+  .m-2 { margin: var(--spacing-md); }
+  .m-3 { margin: var(--spacing-lg); }
+  
+  .mt-1 { margin-top: var(--spacing-sm); }
+  .mt-2 { margin-top: var(--spacing-md); }
+  .mt-3 { margin-top: var(--spacing-lg); }
+  
+  .mb-1 { margin-bottom: var(--spacing-sm); }
+  .mb-2 { margin-bottom: var(--spacing-md); }
+  .mb-3 { margin-bottom: var(--spacing-lg); }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .content-container {
+      flex-direction: column;
+    }
+  }

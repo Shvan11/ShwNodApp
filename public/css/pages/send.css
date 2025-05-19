@@ -1,0 +1,84 @@
+/* pages/send.css - Styles for the WhatsApp send page */
+
+/* Status colors */
+.status-pending {
+    color: orange;
+  }
+  
+  .status-sent {
+    color: green;
+  }
+  
+  .status-delivered {
+    color: forestgreen;
+  }
+  
+  .status-read {
+    color: blue;
+  }
+  
+  .status-error {
+    color: red;
+  }
+  
+  .message-count {
+    font-weight: bold;
+    margin: 10px 0;
+  }
+  
+  /* QR code container */
+  #qr {
+    max-width: 300px;
+    margin: 20px auto;
+    display: block;
+  }
+  
+  /* Loader animation */
+  .loader {
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #3498db;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    animation: spin 2s linear infinite;
+    display: inline-block;
+    margin-right: 10px;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  /* Table formatting */
+  #table-container table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+  }
+  
+  #table-container th, 
+  #table-container td {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  #table-container th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+  }
+  
+  /* Status cell formatting */
+  .status-cell {
+    font-weight: bold;
+  }
+  
+  /* Row styles for message status */
+  .true {
+    background-color: #dff0d8;
+  }
+  
+  .false {
+    background-color: #f2dede;
+  }

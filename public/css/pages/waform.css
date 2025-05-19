@@ -1,0 +1,118 @@
+/* pages/waform.css - Styles for WhatsApp form modal */
+
+@import "http://fonts.googleapis.com/css?family=Raleway";
+
+#abc {
+  width: 100%;
+  height: 100%;
+  opacity: .95;
+  top: 0;
+  left: 0;
+  display: none;
+  position: fixed;
+  background-color: #313131;
+  overflow: auto
+}
+
+#waclose {
+  color: rgb(94, 218, 94);
+  position: absolute;
+  right: -5px;
+  top: -14px;
+  cursor: pointer;
+  max-width: 50px;
+}
+
+div#popupContact {
+  position: absolute;
+  left: 50%;
+  top: 17%;
+  margin-left: -202px;
+  font-family: 'Raleway', sans-serif
+}
+
+.waform {
+  max-width: 300px;
+  min-width: 250px;
+  padding: 10px 50px;
+  border: 2px solid rgb(128, 128, 128);
+  border-radius: 10px;
+  font-family: raleway;
+  background-color: #fff
+}
+
+.wainput {
+  width: 82%;
+  padding: 10px;
+  margin-top: 30px;
+  border: 1px solid #ccc;
+  padding-left: 40px;
+  font-size: 16px;
+  font-family: raleway
+}
+
+#waname {
+  background-image: url(../images/name.jpg);
+  background-repeat: no-repeat;
+  background-position: 5px 7px
+}
+
+#waphone {
+  background-image: url(images/phone.png);
+  background-repeat: no-repeat;
+  background-position: 5px 4px
+}
+
+#wafile {
+  margin-bottom: 30px
+}
+
+textarea {
+  background-image: url(../images/msg.png);
+  background-repeat: no-repeat;
+  background-position: 5px 7px;
+  width: 82%;
+  height: 95px;
+  padding: 10px;
+  resize: none;
+  margin-top: 30px;
+  border: 1px solid #ccc;
+  padding-left: 40px;
+  font-size: 16px;
+  font-family: raleway;
+  margin-bottom: 30px
+}
+
+#wasubmit {
+  text-decoration: none;
+  width: 100%;
+  text-align: center;
+  display: block;
+  background-color: #FFBC00;
+  color: #fff;
+  border: 1px solid #FFCB00;
+  padding: 10px 0;
+  font-size: 20px;
+  cursor: pointer;
+  border-radius: 5px;
+  margin-top: 20px;
+}
+
+span {
+  color: red;
+  font-weight: 700
+}
+
+#emptyBar {
+  width: 100%;
+  background-color: grey;
+  display: none;
+}
+
+#filledBar {
+  width: 1%;
+  height: 30px;
+  background-color: green;
+  color: white;
+  display: none;
+}

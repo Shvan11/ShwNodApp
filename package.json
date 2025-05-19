@@ -1,0 +1,30 @@
+{
+  "name": "dolphnode",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "service:install": "node utils/windows-service/cli.js install",
+    "service:uninstall": "node utils/windows-service/cli.js uninstall"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google-cloud/local-auth": "^3.0.1",
+    "dotenv": "^16.5.0",
+    "express": "^4.18.2",
+    "googleapis": "^144.0.0",
+    "image-size": "^1.1.1",
+    "multer": "^1.4.5-lts.2",
+    "node-telegram-bot-api": "^0.64.0",
+    "node-windows": "^1.0.0-beta.8",
+    "qrcode": "^1.5.3",
+    "tedious": "^16.6.1",
+    "telegram": "^2.19.10",
+    "twilio": "^4.21.0",
+    "whatsapp-web.js": "^1.27.0",
+    "ws": "^8.16.0"
+  }
+}

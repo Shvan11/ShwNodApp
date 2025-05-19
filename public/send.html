@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="css/main.css" />
+    <link rel="stylesheet" href="css/pages/send.css" />
+    <title>Shwan Orthodontics - WhatsApp Sender</title>
+    <style>
+        #qr {
+            max-width: 300px;
+            margin: 20px auto;
+            display: block;
+        }
+
+        .status-pending {
+            color: orange;
+        }
+
+        .status-sent {
+            color: green;
+        }
+
+        .status-delivered {
+            color: forestgreen;
+        }
+
+        .status-read {
+            color: blue;
+        }
+
+        .status-error {
+            color: red;
+        }
+
+        .message-count {
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 2s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Shwan Orthodontics</h1>
+    <div id="state">
+        <div class="loader"></div> Initializing...
+    </div>
+    <div id="qr-container">
+        <img id="qr" style="display: none;">
+    </div>
+    <div id="table-container"></div>
+
+    <script>
+        const App = {
+            urlParams: new URLSearchParams(window.location.search),
+            dateparam: null,
+            ws: null,
+            pollingInterval: null,
+            pingInterval: null,
+            finished: false,
+            persons: [],
+            sentCount: 0,
+            failedCount: 0,
+            manualDisconnect: false,
+            clientReadyShown: false,
+
+            init() {
+                this.dateparam = this.urlParams.get('date') || new Date().toISOString().slice(0, 10);
+                console.log("Initializing with date:", this.dateparam);
+
+                // Prevent accidental page navigation
+                window.addEventListener('beforeunload', (event) => {
+                    if (!this.finished) {
+                        const message = 'Leaving this page will interrupt the WhatsApp sending process.';
+                        event.returnValue = message;
+                        return message;
+                    }
+                });
+
+                this.connectWebSocket();
+                this.sendWa();
+            },
+
+            connectWebSocket() {
+                // Create WebSocket connection
+                try {
+                    // Close any existing connection
+                    if (this.ws && this.ws.readyState === 1) {
+                        this.manualDisconnect = true;
+                        this.ws.close();
+                    }
+
+                    this.manualDisconnect = false;
+                    this.ws = new WebSocket(`${location.origin.replace(/^http/, "ws")}?PDate=${this.dateparam}&clientType=waStatus`);
+
+                    this.ws.onopen = () => {
+                        console.log("WebSocket connected");
+                        // Clear any existing ping interval
+                        if (this.pingInterval) {
+                            clearInterval(this.pingInterval);
+                        }
+
+                        // Keep connection alive with pings
+                        this.pingInterval = setInterval(() => {
+                            if (this.ws && this.ws.readyState === 1) {
+                                console.log("Sending ping to keep connection alive");
+                                this.ws.send(JSON.stringify({ type: 'ping' }));
+                            }
+                        }, 30000); // Send ping every 30 seconds
+                    };
+
+                    // In send.html, update the WebSocket onmessage handler:
+                    this.ws.onmessage = (event) => {
+                        console.log("Raw WebSocket message:", event.data);
+                        try {
+                            const data = JSON.parse(event.data);
+                            console.log("Parsed WebSocket message:", data);
+
+                            // Handle different message types
+                            if (data.messageType === "updated") {
+                                this.updateUI(data.tableData);
+                            } else if (data.messageType === "messageAckUpdated") {
+                                this.updateMessageStatus(data.messageId, data.status);
+                                // Update the table even after finished=true
+                                this.createTable(this.persons);
+                            } else if (data.qr) {
+                                this.updateQR(data.qr);
+                            }
+
+                            // Still track finished state, but don't close connections
+                            if (data.finished && !this.finished) {
+                                this.finished = true;
+                                this.updateFinishedState(); // Updated version that doesn't close WebSocket
+                            }
+                        } catch (error) {
+                            console.error("Error parsing WebSocket message:", error);
+                        }
+                    };
+
+                    this.ws.onclose = (event) => {
+                        console.log("WebSocket connection closed", event.code, event.reason);
+                        // Clear ping interval
+                        if (this.pingInterval) {
+                            clearInterval(this.pingInterval);
+                            this.pingInterval = null;
+                        }
+
+                        // If not a manual disconnect and not finished, try to reconnect
+                        if (!this.manualDisconnect && !this.finished) {
+                            console.log("Reconnecting WebSocket in 2 seconds...");
+                            setTimeout(() => this.connectWebSocket(), 2000);
+                        }
+
+                        // Always ensure polling is active
+                        this.startPolling();
+                    };
+
+                    this.ws.onerror = (error) => {
+                        console.error("WebSocket error:", error);
+                        // Fallback to polling on error
+                        this.startPolling();
+                    };
+                } catch (error) {
+                    console.error("Error creating WebSocket:", error);
+                    this.startPolling();
+                }
+            },
+
+            async sendWa() {
+                try {
+                    // Use fetch with no-redirect options
+                    const response = await fetch(`${window.location.origin}/api/wa/send?date=${this.dateparam}`, {
+                        redirect: 'follow'
+                    });
+
+                    const data = await response.json();
+                    console.log("sendWa response:", data);
+                    this.updateState(data.htmltext);
+
+                    // Always ensure polling is active as fallback
+                    this.startPolling();
+                } catch (error) {
+                    console.error('Error sending WA:', error);
+                    this.updateState('Error starting process');
+                    this.startPolling();
+                }
+            },
+
+            startPolling() {
+                // Only start polling if we don't already have polling running
+                if (!this.pollingInterval && !this.finished) {
+                    console.log("Starting polling mechanism");
+                    this.pollingInterval = setInterval(() => this.loadState(), 2000);
+                }
+            },
+
+            async loadState() {
+                if (this.finished) {
+                    if (this.pollingInterval) {
+                        clearInterval(this.pollingInterval);
+                        this.pollingInterval = null;
+                    }
+                    return;
+                }
+
+                console.log("Polling for updates...");
+                try {
+                    const response = await fetch(`${window.location.origin}/api/update`);
+                    const data = await response.json();
+                    console.log("Polling response:", data);
+
+                    // Always update state with what we get
+                    this.updateState(data.htmltext);
+
+                    // If clientReady flag is now true, update UI accordingly
+                    if (data.clientReady && !this.clientReadyShown) {
+                        this.clientReadyShown = true;
+                        this.updateState(`<p>Client is ready! ${data.sentMessages || 0} Messages Sent, ${data.failedMessages || 0} Failed</p>`);
+                    }
+
+                    if (data.persons && data.persons.length > 0) {
+                        this.updatePersons(data.persons);
+                        this.createTable(this.persons);
+                    }
+
+                    // Process any status updates included in the response
+                    if (data.statusUpdates && data.statusUpdates.length > 0) {
+                        console.log("Processing status updates from polling:", data.statusUpdates);
+                        data.statusUpdates.forEach(update => {
+                            this.updateMessageStatus(update.messageId, update.status);
+                        });
+                    }
+
+                    if (data.qr) {
+                        this.updateQR(data.qr);
+                    }
+
+                    if (data.finished) {
+                        this.finished = true;
+                        this.updateFinishedState();
+                    }
+                } catch (error) {
+                    console.error('Error loading state:', error);
+                    this.updateState('Error updating state');
+                }
+            },
+
+            updatePersons(newPersons) {
+                // Add new persons that aren't already in the list
+                newPersons.forEach(newPerson => {
+                    // Check if person already exists in the list
+                    const existingIndex = this.persons.findIndex(p =>
+                        p.messageId === newPerson.messageId);
+
+                    if (existingIndex >= 0) {
+                        // Update existing person
+                        const existingPerson = this.persons[existingIndex];
+                        this.persons[existingIndex] = {
+                            ...existingPerson,
+                            ...newPerson,
+                            // Keep status if it's more advanced
+                            status: Math.max(existingPerson.status || 0, newPerson.status || 0)
+                        };
+                    } else {
+                        // Add new person
+                        this.persons.push(newPerson);
+                    }
+                });
+
+                console.log("Updated persons array:", this.persons);
+            },
+
+            updateMessageStatus(messageId, status) {
+                console.log(`Updating message status: ${messageId} -> ${status}`);
+
+                // Find the person with this message ID
+                const personIndex = this.persons.findIndex(p => p.messageId === messageId);
+
+                if (personIndex >= 0) {
+                    // Update the status if it's a higher level
+                    const currentStatus = this.persons[personIndex].status || 0;
+                    if (status > currentStatus) {
+                        this.persons[personIndex].status = status;
+                        // Update the table
+                        this.createTable(this.persons);
+                    }
+                } else {
+                    console.log(`Message ID ${messageId} not found in persons array`);
+                }
+            },
+
+            getStatusText(status) {
+                switch (status) {
+                    case -1: return '<span class="status-error">&#10060; Error</span>'; // Error
+                    case 0: return '<span class="status-pending">&#8987; Pending</span>'; // Pending
+                    case 1: return '<span class="status-sent">&#10004; Sent</span>'; // Sent
+                    case 2: return '<span class="status-delivered">&#10004;&#10004; Delivered</span>'; // Delivered
+                    case 3: return '<span class="status-read">&#10004;&#10004; Read</span>'; // Read
+                    case 4: return '<span class="status-read">&#10004;&#10004; Played</span>'; // Played
+                    default: return '<span class="status-sent">&#10004; Sent</span>';
+                }
+            },
+
+            countStatusTypes() {
+                let sent = 0;
+                let delivered = 0;
+                let read = 0;
+                let error = 0;
+                let pending = 0;
+
+                this.persons.forEach(person => {
+                    const status = person.status || (person.success === '&#10004;' ? 1 : -1);
+                    if (status === -1) error++;
+                    else if (status === 0) pending++;
+                    else if (status === 1) sent++;
+                    else if (status === 2) delivered++;
+                    else if (status >= 3) read++;
+                });
+
+                return { sent, delivered, read, error, pending };
+            },
+
+            updateUI(data) {
+                if (data) {
+                    this.updateState(data.htmltext);
+
+                    if (data.persons && data.persons.length > 0) {
+                        this.updatePersons(data.persons);
+                        this.createTable(this.persons);
+                    }
+
+                    if (data.finished) {
+                        this.finished = true;
+                        this.updateFinishedState();
+                    }
+                }
+            },
+
+            createTable(tableData) {
+                if (!tableData || tableData.length === 0) return;
+
+                const table = document.createElement('table');
+                table.border = "1";
+                table.id = 'p_table';
+                const tableBody = document.createElement('tbody');
+
+                const header = table.createTHead();
+                const headerRow = header.insertRow(0);
+                ['Name', 'Phone', 'Status'].forEach(text => {
+                    const cell = headerRow.insertCell();
+                    cell.textContent = text;
+                    cell.style.fontWeight = 'bold';
+                });
+
+                tableData.forEach(rowData => {
+                    const row = document.createElement('tr');
+                    if (rowData.messageId) {
+                        row.dataset.messageId = rowData.messageId;
+                    }
+
+                    // Determine status
+                    let status = 0;
+                    if (rowData.status !== undefined) {
+                        status = rowData.status;
+                    } else if (rowData.success === '&#10004;') {
+                        status = 1; // Sent
+                    } else if (rowData.success === '&times;') {
+                        status = -1; // Error
+                    }
+
+                    // Set row class based on status
+                    row.className = status >= 1 ? 'true' : 'false';
+
+                    // Name cell
+                    const nameCell = document.createElement('td');
+                    nameCell.textContent = rowData.name;
+                    row.appendChild(nameCell);
+
+                    // Phone cell
+                    const phoneCell = document.createElement('td');
+                    phoneCell.textContent = rowData.number;
+                    row.appendChild(phoneCell);
+
+                    // Status cell
+                    const statusCell = document.createElement('td');
+                    statusCell.className = 'status-cell';
+                    statusCell.innerHTML = this.getStatusText(status);
+
+                    row.appendChild(statusCell);
+                    tableBody.appendChild(row);
+                });
+
+                table.appendChild(tableBody);
+
+                // Add status summary above table
+                const statusCounts = this.countStatusTypes();
+                const summary = document.createElement('div');
+                summary.className = 'message-count';
+                summary.innerHTML = `
+                    Total: ${tableData.length} | 
+                    <span class="status-error">Failed: ${statusCounts.error}</span> | 
+                    <span class="status-pending">Pending: ${statusCounts.pending}</span> | 
+                    <span class="status-sent">Sent: ${statusCounts.sent}</span> | 
+                    <span class="status-delivered">Delivered: ${statusCounts.delivered}</span> | 
+                    <span class="status-read">Read: ${statusCounts.read}</span>
+                `;
+
+                const container = document.getElementById("table-container");
+                container.innerHTML = '';
+                container.appendChild(summary);
+                container.appendChild(table);
+            },
+
+            updateState(html) {
+                const stateElement = document.getElementById("state");
+                if (stateElement) {
+                    stateElement.innerHTML = html;
+                }
+            },
+
+            updateQR(qr) {
+                const img = document.getElementById("qr");
+                if (img) {
+                    img.src = qr;
+                    img.style.display = 'block';
+                }
+            },
+
+            // In send.html, modify updateFinishedState():
+            updateFinishedState() {
+                // Update UI to show completion
+                const stateElement = document.getElementById("state");
+                if (stateElement) {
+                    const statusCounts = this.countStatusTypes();
+                    stateElement.innerHTML = `
+            <p>Messages sent successfully! Waiting for delivery confirmations...</p>
+            <p>
+                <span class="status-sent">Sent: ${statusCounts.sent}</span> | 
+                <span class="status-delivered">Delivered: ${statusCounts.delivered}</span> | 
+                <span class="status-read">Read: ${statusCounts.read}</span> | 
+                <span class="status-error">Failed: ${statusCounts.error}</span>
+            </p>
+            <button id="closeBtn">Close Connection</button>
+        `;
+
+                    // Add a click handler for the close button
+                    document.getElementById("closeBtn").addEventListener("click", () => {
+                        this.closeAllConnections();
+                    });
+                }
+
+                // Only stop polling, but keep WebSocket open for status updates
+                if (this.pollingInterval) {
+                    clearInterval(this.pollingInterval);
+                    this.pollingInterval = null;
+                }
+
+                // Start a long (3 minute) timer to eventually close connections
+                this.closingTimer = setTimeout(() => {
+                    this.closeAllConnections();
+                }, 180000); // 3 minutes
+            },
+
+            // Add a new method to close all connections
+            closeAllConnections() {
+                // Show final status before closing
+                this.updateFinalState();
+
+                // Now close everything
+                if (this.closingTimer) {
+                    clearTimeout(this.closingTimer);
+                    this.closingTimer = null;
+                }
+
+                if (this.pingInterval) {
+                    clearInterval(this.pingInterval);
+                    this.pingInterval = null;
+                }
+
+                if (this.ws && this.ws.readyState === 1) {
+                    this.manualDisconnect = true;
+                    this.ws.close();
+                }
+            },
+
+            // Add a method to show final status
+            updateFinalState() {
+                const stateElement = document.getElementById("state");
+                if (stateElement) {
+                    const statusCounts = this.countStatusTypes();
+                    stateElement.innerHTML = `
+            <p>Process complete! ${this.persons.length} messages processed.</p>
+            <p>
+                <span class="status-sent">Sent: ${statusCounts.sent}</span> | 
+                <span class="status-delivered">Delivered: ${statusCounts.delivered}</span> | 
+                <span class="status-read">Read: ${statusCounts.read}</span> | 
+                <span class="status-error">Failed: ${statusCounts.error}</span>
+            </p>
+        `;
+                }
+            }
+        };
+
+        window.onload = () => App.init();
+    </script>
+</body>
+
+</html>

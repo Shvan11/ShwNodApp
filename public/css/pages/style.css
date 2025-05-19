@@ -1,0 +1,35 @@
+/* pages/style.css - Styles for the report page */
+
+body {
+    background-color: lightblue;
+  }
+  
+  table, th, td {
+    border: 1px solid orange;
+    border-collapse: collapse;
+    font-size: large;
+  }
+  
+  table {
+    min-width: 400px;
+  }
+  
+  table thead tr {
+    background-color: #009877;
+    color: #ffffff;
+    text-align: left;
+    font-weight: bold;
+  }
+  
+  table td:nth-child(3) {
+    font-weight: bold;
+    font-size: x-large;
+  }
+  
+  tr.true {
+    background-color: palegreen;
+  }
+  
+  tr.false {
+    background-color: palegoldenrod;
+  }

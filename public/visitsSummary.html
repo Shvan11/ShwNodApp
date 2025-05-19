@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visits Summary</title>
+    <link rel="stylesheet" href="css/main.css" />
+    <link rel="stylesheet" href="css/pages/visitsSummary.css" />
+</head>
+
+<body>
+    <div class="header">
+        <!-- <h1>Initial Photos</h1> -->
+        <ul class="photos">
+        </ul>
+      </div>
+    <h1>Visits Summary</h1>
+    <button id="showAddBtn">Add Visit</button>
+    <div id="visitsSummary"></div>
+
+    <!-- Add this inside the body tag -->
+    <div id="addVisitModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <!-- The form from addVisit.html will be loaded here -->
+            <div id="addVisitFormContainer">
+                <form id="visitForm">
+                    <!-- add hidden element for visit ID-->
+                    <input type="hidden" id="VID" name="VID"><br>
+                    <input type="hidden" id="PID" name="PID"><br>
+                    <label for="visitDate">Visit Date:</label>
+                    <input type="date" id="visitDate" name="visitDate"><br>
+                    <label for="upperWire">Upper Wire:</label>
+                    <select id="upperWire" name="upperWire"></select><br>
+                    <label for="lowerWire">Lower Wire:</label>
+                    <select id="lowerWire" name="lowerWire"></select><br>
+                    <label for="others">Others:</label>
+                    <textarea id="others" name="others"></textarea><br>
+                    <label for="next">Next:</label>
+                    <textarea id="next" name="next"></textarea><br>
+                    <!-- <div id="visitSummary" name="visitSummary" contenteditable="true" class="editable"></div><br> -->
+                    <button id="updateVisitButton" class = "actionBtns">Update Visit</button>
+                    <button id="addVisitButton" class = "actionBtns">Add Visit</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="visitsSummary.js"></script>
+</body>
+
+</html>

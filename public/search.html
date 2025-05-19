@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Patient Database Search Interface">
+    <title>Database Search</title>
+    <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/main.css" />
+    <link rel="stylesheet" href="css/pages/search.css" />
+</head>
+<body>
+    <div class="container">
+        <h1>Search Database</h1>
+        <form id="searchForm">
+            <div class="form-group">
+                <label for="firstName">First Name:</label>
+                <select id="firstName" name="firstName" aria-label="Select patient name"></select>
+            </div>
+            <div class="form-group">
+                <label for="phone">Phone:</label>
+                <select id="phone" name="phone" aria-label="Select patient phone"></select>
+            </div>
+            <div class="form-group">
+                <label for="patientId">Patient ID:</label>
+                <select id="id" name="patientId" aria-label="Select patient ID"></select>
+            </div>
+            <button type="submit">Search</button>
+        </form>
+        <div id="results" role="alert" aria-live="polite"></div>
+        <div id="error-message" class="error-message" role="alert"></div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+    <script type="module" src="js/pages/search.js"></script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="css/main.css" />
+    <link rel="stylesheet" href="css/pages/style.css" />
+    <title>Shwan Orthodontics</title>
+</head>
+
+<body>
+
+
+    <h1>Shwan Orthodontics</h1>
+
+    <div id="state">
+        <p></p>
+
+    </div>
+
+    <script>
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const dateparam = urlParams.get('date');
+
+
+        // var interv;
+        var repeate = true;
+
+        async function loadState() {
+            while (repeate) {
+                console.log('starting fetch');
+                await fetch('http://CLINIC/api/updaterp').then(response => response.json()).then(post => {
+                    document.getElementById("state").innerHTML = post.htmltext;
+                    console.log(post);
+                    if (post.finished) {
+                        repeate = false;
+
+                    };
+                    //else {}
+                });
+            }
+        }
+        window.onload = function () {
+
+            fetch('http://CLINIC/api/wa/report?date=' + dateparam).then(response => response.json()).then(post => {
+                document.getElementById("state").innerHTML = post.htmltext;
+                // interv = setInterval(loadState, 1000);
+                loadState();
+            });
+
+
+        };
+    </script>
+
+</body>
+
+</html>

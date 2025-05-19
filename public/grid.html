@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/pages/grid.css" />
+  <link rel="stylesheet" href="photoswipe/dist/photoswipe.css" />
+  <title>Patient Images</title>
+</head>
+
+<body>
+  <!-- Header -->
+  <div class="header">
+    <ul class="photos">
+      <!-- Navigation tabs will be loaded dynamically -->
+    </ul>
+  </div>
+  
+  <!-- Photo Grid -->
+  <div id="dolph_gallery" class="pswp-gallery">
+    <div class="column">
+      <div class="row1">
+        <a id="apf" target="_blank"><img id="pf" alt="Profile" /></a>
+      </div>
+      <div class="row2">
+        <a id="aup" target="_blank"><img id="up" alt="Upper" /></a>
+      </div>
+      <div class="row3">
+        <a id="art" target="_blank"><img id="rt" alt="Right" /></a>
+      </div>
+    </div>
+    <div class="column">
+      <div class="row1">
+        <a id="afr" target="_blank"><img id="fr" alt="Rest" /></a>
+      </div>
+      <div class="row2">
+        <a id="alogo" target="_blank"><img id="logo" alt="Shwan Orthodontics" /></a>
+      </div>
+      <div class="row3">
+        <a id="act" target="_blank"><img id="ct" alt="Center" /></a>
+      </div>
+    </div>
+    <div class="column">
+      <div class="row1">
+        <a id="afs" target="_blank"><img id="fs" alt="Smile" /></a>
+      </div>
+      <div class="row2">
+        <a id="alw" target="_blank"><img id="lw" alt="Lower" /></a>
+      </div>
+      <div class="row3">
+        <a id="alf" target="_blank"><img id="lf" alt="Left" /></a>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Load the module scripts -->
+  <script type="module" src="js/pages/grid.js"></script>
+</body>
+
+</html>
