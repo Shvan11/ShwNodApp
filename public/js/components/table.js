@@ -377,91 +377,114 @@ export class Table {
    * Render table body
    * @private
    */
-  renderBody() {
-    // Clear body
-    this.tbody.innerHTML = '';
+// This is the modified renderBody method for your table.js component
+renderBody() {
+  // Clear body
+  this.tbody.innerHTML = '';
+  
+  const { processedData } = this.state;
+  
+  // Show "no data" message if no data
+  if (processedData.length === 0) {
+    const noDataRow = createElement('tr');
+    const noDataCell = createElement('td', {
+      colSpan: this.options.columns.length,
+      className: 'no-data-cell'
+    }, this.options.noDataMessage);
     
-    const { processedData } = this.state;
+    appendElement(noDataRow, noDataCell);
+    appendElement(this.tbody, noDataRow);
+    return;
+  }
+  
+  // Create rows
+  processedData.forEach((rowData, rowIndex) => {
+    // Create row
+    const row = createElement('tr', {
+      className: typeof this.options.rowClassName === 'function' 
+        ? this.options.rowClassName(rowData) 
+        : this.options.rowClassName,
+      dataset: {
+        index: rowIndex
+      },
+      events: {
+        click: (event) => {
+          if (typeof this.options.onRowClick === 'function') {
+            this.options.onRowClick(rowData, rowIndex, event);
+          }
+        }
+      }
+    });
     
-    // Show "no data" message if no data
-    if (processedData.length === 0) {
-      const noDataRow = createElement('tr');
-      const noDataCell = createElement('td', {
-        colSpan: this.options.columns.length,
-        className: 'no-data-cell'
-      }, this.options.noDataMessage);
-      
-      appendElement(noDataRow, noDataCell);
-      appendElement(this.tbody, noDataRow);
-      return;
+    // Add selected class if row is selected
+    if (this.state.selectedRows.has(rowIndex)) {
+      row.classList.add('selected');
     }
     
-    // Create rows
-    processedData.forEach((rowData, rowIndex) => {
-      // Create row
-      const row = createElement('tr', {
-        className: this.options.rowClassName,
-        dataset: {
-          index: rowIndex
-        },
-        events: {
-          click: (event) => {
-            if (typeof this.options.onRowClick === 'function') {
-              this.options.onRowClick(rowData, rowIndex, event);
-            }
-          }
-        }
-      });
+    // Create cells
+    this.options.columns.forEach((column, colIndex) => {
+      const cellValue = rowData[column.field];
       
-      // Add selected class if row is selected
-      if (this.state.selectedRows.has(rowIndex)) {
-        row.classList.add('selected');
+      // Get cell class name
+      let cellClassName = this.options.cellClassName || '';
+      if (column.cellClassName) {
+        if (typeof column.cellClassName === 'function') {
+          cellClassName += ' ' + (column.cellClassName(cellValue, rowData) || '');
+        } else {
+          cellClassName += ' ' + column.cellClassName;
+        }
       }
       
-      // Create cells
-      this.options.columns.forEach((column, colIndex) => {
-        const cellValue = rowData[column.field];
-        
-        // Create cell
-        const cell = createElement('td', {
-          className: `${this.options.cellClassName} ${column.cellClassName || ''}`,
-          events: {
-            click: (event) => {
-              if (typeof this.options.onCellClick === 'function') {
-                this.options.onCellClick(cellValue, rowData, column, rowIndex, colIndex, event);
-              }
-              
-              // Prevent row click if cell click handled
-              event.stopPropagation();
+      // Create cell
+      const cell = createElement('td', {
+        className: cellClassName,
+        events: {
+          click: (event) => {
+            if (typeof this.options.onCellClick === 'function') {
+              this.options.onCellClick(cellValue, rowData, column, rowIndex, colIndex, event);
             }
+            
+            // Prevent row click if cell click handled
+            event.stopPropagation();
           }
-        });
-        
-        // Format cell content
-        if (typeof column.render === 'function') {
-          // Custom renderer
-          const rendered = column.render(cellValue, rowData, rowIndex, colIndex);
-          
-          if (typeof rendered === 'string') {
-            cell.innerHTML = rendered;
-          } else if (rendered instanceof HTMLElement) {
-            appendElement(cell, rendered);
-          } else {
-            cell.textContent = String(rendered);
-          }
-        } else {
-          // Default rendering
-          cell.textContent = cellValue !== undefined && cellValue !== null 
-            ? String(cellValue) 
-            : '';
         }
-        
-        appendElement(row, cell);
       });
       
-      appendElement(this.tbody, row);
+      // Format cell content
+      if (typeof column.render === 'function') {
+        // Custom renderer
+        const rendered = column.render(cellValue, rowData, rowIndex, colIndex);
+        
+        if (typeof rendered === 'string') {
+          cell.innerHTML = rendered;
+        } else if (rendered instanceof HTMLElement) {
+          appendElement(cell, rendered);
+        } else if (rendered && typeof rendered === 'object' && 'content' in rendered) {
+          // Handle objects with content and style properties
+          cell.innerHTML = rendered.content !== undefined ? rendered.content : '';
+          
+          // Apply style properties if provided
+          if (rendered.style && typeof rendered.style === 'object') {
+            Object.entries(rendered.style).forEach(([prop, value]) => {
+              cell.style[prop] = value;
+            });
+          }
+        } else {
+          cell.textContent = String(rendered);
+        }
+      } else {
+        // Default rendering
+        cell.textContent = cellValue !== undefined && cellValue !== null 
+          ? String(cellValue) 
+          : '';
+      }
+      
+      appendElement(row, cell);
     });
-  }
+    
+    appendElement(this.tbody, row);
+  });
+}
   
   /**
    * Render table footer
@@ -539,6 +562,7 @@ export class Table {
     if (this.options.paginated) {
       this.updatePagination();
     }
+
   }
   
   /**

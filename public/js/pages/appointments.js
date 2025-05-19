@@ -20,27 +20,27 @@ class AppointmentsPageController {
     this.date = new Date();
     this.dateString = this.formatDateString(this.date);
     this.weekday = this.date.toLocaleDateString(undefined, { weekday: 'long' });
-    
+
     // Ensure screen ID is set
     this.ensureScreenIdSet();
-    
+
     // Active patient ID
     this.activePID = null;
-    
+
     // Initialize properties
     this.findElements();
     this.setupClock();
-    
+
     // Load appointments data
     this.loadAppointments();
-    
+
     // Set up WebSocket connection
     this.setupWebSocket();
-    
+
     // Set up day change detection
     this.setupDayChangeDetection();
   }
-  
+
   /**
    * Ensure screen ID is set in storage
    * @private
@@ -49,7 +49,7 @@ class AppointmentsPageController {
     // This will prompt for screen ID if not already set
     storage.screenId();
   }
-  
+
   /**
    * Find DOM elements used by the controller
    * @private
@@ -57,10 +57,10 @@ class AppointmentsPageController {
   findElements() {
     // Title element
     this.titleElement = getElement('#title');
-    
+
     // Appointment table container
     this.tableContainer = getElement('#appointments-container');
-    
+
     // Statistics elements
     this.statsElements = {
       all: getElement('#all'),
@@ -68,14 +68,14 @@ class AppointmentsPageController {
       waiting: getElement('#waiting'),
       completed: getElement('#completed')
     };
-    
+
     // Images container
     this.imagesContainer = getElement('#images');
-    
+
     // Latest visit container
     this.latestVisitContainer = getElement('#latestVisit');
   }
-  
+
   /**
    * Format date to YYYY-M-D string
    * @param {Date} date - Date to format
@@ -85,21 +85,21 @@ class AppointmentsPageController {
   formatDateString(date) {
     return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
   }
-  
+
   /**
    * Set up the analog clock
    * @private
    */
   setupClock() {
     const canvasElement = getElement('#canvas');
-    
+
     if (canvasElement) {
       this.clock = new Clock(canvasElement, {
         updateInterval: 10000 // Update every 10 seconds
       });
     }
   }
-  
+
   /**
    * Load appointments data
    * @private
@@ -110,17 +110,17 @@ class AppointmentsPageController {
       if (this.titleElement) {
         this.titleElement.textContent = `${this.weekday} ${this.dateString}`;
       }
-      
+
       // Fetch appointments
       const appointmentsData = await appointmentService.getAppointments(this.dateString);
-      
+
       // Update UI with data
       this.updateAppointmentsUI(appointmentsData);
     } catch (error) {
       console.error('Error loading appointments:', error);
     }
   }
-  
+
   /**
    * Update appointments UI
    * @param {Object} data - Appointments data
@@ -129,14 +129,14 @@ class AppointmentsPageController {
   updateAppointmentsUI(data) {
     // Update statistics
     this.updateStatistics(data);
-    
+
     // Update table
     this.updateAppointmentsTable(data.appointments);
-    
+
     // Highlight active patient
     this.highlightActivePatient();
   }
-  
+
   /**
    * Update statistics display
    * @param {Object} data - Appointments data
@@ -146,60 +146,74 @@ class AppointmentsPageController {
     if (this.statsElements.all) {
       this.statsElements.all.textContent = data.all || 0;
     }
-    
+
     if (this.statsElements.present) {
       this.statsElements.present.textContent = data.present || 0;
     }
-    
+
     if (this.statsElements.waiting) {
       this.statsElements.waiting.textContent = data.waiting || 0;
     }
-    
+
     if (this.statsElements.completed) {
       this.statsElements.completed.textContent = data.completed || 0;
     }
   }
-  
+
   /**
    * Update appointments table
    * @param {Array} appointments - Appointments data
    * @private
    */
   updateAppointmentsTable(appointments) {
-    // Add this before mapping the appointments
-console.log('Raw appointment data:', JSON.stringify(appointments[0], null, 2));
-
-// Format appointment data for the table component
-const formattedData = appointments.map(appointment => {
-  // Simplified patient name handling
-  let patientName = '';
-  if (appointment[3] && appointment[3].value) {
-    patientName = String(appointment[3].value);
-  }
-  console.log('Processed patient name:', patientName);
-  // Transform the appointment array to an object with named properties
-  return {
-    no: appointment[0]?.value || '',
-    time: appointment[1]?.value || '',
-    type: appointment[2]?.value || '',
-    patientName: patientName,
-    
-    detail: appointment[4]?.value || '',
-    present: appointment[5]?.value || '',
-    seated: appointment[6]?.value || '',
-    dismissed: appointment[7]?.value || '',
-    notes: appointment[8]?.value === 'true',
-    pid: appointment[9]?.value || ''
-  };
-});
-    
+    // Add more detailed logging about the first appointment
+    if (appointments.length > 0) {
+      console.log('First appointment:', appointments[0]);
+      console.log('First appointment keys:', Object.keys(appointments[0]));
+      console.log('First appointment type:', typeof appointments[0]);
+      
+      // Try to access the third element (index 3) 
+      const patientNameObj = appointments[0][3];
+      console.log('Patient name object:', patientNameObj);
+    }
+  
+    // Format appointment data for the table component with improved error handling
+    const formattedData = appointments.map(appointment => {
+      // Check if appointment is array-like or an object with numeric properties
+      let patientName = 'Unknown';
+      
+      // Access properties based on the actual structure
+      try {
+        if (appointment[3] && appointment[3].value) {
+          patientName = appointment[3].value;
+        } else if (appointment.hasOwnProperty('3') && appointment['3'].value) {
+          patientName = appointment['3'].value;
+        }
+      } catch (e) {
+        console.error('Error accessing patient name:', e);
+      }
+      
+      // Return formatted object
+      return {
+        no: appointment[0]?.value || appointment['0']?.value || '',
+        time: appointment[1]?.value || appointment['1']?.value || '',
+        type: appointment[2]?.value || appointment['2']?.value || '',
+        patientName: patientName,
+        detail: appointment[4]?.value || appointment['4']?.value || '',
+        present: appointment[5]?.value || appointment['5']?.value || '',
+        seated: appointment[6]?.value || appointment['6']?.value || '',
+        dismissed: appointment[7]?.value || appointment['7']?.value || '',
+        notes: (appointment[8]?.value || appointment['8']?.value) === 'true',
+        pid: appointment[9]?.value || appointment['9']?.value || ''
+      };
+    });
     // Define table columns
     const columns = [
       { field: 'no', title: 'No', width: 50 },
       { field: 'time', title: 'Time', width: 80 },
       { field: 'type', title: 'Type', width: 100 },
-      { 
-        field: 'patientName', 
+      {
+        field: 'patientName',
         title: 'Patient Name',
         render: (value, row) => {
           // Create link to patient summary
@@ -222,21 +236,21 @@ const formattedData = appointments.map(appointment => {
           }
           
           return {
-            content: value || '',
-            style: { backgroundColor }
+            content: value || '', // This is what will display in the cell
+            style: { backgroundColor } // This will apply to the cell's style
           };
         }
       },
       { field: 'seated', title: 'Seated' },
       { field: 'dismissed', title: 'Dismissed' },
-      { 
-        field: 'notes', 
+      {
+        field: 'notes',
         title: 'Notes',
         render: value => value ? '✔' : '✘'
       }
       // PID column is not visible in the table
     ];
-    
+
     // Initialize or update table
     if (!this.appointmentsTable) {
       // Create new table
@@ -255,22 +269,48 @@ const formattedData = appointments.map(appointment => {
       // Update existing table
       this.appointmentsTable.setData(formattedData);
     }
-    
+    if (this.appointmentsTable && this.appointmentsTable.table) {
+      // Force table to display correctly with inline styles
+      const tableElement = this.appointmentsTable.table;
+      tableElement.style.width = '100%';
+      tableElement.style.borderCollapse = 'collapse';
+      tableElement.style.tableLayout = 'auto';
+      
+      // Style all cells to ensure they display as table cells
+      const cells = tableElement.querySelectorAll('th, td');
+      cells.forEach(cell => {
+        cell.style.display = 'table-cell';
+        cell.style.padding = '8px';
+        cell.style.border = '1px solid #ccc';
+      });
+      
+      // Style all rows to ensure they display as table rows
+      const rows = tableElement.querySelectorAll('tr');
+      rows.forEach(row => {
+        row.style.display = 'table-row';
+      });
+      
+      // Style thead and tbody
+      const thead = tableElement.querySelector('thead');
+      const tbody = tableElement.querySelector('tbody');
+      if (thead) thead.style.display = 'table-header-group';
+      if (tbody) tbody.style.display = 'table-row-group';
+    }
     // Highlight active patient
     this.highlightActivePatient();
   }
-  
+
   /**
    * Highlight active patient in the table
    * @private
    */
   highlightActivePatient() {
     if (!this.appointmentsTable) return;
-    
+
     // Refresh the table which will reapply row classes
     this.appointmentsTable.refresh();
   }
-  
+
   /**
    * Set up WebSocket connection for real-time updates
    * @private
@@ -278,19 +318,19 @@ const formattedData = appointments.map(appointment => {
   setupWebSocket() {
     // Connect websocket
     websocket.connect();
-    
+
     // Handle 'updated' event
     websocket.on('updated', data => {
       this.updateAppointmentsUI(data.tableData);
     });
-    
+
     // Handle patient loaded event
     websocket.on('patientLoaded', async data => {
       this.activePID = data.pid;
       await this.showPatientData(data);
       this.highlightActivePatient();
     });
-    
+
     // Handle patient unloaded event
     websocket.on('patientunLoaded', () => {
       this.activePID = null;
@@ -298,7 +338,7 @@ const formattedData = appointments.map(appointment => {
       this.highlightActivePatient();
     });
   }
-  
+
   /**
    * Show patient data (images and latest visit)
    * @param {Object} data - Patient data
@@ -307,11 +347,11 @@ const formattedData = appointments.map(appointment => {
   async showPatientData(data) {
     // Show images
     this.showPatientImages(data.images);
-    
+
     // Show latest visit
     this.showLatestVisit(data.latestVisit);
   }
-  
+
   /**
    * Show patient images
    * @param {Array} images - Image data
@@ -319,9 +359,9 @@ const formattedData = appointments.map(appointment => {
    */
   showPatientImages(images) {
     if (!this.imagesContainer || !images || images.length === 0) return;
-    
+
     const imageElements = getElements('.img', this.imagesContainer);
-    
+
     for (let i = 0; i < imageElements.length; i++) {
       if (images[i]) {
         const imglink = 'DolImgs/' + images[i].name;
@@ -331,7 +371,7 @@ const formattedData = appointments.map(appointment => {
       }
     }
   }
-  
+
   /**
    * Show latest visit information
    * @param {Object} latestVisit - Latest visit data
@@ -339,44 +379,44 @@ const formattedData = appointments.map(appointment => {
    */
   showLatestVisit(latestVisit) {
     if (!this.latestVisitContainer || !latestVisit) return;
-    
+
     // Clear container
     this.latestVisitContainer.innerHTML = '';
-    
+
     // Create table
     const table = document.createElement('table');
-    
+
     // Add header row
     const headerRow = document.createElement('tr');
     const headers = ['Visit Date', 'Summary'];
-    
+
     headers.forEach(header => {
       const th = document.createElement('th');
       th.textContent = header;
       headerRow.appendChild(th);
     });
-    
+
     table.appendChild(headerRow);
-    
+
     // Add data row
     const row = document.createElement('tr');
-    
+
     // Date cell
     const dateCell = document.createElement('td');
     dateCell.textContent = new Date(latestVisit.VisitDate).toLocaleDateString('en-GB');
     row.appendChild(dateCell);
-    
+
     // Summary cell
     const summaryCell = document.createElement('td');
     summaryCell.innerHTML = latestVisit.Summary;
     row.appendChild(summaryCell);
-    
+
     table.appendChild(row);
-    
+
     // Add table to container
     this.latestVisitContainer.appendChild(table);
   }
-  
+
   /**
    * Unload patient data
    * @private
@@ -389,13 +429,13 @@ const formattedData = appointments.map(appointment => {
         img.src = '';
       });
     }
-    
+
     // Clear latest visit
     if (this.latestVisitContainer) {
       this.latestVisitContainer.innerHTML = '';
     }
   }
-  
+
   /**
    * Set up day change detection
    * @private
@@ -405,27 +445,27 @@ const formattedData = appointments.map(appointment => {
     setInterval(() => {
       const currentDate = new Date();
       const currentDateString = this.formatDateString(currentDate);
-      
+
       if (currentDateString !== this.dateString) {
         // Date has changed
         this.date = currentDate;
         this.dateString = currentDateString;
         this.weekday = currentDate.toLocaleDateString(undefined, { weekday: 'long' });
-        
+
         // Update UI
         if (this.titleElement) {
           this.titleElement.textContent = `${this.weekday} ${this.dateString}`;
         }
-        
+
         // Reload appointments
         this.loadAppointments();
-        
+
         // Reconnect WebSocket
         websocket.connect();
       }
     }, 60000); // Check every minute
   }
-  
+
   /**
    * Clean up resources
    */
@@ -434,12 +474,12 @@ const formattedData = appointments.map(appointment => {
     if (this.clock) {
       this.clock.destroy();
     }
-    
+
     // Destroy table
     if (this.appointmentsTable) {
       this.appointmentsTable.destroy();
     }
-    
+
     // Disconnect WebSocket
     websocket.disconnect();
   }
