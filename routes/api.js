@@ -6,7 +6,7 @@ import express from 'express';
 import * as database from '../services/database/queries/index.js';
 import whatsapp from '../services/messaging/whatsapp.js';
 import { sendImg_, sendXray_ } from '../services/messaging/whatsapp-api.js';
-
+import { wsEmitter } from '../index.js';
 import sms from '../services/messaging/sms.js';
 import * as imaging from '../services/imaging/index.js';
 import multer from 'multer';
@@ -123,6 +123,13 @@ router.get("/getqrcode", async (req, res) => {
     const { code: pid } = req.query;
     await imaging.generateQRCode(pid);
     res.json({ OK: "OK" });
+});
+
+// Notify that apps were updated
+router.get("/AppsUpdated", async (req, res) => {
+    res.sendStatus(200);
+    const { PDate } = req.query;
+    wsEmitter.emit("updated", PDate);
 });
 
 // Get gallery images
