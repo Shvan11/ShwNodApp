@@ -7,7 +7,7 @@ export function gettimepoints(code, tp) {
   }
   
   function filltimepoints(timepoints, code, tp) {
-    const photoslist = document.querySelector(".photos");
+    const photoslist = document.querySelector(".nav");
     photoslist.innerHTML = ""; // Clear existing content to avoid duplication
   
     // Add timepoints from the fetched data
