@@ -1,3 +1,7 @@
+// services/websocket.js
+import EventEmitter from '../core/events.js';
+import storage from '../core/storage.js';
+
 export class WebSocketService extends EventEmitter {
   /**
    * Create a new WebSocket service
