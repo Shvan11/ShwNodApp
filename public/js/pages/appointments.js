@@ -166,22 +166,32 @@ class AppointmentsPageController {
    * @private
    */
   updateAppointmentsTable(appointments) {
-    // Format appointment data for the table component
-    const formattedData = appointments.map(appointment => {
-      // Transform the appointment array to an object with named properties
-      return {
-        no: appointment[0].value,
-        time: appointment[1].value,
-        type: appointment[2].value,
-        patientName: appointment[3].value,
-        detail: appointment[4].value,
-        present: appointment[5].value,
-        seated: appointment[6].value,
-        dismissed: appointment[7].value,
-        notes: appointment[8].value === 'true',
-        pid: appointment[9].value
-      };
-    });
+    // Add this before mapping the appointments
+console.log('Raw appointment data:', JSON.stringify(appointments[0], null, 2));
+
+// Format appointment data for the table component
+const formattedData = appointments.map(appointment => {
+  // Simplified patient name handling
+  let patientName = '';
+  if (appointment[3] && appointment[3].value) {
+    patientName = String(appointment[3].value);
+  }
+  console.log('Processed patient name:', patientName);
+  // Transform the appointment array to an object with named properties
+  return {
+    no: appointment[0]?.value || '',
+    time: appointment[1]?.value || '',
+    type: appointment[2]?.value || '',
+    patientName: patientName,
+    
+    detail: appointment[4]?.value || '',
+    present: appointment[5]?.value || '',
+    seated: appointment[6]?.value || '',
+    dismissed: appointment[7]?.value || '',
+    notes: appointment[8]?.value === 'true',
+    pid: appointment[9]?.value || ''
+  };
+});
     
     // Define table columns
     const columns = [
@@ -193,7 +203,7 @@ class AppointmentsPageController {
         title: 'Patient Name',
         render: (value, row) => {
           // Create link to patient summary
-          return `<a href="/visits-summary?PID=xyz">Visit Summary</a>`;
+          return `<a href="/visits-summary?PID=${row.pid}">${value || 'Unknown'}</a>`;
         }
       },
       { field: 'detail', title: 'Detail' },
