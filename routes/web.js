@@ -25,6 +25,8 @@ const pageRewrites = [
   { url: '/grid', file: '/views/patient/grid.html' },
   { url: '/add-visit', file: '/views/patient/add-visit.html' },
   { url: '/search', file: '/views/patient/search.html' },
+  { url: '/send-message', file: '/views/messaging/send-message.html' },
+
   
   // Other pages
   { url: '/xrays', file: '/views/xrays.html' },

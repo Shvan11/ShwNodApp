@@ -677,7 +677,7 @@ export async function sendImg_(number, base64Image) {
     const media = new MessageMedia("image/png", base64Image);
     
     // Use the service's queue operation functionality
-    return whatsappService.queueOperation(async (client) => {
+    return WhatsAppService.queueOperation(async (client) => {
       try {
         // Validate number format
         let targetNumber = number;
@@ -712,7 +712,7 @@ export async function sendImg_(number, base64Image) {
  */
 export async function sendXray_(number, file) {
   try {
-    return whatsappService.queueOperation(async (client) => {
+    return WhatsAppService.queueOperation(async (client) => {
       try {
         // Create message media from file
         const media = MessageMedia.fromFilePath(file);

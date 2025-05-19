@@ -339,7 +339,7 @@ class CanvasPageController {
       const moduleScript = document.createElement('script');
       moduleScript.type = 'module';
       moduleScript.textContent = `
-        import { gettimepoints } from "./module.js";
+        import { gettimepoints } from "/js/utils/navigation.js";
         gettimepoints("${this.patientId}", "compare");
       `;
       document.body.appendChild(moduleScript);

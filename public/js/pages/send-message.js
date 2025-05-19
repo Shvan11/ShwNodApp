@@ -192,7 +192,7 @@ class SendMessageController {
     
     try {
       // Send form data
-      const response = await fetch(`${window.location.origin}/sendmedia2`, {
+      const response = await fetch(`${window.location.origin}/api/sendmedia2`, {
         method: "POST",
         body: formData
       });

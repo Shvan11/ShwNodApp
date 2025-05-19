@@ -20,7 +20,8 @@
   opacity: .95;
   top: 0;
   left: 0;
-  display: none;
+  /* display: none; */
+  display: block; /* Show by default */
   position: fixed;
   background-color: #313131;
   overflow: auto
@@ -83,7 +84,7 @@ hr {
 }
 
 #phone {
-  background-image: url(images/phone.png);
+  background-image: url(../../images/phone.png);
   background-repeat: no-repeat;
   background-position: 5px 4px
 }

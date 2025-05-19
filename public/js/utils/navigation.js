@@ -26,7 +26,7 @@ export function gettimepoints(code, tp) {
     const staticTabs = [
       { label: "Compare", href: `canvas.html?code=${code}`, id: "compare" },
       { label: "X-rays", href: `Xrays.html?code=${code}`, id: "xrays" },
-      { label: "Visit Summary", href: `visitsSummary.html?PID=${code}`, id: "visitsSummary" },
+      { label: "Visit Summary", href: `visits-summary.html?PID=${code}`, id: "visitsSummary" },
       { label: "Home", href: "index.html", id: "home" },
     ];
   
