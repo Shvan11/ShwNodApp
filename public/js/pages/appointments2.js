@@ -180,7 +180,7 @@ class Appointments2PageController {
         title: 'Patient Name',
         render: (value, row) => {
           // Create link to patient summary
-          return `<a href="/visitsSummary.html?PID=${row.pid}">${value}</a>`;
+          return `<a href="/visits-summary?PID=${row.pid}">${value}</a>`;
         }
       },
       { field: 'detail', title: 'Detail' },

@@ -129,7 +129,39 @@ export function formatDate(date) {
     return clone;
   }
   
+/**
+ * Format a phone number to standard format
+ * @param {string} phoneNumber - Raw phone number
+ * @param {string} [countryCode='964'] - Country code
+ * @returns {string} - Formatted phone number
+ */
+export function formatPhoneNumber(phoneNumber, countryCode = '964') {
+  if (!phoneNumber) return '';
+  
+  // Remove non-digit characters
+  const digits = phoneNumber.replace(/\D/g, '');
+  
+  // Handle different formats
+  if (digits.startsWith('00' + countryCode)) {
+    // Remove leading 00 and country code
+    return countryCode + digits.substring((countryCode.length + 2));
+  } else if (digits.startsWith('+' + countryCode)) {
+    // Remove leading + and country code
+    return countryCode + digits.substring((countryCode.length + 1));
+  } else if (digits.startsWith('0')) {
+    // Replace leading 0 with country code
+    return countryCode + digits.substring(1);
+  } else if (!digits.startsWith(countryCode)) {
+    // Add country code if missing
+    return countryCode + digits;
+  }
+  
+  return digits;
+}
+
+
   export default {
+    formatPhoneNumber,
     formatDate,
     formatISODate,
     debounce,

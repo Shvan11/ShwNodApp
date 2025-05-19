@@ -1,37 +1,60 @@
 /* pages/payments.css - Styles specific to the payments page */
 
 html {
-    height: 100%;
-  }
-  
-  body {
-    height: 100%;
-    margin: 0;
-    font-family: sans-serif;
-    font-weight: 100;
-  }
-  
-  .container {
-    margin: 0.5cm;
-    background: linear-gradient(45deg, #49a09d, #5f2c82);
-    position: absolute;
-  }
-  
-  table {
-    width: 400px;
-    border-collapse: collapse;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
-  }
-  
-  th,
-  td {
-    padding: 6px;
-    background-color: rgba(255, 255, 255, 0.2);
-    color: #fff;
-    border: none;
-  }
-  
-  th {
-    text-align: left;
-    background-color: #55608f;
-  }
+  height: 100%;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  font-family: var(--font-primary);
+  font-weight: var(--font-weight-normal);
+  background: var(--gradient-accent);
+  color: var(--text-color);
+}
+
+.container {
+  margin: var(--spacing-md);
+  position: absolute;
+}
+
+table {
+  width: 400px;
+  border-collapse: collapse;
+  box-shadow: var(--shadow-md);
+  background-color: var(--background-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+th,
+td {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: none;
+}
+
+th {
+  text-align: left;
+  background-color: var(--accent-color);
+  font-weight: var(--font-weight-bold);
+}
+
+.empty-state {
+  background-color: var(--background-light);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  color: var(--text-color);
+  text-align: center;
+  margin-top: var(--spacing-lg);
+}
+
+.error-message {
+  background-color: rgba(var(--error-color), 0.1);
+  color: var(--error-color);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  margin-top: var(--spacing-md);
+  text-align: center;
+}

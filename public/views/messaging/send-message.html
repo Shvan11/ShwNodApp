@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Send Message</title>
+    <!-- jQuery and Select2 -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <!-- App styles -->
+    <link rel="stylesheet" href="css/main.css" />
+    <link rel="stylesheet" href="css/pages/send-message.css" />
+</head>
+<body>
+  <div id="abc"> 
+    <select name="source" id="source" class="wainput">
+      <option value="pat">Patients' Phones</option>
+      <option value="shw">Dr. Shwan Phone</option>
+      <option value="cli">Clinic Phone</option>
+    </select>
+    <select id="people" name="people" class="wainput">
+    </select>
+    <div id="popupContact">
+      <form
+        action=""
+        id="popform"
+        method="post"
+        name="form"
+        class="waform"
+      >
+        <i i class="fa-solid fa-rectangle-xmark fa-2xl" id="close"></i>
+        <h2>Send WhatsUp</h2>
+        <hr />
+        <img id="waimg" alt="" />
+        <select id="prog" name="prog" class="wainput" type="select">
+          <option value="WhatsApp">WhatsApp</option>
+          <option value="Telegram">Telegram</option>
+        </select>
+        <input
+          id="phone"
+          name="phone"
+          placeholder="phone"
+          type="text"
+          class="wainput"
+        />
+        <input id="file" name="file" type="text" class="wainput" />
+       
+        <button type="submit" id="submit">Send</button>
+        <br />
+        <div id="emptyBar">
+          <div id="filledBar"></div>
+        </div>
+      </form>
+      <br />
+    </div>
+  </div>
+  <script type="module" src="js/pages/send-message.js"></script>
+</body>
+</html>

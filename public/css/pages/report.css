@@ -1,0 +1,62 @@
+/* pages/report.css - Styles for the WhatsApp report status page */
+
+body {
+  background-color: var(--background-color);
+  font-family: var(--font-primary);
+  color: var(--text-color);
+  padding: var(--spacing-md);
+}
+
+h1 {
+  text-align: center;
+  color: var(--primary-color);
+  margin-bottom: var(--spacing-lg);
+}
+
+#state {
+  background-color: var(--background-light);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  margin: 0 auto;
+  max-width: 600px;
+  text-align: center;
+}
+
+#state p {
+  font-size: var(--font-size-lg);
+  margin: var(--spacing-md) 0;
+}
+
+/* Status message styling */
+.status-message {
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  margin: var(--spacing-sm) 0;
+}
+
+.status-working {
+  background-color: rgba(var(--info-color), 0.1);
+  color: var(--info-color);
+}
+
+.status-success {
+  background-color: rgba(var(--success-color), 0.1);
+  color: var(--success-color);
+}
+
+.loader {
+  border: 5px solid var(--background-light);
+  border-top: 5px solid var(--primary-color);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 2s linear infinite;
+  display: inline-block;
+  margin-right: var(--spacing-sm);
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

@@ -105,7 +105,7 @@ class GridPageController {
       const script = document.createElement('script');
       script.type = 'module';
       script.textContent = `
-        import { gettimepoints } from "./module.js";
+        import { gettimepoints } from "/js/utils/navigation.js";
         gettimepoints("${this.patientId}", "${this.timepoint}");
       `;
       document.body.appendChild(script);
