@@ -165,160 +165,212 @@ class AppointmentsPageController {
    * @param {Array} appointments - Appointments data
    * @private
    */
-/**
- * Update appointments table
- * @param {Array} appointments - Appointments data
- * @private
- */
-updateAppointmentsTable(appointments) {
-  // Check if appointments is an array
-  if (!Array.isArray(appointments)) {
-    console.error('Invalid appointments format:', appointments);
-    this.showError('Invalid appointments format');
-    return;
-  }
-  
-  console.log(`Updating table with ${appointments.length} appointments`);
-
-  try {
-    // Format appointment data for the table component
-    const formattedData = this.formatAppointmentsData(appointments);
-    
-    if (!formattedData || !formattedData.length) {
-      console.warn('No appointments data to display');
-    }
-
-    // Initialize or update table component
-    if (!this.appointmentsTable) {
-      this.createTable(formattedData);
-    } else {
-      this.updateTable(formattedData);
-    }
-  } catch (error) {
-    console.error('Error updating appointments table:', error);
-    this.showError('Error updating appointments table');
-  }
-}
-
-/**
- * Format appointments data for table component
- * @param {Array} appointments - Raw appointments data
- * @returns {Array} - Formatted data
- * @private
- */
-formatAppointmentsData(appointments) {
-  return appointments.map(appointmentColumns => {
-    // Ensure appointmentColumns is an array
-    if (!Array.isArray(appointmentColumns)) {
-      console.warn('Invalid appointment row format:', appointmentColumns);
-      return {
-        patientName: 'Error: Invalid row format',
-        pid: ''
-      };
+  updateAppointmentsTable(appointments) {
+    // Check if appointments is an array
+    if (!Array.isArray(appointments)) {
+      console.error('Invalid appointments format:', appointments);
+      this.showError('Invalid appointments format');
+      return;
     }
     
-    // Extract values with safe defaults
-    return {
-      no: this.getColumnValue(appointmentColumns, 0, ''),
-      time: this.getColumnValue(appointmentColumns, 1, ''),
-      type: this.getColumnValue(appointmentColumns, 2, ''),
-      patientName: this.getColumnValue(appointmentColumns, 3, 'Unknown'),
-      detail: this.getColumnValue(appointmentColumns, 4, ''),
-      present: this.getColumnValue(appointmentColumns, 5, ''),
-      seated: this.getColumnValue(appointmentColumns, 6, ''),
-      dismissed: this.getColumnValue(appointmentColumns, 7, ''),
-      notes: this.getColumnValue(appointmentColumns, 8, '') === 'true',
-      pid: this.getColumnValue(appointmentColumns, 9, '')
-    };
-  });
-}
+    console.log(`Updating table with ${appointments.length} appointments`);
 
-/**
- * Create appointments table
- * @param {Array} data - Table data
- * @private
- */
-createTable(data) {
-  // Define table columns
-  const columns = [
-    { field: 'no', title: 'No', width: 50 },
-    { field: 'time', title: 'Time', width: 80 },
-    { field: 'type', title: 'Type', width: 100 },
-    { 
-      field: 'patientName', 
-      title: 'Patient Name',
-      render: (value, row) => {
-        return `<a href="/visits-summary?PID=${row.pid}">${value}</a>`;
+    try {
+      // Format appointment data for the table component
+      const formattedData = this.formatAppointmentsData(appointments);
+      
+      if (!formattedData || !formattedData.length) {
+        console.warn('No appointments data to display');
       }
-    },
-    { field: 'detail', title: 'Detail' },
-    { 
-      field: 'present', 
-      title: 'Present',
-      cellClassName: 'status-cell',
-      render: (value, row) => {
-        // Apply cell styling based on appointment status
-        let backgroundColor = 'pink'; // Default - waiting
-        
-        if (row.dismissed) {
-          backgroundColor = 'lightgreen'; // Completed
-        } else if (row.seated) {
-          backgroundColor = 'lightyellow'; // Seated
-        }
-        
+
+      // Initialize or update table component
+      if (!this.appointmentsTable) {
+        this.createTable(formattedData);
+      } else {
+        this.updateTable(formattedData);
+      }
+    } catch (error) {
+      console.error('Error updating appointments table:', error);
+      this.showError('Error updating appointments table');
+    }
+  }
+
+  /**
+   * Format appointments data for table component
+   * @param {Array} appointments - Raw appointments data
+   * @returns {Array} - Formatted data
+   * @private
+   */
+  formatAppointmentsData(appointments) {
+    return appointments.map(appointmentColumns => {
+      // Ensure appointmentColumns is an array
+      if (!Array.isArray(appointmentColumns)) {
+        console.warn('Invalid appointment row format:', appointmentColumns);
         return {
-          content: value || '',
-          style: { backgroundColor }
+          patientName: 'Error: Invalid row format',
+          pid: ''
         };
       }
-    },
-    { field: 'seated', title: 'Seated' },
-    { field: 'dismissed', title: 'Dismissed' },
-    { 
-      field: 'notes', 
-      title: 'Notes',
-      render: value => value ? '✓' : '✗'
+      
+      // Extract values with safe defaults
+      return {
+        no: this.getColumnValue(appointmentColumns, 0, ''),
+        time: this.getColumnValue(appointmentColumns, 1, ''),
+        type: this.getColumnValue(appointmentColumns, 2, ''),
+        patientName: this.getColumnValue(appointmentColumns, 3, 'Unknown'),
+        detail: this.getColumnValue(appointmentColumns, 4, ''),
+        present: this.getColumnValue(appointmentColumns, 5, ''),
+        seated: this.getColumnValue(appointmentColumns, 6, ''),
+        dismissed: this.getColumnValue(appointmentColumns, 7, ''),
+        notes: this.getColumnValue(appointmentColumns, 8, '') === 'true',
+        pid: this.getColumnValue(appointmentColumns, 9, '')
+      };
+    });
+  }
+
+  /**
+   * Get column value with error handling
+   * @param {Array} row - Row data
+   * @param {number} index - Column index
+   * @param {*} defaultValue - Default value if column is missing
+   * @returns {*} - Column value or default
+   * @private
+   */
+  getColumnValue(row, index, defaultValue) {
+    if (!row[index] || row[index].value === undefined) {
+      return defaultValue;
     }
-  ];
-  
-  // Create table
-  this.appointmentsTable = new Table(this.tableContainer, {
-    columns,
-    data,
-    className: 'appointments-table',
-    responsive: true,
-    rowClassName: row => this.activePID === row.pid ? 'active-patient' : '',
-    onRowClick: this.handleRowClick.bind(this)
-  });
-  
-  console.log('Created new appointments table');
-}
-
-/**
- * Update existing table
- * @param {Array} data - Table data
- * @private
- */
-updateTable(data) {
-  if (!this.appointmentsTable) {
-    this.createTable(data);
-    return;
+    return row[index].value;
   }
-  
-  try {
-    // Update table data
-    this.appointmentsTable.setData(data);
-    console.log('Updated existing appointments table');
-  } catch (error) {
-    console.error('Error updating table:', error);
+
+  /**
+   * Create appointments table
+   * @param {Array} data - Table data
+   * @private
+   */
+  createTable(data) {
+    // Define table columns
+    const columns = [
+      { field: 'no', title: 'No', width: 50 },
+      { field: 'time', title: 'Time', width: 80 },
+      { field: 'type', title: 'Type', width: 100 },
+      { 
+        field: 'patientName', 
+        title: 'Patient Name',
+        render: (value, row) => {
+          return `<a href="/visits-summary?PID=${row.pid}">${value}</a>`;
+        }
+      },
+      { field: 'detail', title: 'Detail' },
+      { 
+        field: 'present', 
+        title: 'Present',
+        cellClassName: 'status-cell',
+        render: (value, row) => {
+          // Apply cell styling based on appointment status
+          let backgroundColor = 'pink'; // Default - waiting
+          
+          if (row.dismissed) {
+            backgroundColor = 'lightgreen'; // Completed
+          } else if (row.seated) {
+            backgroundColor = 'lightyellow'; // Seated
+          }
+          
+          return {
+            content: value || '',
+            style: { backgroundColor }
+          };
+        }
+      },
+      { field: 'seated', title: 'Seated' },
+      { field: 'dismissed', title: 'Dismissed' },
+      { 
+        field: 'notes', 
+        title: 'Notes',
+        render: value => value ? '✓' : '✗'
+      }
+    ];
     
-    // Recreate table on error
-    this.appointmentsTable = null;
-    this.createTable(data);
+    // Create table
+    this.appointmentsTable = new Table(this.tableContainer, {
+      columns,
+      data,
+      className: 'appointments-table',
+      responsive: true,
+      rowClassName: row => this.activePID === row.pid ? 'active-patient' : '',
+      onRowClick: this.handlePatientRowClick.bind(this)
+    });
+    
+    console.log('Created new appointments table');
   }
-}
 
+  /**
+   * Update existing table
+   * @param {Array} data - Table data
+   * @private
+   */
+  updateTable(data) {
+    if (!this.appointmentsTable) {
+      this.createTable(data);
+      return;
+    }
+    
+    try {
+      // Update table data
+      this.appointmentsTable.setData(data);
+      console.log('Updated existing appointments table');
+    } catch (error) {
+      console.error('Error updating table:', error);
+      
+      // Recreate table on error
+      this.appointmentsTable = null;
+      this.createTable(data);
+    }
+  }
 
+  /**
+   * Handle row click event
+   * @param {Object} rowData - Row data
+   * @param {number} rowIndex - Row index
+   * @param {Event} event - Click event
+   * @private
+   */
+  handlePatientRowClick(rowData, rowIndex, event) {
+    if (!rowData || !rowData.pid) return;
+    
+    // Set active patient ID
+    this.activePID = rowData.pid;
+    
+    // Highlight active patient
+    this.highlightActivePatient();
+    
+    // Load patient data and show it
+    this.loadAndShowPatientData(rowData.pid);
+  }
+
+  /**
+   * Load and show patient data
+   * @param {string} patientId - Patient ID
+   * @private
+   */
+  async loadAndShowPatientData(patientId) {
+    try {
+      // Get patient images
+      const images = await appointmentService.getPatientImages(patientId);
+      
+      // Get latest visit
+      const latestVisit = await appointmentService.getLatestVisitSummary(patientId);
+      
+      // Show patient data
+      await this.showPatientData({ 
+        pid: patientId,
+        images,
+        latestVisit
+      });
+    } catch (error) {
+      console.error('Error loading patient data:', error);
+    }
+  }
 
   /**
    * Highlight active patient in the table
@@ -380,44 +432,43 @@ updateTable(data) {
       console.error('WebSocket error:', error);
     });
     
-
-    // Handlesetu 'updated' event
+    // Handle 'updated' event
     websocket.on('updated', data => {
       console.log('Received WebSocket update:', data);
       
       if (!data || !data.tableData) {
-          console.error('Invalid data in "updated" event:', data);
-          return;
+        console.error('Invalid data in "updated" event:', data);
+        return;
       }
       
       // Check appointments data structure
       const appointments = data.tableData.appointments;
       if (!appointments || !Array.isArray(appointments)) {
-          console.error('Invalid appointments data:', appointments);
-          return;
+        console.error('Invalid appointments data:', appointments);
+        return;
       }
       
       console.log(`Processing ${appointments.length} appointments from WebSocket update`);
       
       try {
-          // Update statistics first
-          this.updateStatistics({
-              all: data.tableData.all || 0,
-              present: data.tableData.present || 0,
-              waiting: data.tableData.waiting || 0,
-              completed: data.tableData.completed || 0
-          });
-          
-          // Then update table
-          this.updateAppointmentsTable(appointments);
-          
-          // Also highlight active patient if needed
-          this.highlightActivePatient();
+        // Update statistics first
+        this.updateStatistics({
+          all: data.tableData.all || 0,
+          present: data.tableData.present || 0,
+          waiting: data.tableData.waiting || 0,
+          completed: data.tableData.completed || 0
+        });
+        
+        // Then update table
+        this.updateAppointmentsTable(appointments);
+        
+        // Also highlight active patient if needed
+        this.highlightActivePatient();
       } catch (error) {
-          console.error('Error handling WebSocket update:', error);
-          
+        console.error('Error handling WebSocket update:', error);
+        
       }
-  });
+    });
 
     // Handle patient loaded event
     websocket.on('patientLoaded', async data => {
@@ -529,6 +580,59 @@ updateTable(data) {
     if (this.latestVisitContainer) {
       this.latestVisitContainer.innerHTML = '';
     }
+  }
+
+  /**
+   * Show error message
+   * @param {string} message - Error message
+   * @private
+   */
+  showError(message) {
+    // Check if error container exists
+    let errorContainer = document.getElementById('appointments-error');
+    
+    if (!errorContainer) {
+      // Create error container
+      errorContainer = document.createElement('div');
+      errorContainer.id = 'appointments-error';
+      errorContainer.className = 'error-message';
+      
+      // Style error container
+      Object.assign(errorContainer.style, {
+        backgroundColor: 'rgba(244, 67, 54, 0.1)',
+        color: '#f44336',
+        padding: '10px',
+        margin: '10px 0',
+        borderRadius: '4px',
+        border: '1px solid #f44336',
+        transition: 'opacity 0.5s ease'
+      });
+      
+      // Add to container
+      if (this.tableContainer) {
+        this.tableContainer.parentNode.insertBefore(errorContainer, this.tableContainer);
+      } else {
+        document.body.appendChild(errorContainer);
+      }
+    }
+    
+    // Update error message
+    errorContainer.textContent = message;
+    errorContainer.style.opacity = '1';
+    
+    // Auto-hide after 10 seconds
+    setTimeout(() => {
+      if (errorContainer.parentNode) {
+        errorContainer.style.opacity = '0';
+        
+        // Remove after fade out
+        setTimeout(() => {
+          if (errorContainer.parentNode) {
+            errorContainer.parentNode.removeChild(errorContainer);
+          }
+        }, 500);
+      }
+    }, 10000);
   }
 
   /**
