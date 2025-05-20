@@ -27,7 +27,7 @@ class WebSocketService extends EventEmitter {
       
       // Heartbeat configuration
       heartbeatInterval: 30000,     // Interval for sending heartbeats (ms)
-      heartbeatTimeout: 5000,       // Timeout for heartbeat response (ms)
+      heartbeatTimeout: 15000,      // Timeout for heartbeat response (increased from 5000)
       
       // Message handling
       maxQueueSize: 100,            // Maximum number of queued messages
@@ -410,12 +410,10 @@ class WebSocketService extends EventEmitter {
    * @param {MessageEvent} event - Message event
    * @private
    */
+
   onMessage(event) {
     // Update last activity
     this.state.lastActivity = Date.now();
-    
-    // Reset heartbeat timeout
-    this.resetHeartbeatTimeout();
     
     // Process message
     try {
@@ -437,6 +435,17 @@ class WebSocketService extends EventEmitter {
         if (message.type === 'ping') {
           // Respond to ping with pong
           this.send({ type: 'pong' }, { queueIfDisconnected: false });
+        } else if (message.type === 'pong') {
+          this.log('Received heartbeat pong response');
+  
+          // Clear the timeout timer since we got a response
+          if (this.state.heartbeatTimeoutTimer) {
+            clearTimeout(this.state.heartbeatTimeoutTimer);
+            this.state.heartbeatTimeoutTimer = null;
+          }
+          
+          // Schedule the next heartbeat ping
+          this.scheduleNextHeartbeat();
         }
         
         return;
@@ -477,6 +486,53 @@ class WebSocketService extends EventEmitter {
     }
   }
   
+  setHeartbeatTimeout() {
+    // Clear any existing timeout timer
+    if (this.state.heartbeatTimeoutTimer) {
+      clearTimeout(this.state.heartbeatTimeoutTimer);
+    }
+    
+    this.log('Setting heartbeat timeout timer');
+    
+    // Set timer to detect missing pong
+    this.state.heartbeatTimeoutTimer = setTimeout(() => {
+      this.log('Heartbeat timeout - no pong received');
+      
+      // If still connected, force close and reconnect
+      if (this.state.ws && this.state.ws.readyState === WebSocket.OPEN) {
+        this.log('Forcing close due to heartbeat timeout');
+        
+        // Don't set force close flag, so it will reconnect
+        this.state.ws.close(1000, 'Heartbeat timeout');
+        this.state.ws = null;
+        
+        // Update state
+        this.state.status = 'disconnected';
+        
+        // Schedule reconnect
+        this.scheduleReconnect();
+      }
+    }, this.options.heartbeatTimeout);
+  }
+
+  scheduleNextHeartbeat(delay = null) {
+    // Clear any existing heartbeat timer
+    if (this.state.heartbeatTimer) {
+      clearTimeout(this.state.heartbeatTimer);
+    }
+    
+    const interval = delay || this.options.heartbeatInterval;
+    this.log(`Scheduling next heartbeat in ${interval}ms`);
+    
+    // Schedule next heartbeat
+    this.state.heartbeatTimer = setTimeout(() => {
+      this.sendHeartbeat();
+    }, interval);
+  }
+  
+  
+
+
   /**
    * Process queued messages
    * @private
@@ -585,40 +641,54 @@ class WebSocketService extends EventEmitter {
    * Start heartbeat
    * @private
    */
+
   startHeartbeat() {
     this.log('Starting heartbeat');
     
-    // Clear any existing timer
+    // Clear any existing timers
+    this.clearHeartbeatTimers();
+    
+    // Send first heartbeat immediately
+    this.sendHeartbeat();
+  }
+
+  clearHeartbeatTimers() {
+    // Clear heartbeat timer
     if (this.state.heartbeatTimer) {
+      this.log('Clearing existing heartbeat timer');
       clearTimeout(this.state.heartbeatTimer);
+      this.state.heartbeatTimer = null;
     }
     
-    // Set timer
-    this.state.heartbeatTimer = setTimeout(() => {
-      this.sendHeartbeat();
-    }, this.options.heartbeatInterval);
-    
-    // Start timeout monitor
-    this.resetHeartbeatTimeout();
+    // Clear heartbeat timeout timer
+    if (this.state.heartbeatTimeoutTimer) {
+      this.log('Clearing existing heartbeat timeout timer');
+      clearTimeout(this.state.heartbeatTimeoutTimer);
+      this.state.heartbeatTimeoutTimer = null;
+    }
   }
-  
+
   /**
    * Send heartbeat
    * @private
    */
   sendHeartbeat() {
-    this.log('Sending heartbeat');
+    this.log('Sending heartbeat (ping)');
     
     // Send ping message
     this.send({ type: 'ping' }, { queueIfDisconnected: false })
+      .then(() => {
+        this.log('Heartbeat (ping) sent successfully');
+        
+        // Set timeout timer for pong response
+        this.setHeartbeatTimeout();
+      })
       .catch(error => {
         this.log('Error sending heartbeat:', error);
+        
+        // Schedule next heartbeat on failure after a shorter interval
+        this.scheduleNextHeartbeat(5000); // Retry sooner on failure
       });
-    
-    // Schedule next heartbeat
-    this.state.heartbeatTimer = setTimeout(() => {
-      this.sendHeartbeat();
-    }, this.options.heartbeatInterval);
   }
   
   /**
@@ -626,6 +696,8 @@ class WebSocketService extends EventEmitter {
    * @private
    */
   resetHeartbeatTimeout() {
+    this.log('Resetting heartbeat timeout timer');
+    
     // Clear any existing timer
     if (this.state.heartbeatTimeoutTimer) {
       clearTimeout(this.state.heartbeatTimeoutTimer);

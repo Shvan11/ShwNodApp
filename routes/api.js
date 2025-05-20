@@ -132,6 +132,21 @@ router.get("/AppsUpdated", async (req, res) => {
     wsEmitter.emit("updated", PDate);
 });
 
+// Handle patient loaded event
+router.get("/patientloaded", (req, res) => {
+    res.sendStatus(200);
+    const { pid, screenid: screenID } = req.query;
+    wsEmitter.emit("patientLoaded", pid, screenID);
+});
+
+// Handle patient unloaded event
+router.get("/patientunloaded", (req, res) => {
+    res.sendStatus(200);
+    const { screenid: screenID } = req.query;
+    wsEmitter.emit("patientUnLoaded", screenID);
+});
+
+
 // Get gallery images
 router.get("/getgal", (req, res) => {
     const { code: pid, tp } = req.query;
