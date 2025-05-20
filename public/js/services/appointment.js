@@ -7,7 +7,7 @@ import { fetchJSON, postJSON } from '../core/http.js';
 import { formatDate } from '../core/utils.js';
 
 /**
- * Appointment Service
+ * Appointment Service class
  */
 export class AppointmentService {
   /**
@@ -108,5 +108,6 @@ export class AppointmentService {
   }
 }
 
-// Export singleton instance
-export default new AppointmentService();
+// Export a singleton instance as default
+const appointmentService = new AppointmentService();
+export default appointmentService;

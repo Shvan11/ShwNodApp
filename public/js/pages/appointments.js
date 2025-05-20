@@ -165,285 +165,160 @@ class AppointmentsPageController {
    * @param {Array} appointments - Appointments data
    * @private
    */
-  updateAppointmentsTable(appointments) {
-    console.log('Starting table update at:', new Date().toLocaleTimeString());
-    console.log(`Updating table with ${appointments.length} appointments`);
+/**
+ * Update appointments table
+ * @param {Array} appointments - Appointments data
+ * @private
+ */
+updateAppointmentsTable(appointments) {
+  // Check if appointments is an array
+  if (!Array.isArray(appointments)) {
+    console.error('Invalid appointments format:', appointments);
+    this.showError('Invalid appointments format');
+    return;
+  }
+  
+  console.log(`Updating table with ${appointments.length} appointments`);
+
+  try {
+    // Format appointment data for the table component
+    const formattedData = this.formatAppointmentsData(appointments);
     
-    // Format appointment data to match expected format for Table component
-    const formattedData = appointments.map(appointmentColumns => {
-        // Ensure appointmentColumns is an array
-        if (!Array.isArray(appointmentColumns)) {
-            console.error('Invalid appointment format:', appointmentColumns);
-            return {
-                patientName: 'Error: Invalid data format',
-                pid: ''
-            };
-        }
-        
-        // Extract values from each column
-        const no = appointmentColumns[0]?.value || '';
-        const time = appointmentColumns[1]?.value || '';
-        const type = appointmentColumns[2]?.value || '';
-        const patientName = appointmentColumns[3]?.value || 'Unknown';
-        const detail = appointmentColumns[4]?.value || '';
-        const present = appointmentColumns[5]?.value || '';
-        const seated = appointmentColumns[6]?.value || '';
-        const dismissed = appointmentColumns[7]?.value || '';
-        const notes = appointmentColumns[8]?.value === 'true';
-        const pid = appointmentColumns[9]?.value || '';
-        
-        // Return properly formatted data object
-        return {
-            no,
-            time, 
-            type,
-            patientName,
-            detail,
-            present,
-            seated,
-            dismissed,
-            notes,
-            pid
-        };
-    });
-    
-    console.log(`Formatted ${formattedData.length} appointments for table`);
-    
+    if (!formattedData || !formattedData.length) {
+      console.warn('No appointments data to display');
+    }
+
     // Initialize or update table component
     if (!this.appointmentsTable) {
-        // Create table columns definition
-        const columns = [
-            { field: 'no', title: 'No', width: 50 },
-            { field: 'time', title: 'Time', width: 80 },
-            { field: 'type', title: 'Type', width: 100 },
-            { 
-                field: 'patientName', 
-                title: 'Patient Name',
-                render: (value, row) => {
-                    return `<a href="/visits-summary?PID=${row.pid}">${value}</a>`;
-                }
-            },
-            { field: 'detail', title: 'Detail' },
-            { 
-                field: 'present', 
-                title: 'Present',
-                cellClassName: 'status-cell',
-                render: (value, row) => {
-                    // Apply cell styling based on appointment status
-                    let backgroundColor = 'pink'; // Default - waiting
-                    
-                    if (row.dismissed) {
-                        backgroundColor = 'lightgreen'; // Completed
-                    } else if (row.seated) {
-                        backgroundColor = 'lightyellow'; // Seated
-                    }
-                    
-                    return {
-                        content: value || '',
-                        style: { backgroundColor }
-                    };
-                }
-            },
-            { field: 'seated', title: 'Seated' },
-            { field: 'dismissed', title: 'Dismissed' },
-            { 
-                field: 'notes', 
-                title: 'Notes',
-                render: value => value ? '✔' : '✘'
-            }
-        ];
-        
-        // Create new table
-        this.appointmentsTable = new Table(this.tableContainer, {
-            columns,
-            data: formattedData,
-            className: 'appointments-table',
-            responsive: true,
-            rowClassName: row => this.activePID === row.pid ? 'active-patient' : '',
-            onRowClick: (row) => {
-                console.log('Row clicked:', row);
-            }
-        });
-        
-        console.log('Created new appointments table');
+      this.createTable(formattedData);
     } else {
-        // Update existing table
-        this.appointmentsTable.setData(formattedData);
-        console.log('Updated existing appointments table');
+      this.updateTable(formattedData);
     }
-    
-    // Also perform a direct DOM update as a fallback
-    this.updateTableDirectly(appointments);
-    
-    // Force table to be visible and properly styled
-    if (this.appointmentsTable && this.appointmentsTable.table) {
-        const tableElement = this.appointmentsTable.table;
-        tableElement.style.width = '100%';
-        tableElement.style.borderCollapse = 'collapse';
-        
-        // Ensure all table cells are visible
-        const cells = tableElement.querySelectorAll('th, td');
-        cells.forEach(cell => {
-            cell.style.display = 'table-cell';
-            cell.style.padding = '8px';
-            cell.style.border = '1px solid #ccc';
-        });
-    }
-    
-    // Create a visual indicator that the table has been updated
-    this.showUpdateNotification();
+  } catch (error) {
+    console.error('Error updating appointments table:', error);
+    this.showError('Error updating appointments table');
+  }
 }
 
-// Add a direct DOM-based table update method as fallback
-updateTableDirectly(appointments) {
-    console.log('Performing direct DOM table update');
+/**
+ * Format appointments data for table component
+ * @param {Array} appointments - Raw appointments data
+ * @returns {Array} - Formatted data
+ * @private
+ */
+formatAppointmentsData(appointments) {
+  return appointments.map(appointmentColumns => {
+    // Ensure appointmentColumns is an array
+    if (!Array.isArray(appointmentColumns)) {
+      console.warn('Invalid appointment row format:', appointmentColumns);
+      return {
+        patientName: 'Error: Invalid row format',
+        pid: ''
+      };
+    }
     
-    // Find or create a fallback table if needed
-    let fallbackTable = document.getElementById('fallback-appointments-table');
-    if (!fallbackTable) {
-        fallbackTable = document.createElement('table');
-        fallbackTable.id = 'fallback-appointments-table';
-        fallbackTable.style.width = '100%';
-        fallbackTable.style.borderCollapse = 'collapse';
-        fallbackTable.style.marginTop = '20px';
+    // Extract values with safe defaults
+    return {
+      no: this.getColumnValue(appointmentColumns, 0, ''),
+      time: this.getColumnValue(appointmentColumns, 1, ''),
+      type: this.getColumnValue(appointmentColumns, 2, ''),
+      patientName: this.getColumnValue(appointmentColumns, 3, 'Unknown'),
+      detail: this.getColumnValue(appointmentColumns, 4, ''),
+      present: this.getColumnValue(appointmentColumns, 5, ''),
+      seated: this.getColumnValue(appointmentColumns, 6, ''),
+      dismissed: this.getColumnValue(appointmentColumns, 7, ''),
+      notes: this.getColumnValue(appointmentColumns, 8, '') === 'true',
+      pid: this.getColumnValue(appointmentColumns, 9, '')
+    };
+  });
+}
+
+/**
+ * Create appointments table
+ * @param {Array} data - Table data
+ * @private
+ */
+createTable(data) {
+  // Define table columns
+  const columns = [
+    { field: 'no', title: 'No', width: 50 },
+    { field: 'time', title: 'Time', width: 80 },
+    { field: 'type', title: 'Type', width: 100 },
+    { 
+      field: 'patientName', 
+      title: 'Patient Name',
+      render: (value, row) => {
+        return `<a href="/visits-summary?PID=${row.pid}">${value}</a>`;
+      }
+    },
+    { field: 'detail', title: 'Detail' },
+    { 
+      field: 'present', 
+      title: 'Present',
+      cellClassName: 'status-cell',
+      render: (value, row) => {
+        // Apply cell styling based on appointment status
+        let backgroundColor = 'pink'; // Default - waiting
         
-        // Create header row
-        const thead = document.createElement('thead');
-        const headerRow = document.createElement('tr');
-        
-        ['No', 'Time', 'Type', 'Patient Name', 'Detail', 'Present', 'Seated', 'Dismissed', 'Notes'].forEach(headerText => {
-            const th = document.createElement('th');
-            th.textContent = headerText;
-            th.style.backgroundColor = '#f2f2f2';
-            th.style.padding = '8px';
-            th.style.border = '1px solid #ddd';
-            th.style.textAlign = 'left';
-            headerRow.appendChild(th);
-        });
-        
-        thead.appendChild(headerRow);
-        fallbackTable.appendChild(thead);
-        
-        // Add tbody
-        const tbody = document.createElement('tbody');
-        fallbackTable.appendChild(tbody);
-        
-        // Add to DOM if main table is not working
-        if (!this.appointmentsTable || !this.appointmentsTable.table || !this.appointmentsTable.table.isConnected) {
-            const container = document.getElementById('appointments-container');
-            if (container) {
-                container.appendChild(fallbackTable);
-                console.log('Added fallback table to DOM');
-            }
-        } else {
-            // Create hidden but ready to use
-            fallbackTable.style.display = 'none';
-            document.body.appendChild(fallbackTable);
-            console.log('Created hidden fallback table');
+        if (row.dismissed) {
+          backgroundColor = 'lightgreen'; // Completed
+        } else if (row.seated) {
+          backgroundColor = 'lightyellow'; // Seated
         }
+        
+        return {
+          content: value || '',
+          style: { backgroundColor }
+        };
+      }
+    },
+    { field: 'seated', title: 'Seated' },
+    { field: 'dismissed', title: 'Dismissed' },
+    { 
+      field: 'notes', 
+      title: 'Notes',
+      render: value => value ? '✓' : '✗'
     }
-    
-    // Get or create tbody
-    const tbody = fallbackTable.querySelector('tbody') || fallbackTable.appendChild(document.createElement('tbody'));
-    tbody.innerHTML = '';
-    
-    // Add rows directly
-    appointments.forEach(appointmentColumns => {
-        const row = document.createElement('tr');
-        
-        // Extract values
-        const no = appointmentColumns[0]?.value || '';
-        const time = appointmentColumns[1]?.value || '';
-        const type = appointmentColumns[2]?.value || '';
-        const patientName = appointmentColumns[3]?.value || 'Unknown';
-        const detail = appointmentColumns[4]?.value || '';
-        const present = appointmentColumns[5]?.value || '';
-        const seated = appointmentColumns[6]?.value || '';
-        const dismissed = appointmentColumns[7]?.value || '';
-        const notes = appointmentColumns[8]?.value === 'true';
-        const pid = appointmentColumns[9]?.value || '';
-        
-        // Create cells
-        [
-            { value: no },
-            { value: time },
-            { value: type },
-            { 
-                value: patientName,
-                html: `<a href="/visits-summary?PID=${pid}">${patientName}</a>`
-            },
-            { value: detail },
-            { 
-                value: present,
-                style: {
-                    backgroundColor: dismissed ? 'lightgreen' : (seated ? 'lightyellow' : 'pink')
-                }
-            },
-            { value: seated },
-            { value: dismissed },
-            { value: notes ? '✔' : '✘' }
-        ].forEach(cellData => {
-            const cell = document.createElement('td');
-            
-            // Apply value
-            if (cellData.html) {
-                cell.innerHTML = cellData.html;
-            } else {
-                cell.textContent = cellData.value;
-            }
-            
-            // Apply styling
-            cell.style.padding = '8px';
-            cell.style.border = '1px solid #ddd';
-            
-            // Apply custom styling
-            if (cellData.style) {
-                Object.entries(cellData.style).forEach(([property, value]) => {
-                    cell.style[property] = value;
-                });
-            }
-            
-            row.appendChild(cell);
-        });
-        
-        tbody.appendChild(row);
-    });
-    
-    console.log(`Direct table update completed with ${appointments.length} rows`);
-    
-    // Show fallback table if main table is not visible
-    if (this.appointmentsTable && this.appointmentsTable.table && 
-        (this.appointmentsTable.table.offsetHeight === 0 || 
-         !this.appointmentsTable.table.isConnected)) {
-        fallbackTable.style.display = 'table';
-        console.log('Activated fallback table');
-    }
+  ];
+  
+  // Create table
+  this.appointmentsTable = new Table(this.tableContainer, {
+    columns,
+    data,
+    className: 'appointments-table',
+    responsive: true,
+    rowClassName: row => this.activePID === row.pid ? 'active-patient' : '',
+    onRowClick: this.handleRowClick.bind(this)
+  });
+  
+  console.log('Created new appointments table');
 }
 
-// Add a visual notification method
-showUpdateNotification() {
-    const notification = document.createElement('div');
-    notification.textContent = `Table updated: ${new Date().toLocaleTimeString()}`;
-    notification.style.position = 'fixed';
-    notification.style.top = '10px';
-    notification.style.right = '10px';
-    notification.style.backgroundColor = '#4CAF50';
-    notification.style.color = 'white';
-    notification.style.padding = '10px';
-    notification.style.borderRadius = '5px';
-    notification.style.zIndex = '1000';
-    notification.style.transition = 'opacity 2s';
+/**
+ * Update existing table
+ * @param {Array} data - Table data
+ * @private
+ */
+updateTable(data) {
+  if (!this.appointmentsTable) {
+    this.createTable(data);
+    return;
+  }
+  
+  try {
+    // Update table data
+    this.appointmentsTable.setData(data);
+    console.log('Updated existing appointments table');
+  } catch (error) {
+    console.error('Error updating table:', error);
     
-    document.body.appendChild(notification);
-    
-    // Fade out after 3 seconds
-    setTimeout(() => {
-        notification.style.opacity = '0';
-        setTimeout(() => {
-            notification.remove();
-        }, 2000);
-    }, 3000);
+    // Recreate table on error
+    this.appointmentsTable = null;
+    this.createTable(data);
+  }
 }
+
+
 
   /**
    * Highlight active patient in the table
@@ -541,12 +416,6 @@ showUpdateNotification() {
       } catch (error) {
           console.error('Error handling WebSocket update:', error);
           
-          // Try direct update as last resort
-          try {
-              this.updateTableDirectly(appointments);
-          } catch (directError) {
-              console.error('Even direct table update failed:', directError);
-          }
       }
   });
 
@@ -685,7 +554,7 @@ showUpdateNotification() {
 
         // Reload appointments
         this.loadAppointments();
-
+        websocket.disconnect(); // add before connecting
         // Reconnect WebSocket
         websocket.connect();
       }

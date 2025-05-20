@@ -1,8 +1,12 @@
 // services/websocket.js
+/**
+ * WebSocket Service
+ * A robust WebSocket client with automatic reconnection, heartbeat, and message queuing
+ */
 import EventEmitter from '../core/events.js';
 import storage from '../core/storage.js';
 
-export class WebSocketService extends EventEmitter {
+class WebSocketService extends EventEmitter {
   /**
    * Create a new WebSocket service
    * @param {Object} options - Configuration options
@@ -11,284 +15,714 @@ export class WebSocketService extends EventEmitter {
     super();
     
     // Default options
-    this.options = Object.assign({
-      reconnectInterval: 50000,
-      pingInterval: 30000,
-      timeout: 1200000, // 20 minutes
-      debug: false
-    }, options);
-    
-    // Initialize properties
-    this.ws = null;
-    this.reconnecting = false;
-    this.lastMessageTime = Date.now();
-    this.screenId = storage.screenId(); // Use the storage utility
-    this.currentDate = this.formatDate(new Date());
-    this.pingIntervalId = null;
-    this.timeoutCheckId = null;
-    
-    // Set up timeout checker
-    this.setupTimeoutChecker();
-  }
-  
-  /**
-   * Get screen ID using the storage utility
-   * @returns {string} - Screen ID
-   * @private
-   */
-  getScreenId() {
-    return storage.screenId();
-  }
-  
-  /**
-   * Format date to YYYY-MM-DD
-   * @param {Date} date - Date to format
-   * @returns {string} - Formatted date
-   * @private
-   */
-  formatDate(date) {
-    return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
-  }
-  
-  /**
-   * Set up timeout checker to detect day change or inactivity
-   * @private
-   */
-  setupTimeoutChecker() {
-    this.timeoutCheckId = setInterval(() => {
-      const currentDate = new Date();
-      const formattedDate = this.formatDate(currentDate);
+    this.options = {
+      // Base URL for WebSocket connection (defaults to current host with WS/WSS protocol)
+      baseUrl: (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host,
       
-      // Check if day has changed
-      if (formattedDate !== this.currentDate) {
-        this.log('Day changed, updating connection');
-        this.currentDate = formattedDate;
-        this.connect();
-        return;
-      }
+      // Connection parameters
+      reconnectInterval: 2000,      // How long to wait before reconnect attempts (ms)
+      reconnectDecay: 1.5,          // Backoff factor for reconnect attempts
+      maxReconnectInterval: 30000,  // Maximum reconnect interval (ms)
+      maxReconnectAttempts: 20,     // Maximum number of reconnect attempts (null = infinite)
       
-      // Check for timeout (no messages received for longer than timeout)
-      if (Date.now() > (this.lastMessageTime + this.options.timeout + 2000)) {
-        this.log(`Connection timed out (${Date.now() - this.lastMessageTime}ms)`);
-        this.connect();
-      }
-    }, this.options.timeout);
+      // Heartbeat configuration
+      heartbeatInterval: 30000,     // Interval for sending heartbeats (ms)
+      heartbeatTimeout: 5000,       // Timeout for heartbeat response (ms)
+      
+      // Message handling
+      maxQueueSize: 100,            // Maximum number of queued messages
+      autoReconnect: true,          // Whether to automatically reconnect
+      debug: false,                 // Enable debug logging
+      
+      // Override with provided options
+      ...options
+    };
+    
+    // Connection state
+    this.state = {
+      status: 'disconnected',   // disconnected, connecting, connected, error
+      ws: null,                 // WebSocket instance
+      reconnectAttempts: 0,     // Current reconnect attempt count
+      lastMessageId: 0,         // Last message ID (for tracking)
+      lastActivity: Date.now(), // Last activity timestamp (for timeout detection)
+      reconnectTimer: null,     // Timer for reconnection
+      heartbeatTimer: null,     // Timer for sending heartbeats
+      heartbeatTimeoutTimer: null, // Timer for heartbeat timeout
+      messageQueue: [],         // Queue for messages to send when reconnected
+      pendingMessages: new Map(), // Map of message ID -> { resolve, reject, timeout }
+      forceClose: false,        // Whether close was requested (to prevent auto-reconnect)
+      screenId: storage.screenId() || 'unknown', // Screen ID for this connection
+    };
+    
+    // Bind methods to ensure correct 'this' context
+    this.connect = this.connect.bind(this);
+    this.disconnect = this.disconnect.bind(this);
+    this.send = this.send.bind(this);
+    this.onMessage = this.onMessage.bind(this);
+    this.onOpen = this.onOpen.bind(this);
+    this.onClose = this.onClose.bind(this);
+    this.onError = this.onError.bind(this);
+    
+    // Auto-connect if specified
+    if (this.options.autoConnect) {
+      this.connect();
+    }
+  }
+  
+  /**
+   * Get current connection status
+   * @returns {string} - Connection status
+   */
+  get status() {
+    return this.state.status;
+  }
+  
+  /**
+   * Check if connection is active
+   * @returns {boolean} - Whether connection is active
+   */
+  get isConnected() {
+    return this.state.status === 'connected' && 
+           this.state.ws && 
+           this.state.ws.readyState === WebSocket.OPEN;
   }
   
   /**
    * Connect to WebSocket server
-   * @returns {Promise<WebSocketService>} - This service instance for chaining
+   * @param {Object} [params={}] - Connection parameters
+   * @returns {Promise<WebSocketService>} - This service instance
    */
-  async connect() {
-    this.log('Connecting to WebSocket server');
+  connect(params = {}) {
+    this.log('Connecting to WebSocket server...');
     
-    // Close existing connection if any
-    if (this.ws && this.ws.readyState !== WebSocket.CLOSED) {
-      this.log('Closing existing connection');
-      this.ws.close();
+    // If already connected or connecting, return
+    if (this.state.status === 'connected' || this.state.status === 'connecting') {
+      this.log('Already connected or connecting');
+      return Promise.resolve(this);
     }
     
+    // Reset force close flag
+    this.state.forceClose = false;
+    
+    // Update state
+    this.state.status = 'connecting';
+    this.emit('connecting');
+    
+    // Clear any existing timers
+    this.clearTimers();
+    
+    // Build connection URL with parameters
+    const url = this.buildConnectionUrl(params);
+    
+    // Create WebSocket
     try {
-      this.ws = await this.createWebSocket();
+      this.state.ws = new WebSocket(url);
       
-      // Set up event listeners
-      this.setupWebSocketListeners();
+      // Set up event handlers
+      this.state.ws.onopen = this.onOpen;
+      this.state.ws.onclose = this.onClose;
+      this.state.ws.onerror = this.onError;
+      this.state.ws.onmessage = this.onMessage;
       
-      // Send initial update message
-      this.sendMessage('updateMessage');
-      
-      this.emit('connected');
-      this.log('WebSocket connected and update message sent');
+      // Create a promise that resolves when connected
+      return new Promise((resolve, reject) => {
+        const onConnect = () => {
+          this.off('connected', onConnect);
+          this.off('error', onError);
+          resolve(this);
+        };
+        
+        const onError = (error) => {
+          this.off('connected', onConnect);
+          this.off('error', onError);
+          reject(error);
+        };
+        
+        this.once('connected', onConnect);
+        this.once('error', onError);
+        
+        // Set timeout for connection
+        setTimeout(() => {
+          this.off('connected', onConnect);
+          this.off('error', onError);
+          
+          if (this.state.status !== 'connected') {
+            const error = new Error('Connection timeout');
+            this.emit('error', error);
+            reject(error);
+          }
+        }, 10000); // 10 second timeout
+      });
     } catch (error) {
-      this.log('Failed to connect to WebSocket', error);
+      this.log('Error creating WebSocket:', error);
+      this.state.status = 'error';
       this.emit('error', error);
-    }
-    
-    return this;
-  }
-  
-  /**
-   * Create WebSocket connection
-   * @returns {Promise<WebSocket>} - WebSocket instance
-   * @private
-   */
-  createWebSocket() {
-    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${protocol}//${location.host}?screenID=${this.screenId}&PDate=${this.currentDate}`;
-    
-    return new Promise((resolve, reject) => {
-      const ws = new WebSocket(url);
-      const connectTimeout = setTimeout(() => {
-        reject(new Error('WebSocket connection timeout'));
-      }, 10000);
       
-      const timer = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          clearTimeout(connectTimeout);
-          clearInterval(timer);
-          resolve(ws);
-        } else if (ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
-          clearTimeout(connectTimeout);
-          clearInterval(timer);
-          reject(new Error('WebSocket connection failed'));
-        }
-      }, 10);
-    });
-  }
-  
-  /**
-   * Set up WebSocket event listeners
-   * @private
-   */
-  setupWebSocketListeners() {
-    if (!this.ws) return;
-    
-    // Handle incoming messages
-    this.ws.addEventListener('message', (event) => {
-      this.lastMessageTime = Date.now();
-      
-      try {
-        const data = JSON.parse(event.data);
-        this.log('WebSocket message received', data.messageType);
-        
-        // Emit specific event based on message type
-        if (data.messageType) {
-          this.emit(data.messageType, data);
-        }
-        
-        // Also emit generic 'message' event
-        this.emit('message', data);
-      } catch (error) {
-        this.log('Error parsing WebSocket message', error);
-      }
-    });
-    
-    // Handle connection close
-    this.ws.addEventListener('close', () => {
-      this.log('WebSocket connection closed, reconnecting...');
-      this.emit('disconnected');
-      
-      // Set up reconnection timer
+      // Schedule reconnect
       this.scheduleReconnect();
-    });
-    
-    // Handle connection errors
-    this.ws.addEventListener('error', (error) => {
-      this.log('WebSocket error', error);
-      this.emit('error', error);
-    });
-    
-    // Set up ping interval to keep connection alive
-    this.setupPingInterval();
+      
+      return Promise.reject(error);
+    }
   }
   
   /**
-   * Set up ping interval to keep connection alive
-   * @private
+   * Disconnect from WebSocket server
+   * @param {number} [code=1000] - Close code
+   * @param {string} [reason=''] - Close reason
    */
-  setupPingInterval() {
-    // Clear existing interval if any
-    if (this.pingIntervalId) {
-      clearInterval(this.pingIntervalId);
+  disconnect(code = 1000, reason = '') {
+    this.log(`Disconnecting WebSocket (${code}: ${reason})`);
+    
+    // Set force close flag to prevent auto-reconnect
+    this.state.forceClose = true;
+    
+    // Clear timers
+    this.clearTimers();
+    
+    // Clear message queue
+    this.state.messageQueue = [];
+    
+    // Reject all pending messages
+    for (const [id, { reject }] of this.state.pendingMessages) {
+      reject(new Error('WebSocket disconnected'));
+    }
+    this.state.pendingMessages.clear();
+    
+    // Close WebSocket if it exists
+    if (this.state.ws) {
+      try {
+        if (this.state.ws.readyState === WebSocket.OPEN) {
+          this.state.ws.close(code, reason);
+        }
+      } catch (error) {
+        this.log('Error closing WebSocket:', error);
+      }
+      
+      this.state.ws = null;
     }
     
-    // Set up new interval
-    this.pingIntervalId = setInterval(() => {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.log('Sending ping to keep connection alive');
-        this.ws.send(JSON.stringify({ type: 'ping' }));
-      }
-    }, this.options.pingInterval);
-  }
-  
-  /**
-   * Schedule reconnection after disconnect
-   * @private
-   */
-  scheduleReconnect() {
-    if (this.reconnecting) return;
-    
-    this.reconnecting = true;
-    
-    setTimeout(() => {
-      this.log('Attempting to reconnect WebSocket');
-      this.reconnecting = false;
-      
-      // Only reconnect if socket is closed
-      if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
-        this.connect();
-      }
-    }, this.options.reconnectInterval);
+    // Update state
+    this.state.status = 'disconnected';
+    this.emit('disconnected', { code, reason });
   }
   
   /**
    * Send a message to the WebSocket server
    * @param {string|Object} message - Message to send
-   * @returns {boolean} - Success status
+   * @param {Object} [options={}] - Send options
+   * @returns {Promise<any>} - Promise that resolves with the response
    */
-  sendMessage(message) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.log('Cannot send message, WebSocket not open');
-      return false;
+  send(message, options = {}) {
+    const defaultOptions = {
+      timeout: 30000,       // Timeout for response (ms)
+      expectResponse: false, // Whether to expect a response
+      responseId: null,     // Response ID (if expectResponse is true)
+      retries: 3,           // Number of retries
+      queueIfDisconnected: true, // Whether to queue if disconnected
+      priority: 'normal'    // Priority for queue: 'high', 'normal', 'low'
+    };
+    
+    const sendOptions = { ...defaultOptions, ...options };
+    
+    // Create a new message ID
+    const messageId = ++this.state.lastMessageId;
+    
+    // Prepare message data
+    let messageData;
+    if (typeof message === 'string') {
+      // If it's a simple string message, use as is
+      messageData = message;
+    } else {
+      // For objects, add message ID and stringify
+      messageData = JSON.stringify({
+        id: messageId,
+        ...message
+      });
     }
     
-    try {
-      // Convert object to string if needed
-      const messageString = typeof message === 'object' 
-        ? JSON.stringify(message) 
-        : message;
-      
-      this.ws.send(messageString);
-      return true;
-    } catch (error) {
-      this.log('Error sending WebSocket message', error);
-      return false;
-    }
-  }
-  
-  /**
-   * Log a message if debug is enabled
-   * @param {string} message - Message to log
-   * @param {*} data - Optional data to log
-   * @private
-   */
-  log(message, data) {
-    if (this.options.debug) {
-      if (data) {
-        console.log(`[WebSocketService] ${message}:`, data);
+    // If not connected, queue message or reject
+    if (!this.isConnected) {
+      if (sendOptions.queueIfDisconnected) {
+        // Queue message for later
+        this.log(`Queueing message (${messageId}): ${messageData.substring(0, 100)}${messageData.length > 100 ? '...' : ''}`);
+        
+        // If queue is full, remove oldest messages
+        if (this.state.messageQueue.length >= this.options.maxQueueSize) {
+          // Remove messages based on priority
+          const removeIndex = this.state.messageQueue.findIndex(item => item.priority === 'low');
+          if (removeIndex >= 0) {
+            this.state.messageQueue.splice(removeIndex, 1);
+          } else {
+            // If no low priority messages, remove oldest
+            this.state.messageQueue.shift();
+          }
+        }
+        
+        // Add to queue
+        this.state.messageQueue.push({
+          id: messageId,
+          data: messageData,
+          options: sendOptions,
+          timestamp: Date.now()
+        });
+        
+        // Try to connect if not already
+        if (this.state.status === 'disconnected' && this.options.autoReconnect) {
+          this.connect();
+        }
+        
+        // Return a promise that resolves when the message is actually sent
+        return new Promise((resolve, reject) => {
+          const timeoutId = setTimeout(() => {
+            // If message is still in queue after timeout, reject
+            const queueIndex = this.state.messageQueue.findIndex(m => m.id === messageId);
+            if (queueIndex >= 0) {
+              this.state.messageQueue.splice(queueIndex, 1);
+              reject(new Error(`Message ${messageId} timed out in queue`));
+            }
+          }, sendOptions.timeout);
+          
+          // Store promise handlers in pending messages
+          this.state.pendingMessages.set(messageId, {
+            resolve,
+            reject,
+            timeout: timeoutId,
+            expectResponse: sendOptions.expectResponse,
+            responseId: sendOptions.responseId,
+            retries: sendOptions.retries
+          });
+        });
       } else {
-        console.log(`[WebSocketService] ${message}`);
+        // Reject immediately if not queueing
+        return Promise.reject(new Error('WebSocket not connected'));
+      }
+    }
+    
+    // Send message directly
+    try {
+      this.log(`Sending message (${messageId}): ${messageData.substring(0, 100)}${messageData.length > 100 ? '...' : ''}`);
+      this.state.ws.send(messageData);
+      
+      // Update last activity
+      this.state.lastActivity = Date.now();
+      
+      // If expecting response, return promise that resolves when response is received
+      if (sendOptions.expectResponse) {
+        return new Promise((resolve, reject) => {
+          const timeoutId = setTimeout(() => {
+            this.state.pendingMessages.delete(messageId);
+            reject(new Error(`Message ${messageId} timed out waiting for response`));
+          }, sendOptions.timeout);
+          
+          this.state.pendingMessages.set(messageId, {
+            resolve,
+            reject,
+            timeout: timeoutId,
+            expectResponse: true,
+            responseId: sendOptions.responseId
+          });
+        });
+      } else {
+        // If not expecting response, resolve immediately
+        return Promise.resolve();
+      }
+    } catch (error) {
+      this.log('Error sending message:', error);
+      
+      // If should retry, queue message
+      if (sendOptions.retries > 0) {
+        sendOptions.retries--;
+        return this.send(message, sendOptions);
+      } else {
+        return Promise.reject(error);
       }
     }
   }
   
   /**
-   * Disconnect WebSocket and clean up
+   * Handle WebSocket open event
+   * @param {Event} event - Open event
+   * @private
    */
-  disconnect() {
-    this.log('Disconnecting WebSocket');
+  onOpen(event) {
+    this.log('WebSocket connected');
     
-    // Clear intervals
-    if (this.pingIntervalId) {
-      clearInterval(this.pingIntervalId);
-      this.pingIntervalId = null;
+    // Update state
+    this.state.status = 'connected';
+    this.state.reconnectAttempts = 0;
+    this.state.lastActivity = Date.now();
+    
+    // Start heartbeat
+    this.startHeartbeat();
+    
+    // Process queued messages
+    this.processQueue();
+    
+    // Emit event
+    this.emit('connected', event);
+  }
+  
+  /**
+   * Handle WebSocket close event
+   * @param {CloseEvent} event - Close event
+   * @private
+   */
+  onClose(event) {
+    this.log(`WebSocket closed: ${event.code} - ${event.reason}`);
+    
+    // Clear timers
+    this.clearTimers();
+    
+    // Update state
+    this.state.status = 'disconnected';
+    this.state.ws = null;
+    
+    // Emit event
+    this.emit('disconnected', {
+      code: event.code,
+      reason: event.reason,
+      wasClean: event.wasClean
+    });
+    
+    // Reconnect if not force closed and auto-reconnect enabled
+    if (!this.state.forceClose && this.options.autoReconnect) {
+      this.scheduleReconnect();
+    }
+  }
+  
+  /**
+   * Handle WebSocket error event
+   * @param {Event} event - Error event
+   * @private
+   */
+  onError(event) {
+    this.log('WebSocket error:', event);
+    
+    // Emit event
+    this.emit('error', event);
+    
+    // Set status to error
+    this.state.status = 'error';
+  }
+  
+  /**
+   * Handle WebSocket message event
+   * @param {MessageEvent} event - Message event
+   * @private
+   */
+  onMessage(event) {
+    // Update last activity
+    this.state.lastActivity = Date.now();
+    
+    // Reset heartbeat timeout
+    this.resetHeartbeatTimeout();
+    
+    // Process message
+    try {
+      let message;
+      
+      // Try to parse as JSON
+      try {
+        message = JSON.parse(event.data);
+      } catch (e) {
+        // Not JSON, use raw data
+        message = event.data;
+      }
+      
+      this.log(`Received message: ${typeof message === 'string' ? message : JSON.stringify(message).substring(0, 100)}`);
+      
+      // Check if it's a heartbeat/ping response
+      if (typeof message === 'object' && (message.type === 'pong' || message.type === 'ping')) {
+        // Handle ping/pong
+        if (message.type === 'ping') {
+          // Respond to ping with pong
+          this.send({ type: 'pong' }, { queueIfDisconnected: false });
+        }
+        
+        return;
+      }
+      
+      // Check if it's a response to a pending message
+      if (typeof message === 'object' && message.id) {
+        const pendingMessage = this.state.pendingMessages.get(message.id);
+        
+        if (pendingMessage) {
+          // Clear timeout
+          clearTimeout(pendingMessage.timeout);
+          
+          // Resolve promise
+          pendingMessage.resolve(message);
+          
+          // Remove from pending messages
+          this.state.pendingMessages.delete(message.id);
+          
+          // Also emit the message as an event
+          this.emit('message', message);
+          
+          return;
+        }
+      }
+      
+      // Not a response to a pending message, emit as event
+      // Specific events based on message type (for backward compatibility)
+      if (typeof message === 'object' && message.messageType) {
+        this.emit(message.messageType, message);
+      }
+      
+      // Always emit generic message event
+      this.emit('message', message);
+    } catch (error) {
+      this.log('Error processing message:', error);
+      this.emit('error', error);
+    }
+  }
+  
+  /**
+   * Process queued messages
+   * @private
+   */
+  processQueue() {
+    if (this.state.messageQueue.length === 0) return;
+    
+    this.log(`Processing message queue (${this.state.messageQueue.length} messages)`);
+    
+    // Sort queue by priority and timestamp
+    this.state.messageQueue.sort((a, b) => {
+      const priorityOrder = { high: 0, normal: 1, low: 2 };
+      const aPriority = priorityOrder[a.options.priority] || 1;
+      const bPriority = priorityOrder[b.options.priority] || 1;
+      
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority;
+      } else {
+        return a.timestamp - b.timestamp;
+      }
+    });
+    
+    // Process messages
+    const queue = [...this.state.messageQueue];
+    this.state.messageQueue = [];
+    
+    for (const message of queue) {
+      try {
+        // Send message
+        this.state.ws.send(message.data);
+        
+        // Resolve pending promise
+        const pendingMessage = this.state.pendingMessages.get(message.id);
+        if (pendingMessage) {
+          if (pendingMessage.expectResponse) {
+            // If expecting response, keep in pending messages
+            // but update timeout
+            clearTimeout(pendingMessage.timeout);
+            pendingMessage.timeout = setTimeout(() => {
+              this.state.pendingMessages.delete(message.id);
+              pendingMessage.reject(new Error(`Message ${message.id} timed out waiting for response`));
+            }, message.options.timeout);
+          } else {
+            // If not expecting response, resolve immediately
+            clearTimeout(pendingMessage.timeout);
+            pendingMessage.resolve();
+            this.state.pendingMessages.delete(message.id);
+          }
+        }
+      } catch (error) {
+        this.log(`Error sending queued message ${message.id}:`, error);
+        
+        // If should retry, requeue message
+        if (message.options.retries > 0) {
+          message.options.retries--;
+          this.state.messageQueue.push(message);
+        } else {
+          // Otherwise reject promise
+          const pendingMessage = this.state.pendingMessages.get(message.id);
+          if (pendingMessage) {
+            clearTimeout(pendingMessage.timeout);
+            pendingMessage.reject(error);
+            this.state.pendingMessages.delete(message.id);
+          }
+        }
+      }
+    }
+  }
+  
+  /**
+   * Schedule reconnect attempt
+   * @private
+   */
+  scheduleReconnect() {
+    // Don't reconnect if force closed
+    if (this.state.forceClose) return;
+    
+    // Don't reconnect if max attempts reached
+    if (this.options.maxReconnectAttempts !== null && 
+        this.state.reconnectAttempts >= this.options.maxReconnectAttempts) {
+      this.log('Maximum reconnect attempts reached');
+      return;
     }
     
-    if (this.timeoutCheckId) {
-      clearInterval(this.timeoutCheckId);
-      this.timeoutCheckId = null;
+    // Calculate delay with exponential backoff
+    const delay = Math.min(
+      this.options.reconnectInterval * Math.pow(this.options.reconnectDecay, this.state.reconnectAttempts),
+      this.options.maxReconnectInterval
+    );
+    
+    this.log(`Scheduling reconnect attempt ${this.state.reconnectAttempts + 1} in ${delay}ms`);
+    
+    // Clear any existing timer
+    if (this.state.reconnectTimer) {
+      clearTimeout(this.state.reconnectTimer);
     }
     
-    // Close connection
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+    // Set timer
+    this.state.reconnectTimer = setTimeout(() => {
+      this.state.reconnectAttempts++;
+      this.connect().catch(() => {}); // Ignore errors
+    }, delay);
+  }
+  
+  /**
+   * Start heartbeat
+   * @private
+   */
+  startHeartbeat() {
+    this.log('Starting heartbeat');
+    
+    // Clear any existing timer
+    if (this.state.heartbeatTimer) {
+      clearTimeout(this.state.heartbeatTimer);
     }
     
-    // Reset state
-    this.reconnecting = false;
+    // Set timer
+    this.state.heartbeatTimer = setTimeout(() => {
+      this.sendHeartbeat();
+    }, this.options.heartbeatInterval);
+    
+    // Start timeout monitor
+    this.resetHeartbeatTimeout();
+  }
+  
+  /**
+   * Send heartbeat
+   * @private
+   */
+  sendHeartbeat() {
+    this.log('Sending heartbeat');
+    
+    // Send ping message
+    this.send({ type: 'ping' }, { queueIfDisconnected: false })
+      .catch(error => {
+        this.log('Error sending heartbeat:', error);
+      });
+    
+    // Schedule next heartbeat
+    this.state.heartbeatTimer = setTimeout(() => {
+      this.sendHeartbeat();
+    }, this.options.heartbeatInterval);
+  }
+  
+  /**
+   * Reset heartbeat timeout
+   * @private
+   */
+  resetHeartbeatTimeout() {
+    // Clear any existing timer
+    if (this.state.heartbeatTimeoutTimer) {
+      clearTimeout(this.state.heartbeatTimeoutTimer);
+    }
+    
+    // Set timer
+    this.state.heartbeatTimeoutTimer = setTimeout(() => {
+      this.log('Heartbeat timeout');
+      
+      // If still connected, force close and reconnect
+      if (this.state.ws && this.state.ws.readyState === WebSocket.OPEN) {
+        this.log('Forcing close due to heartbeat timeout');
+        
+        // Don't set force close flag, so it will reconnect
+        this.state.ws.close(1000, 'Heartbeat timeout');
+        this.state.ws = null;
+        
+        // Update state
+        this.state.status = 'disconnected';
+        
+        // Schedule reconnect
+        this.scheduleReconnect();
+      }
+    }, this.options.heartbeatTimeout);
+  }
+  
+  /**
+   * Clear all timers
+   * @private
+   */
+  clearTimers() {
+    // Clear reconnect timer
+    if (this.state.reconnectTimer) {
+      clearTimeout(this.state.reconnectTimer);
+      this.state.reconnectTimer = null;
+    }
+    
+    // Clear heartbeat timer
+    if (this.state.heartbeatTimer) {
+      clearTimeout(this.state.heartbeatTimer);
+      this.state.heartbeatTimer = null;
+    }
+    
+    // Clear heartbeat timeout timer
+    if (this.state.heartbeatTimeoutTimer) {
+      clearTimeout(this.state.heartbeatTimeoutTimer);
+      this.state.heartbeatTimeoutTimer = null;
+    }
+  }
+  
+  /**
+   * Build connection URL with parameters
+   * @param {Object} [params={}] - Additional URL parameters
+   * @returns {string} - Connection URL
+   * @private
+   */
+  buildConnectionUrl(params = {}) {
+    // Start with base URL
+    const url = new URL(this.options.baseUrl);
+    
+    // Add screen ID
+    url.searchParams.append('screenID', this.state.screenId);
+    
+    // Add current date
+    const now = new Date();
+    const dateParam = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+    url.searchParams.append('PDate', dateParam);
+    
+    // Add additional parameters
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null) {
+        url.searchParams.append(key, value);
+      }
+    }
+    
+    return url.toString();
+  }
+  
+  /**
+   * Log message if debug enabled
+   * @param {string} message - Message to log
+   * @param {*} [data] - Additional data to log
+   * @private
+   */
+  log(message, data) {
+    if (!this.options.debug) return;
+    
+    if (data !== undefined) {
+      console.log(`[WebSocketService] ${message}`, data);
+    } else {
+      console.log(`[WebSocketService] ${message}`);
+    }
   }
 }
 
 // Export singleton instance
-export default new WebSocketService();
+export default new WebSocketService({
+  debug: true,
+  autoConnect: false
+});
