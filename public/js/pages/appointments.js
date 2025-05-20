@@ -172,13 +172,13 @@ class AppointmentsPageController {
       this.showError('Invalid appointments format');
       return;
     }
-    
+
     console.log(`Updating table with ${appointments.length} appointments`);
 
     try {
       // Format appointment data for the table component
       const formattedData = this.formatAppointmentsData(appointments);
-      
+
       if (!formattedData || !formattedData.length) {
         console.warn('No appointments data to display');
       }
@@ -211,7 +211,7 @@ class AppointmentsPageController {
           pid: ''
         };
       }
-      
+
       // Extract values with safe defaults
       return {
         no: this.getColumnValue(appointmentColumns, 0, ''),
@@ -254,28 +254,28 @@ class AppointmentsPageController {
       { field: 'no', title: 'No', width: 50 },
       { field: 'time', title: 'Time', width: 80 },
       { field: 'type', title: 'Type', width: 100 },
-      { 
-        field: 'patientName', 
+      {
+        field: 'patientName',
         title: 'Patient Name',
         render: (value, row) => {
           return `<a href="/visits-summary?PID=${row.pid}">${value}</a>`;
         }
       },
       { field: 'detail', title: 'Detail' },
-      { 
-        field: 'present', 
+      {
+        field: 'present',
         title: 'Present',
         cellClassName: 'status-cell',
         render: (value, row) => {
           // Apply cell styling based on appointment status
           let backgroundColor = 'pink'; // Default - waiting
-          
+
           if (row.dismissed) {
             backgroundColor = 'lightgreen'; // Completed
           } else if (row.seated) {
             backgroundColor = 'lightyellow'; // Seated
           }
-          
+
           return {
             content: value || '',
             style: { backgroundColor }
@@ -284,13 +284,13 @@ class AppointmentsPageController {
       },
       { field: 'seated', title: 'Seated' },
       { field: 'dismissed', title: 'Dismissed' },
-      { 
-        field: 'notes', 
+      {
+        field: 'notes',
         title: 'Notes',
         render: value => value ? '✓' : '✗'
       }
     ];
-    
+
     // Create table
     this.appointmentsTable = new Table(this.tableContainer, {
       columns,
@@ -300,7 +300,7 @@ class AppointmentsPageController {
       rowClassName: row => this.activePID === row.pid ? 'active-patient' : '',
       onRowClick: this.handlePatientRowClick.bind(this)
     });
-    
+
     console.log('Created new appointments table');
   }
 
@@ -314,14 +314,14 @@ class AppointmentsPageController {
       this.createTable(data);
       return;
     }
-    
+
     try {
       // Update table data
       this.appointmentsTable.setData(data);
       console.log('Updated existing appointments table');
     } catch (error) {
       console.error('Error updating table:', error);
-      
+
       // Recreate table on error
       this.appointmentsTable = null;
       this.createTable(data);
@@ -337,13 +337,13 @@ class AppointmentsPageController {
    */
   handlePatientRowClick(rowData, rowIndex, event) {
     if (!rowData || !rowData.pid) return;
-    
+
     // Set active patient ID
     this.activePID = rowData.pid;
-    
+
     // Highlight active patient
     this.highlightActivePatient();
-    
+
     // Load patient data and show it
     this.loadAndShowPatientData(rowData.pid);
   }
@@ -357,12 +357,12 @@ class AppointmentsPageController {
     try {
       // Get patient images
       const images = await appointmentService.getPatientImages(patientId);
-      
+
       // Get latest visit
       const latestVisit = await appointmentService.getLatestVisitSummary(patientId);
-      
+
       // Show patient data
-      await this.showPatientData({ 
+      await this.showPatientData({
         pid: patientId,
         images,
         latestVisit
@@ -378,7 +378,10 @@ class AppointmentsPageController {
    */
   highlightActivePatient() {
     if (!this.appointmentsTable) return;
-
+    // Update the rowClassName function with the current activePID value
+    this.appointmentsTable.options.rowClassName = row => {
+      return String(this.activePID) === String(row.pid) ? 'active-patient' : '';
+    };
     // Refresh the table which will reapply row classes
     this.appointmentsTable.refresh();
   }
@@ -393,12 +396,12 @@ class AppointmentsPageController {
     statusIndicator.id = 'ws-status';
     statusIndicator.style.position = 'fixed';
     statusIndicator.style.bottom = '10px';
-    statusIndicator.style.right = '10px';
+    statusIndicator.style.left = '10px';
     statusIndicator.style.padding = '5px 10px';
     statusIndicator.style.borderRadius = '5px';
     statusIndicator.style.fontSize = '12px';
     document.body.appendChild(statusIndicator);
-    
+
     const updateStatus = (status) => {
       const colors = {
         connecting: '#ffa500', // orange
@@ -406,50 +409,50 @@ class AppointmentsPageController {
         disconnected: '#ff3d00', // red
         error: '#d50000'       // deep red
       };
-      
+
       statusIndicator.textContent = `WebSocket: ${status}`;
       statusIndicator.style.backgroundColor = colors[status] || '#9e9e9e';
       statusIndicator.style.color = '#ffffff';
     };
-    
+
     // Connect websocket
     updateStatus('connecting');
-    websocket.connect();
-    
+
+
     // Handle connection events
     websocket.on('connected', () => {
       updateStatus('connected');
       console.log('WebSocket connected');
     });
-    
+
     websocket.on('disconnected', () => {
       updateStatus('disconnected');
       console.log('WebSocket disconnected');
     });
-    
+
     websocket.on('error', (error) => {
       updateStatus('error');
       console.error('WebSocket error:', error);
     });
-    
+
     // Handle 'updated' event
     websocket.on('updated', data => {
       console.log('Received WebSocket update:', data);
-      
+
       if (!data || !data.tableData) {
         console.error('Invalid data in "updated" event:', data);
         return;
       }
-      
+
       // Check appointments data structure
       const appointments = data.tableData.appointments;
       if (!appointments || !Array.isArray(appointments)) {
         console.error('Invalid appointments data:', appointments);
         return;
       }
-      
+
       console.log(`Processing ${appointments.length} appointments from WebSocket update`);
-      
+
       try {
         // Update statistics first
         this.updateStatistics({
@@ -458,15 +461,15 @@ class AppointmentsPageController {
           waiting: data.tableData.waiting || 0,
           completed: data.tableData.completed || 0
         });
-        
+
         // Then update table
         this.updateAppointmentsTable(appointments);
-        
+
         // Also highlight active patient if needed
         this.highlightActivePatient();
       } catch (error) {
         console.error('Error handling WebSocket update:', error);
-        
+
       }
     });
 
@@ -483,6 +486,8 @@ class AppointmentsPageController {
       this.unloadPatientData();
       this.highlightActivePatient();
     });
+
+    websocket.connect();
   }
 
   /**
@@ -590,13 +595,13 @@ class AppointmentsPageController {
   showError(message) {
     // Check if error container exists
     let errorContainer = document.getElementById('appointments-error');
-    
+
     if (!errorContainer) {
       // Create error container
       errorContainer = document.createElement('div');
       errorContainer.id = 'appointments-error';
       errorContainer.className = 'error-message';
-      
+
       // Style error container
       Object.assign(errorContainer.style, {
         backgroundColor: 'rgba(244, 67, 54, 0.1)',
@@ -607,7 +612,7 @@ class AppointmentsPageController {
         border: '1px solid #f44336',
         transition: 'opacity 0.5s ease'
       });
-      
+
       // Add to container
       if (this.tableContainer) {
         this.tableContainer.parentNode.insertBefore(errorContainer, this.tableContainer);
@@ -615,16 +620,16 @@ class AppointmentsPageController {
         document.body.appendChild(errorContainer);
       }
     }
-    
+
     // Update error message
     errorContainer.textContent = message;
     errorContainer.style.opacity = '1';
-    
+
     // Auto-hide after 10 seconds
     setTimeout(() => {
       if (errorContainer.parentNode) {
         errorContainer.style.opacity = '0';
-        
+
         // Remove after fade out
         setTimeout(() => {
           if (errorContainer.parentNode) {

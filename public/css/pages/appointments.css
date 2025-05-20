@@ -107,3 +107,23 @@ th {
 footer {
   text-align: center;
 }
+
+/* Add styles for active patient highlighting */
+tr.active-patient {
+  background-color: #e3f2fd !important; /* Light blue background */
+  font-weight: bold;
+}
+
+tr.active-patient td {
+  background-color: #d1e6fa !important; /* Lighter blue for cells */
+  border-top: 2px solid #2196f3;
+  border-bottom: 2px solid #2196f3;
+}
+
+tr.active-patient td:first-child {
+  border-left: 2px solid #2196f3;
+}
+
+tr.active-patient td:last-child {
+  border-right: 2px solid #2196f3;
+}
