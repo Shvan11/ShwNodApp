@@ -41,13 +41,9 @@ class WhatsAppMessenger {
         // Register page visibility change detection
         document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
 
-        // Register as QR viewer when page loads
-        this.registerAsQRViewer();
+      
 
-        // Register cleanup on page unload
-        window.addEventListener('beforeunload', () => {
-            this.unregisterAsQRViewer();
-        });
+       
 
 
 

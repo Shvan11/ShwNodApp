@@ -298,13 +298,15 @@ router.post('/sendmedia2', upload.none(), async (req, res) => {
 });
 
 // Add this new route
+// Update the QR endpoint to NOT register viewers
+
 router.get('/wa/qr', async (req, res) => {
     try {
-      // Register as QR viewer when QR is requested
-      messageState.registerQRViewer();
+      // Do NOT register as QR viewer here - we only register via WebSockets
+      // REMOVE: messageState.registerQRViewer();
       
-      // Check if QR code is available
-      if (!messageState.qr) {
+      // Just check if QR code is available
+      if (!messageState || !messageState.qr) {
         return res.status(404).json({ 
           error: 'QR code not available yet', 
           status: 'waiting',
@@ -328,11 +330,7 @@ router.get('/wa/qr', async (req, res) => {
       });
     } catch (error) {
       console.error('Error generating WhatsApp QR code image:', error);
-      res.status(500).json({ 
-        error: 'Error generating QR code',
-        status: 'error',
-        message: error.message
-      });
+      res.status(500).json({ error: 'Error generating QR code' });
     }
   });
 

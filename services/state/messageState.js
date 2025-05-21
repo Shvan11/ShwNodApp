@@ -17,6 +17,7 @@ class MessageState {
     this.qrGenerationActive = false;
     this.qrLastRequested = null;
     this.qrTimeoutDuration = 5 * 60 * 1000; // 5 minutes
+    this.registeredViewerIds = new Set();
   }
 
 
@@ -168,26 +169,44 @@ class MessageState {
 
     return updateCount;
   }
-registerQRViewer() {
-  this.activeQRViewers++;
-  this.qrLastRequested = Date.now();
-  this.qrGenerationActive = true;
-  console.log(`QR viewer registered. Active viewers: ${this.activeQRViewers}`);
-  this.updateActivity('qr-viewer-registered');
-}
+  registerQRViewer(viewerId) {
+    // If viewer is already registered, do nothing
+    if (this.registeredViewerIds.has(viewerId)) {
+      console.log(`QR viewer ${viewerId} already registered`);
+      return false;
+    }
+    
+    // Register new viewer
+    this.registeredViewerIds.add(viewerId);
+    this.activeQRViewers++;
+    this.qrGenerationActive = true;
+    this.qrLastRequested = Date.now();
+    console.log(`QR viewer ${viewerId} registered. Active viewers: ${this.activeQRViewers}`);
+    this.updateActivity('qr-viewer-registered');
+    return true;
+  }
 
-unregisterQRViewer() {
-  if (this.activeQRViewers > 0) {
-    this.activeQRViewers--;
+  unregisterQRViewer(viewerId) {
+    // If viewer isn't registered, do nothing
+    if (!this.registeredViewerIds.has(viewerId)) {
+      console.log(`QR viewer ${viewerId} not registered, can't unregister`);
+      return false;
+    }
+    
+    // Unregister the viewer
+    this.registeredViewerIds.delete(viewerId);
+    if (this.activeQRViewers > 0) {
+      this.activeQRViewers--;
+    }
+    this.qrLastRequested = Date.now();
+    console.log(`QR viewer ${viewerId} unregistered. Active viewers: ${this.activeQRViewers}`);
+    
+    // If no more viewers, schedule QR deactivation
+    if (this.activeQRViewers === 0) {
+      this.scheduleQRDeactivation();
+    }
+    return true;
   }
-  this.qrLastRequested = Date.now();
-  console.log(`QR viewer unregistered. Active viewers: ${this.activeQRViewers}`);
-  
-  // If no more viewers, schedule QR deactivation
-  if (this.activeQRViewers === 0) {
-    this.scheduleQRDeactivation();
-  }
-}
 
 scheduleQRDeactivation() {
   // Set a timeout to deactivate QR generation if no viewers
@@ -208,7 +227,27 @@ shouldGenerateQR() {
   return (this.activeQRViewers > 0) || 
          (this.qrGenerationActive && !this.clientReady);
 }
+// Add this method to periodically verify the actual count
 
+verifyQRViewerCount(actualIdsArray) {
+  const actualIds = new Set(actualIdsArray);
+  
+  // Find IDs that are registered but no longer connected
+  const staleIds = [...this.registeredViewerIds].filter(id => !actualIds.has(id));
+  
+  // Remove any stale registrations
+  if (staleIds.length > 0) {
+    console.log(`Found ${staleIds.length} stale QR viewer registrations to clean up`);
+    staleIds.forEach(id => this.unregisterQRViewer(id));
+  }
+  
+  // Update the count to match actual connections
+  if (this.activeQRViewers !== actualIds.size) {
+    console.log(`Correcting QR viewer count from ${this.activeQRViewers} to ${actualIds.size}`);
+    this.activeQRViewers = actualIds.size;
+    this.registeredViewerIds = new Set(actualIds);
+  }
+}
 }
 
 // Export a true singleton

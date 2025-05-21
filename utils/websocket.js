@@ -3,6 +3,7 @@ import { WebSocketServer } from 'ws';
 import { EventEmitter } from 'events';
 import * as database from '../services/database/queries/index.js';
 import messageState from '../services/state/messageState.js';
+
 /**
  * WebSocket Connection Manager
  * Manages different types of WebSocket connections
@@ -310,7 +311,13 @@ function setupWebSocketServer(server) {
       const screenID = url.searchParams.get('screenID');
       const date = url.searchParams.get('PDate');
       const clientType = url.searchParams.get('clientType');
-  
+      // Create a unique ID for this connection
+      const clientIP = req.socket.remoteAddress;
+      const viewerId = `${clientIP}-${clientType}-${date || 'unknown'}-${Date.now()}`;
+      
+      // Store viewer ID on the connection object
+      ws.viewerId = viewerId;
+      ws.qrViewerRegistered = false;
       console.log(`New connection: screenID=${screenID}, date=${date}, clientType=${clientType}`);
   
       // Register connection based on type
@@ -319,12 +326,13 @@ function setupWebSocketServer(server) {
         // WhatsApp status client
         connectionManager.registerConnection(ws, 'waStatus', {
           date: date,
-          ipAddress: req.socket.remoteAddress
+          ipAddress: req.socket.remoteAddress,
+          viewerId: viewerId
         });
         
        // Register as QR viewer - ONLY if not already registered
-      if (messageState && typeof messageState.registerQRViewer === 'function' && !ws.qrViewerRegistered) {
-        messageState.registerQRViewer();
+       if (messageState && typeof messageState.registerQRViewer === 'function') {
+        const registered = messageState.registerQRViewer(viewerId);
         ws.qrViewerRegistered = true; // Mark as registered
         } else {
           console.error('Cannot register QR viewer: messageState not available or missing method');
@@ -413,20 +421,21 @@ function setupWebSocketServer(server) {
       });
   
    // Handle close event
-ws.on('close', (code, reason) => {
-  // If this was a WhatsApp status client AND was registered as QR viewer, unregister it
-  const capabilities = connectionManager.clientCapabilities.get(ws);
-  if (capabilities && capabilities.type === 'waStatus' && ws.qrViewerRegistered) {
-    if (messageState && typeof messageState.unregisterQRViewer === 'function') {
-      messageState.unregisterQRViewer();
-      console.log("Unregistered QR viewer on connection close");
+   ws.on('close', (code, reason) => {
+    // If this was a WhatsApp status client AND was registered as QR viewer, unregister it
+    const capabilities = connectionManager.clientCapabilities.get(ws);
+    if (capabilities && capabilities.type === 'waStatus' && ws.qrViewerRegistered) {
+      if (messageState && typeof messageState.unregisterQRViewer === 'function') {
+        messageState.unregisterQRViewer(ws.viewerId);
+        console.log(`Unregistered QR viewer ${ws.viewerId} on connection close`);
+      }
     }
-  }
-
-  // Then unregister the connection
-  connectionManager.unregisterConnection(ws);
-  console.log(`Client disconnected. Code: ${code}, Reason: ${reason || 'unknown'}`);
-});
+    
+    // Then unregister the connection
+    connectionManager.unregisterConnection(ws);
+    console.log(`Client disconnected. Code: ${code}, Reason: ${reason || 'unknown'}`);
+  });
+  
   
     } catch (error) {
       console.error('Error setting up WebSocket connection:', error);
@@ -727,6 +736,24 @@ function setupPeriodicCleanup(connectionManager) {
     const counts = connectionManager.getConnectionCounts();
     console.log(`Active connections: ${counts.total} total, ${counts.screens} screens, ${counts.waStatus} WhatsApp status`);
   }, 10 * 60 * 1000); // Every 10 minutes
+
+  setInterval(() => {
+    // Get all active WhatsApp status connections with their viewer IDs
+    const activeViewerIds = [];
+    connectionManager.waStatusConnections.forEach(ws => {
+      if (ws.qrViewerRegistered && ws.viewerId) {
+        activeViewerIds.push(ws.viewerId);
+      }
+    });
+    
+    // Verify QR viewer count matches actual connections
+    if (messageState && typeof messageState.verifyQRViewerCount === 'function') {
+      messageState.verifyQRViewerCount(activeViewerIds);
+    }
+    
+    // Rest of your cleanup code...
+  }, 60000); // Every minute
+
 }
 
 /**
