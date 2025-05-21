@@ -1,668 +1,387 @@
 /**
- * WhatsApp service with persistent client
- * Manages a single client instance across multiple operations
+ * WhatsApp Messaging Service
+ * Implements a persistent WhatsApp client for sending messages and tracking delivery status
  */
-import qrcode from "qrcode";
-import whatsapp from "whatsapp-web.js";
-import { EventEmitter } from "events";
-import { getWhatsAppMessages, updateWhatsAppStatus, getWhatsAppDeliveryStatus, updateWhatsAppDeliveryStatus } from "../database/queries/messaging-queries.js";
+import EventEmitter from 'events';
 import messageState from '../state/messageState.js';
+import * as database from '../database/queries/index.js';
 
-const { Client, LocalAuth  } = whatsapp;
+// Client state management at module scope
+let whatsappClient = null;  // The actual client instance
+let isInitializing = false; // Flag to prevent multiple initialization attempts
+let lastActivity = Date.now(); // Track when the client was last active
+let reconnectAttempts = 0;  // Track reconnection attempts
+const MAX_RECONNECT_ATTEMPTS = 10; // Maximum reconnection attempts before giving up
+const RECONNECT_DELAY = 5000; // Base delay between reconnection attempts in ms
+let wsEmitter = null; // Will be set via setEmitter method
 
+// Main WhatsApp service class
 class WhatsAppService extends EventEmitter {
   constructor() {
     super();
-    this.client = null;
-    this.clientState = 'idle'; // idle, initializing, ready, busy, error
-    this.operationQueue = [];
-    this.processingQueue = false;
-    this.lastActivity = Date.now();
-    this.initializationPromise = null;
-    this.initializationPromiseResolve = null;
-    this.initializationPromiseReject = null;
-    this.messageAckTracking = new Map(); // Track message delivery status
-
-    // Set up auto-disconnect timer to save resources
-    setInterval(() => this.checkInactivity(), 300000); // Check every 5 minutes
   }
 
   /**
- * Set the WebSocket event emitter for real-time status updates
- * @param {EventEmitter} emitter - The event emitter to use
- */
+   * Set the WebSocket emitter for event broadcasting
+   * @param {EventEmitter} emitter - WebSocket event emitter
+   */
   setEmitter(emitter) {
-    console.log("Setting WebSocket emitter for WhatsApp service");
-    this.wsEmitter = emitter;
-  }
-
-
-  /**
-   * Get or create a client instance
-   * @returns {Promise<Object>} - The WhatsApp client
-   */
-  async getClient() {
-    // If client exists and is ready, return it
-    if (this.client && this.clientState === 'ready') {
-      this.lastActivity = Date.now();
-      return this.client;
-    }
-
-    // If client is initializing, wait for it
-    if (this.clientState === 'initializing' && this.initializationPromise) {
-      try {
-        await this.initializationPromise;
-        return this.client;
-      } catch (error) {
-        console.error("Client initialization failed, retrying:", error);
-        return this.initializeClient();
-      }
-    }
-
-    // Otherwise, initialize a new client
-    return this.initializeClient();
+    wsEmitter = emitter;
+    console.log("WebSocket emitter set for WhatsApp service");
   }
 
   /**
-   * Initialize the WhatsApp client
-   * @returns {Promise<Object>} - The initialized client
+   * Check if the WhatsApp client is ready
+   * @returns {boolean} - Whether client is ready
    */
-  async initializeClient() {
-    // Set state to initializing
-    this.clientState = 'initializing';
-
-    // Clean up any existing initialization promise
-    if (this.initializationPromiseReject) {
-      this.initializationPromiseReject(new Error('New initialization started'));
-    }
-
-    // Create a promise to track initialization
-    this.initializationPromise = new Promise((resolve, reject) => {
-      this.initializationPromiseResolve = resolve;
-      this.initializationPromiseReject = reject;
-
-      // Add a timeout to prevent hanging
-      setTimeout(() => {
-        if (this.clientState === 'initializing') {
-          this.clientState = 'error';
-          reject(new Error('Client initialization timed out'));
-        }
-      }, 60000); // 60 seconds timeout
-    });
-
-    try {
-      // Clean up any existing client
-      if (this.client) {
-        try {
-          await this.client.destroy();
-          console.log("Previous client destroyed");
-        } catch (error) {
-          console.warn("Error destroying previous client:", error);
-        }
-        this.client = null;
-      }
-
-      // Create a new client
-      console.log("Creating new WhatsApp client...");
-      this.client = new Client({
-        authStrategy: new LocalAuth(),
-        puppeteer: {
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--disable-gpu'
-          ]
-        }
-      });
-
-      // Set up event handlers
-      this.setupClientEvents();
-
-      // Initialize the client
-      await this.client.initialize();
-      console.log("Client initialization started");
-    } catch (error) {
-      this.clientState = 'error';
-      console.error("Error initializing client:", error);
-
-      if (this.initializationPromiseReject) {
-        this.initializationPromiseReject(error);
-      }
-    }
-
-    return this.initializationPromise;
-  }
-
-  /**
-   * Set up client event handlers
-   */
-  setupClientEvents() {
-    // QR code event
-    this.client.on('qr', async (qr) => {
-      try {
-        console.log("QR code received");
-        const myqr = await qrcode.toDataURL(qr);
-        this.emit("qr", myqr);
-      } catch (error) {
-        console.error("Error generating QR code:", error);
-      }
-    });
-
-    // Authentication event
-    this.client.on('authenticated', () => {
-      console.log('AUTHENTICATED');
-      this.emit("Authenticated");
-    });
-
-    // Authentication failure event
-    this.client.on('auth_failure', (msg) => {
-      console.error('AUTH FAILURE:', msg);
-      this.clientState = 'error';
-      this.emit("AuthFailure", msg);
-
-      if (this.initializationPromiseReject) {
-        this.initializationPromiseReject(new Error(`Authentication failed: ${msg}`));
-        this.initializationPromiseReject = null;
-      }
-    });
-
-    // Client ready event
-    this.client.on('ready', () => {
-      console.log('Client is ready!');
-      this.clientState = 'ready';
-      this.lastActivity = Date.now();
-      this.emit("ClientIsReady");
-
-      if (this.initializationPromiseResolve) {
-        this.initializationPromiseResolve(this.client);
-        this.initializationPromiseResolve = null;
-        this.initializationPromiseReject = null;
-      }
-    });
-
-    // Disconnected event
-    this.client.on('disconnected', (reason) => {
-      console.log('Client disconnected:', reason);
-      this.clientState = 'error';
-      this.client = null;
-      this.emit("ClientDisconnected", reason);
-
-      if (this.initializationPromiseReject) {
-        this.initializationPromiseReject(new Error(`Client disconnected: ${reason}`));
-        this.initializationPromiseReject = null;
-      }
-    });
-
-    // Replace the entire message_ack event handler with this corrected version
-    this.client.on('message_ack', (msg, ack) => {
-      console.log(`Message ${msg.id.id} ack status: ${ack}`);
-
-      // If we're tracking this message, update its status
-      if (this.messageAckTracking.has(msg.id.id)) {
-        const { dbId, date } = this.messageAckTracking.get(msg.id.id);
- // Update status in our shared messageState
- messageState.updateMessageStatus(msg.id.id, ack);
-       
-  
-
-        // Update the status in the database
-        updateWhatsAppStatus([dbId], [msg.id.id], ack)
-          .then(() => {
-            // Emit event for WebSocket server to broadcast
-            if (this.wsEmitter) {
-              this.wsEmitter.emit('wa_message_update', msg.id.id, ack, date);
-            } else {
-              console.warn("wsEmitter not available, status updates won't be broadcasted");
-            }
-
-            // If we have a resolve function and this is a final state, resolve it
-            const { resolve } = this.messageAckTracking.get(msg.id.id);
-            if (resolve && (ack >= 3 || ack === -1)) {
-              resolve(ack);
-              this.messageAckTracking.delete(msg.id.id);
-            }
-          })
-          .catch(error => console.error(`Error updating ack status for message ${msg.id.id}:`, error));
-      }
-    });
-  }
-
-  /**
-   * Queue an operation to be executed when the client is available
-   * @param {Function} operation - The operation function to queue
-   * @param {number} [timeout=30000] - Operation timeout in ms
-   * @param {number} [retries=3] - Number of retries for failed operations
-   * @returns {Promise<any>} - Result of the operation
-   */
-  async queueOperation(operation, timeout = 30000, retries = 3) {
-    return new Promise((resolve, reject) => {
-      // Add operation to queue with metadata
-      this.operationQueue.push({
-        operation,
-        resolve,
-        reject,
-        timeout,
-        retries,
-        retryCount: 0
-      });
-
-      // Process queue if not already processing
-      if (!this.processingQueue) {
-        this.processQueue();
-      }
-    });
-  }
-
-  /**
-   * Process the operation queue
-   */
-  async processQueue() {
-    if (this.operationQueue.length === 0) {
-      this.processingQueue = false;
-      return;
-    }
-
-    this.processingQueue = true;
-
-    // Get the next operation
-    const { operation, resolve, reject, timeout, retries, retryCount } = this.operationQueue.shift();
-
-    // Create a timeout promise
-    const timeoutPromise = new Promise((_, timeoutReject) => {
-      setTimeout(() => timeoutReject(new Error('Operation timed out')), timeout);
-    });
-
-    try {
-      // Set state to busy
-      this.clientState = 'busy';
-
-      // Get client
-      const client = await this.getClient();
-
-      // Execute operation with timeout
-      const result = await Promise.race([
-        operation(client),
-        timeoutPromise
-      ]);
-
-      // Reset state to ready
-      this.clientState = 'ready';
-
-      // Update last activity
-      this.lastActivity = Date.now();
-
-      // Resolve promise
-      resolve(result);
-    } catch (error) {
-      console.error("Error executing operation:", error);
-
-      // Check if we should retry
-      if (retryCount < retries) {
-        console.log(`Retrying operation (${retryCount + 1}/${retries})...`);
-        this.operationQueue.unshift({
-          operation,
-          resolve,
-          reject,
-          timeout,
-          retries,
-          retryCount: retryCount + 1
-        });
-
-        // If client error, try to reinitialize
-        if (this.clientState === 'error') {
-          try {
-            await this.initializeClient();
-          } catch (initError) {
-            console.error("Error reinitializing client:", initError);
-          }
-        }
-      } else {
-        // Set state to error if this was the last retry
-        this.clientState = 'error';
-
-        // Reject promise
-        reject(error);
-
-        // Try to reinitialize client
-        try {
-          await this.initializeClient();
-        } catch (initError) {
-          console.error("Error reinitializing client:", initError);
-        }
-      }
-    } finally {
-      // Process next operation in queue
-      setTimeout(() => this.processQueue(), 1000);
-    }
-  }
-
-  /**
-   * Check client inactivity and disconnect if idle too long
-   */
-  async checkInactivity() {
-    const inactiveTime = Date.now() - this.lastActivity;
-
-    // If client is idle for more than 30 minutes and no operations are queued, disconnect
-    if (this.client && this.clientState === 'ready' && inactiveTime > 1800000 && this.operationQueue.length === 0) {
-      console.log("Disconnecting client due to inactivity");
-      try {
-        await this.client.destroy();
-        this.client = null;
-        this.clientState = 'idle';
-
-        // Clear message tracking map
-        this.messageAckTracking.clear();
-      } catch (error) {
-        console.error("Error disconnecting client:", error);
-      }
-    }
-  }
-
-  /**
-   * Send WhatsApp messages
-   * @param {string} date - Date to send messages for
-   * @returns {Promise<void>} - Promise that resolves when complete
-   */
-  async send(date) {
-    return this.queueOperation(async (client) => {
-      try {
-        // Get messages to send
-        const [numbers, messages, ids, names] = await getWhatsAppMessages(date);
-        const successCount = 0;
-        const failCount = 0;
-
-        // Create tracking for batch progress
-        const total = numbers.length;
-        const sendPromises = [];
-
-        // Send each message
-        for (let i = 0; i < numbers.length; i++) {
-          if (!numbers[i]) continue;
-
-          // Create promise for each message send
-          const sendPromise = new Promise((resolve) => {
-            this.sendMessageWithTracking(numbers[i], messages[i], ids[i], names[i], date)
-              .then(result => {
-                if (result.success) {
-                  this.emit("MessageSent", {
-                    name: names[i],
-                    number: numbers[i],
-                    messageId: result.messageId,
-                    progress: {
-                      current: i + 1,
-                      total,
-                      successCount: successCount + 1,
-                      failCount
-                    }
-                  });
-                } else {
-                  this.emit("MessageFailed", {
-                    name: names[i],
-                    number: numbers[i],
-                    error: result.error,
-                    progress: {
-                      current: i + 1,
-                      total,
-                      successCount,
-                      failCount: failCount + 1
-                    }
-                  });
-                }
-                resolve();
-              })
-              .catch(error => {
-                this.emit("MessageFailed", {
-                  name: names[i],
-                  number: numbers[i],
-                  error: error.message,
-                  progress: {
-                    current: i + 1,
-                    total,
-                    successCount,
-                    failCount: failCount + 1
-                  }
-                });
-                resolve();
-              });
-          });
-
-          sendPromises.push(sendPromise);
-        }
-
-        // Wait for all messages to be processed
-        await Promise.all(sendPromises);
-
-        this.emit("finishedSending", {
-          total,
-          successCount,
-          failCount,
-          date
-        });
-
-        return {
-          success: true,
-          total,
-          successCount,
-          failCount
-        };
-      } catch (error) {
-        console.error("Error in send operation:", error);
-        throw error;
-      }
-    }, 120000, 2); // 2 minute timeout, 2 retries
-  }
-
-  /**
-   * Send a single message with tracking
-   * @param {string} number - Recipient number
-   * @param {string} message - Message content
-   * @param {string} dbId - Database ID for this message
-   * @param {string} name - Recipient name
-   * @param {string} date - Date for this message
-   * @returns {Promise<Object>} - Send result
-   */
-  async sendMessageWithTracking(number, message, dbId, name, date) {
-    try {
-      const client = await this.getClient();
-
-      // Validate number format (add any validation logic here)
-      if (!number.includes('@c.us')) {
-        // If number doesn't include WhatsApp suffix, try to get number ID
-        const numberDetails = await client.getNumberId(number);
-        if (!numberDetails) {
-          console.log(`${number} is not registered on WhatsApp`);
-          return {
-            success: false,
-            error: 'Number not registered on WhatsApp'
-          };
-        }
-
-        // Use the serialized number
-        number = numberDetails._serialized;
-      }
-
-      // Send the message
-      const messageData = await client.sendMessage(number, message);
-      const messageId = messageData.id.id;
-
-      // Create a promise for delivery tracking
-      const deliveryPromise = new Promise((resolve) => {
-        // Set up a timeout for delivery tracking (10 minutes)
-        setTimeout(() => {
-          if (this.messageAckTracking.has(messageId)) {
-            // If still tracking after timeout, consider it sent but not confirmed
-            resolve(1); // 1 = sent to server but not delivered
-            this.messageAckTracking.delete(messageId);
-          }
-        }, 600000);
-      });
-
-      // Store message tracking info with the date
-      this.messageAckTracking.set(messageId, {
-        dbId,
-        number,
-        name,
-        sent: Date.now(),
-        resolve: (ack) => deliveryPromise.resolve?.(ack),
-        date // Store the date for use in status updates
-      });
-
-      // Update database with initial send status
-      await updateWhatsAppStatus([dbId], [messageId], 1); // 1 = message sent to server
-
-      return {
-        success: true,
-        messageId,
-        deliveryPromise
-      };
-    } catch (error) {
-      console.error(`Error sending message to ${number}:`, error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
-
-  /**
-   * Generate delivery report using message_ack events
-   * @param {string} date - Date to report on
-   * @returns {Promise<Object>} - Report results
-   */
-  async report(date) {
-    return this.queueOperation(async (client) => {
-      try {
-        // Get messages to check
-        const messages = await getWhatsAppDeliveryStatus(date);
-        let updated = 0;
-        let notFound = 0;
-
-        // Process each message
-        for (const message of messages) {
-          try {
-            // Skip messages without a WhatsApp message ID
-            if (!message.wamid) {
-              message.ack = -1;
-              notFound++;
-              continue;
-            }
-
-            // Try to find chat by number
-            const id = await client.getNumberId(message.num);
-            if (!id) {
-              console.log(`Number not found: ${message.num}`);
-              message.ack = -1;
-              notFound++;
-              continue;
-            }
-
-            // Get chat and messages
-            const chat = await client.getChatById(id._serialized);
-            if (!chat) {
-              console.log("No chat found for number:", message.num);
-              message.ack = -1;
-              notFound++;
-              continue;
-            }
-
-            // Fetch messages and find the one with matching ID
-            const msgs = await chat.fetchMessages({ limit: 30 }); // Optimize by limiting number of messages
-            let found = false;
-
-            for (const msg of msgs) {
-              if (msg.id.id === message.wamid) {
-                message.ack = msg.ack;
-                updated++;
-                found = true;
-                break;
-              }
-            }
-
-            if (!found) {
-              message.ack = -1;
-              notFound++;
-            }
-          } catch (error) {
-            console.error(`Error processing ${message.num}:`, error);
-            message.ack = -1;
-            notFound++;
-          }
-        }
-
-        // Update delivery status
-        await updateWhatsAppDeliveryStatus(messages);
-
-        const result = {
-          date,
-          total: messages.length,
-          updated,
-          notFound
-        };
-
-        this.emit("finish_report", result);
-
-        return result;
-      } catch (error) {
-        console.error("Error in report operation:", error);
-        throw error;
-      }
-    }, 300000, 1); // 5 minute timeout, 1 retry
-  }
-
-  /**
-   * Clear all chats
-   * @returns {Promise<Object>} - Success status
-   */
-  async clear() {
-    return this.queueOperation(async (client) => {
-      try {
-        const chats = await client.getChats();
-        let clearedCount = 0;
-
-        await Promise.all(chats.map(async (chat) => {
-          try {
-            await chat.clearMessages();
-            clearedCount++;
-          } catch (error) {
-            console.error(`Error clearing chat ${chat.name}:`, error);
-          }
-        }));
-
-        return {
-          success: true,
-          totalChats: chats.length,
-          clearedCount
-        };
-      } catch (error) {
-        console.error("Error clearing chats:", error);
-        return {
-          success: false,
-          error: error.message
-        };
-      }
-    }, 60000, 1); // 1 minute timeout, 1 retry
+  isReady() {
+    return !!whatsappClient && messageState.clientReady;
   }
 
   /**
    * Get the status of the WhatsApp client
-   * @returns {Object} Client status information
+   * @returns {Object} - Status information
    */
   getStatus() {
     return {
-      state: this.clientState,
-      queueLength: this.operationQueue.length,
-      lastActivity: this.lastActivity,
-      connected: this.client !== null && this.clientState === 'ready',
-      trackedMessages: this.messageAckTracking.size
+      active: this.isReady(),
+      initializing: isInitializing,
+      lastActivity,
+      reconnectAttempts,
+      qrCode: messageState.qr
     };
+  }
+
+  /**
+   * Initialize the WhatsApp client
+   * @returns {Promise<boolean>} - Whether initialization was successful
+   */
+  async initialize() {
+    // Use module-level implementation
+    return initializeClient();
+  }
+
+  /**
+   * Restart the WhatsApp client
+   * @returns {Promise<boolean>} - Whether restart was successful
+   */
+  async restart() {
+    // Use module-level implementation
+    return restartClient();
+  }
+
+  /**
+   * Send WhatsApp messages for a specific date
+   * @param {string} date - Date to send messages for
+   */
+  async send(date) {
+    // Check if client is ready
+    if (!this.isReady()) {
+      console.error("WhatsApp client not ready to send messages");
+      return;
+    }
+    
+    try {
+      console.log(`Sending WhatsApp messages for date: ${date}`);
+      
+      // Get messages to send
+      const [numbers, messages, ids, names] = await database.getWhatsAppMessages(date);
+      
+      if (!numbers || numbers.length === 0) {
+        console.log(`No messages to send for date ${date}`);
+        messageState.finishedSending = true;
+        this.emit('finishedSending');
+        return;
+      }
+      
+      console.log(`Sending ${numbers.length} messages`);
+      
+      // Process each message
+      for (let i = 0; i < numbers.length; i++) {
+        try {
+          const number = numbers[i];
+          const chatId = `${number}@c.us`;
+          
+          // Send the message using the persistent client
+          const message = await whatsappClient.sendMessage(chatId, messages[i]);
+          
+          // Process sent message
+          console.log(`Message sent to ${number}`);
+          
+          // Emit event with message details
+          this.emit('MessageSent', {
+            messageId: message.id.id,
+            name: names[i],
+            number
+          });
+          
+          // Add small delay between messages to avoid rate limiting
+          if (i < numbers.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } catch (error) {
+          console.error(`Error sending message to ${numbers[i]}: ${error.message}`);
+          
+          // Emit failure event
+          this.emit('MessageFailed', {
+            name: names[i],
+            number: numbers[i]
+          });
+        }
+      }
+      
+      // Update finished state
+      messageState.finishedSending = true;
+      this.emit('finishedSending');
+      
+    } catch (error) {
+      console.error(`Error in send process: ${error.message}`);
+    }
+  }
+
+  /**
+   * Generate report for a specific date
+   * @param {string} date - Date to report on
+   */
+  async report(date) {
+    // Check if client is ready
+    if (!this.isReady()) {
+      console.error("WhatsApp client not ready for report generation");
+      return;
+    }
+    
+    try {
+      console.log(`Generating WhatsApp report for date: ${date}`);
+      
+      // Your existing report generation logic...
+      // Use whatsappClient for any client operations
+      
+      // When finished:
+      this.emit('finish_report', date);
+    } catch (error) {
+      console.error(`Error generating report: ${error.message}`);
+    }
+  }
+
+  /**
+   * Clear message state
+   */
+  async clear() {
+    console.log("Clearing message state");
+    messageState.reset();
   }
 }
 
+/**
+ * Initialize the WhatsApp client once and maintain the connection
+ * @returns {Promise<boolean>} - Promise resolving to true if initialization successful
+ */
+async function initializeClient() {
+  // Prevent multiple initialization attempts
+  if (whatsappClient || isInitializing) {
+    return !!whatsappClient;
+  }
+  
+  try {
+    isInitializing = true;
+    console.log("Initializing persistent WhatsApp client");
+    
+    // Create client using your existing code
+    const { Client, LocalAuth } = require('whatsapp-web.js');
+    
+    whatsappClient = new Client({
+      authStrategy: new LocalAuth({ clientId: "client" }),
+      puppeteer: {
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu'
+        ]
+      }
+    });
+    
+    // Set up event handlers before initialization
+    setupEventHandlers();
+    
+    // Initialize the client
+    await whatsappClient.initialize();
+    
+    console.log("WhatsApp client initialized successfully");
+    messageState.clientReady = true;
+    reconnectAttempts = 0; // Reset reconnect counter on successful connection
+    lastActivity = Date.now();
+    
+    return true;
+  } catch (error) {
+    console.error(`WhatsApp client initialization failed: ${error.message}`);
+    whatsappClient = null;
+    messageState.clientReady = false;
+    
+    // Schedule reconnect if not manually disconnected
+    if (!messageState.manualDisconnect) {
+      scheduleReconnect();
+    }
+    
+    return false;
+  } finally {
+    isInitializing = false;
+  }
+}
 
+/**
+ * Setup WhatsApp client event handlers
+ */
+function setupEventHandlers() {
+  if (!whatsappClient) return;
+  
+  whatsappClient.on('qr', (qr) => {
+    console.log('QR Code received');
+    messageState.qr = qr;
+    
+    // Emit event for WebSocket clients
+    if (wsEmitter) {
+      wsEmitter.emit("qr", qr);
+    }
+  });
+  
+  whatsappClient.on('ready', () => {
+    console.log('WhatsApp client is ready');
+    messageState.clientReady = true;
+    messageState.qr = null;
+    lastActivity = Date.now();
+    
+    // Emit event for WebSocket clients
+    if (wsEmitter) {
+      wsEmitter.emit('ClientIsReady');
+    }
+  });
+  
+  whatsappClient.on('message_ack', async (msg, ack) => {
+    const messageId = msg.id.id;
+    console.log(`Message ${messageId} status updated to ${ack}`);
+    
+    // Update message state
+    messageState.updateMessageStatus(messageId, ack);
+    lastActivity = Date.now();
+    
+    // Update database directly
+    try {
+      await database.updateWhatsAppDeliveryStatus([{
+        id: messageId, 
+        ack: ack
+      }]);
+    } catch (error) {
+      console.error(`Error updating message status in database: ${error.message}`);
+    }
+    
+    // Emit event for WebSocket clients
+    if (wsEmitter) {
+      wsEmitter.emit('wa_message_update', messageId, ack);
+    }
+  });
+  
+  whatsappClient.on('disconnected', (reason) => {
+    console.log(`WhatsApp client disconnected: ${reason}`);
+    whatsappClient = null;
+    
+    // Only attempt reconnection if not manually disconnected
+    if (!messageState.manualDisconnect) {
+      scheduleReconnect();
+    } else {
+      messageState.clientReady = false;
+    }
+  });
+  
+  whatsappClient.on('auth_failure', (error) => {
+    console.error(`WhatsApp authentication failed: ${error.message}`);
+    whatsappClient = null;
+    messageState.clientReady = false;
+    
+    // Schedule reconnect to retry authentication
+    scheduleReconnect();
+  });
+}
 
-// Export a singleton instance
-export default new WhatsAppService();
+/**
+ * Schedule reconnection attempt with exponential backoff
+ */
+function scheduleReconnect() {
+  reconnectAttempts++;
+  
+  if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+    console.log(`Exceeded maximum reconnection attempts (${MAX_RECONNECT_ATTEMPTS})`);
+    messageState.clientReady = false;
+    return;
+  }
+  
+  // Calculate backoff delay with jitter
+  const delay = Math.min(
+    RECONNECT_DELAY * Math.pow(1.5, reconnectAttempts - 1), // Exponential backoff
+    60000 // Max 1 minute delay
+  ) * (0.75 + Math.random() * 0.5); // Add 25% jitter
+  
+  console.log(`Scheduling reconnection attempt ${reconnectAttempts} in ${Math.round(delay)}ms`);
+  
+  setTimeout(() => {
+    console.log(`Attempting to reconnect (attempt ${reconnectAttempts})`);
+    initializeClient().catch(err => {
+      console.error('Error during reconnection attempt:', err);
+    });
+  }, delay);
+}
 
+/**
+ * Restart the WhatsApp client
+ * @returns {Promise<boolean>} - Promise resolving to true if restart successful
+ */
+async function restartClient() {
+  console.log("Restarting WhatsApp client");
+  
+  // Set manual disconnect flag to prevent auto-reconnect
+  messageState.manualDisconnect = true;
+  
+  // Disconnect existing client if any
+  if (whatsappClient) {
+    try {
+      await whatsappClient.logout();
+      console.log("Existing client disconnected");
+    } catch (error) {
+      console.error(`Error disconnecting client: ${error.message}`);
+    }
+    
+    whatsappClient = null;
+  }
+  
+  // Reset state
+  messageState.reset();
+  messageState.manualDisconnect = false;
+  reconnectAttempts = 0;
+  
+  // Initialize new client
+  return initializeClient();
+}
 
+// Create and export singleton instance
+const whatsappService = new WhatsAppService();
+
+// Auto-initialize the client when the module is first imported
+(async function() {
+  try {
+    // Small delay to ensure other services are initialized
+    setTimeout(() => {
+      console.log("Auto-initializing WhatsApp client");
+      initializeClient().catch(err => {
+        console.error("Error during auto-initialization:", err);
+      });
+    }, 5000);
+  } catch (error) {
+    console.error("Failed to auto-initialize WhatsApp client:", error);
+  }
+})();
+
+export default whatsappService;

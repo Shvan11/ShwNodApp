@@ -188,42 +188,7 @@ router.get('/clear', (req, res) => {
     res.sendFile('./public/clear.html', { root: '.' });
 });
 
-// Modify the /update endpoint to be more reliable
-router.get('/update', (req, res) => {
-    console.log("Update endpoint called, messageState:", messageState.dump());
 
-    let html = '';
-    let finished = messageState.finishedSending;
-
-    if (messageState.clientReady) {
-        if (finished) {
-            html = `<p>${messageState.sentMessages} Messages Sent!</p><p>${messageState.failedMessages} Messages Failed!</p><p>Finished</p>`;
-        } else {
-            html = `<p>${messageState.sentMessages} Messages Sent!</p><p>${messageState.failedMessages} Messages Failed!</p><p>Sending...</p>`;
-        }
-    } else if (messageState.qr) {
-        html = '<p>QR code ready...</p>';
-    } else {
-        html = '<p>Initializing the client...</p>';
-    }
-
-    // Get status updates from messageState
-    const statusUpdates = messageState.getStatusUpdates();
-
-    console.log("Sending status updates:", statusUpdates);
-    // Always return the current state
-    res.json({
-        htmltext: html,
-        finished,
-        clientReady: messageState.clientReady,
-        persons: messageState.persons,
-        qr: messageState.qr,
-        statusUpdates // Include status updates in response
-    });
-
-    // Reset change flag after sending
-    messageState.change = false;
-});
 router.get('/sendtwilio', async (req, res) => {
     const dateparam = req.query.date;
     try {
@@ -263,20 +228,42 @@ router.get('/updaterp', (req, res) => {
 });
 
 
+
 router.get('/wa/send', (req, res) => {
+   
     const dateparam = req.query.date;
+    
+    // Check if client is ready
+    if (!whatsapp.isReady()) {
+      return res.status(400).json({
+        success: false,
+        message: "WhatsApp client is not ready. Please wait for initialization to complete.",
+        clientStatus: whatsapp.getStatus()
+      });
+    }
+    
+    console.log(`Starting WhatsApp send process for date: ${dateparam}`);
+    
+    // Call the send method without waiting for it to complete
     whatsapp.send(dateparam);
-    res.json({ htmltext: 'Starting...' });
+    
+    // Respond immediately
+    res.json({ 
+      success: true, 
+      message: "WhatsApp sending process started",
+      htmltext: 'Starting...'
+    });
+    
+    // REMOVE THIS TIMEOUT - the persistent client handles reporting
+    // const delay = messageState.gturbo ? 300000 : 3600000;
+    // setTimeout(() => { whatsapp.report(dateparam); }, delay);
+  });
 
-    const delay = messageState.gturbo ? 300000 : 3600000;
-    setTimeout(() => { whatsapp.report(dateparam); }, delay);
-});
-
-router.get('/wa/report', (req, res) => {
-    const dateparam = req.query.date;
-    whatsapp.report(dateparam);
-    res.json({ htmltext: 'Starting...' });
-});
+// router.get('/wa/report', (req, res) => {
+//     const dateparam = req.query.date;
+//     whatsapp.report(dateparam);
+//     res.json({ htmltext: 'Starting...' });
+// });
 
 router.post('/sendmedia', async (req, res) => {
     const { file: imgData, phone } = req.body;
@@ -459,6 +446,103 @@ router.delete("/deleteVisit", async (req, res) => {
         res.status(500).json({ status: 'error', message: error.message });
     }
 });
+
+/**
+ * Get WhatsApp client status
+ * Returns detailed information about the persistent client
+ */
+router.get('/wa/status', (req, res) => {
+    try {
+      const status = whatsapp.getStatus();
+      
+      res.json({
+        success: true,
+        clientReady: status.active,
+        initializing: status.initializing,
+        lastActivity: status.lastActivity,
+        reconnectAttempts: status.reconnectAttempts,
+        qr: messageState.qr
+      });
+    } catch (error) {
+      console.error("Error getting WhatsApp client status:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to get WhatsApp client status",
+        error: error.message
+      });
+    }
+  });
+
+  /**
+ * Restart WhatsApp client
+ * Safely closes the existing client and creates a new one
+ */
+router.post('/wa/restart', async (req, res) => {
+    try {
+      console.log("Restarting WhatsApp client");
+      
+      const success = await whatsapp.restart();
+      
+      res.json({
+        success: true,
+        message: "WhatsApp client restart initiated",
+        result: success ? "restart_initiated" : "restart_failed"
+      });
+    } catch (error) {
+      console.error("Error restarting WhatsApp client:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to restart WhatsApp client",
+        error: error.message
+      });
+    }
+  });
+
+  // Find this route
+router.get('/update', (req, res) => {
+    // Modify it as follows:
+    
+    console.log("Update endpoint called, messageState:", messageState.dump());
+  
+    let html = '';
+    let finished = messageState.finishedSending;
+    
+    // Get client status from WhatsApp service
+    const clientStatus = whatsapp.getStatus();
+  
+    if (messageState.clientReady || clientStatus.active) {
+      if (finished) {
+        html = `<p>${messageState.sentMessages} Messages Sent!</p><p>${messageState.failedMessages} Messages Failed!</p><p>Finished</p>`;
+      } else {
+        html = `<p>${messageState.sentMessages} Messages Sent!</p><p>${messageState.failedMessages} Messages Failed!</p><p>Sending...</p>`;
+      }
+    } else if (messageState.qr) {
+      html = '<p>QR code ready...</p>';
+    } else {
+      html = '<p>Initializing the client...</p>';
+    }
+  
+    // Get status updates from messageState
+    const statusUpdates = messageState.getStatusUpdates ? messageState.getStatusUpdates() : [];
+  
+    // Always return the current state
+    res.json({
+      htmltext: html,
+      finished,
+      clientReady: messageState.clientReady || clientStatus.active,
+      clientStatus: clientStatus,
+      persons: messageState.persons,
+      qr: messageState.qr,
+      statusUpdates
+    });
+  
+    // Reset change flag after sending
+    if (messageState.change) {
+      messageState.change = false;
+    }
+  });
+
+
 
 // Helper functions
 async function sendSMSNoti(date) {
