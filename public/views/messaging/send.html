@@ -5,6 +5,34 @@
     <link rel="stylesheet" href="css/main.css" />
     <link rel="stylesheet" href="css/pages/send.css" />
     <title>Shwan Orthodontics - WhatsApp Sender</title>
+    <style>
+        /* Additional styles for the restart button */
+        .warning-button {
+            background-color: #f0ad4e;
+            border-color: #eea236;
+        }
+        
+        .warning-button:hover {
+            background-color: #ec971f;
+            border-color: #d58512;
+        }
+        
+        .attention {
+            animation: pulse 1.5s infinite;
+            font-weight: bold;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        #restart-button-container {
+            margin: 10px 0;
+            display: none;
+        }
+    </style>
 </head>
 
 <body>
@@ -18,7 +46,10 @@
             <img id="qr" style="display: none;">
         </div>
         
-        <button id="startSendingBtn" class="action-button">Start Sending Messages</button>
+        <!-- New restart button container -->
+        <div id="restart-button-container" class="button-container"></div>
+        
+        <button id="startSendingBtn" class="action-button" style="display: none;">Start Sending Messages</button>
         
         <div id="table-container" class="results-container"></div>
     </div>

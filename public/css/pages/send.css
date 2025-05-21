@@ -160,3 +160,77 @@ tr.false {
       font-size: 14px;
   }
 }
+
+/* Add these styles to your existing send.css file */
+
+/* Status badges for messages */
+.status-pending {
+  color: #f39c12;
+  font-weight: bold;
+}
+
+.status-sent {
+  color: #27ae60;
+  font-weight: bold;
+}
+
+.status-delivered {
+  color: #2980b9;
+  font-weight: bold;
+}
+
+.status-read {
+  color: #8e44ad;
+  font-weight: bold;
+}
+
+.status-error {
+  color: #c0392b;
+  font-weight: bold;
+}
+
+/* Button styles */
+.action-button {
+  padding: 10px 20px;
+  font-size: 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin: 10px 0;
+  background-color: #2ecc71;
+  color: white;
+  border: none;
+  transition: background-color 0.3s, transform 0.2s;
+}
+
+.action-button:hover {
+  background-color: #27ae60;
+  transform: translateY(-2px);
+}
+
+.action-button:disabled {
+  background-color: #95a5a6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.warning-button {
+  background-color: #f0ad4e;
+  border-color: #eea236;
+}
+
+.warning-button:hover {
+  background-color: #ec971f;
+  border-color: #d58512;
+}
+
+/* Animation for urgent restart button */
+.attention {
+  animation: pulse 1.5s infinite;
+  box-shadow: 0 0 10px rgba(240, 173, 78, 0.7);
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}

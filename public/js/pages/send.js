@@ -3,6 +3,7 @@
 /**
  * WhatsApp Messaging Application
  * Handles the UI and communication for sending WhatsApp messages
+ * Updated for persistent WhatsApp client
  */
 class WhatsAppMessenger {
     /**
@@ -24,20 +25,66 @@ class WhatsAppMessenger {
         this.sendingStarted = false;
         this.initAttempt = 0;  // Count initialization attempts
         this.maxInitAttempts = 5;  // Maximum number of attempts before showing retry button
-
+        this.statusUpdateQueue = new Map(); // Queue for status updates to avoid duplicates
+        // QR code handling properties
+        this.qrFetchInProgress = false;
+        this.qrRefreshTimer = null;
+        this.qrExpiryTime = null;
         // DOM elements
         this.stateElement = document.getElementById("state");
         this.startButton = document.getElementById("startSendingBtn");
         this.qrImage = document.getElementById("qr");
         this.tableContainer = document.getElementById("table-container");
+        this.restartButtonContainer = document.getElementById("restart-button-container");
+
+
+        // Register page visibility change detection
+        document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
+
+        // Register as QR viewer when page loads
+        this.registerAsQRViewer();
+
+        // Register cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            this.unregisterAsQRViewer();
+        });
+
+
 
         // Event bindings
         this.bindEvents();
-        
+
         // Initialize
         this.init();
     }
-
+// Add these methods
+registerAsQRViewer() {
+    fetch('/api/wa/register-qr-viewer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    }).catch(err => console.error("Failed to register as QR viewer:", err));
+  }
+  
+  unregisterAsQRViewer() {
+    // Use sendBeacon for more reliable delivery during page unload
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/wa/unregister-qr-viewer');
+    } else {
+      // Fallback to fetch with keepalive
+      fetch('/api/wa/unregister-qr-viewer', {
+        method: 'POST',
+        keepalive: true
+      }).catch(() => {}); // Ignore errors during page unload
+    }
+  }
+  
+  handleVisibilityChange() {
+    if (document.visibilityState === 'visible') {
+      this.registerAsQRViewer();
+    } else {
+      this.unregisterAsQRViewer();
+    }
+  }
     /**
      * Bind DOM events
      */
@@ -50,7 +97,7 @@ class WhatsAppMessenger {
                     this.retryInitialization();
                     return;
                 }
-                
+
                 // Normal send action
                 this.startSending();
                 this.startButton.disabled = true;
@@ -68,25 +115,104 @@ class WhatsAppMessenger {
     }
 
     /**
+     * Add restart button to UI
+     */
+    addRestartButton() {
+        if (!this.restartButtonContainer) return;
+
+        // Remove any existing restart button
+        const existingButton = document.getElementById('restartClientBtn');
+        if (existingButton) {
+            existingButton.remove();
+        }
+
+        // Create restart button
+        const restartButton = document.createElement('button');
+        restartButton.id = 'restartClientBtn';
+        restartButton.className = 'action-button warning-button';
+        restartButton.textContent = 'Restart WhatsApp Client';
+        restartButton.addEventListener('click', () => this.restartClient());
+
+        // Add to container
+        this.restartButtonContainer.appendChild(restartButton);
+        this.restartButtonContainer.style.display = 'block';
+    }
+
+    /**
+     * Restart WhatsApp client
+     */
+    async restartClient() {
+        console.log("Restarting WhatsApp client");
+
+        // Update UI
+        this.updateState('<div class="loader"></div> Restarting WhatsApp client...');
+
+        // Disable restart button during restart
+        const restartButton = document.getElementById('restartClientBtn');
+        if (restartButton) {
+            restartButton.disabled = true;
+            restartButton.textContent = 'Restarting...';
+        }
+
+        try {
+            // Call restart endpoint
+            const response = await fetch(`${window.location.origin}/api/wa/restart`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+            console.log("Restart response:", data);
+
+            // Update UI with restart status
+            this.updateState(data.message || 'Restarting WhatsApp client...');
+
+            // Reset state
+            this.clientReadyShown = false;
+            this.initAttempt = 0;
+
+            // Start polling for updates
+            this.startPolling();
+
+            // Re-enable restart button
+            if (restartButton) {
+                restartButton.disabled = false;
+                restartButton.textContent = 'Restart WhatsApp Client';
+            }
+        } catch (error) {
+            console.error("Error restarting WhatsApp client:", error);
+            this.updateState('Error restarting WhatsApp client. Please try again.');
+
+            // Re-enable restart button
+            if (restartButton) {
+                restartButton.disabled = false;
+                restartButton.textContent = 'Retry Restart';
+            }
+        }
+    }
+
+    /**
      * Retry WhatsApp client initialization
      */
     retryInitialization() {
         console.log("Retrying WhatsApp client initialization");
-        
+
         // Reset initialization state
         this.initAttempt = 0;
-        
+
         // Update UI
         this.updateState('<div class="loader"></div> Reinitializing WhatsApp client...');
         this.startButton.style.display = 'none';
-        
+
         // Fetch to restart the WhatsApp client
         fetch(`${window.location.origin}/api/wa/restart`, { method: 'POST' })
             .then(response => response.json())
             .then(data => {
                 console.log("Restart response:", data);
                 this.updateState(data.message || 'Restarting WhatsApp client...');
-                
+
                 // Reconnect WebSocket and restart polling
                 this.connectWebSocket();
                 this.loadState();
@@ -104,6 +230,9 @@ class WhatsAppMessenger {
         console.log("Initializing with date:", this.dateparam);
         this.connectWebSocket();
         this.loadState();
+
+        // Add restart button after initialization
+        setTimeout(() => this.addRestartButton(), 2000);
     }
 
     /**
@@ -199,6 +328,22 @@ class WhatsAppMessenger {
                 this.updateQR(data.qr);
             }
 
+            // Handle client status information
+            if (data.clientStatus) {
+                // Show information about the persistent client
+                const statusInfo = data.clientStatus;
+                console.log("Client status received:", statusInfo);
+
+                // If client is inactive for too long, show restart button more prominently
+                if (statusInfo.lastActivity && this.calculateInactiveTime(statusInfo.lastActivity) > 300000) { // 5 minutes
+                    this.addRestartButton();
+                    const restartBtn = document.getElementById('restartClientBtn');
+                    if (restartBtn) {
+                        restartBtn.classList.add('attention');
+                    }
+                }
+            }
+
             // Check for client ready status
             // Added fallback check for clientReady property at the top level
             if ((data.clientReady || data.tableData?.clientReady) && !this.clientReadyShown && !this.sendingStarted) {
@@ -208,14 +353,41 @@ class WhatsAppMessenger {
                 this.startButton.dataset.action = 'send';
             }
 
+            // Process batch status updates
+            if (data.statusUpdates && Array.isArray(data.statusUpdates)) {
+                console.log(`Processing ${data.statusUpdates.length} status updates from WebSocket`);
+                data.statusUpdates.forEach(update => {
+                    this.updateMessageStatus(update.messageId, update.status);
+                });
+
+                // Update table after processing all updates
+                this.createTable(this.persons);
+            }
+
             // Still track finished state
             if (data.finished && !this.finished) {
                 this.finished = true;
                 this.updateFinishedState();
             }
+
+
+
+
         } catch (error) {
             console.error("Error parsing WebSocket message:", error);
         }
+
+
+
+    }
+
+    /**
+     * Calculate time difference in milliseconds
+     * @param {number} timestamp - Timestamp to compare with now
+     * @returns {number} - Time difference in milliseconds
+     */
+    calculateInactiveTime(timestamp) {
+        return Date.now() - timestamp;
     }
 
     /**
@@ -223,6 +395,18 @@ class WhatsAppMessenger {
      */
     async sendWa() {
         try {
+            // First check client status
+            const statusResponse = await fetch(`${window.location.origin}/api/wa/status`);
+            const statusData = await statusResponse.json();
+
+            if (!statusData.clientReady) {
+                alert("WhatsApp client is not ready. Please wait for initialization to complete or restart the client.");
+                this.startButton.disabled = false;
+                return;
+            }
+
+            console.log("Client is ready, sending messages for date:", this.dateparam);
+
             // Use fetch with no-redirect options
             const response = await fetch(`${window.location.origin}/api/wa/send?date=${this.dateparam}`, {
                 redirect: 'follow'
@@ -230,13 +414,14 @@ class WhatsAppMessenger {
 
             const data = await response.json();
             console.log("sendWa response:", data);
-            this.updateState(data.htmltext);
+            this.updateState(data.htmltext || 'Starting to send messages...');
 
             // Always ensure polling is active as fallback
             this.startPolling();
         } catch (error) {
             console.error('Error sending WA:', error);
-            this.updateState('Error starting process');
+            this.updateState('Error starting process. Please try restarting the client.');
+            this.startButton.disabled = false;
             this.startPolling();
         }
     }
@@ -284,7 +469,7 @@ class WhatsAppMessenger {
                 // Increment the initialization attempt counter
                 this.initAttempt++;
                 console.log(`Initialization attempt ${this.initAttempt} of ${this.maxInitAttempts}`);
-                
+
                 // If we've reached max attempts, show the retry button
                 if (this.initAttempt >= this.maxInitAttempts) {
                     console.log("Max initialization attempts reached, showing retry button");
@@ -307,11 +492,30 @@ class WhatsAppMessenger {
                 data.statusUpdates.forEach(update => {
                     this.updateMessageStatus(update.messageId, update.status);
                 });
+
+                // Update table only once after processing all updates
+                this.createTable(this.persons);
             }
 
             // Update QR code if needed
             if (data.qr) {
                 this.updateQR(data.qr);
+            }
+
+            // Check client status for potential issues
+            if (data.clientStatus) {
+                // If client has been inactive for too long, show restart button prominently
+                if (data.clientStatus.lastActivity) {
+                    const inactiveTime = this.calculateInactiveTime(data.clientStatus.lastActivity);
+                    if (inactiveTime > 300000) { // 5 minutes
+                        console.log(`Client inactive for ${inactiveTime}ms, showing restart button`);
+                        this.addRestartButton();
+                        const restartBtn = document.getElementById('restartClientBtn');
+                        if (restartBtn) {
+                            restartBtn.classList.add('attention');
+                        }
+                    }
+                }
             }
 
             // Handle finished state
@@ -360,6 +564,15 @@ class WhatsAppMessenger {
      * @param {number} status - Status code
      */
     updateMessageStatus(messageId, status) {
+        // Skip duplicate updates by using a queue with debouncing
+        const existingUpdate = this.statusUpdateQueue.get(messageId);
+        if (existingUpdate && existingUpdate.status >= status) {
+            return; // Skip if we already have a higher status
+        }
+
+        // Queue this update
+        this.statusUpdateQueue.set(messageId, { messageId, status, timestamp: Date.now() });
+
         console.log(`Updating message status: ${messageId} -> ${status}`);
 
         // Find the person with this message ID
@@ -370,8 +583,7 @@ class WhatsAppMessenger {
             const currentStatus = this.persons[personIndex].status || 0;
             if (status > currentStatus) {
                 this.persons[personIndex].status = status;
-                // Update the table
-                this.createTable(this.persons);
+                // Table will be updated after processing all queued updates
             }
         } else {
             console.log(`Message ID ${messageId} not found in persons array`);
@@ -530,12 +742,135 @@ class WhatsAppMessenger {
      * Update QR code image
      * @param {string} qr - QR code data URL
      */
+    // Update this method
     updateQR(qr) {
-        if (this.qrImage) {
-            this.qrImage.src = qr;
-            this.qrImage.style.display = 'block';
+        if (!this.qrImage) return;
+
+        // Clear any existing QR refresh timers
+        if (this.qrRefreshTimer) {
+            clearTimeout(this.qrRefreshTimer);
+            this.qrRefreshTimer = null;
+        }
+
+        if (!qr) {
+            // No QR code provided
+            this.qrImage.style.display = 'none';
+            this.updateQRErrorState("Waiting for QR code...");
+
+            // Start fetching QR code after a short delay
+            this.qrRefreshTimer = setTimeout(() => this.fetchQRImage(), 2000);
+            return;
+        }
+
+        // Check if we need to fetch the QR image
+        if (typeof qr === 'string') {
+            if (qr.startsWith('data:image')) {
+                // It's a data URL, use directly
+                this.qrImage.src = qr;
+                this.qrImage.style.display = 'block';
+
+                // Hide any error message
+                const errorElement = document.getElementById('qr-error');
+                if (errorElement) errorElement.style.display = 'none';
+            } else {
+                // It's not a data URL, fetch the image
+                this.fetchQRImage();
+            }
+        } else {
+            console.error("Invalid QR code format received:", typeof qr);
+            this.updateQRErrorState("Invalid QR code format received");
+
+            // Retry after delay
+            this.qrRefreshTimer = setTimeout(() => this.fetchQRImage(), 5000);
         }
     }
+
+    async fetchQRImage() {
+        if (this.qrFetchInProgress) return; // Prevent multiple simultaneous requests
+
+        try {
+            this.qrFetchInProgress = true;
+
+            // Show loading state
+            this.updateQRLoadingState(true);
+
+            const response = await fetch('/api/wa/qr');
+            const data = await response.json();
+
+            if (response.ok && data.qr) {
+                console.log("QR code fetched successfully");
+                this.qrImage.src = data.qr;
+                this.qrImage.style.display = 'block';
+
+                // If QR code has expiry time, schedule a refresh
+                if (data.expiryTime) {
+                    const timeToExpiry = data.expiryTime - Date.now();
+                    if (timeToExpiry > 0) {
+                        // Refresh QR code 5 seconds before expiry
+                        setTimeout(() => this.fetchQRImage(), Math.max(timeToExpiry - 5000, 1000));
+                    }
+                }
+
+                // Hide any error message
+                const errorElement = document.getElementById('qr-error');
+                if (errorElement) errorElement.style.display = 'none';
+            } else {
+                // QR code not available yet
+                console.log("QR code not available yet:", data.error || "Unknown error");
+                this.updateQRErrorState(data.error || "QR code not available yet");
+
+                // Retry after 3 seconds
+                setTimeout(() => this.fetchQRImage(), 3000);
+            }
+        } catch (error) {
+            console.error("Error fetching QR code:", error);
+            this.updateQRErrorState("Failed to fetch QR code. Retrying...");
+
+            // Retry after 5 seconds on error
+            setTimeout(() => this.fetchQRImage(), 5000);
+        } finally {
+            this.qrFetchInProgress = false;
+            this.updateQRLoadingState(false);
+        }
+    }
+
+    // Add new helper methods for QR code display states
+    updateQRLoadingState(isLoading) {
+        // Create or update loading indicator
+        let loadingElement = document.getElementById('qr-loading');
+        if (!loadingElement && isLoading) {
+            loadingElement = document.createElement('div');
+            loadingElement.id = 'qr-loading';
+            loadingElement.className = 'qr-loading';
+            loadingElement.innerHTML = '<div class="loader"></div><p>Loading QR code...</p>';
+
+            const qrContainer = this.qrImage.parentElement;
+            qrContainer.appendChild(loadingElement);
+        } else if (loadingElement) {
+            loadingElement.style.display = isLoading ? 'block' : 'none';
+        }
+    }
+
+    updateQRErrorState(errorMessage) {
+        // Create or update error message
+        let errorElement = document.getElementById('qr-error');
+        if (!errorElement) {
+            errorElement = document.createElement('div');
+            errorElement.id = 'qr-error';
+            errorElement.className = 'qr-error';
+
+            const qrContainer = this.qrImage.parentElement;
+            qrContainer.appendChild(errorElement);
+        }
+
+        errorElement.innerHTML = `<p>${errorMessage}</p>`;
+        errorElement.style.display = 'block';
+
+        // Hide the QR image if there's an error
+        this.qrImage.style.display = 'none';
+    }
+
+
 
     /**
      * Update UI for finished state
@@ -556,12 +891,12 @@ class WhatsAppMessenger {
             `;
         }
 
-        // Only stop polling, but keep WebSocket open for status updates
+        // Continue receiving updates via WebSocket, but stop polling
         if (this.pollingInterval) {
             clearInterval(this.pollingInterval);
             this.pollingInterval = null;
         }
-        
+
         // Disable start button
         if (this.startButton) {
             this.startButton.disabled = true;

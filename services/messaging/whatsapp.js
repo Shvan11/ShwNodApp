@@ -5,7 +5,8 @@
 import EventEmitter from 'events';
 import messageState from '../state/messageState.js';
 import * as database from '../database/queries/index.js';
-
+import pkg from 'whatsapp-web.js';
+const { Client, LocalAuth } = pkg;
 // Client state management at module scope
 let whatsappClient = null;  // The actual client instance
 let isInitializing = false; // Flag to prevent multiple initialization attempts
@@ -187,7 +188,7 @@ async function initializeClient() {
     console.log("Initializing persistent WhatsApp client");
     
     // Create client using your existing code
-    const { Client, LocalAuth } = require('whatsapp-web.js');
+    //const { Client, LocalAuth } = require('whatsapp-web.js');
     
     whatsappClient = new Client({
       authStrategy: new LocalAuth({ clientId: "client" }),
@@ -240,12 +241,15 @@ function setupEventHandlers() {
   if (!whatsappClient) return;
   
   whatsappClient.on('qr', (qr) => {
-    console.log('QR Code received');
-    messageState.qr = qr;
-    
-    // Emit event for WebSocket clients
-    if (wsEmitter) {
-      wsEmitter.emit("qr", qr);
+    // Only process QR code if we should be generating them
+    if (messageState.shouldGenerateQR() || !whatsappClient.info?.me) {
+      messageState.qr = qr;
+      messageState.updateActivity('qr-received');
+      whatsappService.emit('qr', qr);
+      wsEmitter.emit('qr', qr);
+      console.log('QR code received, emitting to clients');
+    } else {
+      console.log('QR code received but no active viewers, suppressing');
     }
   });
   

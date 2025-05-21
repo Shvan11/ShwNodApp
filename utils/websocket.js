@@ -2,7 +2,7 @@
 import { WebSocketServer } from 'ws';
 import { EventEmitter } from 'events';
 import * as database from '../services/database/queries/index.js';
-
+import messageState from '../services/state/messageState.js';
 /**
  * WebSocket Connection Manager
  * Manages different types of WebSocket connections
@@ -302,29 +302,37 @@ function setupWebSocketServer(server) {
   // Handle new connections
   wss.on('connection', (ws, req) => {
     console.log('Client connected to WebSocket');
-
+   // Add this at the beginning
+   ws.qrViewerRegistered = false;
     try {
       // Parse query parameters
       const url = new URL(req.url, 'http://localhost');
       const screenID = url.searchParams.get('screenID');
       const date = url.searchParams.get('PDate');
       const clientType = url.searchParams.get('clientType');
-
+  
       console.log(`New connection: screenID=${screenID}, date=${date}, clientType=${clientType}`);
-
+  
       // Register connection based on type
       if (clientType === 'waStatus') {
+        console.log('WhatsApp status client connected');
         // WhatsApp status client
         connectionManager.registerConnection(ws, 'waStatus', {
           date: date,
           ipAddress: req.socket.remoteAddress
         });
-
+        
+       // Register as QR viewer - ONLY if not already registered
+      if (messageState && typeof messageState.registerQRViewer === 'function' && !ws.qrViewerRegistered) {
+        messageState.registerQRViewer();
+        ws.qrViewerRegistered = true; // Mark as registered
+        } else {
+          console.error('Cannot register QR viewer: messageState not available or missing method');
+        }
+        
         // Store date for filtering updates
         ws.waDate = date;
         ws.isWaClient = true;
-
-        console.log('WhatsApp status client connected');
       } else if (screenID) {
         // Regular appointment screen
         connectionManager.registerConnection(ws, 'screen', {
@@ -332,9 +340,9 @@ function setupWebSocketServer(server) {
           date: date,
           ipAddress: req.socket.remoteAddress
         });
-
+  
         console.log(`Screen ${screenID} connected`);
-
+  
         // Send initial data immediately
         sendInitialData(ws, date);
       } else {
@@ -342,10 +350,10 @@ function setupWebSocketServer(server) {
         connectionManager.registerConnection(ws, 'generic', {
           ipAddress: req.socket.remoteAddress
         });
-
+  
         console.log('Generic client connected');
       }
-
+  
       // Handle messages from clients
       ws.on('message', async (message) => {
         try {
@@ -354,20 +362,20 @@ function setupWebSocketServer(server) {
           if (capabilities) {
             capabilities.lastActivity = Date.now();
           }
-
+  
           // Parse message
           let parsedMessage;
           const messageStr = message.toString();
-
+  
           try {
             parsedMessage = JSON.parse(messageStr);
           } catch (e) {
             // Not JSON, use raw message
             parsedMessage = messageStr;
           }
-
+  
           console.log(`Received message: ${typeof parsedMessage === 'string' ? parsedMessage : JSON.stringify(parsedMessage).substring(0, 100)}`);
-
+  
           // Handle message based on type
           if (typeof parsedMessage === 'object' && parsedMessage.type) {
             handleTypedMessage(ws, parsedMessage, date, connectionManager);
@@ -388,18 +396,38 @@ function setupWebSocketServer(server) {
           console.error('Error processing message:', msgError);
         }
       });
-
-      // Handle close
-      ws.on('close', (code, reason) => {
-        connectionManager.unregisterConnection(ws);
-        console.log(`Client disconnected. Code: ${code}, Reason: ${reason || 'unknown'}`);
-      });
-
+  
       // Handle errors
       ws.on('error', (error) => {
         console.error('WebSocket error:', error);
+        
+        // If this was a WhatsApp status client, unregister as QR viewer
+        const capabilities = connectionManager.clientCapabilities.get(ws);
+        if (capabilities && capabilities.type === 'waStatus') {
+          if (messageState && typeof messageState.unregisterQRViewer === 'function') {
+            messageState.unregisterQRViewer();
+          }
+        }
+        
         connectionManager.unregisterConnection(ws);
       });
+  
+   // Handle close event
+ws.on('close', (code, reason) => {
+  // If this was a WhatsApp status client AND was registered as QR viewer, unregister it
+  const capabilities = connectionManager.clientCapabilities.get(ws);
+  if (capabilities && capabilities.type === 'waStatus' && ws.qrViewerRegistered) {
+    if (messageState && typeof messageState.unregisterQRViewer === 'function') {
+      messageState.unregisterQRViewer();
+      console.log("Unregistered QR viewer on connection close");
+    }
+  }
+
+  // Then unregister the connection
+  connectionManager.unregisterConnection(ws);
+  console.log(`Client disconnected. Code: ${code}, Reason: ${reason || 'unknown'}`);
+});
+  
     } catch (error) {
       console.error('Error setting up WebSocket connection:', error);
     }
@@ -590,13 +618,13 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
     const filteredImages = allImages.filter(img =>
       ['.i20', '.i22', '.i21'].some(ext => img.name.toLowerCase().endsWith(ext))
     );
- 
- const sortOrder = ['.i20', '.i22', '.i21'];
- filteredImages.sort((a, b) => {
-   const aExt = sortOrder.find(ext => a.name.toLowerCase().endsWith(ext)) || '';
-   const bExt = sortOrder.find(ext => b.name.toLowerCase().endsWith(ext)) || '';
-   return sortOrder.indexOf(aExt) - sortOrder.indexOf(bExt);
- });
+
+    const sortOrder = ['.i20', '.i22', '.i21'];
+    filteredImages.sort((a, b) => {
+      const aExt = sortOrder.find(ext => a.name.toLowerCase().endsWith(ext)) || '';
+      const bExt = sortOrder.find(ext => b.name.toLowerCase().endsWith(ext)) || '';
+      return sortOrder.indexOf(aExt) - sortOrder.indexOf(bExt);
+    });
 
 
     console.log("Filtered images for patient" + pid + ":", filteredImages);

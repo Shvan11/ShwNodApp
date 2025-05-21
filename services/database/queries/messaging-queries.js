@@ -3,7 +3,7 @@
  * Provides functions for WhatsApp and SMS messaging database operations
  */
 import { Connection, Request, TYPES } from 'tedious';
-import config from '../../config/config.js';
+
 import { executeQuery, executeStoredProcedure } from '../index.js';
 
 /**

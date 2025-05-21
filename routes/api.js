@@ -18,32 +18,7 @@ import messageState from '../services/state/messageState.js';
 const router = express.Router();
 const upload = multer();
 
-// Create a message state singleton to track WhatsApp message status across requests
-class MessageState {
-    constructor() {
-        this.sentMessages = 0;
-        this.failedMessages = 0;
-        this.finishedSending = false;
-        this.finishReport = false;
-        this.clientReady = false;
-        this.change = false;
-        this.persons = [];
-        this.qr = null;
-        this.gturbo = false;
-    }
 
-
-
-    reset() {
-        this.sentMessages = 0;
-        this.failedMessages = 0;
-        this.finishedSending = false;
-        this.qr = null;
-        this.clientReady = false;
-        this.change = false;
-        this.persons = [];
-    }
-}
 
 
 
@@ -322,16 +297,44 @@ router.post('/sendmedia2', upload.none(), async (req, res) => {
     res.json(state);
 });
 
-router.get('/checkqr', (req, res) => {
-    senderClient.on("qr", async (qr) => {
-        try {
-            const myqr = await qrcode.toDataURL(qr);
-            res.json({ qr: myqr });
-        } catch (error) {
-            res.status(500).json({ error: 'Failed to generate QR code' });
-        }
-    });
-});
+// Add this new route
+router.get('/wa/qr', async (req, res) => {
+    try {
+      // Register as QR viewer when QR is requested
+      messageState.registerQRViewer();
+      
+      // Check if QR code is available
+      if (!messageState.qr) {
+        return res.status(404).json({ 
+          error: 'QR code not available yet', 
+          status: 'waiting',
+          timestamp: Date.now()
+        });
+      }
+      
+      // Convert the QR code string to a data URL
+      const qrImageUrl = await qrcode.toDataURL(messageState.qr, {
+        margin: 4,
+        scale: 6,
+        errorCorrectionLevel: 'M'
+      });
+      
+      // Send back as JSON with metadata
+      res.json({ 
+        qr: qrImageUrl, 
+        status: 'available',
+        timestamp: Date.now(),
+        expiryTime: Date.now() + 60000 // QR codes typically expire after 1 minute
+      });
+    } catch (error) {
+      console.error('Error generating WhatsApp QR code image:', error);
+      res.status(500).json({ 
+        error: 'Error generating QR code',
+        status: 'error',
+        message: error.message
+      });
+    }
+  });
 
 router.get("/visitsSummary", async (req, res) => {
     try {
