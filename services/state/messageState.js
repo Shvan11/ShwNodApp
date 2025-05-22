@@ -1,3 +1,5 @@
+// Add import at the top
+import stateEvents from './stateEvents.js';
 // services/state/messageState.js
 class MessageState {
   constructor() {
@@ -18,6 +20,7 @@ class MessageState {
     this.qrLastRequested = null;
     this.qrTimeoutDuration = 5 * 60 * 1000; // 5 minutes
     this.registeredViewerIds = new Set();
+    this.qrCleanupTimer = null;
   }
 
 
@@ -35,6 +38,11 @@ class MessageState {
     this.change = true;
     this.persons = [];
     this.messageStatuses.clear();
+      // Clear any cleanup timer
+  if (this.qrCleanupTimer) {
+    clearTimeout(this.qrCleanupTimer);
+    this.qrCleanupTimer = null;
+  }
     // Don't reset manualDisconnect here - it's managed separately
 
     // Log the reset for debugging
@@ -169,44 +177,74 @@ class MessageState {
 
     return updateCount;
   }
-  registerQRViewer(viewerId) {
-    // If viewer is already registered, do nothing
-    if (this.registeredViewerIds.has(viewerId)) {
-      console.log(`QR viewer ${viewerId} already registered`);
-      return false;
+  // Modify the unregisterQRViewer method
+unregisterQRViewer(viewerId) {
+  // If viewer isn't registered, do nothing
+  if (!this.registeredViewerIds.has(viewerId)) {
+    console.log(`QR viewer ${viewerId} not registered, can't unregister`);
+    return false;
+  }
+  
+  // Unregister the viewer
+  this.registeredViewerIds.delete(viewerId);
+  if (this.activeQRViewers > 0) {
+    this.activeQRViewers--;
+  }
+  this.qrLastRequested = Date.now();
+  console.log(`QR viewer ${viewerId} unregistered. Active viewers: ${this.activeQRViewers}`);
+  
+  // If this was the last viewer, start cleanup timer
+  if (this.activeQRViewers === 0 && !this.clientReady) {
+    // Clear any existing timer
+    if (this.qrCleanupTimer) {
+      clearTimeout(this.qrCleanupTimer);
     }
     
-    // Register new viewer
-    this.registeredViewerIds.add(viewerId);
-    this.activeQRViewers++;
-    this.qrGenerationActive = true;
-    this.qrLastRequested = Date.now();
-    console.log(`QR viewer ${viewerId} registered. Active viewers: ${this.activeQRViewers}`);
-    this.updateActivity('qr-viewer-registered');
-    return true;
+    // Set cleanup timer for 60 seconds
+    console.log("Starting QR cleanup timer (60 seconds)");
+    this.qrCleanupTimer = setTimeout(() => {
+      if (this.activeQRViewers === 0 && !this.clientReady) {
+        console.log("No viewers for 60 seconds, stopping QR generation");
+        
+        // Emit event instead of direct import
+        stateEvents.emit('qr_cleanup_required');
+      }
+    }, 60000); // 60 seconds timeout
   }
+  
+  return true;
+}
 
-  unregisterQRViewer(viewerId) {
-    // If viewer isn't registered, do nothing
-    if (!this.registeredViewerIds.has(viewerId)) {
-      console.log(`QR viewer ${viewerId} not registered, can't unregister`);
-      return false;
-    }
-    
-    // Unregister the viewer
-    this.registeredViewerIds.delete(viewerId);
-    if (this.activeQRViewers > 0) {
-      this.activeQRViewers--;
-    }
-    this.qrLastRequested = Date.now();
-    console.log(`QR viewer ${viewerId} unregistered. Active viewers: ${this.activeQRViewers}`);
-    
-    // If no more viewers, schedule QR deactivation
-    if (this.activeQRViewers === 0) {
-      this.scheduleQRDeactivation();
-    }
-    return true;
+// Also update the registerQRViewer to cancel any cleanup timer
+registerQRViewer(viewerId) {
+  // If viewer is already registered, do nothing
+  if (this.registeredViewerIds.has(viewerId)) {
+    console.log(`QR viewer ${viewerId} already registered`);
+    return false;
   }
+  
+  // Register new viewer
+  this.registeredViewerIds.add(viewerId);
+  this.activeQRViewers++;
+  this.qrGenerationActive = true;
+  this.qrLastRequested = Date.now();
+  console.log(`QR viewer ${viewerId} registered. Active viewers: ${this.activeQRViewers}`);
+  this.updateActivity('qr-viewer-registered');
+  
+  // Cancel any cleanup timer
+  if (this.qrCleanupTimer) {
+    console.log("Cancelling QR cleanup timer due to new viewer");
+    clearTimeout(this.qrCleanupTimer);
+    this.qrCleanupTimer = null;
+  }
+  
+  // Emit event to initialize WhatsApp client if needed
+  if (this.activeQRViewers === 1) {
+    stateEvents.emit('qr_viewer_connected');
+  }
+  
+  return true;
+}
 
 scheduleQRDeactivation() {
   // Set a timeout to deactivate QR generation if no viewers
@@ -221,11 +259,8 @@ scheduleQRDeactivation() {
 }
 
 shouldGenerateQR() {
-  // Only generate QR codes if:
-  // 1. We have active viewers, OR
-  // 2. QR generation is actively enabled and client isn't ready yet
-  return (this.activeQRViewers > 0) || 
-         (this.qrGenerationActive && !this.clientReady);
+  // Only generate QR codes if we have active viewers
+  return this.activeQRViewers > 0;
 }
 // Add this method to periodically verify the actual count
 

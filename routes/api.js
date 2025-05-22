@@ -525,7 +525,7 @@ router.get('/update', (req, res) => {
   
     // Get status updates from messageState
     const statusUpdates = messageState.getStatusUpdates ? messageState.getStatusUpdates() : [];
-  
+    const isClientReady = messageState.clientReady || (clientStatus && clientStatus.active);
     // Always return the current state
     res.json({
       htmltext: html,
@@ -533,7 +533,8 @@ router.get('/update', (req, res) => {
       clientReady: messageState.clientReady || clientStatus.active,
       clientStatus: clientStatus,
       persons: messageState.persons,
-      qr: messageState.qr,
+      qr: isClientReady ? null : messageState.qr, // Never send QR if client is ready
+    statusUpdates,
       statusUpdates
     });
   

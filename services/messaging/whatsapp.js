@@ -4,9 +4,11 @@
  */
 import EventEmitter from 'events';
 import messageState from '../state/messageState.js';
+import stateEvents from '../state/stateEvents.js';
 import * as database from '../database/queries/index.js';
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth } = pkg;
+
 // Client state management at module scope
 let whatsappClient = null;  // The actual client instance
 let isInitializing = false; // Flag to prevent multiple initialization attempts
@@ -58,7 +60,6 @@ class WhatsAppService extends EventEmitter {
    * @returns {Promise<boolean>} - Whether initialization was successful
    */
   async initialize() {
-    // Use module-level implementation
     return initializeClient();
   }
 
@@ -67,7 +68,6 @@ class WhatsAppService extends EventEmitter {
    * @returns {Promise<boolean>} - Whether restart was successful
    */
   async restart() {
-    // Use module-level implementation
     return restartClient();
   }
 
@@ -171,6 +171,26 @@ class WhatsAppService extends EventEmitter {
     console.log("Clearing message state");
     messageState.reset();
   }
+  
+  /**
+   * Clean up the client when no viewers have been present for some time
+   */
+  cleanupClient() {
+    if (!messageState.clientReady && whatsappClient) {
+      console.log("Stopping WhatsApp client as no viewers present for extended period");
+      
+      try {
+        // Destroy the client to free resources
+        whatsappClient.destroy().catch(err => console.error("Error destroying client:", err));
+        whatsappClient = null;
+        isInitializing = false;
+        
+        console.log("WhatsApp client stopped successfully");
+      } catch (error) {
+        console.error("Error stopping WhatsApp client:", error);
+      }
+    }
+  }
 }
 
 /**
@@ -186,9 +206,6 @@ async function initializeClient() {
   try {
     isInitializing = true;
     console.log("Initializing persistent WhatsApp client");
-    
-    // Create client using your existing code
-    //const { Client, LocalAuth } = require('whatsapp-web.js');
     
     whatsappClient = new Client({
       authStrategy: new LocalAuth({ clientId: "client" }),
@@ -241,16 +258,27 @@ function setupEventHandlers() {
   if (!whatsappClient) return;
   
   whatsappClient.on('qr', (qr) => {
-    // Only process QR code if we should be generating them
-    if (messageState.shouldGenerateQR() || !whatsappClient.info?.me) {
-      messageState.qr = qr;
-      messageState.updateActivity('qr-received');
-      whatsappService.emit('qr', qr);
-      wsEmitter.emit('qr', qr);
-      console.log('QR code received, emitting to clients');
-    } else {
-      console.log('QR code received but no active viewers, suppressing');
+    // Reset ready state if we receive a QR code
+    if (messageState.clientReady) {
+      console.log('Received QR code, resetting clientReady flag to false');
+      messageState.clientReady = false;
     }
+    
+    // Only emit QR if there are active viewers
+    if (messageState.activeQRViewers <= 0) {
+      console.log('QR code received but no active viewers, suppressing emission');
+      // Still store the QR code in case viewers connect soon
+      messageState.qr = qr;
+      messageState.updateActivity('qr-received-suppressed');
+      return; // Don't emit if no active viewers
+    }
+    
+    // Process and emit the QR code
+    messageState.qr = qr;
+    messageState.updateActivity('qr-received');
+    whatsappService.emit('qr', qr);
+    wsEmitter.emit('qr', qr);
+    console.log('QR code received, emitting to clients');
   });
   
   whatsappClient.on('ready', () => {
@@ -291,13 +319,12 @@ function setupEventHandlers() {
   
   whatsappClient.on('disconnected', (reason) => {
     console.log(`WhatsApp client disconnected: ${reason}`);
+    messageState.clientReady = false;
     whatsappClient = null;
     
     // Only attempt reconnection if not manually disconnected
     if (!messageState.manualDisconnect) {
       scheduleReconnect();
-    } else {
-      messageState.clientReady = false;
     }
   });
   
@@ -370,22 +397,22 @@ async function restartClient() {
   return initializeClient();
 }
 
-// Create and export singleton instance
+// Create singleton instance
 const whatsappService = new WhatsAppService();
 
-// Auto-initialize the client when the module is first imported
-(async function() {
-  try {
-    // Small delay to ensure other services are initialized
-    setTimeout(() => {
-      console.log("Auto-initializing WhatsApp client");
-      initializeClient().catch(err => {
-        console.error("Error during auto-initialization:", err);
-      });
-    }, 5000);
-  } catch (error) {
-    console.error("Failed to auto-initialize WhatsApp client:", error);
+// Subscribe to the cleanup event
+stateEvents.on('qr_cleanup_required', () => {
+  whatsappService.cleanupClient();
+});
+// Add this near the stateEvents listener at the bottom
+stateEvents.on('qr_viewer_connected', () => {
+  console.log("QR viewer connected, initializing WhatsApp client if needed");
+  
+  // Only initialize if not already initialized
+  if (!whatsappClient && !isInitializing && !messageState.clientReady) {
+    initializeClient().catch(err => {
+      console.error("Error initializing client:", err);
+    });
   }
-})();
-
+});
 export default whatsappService;
