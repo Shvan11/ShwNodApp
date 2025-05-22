@@ -3,7 +3,7 @@ import { WebSocketServer } from 'ws';
 import { EventEmitter } from 'events';
 import * as database from '../services/database/queries/index.js';
 import messageState from '../services/state/messageState.js';
-
+import { createWebSocketMessage, validateWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
 /**
  * WebSocket Connection Manager
  * Manages different types of WebSocket connections
@@ -450,39 +450,47 @@ function setupWebSocketServer(server) {
    * @param {ConnectionManager} connectionManager - Connection manager
    */
   async function handleTypedMessage(ws, message, date, connectionManager) {
+    const validation = validateWebSocketMessage(message);
+    if (!validation.valid) {
+      console.error('Invalid message format:', validation.error);
+      const errorMessage = createWebSocketMessage(
+        MessageSchemas.WebSocketMessage.ERROR,
+        { error: validation.error }
+      );
+      connectionManager.sendToClient(ws, errorMessage);
+      return;
+    }
+  
     switch (message.type) {
       case 'ping':
-        // Respond to ping with pong
-        connectionManager.sendToClient(ws, { type: 'pong' });
+        const pongMessage = createWebSocketMessage('pong', {});
+        connectionManager.sendToClient(ws, pongMessage);
         break;
-
+  
       case 'pong':
-        // Update client capabilities with ping support
         connectionManager.updateClientCapabilities(ws, {
-          supportsPing: true
+          supportsPing: true,
+          lastPong: Date.now()
         });
         break;
-
+  
       case 'getAppointments':
-        // Get appointments data for a specific date
-        const requestDate = message.date || date;
+        const requestDate = message.data?.date || date;
         if (requestDate) {
-          await sendAppointmentsData(ws, requestDate);
+          await sendAppointmentsData(ws, requestDate, connectionManager);
         }
         break;
-
+  
       case 'getPatient':
-        // Get patient data
-        if (message.patientId) {
-          await sendPatientData(ws, message.patientId);
+        if (message.data?.patientId) {
+          await sendPatientData(ws, message.data.patientId, connectionManager);
         }
         break;
-
+  
       case 'capabilities':
-        // Update client capabilities
-        connectionManager.updateClientCapabilities(ws, message.capabilities || {});
+        connectionManager.updateClientCapabilities(ws, message.data?.capabilities || {});
         break;
-
+  
       default:
         console.log(`Unknown message type: ${message.type}`);
     }
@@ -510,23 +518,31 @@ function setupWebSocketServer(server) {
    * @param {WebSocket} ws - WebSocket connection
    * @param {string} date - Date to get appointments for
    */
-  async function sendAppointmentsData(ws, date) {
+  async function sendAppointmentsData(ws, date, connectionManager) {
     if (!date || ws.readyState !== ws.OPEN) return;
-
+  
     console.log(`Fetching appointments data for date: ${date}`);
-
+  
     try {
       const result = await database.getPresentAps(date);
       console.log(`Got appointments data for date ${date}: ${result.appointments ? result.appointments.length : 0} appointments`);
-
-      connectionManager.sendToClient(ws, {
-        messageType: 'updated',
-        tableData: result
-      });
-
+  
+      const message = createWebSocketMessage(
+        'appointment_data',
+        { tableData: result },
+        { date }
+      );
+  
+      connectionManager.sendToClient(ws, message);
       console.log(`Sent appointments data to client for date: ${date}`);
     } catch (error) {
       console.error(`Error fetching appointment data for date ${date}:`, error);
+      
+      const errorMessage = createWebSocketMessage(
+        MessageSchemas.WebSocketMessage.ERROR,
+        { error: `Failed to fetch appointments for ${date}` }
+      );
+      connectionManager.sendToClient(ws, errorMessage);
     }
   }
 
@@ -535,29 +551,50 @@ function setupWebSocketServer(server) {
    * @param {WebSocket} ws - WebSocket connection
    * @param {string} patientId - Patient ID
    */
-  async function sendPatientData(ws, patientId) {
+  async function sendPatientData(ws, patientId, connectionManager) {
     if (!patientId || ws.readyState !== ws.OPEN) return;
-
+  
     console.log(`Fetching patient data for patient ID: ${patientId}`);
-
+  
     try {
-      // Get patient images
       const images = await getPatientImages(patientId);
-
-      // Get latest visit
       const latestVisit = await database.getLatestVisitsSum(patientId);
-
-      // Send response
-      connectionManager.sendToClient(ws, {
-        messageType: 'patientLoaded',
-        pid: patientId,
-        images,
-        latestVisit
-      });
-
+  
+      const message = createWebSocketMessage(
+        'patient_data',
+        {
+          pid: patientId,
+          images,
+          latestVisit
+        }
+      );
+  
+      connectionManager.sendToClient(ws, message);
       console.log(`Sent patient data for ${patientId}`);
     } catch (error) {
       console.error(`Error sending patient data for ${patientId}:`, error);
+      
+      const errorMessage = createWebSocketMessage(
+        MessageSchemas.WebSocketMessage.ERROR,
+        { error: `Failed to fetch patient data for ${patientId}` }
+      );
+      connectionManager.sendToClient(ws, errorMessage);
+    }
+  
+    // Helper function for patient images
+    async function getPatientImages(pid) {
+      try {
+        const tp = "0";
+        const images = await database.getTimePointImgs(pid, tp);
+  
+        return images.map(code => {
+          const name = `${pid}0${tp}.i${code}`;
+          return { name };
+        });
+      } catch (error) {
+        console.error('Error getting patient images:', error);
+        return [];
+      }
     }
   }
 
@@ -596,59 +633,64 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
   emitter.on('updated', async (dateParam) => {
     console.log(`Received 'updated' event for date: ${dateParam}`);
 
-    // Get appointment data once to reuse for all connections
-    let appointmentData;
     try {
-      appointmentData = await database.getPresentAps(dateParam);
+      const appointmentData = await database.getPresentAps(dateParam);
       console.log(`Fetched appointment data for date ${dateParam}: ${appointmentData.appointments ? appointmentData.appointments.length : 0} appointments`);
+
+      const message = createWebSocketMessage(
+        'appointment_update',
+        { tableData: appointmentData },
+        { date: dateParam }
+      );
+
+      const updateCount = connectionManager.broadcastToScreens(message);
+      console.log(`Broadcast appointment updates to ${updateCount} screens`);
     } catch (error) {
       console.error(`Error fetching appointment data for date ${dateParam}:`, error);
-      return; // Exit if we can't get data
     }
-
-    // Prepare message
-    const message = {
-      messageType: 'updated',
-      tableData: appointmentData
-    };
-
-    // Broadcast to all screen connections
-    const updateCount = connectionManager.broadcastToScreens(message);
-    console.log(`Broadcast appointment updates to ${updateCount} screens`);
   });
 
   // Handle patient loaded event
   emitter.on('patientLoaded', async (pid, targetScreenID) => {
     console.log(`Received 'patientLoaded' event for patient ${pid}, screen ${targetScreenID}`);
-    // Get all patient images
-    const allImages = await getPatientImages(pid);
-    console.log("All images for patient" + pid + ":", allImages);
-    // Filter to only .120, .i22, .i21
-    const filteredImages = allImages.filter(img =>
-      ['.i20', '.i22', '.i21'].some(ext => img.name.toLowerCase().endsWith(ext))
-    );
+    
+    try {
+      const allImages = await getPatientImages(pid);
+      console.log("All images for patient " + pid + ":", allImages);
+      
+      const filteredImages = allImages.filter(img =>
+        ['.i20', '.i22', '.i21'].some(ext => img.name.toLowerCase().endsWith(ext))
+      );
 
-    const sortOrder = ['.i20', '.i22', '.i21'];
-    filteredImages.sort((a, b) => {
-      const aExt = sortOrder.find(ext => a.name.toLowerCase().endsWith(ext)) || '';
-      const bExt = sortOrder.find(ext => b.name.toLowerCase().endsWith(ext)) || '';
-      return sortOrder.indexOf(aExt) - sortOrder.indexOf(bExt);
-    });
+      const sortOrder = ['.i20', '.i22', '.i21'];
+      filteredImages.sort((a, b) => {
+        const aExt = sortOrder.find(ext => a.name.toLowerCase().endsWith(ext)) || '';
+        const bExt = sortOrder.find(ext => b.name.toLowerCase().endsWith(ext)) || '';
+        return sortOrder.indexOf(aExt) - sortOrder.indexOf(bExt);
+      });
 
+      console.log("Filtered images for patient " + pid + ":", filteredImages);
+      
+      const latestVisit = await database.getLatestVisitsSum(pid);
+      
+      const message = createWebSocketMessage(
+        'patient_loaded',
+        {
+          pid,
+          images: filteredImages,
+          latestVisit
+        }
+      );
 
-    console.log("Filtered images for patient" + pid + ":", filteredImages);
-    // Send to specific screen
-    const success = connectionManager.sendToScreen(targetScreenID, {
-      messageType: 'patientLoaded',
-      pid,
-      images: filteredImages,
-      latestVisit: await database.getLatestVisitsSum(pid)
-    });
+      const success = connectionManager.sendToScreen(targetScreenID, message);
 
-    if (success) {
-      console.log(`Sent patient data for ${pid} to screen ${targetScreenID}`);
-    } else {
-      console.log(`Failed to send patient data - screen ${targetScreenID} not found or not ready`);
+      if (success) {
+        console.log(`Sent patient data for ${pid} to screen ${targetScreenID}`);
+      } else {
+        console.log(`Failed to send patient data - screen ${targetScreenID} not found or not ready`);
+      }
+    } catch (error) {
+      console.error(`Error processing patient loaded event:`, error);
     }
   });
 
@@ -656,10 +698,12 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
   emitter.on('patientUnLoaded', (targetScreenID) => {
     console.log(`Received 'patientUnLoaded' event for screen ${targetScreenID}`);
 
-    // Send to specific screen
-    const success = connectionManager.sendToScreen(targetScreenID, {
-      messageType: 'patientunLoaded'
-    });
+    const message = createWebSocketMessage(
+      'patient_unloaded',
+      {}
+    );
+
+    const success = connectionManager.sendToScreen(targetScreenID, message);
 
     if (success) {
       console.log(`Sent patientunLoaded to screen ${targetScreenID}`);
@@ -668,45 +712,80 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
     }
   });
 
-  // Handle WhatsApp message updates
+  // Handle WhatsApp message updates with batching
+  const statusUpdateBuffer = new Map();
+  const BATCH_DELAY = 1000; // 1 second
+  
   emitter.on('wa_message_update', (messageId, status, date) => {
     console.log(`Received 'wa_message_update' event: messageId=${messageId}, status=${status}, date=${date}`);
 
-    // Prepare message
-    const updateData = {
-      messageType: 'messageAckUpdated',
-      messageId,
-      status,
-      date
-    };
+    // Add to buffer
+    if (!statusUpdateBuffer.has(date)) {
+      statusUpdateBuffer.set(date, []);
+    }
+    
+    statusUpdateBuffer.get(date).push({ messageId, status });
 
-    // Create filter function for date matching
-    const dateFilter = (ws, capabilities) => {
-      // If no date specified, send to all
-      if (!date) return true;
+    // Debounce the batch send
+    setTimeout(() => {
+      const updates = statusUpdateBuffer.get(date);
+      if (updates && updates.length > 0) {
+        const message = createWebSocketMessage(
+          MessageSchemas.WebSocketMessage.BATCH_STATUS,
+          {
+            statusUpdates: updates,
+            date
+          }
+        );
 
-      // Check if client has a matching date
-      return capabilities &&
-        capabilities.metadata &&
-        capabilities.metadata.date === date;
-    };
+        const dateFilter = (ws, capabilities) => {
+          if (!date) return true;
+          return capabilities && 
+                 capabilities.metadata && 
+                 capabilities.metadata.date === date;
+        };
 
-    // Broadcast to WhatsApp status clients
-    const updateCount = connectionManager.broadcastToWaStatus(updateData, dateFilter);
-    console.log(`Broadcast WhatsApp message update to ${updateCount} clients`);
+        const updateCount = connectionManager.broadcastToWaStatus(message, dateFilter);
+        console.log(`Broadcast batched WhatsApp message updates to ${updateCount} clients`);
+        
+        // Clear the buffer
+        statusUpdateBuffer.delete(date);
+      }
+    }, BATCH_DELAY);
+  });
+
+  // Handle broadcast messages from WhatsApp service
+  emitter.on('broadcast_message', (message) => {
+    const validation = validateWebSocketMessage(message);
+    if (!validation.valid) {
+      console.error('Invalid message format:', validation.error);
+      return;
+    }
+
+    // Broadcast to appropriate clients based on message type
+    switch (message.type) {
+      case MessageSchemas.WebSocketMessage.QR_UPDATE:
+        connectionManager.broadcastToWaStatus(message);
+        break;
+      case MessageSchemas.WebSocketMessage.CLIENT_READY:
+        connectionManager.broadcastToWaStatus(message);
+        break;
+      case MessageSchemas.WebSocketMessage.MESSAGE_STATUS:
+        connectionManager.broadcastToWaStatus(message);
+        break;
+      default:
+        connectionManager.broadcastToAll(message);
+    }
   });
 
   /**
    * Get patient images helper function
-   * @param {string} pid - Patient ID
-   * @returns {Promise<Array>} - Patient images
    */
   async function getPatientImages(pid) {
     try {
-      const tp = "0"; // Default timepoint
+      const tp = "0";
       const images = await database.getTimePointImgs(pid, tp);
 
-      // Transform image names to proper format
       return images.map(code => {
         const name = `${pid}0${tp}.i${code}`;
         return { name };

@@ -148,6 +148,152 @@ class WhatsAppMessenger {
         this.sendWa();
     }
 
+
+    getTimeAgo(timestamp) {
+        const now = Date.now();
+        const diff = now - timestamp;
+        
+        if (diff < 60000) {
+          return 'Just now';
+        } else if (diff < 3600000) {
+          const minutes = Math.floor(diff / 60000);
+          return `${minutes}m ago`;
+        } else if (diff < 86400000) {
+          const hours = Math.floor(diff / 3600000);
+          return `${hours}h ago`;
+        } else {
+          const days = Math.floor(diff / 86400000);
+          return `${days}d ago`;
+        }
+      }
+      
+      // ===== ENHANCE updateFinishedState METHOD =====
+      // Find the existing updateFinishedState method and replace with:
+      
+      updateFinishedState() {
+        // Update UI to show completion
+        if (this.stateElement) {
+          const statusCounts = this.countStatusTypes();
+          this.stateElement.innerHTML = `
+            <div class="completion-status">
+              <h3>✅ Messages sent successfully!</h3>
+              <p>Status updates will continue to be received.</p>
+              <div class="final-stats">
+                <span class="stat-item status-sent">Sent: ${statusCounts.sent}</span>
+                <span class="stat-item status-delivered">Delivered: ${statusCounts.delivered}</span>
+                <span class="stat-item status-read">Read: ${statusCounts.read}</span>
+                <span class="stat-item status-error">Failed: ${statusCounts.error}</span>
+              </div>
+              <p class="note">Message statuses are being stored in the database and will be accessible for 24 hours.</p>
+            </div>
+          `;
+        }
+      
+        // Stop polling, but continue receiving WebSocket updates
+        if (this.pollingInterval) {
+          clearInterval(this.pollingInterval);
+          this.pollingInterval = null;
+        }
+      
+        // Disable start button
+        if (this.startButton) {
+          this.startButton.disabled = true;
+          this.startButton.textContent = 'Completed';
+        }
+      }
+
+    handleQRUpdate(data) {
+        console.log("QR code received via WebSocket");
+        
+        if (data.qr && !data.clientReady) {
+          this.updateQR(data.qr);
+          this.updateState('<p>Please scan the QR code with your WhatsApp</p>');
+        }
+      }
+      
+      handleClientReady(data) {
+        console.log("Client is ready from WebSocket!");
+        
+        if (this.qrImage) {
+          this.qrImage.style.display = 'none';
+        }
+        
+        if (!this.clientReadyShown && !this.sendingStarted) {
+          this.clientReadyShown = true;
+          this.startButton.style.display = 'block';
+          this.startButton.disabled = false;
+          this.startButton.dataset.action = 'send';
+          this.updateState('<p>Client is ready! Click "Start Sending Messages" to begin</p>');
+        }
+      }
+      
+      handleSingleStatusUpdate(data) {
+        console.log("Single status update received:", data);
+        
+        if (data.messageId && data.status !== undefined) {
+          this.updateMessageStatus(data.messageId, data.status);
+          this.createTable(this.persons);
+        }
+      }
+      
+      handleBatchStatusUpdate(data) {
+        console.log("Batch status update received:", data);
+        
+        if (data.statusUpdates && Array.isArray(data.statusUpdates)) {
+          let updatesProcessed = 0;
+          
+          data.statusUpdates.forEach(update => {
+            if (update.messageId && update.status !== undefined) {
+              this.updateMessageStatus(update.messageId, update.status);
+              updatesProcessed++;
+            }
+          });
+          
+          if (updatesProcessed > 0) {
+            this.createTable(this.persons);
+            console.log(`Processed ${updatesProcessed} status updates`);
+          }
+        }
+      }
+      
+      handleAppointmentUpdate(data) {
+        console.log("Appointment update received:", data);
+        
+        if (data.tableData) {
+          this.updateUI(data);
+        }
+      }
+      
+      handleSendingFinished(data) {
+        console.log("Sending finished received:", data);
+        
+        if (data.finished && !this.finished) {
+          this.finished = true;
+          this.updateFinishedState();
+        }
+      }
+      
+      handleError(data) {
+        console.error("Error message received:", data);
+        
+        if (data.error) {
+          this.updateState(`<p class="error">Error: ${data.error}</p>`);
+        }
+      }
+      
+      handleLegacyMessage(message) {
+        // Handle old message formats for backward compatibility
+        if (message.messageType === "updated") {
+          this.updateUI(message.tableData);
+        } else if (message.messageType === "messageAckUpdated") {
+          this.updateMessageStatus(message.messageId, message.status);
+          this.createTable(this.persons);
+        } else if (message.finished && !this.finished) {
+          this.finished = true;
+          this.updateFinishedState();
+        }
+      }
+      
     connectWebSocket() {
         try {
             // Close any existing connection
@@ -204,58 +350,60 @@ class WhatsAppMessenger {
 
     handleWebSocketMessage(event) {
         console.log("Raw WebSocket message received:", event.data);
+        
         try {
-            const data = JSON.parse(event.data);
-            console.log("Parsed WebSocket message:", data);
-
-            // Handle QR code from WebSocket
-            if (data.qr && !data.clientReady) {
-                console.log("QR code received via WebSocket");
-                this.updateQR(data.qr);
-                this.updateState('<p>Please scan the QR code with your WhatsApp</p>');
-            }
-
-            // Handle client ready state
-            if (data.clientReady === true) {
-                console.log("Client is ready from WebSocket!");
-                if (this.qrImage) {
-                    this.qrImage.style.display = 'none';
-                }
-                
-                if (!this.clientReadyShown && !this.sendingStarted) {
-                    this.clientReadyShown = true;
-                    this.startButton.style.display = 'block';
-                    this.startButton.disabled = false;
-                    this.startButton.dataset.action = 'send';
-                    this.updateState('<p>Client is ready! Click "Start Sending Messages" to begin</p>');
-                }
-            }
-
-            // Process other message types
-            if (data.messageType === "updated") {
-                this.updateUI(data.tableData);
-            } else if (data.messageType === "messageAckUpdated") {
-                this.updateMessageStatus(data.messageId, data.status);
-                this.createTable(this.persons);
-            }
-
-            // Process batch status updates
-            if (data.statusUpdates && Array.isArray(data.statusUpdates)) {
-                data.statusUpdates.forEach(update => {
-                    this.updateMessageStatus(update.messageId, update.status);
-                });
-                this.createTable(this.persons);
-            }
-
-            // Handle finished state
-            if (data.finished && !this.finished) {
-                this.finished = true;
-                this.updateFinishedState();
-            }
+          const message = JSON.parse(event.data);
+          console.log("Parsed WebSocket message:", message);
+      
+          // Validate message format
+          if (!message.type || !message.data) {
+            console.warn("Invalid message format received:", message);
+            return;
+          }
+      
+          // Handle different message types
+          switch (message.type) {
+            case 'qr_update':
+              this.handleQRUpdate(message.data);
+              break;
+              
+            case 'client_ready':
+              this.handleClientReady(message.data);
+              break;
+              
+            case 'message_status':
+              this.handleSingleStatusUpdate(message.data);
+              break;
+              
+            case 'batch_status':
+              this.handleBatchStatusUpdate(message.data);
+              break;
+              
+            case 'appointment_update':
+              this.handleAppointmentUpdate(message.data);
+              break;
+              
+            case 'sending_finished':
+              this.handleSendingFinished(message.data);
+              break;
+              
+            case 'error':
+              this.handleError(message.data);
+              break;
+              
+            case 'pong':
+              console.log("Received pong response");
+              break;
+              
+            default:
+              // Handle legacy message formats for backward compatibility
+              this.handleLegacyMessage(message);
+          }
+          
         } catch (error) {
-            console.error("Error parsing WebSocket message:", error);
+          console.error("Error parsing WebSocket message:", error);
         }
-    }
+      }
 
     async sendWa() {
         try {
@@ -373,45 +521,61 @@ class WhatsAppMessenger {
 
     updatePersons(newPersons) {
         newPersons.forEach(newPerson => {
-            const existingIndex = this.persons.findIndex(p => p.messageId === newPerson.messageId);
-
-            if (existingIndex >= 0) {
-                // Update existing person
-                const existingPerson = this.persons[existingIndex];
-                this.persons[existingIndex] = {
-                    ...existingPerson,
-                    ...newPerson,
-                    // Keep status if it's more advanced
-                    status: Math.max(existingPerson.status || 0, newPerson.status || 0)
-                };
-            } else {
-                // Add new person
-                this.persons.push(newPerson);
-            }
+          const existingIndex = this.persons.findIndex(p => 
+            p.messageId === newPerson.messageId || 
+            (p.name === newPerson.name && p.number === newPerson.number)
+          );
+      
+          if (existingIndex >= 0) {
+            // Update existing person
+            const existingPerson = this.persons[existingIndex];
+            this.persons[existingIndex] = {
+              ...existingPerson,
+              ...newPerson,
+              // Keep status if it's more advanced
+              status: Math.max(existingPerson.status || 0, newPerson.status || 0),
+              lastUpdated: Date.now()
+            };
+          } else {
+            // Add new person
+            this.persons.push({
+              ...newPerson,
+              addedAt: Date.now(),
+              lastUpdated: Date.now()
+            });
+          }
         });
-    }
+      }
 
     updateMessageStatus(messageId, status) {
         // Skip duplicate updates using queue
         const existingUpdate = this.statusUpdateQueue.get(messageId);
         if (existingUpdate && existingUpdate.status >= status) {
-            return;
+          return;
         }
-
-        // Queue this update
-        this.statusUpdateQueue.set(messageId, { messageId, status, timestamp: Date.now() });
-
+      
+        // Queue this update with timestamp
+        this.statusUpdateQueue.set(messageId, { 
+          messageId, 
+          status, 
+          timestamp: Date.now() 
+        });
+      
         // Find the person with this message ID
         const personIndex = this.persons.findIndex(p => p.messageId === messageId);
-
+      
         if (personIndex >= 0) {
-            // Update the status if it's a higher level
-            const currentStatus = this.persons[personIndex].status || 0;
-            if (status > currentStatus) {
-                this.persons[personIndex].status = status;
-            }
+          // Update the status if it's a higher level
+          const currentStatus = this.persons[personIndex].status || 0;
+          if (status > currentStatus) {
+            this.persons[personIndex].status = status;
+            this.persons[personIndex].lastUpdated = Date.now();
+          }
+        } else {
+          // If person not found but we have a status update, log it
+          console.warn(`Received status update for unknown message ID: ${messageId}`);
         }
-    }
+      }
 
     getStatusText(status) {
         switch (status) {
@@ -458,77 +622,112 @@ class WhatsAppMessenger {
 
     createTable(tableData) {
         if (!tableData || tableData.length === 0) return;
-
+      
         const table = document.createElement('table');
         table.border = "1";
         table.id = 'p_table';
+        table.className = 'message-status-table';
+        
         const tableBody = document.createElement('tbody');
-
+      
+        // Create header
         const header = table.createTHead();
         const headerRow = header.insertRow(0);
-        ['Name', 'Phone', 'Status'].forEach(text => {
-            const cell = headerRow.insertCell();
-            cell.textContent = text;
-            cell.style.fontWeight = 'bold';
+        ['Name', 'Phone', 'Status', 'Last Updated'].forEach(text => {
+          const cell = headerRow.insertCell();
+          cell.textContent = text;
+          cell.style.fontWeight = 'bold';
+          cell.className = 'table-header';
         });
-
-        tableData.forEach(rowData => {
-            const row = document.createElement('tr');
-            if (rowData.messageId) {
-                row.dataset.messageId = rowData.messageId;
-            }
-
-            // Determine status
-            let status = 0;
-            if (rowData.status !== undefined) {
-                status = rowData.status;
-            } else if (rowData.success === '&#10004;') {
-                status = 1; // Sent
-            } else if (rowData.success === '&times;') {
-                status = -1; // Error
-            }
-
-            // Set row class based on status
-            row.className = status >= 1 ? 'true' : 'false';
-
-            // Name cell
-            const nameCell = document.createElement('td');
-            nameCell.textContent = rowData.name;
-            row.appendChild(nameCell);
-
-            // Phone cell
-            const phoneCell = document.createElement('td');
-            phoneCell.textContent = rowData.number;
-            row.appendChild(phoneCell);
-
-            // Status cell
-            const statusCell = document.createElement('td');
-            statusCell.className = 'status-cell';
-            statusCell.innerHTML = this.getStatusText(status);
-
-            row.appendChild(statusCell);
-            tableBody.appendChild(row);
+      
+        // Sort table data by status and last updated
+        const sortedData = [...tableData].sort((a, b) => {
+          const statusA = a.status || (a.success === '&#10004;' ? 1 : 0);
+          const statusB = b.status || (b.success === '&#10004;' ? 1 : 0);
+          
+          if (statusA !== statusB) {
+            return statusB - statusA; // Higher status first
+          }
+          
+          // If same status, sort by last updated (most recent first)
+          const timeA = a.lastUpdated || a.addedAt || 0;
+          const timeB = b.lastUpdated || b.addedAt || 0;
+          return timeB - timeA;
         });
-
+      
+        sortedData.forEach(rowData => {
+          const row = document.createElement('tr');
+          if (rowData.messageId) {
+            row.dataset.messageId = rowData.messageId;
+          }
+      
+          // Determine status
+          let status = 0;
+          if (rowData.status !== undefined) {
+            status = rowData.status;
+          } else if (rowData.success === '&#10004;') {
+            status = 1; // Sent
+          } else if (rowData.success === '&times;') {
+            status = -1; // Error
+          }
+      
+          // Set row class based on status
+          row.className = status >= 1 ? 'status-success' : 'status-error';
+      
+          // Name cell
+          const nameCell = document.createElement('td');
+          nameCell.textContent = rowData.name;
+          nameCell.className = 'name-cell';
+          row.appendChild(nameCell);
+      
+          // Phone cell
+          const phoneCell = document.createElement('td');
+          phoneCell.textContent = rowData.number;
+          phoneCell.className = 'phone-cell';
+          row.appendChild(phoneCell);
+      
+          // Status cell
+          const statusCell = document.createElement('td');
+          statusCell.className = 'status-cell';
+          statusCell.innerHTML = this.getStatusText(status);
+          row.appendChild(statusCell);
+      
+          // Last updated cell
+          const updatedCell = document.createElement('td');
+          const lastUpdated = rowData.lastUpdated || rowData.addedAt;
+          if (lastUpdated) {
+            const timeAgo = this.getTimeAgo(lastUpdated);
+            updatedCell.textContent = timeAgo;
+            updatedCell.className = 'time-cell';
+          } else {
+            updatedCell.textContent = '-';
+          }
+          row.appendChild(updatedCell);
+      
+          tableBody.appendChild(row);
+        });
+      
         table.appendChild(tableBody);
-
+      
         // Add status summary above table
         const statusCounts = this.countStatusTypes();
         const summary = document.createElement('div');
         summary.className = 'message-count';
         summary.innerHTML = `
-            Total: ${tableData.length} | 
-            <span class="status-error">Failed: ${statusCounts.error}</span> | 
-            <span class="status-pending">Pending: ${statusCounts.pending}</span> | 
-            <span class="status-sent">Sent: ${statusCounts.sent}</span> | 
-            <span class="status-delivered">Delivered: ${statusCounts.delivered}</span> | 
-            <span class="status-read">Read: ${statusCounts.read}</span>
+          <div class="status-summary">
+            <span class="summary-item">Total: <strong>${tableData.length}</strong></span>
+            <span class="summary-item status-error">Failed: <strong>${statusCounts.error}</strong></span>
+            <span class="summary-item status-pending">Pending: <strong>${statusCounts.pending}</strong></span>
+            <span class="summary-item status-sent">Sent: <strong>${statusCounts.sent}</strong></span>
+            <span class="summary-item status-delivered">Delivered: <strong>${statusCounts.delivered}</strong></span>
+            <span class="summary-item status-read">Read: <strong>${statusCounts.read}</strong></span>
+          </div>
         `;
-
+      
         this.tableContainer.innerHTML = '';
         this.tableContainer.appendChild(summary);
         this.tableContainer.appendChild(table);
-    }
+      }
 
     updateState(html) {
         if (this.stateElement) {

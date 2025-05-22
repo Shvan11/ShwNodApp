@@ -13,7 +13,9 @@ import multer from 'multer';
 import { sendgramfile } from '../services/messaging/telegram.js';
 import qrcode from 'qrcode';
 import messageState from '../services/state/messageState.js';
-
+import { createWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
+import HealthCheck from '../services/monitoring/HealthCheck.js';
+import * as messagingQueries from '../services/database/queries/messaging-queries.js';
 
 const router = express.Router();
 const upload = multer();
@@ -21,50 +23,110 @@ const upload = multer();
 
 
 
-
-// Modify the event handlers to add more logging
-whatsapp.on('MessageSent', (p) => {
-    console.log("MessageSent event fired:", p);
+whatsapp.on('MessageSent', async (person) => {
+    console.log("MessageSent event fired:", person);
     try {
-        p.success = '&#10004;';
-        const result = messageState.addPerson(p);
-        console.log("messageState after MessageSent:", messageState.dump());
+        person.success = '&#10004;';
+        await messageState.addPerson(person);
+        
+        // Broadcast via WebSocket
+        if (wsEmitter) {
+            const message = createWebSocketMessage(
+                MessageSchemas.WebSocketMessage.MESSAGE_STATUS,
+                {
+                    messageId: person.messageId,
+                    status: MessageSchemas.MessageStatus.SERVER,
+                    person
+                }
+            );
+            wsEmitter.emit('broadcast_message', message);
+        }
+        
+        console.log("MessageSent processed successfully");
     } catch (error) {
         console.error("Error handling MessageSent event:", error);
     }
 });
 
-whatsapp.on('MessageFailed', (p) => {
-    console.log("MessageFailed event fired:", p);
-    messageState.change = true;
-    messageState.failedMessages += 1;
-    p.success = '&times;';
-    messageState.persons.push(p);
+whatsapp.on('MessageFailed', async (person) => {
+    console.log("MessageFailed event fired:", person);
+    try {
+        person.success = '&times;';
+        await messageState.addPerson(person);
+        
+        // Broadcast failure
+        if (wsEmitter) {
+            const message = createWebSocketMessage(
+                MessageSchemas.WebSocketMessage.MESSAGE_STATUS,
+                {
+                    messageId: person.messageId || `failed_${Date.now()}`,
+                    status: MessageSchemas.MessageStatus.ERROR,
+                    person
+                }
+            );
+            wsEmitter.emit('broadcast_message', message);
+        }
+        
+        console.log("MessageFailed processed successfully");
+    } catch (error) {
+        console.error("Error handling MessageFailed event:", error);
+    }
 });
 
-// Create a singleton instance
-//const messageState = new MessageState();
-
-// Set up event handlers for WhatsApp service
-// Use arrow functions to preserve 'this' context
-
-
-whatsapp.on('finishedSending', () => {
-    messageState.finishedSending = true;
+whatsapp.on('finishedSending', async () => {
+    console.log("finishedSending event fired");
+    try {
+        await messageState.setFinishedSending(true);
+        
+        // Broadcast completion
+        if (wsEmitter) {
+            const message = createWebSocketMessage(
+                'sending_finished',
+                { finished: true, stats: messageState.dump() }
+            );
+            wsEmitter.emit('broadcast_message', message);
+        }
+    } catch (error) {
+        console.error("Error handling finishedSending event:", error);
+    }
 });
 
-whatsapp.on('finish_report', (date) => {
-    messageState.finishReport = true;
-    sendSMSNoti(date);
+whatsapp.on('ClientIsReady', async () => {
+    console.log("ClientIsReady event fired");
+    try {
+        await messageState.setClientReady(true);
+        
+        // Broadcast client ready
+        if (wsEmitter) {
+            const message = createWebSocketMessage(
+                MessageSchemas.WebSocketMessage.CLIENT_READY,
+                { clientReady: true }
+            );
+            wsEmitter.emit('broadcast_message', message);
+        }
+    } catch (error) {
+        console.error("Error handling ClientIsReady event:", error);
+    }
 });
 
-whatsapp.on('ClientIsReady', () => {
-    messageState.clientReady = true;
+whatsapp.on('qr', async (qr) => {
+    console.log("QR event fired");
+    try {
+        await messageState.setQR(qr);
+        
+        // Only broadcast if there are active viewers
+        if (messageState.activeQRViewers > 0 && wsEmitter) {
+            const message = createWebSocketMessage(
+                MessageSchemas.WebSocketMessage.QR_UPDATE,
+                { qr, clientReady: false }
+            );
+            wsEmitter.emit('broadcast_message', message);
+        }
+    } catch (error) {
+        console.error("Error handling QR event:", error);
+    }
 });
 
-whatsapp.on('qr', (aqr) => {
-    messageState.qr = aqr;
-});
 
 // Patient information routes
 router.get("/getinfos", async (req, res) => {
@@ -204,41 +266,57 @@ router.get('/updaterp', (req, res) => {
 
 
 
-router.get('/wa/send', (req, res) => {
-   
+router.get('/wa/send', async (req, res) => {
     const dateparam = req.query.date;
     
-    // Check if client is ready
-    if (!whatsapp.isReady()) {
-      return res.status(400).json({
-        success: false,
-        message: "WhatsApp client is not ready. Please wait for initialization to complete.",
-        clientStatus: whatsapp.getStatus()
-      });
+    try {
+        console.log(`WhatsApp send request for date: ${dateparam}`);
+        
+        // Check if client is ready
+        if (!whatsapp.isReady()) {
+            const status = whatsapp.getStatus();
+            return res.status(400).json({
+                success: false,
+                message: "WhatsApp client is not ready. Please wait for initialization to complete.",
+                clientStatus: status,
+                requiresRestart: status.circuitBreakerOpen
+            });
+        }
+        
+        // Start sending process (non-blocking)
+        whatsapp.send(dateparam).catch(error => {
+            console.error(`Error in WhatsApp send process: ${error.message}`);
+            
+            // Broadcast error to clients
+            if (wsEmitter) {
+                const message = createWebSocketMessage(
+                    MessageSchemas.WebSocketMessage.ERROR,
+                    { 
+                        error: `Send process failed: ${error.message}`,
+                        date: dateparam 
+                    }
+                );
+                wsEmitter.emit('broadcast_message', message);
+            }
+        });
+        
+        // Respond immediately
+        res.json({ 
+            success: true, 
+            message: "WhatsApp sending process started",
+            htmltext: 'Starting to send messages...',
+            date: dateparam
+        });
+        
+    } catch (error) {
+        console.error(`Error starting WhatsApp send: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            message: `Failed to start sending process: ${error.message}`,
+            error: error.message
+        });
     }
-    
-    console.log(`Starting WhatsApp send process for date: ${dateparam}`);
-    
-    // Call the send method without waiting for it to complete
-    whatsapp.send(dateparam);
-    
-    // Respond immediately
-    res.json({ 
-      success: true, 
-      message: "WhatsApp sending process started",
-      htmltext: 'Starting...'
-    });
-    
-    // REMOVE THIS TIMEOUT - the persistent client handles reporting
-    // const delay = messageState.gturbo ? 300000 : 3600000;
-    // setTimeout(() => { whatsapp.report(dateparam); }, delay);
-  });
-
-// router.get('/wa/report', (req, res) => {
-//     const dateparam = req.query.date;
-//     whatsapp.report(dateparam);
-//     res.json({ htmltext: 'Starting...' });
-// });
+});
 
 router.post('/sendmedia', async (req, res) => {
     const { file: imgData, phone } = req.body;
@@ -500,49 +578,237 @@ router.post('/wa/restart', async (req, res) => {
   });
 
   // Find this route
-router.get('/update', (req, res) => {
-    // Modify it as follows:
-    
-    console.log("Update endpoint called, messageState:", messageState.dump());
-  
-    let html = '';
-    let finished = messageState.finishedSending;
-    
-    // Get client status from WhatsApp service
-    const clientStatus = whatsapp.getStatus();
-  
-    if (messageState.clientReady || clientStatus.active) {
-      if (finished) {
-        html = `<p>${messageState.sentMessages} Messages Sent!</p><p>${messageState.failedMessages} Messages Failed!</p><p>Finished</p>`;
-      } else {
-        html = `<p>${messageState.sentMessages} Messages Sent!</p><p>${messageState.failedMessages} Messages Failed!</p><p>Sending...</p>`;
-      }
-    } else if (messageState.qr) {
-      html = '<p>QR code ready...</p>';
-    } else {
-      html = '<p>Initializing the client...</p>';
+  router.get('/update', async (req, res) => {
+    try {
+        console.log("Update endpoint called");
+        
+        const stateDump = messageState.dump();
+        const clientStatus = whatsapp.getStatus();
+        
+        let html = '';
+        const isClientReady = stateDump.clientReady || clientStatus.active;
+        const finished = stateDump.finishedSending;
+        
+        if (isClientReady) {
+            if (finished) {
+                html = `<p>${stateDump.sentMessages} Messages Sent!</p><p>${stateDump.failedMessages} Messages Failed!</p><p>Finished</p>`;
+            } else {
+                html = `<p>${stateDump.sentMessages} Messages Sent!</p><p>${stateDump.failedMessages} Messages Failed!</p><p>Sending...</p>`;
+            }
+        } else if (messageState.qr && messageState.activeQRViewers > 0) {
+            html = '<p>QR code ready - Please scan with WhatsApp</p>';
+        } else {
+            html = '<p>Initializing the client...</p>';
+        }
+        
+        // Prepare response
+        const response = {
+            success: true,
+            htmltext: html,
+            finished,
+            clientReady: isClientReady,
+            clientStatus: clientStatus,
+            persons: messageState.persons,
+            qr: isClientReady ? null : messageState.qr,
+            stats: stateDump,
+            timestamp: Date.now()
+        };
+        
+        res.json(response);
+        
+    } catch (error) {
+        console.error("Error in update endpoint:", error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            htmltext: '<p>Error retrieving status</p>',
+            finished: false,
+            clientReady: false
+        });
     }
-  
-    // Get status updates from messageState
-    const statusUpdates = messageState.getStatusUpdates ? messageState.getStatusUpdates() : [];
-    const isClientReady = messageState.clientReady || (clientStatus && clientStatus.active);
-    // Always return the current state
-    res.json({
-      htmltext: html,
-      finished,
-      clientReady: messageState.clientReady || clientStatus.active,
-      clientStatus: clientStatus,
-      persons: messageState.persons,
-      qr: isClientReady ? null : messageState.qr, // Never send QR if client is ready
-    statusUpdates,
-      statusUpdates
-    });
-  
-    // Reset change flag after sending
-    if (messageState.change) {
-      messageState.change = false;
+});
+
+/**
+ * Health check endpoint
+ */
+router.get('/health', (req, res) => {
+    try {
+        const health = HealthCheck.getHealthStatus();
+        const statusCode = health.overall ? 200 : 503;
+        
+        res.status(statusCode).json({
+            status: health.overall ? 'healthy' : 'unhealthy',
+            ...health
+        });
+    } catch (error) {
+        console.error('Error getting health status:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to get health status',
+            error: error.message
+        });
     }
-  });
+});
+
+/**
+ * Detailed health report endpoint
+ */
+router.get('/health/detailed', (req, res) => {
+    try {
+        const report = HealthCheck.getDetailedReport();
+        res.json(report);
+    } catch (error) {
+        console.error('Error getting detailed health report:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to get detailed health report',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Start health monitoring
+ */
+router.post('/health/start', (req, res) => {
+    try {
+        HealthCheck.start();
+        res.json({
+            success: true,
+            message: 'Health monitoring started'
+        });
+    } catch (error) {
+        console.error('Error starting health monitoring:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to start health monitoring',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Stop health monitoring
+ */
+router.post('/health/stop', (req, res) => {
+    try {
+        HealthCheck.stop();
+        res.json({
+            success: true,
+            message: 'Health monitoring stopped'
+        });
+    } catch (error) {
+        console.error('Error stopping health monitoring:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to stop health monitoring',
+            error: error.message
+        });
+    }
+});
+
+// ===== ADD MESSAGING-SPECIFIC ROUTES =====
+
+/**
+ * Circuit breaker status for messaging operations
+ */
+router.get('/messaging/circuit-breaker-status', (req, res) => {
+    try {
+        const status = messagingQueries.getCircuitBreakerStatus();
+        res.json({
+            success: true,
+            ...status
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Reset circuit breaker (manual recovery)
+ */
+router.post('/messaging/reset-circuit-breaker', (req, res) => {
+    try {
+        const result = messagingQueries.resetCircuitBreaker();
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Batch status update endpoint
+ */
+router.post('/messaging/batch-status-update', async (req, res) => {
+    try {
+        const { updates } = req.body;
+        
+        if (!updates || !Array.isArray(updates)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Updates array is required'
+            });
+        }
+
+        const result = await messagingQueries.batchUpdateMessageStatuses(updates, wsEmitter);
+        res.json(result);
+        
+    } catch (error) {
+        console.error('Error in batch status update:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Get message status by date
+ */
+router.get('/messaging/status/:date', async (req, res) => {
+    try {
+        const { date } = req.params;
+        const result = await messagingQueries.getMessageStatusByDate(date);
+        res.json(result);
+    } catch (error) {
+        console.error('Error getting message status:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// ===== ADD ENHANCED WA STATUS ROUTES =====
+
+/**
+ * Detailed WhatsApp status endpoint
+ */
+router.get('/wa/detailed-status', async (req, res) => {
+    try {
+        const stateDump = messageState.dump(true); // Get detailed dump
+        const clientStatus = whatsapp.getStatus();
+        
+        res.json({
+            success: true,
+            messageState: stateDump,
+            clientStatus: clientStatus,
+            timestamp: Date.now()
+        });
+    } catch (error) {
+        console.error("Error getting detailed status:", error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
 
 
 
