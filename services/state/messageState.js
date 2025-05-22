@@ -1,6 +1,7 @@
 // services/state/messageState.js
 import stateEvents from './stateEvents.js';
-import StateManager from './StateManager.js';
+// ===== FIXED: Import both the class and instance =====
+import StateManager, { StateManager as StateManagerClass } from './StateManager.js';
 import { MessageSchemas } from '../messaging/schemas.js';
 
 class MessageStateManager {
@@ -13,34 +14,45 @@ class MessageStateManager {
       QR_STATUS: 'qr_status'
     };
 
-    this.initializeState();
-    this.setupEventHandlers();
+    // ===== FIXED: Initialize state after constructor is complete =====
+    // Use setTimeout to ensure StateManager is fully initialized
+    setTimeout(() => {
+      this.initializeState();
+      this.setupEventHandlers();
+    }, 0);
   }
 
   initializeState() {
-    // Initialize all state keys
-    StateManager.atomicOperation(this.stateKeys.CLIENT_STATUS, () => ({
-      ready: false,
-      initializing: false,
-      lastActivity: Date.now(),
-      manualDisconnect: false
-    }));
+    try {
+      // Initialize all state keys using the singleton instance
+      StateManager.atomicOperation(this.stateKeys.CLIENT_STATUS, () => ({
+        ready: false,
+        initializing: false,
+        lastActivity: Date.now(),
+        manualDisconnect: false
+      }));
 
-    StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, () => ({
-      sent: 0,
-      failed: 0,
-      finished: false,
-      finishReport: false
-    }));
+      StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, () => ({
+        sent: 0,
+        failed: 0,
+        finished: false,
+        finishReport: false
+      }));
 
-    StateManager.atomicOperation(this.stateKeys.PERSONS, () => []);
-    StateManager.atomicOperation(this.stateKeys.MESSAGE_STATUSES, () => new Map());
-    StateManager.atomicOperation(this.stateKeys.QR_STATUS, () => ({
-      qr: null,
-      activeViewers: 0,
-      generationActive: false,
-      lastRequested: null
-    }));
+      StateManager.atomicOperation(this.stateKeys.PERSONS, () => []);
+      StateManager.atomicOperation(this.stateKeys.MESSAGE_STATUSES, () => new Map());
+      StateManager.atomicOperation(this.stateKeys.QR_STATUS, () => ({
+        qr: null,
+        activeViewers: 0,
+        generationActive: false,
+        lastRequested: null
+      }));
+
+      console.log('✅ MessageStateManager initialized successfully');
+    } catch (error) {
+      console.error('❌ Error initializing MessageStateManager:', error);
+      throw error;
+    }
   }
 
   setupEventHandlers() {
@@ -58,7 +70,8 @@ class MessageStateManager {
    * Get client ready status
    */
   get clientReady() {
-    return StateManager.get(this.stateKeys.CLIENT_STATUS)?.ready || false;
+    const status = StateManager.get(this.stateKeys.CLIENT_STATUS);
+    return status?.ready || false;
   }
 
   /**
@@ -85,7 +98,7 @@ class MessageStateManager {
     try {
       // Get current status for rollback
       const currentStatuses = StateManager.get(this.stateKeys.MESSAGE_STATUSES);
-      rollbackData.oldStatus = currentStatuses.get(messageId);
+      rollbackData.oldStatus = currentStatuses?.get(messageId);
 
       // Only update if status is higher or first time
       if (rollbackData.oldStatus !== undefined && rollbackData.oldStatus >= status) {
@@ -94,7 +107,7 @@ class MessageStateManager {
 
       // Update memory state
       await StateManager.atomicOperation(this.stateKeys.MESSAGE_STATUSES, (statuses) => {
-        const newStatuses = new Map(statuses);
+        const newStatuses = new Map(statuses || new Map());
         newStatuses.set(messageId, status);
         return newStatuses;
       });
@@ -116,7 +129,7 @@ class MessageStateManager {
       // Rollback memory state on database failure
       if (rollbackData.oldStatus !== null) {
         await StateManager.atomicOperation(this.stateKeys.MESSAGE_STATUSES, (statuses) => {
-          const newStatuses = new Map(statuses);
+          const newStatuses = new Map(statuses || new Map());
           newStatuses.set(messageId, rollbackData.oldStatus);
           return newStatuses;
         });
@@ -133,7 +146,7 @@ class MessageStateManager {
    */
   async updatePersonStatus(messageId, status) {
     await StateManager.atomicOperation(this.stateKeys.PERSONS, (persons) => {
-      const newPersons = [...persons];
+      const newPersons = [...(persons || [])];
       const personIndex = newPersons.findIndex(p => p.messageId === messageId);
       
       if (personIndex >= 0) {
@@ -153,7 +166,7 @@ class MessageStateManager {
    */
   async addPerson(person) {
     await StateManager.atomicOperation(this.stateKeys.PERSONS, (persons) => {
-      return [...persons, {
+      return [...(persons || []), {
         ...person,
         addedAt: Date.now(),
         status: MessageSchemas.MessageStatus.PENDING
@@ -161,8 +174,8 @@ class MessageStateManager {
     });
 
     await StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, (stats) => ({
-      ...stats,
-      sent: stats.sent + 1
+      ...(stats || {}),
+      sent: (stats?.sent || 0) + 1
     }));
 
     return true;
@@ -173,9 +186,10 @@ class MessageStateManager {
    */
   async registerQRViewer(viewerId) {
     return StateManager.atomicOperation(this.stateKeys.QR_STATUS, (qrStatus) => {
+      const current = qrStatus || {};
       return {
-        ...qrStatus,
-        activeViewers: qrStatus.activeViewers + 1,
+        ...current,
+        activeViewers: (current.activeViewers || 0) + 1,
         generationActive: true,
         lastRequested: Date.now()
       };
@@ -187,9 +201,10 @@ class MessageStateManager {
    */
   async unregisterQRViewer(viewerId) {
     const result = await StateManager.atomicOperation(this.stateKeys.QR_STATUS, (qrStatus) => {
-      const newViewers = Math.max(0, qrStatus.activeViewers - 1);
+      const current = qrStatus || {};
+      const newViewers = Math.max(0, (current.activeViewers || 0) - 1);
       return {
-        ...qrStatus,
+        ...current,
         activeViewers: newViewers,
         lastRequested: Date.now()
       };
@@ -199,7 +214,7 @@ class MessageStateManager {
     if (result.activeViewers === 0 && !this.clientReady) {
       setTimeout(() => {
         const current = StateManager.get(this.stateKeys.QR_STATUS);
-        if (current.activeViewers === 0) {
+        if (current && current.activeViewers === 0) {
           stateEvents.emit('qr_cleanup_required');
         }
       }, 60000);
@@ -213,7 +228,7 @@ class MessageStateManager {
    */
   async setQR(qr) {
     return StateManager.atomicOperation(this.stateKeys.QR_STATUS, (qrStatus) => ({
-      ...qrStatus,
+      ...(qrStatus || {}),
       qr,
       lastRequested: Date.now()
     }));
@@ -223,14 +238,16 @@ class MessageStateManager {
    * Get QR code
    */
   get qr() {
-    return StateManager.get(this.stateKeys.QR_STATUS)?.qr;
+    const qrStatus = StateManager.get(this.stateKeys.QR_STATUS);
+    return qrStatus?.qr;
   }
 
   /**
    * Get active QR viewers count
    */
   get activeQRViewers() {
-    return StateManager.get(this.stateKeys.QR_STATUS)?.activeViewers || 0;
+    const qrStatus = StateManager.get(this.stateKeys.QR_STATUS);
+    return qrStatus?.activeViewers || 0;
   }
 
   /**
@@ -272,26 +289,26 @@ class MessageStateManager {
    * Get current state dump
    */
   dump(detailed = false) {
-    const clientStatus = StateManager.get(this.stateKeys.CLIENT_STATUS);
-    const messageStats = StateManager.get(this.stateKeys.MESSAGE_STATS);
-    const persons = StateManager.get(this.stateKeys.PERSONS);
-    const messageStatuses = StateManager.get(this.stateKeys.MESSAGE_STATUSES);
-    const qrStatus = StateManager.get(this.stateKeys.QR_STATUS);
+    const clientStatus = StateManager.get(this.stateKeys.CLIENT_STATUS) || {};
+    const messageStats = StateManager.get(this.stateKeys.MESSAGE_STATS) || {};
+    const persons = StateManager.get(this.stateKeys.PERSONS) || [];
+    const messageStatuses = StateManager.get(this.stateKeys.MESSAGE_STATUSES) || new Map();
+    const qrStatus = StateManager.get(this.stateKeys.QR_STATUS) || {};
 
     const dump = {
-      clientReady: clientStatus?.ready || false,
-      sentMessages: messageStats?.sent || 0,
-      failedMessages: messageStats?.failed || 0,
-      finishedSending: messageStats?.finished || false,
-      personsCount: persons?.length || 0,
-      statusUpdatesCount: messageStatuses?.size || 0,
-      activeQRViewers: qrStatus?.activeViewers || 0,
-      lastActivity: clientStatus?.lastActivity || Date.now()
+      clientReady: clientStatus.ready || false,
+      sentMessages: messageStats.sent || 0,
+      failedMessages: messageStats.failed || 0,
+      finishedSending: messageStats.finished || false,
+      personsCount: persons.length || 0,
+      statusUpdatesCount: messageStatuses.size || 0,
+      activeQRViewers: qrStatus.activeViewers || 0,
+      lastActivity: clientStatus.lastActivity || Date.now()
     };
 
     if (detailed) {
       dump.persons = persons;
-      dump.messageStatuses = Array.from(messageStatuses?.entries() || []);
+      dump.messageStatuses = Array.from(messageStatuses.entries());
       dump.qrStatus = qrStatus;
     }
 
@@ -309,20 +326,23 @@ class MessageStateManager {
    * Get message stats
    */
   get sentMessages() {
-    return StateManager.get(this.stateKeys.MESSAGE_STATS)?.sent || 0;
+    const stats = StateManager.get(this.stateKeys.MESSAGE_STATS) || {};
+    return stats.sent || 0;
   }
 
   get failedMessages() {
-    return StateManager.get(this.stateKeys.MESSAGE_STATS)?.failed || 0;
+    const stats = StateManager.get(this.stateKeys.MESSAGE_STATS) || {};
+    return stats.failed || 0;
   }
 
   get finishedSending() {
-    return StateManager.get(this.stateKeys.MESSAGE_STATS)?.finished || false;
+    const stats = StateManager.get(this.stateKeys.MESSAGE_STATS) || {};
+    return stats.finished || false;
   }
 
   async setFinishedSending(finished) {
     return StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, (stats) => ({
-      ...stats,
+      ...(stats || {}),
       finished
     }));
   }
@@ -331,7 +351,7 @@ class MessageStateManager {
   cleanupQR() {
     console.log("Cleaning up QR code");
     StateManager.atomicOperation(this.stateKeys.QR_STATUS, (qrStatus) => ({
-      ...qrStatus,
+      ...(qrStatus || {}),
       qr: null,
       generationActive: false
     }));
@@ -339,7 +359,7 @@ class MessageStateManager {
 
   handleClientDisconnect() {
     StateManager.atomicOperation(this.stateKeys.CLIENT_STATUS, (status) => ({
-      ...status,
+      ...(status || {}),
       ready: false,
       lastActivity: Date.now()
     }));
@@ -354,5 +374,9 @@ class MessageStateManager {
   }
 }
 
+// ===== FIXED: Export singleton with proper initialization =====
+// Create singleton instance
+const messageStateManagerInstance = new MessageStateManager();
+
 // Export singleton
-export default new MessageStateManager();
+export default messageStateManagerInstance;

@@ -3,9 +3,9 @@
  * Provides methods for database operations with improved resource management
  */
 import { Connection, Request, TYPES } from 'tedious';
-import config from '../../config/config.js';
-import ConnectionPool from './ConnectionPool.js';
-import ResourceManager from '../core/ResourceManager.js';
+
+import ConnectionPool from '../ConnectionPool.js';
+import ResourceManager from '../../core/ResourceManager.js';
 
 // Register database service with resource manager
 ResourceManager.register('database-service', null, async () => {

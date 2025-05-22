@@ -1,358 +1,390 @@
-// services/state/messageState.js
-import stateEvents from './stateEvents.js';
-import StateManager from './StateManager.js';
-import { MessageSchemas } from '../messaging/schemas.js';
-
-class MessageStateManager {
+// services/state/StateManager.js
+/**
+ * Thread-safe state manager with atomic operations
+ */
+class StateManager {
   constructor() {
-    this.stateKeys = {
-      CLIENT_STATUS: 'client_status',
-      MESSAGE_STATS: 'message_stats',
-      PERSONS: 'persons',
-      MESSAGE_STATUSES: 'message_statuses',
-      QR_STATUS: 'qr_status'
-    };
-
-    this.initializeState();
-    this.setupEventHandlers();
-  }
-
-  initializeState() {
-    // Initialize all state keys
-    StateManager.atomicOperation(this.stateKeys.CLIENT_STATUS, () => ({
-      ready: false,
-      initializing: false,
-      lastActivity: Date.now(),
-      manualDisconnect: false
-    }));
-
-    StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, () => ({
-      sent: 0,
-      failed: 0,
-      finished: false,
-      finishReport: false
-    }));
-
-    StateManager.atomicOperation(this.stateKeys.PERSONS, () => []);
-    StateManager.atomicOperation(this.stateKeys.MESSAGE_STATUSES, () => new Map());
-    StateManager.atomicOperation(this.stateKeys.QR_STATUS, () => ({
-      qr: null,
-      activeViewers: 0,
-      generationActive: false,
-      lastRequested: null
-    }));
-  }
-
-  setupEventHandlers() {
-    // Listen for cleanup events
-    stateEvents.on('qr_cleanup_required', () => {
-      this.cleanupQR();
-    });
-
-    stateEvents.on('client_disconnected', () => {
-      this.handleClientDisconnect();
-    });
+    this.state = new Map();
+    this.locks = new Map();
+    this.operations = 0;
+    this.maxRetries = 10;
+    this.retryDelay = 10; // milliseconds
   }
 
   /**
-   * Get client ready status
+   * Get a value from state
+   * @param {string} key - State key
+   * @returns {any} - State value
    */
-  get clientReady() {
-    return StateManager.get(this.stateKeys.CLIENT_STATUS)?.ready || false;
+  get(key) {
+    return this.state.get(key);
   }
 
   /**
-   * Set client ready status atomically
+   * Set a value in state
+   * @param {string} key - State key
+   * @param {any} value - State value
    */
-  async setClientReady(ready) {
-    return StateManager.atomicOperation(this.stateKeys.CLIENT_STATUS, (current) => ({
-      ...current,
-      ready,
-      lastActivity: Date.now()
-    }));
+  set(key, value) {
+    this.state.set(key, value);
   }
 
   /**
-   * Update message status atomically with rollback capability
+   * Check if a key exists in state
+   * @param {string} key - State key
+   * @returns {boolean} - Whether key exists
    */
-  async updateMessageStatus(messageId, status, dbOperation = null) {
-    const rollbackData = {
-      messageId,
-      oldStatus: null,
-      newStatus: status
-    };
-
-    try {
-      // Get current status for rollback
-      const currentStatuses = StateManager.get(this.stateKeys.MESSAGE_STATUSES);
-      rollbackData.oldStatus = currentStatuses.get(messageId);
-
-      // Only update if status is higher or first time
-      if (rollbackData.oldStatus !== undefined && rollbackData.oldStatus >= status) {
-        return false;
-      }
-
-      // Update memory state
-      await StateManager.atomicOperation(this.stateKeys.MESSAGE_STATUSES, (statuses) => {
-        const newStatuses = new Map(statuses);
-        newStatuses.set(messageId, status);
-        return newStatuses;
-      });
-
-      // Execute database operation if provided
-      if (dbOperation) {
-        await dbOperation();
-      }
-
-      // Update persons array
-      await this.updatePersonStatus(messageId, status);
-
-      // Emit success event
-      stateEvents.emit('message_status_updated', { messageId, status });
-      
-      return true;
-
-    } catch (error) {
-      // Rollback memory state on database failure
-      if (rollbackData.oldStatus !== null) {
-        await StateManager.atomicOperation(this.stateKeys.MESSAGE_STATUSES, (statuses) => {
-          const newStatuses = new Map(statuses);
-          newStatuses.set(messageId, rollbackData.oldStatus);
-          return newStatuses;
-        });
-      }
-
-      console.error(`Failed to update message status for ${messageId}:`, error);
-      stateEvents.emit('message_status_error', { messageId, error: error.message });
-      throw error;
-    }
+  has(key) {
+    return this.state.has(key);
   }
 
   /**
-   * Update person status in persons array
+   * Delete a key from state
+   * @param {string} key - State key
+   * @returns {boolean} - Whether key was deleted
    */
-  async updatePersonStatus(messageId, status) {
-    await StateManager.atomicOperation(this.stateKeys.PERSONS, (persons) => {
-      const newPersons = [...persons];
-      const personIndex = newPersons.findIndex(p => p.messageId === messageId);
-      
-      if (personIndex >= 0) {
-        newPersons[personIndex] = {
-          ...newPersons[personIndex],
-          status,
-          lastUpdated: Date.now()
-        };
-      }
-      
-      return newPersons;
-    });
+  delete(key) {
+    // Also clean up any locks for this key
+    this.locks.delete(key);
+    return this.state.delete(key);
   }
 
   /**
-   * Add person atomically
+   * Clear all state
    */
-  async addPerson(person) {
-    await StateManager.atomicOperation(this.stateKeys.PERSONS, (persons) => {
-      return [...persons, {
-        ...person,
-        addedAt: Date.now(),
-        status: MessageSchemas.MessageStatus.PENDING
-      }];
-    });
-
-    await StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, (stats) => ({
-      ...stats,
-      sent: stats.sent + 1
-    }));
-
-    return true;
+  clear() {
+    this.state.clear();
+    this.locks.clear();
   }
 
   /**
-   * Handle QR viewer registration
+   * Get all keys
+   * @returns {string[]} - Array of all keys
    */
-  async registerQRViewer(viewerId) {
-    return StateManager.atomicOperation(this.stateKeys.QR_STATUS, (qrStatus) => {
-      return {
-        ...qrStatus,
-        activeViewers: qrStatus.activeViewers + 1,
-        generationActive: true,
-        lastRequested: Date.now()
-      };
-    });
+  keys() {
+    return Array.from(this.state.keys());
   }
 
   /**
-   * Handle QR viewer unregistration
+   * Get state size
+   * @returns {number} - Number of state entries
    */
-  async unregisterQRViewer(viewerId) {
-    const result = await StateManager.atomicOperation(this.stateKeys.QR_STATUS, (qrStatus) => {
-      const newViewers = Math.max(0, qrStatus.activeViewers - 1);
-      return {
-        ...qrStatus,
-        activeViewers: newViewers,
-        lastRequested: Date.now()
-      };
-    });
-
-    // Schedule cleanup if no viewers
-    if (result.activeViewers === 0 && !this.clientReady) {
-      setTimeout(() => {
-        const current = StateManager.get(this.stateKeys.QR_STATUS);
-        if (current.activeViewers === 0) {
-          stateEvents.emit('qr_cleanup_required');
-        }
-      }, 60000);
-    }
-
-    return true;
+  size() {
+    return this.state.size;
   }
 
   /**
-   * Set QR code
+   * Acquire a lock for a key
+   * @param {string} key - Key to lock
+   * @returns {Promise<void>}
    */
-  async setQR(qr) {
-    return StateManager.atomicOperation(this.stateKeys.QR_STATUS, (qrStatus) => ({
-      ...qrStatus,
-      qr,
-      lastRequested: Date.now()
-    }));
-  }
-
-  /**
-   * Get QR code
-   */
-  get qr() {
-    return StateManager.get(this.stateKeys.QR_STATUS)?.qr;
-  }
-
-  /**
-   * Get active QR viewers count
-   */
-  get activeQRViewers() {
-    return StateManager.get(this.stateKeys.QR_STATUS)?.activeViewers || 0;
-  }
-
-  /**
-   * Reset all state
-   */
-  async reset() {
-    console.log("Resetting message state");
+  async acquireLock(key) {
+    let retries = 0;
     
-    await Promise.all([
-      StateManager.atomicOperation(this.stateKeys.CLIENT_STATUS, () => ({
-        ready: false,
-        initializing: false,
-        lastActivity: Date.now(),
-        manualDisconnect: false
-      })),
-      
-      StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, () => ({
-        sent: 0,
-        failed: 0,
-        finished: false,
-        finishReport: false
-      })),
-      
-      StateManager.atomicOperation(this.stateKeys.PERSONS, () => []),
-      StateManager.atomicOperation(this.stateKeys.MESSAGE_STATUSES, () => new Map()),
-      
-      StateManager.atomicOperation(this.stateKeys.QR_STATUS, () => ({
-        qr: null,
-        activeViewers: 0,
-        generationActive: false,
-        lastRequested: null
-      }))
-    ]);
-
-    stateEvents.emit('state_reset');
-  }
-
-  /**
-   * Get current state dump
-   */
-  dump(detailed = false) {
-    const clientStatus = StateManager.get(this.stateKeys.CLIENT_STATUS);
-    const messageStats = StateManager.get(this.stateKeys.MESSAGE_STATS);
-    const persons = StateManager.get(this.stateKeys.PERSONS);
-    const messageStatuses = StateManager.get(this.stateKeys.MESSAGE_STATUSES);
-    const qrStatus = StateManager.get(this.stateKeys.QR_STATUS);
-
-    const dump = {
-      clientReady: clientStatus?.ready || false,
-      sentMessages: messageStats?.sent || 0,
-      failedMessages: messageStats?.failed || 0,
-      finishedSending: messageStats?.finished || false,
-      personsCount: persons?.length || 0,
-      statusUpdatesCount: messageStatuses?.size || 0,
-      activeQRViewers: qrStatus?.activeViewers || 0,
-      lastActivity: clientStatus?.lastActivity || Date.now()
-    };
-
-    if (detailed) {
-      dump.persons = persons;
-      dump.messageStatuses = Array.from(messageStatuses?.entries() || []);
-      dump.qrStatus = qrStatus;
+    while (this.locks.has(key) && retries < this.maxRetries) {
+      await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+      retries++;
     }
-
-    return dump;
+    
+    if (this.locks.has(key)) {
+      throw new Error(`Failed to acquire lock for key: ${key} after ${this.maxRetries} retries`);
+    }
+    
+    this.locks.set(key, {
+      acquired: Date.now(),
+      operationId: ++this.operations
+    });
   }
 
   /**
-   * Get persons array
+   * Release a lock for a key
+   * @param {string} key - Key to unlock
    */
-  get persons() {
-    return StateManager.get(this.stateKeys.PERSONS) || [];
+  releaseLock(key) {
+    this.locks.delete(key);
   }
 
   /**
-   * Get message stats
+   * Perform an atomic operation on state
+   * @param {string} key - State key
+   * @param {Function} operation - Operation function that receives current value and returns new value
+   * @returns {Promise<any>} - New state value
    */
-  get sentMessages() {
-    return StateManager.get(this.stateKeys.MESSAGE_STATS)?.sent || 0;
-  }
-
-  get failedMessages() {
-    return StateManager.get(this.stateKeys.MESSAGE_STATS)?.failed || 0;
-  }
-
-  get finishedSending() {
-    return StateManager.get(this.stateKeys.MESSAGE_STATS)?.finished || false;
-  }
-
-  async setFinishedSending(finished) {
-    return StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, (stats) => ({
-      ...stats,
-      finished
-    }));
-  }
-
-  // Cleanup methods
-  cleanupQR() {
-    console.log("Cleaning up QR code");
-    StateManager.atomicOperation(this.stateKeys.QR_STATUS, (qrStatus) => ({
-      ...qrStatus,
-      qr: null,
-      generationActive: false
-    }));
-  }
-
-  handleClientDisconnect() {
-    StateManager.atomicOperation(this.stateKeys.CLIENT_STATUS, (status) => ({
-      ...status,
-      ready: false,
-      lastActivity: Date.now()
-    }));
+  async atomicOperation(key, operation) {
+    await this.acquireLock(key);
+    
+    try {
+      const currentValue = this.state.get(key);
+      const newValue = await operation(currentValue);
+      this.state.set(key, newValue);
+      return newValue;
+    } finally {
+      this.releaseLock(key);
+    }
   }
 
   /**
-   * Clean up all resources
+   * Perform multiple atomic operations
+   * @param {Object} operations - Object with key-operation pairs
+   * @returns {Promise<Object>} - Object with key-result pairs
+   */
+  async batchAtomicOperations(operations) {
+    const keys = Object.keys(operations);
+    const results = {};
+    
+    // Acquire all locks first (in sorted order to prevent deadlocks)
+    const sortedKeys = keys.sort();
+    for (const key of sortedKeys) {
+      await this.acquireLock(key);
+    }
+    
+    try {
+      // Execute all operations
+      for (const key of keys) {
+        const currentValue = this.state.get(key);
+        const newValue = await operations[key](currentValue);
+        this.state.set(key, newValue);
+        results[key] = newValue;
+      }
+      
+      return results;
+    } finally {
+      // Release all locks
+      for (const key of sortedKeys) {
+        this.releaseLock(key);
+      }
+    }
+  }
+
+  /**
+   * Get current lock status
+   * @returns {Object} - Lock status information
+   */
+  getLockStatus() {
+    const locks = {};
+    for (const [key, lockInfo] of this.locks.entries()) {
+      locks[key] = {
+        ...lockInfo,
+        duration: Date.now() - lockInfo.acquired
+      };
+    }
+    
+    return {
+      activeLocks: this.locks.size,
+      locks,
+      totalOperations: this.operations
+    };
+  }
+
+  /**
+   * Clean up expired locks (safety mechanism)
+   * @param {number} maxAge - Maximum age in milliseconds (default: 30 seconds)
+   */
+  cleanupExpiredLocks(maxAge = 30000) {
+    const now = Date.now();
+    const expiredKeys = [];
+    
+    for (const [key, lockInfo] of this.locks.entries()) {
+      if (now - lockInfo.acquired > maxAge) {
+        expiredKeys.push(key);
+      }
+    }
+    
+    if (expiredKeys.length > 0) {
+      console.warn(`Cleaning up ${expiredKeys.length} expired locks:`, expiredKeys);
+      expiredKeys.forEach(key => this.locks.delete(key));
+    }
+    
+    return expiredKeys.length;
+  }
+
+  /**
+   * Get state snapshot for debugging
+   * @returns {Object} - Current state snapshot
+   */
+  getSnapshot() {
+    const snapshot = {};
+    for (const [key, value] of this.state.entries()) {
+      try {
+        // Handle circular references and non-serializable objects
+        snapshot[key] = JSON.parse(JSON.stringify(value));
+      } catch (error) {
+        snapshot[key] = `[Non-serializable: ${typeof value}]`;
+      }
+    }
+    
+    return {
+      state: snapshot,
+      locks: this.getLockStatus(),
+      timestamp: Date.now()
+    };
+  }
+
+  /**
+   * Validate state integrity
+   * @returns {Object} - Validation results
+   */
+  validateState() {
+    const issues = [];
+    const stats = {
+      totalKeys: this.state.size,
+      totalLocks: this.locks.size,
+      memoryUsage: 0
+    };
+    
+    // Check for orphaned locks
+    for (const key of this.locks.keys()) {
+      if (!this.state.has(key)) {
+        issues.push(`Orphaned lock for non-existent key: ${key}`);
+      }
+    }
+    
+    // Estimate memory usage
+    try {
+      const serialized = JSON.stringify(this.getSnapshot());
+      stats.memoryUsage = Buffer.byteLength(serialized, 'utf8');
+    } catch (error) {
+      issues.push(`Cannot calculate memory usage: ${error.message}`);
+    }
+    
+    return {
+      valid: issues.length === 0,
+      issues,
+      stats
+    };
+  }
+
+  /**
+   * Backup current state
+   * @returns {Object} - State backup
+   */
+  backup() {
+    return {
+      state: new Map(this.state),
+      timestamp: Date.now(),
+      operations: this.operations
+    };
+  }
+
+  /**
+   * Restore state from backup
+   * @param {Object} backup - State backup
+   */
+  restore(backup) {
+    if (!backup || !backup.state) {
+      throw new Error('Invalid backup data');
+    }
+    
+    // Clear current state and locks
+    this.clear();
+    
+    // Restore state
+    for (const [key, value] of backup.state.entries()) {
+      this.state.set(key, value);
+    }
+    
+    // Restore operation counter if available
+    if (backup.operations) {
+      this.operations = backup.operations;
+    }
+    
+    console.log(`State restored from backup (${backup.timestamp}), ${this.state.size} keys restored`);
+  }
+
+  /**
+   * Export state as JSON
+   * @returns {string} - JSON representation of state
+   */
+  exportState() {
+    const exportData = {
+      state: Object.fromEntries(this.state),
+      metadata: {
+        timestamp: Date.now(),
+        operations: this.operations,
+        size: this.state.size
+      }
+    };
+    
+    return JSON.stringify(exportData, null, 2);
+  }
+
+  /**
+   * Import state from JSON
+   * @param {string} jsonData - JSON state data
+   */
+  importState(jsonData) {
+    try {
+      const importData = JSON.parse(jsonData);
+      
+      if (!importData.state) {
+        throw new Error('Invalid state data format');
+      }
+      
+      // Clear current state
+      this.clear();
+      
+      // Import state
+      for (const [key, value] of Object.entries(importData.state)) {
+        this.state.set(key, value);
+      }
+      
+      // Import metadata if available
+      if (importData.metadata?.operations) {
+        this.operations = importData.metadata.operations;
+      }
+      
+      console.log(`State imported, ${this.state.size} keys loaded`);
+    } catch (error) {
+      throw new Error(`Failed to import state: ${error.message}`);
+    }
+  }
+
+  /**
+   * Clean up resources
    */
   cleanup() {
-    StateManager.cleanup();
-    stateEvents.removeAllListeners();
+    console.log('Cleaning up StateManager...');
+    
+    // Log final statistics
+    const validation = this.validateState();
+    console.log('Final state validation:', validation);
+    
+    // Clear everything
+    this.clear();
+    
+    console.log('StateManager cleanup completed');
+  }
+
+  /**
+   * Get performance statistics
+   * @returns {Object} - Performance stats
+   */
+  getStats() {
+    const validation = this.validateState();
+    
+    return {
+      stateSize: this.state.size,
+      activeLocks: this.locks.size,
+      totalOperations: this.operations,
+      memoryUsage: validation.stats.memoryUsage,
+      isHealthy: validation.valid,
+      issues: validation.issues
+    };
   }
 }
 
-// Export singleton
-export default new MessageStateManager();
+// ===== FIXED: Export StateManager class first, then create singleton =====
+// Export the StateManager class for direct use
+export { StateManager };
+
+// Create and export singleton instance
+const stateManagerInstance = new StateManager();
+
+// ===== FIXED: Set up cleanup interval after instance creation =====
+// Set up periodic cleanup of expired locks
+setInterval(() => {
+  stateManagerInstance.cleanupExpiredLocks();
+}, 60000); // Every minute
+
+// Export singleton as default
+export default stateManagerInstance;
