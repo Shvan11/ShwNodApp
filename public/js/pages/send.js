@@ -3,34 +3,37 @@
  * Handles the UI and communication for sending WhatsApp messages
  */
 class WhatsAppMessenger {
-    constructor() {
-        // State properties
-        this.urlParams = new URLSearchParams(window.location.search);
-        this.dateparam = this.urlParams.get('date') || new Date().toISOString().slice(0, 10);
-        this.ws = null;
-        this.pollingInterval = null;
-        this.pingInterval = null;
-        this.finished = false;
-        this.persons = [];
-        this.clientReadyShown = false;
-        this.sendingStarted = false;
-        this.initAttempt = 0;
-        this.maxInitAttempts = 5;
-        this.statusUpdateQueue = new Map();
-        
-        // DOM elements
-        this.stateElement = document.getElementById("state");
-        this.startButton = document.getElementById("startSendingBtn");
-        this.qrImage = document.getElementById("qr");
-        this.tableContainer = document.getElementById("table-container");
-        this.restartButtonContainer = document.getElementById("restart-button-container");
+  constructor() {
+    // State properties
+    this.urlParams = new URLSearchParams(window.location.search);
+    this.dateparam = this.urlParams.get('date') || new Date().toISOString().slice(0, 10);
+    this.ws = null;
+    this.pollingInterval = null;
+    this.pingInterval = null;
+    this.healthCheckInterval = null; // ===== ADDED =====
+    this.finished = false;
+    this.persons = [];
+    this.clientReadyShown = false;
+    this.sendingStarted = false;
+    this.initAttempt = 0;
+    this.maxInitAttempts = 5;
+    this.statusUpdateQueue = new Map();
+    this.lastPongReceived = null; // ===== ADDED =====
+    this.manualDisconnect = false; // ===== ADDED =====
+    
+    // DOM elements
+    this.stateElement = document.getElementById("state");
+    this.startButton = document.getElementById("startSendingBtn");
+    this.qrImage = document.getElementById("qr");
+    this.tableContainer = document.getElementById("table-container");
+    this.restartButtonContainer = document.getElementById("restart-button-container");
 
-        // Event bindings
-        this.bindEvents();
+    // Event bindings
+    this.bindEvents();
 
-        // Initialize
-        this.init();
-    }
+    // Initialize
+    this.init();
+}
 
     bindEvents() {
         // Start button click
@@ -294,7 +297,7 @@ class WhatsAppMessenger {
         }
       }
       
-    connectWebSocket() {
+      connectWebSocket() {
         try {
             // Close any existing connection
             if (this.ws && this.ws.readyState === 1) {
@@ -309,12 +312,46 @@ class WhatsAppMessenger {
                     clearInterval(this.pingInterval);
                 }
 
+                // ===== FIXED: Enhanced ping with better error handling =====
                 this.pingInterval = setInterval(() => {
                     if (this.ws && this.ws.readyState === 1) {
                         console.log("Sending ping to keep connection alive");
-                        this.ws.send(JSON.stringify({ type: 'ping' }));
+                        try {
+                            // Send simple ping message
+                            this.ws.send(JSON.stringify({ type: 'ping' }));
+                        } catch (error) {
+                            console.error("Error sending ping:", error);
+                            // Clear interval if sending fails
+                            if (this.pingInterval) {
+                                clearInterval(this.pingInterval);
+                                this.pingInterval = null;
+                            }
+                        }
+                    } else {
+                        console.warn("WebSocket not ready for ping, state:", this.ws?.readyState);
+                        // Clear interval if connection is not ready
+                        if (this.pingInterval) {
+                            clearInterval(this.pingInterval);
+                            this.pingInterval = null;
+                        }
                     }
-                }, 30000);
+                }, 30000); // Every 30 seconds
+
+                // ===== ADDED: Track last pong received =====
+                this.lastPongReceived = Date.now();
+                
+                // ===== ADDED: Monitor connection health =====
+                this.healthCheckInterval = setInterval(() => {
+                    const now = Date.now();
+                    const timeSinceLastPong = now - (this.lastPongReceived || now);
+                    
+                    // If no pong received for 2 minutes, consider connection stale
+                    if (timeSinceLastPong > 120000) {
+                        console.warn("No pong received for 2 minutes, connection may be stale");
+                        console.log("Attempting to reconnect...");
+                        this.connectWebSocket(); // Reconnect
+                    }
+                }, 60000); // Check every minute
             };
 
             this.ws.onmessage = (event) => {
@@ -323,25 +360,46 @@ class WhatsAppMessenger {
 
             this.ws.onclose = (event) => {
                 console.log("WebSocket connection closed", event.code, event.reason);
+                
+                // ===== FIXED: Enhanced cleanup =====
                 if (this.pingInterval) {
                     clearInterval(this.pingInterval);
                     this.pingInterval = null;
                 }
+                
+                if (this.healthCheckInterval) {
+                    clearInterval(this.healthCheckInterval);
+                    this.healthCheckInterval = null;
+                }
 
                 // Reconnect unless manual disconnect or finished
-                if (!this.finished) {
+                if (!this.finished && !this.manualDisconnect) {
                     console.log("Reconnecting WebSocket in 2 seconds...");
                     setTimeout(() => this.connectWebSocket(), 2000);
                 }
 
-                // Ensure polling is active
+                // Ensure polling is active as fallback
                 this.startPolling();
             };
 
             this.ws.onerror = (error) => {
                 console.error("WebSocket error:", error);
+                
+                // Clear intervals on error
+                if (this.pingInterval) {
+                    clearInterval(this.pingInterval);
+                    this.pingInterval = null;
+                }
+                
+                if (this.healthCheckInterval) {
+                    clearInterval(this.healthCheckInterval);
+                    this.healthCheckInterval = null;
+                }
+                
+                // Start polling as fallback
                 this.startPolling();
             };
+            
         } catch (error) {
             console.error("Error creating WebSocket:", error);
             this.startPolling();
@@ -349,61 +407,89 @@ class WhatsAppMessenger {
     }
 
     handleWebSocketMessage(event) {
-        console.log("Raw WebSocket message received:", event.data);
-        
-        try {
-          const message = JSON.parse(event.data);
-          console.log("Parsed WebSocket message:", message);
+      console.log("Raw WebSocket message received:", event.data);
       
-          // Validate message format
-          if (!message.type || !message.data) {
-            console.warn("Invalid message format received:", message);
-            return;
-          }
-      
-          // Handle different message types
-          switch (message.type) {
-            case 'qr_update':
-              this.handleQRUpdate(message.data);
-              break;
-              
-            case 'client_ready':
-              this.handleClientReady(message.data);
-              break;
-              
-            case 'message_status':
-              this.handleSingleStatusUpdate(message.data);
-              break;
-              
-            case 'batch_status':
-              this.handleBatchStatusUpdate(message.data);
-              break;
-              
-            case 'appointment_update':
-              this.handleAppointmentUpdate(message.data);
-              break;
-              
-            case 'sending_finished':
-              this.handleSendingFinished(message.data);
-              break;
-              
-            case 'error':
-              this.handleError(message.data);
-              break;
-              
-            case 'pong':
-              console.log("Received pong response");
-              break;
-              
-            default:
-              // Handle legacy message formats for backward compatibility
-              this.handleLegacyMessage(message);
-          }
-          
-        } catch (error) {
-          console.error("Error parsing WebSocket message:", error);
+      try {
+        const message = JSON.parse(event.data);
+        console.log("Parsed WebSocket message:", message);
+    
+        // ===== FIXED: More flexible message validation =====
+        // Validate message format - allow simple control messages
+        if (!message || typeof message !== 'object' || !message.type) {
+          console.warn("Invalid message format received:", message);
+          return;
         }
+        
+        // ===== FIXED: Allow control messages without data field =====
+        const controlMessages = ['ping', 'pong', 'heartbeat', 'ack', 'error'];
+        const requiresData = !controlMessages.includes(message.type);
+        
+        if (requiresData && !message.data) {
+          console.warn("Message missing data field:", message);
+          return;
+        }
+    
+        // Handle different message types
+        switch (message.type) {
+          case 'qr_update':
+            this.handleQRUpdate(message.data);
+            break;
+            
+          case 'client_ready':
+            this.handleClientReady(message.data);
+            break;
+            
+          case 'message_status':
+            this.handleSingleStatusUpdate(message.data);
+            break;
+            
+          case 'batch_status':
+            this.handleBatchStatusUpdate(message.data);
+            break;
+            
+          case 'appointment_update':
+            this.handleAppointmentUpdate(message.data);
+            break;
+            
+          case 'sending_finished':
+            this.handleSendingFinished(message.data);
+            break;
+            
+          case 'error':
+            // ===== FIXED: Handle error messages properly =====
+            if (message.data && message.data.error) {
+              this.handleError(message.data);
+            } else {
+              console.error("Received error message without details:", message);
+            }
+            break;
+            
+          case 'pong':
+            // ===== FIXED: Handle pong responses =====
+            console.log("Received pong response - connection alive");
+            // Update connection status if needed
+            this.lastPongReceived = Date.now();
+            break;
+            
+          case 'ping':
+            // ===== FIXED: Respond to server pings =====
+            console.log("Received ping from server, sending pong");
+            if (this.ws && this.ws.readyState === 1) {
+              this.ws.send(JSON.stringify({ type: 'pong' }));
+            }
+            break;
+            
+          default:
+            // Handle legacy message formats for backward compatibility
+            console.log("Handling legacy message format:", message.type);
+            this.handleLegacyMessage(message);
+        }
+        
+      } catch (error) {
+        console.error("Error parsing WebSocket message:", error);
+        console.error("Raw message data:", event.data);
       }
+    }
 
     async sendWa() {
         try {

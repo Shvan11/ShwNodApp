@@ -442,59 +442,67 @@ function setupWebSocketServer(server) {
     }
   });
 
-  /**
+
+ /**
    * Handle typed messages (with a 'type' property)
    * @param {WebSocket} ws - WebSocket connection
    * @param {Object} message - Parsed message
    * @param {string} date - Date parameter
    * @param {ConnectionManager} connectionManager - Connection manager
    */
-  async function handleTypedMessage(ws, message, date, connectionManager) {
-    const validation = validateWebSocketMessage(message);
-    if (!validation.valid) {
-      console.error('Invalid message format:', validation.error);
-      const errorMessage = createWebSocketMessage(
-        MessageSchemas.WebSocketMessage.ERROR,
-        { error: validation.error }
-      );
-      connectionManager.sendToClient(ws, errorMessage);
-      return;
-    }
-  
-    switch (message.type) {
-      case 'ping':
-        const pongMessage = createWebSocketMessage('pong', {});
-        connectionManager.sendToClient(ws, pongMessage);
-        break;
-  
-      case 'pong':
-        connectionManager.updateClientCapabilities(ws, {
-          supportsPing: true,
-          lastPong: Date.now()
-        });
-        break;
-  
-      case 'getAppointments':
-        const requestDate = message.data?.date || date;
-        if (requestDate) {
-          await sendAppointmentsData(ws, requestDate, connectionManager);
-        }
-        break;
-  
-      case 'getPatient':
-        if (message.data?.patientId) {
-          await sendPatientData(ws, message.data.patientId, connectionManager);
-        }
-        break;
-  
-      case 'capabilities':
-        connectionManager.updateClientCapabilities(ws, message.data?.capabilities || {});
-        break;
-  
-      default:
-        console.log(`Unknown message type: ${message.type}`);
-    }
+ async function handleTypedMessage(ws, message, date, connectionManager) {
+  // ===== FIXED: More flexible validation for ping/pong messages =====
+  // Simple validation that allows ping/pong without data field
+  if (!message || typeof message !== 'object' || !message.type) {
+    console.error('Invalid message format: missing type');
+    const errorMessage = createWebSocketMessage(
+      MessageSchemas.WebSocketMessage.ERROR,
+      { error: 'Invalid message format: missing type' }
+    );
+    connectionManager.sendToClient(ws, errorMessage);
+    return;
   }
+
+  // Handle different message types
+  switch (message.type) {
+    case 'ping':
+      // ===== FIXED: Simple pong response =====
+      const pongMessage = {
+        type: 'pong',
+        timestamp: Date.now(),
+        originalId: message.id
+      };
+      connectionManager.sendToClient(ws, pongMessage);
+      break;
+
+    case 'pong':
+      connectionManager.updateClientCapabilities(ws, {
+        supportsPing: true,
+        lastPong: Date.now()
+      });
+      break;
+
+    case 'getAppointments':
+      const requestDate = message.data?.date || date;
+      if (requestDate) {
+        await sendAppointmentsData(ws, requestDate, connectionManager);
+      }
+      break;
+
+    case 'getPatient':
+      if (message.data?.patientId) {
+        await sendPatientData(ws, message.data.patientId, connectionManager);
+      }
+      break;
+
+    case 'capabilities':
+      connectionManager.updateClientCapabilities(ws, message.data?.capabilities || {});
+      break;
+
+    default:
+      console.log(`Unknown message type: ${message.type}`);
+  }
+}
 
   /**
    * Send initial data to a client
