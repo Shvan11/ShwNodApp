@@ -3,6 +3,8 @@ import { WebSocketServer } from 'ws';
 import { EventEmitter } from 'events';
 import * as database from '../services/database/queries/index.js';
 import messageState from '../services/state/messageState.js';
+import { getTimePointImgs } from '../services/database/queries/timepoint-queries.js';
+import { getLatestVisitsSum } from '../services/database/queries/visit-queries.js';
 import { createWebSocketMessage, validateWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
 /**
  * WebSocket Connection Manager
@@ -482,6 +484,7 @@ function setupWebSocketServer(server) {
       });
       break;
 
+
     case 'getAppointments':
       const requestDate = message.data?.date || date;
       if (requestDate) {
@@ -566,7 +569,7 @@ function setupWebSocketServer(server) {
   
     try {
       const images = await getPatientImages(patientId);
-      const latestVisit = await database.getLatestVisitsSum(patientId);
+      const latestVisit = await getLatestVisitsSum(patientId);
   
       const message = createWebSocketMessage(
         'patient_data',
@@ -593,7 +596,7 @@ function setupWebSocketServer(server) {
     async function getPatientImages(pid) {
       try {
         const tp = "0";
-        const images = await database.getTimePointImgs(pid, tp);
+        const images = await getTimePointImgs(pid, tp);
   
         return images.map(code => {
           const name = `${pid}0${tp}.i${code}`;
@@ -614,7 +617,7 @@ function setupWebSocketServer(server) {
   async function getPatientImages(pid) {
     try {
       const tp = "0"; // Default timepoint
-      const images = await database.getTimePointImgs(pid, tp);
+      const images = await getTimePointImgs(pid, tp);
 
       // Transform image names to proper format
       return images.map(code => {
@@ -679,7 +682,7 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
 
       console.log("Filtered images for patient " + pid + ":", filteredImages);
       
-      const latestVisit = await database.getLatestVisitsSum(pid);
+      const latestVisit = await getLatestVisitsSum(pid);
       
       const message = createWebSocketMessage(
         'patient_loaded',
@@ -792,7 +795,7 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
   async function getPatientImages(pid) {
     try {
       const tp = "0";
-      const images = await database.getTimePointImgs(pid, tp);
+      const images = await getTimePointImgs(pid, tp);
 
       return images.map(code => {
         const name = `${pid}0${tp}.i${code}`;

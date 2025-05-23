@@ -169,9 +169,7 @@ class WhatsAppMessenger {
           return `${days}d ago`;
         }
       }
-      
-      // ===== ENHANCE updateFinishedState METHOD =====
-      // Find the existing updateFinishedState method and replace with:
+
       
       updateFinishedState() {
         // Update UI to show completion
@@ -308,9 +306,7 @@ class WhatsAppMessenger {
 
             this.ws.onopen = () => {
                 console.log("WebSocket connected");
-                if (this.pingInterval) {
-                    clearInterval(this.pingInterval);
-                }
+    
 
                 // ===== FIXED: Enhanced ping with better error handling =====
                 this.pingInterval = setInterval(() => {
@@ -413,6 +409,12 @@ class WhatsAppMessenger {
         const message = JSON.parse(event.data);
         console.log("Parsed WebSocket message:", message);
     
+         // Add this debugging section
+    if (message.type === 'qr_update') {
+      console.log("QR UPDATE RECEIVED!", message.data);
+    }
+
+
         // ===== FIXED: More flexible message validation =====
         // Validate message format - allow simple control messages
         if (!message || typeof message !== 'object' || !message.type) {
@@ -821,30 +823,36 @@ class WhatsAppMessenger {
         }
     }
 
-    updateQR(qr) {
-        if (!this.qrImage) return;
+// In public/js/pages/send.js
+// Fix the updateQR method
+updateQR(qr) {
+  if (!this.qrImage) {
+    console.error("No QR image element found!");
+    return;
+  }
 
-        if (!qr) {
-            this.qrImage.style.display = 'none';
-            return;
-        }
+  if (!qr) {
+    console.log("No QR provided, hiding QR image");
+    this.qrImage.style.display = 'none';
+    return;
+  }
 
-        console.log("Updating QR code display");
-        
-        // Handle the QR code based on its format
-        if (typeof qr === 'string') {
-            if (qr.startsWith('data:image')) {
-                // It's already a data URL
-                this.qrImage.src = qr;
-            } else {
-                // It's a raw QR code string, convert to image
-                this.qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
-            }
-            this.qrImage.style.display = 'block';
-        } else {
-            console.error("Invalid QR code format received:", typeof qr);
-        }
+  console.log("Updating QR code display with:", qr.substring(0, 50) + "...");
+  
+  // Handle the QR code based on its format
+  if (typeof qr === 'string') {
+    if (qr.startsWith('data:image')) {
+      // It's already a data URL
+      this.qrImage.src = qr;
+    } else {
+      // It's a raw QR code string, convert to image
+      this.qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
     }
+    this.qrImage.style.display = 'block';
+  } else {
+    console.error("Invalid QR code format received:", typeof qr);
+  }
+}
 
     updateFinishedState() {
         // Update UI to show completion

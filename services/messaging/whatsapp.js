@@ -4,6 +4,8 @@ import messageState from '../state/messageState.js';
 import stateEvents from '../state/stateEvents.js';
 import transactionManager from '../database/TransactionManager.js';
 import * as database from '../database/queries/index.js';
+import { getWhatsAppMessages } from '../database/queries/messaging-queries.js';
+
 import { createWebSocketMessage, MessageSchemas } from './schemas.js';
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth } = pkg;
@@ -113,18 +115,24 @@ class WhatsAppService extends EventEmitter {
   /**
    * Initialize client only when needed
    */
-  async initializeOnDemand() {
-    if (whatsappClient || isInitializing) {
-      return clientInitPromise || Promise.resolve(!!whatsappClient);
-    }
-
-    if (messageState.activeQRViewers === 0) {
-      console.log("No QR viewers, skipping initialization");
-      return false;
-    }
-
-    return this.initialize();
+// In services/messaging/whatsapp.js
+// Update the initializeOnDemand method
+async initializeOnDemand() {
+  console.log("initializeOnDemand called - QR viewer connected");
+  
+  if (whatsappClient || isInitializing) {
+    console.log("Client exists or is initializing already");
+    return clientInitPromise || Promise.resolve(!!whatsappClient);
   }
+
+  if (messageState.activeQRViewers === 0) {
+    console.log("No QR viewers, skipping initialization");
+    return false;
+  }
+
+  console.log("Auto-initializing WhatsApp client");
+  return this.initialize();
+}
 
   /**
    * Initialize with circuit breaker protection
@@ -201,27 +209,34 @@ class WhatsAppService extends EventEmitter {
   async setupEventHandlers() {
     if (!whatsappClient) return;
 
-    whatsappClient.on('qr', async (qr) => {
-      console.log('QR code received');
-      
-      // Always store QR code
-      await messageState.setQR(qr);
-      
-      // Only emit if there are active viewers
-      if (messageState.activeQRViewers > 0) {
-        this.emit('qr', qr);
-        if (wsEmitter) {
-          const message = createWebSocketMessage(
-            MessageSchemas.WebSocketMessage.QR_UPDATE,
-            { qr, clientReady: false }
-          );
-          this.broadcastToClients(message);
-        }
-        console.log('QR code emitted to active viewers');
-      } else {
-        console.log('QR code stored but not emitted (no active viewers)');
-      }
-    });
+  // In services/messaging/whatsapp.js
+// Update the setupEventHandlers function
+
+// In services/messaging/whatsapp.js
+// In setupEventHandlers function
+whatsappClient.on('qr', async (qr) => {
+  console.log('QR code received - client is definitely NOT ready');
+  
+  // If we receive a QR code, the client is definitely not ready
+  if (messageState.clientReady) {
+    console.log('Correcting clientReady state to false as QR was received');
+    await messageState.setClientReady(false);
+  }
+  
+  // Store QR code regardless of viewers (they might connect later)
+  await messageState.setQR(qr);
+  this.emit('qr', qr);
+  
+  // Only broadcast to viewers if they exist
+  if (wsEmitter) {
+    console.log('QR code received, emitting to clients');
+    const message = createWebSocketMessage(
+      MessageSchemas.WebSocketMessage.QR_UPDATE,
+      { qr, clientReady: false }
+    );
+    this.broadcastToClients(message);
+  }
+});
 
     whatsappClient.on('ready', async () => {
       console.log('WhatsApp client is ready');
@@ -361,7 +376,7 @@ class WhatsAppService extends EventEmitter {
     return circuitBreaker.execute(async () => {
       console.log(`Sending WhatsApp messages for date: ${date}`);
       
-      const [numbers, messages, ids, names] = await database.getWhatsAppMessages(date);
+      const [numbers, messages, ids, names] = await getWhatsAppMessages(date);
       
       if (!numbers || numbers.length === 0) {
         console.log(`No messages to send for date ${date}`);

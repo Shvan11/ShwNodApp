@@ -184,17 +184,25 @@ class MessageStateManager {
   /**
    * Handle QR viewer registration
    */
-  async registerQRViewer(viewerId) {
-    return StateManager.atomicOperation(this.stateKeys.QR_STATUS, (qrStatus) => {
-      const current = qrStatus || {};
-      return {
-        ...current,
-        activeViewers: (current.activeViewers || 0) + 1,
-        generationActive: true,
-        lastRequested: Date.now()
-      };
-    });
-  }
+ // In services/state/messageState.js
+// Add this line to registerQRViewer method
+async registerQRViewer(viewerId) {
+  const result = await StateManager.atomicOperation(this.stateKeys.QR_STATUS, (qrStatus) => {
+    const current = qrStatus || {};
+    return {
+      ...current,
+      activeViewers: (current.activeViewers || 0) + 1,
+      generationActive: true,
+      lastRequested: Date.now()
+    };
+  });
+  
+  // Add this line to emit the event when viewers connect
+  stateEvents.emit('qr_viewer_connected');
+  
+  console.log(`QR viewer ${viewerId || 'unknown'} registered. Active viewers: ${result.activeViewers}`);
+  return result;
+}
 
   /**
    * Handle QR viewer unregistration
