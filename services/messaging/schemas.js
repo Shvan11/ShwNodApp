@@ -40,18 +40,41 @@ export function createWebSocketMessage(type, data = {}, metadata = {}) {
 }
 
 /**
- * Enhanced validate WebSocket message format - more flexible validation
+ * Enhanced validate WebSocket message format with comprehensive security checks
  */
 export function validateWebSocketMessage(message) {
+  // Basic type validation
   if (!message || typeof message !== 'object') {
     return { valid: false, error: 'Message must be an object' };
   }
   
+  // Prevent prototype pollution
+  if (message.hasOwnProperty('__proto__') || 
+      message.hasOwnProperty('constructor') || 
+      message.hasOwnProperty('prototype')) {
+    return { valid: false, error: 'Message contains forbidden properties' };
+  }
+  
+  // Check for required type field
   if (!message.type) {
     return { valid: false, error: 'Message missing type field' };
   }
   
-  // ===== FIXED: More flexible validation =====
+  // Type validation - must be string
+  if (typeof message.type !== 'string' || message.type.length === 0) {
+    return { valid: false, error: 'Message type must be a non-empty string' };
+  }
+  
+  // Validate type against known types
+  const validTypes = [
+    ...Object.values(MessageSchemas.WebSocketMessage),
+    'ping', 'pong', 'heartbeat', 'ack', 'error', 'sending_finished'
+  ];
+  
+  if (!validTypes.includes(message.type)) {
+    return { valid: false, error: `Unknown message type: ${message.type}` };
+  }
+  
   // Allow messages without data field for simple ping/pong and other control messages
   const simpleMessageTypes = ['ping', 'pong', 'heartbeat', 'ack'];
   
@@ -61,8 +84,23 @@ export function validateWebSocketMessage(message) {
   }
   
   // For other message types, require data but make timestamp optional
-  if (message.data === undefined) {
+  if (message.data === undefined || message.data === null) {
     return { valid: false, error: 'Message missing data field' };
+  }
+  
+  // Validate data field is an object for complex messages
+  if (typeof message.data !== 'object') {
+    return { valid: false, error: 'Message data must be an object' };
+  }
+  
+  // Validate timestamp if present
+  if (message.timestamp !== undefined && (typeof message.timestamp !== 'number' || message.timestamp <= 0)) {
+    return { valid: false, error: 'Message timestamp must be a positive number' };
+  }
+  
+  // Validate id if present
+  if (message.id !== undefined && typeof message.id !== 'string') {
+    return { valid: false, error: 'Message id must be a string' };
   }
   
   return { valid: true };
@@ -95,6 +133,48 @@ export function normalizeWebSocketMessage(message) {
 }
 
 /**
+ * Generate a unique message ID
+ */
+function generateMessageId() {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substr(2, 9);
+  return `msg_${timestamp}_${random}`;
+}
+
+/**
+ * Sanitize message data to prevent XSS and other attacks
+ */
+export function sanitizeMessageData(data) {
+  if (typeof data !== 'object' || data === null) {
+    return data;
+  }
+  
+  const sanitized = {};
+  
+  for (const [key, value] of Object.entries(data)) {
+    // Skip dangerous properties
+    if (['__proto__', 'constructor', 'prototype'].includes(key)) {
+      continue;
+    }
+    
+    if (typeof value === 'string') {
+      // Basic HTML/script tag sanitization
+      sanitized[key] = value
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+        .replace(/javascript:/gi, '')
+        .replace(/on\w+\s*=/gi, '');
+    } else if (typeof value === 'object' && value !== null) {
+      sanitized[key] = sanitizeMessageData(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  
+  return sanitized;
+}
+
+/**
  * Create a simple control message (ping, pong, etc.)
  */
 export function createControlMessage(type, additionalData = {}) {
@@ -120,6 +200,3 @@ export function isValidMessageType(type) {
   return allTypes.includes(type);
 }
 
-function generateMessageId() {
-  return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}

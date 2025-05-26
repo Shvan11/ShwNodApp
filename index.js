@@ -16,7 +16,7 @@ import messageState from './services/state/messageState.js';
 import ResourceManager from './services/core/ResourceManager.js';
 import HealthCheck from './services/monitoring/HealthCheck.js';
 import ConnectionPool from './services/database/ConnectionPool.js';
-import { testConnection } from './services/database/queries/index.js';
+import { testConnection, testConnectionWithRetry } from './services/database/queries/index.js';
 
 // Get current file and directory name for ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -37,15 +37,18 @@ async function initializeApplication() {
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`Port: ${port}`);
 
-    // ===== ADDED: Test database connectivity early =====
+    // ===== ADDED: Test database connectivity with retry logic =====
     console.log('📊 Testing database connectivity...');
-    const dbTest = await testConnection();
+    const dbTest = await testConnectionWithRetry();
     if (!dbTest.success) {
-      console.error('❌ Database connection failed:', dbTest.error);
+      console.error('❌ Database connection failed after retries:', dbTest.error);
       console.log('💡 Please check your database configuration and ensure the server is running');
-      process.exit(1);
+      console.log('🔄 Application will continue to retry database connection in background');
+      // Start background retry mechanism
+      startBackgroundDatabaseRetry();
+    } else {
+      console.log('✅ Database connection successful');
     }
-    console.log('✅ Database connection successful');
 
     // Setup middleware
     console.log('⚙️  Setting up middleware...');
@@ -229,6 +232,21 @@ const { wsEmitter } = await initializeApplication();
 
 // Export WebSocket emitter for other modules (maintain existing functionality)
 export { wsEmitter };
+
+// ===== ADDED: Simple background database retry mechanism =====
+function startBackgroundDatabaseRetry() {
+  const retryInterval = setInterval(async () => {
+    try {
+      const dbTest = await testConnection();
+      if (dbTest.success) {
+        console.log('✅ Database connection restored!');
+        clearInterval(retryInterval);
+      }
+    } catch (error) {
+      // Silent retry - only log success
+    }
+  }, 60000); // Check every 60 seconds
+}
 
 // ===== ADDED: Export graceful shutdown for external use =====
 export { gracefulShutdown };

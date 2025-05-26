@@ -178,14 +178,24 @@ export async function updateWhatsAppDeliveryStatus(messages) {
     });
     
     console.log(`Status distribution:`, statusGroups);
+    console.log(`Input messages data:`, messages.map(m => ({
+      id: m.id,
+      ack: m.ack, 
+      whatsappMessageId: m.whatsappMessageId
+    })));
 
     const rows = messages.map(message => {
       const status = convertAckStatus(message.ack);
+      const waMessageId = message.whatsappMessageId || '';
+      console.log(`Processing message: appointmentId=${message.id}, whatsappMessageId=${waMessageId}, status=${status}`);
+      
       return [
-        message.id,           // AppointmentID
-        null,                 // SentWa
-        status,               // DeliveredWa
-        null                  // WaMessageID
+        message.id,                           // AppointmentID
+        null,                                 // SentWa (bit) - null for status updates
+        status,                               // DeliveredWa (nvarchar 50)
+        waMessageId,                          // WaMessageID (nvarchar 255) - store WhatsApp message ID
+        new Date(),                           // LastUpdated (datetime)
+        null                                  // SentTimestamp (datetime) - null for delivery status updates
       ];
     });
 
@@ -194,18 +204,19 @@ export async function updateWhatsAppDeliveryStatus(messages) {
         { name: 'AppointmentID', type: TYPES.Int },
         { name: 'SentWa', type: TYPES.Bit },
         { name: 'DeliveredWa', type: TYPES.NVarChar },
-        { name: 'WaMessageID', type: TYPES.NVarChar }
+        { name: 'WaMessageID', type: TYPES.NVarChar },
+        { name: 'LastUpdated', type: TYPES.DateTime },
+        { name: 'SentTimestamp', type: TYPES.DateTime }
       ],
       rows: rows
     };
 
-    // Use transaction for atomic operation
-    return TransactionManager.withTransaction([
-      async (connection) => {
-        return executeStoredProcedureWithConnection(
-          connection,
-          'UpdateWhatsAppDeliveryStatus',
-          [['AIDS', TYPES.TVP, tableDefinition]],
+    // Use direct connection to avoid transaction conflicts
+    return ConnectionPool.withConnection(async (connection) => {
+      return executeStoredProcedureWithConnection(
+        connection,
+        'UpdateWhatsAppDeliveryStatus',
+        [['AIDS', TYPES.TVP, tableDefinition]],
           null,
           (columns) => {
             if (columns.length >= 4) {
@@ -236,8 +247,7 @@ export async function updateWhatsAppDeliveryStatus(messages) {
             };
           }
         );
-      }
-    ]);
+      });
 
   }, operationName).catch(error => {
     console.error(`Error in ${operationName}: ${error.message}`);
@@ -277,10 +287,10 @@ export async function getWhatsAppMessages(date) {
           return null;
         },
         (result) => {
-          const numbers = result.map(r => r.number);
-          const messages = result.map(r => r.message);
-          const ids = result.map(r => r.id);
-          const names = result.map(r => r.name);
+          const numbers = result.map(r => r.number || '');
+          const messages = result.map(r => r.message || '');
+          const ids = result.map(r => r.id || '');
+          const names = result.map(r => r.name || '');
           
           console.log(`Retrieved ${result.length} WhatsApp messages for date ${date}`);
           
@@ -298,7 +308,8 @@ export async function getWhatsAppMessages(date) {
             // Log sample messages for debugging
             const sampleCount = Math.min(3, result.length);
             for (let i = 0; i < sampleCount; i++) {
-              const msgPreview = result[i].message.substring(0, 30) + '...';
+              const message = result[i].message || '';
+              const msgPreview = message.length > 30 ? message.substring(0, 30) + '...' : message;
               console.log(`Sample ${i + 1}: ID=${result[i].id}, Time=${new Date(result[i].appTime).toLocaleTimeString()}, Phone=${result[i].number}, Preview=${msgPreview}`);
             }
           }
@@ -313,6 +324,7 @@ export async function getWhatsAppMessages(date) {
     return [[], [], [], []];
   });
 }
+
 
 /**
  * Enhanced updateWhatsAppStatus with transaction management
@@ -338,34 +350,37 @@ export async function updateWhatsAppStatus(appointmentIds, messageIds) {
     
     const rows = [];
     
-    // Create table rows for the procedure
+    // Create table rows for the procedure (6 columns to match WhatsTableType)
     for (let i = 0; i < appointmentIds.length; i++) {
       rows.push([
         appointmentIds[i],  // AppointmentID
         1,                  // SentWa - Set to 1 to mark as sent
         null,               // DeliveredWa - Not updated here
-        messageIds[i]       // WaMessageID - Store the message ID
+        messageIds[i],      // WaMessageID - Store the message ID
+        new Date(),         // LastUpdated
+        new Date()          // SentTimestamp - When message was sent
       ]);
     }
 
-    // Table definition
+    // Table definition (6 columns to match WhatsTableType)
     const tableDefinition = {
       columns: [
         { name: 'AppointmentID', type: TYPES.Int },
         { name: 'SentWa', type: TYPES.Bit },
         { name: 'DeliveredWa', type: TYPES.NVarChar },
-        { name: 'WaMessageID', type: TYPES.NVarChar }
+        { name: 'WaMessageID', type: TYPES.NVarChar },
+        { name: 'LastUpdated', type: TYPES.DateTime },
+        { name: 'SentTimestamp', type: TYPES.DateTime }
       ],
       rows: rows
     };
 
-    // Execute with transaction
-    return TransactionManager.withTransaction([
-      async (connection) => {
-        return executeStoredProcedureWithConnection(
-          connection,
-          'UpdateWhatsAppStatus',
-          [['AIDS', TYPES.TVP, tableDefinition]],
+    // Execute with direct connection to avoid transaction conflicts
+    return ConnectionPool.withConnection(async (connection) => {
+      return executeStoredProcedureWithConnection(
+        connection,
+        'UpdateWhatsAppStatus',
+        [['AIDS', TYPES.TVP, tableDefinition]],
           null,
           (columns) => {
             if (columns.length >= 1) {
@@ -383,8 +398,7 @@ export async function updateWhatsAppStatus(appointmentIds, messageIds) {
             };
           }
         );
-      }
-    ]);
+      });
     
   }, operationName).catch(error => {
     console.error(`Error in ${operationName}: ${error.message}`);

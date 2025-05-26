@@ -321,6 +321,47 @@ async function testConnection() {
 }
 
 /**
+ * Test database connectivity with retry logic for service startup
+ * @param {number} maxRetries - Maximum number of retry attempts (default: 5)
+ * @param {number} retryDelay - Delay between retries in ms (default: 15000)
+ * @returns {Promise<Object>} - Connection test result
+ */
+async function testConnectionWithRetry(maxRetries = 5, retryDelay = 15000) {
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`📊 Database connection attempt ${attempt}/${maxRetries}...`);
+      const result = await testConnection();
+      
+      if (result.success) {
+        if (attempt > 1) {
+          console.log(`✅ Database connection successful after ${attempt} attempts`);
+        }
+        return result;
+      }
+      
+      lastError = result.error;
+    } catch (error) {
+      lastError = error.message;
+      console.error(`❌ Database connection attempt ${attempt} failed:`, error.message);
+    }
+    
+    // Don't wait after the last attempt
+    if (attempt < maxRetries) {
+      console.log(`⏳ Waiting ${retryDelay/1000}s before retry...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+    }
+  }
+  
+  return {
+    success: false,
+    message: `Database connection failed after ${maxRetries} attempts`,
+    error: lastError
+  };
+}
+
+/**
  * Get database and connection pool statistics
  * @returns {Object} - Database statistics
  */
@@ -395,6 +436,7 @@ export {
   withConnection,
   executeRawQuery,
   testConnection,
+  testConnectionWithRetry,
   getDatabaseStats,
   healthCheck,
   shutdown,

@@ -19,28 +19,36 @@ class ConnectionPool {
   }
 
   /**
-   * Get a connection from the pool
+   * Get a connection from the pool with enhanced timeout and cleanup
    */
-  async getConnection() {
+  async getConnection(timeoutMs = 30000) {
     if (this.isShuttingDown) {
       throw new Error('Connection pool is shutting down');
     }
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        const index = this.waitingQueue.findIndex(item => item.resolve === resolve);
-        if (index >= 0) {
-          this.waitingQueue.splice(index, 1);
-          reject(new Error('Connection request timeout'));
+        // Enhanced cleanup - find and remove this specific request
+        const requestIndex = this.waitingQueue.findIndex(item => 
+          item.resolve === resolve || item.reject === reject
+        );
+        if (requestIndex >= 0) {
+          this.waitingQueue.splice(requestIndex, 1);
+          console.warn(`Connection request timeout after ${timeoutMs}ms. Queue length: ${this.waitingQueue.length}`);
         }
-      }, 30000); // 30 second timeout
+        reject(new Error(`Connection request timeout after ${timeoutMs}ms`));
+      }, timeoutMs);
 
-      // Check if we have available connections
-      const availableConnection = this.connections.find(conn => !this.activeConnections.has(conn));
+      // Check if we have available connections (verify connection state)
+      const availableConnection = this.connections.find(conn => 
+        !this.activeConnections.has(conn) && 
+        conn.readyState === conn.STATE.LoggedIn
+      );
       
       if (availableConnection) {
         clearTimeout(timeout);
         this.activeConnections.add(availableConnection);
+        console.log(`Reusing existing connection. Active: ${this.activeConnections.size}/${this.connections.length}`);
         resolve(availableConnection);
         return;
       }
@@ -51,17 +59,28 @@ class ConnectionPool {
           .then(connection => {
             clearTimeout(timeout);
             this.activeConnections.add(connection);
+            console.log(`Created new connection. Active: ${this.activeConnections.size}/${this.connections.length}`);
             resolve(connection);
           })
           .catch(error => {
             clearTimeout(timeout);
+            console.error('Failed to create new connection:', error);
             reject(error);
           });
         return;
       }
 
-      // Add to waiting queue
-      this.waitingQueue.push({ resolve, reject, timeout });
+      // Add to waiting queue with enhanced metadata
+      const queueEntry = { 
+        resolve, 
+        reject, 
+        timeout,
+        timestamp: Date.now(),
+        timeoutMs
+      };
+      this.waitingQueue.push(queueEntry);
+      
+      console.log(`Added to connection queue. Position: ${this.waitingQueue.length}, Pool: ${this.activeConnections.size}/${this.connections.length}`);
     });
   }
 
@@ -124,9 +143,15 @@ class ConnectionPool {
   removeConnection(connection) {
     const index = this.connections.indexOf(connection);
     if (index >= 0) {
+      try {
+        if (connection.readyState === connection.STATE.LoggedIn) {
+          connection.close();
+        }
+      } catch (error) {
+        console.error('Error closing connection:', error);
+      }
       this.connections.splice(index, 1);
       this.activeConnections.delete(connection);
-      console.log(`Database connection removed. Pool size: ${this.connections.length}`);
     }
   }
 

@@ -32,12 +32,234 @@
             margin: 10px 0;
             display: none;
         }
+        
+        /* Date Selection Panel Styles */
+        .date-selection-panel {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .date-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .date-controls label {
+            font-weight: bold;
+            color: #333;
+            min-width: 100px;
+        }
+        
+        .date-dropdown {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            min-width: 150px;
+        }
+        
+        .date-dropdown:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+        
+        .secondary-button {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        
+        .secondary-button:hover {
+            background-color: #5a6268;
+        }
+        
+        .secondary-button:disabled {
+            background-color: #adb5bd;
+            cursor: not-allowed;
+        }
+        
+        .message-count-info {
+            background: #e9ecef;
+            border-radius: 4px;
+            padding: 12px;
+            font-size: 14px;
+            color: #495057;
+            border-left: 4px solid #007bff;
+        }
+        
+        .message-count-info.loading {
+            color: #6c757d;
+            font-style: italic;
+        }
+        
+        .message-count-info.error {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+            color: #721c24;
+        }
+        
+        .message-count-info.success {
+            background: #d4edda;
+            border-left-color: #28a745;
+            color: #155724;
+        }
+        
+        /* Reset Button Styles */
+        .reset-button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+            margin-left: 10px;
+        }
+        
+        .reset-button:hover {
+            background-color: #c82333;
+        }
+        
+        .reset-button:disabled {
+            background-color: #adb5bd;
+            cursor: not-allowed;
+        }
+        
+        .reset-button.confirming {
+            background-color: #fd7e14;
+            animation: pulse 1s infinite;
+        }
+        
+        /* Destroy Button Styles */
+        .destroy-button {
+            background-color: #ffc107;
+            color: #212529;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+            margin-left: 10px;
+        }
+        
+        .destroy-button:hover {
+            background-color: #e0a800;
+        }
+        
+        .destroy-button:disabled {
+            background-color: #adb5bd;
+            cursor: not-allowed;
+        }
+        
+        .destroy-button.confirming {
+            background-color: #fd7e14;
+            animation: pulse 1s infinite;
+        }
+        
+        .destroy-button.destroying {
+            background-color: #6c757d;
+        }
+        
+        /* Logout Button Styles */
+        .logout-button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+            margin-left: 10px;
+        }
+        
+        .logout-button:hover {
+            background-color: #c82333;
+        }
+        
+        .logout-button:disabled {
+            background-color: #adb5bd;
+            cursor: not-allowed;
+        }
+        
+        .logout-button.confirming {
+            background-color: #fd7e14;
+            animation: pulse 1s infinite;
+        }
+        
+        .logout-button.logging-out {
+            background-color: #6c757d;
+        }
+        
+        /* Restart Button Styles */
+        .restart-button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+            margin-left: 10px;
+        }
+        
+        .restart-button:hover {
+            background-color: #218838;
+        }
+        
+        .restart-button:disabled {
+            background-color: #adb5bd;
+            cursor: not-allowed;
+        }
+        
+        .restart-button.restarting {
+            background-color: #6c757d;
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
         <h1>Shwan Orthodontics</h1>
+        
+        <!-- Date Selection Panel -->
+        <div class="date-selection-panel">
+            <div class="date-controls">
+                <label for="dateSelector">Select Date:</label>
+                <select id="dateSelector" class="date-dropdown">
+                    <!-- Options will be populated by JavaScript -->
+                </select>
+                <button id="refreshDateBtn" class="secondary-button">Refresh</button>
+                <button id="resetMessagingBtn" class="reset-button">Reset Messages</button>
+            </div>
+            <div class="date-controls">
+                <label>Client Actions:</label>
+                <button id="restartClientBtn" class="restart-button">Restart Client</button>
+                <button id="destroyClientBtn" class="destroy-button">Destroy Client</button>
+                <button id="logoutClientBtn" class="logout-button">Logout Client</button>
+            </div>
+            <div id="messageCount" class="message-count-info">
+                Loading message count...
+            </div>
+        </div>
+        
         <div id="state" class="status-panel">
             <div class="loader"></div> Initializing...
         </div>
@@ -46,12 +268,12 @@
             <img id="qr" style="display: none;">
         </div>
         
-        <!-- New restart button container -->
-        <div id="restart-button-container" class="button-container"></div>
-        
         <button id="startSendingBtn" class="action-button" style="display: none;">Start Sending Messages</button>
         
         <div id="table-container" class="results-container"></div>
+        
+        <!-- Restart button moved to bottom, less accessible -->
+        <div id="restart-button-container" class="button-container" style="margin-top: 40px; text-align: right;"></div>
     </div>
 
     <!-- Load external JavaScript -->

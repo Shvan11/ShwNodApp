@@ -67,6 +67,12 @@ class SendMessageController {
     if (this.sourceSelect) {
       this.sourceSelect.addEventListener('change', this.handleSourceChange.bind(this));
     }
+    
+    // Close button
+    const closeButton = document.getElementById('close');
+    if (closeButton) {
+      closeButton.addEventListener('click', this.handleClose.bind(this));
+    }
   }
   
   /**
@@ -178,6 +184,12 @@ class SendMessageController {
   async handleSubmit(event) {
     event.preventDefault();
     
+    // Check client status first
+    const isReady = await this.checkClientStatus();
+    if (!isReady) {
+      return; // Error message already shown
+    }
+    
     // Start progress bar
     this.progressBar.initiate();
     
@@ -200,66 +212,119 @@ class SendMessageController {
       const data = await response.json();
       
       // Handle response
-      if (data.qr) {
-        // Show QR code for authentication
-        this.showQRCode(data.qr);
-        this.updateQR();
-      } else if (data.result === "OK") {
-        // Complete progress bar
+      if (data.result === "OK") {
         this.progressBar.finish();
+        this.showSuccessMessage(`Message sent successfully! (${data.sentMessages} files sent)`);
+      } else if (data.error) {
+        this.progressBar.reset();
+        this.showErrorMessage(data.error);
       }
     } catch (error) {
       console.error('Error sending message:', error);
       this.progressBar.reset();
+      this.showErrorMessage('Failed to send message. Please try again.');
     }
   }
   
   /**
-   * Show QR code
-   * @param {string} qrData - QR code data URL
+   * Check WhatsApp client status
+   * @returns {Promise<boolean>} - True if ready to send
    */
-  showQRCode(qrData) {
-    const img = document.createElement("img");
-    img.setAttribute('id', 'qr_img');
-    img.src = qrData;
-    document.body.appendChild(img);
-    
-    if (this.form) {
-      this.form.style.display = "none";
-    }
-  }
-  
-  /**
-   * Update QR code status
-   */
-  async updateQR() {
+  async checkClientStatus() {
     try {
-      const response = await fetch(`${window.location.origin}/checkqr`);
+      const response = await fetch('/api/wa/status');
       const data = await response.json();
       
-      if (data.qr) {
-        // Update QR code image
-        const img = document.getElementById("qr_img");
-        if (img) {
-          img.src = data.qr;
-        }
-        // Continue checking
-        this.updateQR();
-      } else if (data.status === "success") {
-        // Authentication successful
-        alert("Authorized successfully");
-        
-        if (this.form) {
-          this.form.style.display = "block";
-        }
-        
-        const qrImg = document.getElementById("qr_img");
-        if (qrImg) {
-          qrImg.remove();
-        }
+      if (data.ready) {
+        return true;
+      } else {
+        this.showClientNotReadyMessage();
+        return false;
       }
     } catch (error) {
-      console.error('Error checking QR status:', error);
+      console.error('Error checking client status:', error);
+      this.showErrorMessage('Unable to check WhatsApp client status');
+      return false;
+    }
+  }
+  
+  /**
+   * Show client not ready message
+   */
+  showClientNotReadyMessage() {
+    const message = `
+      <div class="status-message error">
+        <h3>WhatsApp Client Not Ready</h3>
+        <p>The WhatsApp client is not logged in or not ready to send messages.</p>
+        <p>Please go to <a href="/send" target="_blank">Send Page</a> to authenticate and initialize the WhatsApp client.</p>
+        <button onclick="window.location.reload()" class="retry-btn">Retry</button>
+      </div>
+    `;
+    this.showMessage(message);
+  }
+  
+  /**
+   * Show success message
+   * @param {string} text - Success message
+   */
+  showSuccessMessage(text) {
+    const message = `<div class="status-message success">${text}</div>`;
+    this.showMessage(message);
+  }
+  
+  /**
+   * Show error message
+   * @param {string} text - Error message
+   */
+  showErrorMessage(text) {
+    const message = `<div class="status-message error">${text}</div>`;
+    this.showMessage(message);
+  }
+  
+  /**
+   * Show message in popup
+   * @param {string} html - Message HTML
+   */
+  showMessage(html) {
+    // Remove existing messages
+    const existing = document.querySelector('.status-message');
+    if (existing) {
+      existing.remove();
+    }
+    
+    // Create message element
+    const messageDiv = document.createElement('div');
+    messageDiv.innerHTML = html;
+    const messageElement = messageDiv.firstElementChild;
+    
+    // Insert after form
+    if (this.form && this.form.parentNode) {
+      this.form.parentNode.insertBefore(messageElement, this.form.nextSibling);
+    } else {
+      document.body.appendChild(messageElement);
+    }
+    
+    // Auto-remove success messages after 5 seconds
+    if (messageElement.classList.contains('success')) {
+      setTimeout(() => {
+        if (messageElement.parentNode) {
+          messageElement.remove();
+        }
+      }, 5000);
+    }
+  }
+  
+  /**
+   * Handle close button click
+   */
+  handleClose() {
+    // Close the modal/window
+    if (window.opener) {
+      // If opened from another window, close this window
+      window.close();
+    } else {
+      // If opened directly, redirect to home or hide the modal
+      window.location.href = '/';
     }
   }
 }

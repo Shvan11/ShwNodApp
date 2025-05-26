@@ -122,7 +122,7 @@ class MessageStateManager {
 
       // Emit success event
       stateEvents.emit('message_status_updated', { messageId, status });
-      
+
       return true;
 
     } catch (error) {
@@ -148,7 +148,7 @@ class MessageStateManager {
     await StateManager.atomicOperation(this.stateKeys.PERSONS, (persons) => {
       const newPersons = [...(persons || [])];
       const personIndex = newPersons.findIndex(p => p.messageId === messageId);
-      
+
       if (personIndex >= 0) {
         newPersons[personIndex] = {
           ...newPersons[personIndex],
@@ -156,7 +156,7 @@ class MessageStateManager {
           lastUpdated: Date.now()
         };
       }
-      
+
       return newPersons;
     });
   }
@@ -184,25 +184,25 @@ class MessageStateManager {
   /**
    * Handle QR viewer registration
    */
- // In services/state/messageState.js
-// Add this line to registerQRViewer method
-async registerQRViewer(viewerId) {
-  const result = await StateManager.atomicOperation(this.stateKeys.QR_STATUS, (qrStatus) => {
-    const current = qrStatus || {};
-    return {
-      ...current,
-      activeViewers: (current.activeViewers || 0) + 1,
-      generationActive: true,
-      lastRequested: Date.now()
-    };
-  });
-  
-  // Add this line to emit the event when viewers connect
-  stateEvents.emit('qr_viewer_connected');
-  
-  console.log(`QR viewer ${viewerId || 'unknown'} registered. Active viewers: ${result.activeViewers}`);
-  return result;
-}
+  // In services/state/messageState.js
+  // Add this line to registerQRViewer method
+  async registerQRViewer(viewerId) {
+    const result = await StateManager.atomicOperation(this.stateKeys.QR_STATUS, (qrStatus) => {
+      const current = qrStatus || {};
+      return {
+        ...current,
+        activeViewers: (current.activeViewers || 0) + 1,
+        generationActive: true,
+        lastRequested: Date.now()
+      };
+    });
+
+    // Add this line to emit the event when viewers connect
+    stateEvents.emit('qr_viewer_connected');
+
+    console.log(`QR viewer ${viewerId || 'unknown'} registered. Active viewers: ${result.activeViewers}`);
+    return result;
+  }
 
   /**
    * Handle QR viewer unregistration
@@ -258,12 +258,75 @@ async registerQRViewer(viewerId) {
     return qrStatus?.activeViewers || 0;
   }
 
+
+  /**
+ * Verify QR viewer count matches actual connections
+ * @param {Array} activeViewerIds - Array of active viewer IDs from WebSocket connections
+ */
+  async verifyQRViewerCount(activeViewerIds = []) {
+    const result = await StateManager.atomicOperation(this.stateKeys.QR_STATUS, (qrStatus) => {
+      const current = qrStatus || {};
+      const expectedCount = activeViewerIds.length;
+      const actualCount = current.activeViewers || 0;
+
+      if (expectedCount !== actualCount) {
+        console.warn(`QR viewer count mismatch - Expected: ${expectedCount}, Actual: ${actualCount}`);
+        // Correct the count
+        return {
+          ...current,
+          activeViewers: expectedCount,
+          lastVerified: Date.now()
+        };
+      }
+
+      return current;
+    });
+
+    if (result.activeViewers !== activeViewerIds.length) {
+      console.log(`Corrected QR viewer count to ${activeViewerIds.length}`);
+    }
+
+    return result;
+  }
+
+  /**
+   * Set finish report status
+   */
+  async setFinishReport(finished) {
+    return StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, (stats) => ({
+      ...(stats || {}),
+      finishReport: finished
+    }));
+  }
+
+  get finishReport() {
+    const stats = StateManager.get(this.stateKeys.MESSAGE_STATS) || {};
+    return stats.finishReport || false;
+  }
+
+  /**
+   * Get manual disconnect status
+   */
+  get manualDisconnect() {
+    const status = StateManager.get(this.stateKeys.CLIENT_STATUS);
+    return status?.manualDisconnect || false;
+  }
+
+  /**
+   * Set manual disconnect status
+   */
+  set manualDisconnect(value) {
+    StateManager.atomicOperation(this.stateKeys.CLIENT_STATUS, (current) => ({
+      ...current,
+      manualDisconnect: value
+    }));
+  }
   /**
    * Reset all state
    */
   async reset() {
     console.log("Resetting message state");
-    
+
     await Promise.all([
       StateManager.atomicOperation(this.stateKeys.CLIENT_STATUS, () => ({
         ready: false,
@@ -271,17 +334,17 @@ async registerQRViewer(viewerId) {
         lastActivity: Date.now(),
         manualDisconnect: false
       })),
-      
+
       StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, () => ({
         sent: 0,
         failed: 0,
         finished: false,
         finishReport: false
       })),
-      
+
       StateManager.atomicOperation(this.stateKeys.PERSONS, () => []),
       StateManager.atomicOperation(this.stateKeys.MESSAGE_STATUSES, () => new Map()),
-      
+
       StateManager.atomicOperation(this.stateKeys.QR_STATUS, () => ({
         qr: null,
         activeViewers: 0,
@@ -381,6 +444,9 @@ async registerQRViewer(viewerId) {
     stateEvents.removeAllListeners();
   }
 }
+
+
+
 
 // ===== FIXED: Export singleton with proper initialization =====
 // Create singleton instance

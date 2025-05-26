@@ -37,17 +37,33 @@ class HealthCheckService extends EventEmitter {
     // WhatsApp client health check
     this.registerCheck('whatsapp', async () => {
       const clientReady = messageState.clientReady;
+      const activeViewers = messageState.activeQRViewers;
       const stateDump = messageState.dump();
       
+      // Consider healthy if:
+      // 1. Client is ready, OR
+      // 2. No active viewers (client doesn't need to be ready)
+      const healthy = clientReady || activeViewers === 0;
+      
+      let message;
+      if (clientReady) {
+        message = 'WhatsApp client is ready';
+      } else if (activeViewers === 0) {
+        message = 'WhatsApp client idle (no viewers)';
+      } else {
+        message = 'WhatsApp client is not ready but has viewers';
+      }
+      
       return {
-        healthy: clientReady,
+        healthy,
         details: {
           clientReady,
-          activeQRViewers: messageState.activeQRViewers,
+          activeQRViewers: activeViewers,
           lastActivity: stateDump.lastActivity,
-          inactiveFor: Date.now() - stateDump.lastActivity
+          inactiveFor: Date.now() - stateDump.lastActivity,
+          status: clientReady ? 'ready' : (activeViewers === 0 ? 'idle' : 'initializing')
         },
-        message: clientReady ? 'WhatsApp client is ready' : 'WhatsApp client is not ready'
+        message
       };
     }, 15000); // Check every 15 seconds
 

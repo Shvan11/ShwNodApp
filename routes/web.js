@@ -14,7 +14,6 @@ const router = express.Router();
 const pageRewrites = [
   // Messaging pages
   { url: '/send-message', file: '/views/messaging/send-message.html' },
-  { url: '/report', file: '/views/messaging/report.html' },
   
   // Patient pages
   { url: '/patient-lookup', file: '/views/patient/lookup.html' },
@@ -34,8 +33,7 @@ const pageRewrites = [
   { url: '/xrays', file: '/views/xrays.html' },
   
   // Handle legacy URLs with new paths
-  { url: '/wa', file: '/views/messaging/send-message.html' }, // Replace old /wa route
-  { url: '/wareport', file: '/views/messaging/report.html' }  // Replace old /wareport route
+  { url: '/wa', file: '/views/messaging/send-message.html' } // Replace old /wa route
 ];
 
 // ==============================
@@ -67,10 +65,7 @@ router.get('/:page.html', (req, res, next) => {
   }
 });
 
-// Legacy routes kept for backward compatibility
-router.get('/clear', (req, res) => {
-    res.sendFile(path.join(process.cwd(), './public/clear.html'));
-});
+// Legacy routes removed - clear.html file was missing
 
 // Export the router
 export default router;

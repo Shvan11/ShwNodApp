@@ -435,12 +435,12 @@ class AppointmentsPageController {
       console.error('WebSocket error:', error);
     });
 
-    // Handle 'updated' event
-    websocket.on('updated', data => {
-      console.log('Received WebSocket update:', data);
+    // Handle appointment updates (both legacy 'updated' and new 'appointmentUpdate' events)
+    const handleAppointmentUpdate = (data) => {
+      console.log('Received WebSocket appointment update:', data);
 
       if (!data || !data.tableData) {
-        console.error('Invalid data in "updated" event:', data);
+        console.error('Invalid data in appointment update event:', data);
         return;
       }
 
@@ -469,19 +469,27 @@ class AppointmentsPageController {
         this.highlightActivePatient();
       } catch (error) {
         console.error('Error handling WebSocket update:', error);
-
       }
-    });
+    };
+
+    // Handle legacy 'updated' event
+    websocket.on('updated', handleAppointmentUpdate);
+    
+    // Handle new 'appointmentUpdate' event (from appointment_update server message)
+    websocket.on('appointmentUpdate', handleAppointmentUpdate);
 
     // Handle patient loaded event
     websocket.on('patientLoaded', async data => {
+      console.log('Received patientLoaded event:', data);
+      console.log('Current screen ID:', storage.screenId());
+      
       this.activePID = data.pid;
       await this.showPatientData(data);
       this.highlightActivePatient();
     });
 
     // Handle patient unloaded event
-    websocket.on('patientunLoaded', () => {
+    websocket.on('patientUnloaded', () => {
       this.activePID = null;
       this.unloadPatientData();
       this.highlightActivePatient();
@@ -496,10 +504,14 @@ class AppointmentsPageController {
    * @private
    */
   async showPatientData(data) {
+    console.log('showPatientData called with:', data);
+    
     // Show images
+    console.log('Showing patient images:', data.images);
     this.showPatientImages(data.images);
 
     // Show latest visit
+    console.log('Showing latest visit:', data.latestVisit);
     this.showLatestVisit(data.latestVisit);
   }
 
@@ -509,15 +521,24 @@ class AppointmentsPageController {
    * @private
    */
   showPatientImages(images) {
-    if (!this.imagesContainer || !images || images.length === 0) return;
+    console.log('showPatientImages called with:', images);
+    console.log('Images container found:', !!this.imagesContainer);
+    
+    if (!this.imagesContainer || !images || images.length === 0) {
+      console.log('Early return: container not found or no images');
+      return;
+    }
 
     const imageElements = getElements('.img', this.imagesContainer);
+    console.log('Found image elements:', imageElements.length);
 
     for (let i = 0; i < imageElements.length; i++) {
       if (images[i]) {
         const imglink = 'DolImgs/' + images[i].name;
+        console.log(`Setting image ${i} src to: ${imglink}`);
         imageElements[i].src = imglink;
       } else {
+        console.log(`Clearing image ${i}`);
         imageElements[i].src = '';
       }
     }

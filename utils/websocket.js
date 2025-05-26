@@ -2,6 +2,7 @@
 import { WebSocketServer } from 'ws';
 import { EventEmitter } from 'events';
 import * as database from '../services/database/queries/index.js';
+import { getPresentAps } from '../services/database/queries/appointment-queries.js';
 import messageState from '../services/state/messageState.js';
 import { getTimePointImgs } from '../services/database/queries/timepoint-queries.js';
 import { getLatestVisitsSum } from '../services/database/queries/visit-queries.js';
@@ -332,12 +333,14 @@ function setupWebSocketServer(server) {
           viewerId: viewerId
         });
         
-       // Register as QR viewer - ONLY if not already registered
-       if (messageState && typeof messageState.registerQRViewer === 'function') {
+       // Register as QR viewer ONLY if explicitly requested via 'needsQR' parameter
+       const needsQR = url.searchParams.get('needsQR') === 'true';
+       if (needsQR && messageState && typeof messageState.registerQRViewer === 'function') {
         const registered = messageState.registerQRViewer(viewerId);
         ws.qrViewerRegistered = true; // Mark as registered
+        console.log(`QR viewer registered for ${viewerId} (needsQR=true)`);
         } else {
-          console.error('Cannot register QR viewer: messageState not available or missing method');
+          console.log(`WebSocket connected for status only (needsQR=${needsQR})`);
         }
         
         // Store date for filtering updates
@@ -354,7 +357,7 @@ function setupWebSocketServer(server) {
         console.log(`Screen ${screenID} connected`);
   
         // Send initial data immediately
-        sendInitialData(ws, date);
+        sendInitialData(ws, date, connectionManager);
       } else {
         // Generic connection
         connectionManager.registerConnection(ws, 'generic', {
@@ -411,11 +414,11 @@ function setupWebSocketServer(server) {
       ws.on('error', (error) => {
         console.error('WebSocket error:', error);
         
-        // If this was a WhatsApp status client, unregister as QR viewer
+        // If this was a WhatsApp status client AND was registered as QR viewer, unregister it
         const capabilities = connectionManager.clientCapabilities.get(ws);
-        if (capabilities && capabilities.type === 'waStatus') {
+        if (capabilities && capabilities.type === 'waStatus' && ws.qrViewerRegistered) {
           if (messageState && typeof messageState.unregisterQRViewer === 'function') {
-            messageState.unregisterQRViewer();
+            messageState.unregisterQRViewer(ws.viewerId);
           }
         }
         
@@ -502,6 +505,11 @@ function setupWebSocketServer(server) {
       connectionManager.updateClientCapabilities(ws, message.data?.capabilities || {});
       break;
 
+    case 'request_initial_state':
+      console.log('Received request for initial state via WebSocket');
+      await sendInitialStateForWaClient(ws, message.data, connectionManager);
+      break;
+
     default:
       console.log(`Unknown message type: ${message.type}`);
   }
@@ -512,15 +520,90 @@ function setupWebSocketServer(server) {
    * @param {WebSocket} ws - WebSocket connection
    * @param {string} date - Date parameter
    */
-  async function sendInitialData(ws, date) {
+  async function sendInitialData(ws, date, connectionManager) {
     if (!date || ws.readyState !== ws.OPEN) return;
 
     console.log(`Sending initial data for date: ${date}`);
 
     try {
-      await sendAppointmentsData(ws, date);
+      await sendAppointmentsData(ws, date, connectionManager);
     } catch (error) {
       console.error('Error sending initial data:', error);
+    }
+  }
+
+  /**
+   * Send initial state for WhatsApp status clients
+   * @param {WebSocket} ws - WebSocket connection
+   * @param {Object} requestData - Request data from client
+   * @param {ConnectionManager} connectionManager - Connection manager
+   */
+  async function sendInitialStateForWaClient(ws, requestData, connectionManager) {
+    if (ws.readyState !== ws.OPEN) return;
+
+    console.log('Sending initial state for WhatsApp client via WebSocket');
+
+    try {
+      // Get state from messageState and whatsapp service
+      const stateDump = messageState.dump();
+      
+      // Try to get whatsapp status - handle case where service might not be ready
+      let clientStatus;
+      try {
+        const whatsappService = await import('../services/messaging/whatsapp.js');
+        clientStatus = whatsappService.default.getStatus();
+      } catch (error) {
+        console.warn('Could not get WhatsApp status:', error.message);
+        clientStatus = { active: false };
+      }
+      
+      let html = '';
+      const isClientReady = stateDump.clientReady || clientStatus.active;
+      const finished = stateDump.finishedSending;
+      
+      if (isClientReady) {
+        if (finished) {
+          html = `<p>${stateDump.sentMessages} Messages Sent!</p><p>${stateDump.failedMessages} Messages Failed!</p><p>Finished</p>`;
+        } else {
+          html = `<p>${stateDump.sentMessages} Messages Sent!</p><p>${stateDump.failedMessages} Messages Failed!</p><p>Sending...</p>`;
+        }
+      } else if (messageState.qr && messageState.activeQRViewers > 0) {
+        html = '<p>QR code ready - Please scan with WhatsApp</p>';
+      } else {
+        html = '<p>Initializing the client...</p>';
+      }
+      
+      // Create response similar to /api/update endpoint
+      const responseData = {
+        success: true,
+        htmltext: html,
+        finished,
+        clientReady: isClientReady,
+        clientStatus: clientStatus,
+        persons: messageState.persons || [],
+        qr: isClientReady ? null : messageState.qr,
+        stats: stateDump,
+        sentMessages: stateDump.sentMessages || 0,
+        failedMessages: stateDump.failedMessages || 0,
+        timestamp: Date.now()
+      };
+
+      const message = createWebSocketMessage(
+        'initial_state_response',
+        responseData
+      );
+
+      connectionManager.sendToClient(ws, message);
+      console.log('Sent initial state response via WebSocket');
+      
+    } catch (error) {
+      console.error('Error sending initial state for WhatsApp client:', error);
+      
+      const errorMessage = createWebSocketMessage(
+        MessageSchemas.WebSocketMessage.ERROR,
+        { error: 'Failed to fetch initial state' }
+      );
+      connectionManager.sendToClient(ws, errorMessage);
     }
   }
 
@@ -535,7 +618,7 @@ function setupWebSocketServer(server) {
     console.log(`Fetching appointments data for date: ${date}`);
   
     try {
-      const result = await database.getPresentAps(date);
+      const result = await getPresentAps(date);
       console.log(`Got appointments data for date ${date}: ${result.appointments ? result.appointments.length : 0} appointments`);
   
       const message = createWebSocketMessage(
@@ -645,7 +728,7 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
     console.log(`Received 'updated' event for date: ${dateParam}`);
 
     try {
-      const appointmentData = await database.getPresentAps(dateParam);
+      const appointmentData = await getPresentAps(dateParam);
       console.log(`Fetched appointment data for date ${dateParam}: ${appointmentData.appointments ? appointmentData.appointments.length : 0} appointments`);
 
       const message = createWebSocketMessage(
@@ -664,6 +747,20 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
   // Handle patient loaded event
   emitter.on('patientLoaded', async (pid, targetScreenID) => {
     console.log(`Received 'patientLoaded' event for patient ${pid}, screen ${targetScreenID}`);
+    
+    // Check if target screen is connected and ready
+    const screenConnection = connectionManager.screenConnections.get(targetScreenID);
+    if (!screenConnection || screenConnection.readyState !== screenConnection.OPEN) {
+      console.log(`Screen ${targetScreenID} not connected - skipping patient data send`);
+      return;
+    }
+
+    // Verify this is actually an appointments screen (not another type of connection)
+    const capabilities = connectionManager.clientCapabilities.get(screenConnection);
+    if (!capabilities || capabilities.type !== 'screen') {
+      console.log(`Screen ${targetScreenID} is not an appointments screen - skipping patient data send`);
+      return;
+    }
     
     try {
       const allImages = await getPatientImages(pid);
@@ -708,6 +805,20 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
   // Handle patient unloaded event
   emitter.on('patientUnLoaded', (targetScreenID) => {
     console.log(`Received 'patientUnLoaded' event for screen ${targetScreenID}`);
+
+    // Check if target screen is connected and ready
+    const screenConnection = connectionManager.screenConnections.get(targetScreenID);
+    if (!screenConnection || screenConnection.readyState !== screenConnection.OPEN) {
+      console.log(`Screen ${targetScreenID} not connected - skipping patient unload send`);
+      return;
+    }
+
+    // Verify this is actually an appointments screen (not another type of connection)
+    const capabilities = connectionManager.clientCapabilities.get(screenConnection);
+    if (!capabilities || capabilities.type !== 'screen') {
+      console.log(`Screen ${targetScreenID} is not an appointments screen - skipping patient unload send`);
+      return;
+    }
 
     const message = createWebSocketMessage(
       'patient_unloaded',
@@ -826,6 +937,28 @@ function setupPeriodicCleanup(connectionManager) {
     const counts = connectionManager.getConnectionCounts();
     console.log(`Active connections: ${counts.total} total, ${counts.screens} screens, ${counts.waStatus} WhatsApp status`);
   }, 10 * 60 * 1000); // Every 10 minutes
+
+  
+  setInterval(() => {
+    // Get all active WhatsApp status connections with their viewer IDs
+    const activeViewerIds = [];
+    connectionManager.waStatusConnections.forEach(ws => {
+      if (ws.qrViewerRegistered && ws.viewerId) {
+        activeViewerIds.push(ws.viewerId);
+      }
+    });
+    
+    // Verify QR viewer count matches actual connections
+    if (messageState && typeof messageState.verifyQRViewerCount === 'function') {
+      messageState.verifyQRViewerCount(activeViewerIds);
+    }
+    
+    // Log connection health
+    const counts = connectionManager.getConnectionCounts();
+    if (counts.waStatus > 0) {
+      console.log(`WebSocket health check: ${counts.waStatus} WhatsApp status connections, ${activeViewerIds.length} QR viewers registered`);
+    }
+  }, 60000); // Every minute
 
   setInterval(() => {
     // Get all active WhatsApp status connections with their viewer IDs

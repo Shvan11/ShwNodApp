@@ -24,7 +24,7 @@
     "tedious": "^16.6.1",
     "telegram": "^2.19.10",
     "twilio": "^4.21.0",
-    "whatsapp-web.js": "^1.27.0",
+    "whatsapp-web.js": "^1.28.0",
     "ws": "^8.16.0"
   }
 }

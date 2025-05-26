@@ -478,6 +478,14 @@ class WebSocketService extends EventEmitter {
         this.emit(message.messageType, message);
       }
       
+      // Handle new format messages with 'type' field
+      if (typeof message === 'object' && message.type) {
+        // Convert snake_case server message types to camelCase client events
+        const eventName = message.type.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
+        this.log(`Emitting event '${eventName}' from message type '${message.type}'`);
+        this.emit(eventName, message.data || message);
+      }
+      
       // Always emit generic message event
       this.emit('message', message);
     } catch (error) {

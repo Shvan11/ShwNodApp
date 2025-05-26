@@ -4,6 +4,10 @@
 import express from 'express';
 
 import * as database from '../services/database/queries/index.js';
+import { getPresentAps } from '../services/database/queries/appointment-queries.js';
+import {getTimePoints, getTimePointImgs } from '../services/database/queries/timepoint-queries.js';
+import { getWhatsAppMessages } from '../services/database/queries/messaging-queries.js';
+import { getPatientsPhones } from '../services/database/queries/patient-queries.js';
 import whatsapp from '../services/messaging/whatsapp.js';
 import { sendImg_, sendXray_ } from '../services/messaging/whatsapp-api.js';
 import { wsEmitter } from '../index.js';
@@ -16,6 +20,7 @@ import messageState from '../services/state/messageState.js';
 import { createWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
 import HealthCheck from '../services/monitoring/HealthCheck.js';
 import * as messagingQueries from '../services/database/queries/messaging-queries.js';
+import { getContacts } from '../services/authentication/google.js';
 
 const router = express.Router();
 const upload = multer();
@@ -138,13 +143,13 @@ router.get("/getinfos", async (req, res) => {
 // Get time points
 router.get("/gettimepoints", async (req, res) => {
     const { code: pid } = req.query;
-    const timepoints = await database.getTimePoints(pid);
+    const timepoints = await getTimePoints(pid);
     res.json(timepoints);
 });
 
 router.get("/gettimepointimgs", async (req, res) => {
     const { code: pid, tp } = req.query;
-    const timepointimgs = await database.getTimePointImgs(pid, tp);
+    const timepointimgs = await getTimePointImgs(pid, tp);
     res.json(timepointimgs);
 });
 
@@ -199,13 +204,6 @@ router.get("/getxray", async (req, res) => {
 });
 
 // WhatsApp messaging routes
-router.get('/wareport', (req, res) => {
-    messageState.reset();
-    messageState.finishReport = false;
-    res.sendFile('./public/report.html', { root: '.' });
-});
-
-
 // router.get('/wa', (req, res) => {
 //     messageState.gturbo = !!req.query.turbo;
 //     messageState.reset();
@@ -246,21 +244,42 @@ router.get('/checktwilio', async (req, res) => {
     }
 });
 
+/**
+ * Legacy report update endpoint
+ * @deprecated Use WebSocket for real-time report updates instead
+ */
 router.get('/updaterp', (req, res) => {
+    console.log("Legacy updaterp endpoint called - WebSocket recommended");
+    
     let html = '';
     if (messageState.clientReady) {
         if (messageState.finishReport) {
             html = '<p>Finished!</p>';
-            res.json({ htmltext: html, finished: true });
+            res.json({ 
+                htmltext: html, 
+                finished: true,
+                deprecated: true,
+                websocketRecommended: true
+            });
             messageState.finishReport = false;
             messageState.clientReady = false;
         } else {
             html = '<p>Working on it ...</p>';
-            res.json({ htmltext: html, finished: false });
+            res.json({ 
+                htmltext: html, 
+                finished: false,
+                deprecated: true,
+                websocketRecommended: true
+            });
         }
     } else {
         html = '<p>Initializing the client ...</p>';
-        res.json({ htmltext: html, finished: false });
+        res.json({ 
+            htmltext: html, 
+            finished: false,
+            deprecated: true,
+            websocketRecommended: true
+        });
     }
 });
 
@@ -270,7 +289,33 @@ router.get('/wa/send', async (req, res) => {
     const dateparam = req.query.date;
     
     try {
-        console.log(`WhatsApp send request for date: ${dateparam}`);
+        // Enhanced input validation
+        if (!dateparam) {
+            return res.status(400).json({
+                success: false,
+                message: "Date parameter is required"
+            });
+        }
+        
+        // Validate date format (YYYY-MM-DD)
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(dateparam)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid date format. Expected YYYY-MM-DD"
+            });
+        }
+        
+        // Validate that it's a valid date
+        const dateObj = new Date(dateparam);
+        if (isNaN(dateObj.getTime()) || dateObj.toISOString().slice(0, 10) !== dateparam) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid date value"
+            });
+        }
+        
+        console.log(`WhatsApp send request for validated date: ${dateparam}`);
         
         // Check if client is ready
         if (!whatsapp.isReady()) {
@@ -440,14 +485,38 @@ router.get("/getWires", async (req, res) => {
 // Get current web apps
 router.get("/getWebApps", async (req, res) => {
     const { PDate } = req.query;
-    const result = await database.getPresentAps(PDate);
+    const result = await getPresentAps(PDate);
     res.json(result);
 });
 
 // Get patient phone numbers
 router.get("/patientsPhones", async (req, res) => {
-    const phonesList = await database.getPatientsPhones();
-    res.json(phonesList);
+    try {
+        const phonesList = await getPatientsPhones();
+        res.json(phonesList);
+    } catch (error) {
+        console.error("Error fetching patients phones:", error);
+        res.status(500).json({ error: "Failed to fetch patients phones" });
+    }
+});
+
+// Get Google contacts
+router.get("/google", async (req, res) => {
+    try {
+        const { source } = req.query;
+        if (!source) {
+            return res.status(400).json({ error: "Missing required parameter: source" });
+        }
+        
+        const contacts = await getContacts(source);
+        res.json(contacts);
+    } catch (error) {
+        console.error("Error fetching Google contacts:", error);
+        res.status(500).json({ 
+            error: "Failed to fetch Google contacts",
+            message: error.message
+        });
+    }
 });
 
 router.get("/getLatestwire", async (req, res) => {
@@ -577,10 +646,82 @@ router.post('/wa/restart', async (req, res) => {
     }
   });
 
-  // Find this route
+/**
+ * Destroy WhatsApp client - close browser but preserve authentication
+ * This closes the browser/puppeteer but keeps authentication for reconnection
+ */
+router.post('/wa/destroy', async (req, res) => {
+  try {
+    console.log("Destroying WhatsApp client - preserving authentication");
+    
+    const result = await whatsapp.simpleDestroy();
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message,
+        action: "destroy",
+        authPreserved: true
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: result.error || "Destroy failed",
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error("Error destroying WhatsApp client:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to destroy WhatsApp client",
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Logout WhatsApp client - completely clear authentication
+ * This logs out from WhatsApp and removes all authentication data
+ */
+router.post('/wa/logout', async (req, res) => {
+  try {
+    console.log("Logging out WhatsApp client - clearing authentication");
+    
+    const result = await whatsapp.completeLogout();
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message,
+        action: "logout",
+        authCleared: true
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: result.error || "Logout failed",
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error("Error logging out WhatsApp client:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to logout WhatsApp client",
+      error: error.message
+    });
+  }
+});
+
+  /**
+   * Legacy update endpoint - Used only as fallback for initial state
+   * @deprecated This endpoint is maintained for WebSocket fallback only
+   * Primary communication should use WebSocket for real-time updates
+   */
   router.get('/update', async (req, res) => {
     try {
-        console.log("Update endpoint called");
+        console.log("Legacy update endpoint called (WebSocket fallback)");
         
         const stateDump = messageState.dump();
         const clientStatus = whatsapp.getStatus();
@@ -601,7 +742,7 @@ router.post('/wa/restart', async (req, res) => {
             html = '<p>Initializing the client...</p>';
         }
         
-        // Prepare response
+        // Optimized response for WebSocket-only clients
         const response = {
             success: true,
             htmltext: html,
@@ -611,13 +752,16 @@ router.post('/wa/restart', async (req, res) => {
             persons: messageState.persons,
             qr: isClientReady ? null : messageState.qr,
             stats: stateDump,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            // Add hint for WebSocket usage
+            websocketRecommended: true,
+            websocketUrl: `${req.protocol === 'https' ? 'wss' : 'ws'}://${req.get('host')}`
         };
         
         res.json(response);
         
     } catch (error) {
-        console.error("Error in update endpoint:", error);
+        console.error("Error in legacy update endpoint:", error);
         res.status(500).json({
             success: false,
             error: error.message,
@@ -834,5 +978,200 @@ async function CheckSMSNoti(date) {
         return false;
     }
 }
+
+/**
+ * Get message count for a specific date
+ * Returns how many appointments are scheduled and eligible for messaging
+ */
+router.get('/messaging/count/:date', async (req, res) => {
+    try {
+        const { date } = req.params;
+        console.log(`Getting message count for date: ${date}`);
+        
+        // Get actual WhatsApp messages to be sent for the date
+        const whatsappMessages = await getWhatsAppMessages(date);
+        
+        // whatsappMessages returns [numbers, messages, ids, names]
+        const [numbers, messages, ids, names] = whatsappMessages || [[], [], [], []];
+        const messageCount = {
+            date: date,
+            totalMessages: numbers.length,
+            eligibleForMessaging: numbers.length,
+            alreadySent: 0,
+            pending: 0
+        };
+
+        // Get existing message statuses for this date
+        try {
+            const existingMessages = await messagingQueries.getMessageStatusByDate(date);
+            if (existingMessages && existingMessages.messages) {
+                messageCount.alreadySent = existingMessages.messages.filter(m => m.status >= 1).length;
+                messageCount.pending = existingMessages.messages.filter(m => m.status === 0).length;
+            }
+        } catch (msgError) {
+            console.warn('Could not get existing message statuses:', msgError.message);
+            // Continue without existing message data
+        }
+
+        console.log(`Message count for ${date}:`, messageCount);
+        
+        res.json({
+            success: true,
+            data: messageCount,
+            timestamp: Date.now()
+        });
+        
+    } catch (error) {
+        console.error('Error getting message count:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            timestamp: Date.now()
+        });
+    }
+});
+
+/**
+ * Reset messaging status for a specific date
+ * Calls the ResetMessagingForDate stored procedure
+ */
+router.post('/messaging/reset/:date', async (req, res) => {
+    try {
+        const { date } = req.params;
+        console.log(`Resetting messaging for date: ${date}`);
+        
+        // Execute the stored procedure
+        const result = await database.executeStoredProcedure(
+            'ResetMessagingForDate',
+            [['ResetDate', database.TYPES.Date, date]],
+            null,
+            (columns) => {
+                // Map the result columns
+                if (columns.length >= 7) {
+                    return {
+                        resetDate: columns[0].value,
+                        totalAppointments: columns[1].value,
+                        readyForWhatsApp: columns[2].value,
+                        readyForSMS: columns[3].value,
+                        alreadySentWA: columns[4].value,
+                        alreadyNotified: columns[5].value,
+                        appointmentsReset: columns[6].value,
+                        smsRecordsReset: columns[7].value || 0
+                    };
+                }
+                return null;
+            },
+            (result) => {
+                const resetStats = result && result.length > 0 ? result[0] : {
+                    resetDate: date,
+                    totalAppointments: 0,
+                    readyForWhatsApp: 0,
+                    readyForSMS: 0,
+                    alreadySentWA: 0,
+                    alreadyNotified: 0,
+                    appointmentsReset: 0,
+                    smsRecordsReset: 0
+                };
+                
+                console.log(`Reset completed for ${date}:`, resetStats);
+                return resetStats;
+            }
+        );
+        
+        res.json({
+            success: true,
+            message: `Messaging reset completed for ${date}`,
+            data: result,
+            timestamp: Date.now()
+        });
+        
+    } catch (error) {
+        console.error('Error resetting messaging:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            message: 'Failed to reset messaging status',
+            timestamp: Date.now()
+        });
+    }
+});
+
+/**
+ * Get detailed message information for a specific date
+ * Returns both potential messages and existing message statuses
+ */
+router.get('/messaging/details/:date', async (req, res) => {
+    try {
+        const { date } = req.params;
+        console.log(`Getting message details for date: ${date}`);
+        
+        const result = {
+            date: date,
+            messagesToSend: [],
+            existingMessages: [],
+            summary: {
+                totalMessages: 0,
+                eligibleForMessaging: 0,
+                messagesSent: 0,
+                messagesDelivered: 0,
+                messagesFailed: 0,
+                messagesPending: 0
+            }
+        };
+
+        // Get WhatsApp messages to be sent for the date
+        const whatsappMessages = await getWhatsAppMessages(date);
+        
+        // whatsappMessages returns [numbers, messages, ids, names]
+        const [numbers, messages, ids, names] = whatsappMessages || [[], [], [], []];
+        
+        if (numbers.length > 0) {
+            // Convert arrays to objects for frontend
+            result.messagesToSend = numbers.map((number, index) => ({
+                id: ids[index] || '',
+                number: number || '',
+                name: names[index] || '',
+                message: messages[index] || ''
+            }));
+            result.summary.totalMessages = numbers.length;
+            result.summary.eligibleForMessaging = numbers.length;
+        }
+
+        // Get existing message statuses
+        try {
+            const messageStatuses = await messagingQueries.getMessageStatusByDate(date);
+            if (messageStatuses && messageStatuses.messages) {
+                result.existingMessages = messageStatuses.messages;
+                
+                // Count message statuses
+                result.existingMessages.forEach(msg => {
+                    if (msg.status === 0) result.summary.messagesPending++;
+                    else if (msg.status === 1) result.summary.messagesSent++;
+                    else if (msg.status >= 2) result.summary.messagesDelivered++;
+                    else if (msg.status === -1) result.summary.messagesFailed++;
+                });
+            }
+        } catch (msgError) {
+            console.warn('Could not get message statuses for details:', msgError.message);
+            result.existingMessages = [];
+        }
+
+        console.log(`Message details for ${date}: ${result.summary.totalMessages} messages to send, ${result.existingMessages.length} existing messages`);
+        
+        res.json({
+            success: true,
+            data: result,
+            timestamp: Date.now()
+        });
+        
+    } catch (error) {
+        console.error('Error getting message details:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            timestamp: Date.now()
+        });
+    }
+});
 
 export default router;
