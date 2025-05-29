@@ -5,7 +5,7 @@
  */
 import Clock from '../components/clock.js';
 import Table from '../components/table.js';
-import websocket from '../services/websocket.js';
+import websocketService from '../services/websocket.js';
 import appointmentService from '../services/appointment.js';
 import storage from '../core/storage.js';
 import { getElement, getElements } from '../core/dom.js';
@@ -420,17 +420,17 @@ class AppointmentsPageController {
 
 
     // Handle connection events
-    websocket.on('connected', () => {
+    websocketService.on('connected', () => {
       updateStatus('connected');
       console.log('WebSocket connected');
     });
 
-    websocket.on('disconnected', () => {
+    websocketService.on('disconnected', () => {
       updateStatus('disconnected');
       console.log('WebSocket disconnected');
     });
 
-    websocket.on('error', (error) => {
+    websocketService.on('error', (error) => {
       updateStatus('error');
       console.error('WebSocket error:', error);
     });
@@ -473,13 +473,13 @@ class AppointmentsPageController {
     };
 
     // Handle legacy 'updated' event
-    websocket.on('updated', handleAppointmentUpdate);
+    websocketService.on('updated', handleAppointmentUpdate);
     
     // Handle new 'appointmentUpdate' event (from appointment_update server message)
-    websocket.on('appointmentUpdate', handleAppointmentUpdate);
+    websocketService.on('appointmentUpdate', handleAppointmentUpdate);
 
     // Handle patient loaded event
-    websocket.on('patientLoaded', async data => {
+    websocketService.on('patientLoaded', async data => {
       console.log('Received patientLoaded event:', data);
       console.log('Current screen ID:', storage.screenId());
       
@@ -489,13 +489,13 @@ class AppointmentsPageController {
     });
 
     // Handle patient unloaded event
-    websocket.on('patientUnloaded', () => {
+    websocketService.on('patientUnloaded', () => {
       this.activePID = null;
       this.unloadPatientData();
       this.highlightActivePatient();
     });
 
-    websocket.connect();
+    websocketService.connect();
   }
 
   /**
@@ -684,9 +684,9 @@ class AppointmentsPageController {
 
         // Reload appointments
         this.loadAppointments();
-        websocket.disconnect(); // add before connecting
+        websocketService.disconnect(); // add before connecting
         // Reconnect WebSocket
-        websocket.connect();
+        websocketService.connect();
       }
     }, 60000); // Check every minute
   }
@@ -706,7 +706,7 @@ class AppointmentsPageController {
     }
 
     // Disconnect WebSocket
-    websocket.disconnect();
+    websocketService.disconnect();
   }
 }
 

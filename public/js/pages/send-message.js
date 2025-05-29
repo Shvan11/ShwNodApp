@@ -168,12 +168,24 @@ class SendMessageController {
    * @returns {Promise<Array>} - Contact data
    */
   async fetchContacts(source) {
-    if (source === 'pat') {
-      const response = await fetch('/api/patientsPhones');
-      return await response.json();
-    } else {
-      const response = await fetch('/api/google?source=' + source);
-      return await response.json();
+    try {
+      let response;
+      if (source === 'pat') {
+        response = await fetch('/api/patientsPhones');
+      } else {
+        response = await fetch('/api/google?source=' + encodeURIComponent(source));
+      }
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      console.error('Error fetching contacts:', error);
+      this.showErrorMessage(`Failed to load contacts: ${error.message}`);
+      return [];
     }
   }
   
@@ -184,18 +196,32 @@ class SendMessageController {
   async handleSubmit(event) {
     event.preventDefault();
     
-    // Check client status first
-    const isReady = await this.checkClientStatus();
-    if (!isReady) {
-      return; // Error message already shown
+    // Get form data
+    const phone = this.phoneInput.value;
+    const prog = document.getElementById("prog").value;
+    const file = this.fileInput.value;
+    
+    // Validate inputs
+    if (!phone || !phone.trim()) {
+      this.showErrorMessage('Please enter a phone number');
+      return;
+    }
+    
+    if (!file || !file.trim()) {
+      this.showErrorMessage('Please select a file to send');
+      return;
+    }
+    
+    // Only check WhatsApp client status if WhatsApp is selected
+    if (prog === "WhatsApp") {
+      const isReady = await this.checkClientStatus();
+      if (!isReady) {
+        return; // Error message already shown
+      }
     }
     
     // Start progress bar
     this.progressBar.initiate();
-    
-    // Get form data
-    const phone = this.phoneInput.value;
-    const prog = document.getElementById("prog").value;
     const formData = new FormData();
     
     formData.append("prog", prog);
@@ -209,20 +235,32 @@ class SendMessageController {
         body: formData
       });
       
+      // Check response status
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const data = await response.json();
       
       // Handle response
       if (data.result === "OK") {
         this.progressBar.finish();
-        this.showSuccessMessage(`Message sent successfully! (${data.sentMessages} files sent)`);
+        const platform = prog === "WhatsApp" ? "WhatsApp" : "Telegram";
+        const fileCount = this.fileInput.value.split(',').length;
+        this.showSuccessMessage(`${platform} message sent successfully! (${data.sentMessages || 0}/${fileCount} files sent)`);
       } else if (data.error) {
         this.progressBar.reset();
-        this.showErrorMessage(data.error);
+        const platform = prog === "WhatsApp" ? "WhatsApp" : "Telegram";
+        this.showErrorMessage(`${platform} Error: ${data.error}`);
+      } else {
+        this.progressBar.reset();
+        this.showErrorMessage('Unknown error occurred while sending message');
       }
     } catch (error) {
       console.error('Error sending message:', error);
       this.progressBar.reset();
-      this.showErrorMessage('Failed to send message. Please try again.');
+      const platform = prog === "WhatsApp" ? "WhatsApp" : "Telegram";
+      this.showErrorMessage(`Failed to send ${platform} message: ${error.message}`);
     }
   }
   
@@ -233,17 +271,34 @@ class SendMessageController {
   async checkClientStatus() {
     try {
       const response = await fetch('/api/wa/status');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const data = await response.json();
       
-      if (data.ready) {
+      console.log('Client status check result:', data);
+      
+      if (data.success === false) {
+        this.showErrorMessage(`WhatsApp service error: ${data.message || 'Unknown error'}`);
+        return false;
+      }
+      
+      if (data.clientReady) {
         return true;
       } else {
-        this.showClientNotReadyMessage();
+        // Check if client is initializing
+        if (data.initializing) {
+          this.showClientInitializingMessage();
+        } else {
+          this.showClientNotReadyMessage();
+        }
         return false;
       }
     } catch (error) {
       console.error('Error checking client status:', error);
-      this.showErrorMessage('Unable to check WhatsApp client status');
+      this.showErrorMessage(`Unable to check WhatsApp client status: ${error.message}`);
       return false;
     }
   }
@@ -257,6 +312,20 @@ class SendMessageController {
         <h3>WhatsApp Client Not Ready</h3>
         <p>The WhatsApp client is not logged in or not ready to send messages.</p>
         <p>Please go to <a href="/send" target="_blank">Send Page</a> to authenticate and initialize the WhatsApp client.</p>
+        <button onclick="window.location.reload()" class="retry-btn">Retry</button>
+      </div>
+    `;
+    this.showMessage(message);
+  }
+
+  /**
+   * Show client initializing message
+   */
+  showClientInitializingMessage() {
+    const message = `
+      <div class="status-message warning">
+        <h3>WhatsApp Client Initializing</h3>
+        <p>The WhatsApp client is currently starting up. Please wait a moment and try again.</p>
         <button onclick="window.location.reload()" class="retry-btn">Retry</button>
       </div>
     `;

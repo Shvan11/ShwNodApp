@@ -1,7 +1,7 @@
 // utils/websocket.js
 import { WebSocketServer } from 'ws';
 import { EventEmitter } from 'events';
-import * as database from '../services/database/queries/index.js';
+import * as database from '../services/database/index.js';
 import { getPresentAps } from '../services/database/queries/appointment-queries.js';
 import messageState from '../services/state/messageState.js';
 import { getTimePointImgs } from '../services/database/queries/timepoint-queries.js';

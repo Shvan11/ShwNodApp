@@ -11,12 +11,13 @@ import apiRoutes from './routes/api.js';
 import webRoutes from './routes/web.js';
 import whatsappService from './services/messaging/whatsapp.js';
 import messageState from './services/state/messageState.js';
+import { createWebSocketMessage, MessageSchemas } from './services/messaging/schemas.js';
 
 // ===== ADDED: Import new infrastructure components =====
 import ResourceManager from './services/core/ResourceManager.js';
 import HealthCheck from './services/monitoring/HealthCheck.js';
 import ConnectionPool from './services/database/ConnectionPool.js';
-import { testConnection, testConnectionWithRetry } from './services/database/queries/index.js';
+import { testConnection, testConnectionWithRetry } from './services/database/index.js';
 
 // Get current file and directory name for ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -78,14 +79,111 @@ async function initializeApplication() {
     console.log('💬 Connecting WhatsApp service...');
     whatsappService.setEmitter(wsEmitter);
 
-    // Set up WhatsApp event handlers
+    // Set up comprehensive WhatsApp event handlers
+    whatsappService.on('MessageSent', async (person) => {
+        console.log("MessageSent event fired:", person);
+        try {
+            person.success = '&#10004;';
+            await messageState.addPerson(person);
+            
+            // Broadcast via WebSocket
+            if (wsEmitter) {
+                const message = createWebSocketMessage(
+                    MessageSchemas.WebSocketMessage.MESSAGE_STATUS,
+                    {
+                        messageId: person.messageId,
+                        status: MessageSchemas.MessageStatus.SERVER,
+                        person
+                    }
+                );
+                wsEmitter.emit('broadcast_message', message);
+            }
+            
+            console.log("MessageSent processed successfully");
+        } catch (error) {
+            console.error("Error handling MessageSent event:", error);
+        }
+    });
+
+    whatsappService.on('MessageFailed', async (person) => {
+        console.log("MessageFailed event fired:", person);
+        try {
+            person.success = '&times;';
+            await messageState.addPerson(person);
+            
+            // Broadcast failure
+            if (wsEmitter) {
+                const message = createWebSocketMessage(
+                    MessageSchemas.WebSocketMessage.MESSAGE_STATUS,
+                    {
+                        messageId: person.messageId || `failed_${Date.now()}`,
+                        status: MessageSchemas.MessageStatus.ERROR,
+                        person
+                    }
+                );
+                wsEmitter.emit('broadcast_message', message);
+            }
+            
+            console.log("MessageFailed processed successfully");
+        } catch (error) {
+            console.error("Error handling MessageFailed event:", error);
+        }
+    });
+
+    whatsappService.on('finishedSending', async () => {
+        console.log("finishedSending event fired");
+        try {
+            await messageState.setFinishedSending(true);
+            
+            // Broadcast completion
+            if (wsEmitter) {
+                const message = createWebSocketMessage(
+                    'sending_finished',
+                    { finished: true, stats: messageState.dump() }
+                );
+                wsEmitter.emit('broadcast_message', message);
+            }
+        } catch (error) {
+            console.error("Error handling finishedSending event:", error);
+        }
+    });
+
     whatsappService.on('ClientIsReady', async () => {
-      try {
-        await messageState.setClientReady(true);
-        console.log("✅ WhatsApp client is ready and state updated");
-      } catch (error) {
-        console.error("❌ Error updating WhatsApp client ready state:", error);
-      }
+        console.log("ClientIsReady event fired");
+        try {
+            await messageState.setClientReady(true);
+            
+            // Broadcast client ready
+            if (wsEmitter) {
+                const message = createWebSocketMessage(
+                    MessageSchemas.WebSocketMessage.CLIENT_READY,
+                    { clientReady: true }
+                );
+                wsEmitter.emit('broadcast_message', message);
+            }
+            
+            console.log("✅ WhatsApp client is ready and state updated");
+        } catch (error) {
+            console.error("❌ Error updating WhatsApp client ready state:", error);
+        }
+    });
+
+    whatsappService.on('qr', async (qr) => {
+        console.log("QR event fired");
+        try {
+            await messageState.setQR(qr);
+            
+            // Only broadcast if there are active viewers
+            if (messageState.activeQRViewers > 0 && wsEmitter) {
+                const message = createWebSocketMessage(
+                    MessageSchemas.WebSocketMessage.QR_UPDATE,
+                    { qr, clientReady: false }
+                );
+                wsEmitter.emit('broadcast_message', message);
+            }
+        } catch (error) {
+            console.error("Error handling QR event:", error);
+        }
     });
 
     // ===== ADDED: Enhanced error handling for startup =====

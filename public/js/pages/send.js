@@ -2,6 +2,8 @@
  * WhatsApp Messaging Application - WebSocket Only
  * Handles real-time UI communication for sending WhatsApp messages
  */
+import websocketService from '../services/websocket.js';
+
 class WhatsAppMessenger {
   constructor() {
     // Core state
@@ -12,22 +14,7 @@ class WhatsAppMessenger {
     this.sendingStarted = false;
     this.clientReadyShown = false;
     
-    // WebSocket connection
-    this.ws = null;
-    this.connectionState = 'disconnected'; // disconnected, connecting, connected, error
-    this.manualDisconnect = false;
-    this.lastWebSocketMessage = null;
-    
-    // Reconnection management
-    this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 10;
-    this.reconnectDelay = 1000;
-    this.maxReconnectDelay = 30000;
-    
-    // Connection health
-    this.pingInterval = null;
-    this.healthCheckInterval = null;
-    this.lastPongReceived = null;
+    // WebSocket connection via service - no manual state tracking needed
     
     // Message management
     this.persons = [];
@@ -72,7 +59,7 @@ class WhatsAppMessenger {
     this.setupDateDropdown();
     this.bindEvents();
     this.setupCleanupHandlers();
-    this.connectWebSocket();
+    this.setupWebSocket();
     this.loadMessageCount(); // Load initial message count
   }
 
@@ -359,7 +346,7 @@ class WhatsAppMessenger {
       if (result.success) {
         console.log('Restart successful:', result.message);
         this.clientReadyShown = false;
-        this.reconnectAttempts = 0;
+        // Reconnection is handled by websocket service
         // Don't request initial state - let WebSocket real-time updates handle it
         
         this.updateMessageCountDisplay('Client restart initiated', 'success');
@@ -568,8 +555,9 @@ class WhatsAppMessenger {
       this.sendingStarted = false;
       this.clientReadyShown = false;
       
-      // Reconnect WebSocket with new date
-      this.connectWebSocket();
+      // Clean up previous websocket handlers and reconnect with new date
+      this.cleanupWebSocketHandlers();
+      this.setupWebSocket();
       
       // Load new message count
       this.loadMessageCount();
@@ -792,7 +780,7 @@ class WhatsAppMessenger {
 
   retryInitialization() {
     console.log("Retrying WhatsApp client initialization");
-    this.reconnectAttempts = 0;
+    // Reconnection is handled by websocket service
     this.updateState('<div class="loader"></div> Reinitializing WhatsApp client...');
     this.startButton.style.display = 'none';
 
@@ -801,7 +789,8 @@ class WhatsAppMessenger {
       .then(data => {
         console.log("Restart response:", data);
         this.updateState(data.message || 'Restarting WhatsApp client...');
-        this.connectWebSocket();
+        this.cleanupWebSocketHandlers();
+        this.setupWebSocket();
       })
       .catch(error => {
         console.error("Error restarting WhatsApp client:", error);
@@ -815,246 +804,88 @@ class WhatsAppMessenger {
     this.sendWa();
   }
 
-  // WebSocket Connection Management
-  connectWebSocket() {
-    try {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.manualDisconnect = true;
-        this.ws.close();
+  // WebSocket Connection Management using websocket service
+  setupWebSocket() {
+    // Set up event handlers for the websocket service
+    websocketService.on('connected', () => {
+      console.log("WebSocket connected successfully");
+      this.requestInitialState();
+    });
+
+    websocketService.on('disconnected', (event) => {
+      console.log("WebSocket connection closed", event.code, event.reason);
+      // The service handles automatic reconnection
+    });
+
+    websocketService.on('error', (error) => {
+      console.error("WebSocket error:", error);
+    });
+
+    // Handle all message types
+    websocketService.on('qrUpdate', (data) => this.handleQRUpdate(data));
+    websocketService.on('clientReady', (data) => this.handleClientReady(data));
+    websocketService.on('messageStatus', (data) => this.handleSingleStatusUpdate(data));
+    websocketService.on('batchStatus', (data) => this.handleBatchStatusUpdate(data));
+    websocketService.on('appointmentUpdate', (data) => this.handleAppointmentUpdate(data));
+    websocketService.on('sendingFinished', (data) => this.handleSendingFinished(data));
+    websocketService.on('initialStateResponse', (data) => {
+      console.log("Received initial state response via WebSocket");
+      this.processInitialState(data);
+    });
+    websocketService.on('error', (data) => {
+      if (data && data.error) {
+        this.handleError(data);
+      } else {
+        console.error("Received error message without details:", data);
       }
+    });
 
-      this.connectionState = 'connecting';
-      this.ws = new WebSocket(`${location.origin.replace(/^http/, "ws")}?PDate=${this.dateparam}&clientType=waStatus&needsQR=true`);
+    // Legacy message handling for backwards compatibility
+    websocketService.on('message', (message) => {
+      this.handleLegacyMessage(message);
+    });
 
-      this.ws.onopen = () => {
-        console.log("WebSocket connected successfully");
-        this.connectionState = 'connected';
-        this.manualDisconnect = false;
-        
-        this.reconnectAttempts = 0;
-        this.reconnectDelay = 1000;
-        this.requestInitialState();
-
-        // Setup ping mechanism
-        this.pingInterval = this.addTimerWithTracking(() => {
-          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            console.log("Sending ping to keep connection alive");
-            try {
-              this.ws.send(JSON.stringify({ type: 'ping' }));
-            } catch (error) {
-              console.error("Error sending ping:", error);
-              this.clearTimerWithTracking(this.pingInterval);
-              this.pingInterval = null;
-            }
-          } else {
-            console.warn("WebSocket not ready for ping, state:", this.ws?.readyState);
-            this.clearTimerWithTracking(this.pingInterval);
-            this.pingInterval = null;
-          }
-        }, 30000, true);
-
-        this.lastPongReceived = Date.now();
-        
-        // Health monitoring
-        this.healthCheckInterval = this.addTimerWithTracking(() => {
-          const now = Date.now();
-          const timeSinceLastPong = now - (this.lastPongReceived || now);
-          
-          if (timeSinceLastPong > 120000) {
-            console.warn("No pong received for 2 minutes, connection may be stale");
-            this.connectWebSocket();
-          }
-        }, 60000, true);
-      };
-
-      this.ws.onmessage = (event) => {
-        this.handleWebSocketMessage(event);
-      };
-
-      this.ws.onclose = (event) => {
-        console.log("WebSocket connection closed", event.code, event.reason);
-        this.connectionState = 'disconnected';
-        
-        if (this.pingInterval) {
-          this.clearTimerWithTracking(this.pingInterval);
-          this.pingInterval = null;
-        }
-        
-        if (this.healthCheckInterval) {
-          this.clearTimerWithTracking(this.healthCheckInterval);
-          this.healthCheckInterval = null;
-        }
-
-        if (!this.finished && !this.manualDisconnect) {
-          this.scheduleReconnect();
-        }
-      };
-
-      this.ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        this.connectionState = 'error';
-        
-        if (this.pingInterval) {
-          this.clearTimerWithTracking(this.pingInterval);
-          this.pingInterval = null;
-        }
-        
-        if (this.healthCheckInterval) {
-          this.clearTimerWithTracking(this.healthCheckInterval);
-          this.healthCheckInterval = null;
-        }
-        
-        if (!this.finished && !this.manualDisconnect) {
-          this.scheduleReconnect();
-        }
-      };
-            
-    } catch (error) {
-      console.error("Error creating WebSocket:", error);
-      this.connectionState = 'error';
-      if (!this.finished && !this.manualDisconnect) {
-        this.scheduleReconnect();
-      }
-    }
+    // Connect with the required parameters
+    const connectionParams = {
+      PDate: this.dateparam,
+      clientType: 'waStatus',
+      needsQR: 'true'
+    };
+    
+    websocketService.connect(connectionParams);
   }
 
-  handleWebSocketMessage(event) {
-    console.log("Raw WebSocket message received:", event.data);
-    
-    try {
-      const message = JSON.parse(event.data);
-      console.log("Parsed WebSocket message:", message);
-      
-      if (!this.validateMessage(message)) {
-        console.warn("Invalid or insecure message received, skipping");
-        return;
-      }
-      
-      this.lastWebSocketMessage = Date.now();
-      
-      if (message.id && this.isDuplicateMessage(message.id, message.type)) {
-        console.log("Skipping duplicate WebSocket message");
-        return;
-      }
+  // WebSocket message handling is now done via specific event handlers in setupWebSocket()
 
-      if (message.type === 'qr_update') {
-        console.log("QR UPDATE RECEIVED!", message.data);
-      }
-
-      switch (message.type) {
-        case 'qr_update':
-          this.handleQRUpdate(message.data);
-          break;
-          
-        case 'client_ready':
-          this.handleClientReady(message.data);
-          break;
-          
-        case 'message_status':
-          this.handleSingleStatusUpdate(message.data);
-          break;
-          
-        case 'batch_status':
-          this.handleBatchStatusUpdate(message.data);
-          break;
-          
-        case 'appointment_update':
-          this.handleAppointmentUpdate(message.data);
-          break;
-          
-        case 'sending_finished':
-          this.handleSendingFinished(message.data);
-          break;
-          
-        case 'initial_state_response':
-          console.log("Received initial state response via WebSocket");
-          this.processInitialState(message.data);
-          break;
-          
-        case 'error':
-          if (message.data && message.data.error) {
-            this.handleError(message.data);
-          } else {
-            console.error("Received error message without details:", message);
-          }
-          break;
-          
-        case 'pong':
-          console.log("Received pong response - connection alive");
-          this.lastPongReceived = Date.now();
-          break;
-          
-        case 'ping':
-          console.log("Received ping from server, sending pong");
-          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({ type: 'pong' }));
-          }
-          break;
-          
-        default:
-          console.log("Handling legacy message format:", message.type);
-          this.handleLegacyMessage(message);
-      }
-      
-    } catch (error) {
-      console.error("Error parsing WebSocket message:", error);
-      console.error("Raw message data (first 200 chars):", 
-        typeof event.data === 'string' ? event.data.substring(0, 200) + '...' : event.data);
-      
-      if (error instanceof SyntaxError) {
-        console.error("Invalid JSON received via WebSocket");
-      }
-    }
+  cleanupWebSocketHandlers() {
+    // Remove all event handlers to prevent duplicates
+    websocketService.off('connected');
+    websocketService.off('disconnected');
+    websocketService.off('error');
+    websocketService.off('qrUpdate');
+    websocketService.off('clientReady');
+    websocketService.off('messageStatus');
+    websocketService.off('batchStatus');
+    websocketService.off('appointmentUpdate');
+    websocketService.off('sendingFinished');
+    websocketService.off('initialStateResponse');
+    websocketService.off('message');
   }
 
-  scheduleReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error(`Max reconnection attempts (${this.maxReconnectAttempts}) reached. Please refresh the page.`);
-      this.updateState(`
-        <div class="error-state">
-          <p>❌ Connection lost - Maximum reconnection attempts reached</p>
-          <p>Please refresh the page to reconnect</p>
-          <button onclick="window.location.reload()" class="action-button">Refresh Page</button>
-        </div>
-      `);
-      return;
-    }
-
-    this.reconnectAttempts++;
-    
-    const jitter = Math.random() * 1000;
-    const delay = Math.min(this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1), this.maxReconnectDelay) + jitter;
-
-    console.log(`Scheduling WebSocket reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${Math.round(delay)}ms`);
-    
-    this.updateState(`
-      <div class="reconnecting-state">
-        <div class="loader"></div>
-        <p>Connection lost - Reconnecting in ${Math.round(delay/1000)} seconds...</p>
-        <p>Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}</p>
-      </div>
-    `);
-
-    this.addTimerWithTracking(() => {
-      if (!this.finished && !this.manualDisconnect) {
-        console.log(`Attempting WebSocket reconnection ${this.reconnectAttempts}`);
-        this.connectWebSocket();
-      }
-    }, delay);
-  }
+  // Reconnection is now handled automatically by the websocket service
 
   // State Management
   requestInitialState() {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    if (websocketService.isConnected) {
       console.log("Requesting initial state via WebSocket");
       try {
-        this.ws.send(JSON.stringify({
+        websocketService.send({
           type: 'request_initial_state',
           data: {
             date: this.dateparam,
             timestamp: Date.now()
           }
-        }));
+        });
       } catch (error) {
         console.error("Error requesting initial state:", error);
         this.requestInitialStateAPI();
@@ -1580,21 +1411,14 @@ class WhatsAppMessenger {
     console.log('Starting comprehensive WhatsAppMessenger cleanup');
     
     this.finished = true;
-    this.manualDisconnect = true;
     
     this.clearAllTimers();
     
-    if (this.ws) {
-      try {
-        if (this.ws.readyState === WebSocket.OPEN) {
-          this.ws.close(1000, 'Manual cleanup');
-        }
-      } catch (error) {
-        console.error('Error closing WebSocket:', error);
-      } finally {
-        this.ws = null;
-      }
-    }
+    // Clean up websocket service event handlers
+    this.cleanupWebSocketHandlers();
+    
+    // Disconnect websocket service
+    websocketService.disconnect();
     
     this.persons = [];
     this.statusUpdateQueue.clear();
@@ -1602,7 +1426,7 @@ class WhatsAppMessenger {
     
     this.cleanupEventListeners();
     
-    console.log('WhatsAppMessenger cleanup completed - WebSocket-only approach');
+    console.log('WhatsAppMessenger cleanup completed - WebSocket service approach');
   }
 
   cleanupEventListeners() {

@@ -3,11 +3,13 @@
  */
 import express from 'express';
 
-import * as database from '../services/database/queries/index.js';
+import * as database from '../services/database/index.js';
 import { getPresentAps } from '../services/database/queries/appointment-queries.js';
 import {getTimePoints, getTimePointImgs } from '../services/database/queries/timepoint-queries.js';
 import { getWhatsAppMessages } from '../services/database/queries/messaging-queries.js';
-import { getPatientsPhones } from '../services/database/queries/patient-queries.js';
+import { getPatientsPhones, getInfos } from '../services/database/queries/patient-queries.js';
+import { getPayments } from '../services/database/queries/payment-queries.js';
+import { getWires, getVisitsSummary, addVisit, updateVisit, deleteVisit, getVisitDetailsByID, getLatestWire } from '../services/database/queries/visit-queries.js';
 import whatsapp from '../services/messaging/whatsapp.js';
 import { sendImg_, sendXray_ } from '../services/messaging/whatsapp-api.js';
 import { wsEmitter } from '../index.js';
@@ -28,115 +30,11 @@ const upload = multer();
 
 
 
-whatsapp.on('MessageSent', async (person) => {
-    console.log("MessageSent event fired:", person);
-    try {
-        person.success = '&#10004;';
-        await messageState.addPerson(person);
-        
-        // Broadcast via WebSocket
-        if (wsEmitter) {
-            const message = createWebSocketMessage(
-                MessageSchemas.WebSocketMessage.MESSAGE_STATUS,
-                {
-                    messageId: person.messageId,
-                    status: MessageSchemas.MessageStatus.SERVER,
-                    person
-                }
-            );
-            wsEmitter.emit('broadcast_message', message);
-        }
-        
-        console.log("MessageSent processed successfully");
-    } catch (error) {
-        console.error("Error handling MessageSent event:", error);
-    }
-});
-
-whatsapp.on('MessageFailed', async (person) => {
-    console.log("MessageFailed event fired:", person);
-    try {
-        person.success = '&times;';
-        await messageState.addPerson(person);
-        
-        // Broadcast failure
-        if (wsEmitter) {
-            const message = createWebSocketMessage(
-                MessageSchemas.WebSocketMessage.MESSAGE_STATUS,
-                {
-                    messageId: person.messageId || `failed_${Date.now()}`,
-                    status: MessageSchemas.MessageStatus.ERROR,
-                    person
-                }
-            );
-            wsEmitter.emit('broadcast_message', message);
-        }
-        
-        console.log("MessageFailed processed successfully");
-    } catch (error) {
-        console.error("Error handling MessageFailed event:", error);
-    }
-});
-
-whatsapp.on('finishedSending', async () => {
-    console.log("finishedSending event fired");
-    try {
-        await messageState.setFinishedSending(true);
-        
-        // Broadcast completion
-        if (wsEmitter) {
-            const message = createWebSocketMessage(
-                'sending_finished',
-                { finished: true, stats: messageState.dump() }
-            );
-            wsEmitter.emit('broadcast_message', message);
-        }
-    } catch (error) {
-        console.error("Error handling finishedSending event:", error);
-    }
-});
-
-whatsapp.on('ClientIsReady', async () => {
-    console.log("ClientIsReady event fired");
-    try {
-        await messageState.setClientReady(true);
-        
-        // Broadcast client ready
-        if (wsEmitter) {
-            const message = createWebSocketMessage(
-                MessageSchemas.WebSocketMessage.CLIENT_READY,
-                { clientReady: true }
-            );
-            wsEmitter.emit('broadcast_message', message);
-        }
-    } catch (error) {
-        console.error("Error handling ClientIsReady event:", error);
-    }
-});
-
-whatsapp.on('qr', async (qr) => {
-    console.log("QR event fired");
-    try {
-        await messageState.setQR(qr);
-        
-        // Only broadcast if there are active viewers
-        if (messageState.activeQRViewers > 0 && wsEmitter) {
-            const message = createWebSocketMessage(
-                MessageSchemas.WebSocketMessage.QR_UPDATE,
-                { qr, clientReady: false }
-            );
-            wsEmitter.emit('broadcast_message', message);
-        }
-    } catch (error) {
-        console.error("Error handling QR event:", error);
-    }
-});
-
 
 // Patient information routes
 router.get("/getinfos", async (req, res) => {
     const { code: pid } = req.query;
-    const infos = await database.getInfos(pid);
+    const infos = await getInfos(pid);
     res.json(infos);
 });
 
@@ -156,7 +54,7 @@ router.get("/gettimepointimgs", async (req, res) => {
 // Get payment details
 router.get("/getpayments", async (req, res) => {
     const { code: pid } = req.query;
-    const payments = await database.getPayments(pid);
+    const payments = await getPayments(pid);
     res.json(payments);
 });
 
@@ -227,7 +125,7 @@ router.get('/clear', (req, res) => {
 router.get('/sendtwilio', async (req, res) => {
     const dateparam = req.query.date;
     try {
-        await sendSMSNoti(dateparam);
+        await sms.sendSms(dateparam);
         res.send("SMS sent successfully");
     } catch (error) {
         res.status(500).send("Failed to send SMS");
@@ -237,7 +135,7 @@ router.get('/sendtwilio', async (req, res) => {
 router.get('/checktwilio', async (req, res) => {
     const dateparam = req.query.date;
     try {
-        await CheckSMSNoti(dateparam);
+        await sms.checksms(dateparam);
         res.send("SMS check completed");
     } catch (error) {
         res.status(500).send("Failed to check SMS");
@@ -385,39 +283,73 @@ router.get('/sendxrayfile', async (req, res) => {
 });
 
 router.post('/sendmedia2', upload.none(), async (req, res) => {
-    const paths = req.body.file.split(',');
-    let phone = req.body.phone;
-    const prog = req.body.prog;
+    try {
+        const paths = req.body.file.split(',');
+        let phone = req.body.phone;
+        const prog = req.body.prog;
 
-    let sentMessages = 0;
-    let state = {};
+        console.log(`Sendmedia2 request - Program: ${prog}, Phone: ${phone}, Files: ${paths.length}`);
 
-    if (prog === "WhatsApp") {
-        phone = phone.startsWith("+") || phone.startsWith("0") ? phone.substring(1) : phone;
-        for (const path of paths) {
-            state = await sendXray_(phone, path);
-            if (state.result === "OK") {
-                sentMessages += 1;
+        if (!phone || !prog || !paths.length) {
+            return res.status(400).json({
+                result: "ERROR",
+                error: "Missing required parameters (phone, prog, or file)"
+            });
+        }
+
+        let sentMessages = 0;
+        let state = {};
+
+        if (prog === "WhatsApp") {
+            phone = phone.startsWith("+") || phone.startsWith("0") ? phone.substring(1) : phone;
+            console.log(`WhatsApp - Formatted phone: ${phone}`);
+            
+            for (const path of paths) {
+                console.log(`Sending WhatsApp file: ${path}`);
+                state = await sendXray_(phone, path);
+                console.log(`WhatsApp result:`, state);
+                if (state.result === "OK") {
+                    sentMessages += 1;
+                }
             }
-        }
-    } else {
-        if (phone.startsWith("0")) {
-            phone = "+964" + phone.substring(1);
-        }
-        else if (!phone.startsWith("+964")) {
-            phone = "+964" + phone;
+        } else if (prog === "Telegram") {
+            // Improved phone number formatting for Telegram
+            const originalPhone = phone;
+            if (phone.startsWith("0")) {
+                phone = "+964" + phone.substring(1);
+            } else if (phone.startsWith("964")) {
+                phone = "+" + phone;
+            } else if (!phone.startsWith("+964") && !phone.startsWith("+")) {
+                phone = "+964" + phone;
+            }
+            
+            console.log(`Telegram - Original phone: ${originalPhone}, Formatted phone: ${phone}`);
+
+            for (const path of paths) {
+                console.log(`Sending Telegram file: ${path}`);
+                state = await sendgramfile(phone, path);
+                console.log(`Telegram result:`, state);
+                if (state.result === "OK") {
+                    sentMessages += 1;
+                }
+            }
+        } else {
+            return res.status(400).json({
+                result: "ERROR",
+                error: `Unsupported program: ${prog}. Use 'WhatsApp' or 'Telegram'`
+            });
         }
 
-        for (const path of paths) {
-            state = await sendgramfile(phone, path);
-            if (state.result === "OK") {
-                sentMessages += 1;
-            }
-        }
+        state.sentMessages = sentMessages;
+        console.log(`Final result - Sent: ${sentMessages}/${paths.length}, State:`, state);
+        res.json(state);
+    } catch (error) {
+        console.error('Error in sendmedia2:', error);
+        res.status(500).json({
+            result: "ERROR",
+            error: error.message || "Internal server error"
+        });
     }
-
-    state.sentMessages = sentMessages;
-    res.json(state);
 });
 
 // Add this new route
@@ -464,7 +396,7 @@ router.get("/visitsSummary", async (req, res) => {
             return res.status(400).json({ error: "Missing required parameter: PID" });
         }
 
-        const visitsSummary = await database.getVisitsSummary(PID);
+        const visitsSummary = await getVisitsSummary(PID);
         res.json(visitsSummary);
     } catch (error) {
         console.error("Error fetching visits summary:", error);
@@ -474,7 +406,7 @@ router.get("/visitsSummary", async (req, res) => {
 
 router.get("/getWires", async (req, res) => {
     try {
-        const wires = await database.getWires();
+        const wires = await getWires();
         res.json(wires);
     } catch (error) {
         console.error("Error fetching wires:", error);
@@ -526,7 +458,7 @@ router.get("/getLatestwire", async (req, res) => {
             return res.status(400).json({ error: "Missing required parameter: PID" });
         }
 
-        const latestWire = await database.getLatestWire(PID);
+        const latestWire = await getLatestWire(PID);
         res.json(latestWire);
     } catch (error) {
         console.error("Error fetching latest wire:", error);
@@ -541,7 +473,7 @@ router.get("/getVisitDetailsByID", async (req, res) => {
             return res.status(400).json({ error: "Missing required parameter: VID" });
         }
 
-        const visitDetails = await database.getVisitDetailsByID(VID);
+        const visitDetails = await getVisitDetailsByID(VID);
         res.json(visitDetails);
     } catch (error) {
         console.error("Error fetching visit details:", error);
@@ -557,7 +489,7 @@ router.post("/addVisit", async (req, res) => {
             return res.status(400).json({ status: 'error', message: 'Missing required parameters' });
         }
 
-        const result = await database.addVisit(PID, visitDate, upperWireID, lowerWireID, others, next);
+        const result = await addVisit(PID, visitDate, upperWireID, lowerWireID, others, next);
         res.json({ status: 'success', data: result });
     } catch (error) {
         console.error("Error adding visit:", error);
@@ -572,7 +504,7 @@ router.put("/updateVisit", async (req, res) => {
             return res.status(400).json({ status: 'error', message: 'Missing required parameters' });
         }
 
-        const result = await database.updateVisit(VID, visitDate, upperWireID, lowerWireID, others, next);
+        const result = await updateVisit(VID, visitDate, upperWireID, lowerWireID, others, next);
         res.json({ status: 'success', data: result });
     } catch (error) {
         console.error("Error updating visit:", error);
@@ -587,7 +519,7 @@ router.delete("/deleteVisit", async (req, res) => {
             return res.status(400).json({ status: 'error', message: 'Missing required parameter: VID' });
         }
 
-        const result = await database.deleteVisit(VID);
+        const result = await deleteVisit(VID);
         res.json({ status: 'success', data: result });
     } catch (error) {
         console.error("Error deleting visit:", error);
@@ -956,28 +888,6 @@ router.get('/wa/detailed-status', async (req, res) => {
 
 
 
-// Helper functions
-async function sendSMSNoti(date) {
-    // This function should be in the SMS service but kept here for backward compatibility
-    try {
-        await sms.sendSms(date);
-        return true;
-    } catch (error) {
-        console.error("SMS notification error:", error);
-        return false;
-    }
-}
-
-async function CheckSMSNoti(date) {
-    // This function should be in the SMS service but kept here for backward compatibility
-    try {
-        await sms.checksms(date);
-        return true;
-    } catch (error) {
-        console.error("SMS check error:", error);
-        return false;
-    }
-}
 
 /**
  * Get message count for a specific date
