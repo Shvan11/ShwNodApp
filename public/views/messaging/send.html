@@ -1,283 +1,218 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
-    <link rel="stylesheet" href="css/main.css" />
-    <link rel="stylesheet" href="css/pages/send.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/css/main.css" />
+    <link rel="stylesheet" href="/css/pages/send.css" />
     <title>Shwan Orthodontics - WhatsApp Sender</title>
-    <style>
-        /* Additional styles for the restart button */
-        .warning-button {
-            background-color: #f0ad4e;
-            border-color: #eea236;
-        }
-        
-        .warning-button:hover {
-            background-color: #ec971f;
-            border-color: #d58512;
-        }
-        
-        .attention {
-            animation: pulse 1.5s infinite;
-            font-weight: bold;
-        }
-        
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-        
-        #restart-button-container {
-            margin: 10px 0;
-            display: none;
-        }
-        
-        /* Date Selection Panel Styles */
-        .date-selection-panel {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .date-controls {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
-        
-        .date-controls label {
-            font-weight: bold;
-            color: #333;
-            min-width: 100px;
-        }
-        
-        .date-dropdown {
-            padding: 8px 12px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 14px;
-            background: white;
-            min-width: 150px;
-        }
-        
-        .date-dropdown:focus {
-            outline: none;
-            border-color: #007bff;
-            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
-        }
-        
-        .secondary-button {
-            background-color: #6c757d;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.2s;
-        }
-        
-        .secondary-button:hover {
-            background-color: #5a6268;
-        }
-        
-        .secondary-button:disabled {
-            background-color: #adb5bd;
-            cursor: not-allowed;
-        }
-        
-        .message-count-info {
-            background: #e9ecef;
-            border-radius: 4px;
-            padding: 12px;
-            font-size: 14px;
-            color: #495057;
-            border-left: 4px solid #007bff;
-        }
-        
-        .message-count-info.loading {
-            color: #6c757d;
-            font-style: italic;
-        }
-        
-        .message-count-info.error {
-            background: #f8d7da;
-            border-left-color: #dc3545;
-            color: #721c24;
-        }
-        
-        .message-count-info.success {
-            background: #d4edda;
-            border-left-color: #28a745;
-            color: #155724;
-        }
-        
-        /* Reset Button Styles */
-        .reset-button {
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.2s;
-            margin-left: 10px;
-        }
-        
-        .reset-button:hover {
-            background-color: #c82333;
-        }
-        
-        .reset-button:disabled {
-            background-color: #adb5bd;
-            cursor: not-allowed;
-        }
-        
-        .reset-button.confirming {
-            background-color: #fd7e14;
-            animation: pulse 1s infinite;
-        }
-        
-        /* Destroy Button Styles */
-        .destroy-button {
-            background-color: #ffc107;
-            color: #212529;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.2s;
-            margin-left: 10px;
-        }
-        
-        .destroy-button:hover {
-            background-color: #e0a800;
-        }
-        
-        .destroy-button:disabled {
-            background-color: #adb5bd;
-            cursor: not-allowed;
-        }
-        
-        .destroy-button.confirming {
-            background-color: #fd7e14;
-            animation: pulse 1s infinite;
-        }
-        
-        .destroy-button.destroying {
-            background-color: #6c757d;
-        }
-        
-        /* Logout Button Styles */
-        .logout-button {
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.2s;
-            margin-left: 10px;
-        }
-        
-        .logout-button:hover {
-            background-color: #c82333;
-        }
-        
-        .logout-button:disabled {
-            background-color: #adb5bd;
-            cursor: not-allowed;
-        }
-        
-        .logout-button.confirming {
-            background-color: #fd7e14;
-            animation: pulse 1s infinite;
-        }
-        
-        .logout-button.logging-out {
-            background-color: #6c757d;
-        }
-        
-        /* Restart Button Styles */
-        .restart-button {
-            background-color: #28a745;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.2s;
-            margin-left: 10px;
-        }
-        
-        .restart-button:hover {
-            background-color: #218838;
-        }
-        
-        .restart-button:disabled {
-            background-color: #adb5bd;
-            cursor: not-allowed;
-        }
-        
-        .restart-button.restarting {
-            background-color: #6c757d;
-        }
-    </style>
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="/js/pages/send.js" as="script" crossorigin="anonymous">
+    
+    <!-- Meta tags for better mobile experience -->
+    <meta name="theme-color" content="#25D366">
+    <meta name="description" content="WhatsApp messaging interface for Shwan Orthodontics appointment reminders">
 </head>
 
 <body>
-    <div class="container">
-        <h1>Shwan Orthodontics</h1>
+    <main class="container main-layout" role="main">
+        <header class="header-area">
+            <h1>Shwan Orthodontics - WhatsApp Messaging</h1>
+            <div class="connection-status" aria-live="polite">
+                <span class="connection-indicator" aria-hidden="true"></span>
+                <span class="connection-text">Initializing...</span>
+            </div>
+        </header>
         
         <!-- Date Selection Panel -->
-        <div class="date-selection-panel">
-            <div class="date-controls">
-                <label for="dateSelector">Select Date:</label>
-                <select id="dateSelector" class="date-dropdown">
-                    <!-- Options will be populated by JavaScript -->
-                </select>
-                <button id="refreshDateBtn" class="secondary-button">Refresh</button>
-                <button id="resetMessagingBtn" class="reset-button">Reset Messages</button>
+        <section class="controls-area">
+            <fieldset class="date-selection-panel">
+                <legend class="sr-only">Date and Message Controls</legend>
+                <div class="date-controls">
+                    <label for="dateSelector">Select Date:</label>
+                    <select id="dateSelector" class="date-dropdown" 
+                            aria-label="Select date for messaging"
+                            aria-describedby="messageCount">
+                        <option value="">Loading dates...</option>
+                    </select>
+                    <button id="refreshDateBtn" class="btn btn-secondary" 
+                            aria-label="Refresh message count for selected date">
+                        <span class="btn-icon" aria-hidden="true">🔄</span>
+                        <span>Refresh</span>
+                    </button>
+                    <button id="resetMessagingBtn" class="btn btn-danger" 
+                            aria-label="Reset all messages for selected date">
+                        <span class="btn-icon" aria-hidden="true">🔄</span>
+                        <span>Reset Messages</span>
+                    </button>
+                </div>
+                
+                <div class="whatsapp-controls">
+                    <h2 class="sr-only">WhatsApp Client Controls</h2>
+                    <div class="secondary-actions">
+                        <button id="restartClientBtn" class="btn btn-success" 
+                                aria-label="Restart WhatsApp client while preserving authentication">
+                            <span class="btn-icon" aria-hidden="true">🔄</span>
+                            <span>Restart Client</span>
+                        </button>
+                        <button id="destroyClientBtn" class="btn btn-warning" 
+                                aria-label="Close WhatsApp client browser but preserve authentication">
+                            <span class="btn-icon" aria-hidden="true">⏹️</span>
+                            <span>Close Browser</span>
+                        </button>
+                        <button id="logoutClientBtn" class="btn btn-danger" 
+                                aria-label="Completely logout WhatsApp client requiring QR scan to reconnect">
+                            <span class="btn-icon" aria-hidden="true">🚪</span>
+                            <span>Logout Client</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="messageCount" class="message-count-info" role="status" aria-live="polite" aria-atomic="true">
+                    <span class="loading-spinner" aria-hidden="true"></span>
+                    <span>Loading message count...</span>
+                </div>
+            </fieldset>
+        </section>
+        
+        <!-- Status and Action Area -->
+        <section class="status-area">
+            <div id="state" class="status-panel connection-status-disconnected" role="status" aria-live="polite" aria-atomic="true">
+                <span class="status-icon" aria-hidden="true"></span>
+                <span>Initializing WhatsApp client...</span>
             </div>
-            <div class="date-controls">
-                <label>Client Actions:</label>
-                <button id="restartClientBtn" class="restart-button">Restart Client</button>
-                <button id="destroyClientBtn" class="destroy-button">Destroy Client</button>
-                <button id="logoutClientBtn" class="logout-button">Logout Client</button>
+            
+            <!-- Progress Display for Message Sending -->
+            <div id="progressContainer" class="sending-progress-container" style="display: none;" role="progressbar" aria-label="Message sending progress">
+                <div class="sending-progress-header">
+                    <span class="sending-progress-title">Sending Messages</span>
+                    <span id="progressStats" class="sending-progress-stats">0/0</span>
+                </div>
+                <div class="sending-progress-bar-container">
+                    <div id="progressBarFill" class="sending-progress-bar-fill" style="width: 0%"></div>
+                </div>
+                <div id="progressText" class="sending-progress-text">Starting...</div>
             </div>
-            <div id="messageCount" class="message-count-info">
-                Loading message count...
+            
+            <!-- QR Code Display -->
+            <div id="qrContainer" class="qr-container" style="display: none;">
+                <img id="qrImage" class="qr-image" style="display: none;" alt="WhatsApp QR Code for authentication" aria-describedby="qr-instructions">
+                <p id="qr-instructions" class="qr-instructions">
+                    <span class="status-icon" aria-hidden="true">📱</span>
+                    Scan this QR code with your WhatsApp mobile app to authenticate
+                </p>
+            </div>
+            
+            <!-- Main Action Button -->
+            <div class="action-section">
+                <button id="startButton" class="btn btn-primary primary-action" 
+                        style="display: none;" 
+                        aria-describedby="send-instructions">
+                    <span class="btn-icon" aria-hidden="true">📱</span>
+                    <span>Start Sending Messages</span>
+                </button>
+                <p id="send-instructions" class="help-text sr-only">
+                    Click to begin sending WhatsApp messages to selected date appointments
+                </p>
+            </div>
+        </section>
+        
+        <!-- Results and Content Area -->
+        <section class="content-area">
+            <div id="tableContainer" class="results-container" role="region" aria-label="Message sending results">
+                <div id="resultsPlaceholder" class="results-placeholder">
+                    <p class="placeholder-text">
+                        <span class="status-icon" aria-hidden="true">📊</span>
+                        Message results will appear here after sending begins
+                    </p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container" role="alert" aria-live="assertive"></div>
+
+    <!-- Error Overlay -->
+    <div id="errorOverlay" class="error-overlay" role="dialog" aria-modal="true" aria-hidden="true" style="display: none;">
+        <div class="error-content">
+            <h2 id="errorTitle">Application Error</h2>
+            <p id="errorMessage">An unexpected error occurred</p>
+            <div class="error-actions">
+                <button class="btn btn-primary" onclick="location.reload()" aria-label="Reload the page">
+                    <span class="btn-icon" aria-hidden="true">🔄</span>
+                    <span>Retry</span>
+                </button>
+                <button class="btn btn-secondary" onclick="this.closest('.error-overlay').style.display='none'" aria-label="Dismiss error message">
+                    <span>Dismiss</span>
+                </button>
             </div>
         </div>
-        
-        <div id="state" class="status-panel">
-            <div class="loader"></div> Initializing...
-        </div>
-        
-        <div id="qr-container">
-            <img id="qr" style="display: none;">
-        </div>
-        
-        <button id="startSendingBtn" class="action-button" style="display: none;">Start Sending Messages</button>
-        
-        <div id="table-container" class="results-container"></div>
-        
-        <!-- Restart button moved to bottom, less accessible -->
-        <div id="restart-button-container" class="button-container" style="margin-top: 40px; text-align: right;"></div>
     </div>
 
-    <!-- Load external JavaScript -->
-    <script src="js/pages/send.js"></script>
+    <!-- Screen Reader Announcements -->
+    <div id="announcer" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+    <div id="progressAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Load modular JavaScript -->
+    <script type="module" src="/js/pages/send.js"></script>
+    
+    <!-- Fallback for JavaScript disabled -->
+    <noscript>
+        <div class="noscript-warning" role="alert">
+            <h2>JavaScript Required</h2>
+            <p>This WhatsApp messaging interface requires JavaScript to function properly.</p>
+            <p>Please enable JavaScript in your browser and refresh the page.</p>
+            <button onclick="location.reload()">Refresh Page</button>
+        </div>
+    </noscript>
+
+    <!-- CSS for noscript warning -->
+    <style>
+        .noscript-warning {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: 2px solid #dc3545;
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 9999;
+        }
+        .noscript-warning h2 {
+            color: #dc3545;
+            margin: 0 0 16px;
+        }
+        .noscript-warning p {
+            margin: 0 0 16px;
+            color: #6c757d;
+        }
+        .noscript-warning button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .placeholder-text {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 40px 20px;
+        }
+        .results-placeholder {
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
 </body>
 
 </html>

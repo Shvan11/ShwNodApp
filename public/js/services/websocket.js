@@ -483,6 +483,7 @@ class WebSocketService extends EventEmitter {
         // Convert snake_case server message types to camelCase client events
         const eventName = message.type.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
         this.log(`Emitting event '${eventName}' from message type '${message.type}'`);
+        console.log(`WebSocket message received - Type: ${message.type}, EventName: ${eventName}, Data:`, message.data || message);
         this.emit(eventName, message.data || message);
       }
       

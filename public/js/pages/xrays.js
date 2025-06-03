@@ -51,7 +51,7 @@ class XraysPageController {
       
       // Create link
       const xrayLink = document.createElement('a');
-      xrayLink.href = `getxray/?code=${this.patientId}&file=${xray.name}&imageF=${xray.imageFile}`;
+      xrayLink.href = `api/getxray/?code=${this.patientId}&file=${xray.name}&imageF=${xray.imageFile}`;
       
       // Create date element
       const dateElement = document.createElement('p');
@@ -92,7 +92,7 @@ class XraysPageController {
     const script = document.createElement('script');
     script.type = 'module';
     script.textContent = `
-      import { gettimepoints } from "./module.js";
+      import { gettimepoints } from "/js/utils/navigation.js";
       gettimepoints("${this.patientId}", "xrays");
     `;
     document.body.appendChild(script);

@@ -1,1445 +1,1581 @@
 /**
- * WhatsApp Messaging Application - WebSocket Only
- * Handles real-time UI communication for sending WhatsApp messages
+ * WhatsApp Messaging Page - Production Ready
+ * Handles all WhatsApp messaging functionality with clean architecture
  */
-import websocketService from '../services/websocket.js';
+import EventEmitter from '../core/events.js';
 
-class WhatsAppMessenger {
-  constructor() {
-    // Core state
-    this.urlParams = new URLSearchParams(window.location.search);
-    this.defaultDate = this.urlParams.get('date') || new Date().toISOString().slice(0, 10);
-    this.dateparam = this.defaultDate; // Will be updated when user selects different date
-    this.finished = false;
-    this.sendingStarted = false;
-    this.clientReadyShown = false;
+// Configuration Constants
+const CONFIG = {
+    // Timing constants
+    DEDUPLICATION_WINDOW_MS: 5000,
+    PROGRESS_BAR_INTERVAL_MS: 200,
+    PROGRESS_BAR_MAX_WIDTH: 90,
+    HEARTBEAT_INTERVAL_MS: 60000,
+    ERROR_DISPLAY_DURATION_MS: 10000,
+    MAX_RECONNECT_ATTEMPTS: 20,
     
-    // WebSocket connection via service - no manual state tracking needed
+    // Delay constants
+    WEBSOCKET_RECONNECT_DELAY_MS: 500,
+    CLIENT_RESTART_DELAY_MS: 2000,
+    LOGOUT_DELAY_MS: 1000,
+    DEBOUNCE_DELAY_MS: 300,
+    OPERATION_TIMEOUT_MS: 30000,
     
-    // Message management
-    this.persons = [];
-    this.statusUpdateQueue = new Map();
-    this.processedMessageIds = new Map();
-    this.messageDeduplicationWindow = 5000;
-    this.messageCount = null;
+    // Retry constants
+    RETRY_BASE_DELAY_MS: 1000,
+    RETRY_MAX_DELAY_MS: 10000,
+    RETRY_MAX_ATTEMPTS: 3,
     
-    // Resource tracking
-    this.activeTimers = new Set();
-    this.activeEventListeners = new Map();
-    
-    // DOM elements
-    this.stateElement = document.getElementById("state");
-    this.startButton = document.getElementById("startSendingBtn");
-    this.qrImage = document.getElementById("qr");
-    this.tableContainer = document.getElementById("table-container");
-    this.restartButtonContainer = document.getElementById("restart-button-container");
-    
-    console.log('DOM elements found:');
-    console.log('- state:', !!this.stateElement);
-    console.log('- startSendingBtn:', !!this.startButton);
-    console.log('- restart-button-container:', !!this.restartButtonContainer);
-    
-    // New date selection elements
-    this.dateSelector = document.getElementById("dateSelector");
-    this.refreshDateBtn = document.getElementById("refreshDateBtn");
-    this.resetMessagingBtn = document.getElementById("resetMessagingBtn");
-    this.messageCountElement = document.getElementById("messageCount");
-    
-    // Client action buttons
-    this.restartClientBtn = document.getElementById("restartClientBtn");
-    this.destroyClientBtn = document.getElementById("destroyClientBtn");
-    this.logoutClientBtn = document.getElementById("logoutClientBtn");
+    // Date range
+    DATE_RANGE_DAYS_BACK: 7,
+    DATE_RANGE_DAYS_FORWARD: 30
+};
 
-    this.init();
-  }
+// API Endpoints
+const API_ENDPOINTS = {
+    MESSAGE_COUNT: (date) => `/api/messaging/count/${date}`,
+    MESSAGE_RESET: (date) => `/api/messaging/reset/${date}`,
+    WA_SEND: (date) => `/api/wa/send?date=${date}`,
+    WA_RESTART: '/api/wa/restart',
+    WA_DESTROY: '/api/wa/destroy',
+    WA_LOGOUT: '/api/wa/logout',
+    WA_STATUS: '/api/wa/status'
+};
 
-  init() {
-    console.log("Initializing WebSocket-only messenger with default date:", this.dateparam);
-    
-    this.setupDateDropdown();
-    this.bindEvents();
-    this.setupCleanupHandlers();
-    this.setupWebSocket();
-    this.loadMessageCount(); // Load initial message count
-  }
+// State Constants
+const UI_STATES = {
+    DISCONNECTED: 'disconnected',
+    CONNECTING: 'connecting', 
+    CONNECTED: 'connected',
+    SENDING: 'sending',
+    COMPLETED: 'completed',
+    ERROR: 'error'
+};
 
-  setupDateDropdown() {
-    if (!this.dateSelector) {
-      console.error("Date selector element not found");
-      return;
-    }
+const MESSAGE_TYPES = {
+    LOADING: 'loading',
+    SUCCESS: 'success',
+    ERROR: 'error',
+    WARNING: 'warning'
+};
 
-    // Generate date options (last 7 days and next 30 days)
-    const today = new Date();
-    const dates = [];
-    
-    // Add past 7 days
-    for (let i = 7; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      dates.push(date);
-    }
-    
-    // Add next 30 days
-    for (let i = 1; i <= 30; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      dates.push(date);
-    }
+const BUTTON_STATES = {
+    NORMAL: 'normal',
+    LOADING: 'loading',
+    CONFIRMING: 'confirming',
+    DISABLED: 'disabled'
+};
 
-    // Clear existing options
-    this.dateSelector.innerHTML = '';
-
-    // Add options to dropdown
-    dates.forEach(date => {
-      const option = document.createElement('option');
-      const dateStr = date.toISOString().slice(0, 10);
-      option.value = dateStr;
-      
-      // Format display text
-      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const dayName = dayNames[date.getDay()];
-      const isToday = dateStr === today.toISOString().slice(0, 10);
-      const isYesterday = dateStr === new Date(today.getTime() - 86400000).toISOString().slice(0, 10);
-      const isTomorrow = dateStr === new Date(today.getTime() + 86400000).toISOString().slice(0, 10);
-      
-      let displayText = `${dateStr} (${dayName})`;
-      if (isToday) displayText += ' - Today';
-      else if (isYesterday) displayText += ' - Yesterday';
-      else if (isTomorrow) displayText += ' - Tomorrow';
-      
-      option.textContent = displayText;
-      
-      // Set as selected if it matches the default date
-      if (dateStr === this.defaultDate) {
-        option.selected = true;
-      }
-      
-      this.dateSelector.appendChild(option);
-    });
-
-    console.log(`Set up date dropdown with ${dates.length} options, default: ${this.defaultDate}`);
-  }
-
-  async loadMessageCount() {
-    if (!this.messageCountElement) return;
-    
-    this.updateMessageCountDisplay('Loading message count...', 'loading');
-    
-    try {
-      const response = await fetch(`${window.location.origin}/api/messaging/count/${this.dateparam}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        const count = data.data;
-        
-        // Calculate actual sendable messages by excluding those with errors
-        const statusCounts = this.countStatusTypes();
-        const actualSendable = Math.max(0, count.eligibleForMessaging - statusCounts.error);
-        
-        let message = `${actualSendable} messages ready to send`;
-        
-        if (statusCounts.error > 0) {
-          message += ` (${statusCounts.error} with errors)`;
+/**
+ * Input Validation Manager
+ */
+class ValidationManager {
+    static validateMessageCountResponse(data) {
+        if (!data || typeof data !== 'object') {
+            throw new Error('Invalid response format');
         }
         
-        if (count.alreadySent > 0) {
-          message += ` (${count.alreadySent} already sent`;
-          if (count.pending > 0) {
-            message += `, ${count.pending} pending`;
-          }
-          message += ')';
-        } else if (count.pending > 0) {
-          message += ` (${count.pending} pending)`;
+        if (!data.success) {
+            throw new Error(data.error || 'Operation failed');
         }
         
-        this.updateMessageCountDisplay(message, actualSendable > 0 ? 'success' : 'error');
-        
-        // Store message count for button enablement logic
-        this.messageCount = count;
-        this.updateButtonState();
-        
-        // Load existing message details if any exist
-        if (count.alreadySent > 0 || count.pending > 0) {
-          this.loadExistingMessages();
-        }
-      } else {
-        this.updateMessageCountDisplay(`Error: ${data.error}`, 'error');
-        this.messageCount = null;
-        this.updateButtonState();
-      }
-    } catch (error) {
-      console.error('Error loading message count:', error);
-      this.updateMessageCountDisplay('Error loading message count', 'error');
-      this.messageCount = null;
-      this.updateButtonState();
-    }
-  }
-
-  async loadExistingMessages() {
-    try {
-      const response = await fetch(`${window.location.origin}/api/messaging/details/${this.dateparam}`);
-      const data = await response.json();
-      
-      if (data.success && data.data.existingMessages.length > 0) {
-        console.log(`Loaded ${data.data.existingMessages.length} existing messages for ${this.dateparam}`);
-        
-        // Convert existing messages to the format expected by the table
-        const persons = data.data.existingMessages.map(msg => ({
-          name: msg.patientName || msg.name || 'Unknown',
-          number: msg.phoneNumber || msg.number || '',
-          messageId: msg.messageId || msg.id,
-          status: msg.status || 0,
-          lastUpdated: msg.lastUpdated ? new Date(msg.lastUpdated).getTime() : Date.now()
-        }));
-        
-        this.updatePersons(persons);
-        this.createTable(this.persons);
-      }
-    } catch (error) {
-      console.error('Error loading existing messages:', error);
-    }
-  }
-
-  updateMessageCountDisplay(message, type = '') {
-    if (!this.messageCountElement) return;
-    
-    this.messageCountElement.textContent = message;
-    this.messageCountElement.className = `message-count-info ${type}`;
-  }
-
-  // Reset messaging functionality
-  async handleResetMessaging() {
-    if (!this.resetMessagingBtn) return;
-    
-    // First click - show confirmation
-    if (!this.resetMessagingBtn.classList.contains('confirming')) {
-      this.resetMessagingBtn.textContent = 'Click Again to Confirm';
-      this.resetMessagingBtn.classList.add('confirming');
-      
-      // Reset confirmation after 3 seconds
-      setTimeout(() => {
-        if (this.resetMessagingBtn) {
-          this.resetMessagingBtn.textContent = 'Reset Messages';
-          this.resetMessagingBtn.classList.remove('confirming');
-        }
-      }, 3000);
-      
-      return;
-    }
-    
-    // Second click - execute reset
-    await this.executeReset();
-  }
-
-  async executeReset() {
-    if (!this.resetMessagingBtn) return;
-    
-    try {
-      // Disable button and show loading
-      this.resetMessagingBtn.disabled = true;
-      this.resetMessagingBtn.textContent = 'Resetting...';
-      this.resetMessagingBtn.classList.remove('confirming');
-      
-      console.log(`Resetting messaging for date: ${this.dateparam}`);
-      
-      // Call the API to reset messaging
-      const response = await fetch(`${window.location.origin}/api/messaging/reset/${this.dateparam}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        console.log('Reset successful:', result.data);
-        
-        // Clear frontend data
-        this.clearAllMessagingData();
-        
-        // Show success message
-        this.updateMessageCountDisplay(
-          `Reset completed! ${result.data.appointmentsReset} appointments reset`, 
-          'success'
-        );
-        
-        // Reload message count to reflect changes
-        setTimeout(() => {
-          this.loadMessageCount();
-        }, 1000);
-        
-        // Reset button text
-        this.resetMessagingBtn.textContent = 'Reset Messages';
-        this.resetMessagingBtn.disabled = false;
-        
-      } else {
-        throw new Error(result.message || result.error || 'Reset failed');
-      }
-      
-    } catch (error) {
-      console.error('Error resetting messaging:', error);
-      
-      this.updateMessageCountDisplay(
-        `Reset failed: ${error.message}`, 
-        'error'
-      );
-      
-      // Reset button
-      this.resetMessagingBtn.textContent = 'Reset Messages';
-      this.resetMessagingBtn.disabled = false;
-    }
-  }
-
-  // Clear all messaging data from frontend
-  clearAllMessagingData() {
-    console.log('Clearing all message data from memory');
-    
-    // Clear persons array
-    this.persons = [];
-    
-    // Clear status update queue
-    this.statusUpdateQueue.clear();
-    
-    // Clear processed message IDs
-    this.processedMessageIds.clear();
-    
-    // Clear table display
-    this.tableContainer.innerHTML = '';
-    
-    // Reset message count
-    this.messageCount = null;
-    
-    // Reset state flags
-    this.finished = false;
-    this.sendingStarted = false;
-    
-    // Hide start button
-    if (this.startButton) {
-      this.startButton.style.display = 'none';
-      this.startButton.disabled = true;
-    }
-    
-    console.log('All message data cleared from frontend memory');
-  }
-
-  // Restart client functionality - preserves authentication
-  async handleRestartClient() {
-    if (!this.restartClientBtn) return;
-    
-    try {
-      this.restartClientBtn.disabled = true;
-      this.restartClientBtn.textContent = 'Restarting...';
-      this.restartClientBtn.classList.add('restarting');
-      
-      console.log('Restarting WhatsApp client - authentication preserved');
-      this.updateState('<div class="loader"></div> Restarting WhatsApp client...');
-      
-      const response = await fetch(`${window.location.origin}/api/wa/restart`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        console.log('Restart successful:', result.message);
-        this.clientReadyShown = false;
-        // Reconnection is handled by websocket service
-        // Don't request initial state - let WebSocket real-time updates handle it
-        
-        this.updateMessageCountDisplay('Client restart initiated', 'success');
-      } else {
-        throw new Error(result.message || 'Restart failed');
-      }
-      
-    } catch (error) {
-      console.error('Error restarting client:', error);
-      this.updateState(`<div class="error-state"><p>❌ Restart failed: ${error.message}</p></div>`);
-      this.updateMessageCountDisplay(`Restart failed: ${error.message}`, 'error');
-    } finally {
-      this.restartClientBtn.textContent = 'Restart Client';
-      this.restartClientBtn.disabled = false;
-      this.restartClientBtn.classList.remove('restarting');
-    }
-  }
-
-  // Destroy client functionality - close browser but preserve authentication
-  async handleDestroyClient() {
-    if (!this.destroyClientBtn) return;
-    
-    // First click - show confirmation
-    if (!this.destroyClientBtn.classList.contains('confirming')) {
-      this.destroyClientBtn.textContent = 'Click Again to Confirm';
-      this.destroyClientBtn.classList.add('confirming');
-      
-      setTimeout(() => {
-        if (this.destroyClientBtn) {
-          this.destroyClientBtn.textContent = 'Destroy Client';
-          this.destroyClientBtn.classList.remove('confirming');
-        }
-      }, 3000);
-      
-      return;
-    }
-    
-    try {
-      this.destroyClientBtn.disabled = true;
-      this.destroyClientBtn.textContent = 'Destroying...';
-      this.destroyClientBtn.classList.remove('confirming');
-      this.destroyClientBtn.classList.add('destroying');
-      
-      console.log('Destroying WhatsApp client - preserving authentication');
-      this.updateState('<div class="loader"></div> Destroying client - preserving authentication...');
-      
-      const response = await fetch(`${window.location.origin}/api/wa/destroy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        console.log('Destroy successful:', result.message);
-        this.clientReadyShown = false;
-        
-        if (this.qrImage) {
-          this.qrImage.style.display = 'none';
+        if (!data.data || typeof data.data !== 'object') {
+            throw new Error('Invalid data structure');
         }
         
-        this.updateState(`
-          <div class="completion-status">
-            <h3>🔄 WhatsApp client destroyed successfully!</h3>
-            <p>${result.message}</p>
-            <p class="note">Browser closed to save resources. Authentication preserved.</p>
-            <p class="note">Use "Restart Client" to reconnect without scanning QR code.</p>
-          </div>
-        `);
-        
-        this.updateMessageCountDisplay('Client destroyed - authentication preserved', 'success');
-      } else {
-        throw new Error(result.message || 'Destroy failed');
-      }
-      
-    } catch (error) {
-      console.error('Error destroying client:', error);
-      this.updateState(`<div class="error-state"><p>❌ Destroy failed: ${error.message}</p></div>`);
-      this.updateMessageCountDisplay(`Destroy failed: ${error.message}`, 'error');
-    } finally {
-      this.destroyClientBtn.textContent = 'Destroy Client';
-      this.destroyClientBtn.disabled = false;
-      this.destroyClientBtn.classList.remove('destroying');
-    }
-  }
-
-  // Logout client functionality - completely clear authentication
-  async handleLogoutClient() {
-    if (!this.logoutClientBtn) return;
-    
-    // First click - show confirmation
-    if (!this.logoutClientBtn.classList.contains('confirming')) {
-      this.logoutClientBtn.textContent = 'Click Again to Confirm';
-      this.logoutClientBtn.classList.add('confirming');
-      
-      setTimeout(() => {
-        if (this.logoutClientBtn) {
-          this.logoutClientBtn.textContent = 'Logout Client';
-          this.logoutClientBtn.classList.remove('confirming');
-        }
-      }, 5000);
-      
-      return;
-    }
-    
-    try {
-      this.logoutClientBtn.disabled = true;
-      this.logoutClientBtn.textContent = 'Logging out...';
-      this.logoutClientBtn.classList.remove('confirming');
-      this.logoutClientBtn.classList.add('logging-out');
-      
-      console.log('Logging out WhatsApp client - clearing authentication');
-      this.updateState('<div class="loader"></div> Logging out and clearing authentication...');
-      
-      const response = await fetch(`${window.location.origin}/api/wa/logout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        console.log('Logout successful:', result.message);
-        
-        // Clear all frontend data
-        this.clearAllMessagingData();
-        this.clientReadyShown = false;
-        
-        if (this.qrImage) {
-          this.qrImage.style.display = 'none';
+        const requiredFields = ['eligibleForMessaging', 'alreadySent'];
+        for (const field of requiredFields) {
+            if (typeof data.data[field] !== 'number') {
+                throw new Error(`Missing or invalid field: ${field}`);
+            }
         }
         
-        this.updateState(`
-          <div class="completion-status">
-            <h3>🚪 WhatsApp client logged out successfully!</h3>
-            <p>${result.message}</p>
-            <p class="note">Device removed from WhatsApp linked devices.</p>
-            <p class="note">Authentication completely cleared - QR scan required for reconnection.</p>
-          </div>
-        `);
+        return data.data;
+    }
+    
+    static validateApiResponse(data, expectedFields = []) {
+        if (!data || typeof data !== 'object') {
+            throw new Error('Invalid response format');
+        }
         
-        this.updateMessageCountDisplay('Client logged out - authentication cleared', 'success');
-      } else {
-        throw new Error(result.message || 'Logout failed');
-      }
-      
-    } catch (error) {
-      console.error('Error logging out client:', error);
-      this.updateState(`<div class="error-state"><p>❌ Logout failed: ${error.message}</p></div>`);
-      this.updateMessageCountDisplay(`Logout failed: ${error.message}`, 'error');
-    } finally {
-      this.logoutClientBtn.textContent = 'Logout Client';
-      this.logoutClientBtn.disabled = false;
-      this.logoutClientBtn.classList.remove('logging-out');
-    }
-  }
-
-  updateButtonState() {
-    if (!this.startButton) return;
-    
-    // Calculate actual sendable messages (exclude errors)
-    const statusCounts = this.countStatusTypes();
-    const sendableMessages = this.messageCount ? 
-      (this.messageCount.eligibleForMessaging - statusCounts.error) : 0;
-    const hasUnsentMessages = sendableMessages > statusCounts.sent + statusCounts.delivered + statusCounts.read;
-    
-    // Enable button if there are unsent messages and client is ready
-    const canEnable = hasUnsentMessages && this.clientReadyShown && !this.sendingStarted;
-    
-    this.startButton.disabled = !canEnable;
-    
-    if (this.messageCount && this.messageCount.eligibleForMessaging > 0 && this.clientReadyShown) {
-      this.startButton.style.display = 'block';
-      
-      if (this.finished) {
-        // Check if there are still unsent messages after completion
-        if (hasUnsentMessages) {
-          this.startButton.textContent = 'Send Remaining Messages';
-          this.startButton.disabled = false;
-        } else {
-          this.startButton.textContent = 'Completed';
-          this.startButton.disabled = true;
+        for (const field of expectedFields) {
+            if (!(field in data)) {
+                throw new Error(`Missing required field: ${field}`);
+            }
         }
-      } else if (!this.sendingStarted) {
-        this.startButton.textContent = 'Start Sending Messages';
-        this.startButton.disabled = !canEnable;
-      }
-    }
-    
-    console.log(`Button state updated: sendableMessages=${sendableMessages}, hasUnsent=${hasUnsentMessages}, clientReady=${this.clientReadyShown}, canEnable=${canEnable}`);
-  }
-
-  onDateChange() {
-    const newDate = this.dateSelector.value;
-    if (newDate && newDate !== this.dateparam) {
-      console.log(`Date changed from ${this.dateparam} to ${newDate}`);
-      this.dateparam = newDate;
-      
-      // Clear existing data
-      this.persons = [];
-      this.statusUpdateQueue.clear();
-      this.tableContainer.innerHTML = '';
-      
-      // Reset state
-      this.finished = false;
-      this.sendingStarted = false;
-      this.clientReadyShown = false;
-      
-      // Clean up previous websocket handlers and reconnect with new date
-      this.cleanupWebSocketHandlers();
-      this.setupWebSocket();
-      
-      // Load new message count
-      this.loadMessageCount();
-      
-      console.log(`Switched to date: ${newDate}`);
-    }
-  }
-
-  bindEvents() {
-    // Date selector functionality
-    if (this.dateSelector) {
-      this.dateSelector.addEventListener('change', () => {
-        this.onDateChange();
-      });
-    }
-
-    // Refresh button functionality
-    if (this.refreshDateBtn) {
-      this.refreshDateBtn.addEventListener('click', () => {
-        this.loadMessageCount();
-      });
-    }
-
-    // Reset messaging button functionality
-    if (this.resetMessagingBtn) {
-      this.resetMessagingBtn.addEventListener('click', () => {
-        this.handleResetMessaging();
-      });
-    }
-
-    // Client action button functionality
-    if (this.restartClientBtn) {
-      this.restartClientBtn.addEventListener('click', () => {
-        this.handleRestartClient();
-      });
-    }
-
-    if (this.destroyClientBtn) {
-      this.destroyClientBtn.addEventListener('click', () => {
-        this.handleDestroyClient();
-      });
-    }
-
-    if (this.logoutClientBtn) {
-      this.logoutClientBtn.addEventListener('click', () => {
-        this.handleLogoutClient();
-      });
-    }
-
-    // Start button functionality
-    if (this.startButton) {
-      this.startButton.addEventListener('click', () => {
-        if (this.startButton.dataset.action === 'retry') {
-          this.retryInitialization();
-          return;
-        }
-        this.startSending();
-        this.startButton.disabled = true;
-      });
-    }
-
-    // Prevent accidental navigation during sending
-    const beforeUnloadHandler = (event) => {
-      if (!this.finished && this.sendingStarted) {
-        const message = 'Leaving this page will interrupt the WhatsApp sending process.';
-        event.returnValue = message;
-        return message;
-      }
-    };
-    
-    window.addEventListener('beforeunload', beforeUnloadHandler);
-    this.activeEventListeners.set('beforeunload', beforeUnloadHandler);
-  }
-
-  // Resource Management
-  addTimerWithTracking(callback, delay, isInterval = false) {
-    const timerId = isInterval ? 
-      setInterval(callback, delay) : 
-      setTimeout(callback, delay);
-    
-    this.activeTimers.add(timerId);
-    
-    if (!isInterval) {
-      setTimeout(() => this.activeTimers.delete(timerId), delay + 100);
-    }
-    
-    return timerId;
-  }
-
-  clearTimerWithTracking(timerId) {
-    if (this.activeTimers.has(timerId)) {
-      clearTimeout(timerId);
-      clearInterval(timerId);
-      this.activeTimers.delete(timerId);
-    }
-  }
-
-  clearAllTimers() {
-    console.log(`Clearing ${this.activeTimers.size} active timers`);
-    this.activeTimers.forEach(timerId => {
-      clearTimeout(timerId);
-      clearInterval(timerId);
-    });
-    this.activeTimers.clear();
-  }
-
-  // Message Deduplication
-  isDuplicateMessage(messageId, messageType) {
-    if (!messageId) return false;
-    
-    const key = `${messageType}_${messageId}`;
-    const now = Date.now();
-    
-    // Clean old entries
-    for (const [processedKey, timestamp] of this.processedMessageIds) {
-      if (now - timestamp > this.messageDeduplicationWindow) {
-        this.processedMessageIds.delete(processedKey);
-      }
-    }
-    
-    if (this.processedMessageIds.has(key)) {
-      console.log(`Duplicate message detected: ${key}`);
-      return true;
-    }
-    
-    this.processedMessageIds.set(key, now);
-    return false;
-  }
-
-  // Message Validation
-  validateMessage(message) {
-    if (!message || typeof message !== 'object') {
-      console.warn("Message must be an object");
-      return false;
-    }
-    
-    // Security: Prevent prototype pollution
-    if (message.hasOwnProperty('__proto__') || 
-        message.hasOwnProperty('constructor') || 
-        message.hasOwnProperty('prototype')) {
-      console.error("Message contains forbidden properties - potential security risk");
-      return false;
-    }
-    
-    if (!message.type || typeof message.type !== 'string' || message.type.length === 0) {
-      console.warn("Message missing or invalid type field");
-      return false;
-    }
-    
-    const validTypes = [
-      'qr_update', 'client_ready', 'message_status', 'batch_status',
-      'appointment_update', 'sending_finished', 'error',
-      'initial_state_response', 'request_initial_state',
-      'ping', 'pong', 'heartbeat', 'ack'
-    ];
-    
-    if (!validTypes.includes(message.type)) {
-      console.warn(`Unknown message type: ${message.type}`);
-      return false;
-    }
-    
-    const controlMessages = ['ping', 'pong', 'heartbeat', 'ack'];
-    
-    if (!controlMessages.includes(message.type)) {
-      if (message.data === undefined || message.data === null) {
-        console.warn("Message missing data field:", message.type);
-        return false;
-      }
-      
-      if (typeof message.data !== 'object') {
-        console.warn("Message data must be an object");
-        return false;
-      }
-    }
-    
-    if (message.timestamp !== undefined && 
-        (typeof message.timestamp !== 'number' || message.timestamp <= 0)) {
-      console.warn("Invalid timestamp in message");
-      return false;
-    }
-    
-    return true;
-  }
-
-  // UI Management - addRestartButton removed as buttons are now in HTML
-
-  updateState(html) {
-    if (this.stateElement) {
-      this.stateElement.innerHTML = html;
-    }
-  }
-
-  updateQR(qr) {
-    if (!this.qrImage) {
-      console.error("No QR image element found!");
-      return;
-    }
-
-    if (!qr) {
-      console.log("No QR provided, hiding QR image");
-      this.qrImage.style.display = 'none';
-      return;
-    }
-
-    console.log("Updating QR code display");
-    
-    if (typeof qr === 'string') {
-      if (qr.startsWith('data:image')) {
-        this.qrImage.src = qr;
-      } else {
-        this.qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
-      }
-      this.qrImage.style.display = 'block';
-    } else {
-      console.error("Invalid QR code format received:", typeof qr);
-    }
-  }
-
-  // Client Management - moved to handleRestartClient()
-
-  retryInitialization() {
-    console.log("Retrying WhatsApp client initialization");
-    // Reconnection is handled by websocket service
-    this.updateState('<div class="loader"></div> Reinitializing WhatsApp client...');
-    this.startButton.style.display = 'none';
-
-    fetch(`${window.location.origin}/api/wa/restart`, { method: 'POST' })
-      .then(response => response.json())
-      .then(data => {
-        console.log("Restart response:", data);
-        this.updateState(data.message || 'Restarting WhatsApp client...');
-        this.cleanupWebSocketHandlers();
-        this.setupWebSocket();
-      })
-      .catch(error => {
-        console.error("Error restarting WhatsApp client:", error);
-        this.updateState('Error restarting WhatsApp client. Please refresh the page.');
-      });
-  }
-
-  startSending() {
-    console.log("Starting sending process...");
-    this.sendingStarted = true;
-    this.sendWa();
-  }
-
-  // WebSocket Connection Management using websocket service
-  setupWebSocket() {
-    // Set up event handlers for the websocket service
-    websocketService.on('connected', () => {
-      console.log("WebSocket connected successfully");
-      this.requestInitialState();
-    });
-
-    websocketService.on('disconnected', (event) => {
-      console.log("WebSocket connection closed", event.code, event.reason);
-      // The service handles automatic reconnection
-    });
-
-    websocketService.on('error', (error) => {
-      console.error("WebSocket error:", error);
-    });
-
-    // Handle all message types
-    websocketService.on('qrUpdate', (data) => this.handleQRUpdate(data));
-    websocketService.on('clientReady', (data) => this.handleClientReady(data));
-    websocketService.on('messageStatus', (data) => this.handleSingleStatusUpdate(data));
-    websocketService.on('batchStatus', (data) => this.handleBatchStatusUpdate(data));
-    websocketService.on('appointmentUpdate', (data) => this.handleAppointmentUpdate(data));
-    websocketService.on('sendingFinished', (data) => this.handleSendingFinished(data));
-    websocketService.on('initialStateResponse', (data) => {
-      console.log("Received initial state response via WebSocket");
-      this.processInitialState(data);
-    });
-    websocketService.on('error', (data) => {
-      if (data && data.error) {
-        this.handleError(data);
-      } else {
-        console.error("Received error message without details:", data);
-      }
-    });
-
-    // Legacy message handling for backwards compatibility
-    websocketService.on('message', (message) => {
-      this.handleLegacyMessage(message);
-    });
-
-    // Connect with the required parameters
-    const connectionParams = {
-      PDate: this.dateparam,
-      clientType: 'waStatus',
-      needsQR: 'true'
-    };
-    
-    websocketService.connect(connectionParams);
-  }
-
-  // WebSocket message handling is now done via specific event handlers in setupWebSocket()
-
-  cleanupWebSocketHandlers() {
-    // Remove all event handlers to prevent duplicates
-    websocketService.off('connected');
-    websocketService.off('disconnected');
-    websocketService.off('error');
-    websocketService.off('qrUpdate');
-    websocketService.off('clientReady');
-    websocketService.off('messageStatus');
-    websocketService.off('batchStatus');
-    websocketService.off('appointmentUpdate');
-    websocketService.off('sendingFinished');
-    websocketService.off('initialStateResponse');
-    websocketService.off('message');
-  }
-
-  // Reconnection is now handled automatically by the websocket service
-
-  // State Management
-  requestInitialState() {
-    if (websocketService.isConnected) {
-      console.log("Requesting initial state via WebSocket");
-      try {
-        websocketService.send({
-          type: 'request_initial_state',
-          data: {
-            date: this.dateparam,
-            timestamp: Date.now()
-          }
-        });
-      } catch (error) {
-        console.error("Error requesting initial state:", error);
-        this.requestInitialStateAPI();
-      }
-    } else {
-      console.warn("WebSocket not ready, using API fallback for initial state");
-      this.requestInitialStateAPI();
-    }
-  }
-  
-  async requestInitialStateAPI() {
-    try {
-      console.log("Fetching initial state via API");
-      const response = await fetch(`${window.location.origin}/api/update`);
-      const data = await response.json();
-      console.log("Initial state response:", data);
-      
-      this.processInitialState(data);
-    } catch (error) {
-      console.error('Error fetching initial state:', error);
-      this.updateState('Error loading initial state');
-    }
-  }
-  
-  processInitialState(data) {
-    if (data.qr && !data.clientReady) {
-      console.log("QR code received in initial state");
-      this.updateQR(data.qr);
-      this.updateState('<p>Please scan the QR code with your WhatsApp</p>');
-    }
-
-    if (data.clientReady && !this.clientReadyShown && !this.sendingStarted) {
-      console.log("Client is ready from initial state!");
-      if (this.qrImage) {
-        this.qrImage.style.display = 'none';
-      }
-      
-      this.clientReadyShown = true;
-      this.startButton.dataset.action = 'send';
-      this.updateState(`<p>Client is ready! ${data.sentMessages || 0} Messages Sent, ${data.failedMessages || 0} Failed</p><p>Click "Start Sending Messages" to begin</p>`);
-      
-      // Update button state based on message count
-      this.updateButtonState();
-    } else if (!data.clientReady && !this.clientReadyShown) {
-      this.updateState(data.htmltext || 'Initializing the client...');
-    }
-
-    if (data.persons && data.persons.length > 0) {
-      this.updatePersons(data.persons);
-      this.createTable(this.persons);
-    }
-
-    if (data.statusUpdates && data.statusUpdates.length > 0) {
-      data.statusUpdates.forEach(update => {
-        this.updateMessageStatus(update.messageId, update.status);
-      });
-      this.createTable(this.persons);
-    }
-
-    if (data.finished) {
-      this.finished = true;
-      this.updateFinishedState();
-    }
-  }
-
-  // Message Handlers
-  handleQRUpdate(data) {
-    console.log("QR code received via WebSocket");
-    
-    if (data.qr && !data.clientReady) {
-      this.updateQR(data.qr);
-      this.updateState('<p>Please scan the QR code with your WhatsApp</p>');
-    }
-  }
-  
-  handleClientReady(data) {
-    console.log("Client ready state update received:", data);
-    
-    // Handle different client states
-    if (data.state === 'restarting') {
-      console.log("Client is restarting");
-      this.clientReadyShown = false;
-      this.updateState('<div class="loader"></div> Restarting WhatsApp client...');
-      
-      if (this.qrImage) {
-        this.qrImage.style.display = 'none';
-      }
-      
-      if (this.startButton) {
-        this.startButton.style.display = 'none';
-        this.startButton.disabled = true;
-      }
-      
-    } else if (data.state === 'initializing') {
-      console.log("Client is initializing (from restart)");
-      this.clientReadyShown = false;
-      this.updateState('<div class="loader"></div> Initializing WhatsApp client after restart...');
-      
-      if (this.qrImage) {
-        this.qrImage.style.display = 'none';
-      }
-      
-      if (this.startButton) {
-        this.startButton.style.display = 'none';
-        this.startButton.disabled = true;
-      }
-      
-    } else if (data.clientReady || data.state === 'ready') {
-      console.log("Client is ready from WebSocket!", data);
-      
-      if (this.qrImage) {
-        this.qrImage.style.display = 'none';
-      }
-      
-      if (!this.clientReadyShown && !this.sendingStarted) {
-        this.clientReadyShown = true;
-        this.startButton.dataset.action = 'send';
-        const message = data.message || 'Client is ready! Click "Start Sending Messages" to begin';
-        this.updateState(`<p>${message}</p>`);
         
-        // Update button state based on message count
-        this.updateButtonState();
-      }
-      
-    } else {
-      // Client not ready - might be disconnected or error state
-      console.log("Client not ready (fallback case):", data);
-      this.clientReadyShown = false;
-      
-      const message = data.message || 'Client disconnected - initializing...';
-      this.updateState(`<div class="loader"></div> ${message}`);
-      
-      if (this.startButton) {
-        this.startButton.style.display = 'none';
-        this.startButton.disabled = true;
-      }
+        return data;
     }
-  }
-  
-  handleSingleStatusUpdate(data) {
-    console.log("Single status update received:", data);
     
-    if (data.messageId && data.status !== undefined) {
-      // If this is a newly sent message (includes person data), add it to our list
-      if (data.person && !this.persons.find(p => p.messageId === data.messageId)) {
-        console.log("Adding newly sent message to client list:", data.person);
-        const person = {
-          messageId: data.person.messageId,
-          appointmentId: data.person.appointmentId,
-          name: data.person.name,
-          number: data.person.number,
-          status: data.status,
-          success: data.person.success,
-          lastUpdated: Date.now(),
-          addedAt: Date.now()
-        };
-        this.persons.push(person);
-      }
-      
-      // Update the status
-      this.updateMessageStatus(data.messageId, data.status);
-      this.createTable(this.persons);
-    }
-  }
-  
-  handleBatchStatusUpdate(data) {
-    console.log("Batch status update received:", data);
-    
-    if (data.statusUpdates && Array.isArray(data.statusUpdates)) {
-      let updatesProcessed = 0;
-      
-      data.statusUpdates.forEach(update => {
-        if (update.messageId && update.status !== undefined) {
-          this.updateMessageStatus(update.messageId, update.status);
-          updatesProcessed++;
+    static validateDate(dateString) {
+        if (!dateString || typeof dateString !== 'string') {
+            throw new Error('Invalid date format');
         }
-      });
-      
-      if (updatesProcessed > 0) {
-        this.createTable(this.persons);
-        console.log(`Processed ${updatesProcessed} status updates`);
-      }
+        
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) {
+            throw new Error('Invalid date value');
+        }
+        
+        return dateString;
     }
-  }
-  
-  handleAppointmentUpdate(data) {
-    console.log("Appointment update received:", data);
-    
-    if (data.tableData) {
-      this.updateUI(data);
-    }
-  }
-  
-  handleSendingFinished(data) {
-    console.log("Sending finished received:", data);
-    
-    if (data.finished && !this.finished) {
-      this.finished = true;
-      this.updateFinishedState();
-      
-      // Refresh message count to show updated numbers
-      this.loadMessageCount();
-    }
-  }
-  
-  handleError(data) {
-    console.error("Error message received:", data);
-    
-    if (data.error) {
-      this.updateState(`<p class="error">Error: ${data.error}</p>`);
-    }
-  }
-  
-  handleLegacyMessage(message) {
-    if (message.messageType === "updated") {
-      this.updateUI(message.tableData);
-    } else if (message.messageType === "messageAckUpdated") {
-      this.updateMessageStatus(message.messageId, message.status);
-      this.createTable(this.persons);
-    } else if (message.finished && !this.finished) {
-      this.finished = true;
-      this.updateFinishedState();
-    }
-  }
-
-  // Data Management
-  updatePersons(newPersons) {
-    newPersons.forEach(newPerson => {
-      const existingIndex = this.persons.findIndex(p => 
-        p.messageId === newPerson.messageId || 
-        (p.name === newPerson.name && p.number === newPerson.number)
-      );
-  
-      if (existingIndex >= 0) {
-        const existingPerson = this.persons[existingIndex];
-        this.persons[existingIndex] = {
-          ...existingPerson,
-          ...newPerson,
-          status: Math.max(existingPerson.status || 0, newPerson.status || 0),
-          lastUpdated: Date.now()
-        };
-      } else {
-        this.persons.push({
-          ...newPerson,
-          addedAt: Date.now(),
-          lastUpdated: Date.now()
-        });
-      }
-    });
-  }
-
-  updateMessageStatus(messageId, status) {
-    const existingUpdate = this.statusUpdateQueue.get(messageId);
-    if (existingUpdate && existingUpdate.status >= status) {
-      return;
-    }
-  
-    this.statusUpdateQueue.set(messageId, { 
-      messageId, 
-      status, 
-      timestamp: Date.now() 
-    });
-  
-    const personIndex = this.persons.findIndex(p => p.messageId === messageId);
-  
-    if (personIndex >= 0) {
-      const currentStatus = this.persons[personIndex].status || 0;
-      
-      // FIXED: Prevent error status (-1) from being overwritten by pending (0)
-      // Only update if the new status is better than current, unless current is error
-      if (currentStatus === -1 && status === 0) {
-        console.log(`Ignoring pending status for message ${messageId} that already has error status`);
-        return;
-      }
-      
-      if (status > currentStatus || (currentStatus !== -1 && status >= 0)) {
-        this.persons[personIndex].status = status;
-        this.persons[personIndex].lastUpdated = Date.now();
-      }
-    } else {
-      console.warn(`Received status update for unknown message ID: ${messageId}`);
-    }
-  }
-
-  getStatusText(status) {
-    switch (status) {
-      case -1: return '<span class="status-error">&#10060; Error</span>';
-      case 0: return '<span class="status-pending">&#8987; Pending</span>';
-      case 1: return '<span class="status-sent">&#10004; Sent</span>';
-      case 2: return '<span class="status-delivered">&#10004;&#10004; Delivered</span>';
-      case 3: return '<span class="status-read">&#10004;&#10004; Read</span>';
-      case 4: return '<span class="status-read">&#10004;&#10004; Played</span>';
-      default: return '<span class="status-sent">&#10004; Sent</span>';
-    }
-  }
-
-  countStatusTypes() {
-    let sent = 0, delivered = 0, read = 0, error = 0, pending = 0;
-
-    this.persons.forEach(person => {
-      const status = person.status || (person.success === '&#10004;' ? 1 : -1);
-      if (status === -1) error++;
-      else if (status === 0) pending++;
-      else if (status === 1) sent++;
-      else if (status === 2) delivered++;
-      else if (status >= 3) read++;
-    });
-
-    return { sent, delivered, read, error, pending };
-  }
-
-  getTimeAgo(timestamp) {
-    const now = Date.now();
-    const diff = now - timestamp;
-    
-    if (diff < 60000) {
-      return 'Just now';
-    } else if (diff < 3600000) {
-      const minutes = Math.floor(diff / 60000);
-      return `${minutes}m ago`;
-    } else if (diff < 86400000) {
-      const hours = Math.floor(diff / 3600000);
-      return `${hours}h ago`;
-    } else {
-      const days = Math.floor(diff / 86400000);
-      return `${days}d ago`;
-    }
-  }
-
-  updateUI(data) {
-    if (!data) return;
-    
-    this.updateState(data.htmltext);
-
-    if (data.persons && data.persons.length > 0) {
-      this.updatePersons(data.persons);
-      this.createTable(this.persons);
-    }
-
-    if (data.finished) {
-      this.finished = true;
-      this.updateFinishedState();
-    }
-  }
-
-  createTable(tableData) {
-    if (!tableData || tableData.length === 0) return;
-  
-    const table = document.createElement('table');
-    table.border = "1";
-    table.id = 'p_table';
-    table.className = 'message-status-table';
-    
-    const tableBody = document.createElement('tbody');
-  
-    // Create header
-    const header = table.createTHead();
-    const headerRow = header.insertRow(0);
-    ['Name', 'Phone', 'Status', 'Last Updated'].forEach(text => {
-      const cell = headerRow.insertCell();
-      cell.textContent = text;
-      cell.style.fontWeight = 'bold';
-      cell.className = 'table-header';
-    });
-  
-    // Sort table data by status and last updated
-    const sortedData = [...tableData].sort((a, b) => {
-      const statusA = a.status || (a.success === '&#10004;' ? 1 : 0);
-      const statusB = b.status || (b.success === '&#10004;' ? 1 : 0);
-      
-      if (statusA !== statusB) {
-        return statusB - statusA;
-      }
-      
-      const timeA = a.lastUpdated || a.addedAt || 0;
-      const timeB = b.lastUpdated || b.addedAt || 0;
-      return timeB - timeA;
-    });
-  
-    sortedData.forEach(rowData => {
-      const row = document.createElement('tr');
-      if (rowData.messageId) {
-        row.dataset.messageId = rowData.messageId;
-      }
-  
-      let status = 0;
-      if (rowData.status !== undefined) {
-        status = rowData.status;
-      } else if (rowData.success === '&#10004;') {
-        status = 1;
-      } else if (rowData.success === '&times;') {
-        status = -1;
-      }
-  
-      row.className = status >= 1 ? 'status-success' : 'status-error';
-  
-      // Name cell
-      const nameCell = document.createElement('td');
-      nameCell.textContent = rowData.name;
-      nameCell.className = 'name-cell';
-      row.appendChild(nameCell);
-  
-      // Phone cell
-      const phoneCell = document.createElement('td');
-      phoneCell.textContent = rowData.number;
-      phoneCell.className = 'phone-cell';
-      row.appendChild(phoneCell);
-  
-      // Status cell
-      const statusCell = document.createElement('td');
-      statusCell.className = 'status-cell';
-      statusCell.innerHTML = this.getStatusText(status);
-      row.appendChild(statusCell);
-  
-      // Last updated cell
-      const updatedCell = document.createElement('td');
-      const lastUpdated = rowData.lastUpdated || rowData.addedAt;
-      if (lastUpdated) {
-        const timeAgo = this.getTimeAgo(lastUpdated);
-        updatedCell.textContent = timeAgo;
-        updatedCell.className = 'time-cell';
-      } else {
-        updatedCell.textContent = '-';
-      }
-      row.appendChild(updatedCell);
-  
-      tableBody.appendChild(row);
-    });
-  
-    table.appendChild(tableBody);
-  
-    // Add status summary
-    const statusCounts = this.countStatusTypes();
-    const summary = document.createElement('div');
-    summary.className = 'message-count';
-    summary.innerHTML = `
-      <div class="status-summary">
-        <span class="summary-item">Total: <strong>${tableData.length}</strong></span>
-        <span class="summary-item status-error">Failed: <strong>${statusCounts.error}</strong></span>
-        <span class="summary-item status-pending">Pending: <strong>${statusCounts.pending}</strong></span>
-        <span class="summary-item status-sent">Sent: <strong>${statusCounts.sent}</strong></span>
-        <span class="summary-item status-delivered">Delivered: <strong>${statusCounts.delivered}</strong></span>
-        <span class="summary-item status-read">Read: <strong>${statusCounts.read}</strong></span>
-      </div>
-    `;
-  
-    this.tableContainer.innerHTML = '';
-    this.tableContainer.appendChild(summary);
-    this.tableContainer.appendChild(table);
-  }
-
-  // Send Operations
-  async sendWa() {
-    try {
-      const statusResponse = await fetch(`${window.location.origin}/api/wa/status`);
-      const statusData = await statusResponse.json();
-
-      if (!statusData.clientReady) {
-        alert("WhatsApp client is not ready. Please wait for initialization to complete or restart the client.");
-        this.startButton.disabled = false;
-        return;
-      }
-
-      console.log("Client is ready, sending messages for date:", this.dateparam);
-      const response = await fetch(`${window.location.origin}/api/wa/send?date=${this.dateparam}`, {
-        redirect: 'follow'
-      });
-
-      const data = await response.json();
-      console.log("sendWa response:", data);
-      this.updateState(data.htmltext || 'Starting to send messages...');
-      // Updates will come via WebSocket real-time
-    } catch (error) {
-      console.error('Error sending WA:', error);
-      this.updateState('Error starting process. Please try restarting the client.');
-      this.startButton.disabled = false;
-      // Error handling will be managed via WebSocket or manual retry
-    }
-  }
-
-  updateFinishedState() {
-    if (this.stateElement) {
-      const statusCounts = this.countStatusTypes();
-      this.stateElement.innerHTML = `
-        <div class="completion-status">
-          <h3>✅ Messages sent successfully!</h3>
-          <p>Status updates will continue to be received via WebSocket.</p>
-          <div class="final-stats">
-            <span class="stat-item status-sent">Sent: ${statusCounts.sent}</span>
-            <span class="stat-item status-delivered">Delivered: ${statusCounts.delivered}</span>
-            <span class="stat-item status-read">Read: ${statusCounts.read}</span>
-            <span class="stat-item status-error">Failed: ${statusCounts.error}</span>
-          </div>
-          <p class="note">Message statuses are being stored in the database and will be accessible for 24 hours.</p>
-        </div>
-      `;
-    }
-
-    console.log("Message sending completed - WebSocket remains active for status updates");
-
-    if (this.startButton) {
-      this.startButton.disabled = true;
-      this.startButton.textContent = 'Completed';
-    }
-  }
-
-  // Cleanup Management
-  setupCleanupHandlers() {
-    const beforeUnloadHandler = (event) => {
-      if (!this.finished && this.sendingStarted) {
-        const message = 'Leaving this page will interrupt the WhatsApp sending process.';
-        event.returnValue = message;
-        return message;
-      }
-      this.cleanup();
-    };
-    
-    window.addEventListener('beforeunload', beforeUnloadHandler);
-    this.activeEventListeners.set('beforeunload', beforeUnloadHandler);
-  }
-
-  cleanup() {
-    console.log('Starting comprehensive WhatsAppMessenger cleanup');
-    
-    this.finished = true;
-    
-    this.clearAllTimers();
-    
-    // Clean up websocket service event handlers
-    this.cleanupWebSocketHandlers();
-    
-    // Disconnect websocket service
-    websocketService.disconnect();
-    
-    this.persons = [];
-    this.statusUpdateQueue.clear();
-    this.processedMessageIds.clear();
-    
-    this.cleanupEventListeners();
-    
-    console.log('WhatsAppMessenger cleanup completed - WebSocket service approach');
-  }
-
-  cleanupEventListeners() {
-    if (this.activeEventListeners.has('beforeunload')) {
-      window.removeEventListener('beforeunload', this.activeEventListeners.get('beforeunload'));
-      this.activeEventListeners.delete('beforeunload');
-    }
-    
-    this.activeEventListeners.clear();
-  }
 }
 
-// Initialize when the page loads
-document.addEventListener('DOMContentLoaded', () => {
-  window.messenger = new WhatsAppMessenger();
+/**
+ * Retry Manager with Exponential Backoff
+ */
+class RetryManager {
+    static async withRetry(operation, options = {}) {
+        const {
+            maxAttempts = CONFIG.RETRY_MAX_ATTEMPTS,
+            baseDelay = CONFIG.RETRY_BASE_DELAY_MS,
+            maxDelay = CONFIG.RETRY_MAX_DELAY_MS,
+            onRetry = null
+        } = options;
+        
+        let lastError;
+        
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return await operation();
+            } catch (error) {
+                lastError = error;
+                
+                if (attempt === maxAttempts) {
+                    break;
+                }
+                
+                const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
+                
+                if (onRetry) {
+                    onRetry(error, attempt, delay);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+        
+        throw lastError;
+    }
+}
+
+/**
+ * API Client with Validation and Retry
+ */
+class APIClient {
+    constructor() {
+        this.abortControllers = new Map();
+    }
+    
+    async request(url, options = {}) {
+        const requestId = `${Date.now()}-${Math.random()}`;
+        
+        // Cancel previous request with same ID if needed
+        if (options.cancelPrevious && this.abortControllers.has(options.cancelPrevious)) {
+            this.abortControllers.get(options.cancelPrevious).abort();
+        }
+        
+        // Create abort controller
+        const abortController = new AbortController();
+        const requestKey = options.cancelPrevious || requestId;
+        this.abortControllers.set(requestKey, abortController);
+        
+        try {
+            return await RetryManager.withRetry(async () => {
+                const response = await fetch(url, {
+                    signal: abortController.signal,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                return ValidationManager.validateApiResponse(data, options.expectedFields || []);
+            }, {
+                onRetry: (error, attempt, delay) => {
+                    console.warn(`API request retry ${attempt} for ${url} after ${delay}ms:`, error.message);
+                }
+            });
+        } finally {
+            this.abortControllers.delete(requestKey);
+        }
+    }
+    
+    async get(url, options = {}) {
+        return this.request(url, { method: 'GET', ...options });
+    }
+    
+    async post(url, data = null, options = {}) {
+        return this.request(url, {
+            method: 'POST',
+            body: data ? JSON.stringify(data) : undefined,
+            ...options
+        });
+    }
+    
+    cancelRequest(requestKey) {
+        if (this.abortControllers.has(requestKey)) {
+            this.abortControllers.get(requestKey).abort();
+            this.abortControllers.delete(requestKey);
+        }
+    }
+    
+    cancelAllRequests() {
+        for (const [key, controller] of this.abortControllers) {
+            controller.abort();
+        }
+        this.abortControllers.clear();
+    }
+}
+
+/**
+ * Button State Manager
+ */
+class ButtonStateManager {
+    constructor(domManager) {
+        this.domManager = domManager;
+        this.buttonStates = new Map();
+        this.originalTexts = new Map();
+    }
+    
+    setButtonState(buttonName, state, options = {}) {
+        const button = this.domManager.getElement(buttonName);
+        if (!button) return;
+        
+        // Store original text if not already stored
+        if (!this.originalTexts.has(buttonName)) {
+            this.originalTexts.set(buttonName, button.textContent);
+        }
+        
+        // Remove existing state classes
+        const existingState = this.buttonStates.get(buttonName);
+        if (existingState) {
+            button.classList.remove(`btn-${existingState}`);
+        }
+        
+        // Apply new state
+        this.buttonStates.set(buttonName, state);
+        button.classList.add(`btn-${state}`);
+        
+        switch (state) {
+            case BUTTON_STATES.LOADING:
+                button.disabled = true;
+                button.textContent = options.text || 'Loading...';
+                button.setAttribute('aria-busy', 'true');
+                break;
+                
+            case BUTTON_STATES.CONFIRMING:
+                button.disabled = false;
+                button.textContent = options.text || 'Click Again to Confirm';
+                button.setAttribute('aria-expanded', 'true');
+                
+                // Auto-reset after timeout
+                if (options.timeout !== false) {
+                    setTimeout(() => {
+                        this.resetButton(buttonName);
+                    }, options.timeout || 3000);
+                }
+                break;
+                
+            case BUTTON_STATES.DISABLED:
+                button.disabled = true;
+                button.removeAttribute('aria-busy');
+                button.removeAttribute('aria-expanded');
+                break;
+                
+            case BUTTON_STATES.NORMAL:
+            default:
+                button.disabled = false;
+                button.textContent = options.text || this.originalTexts.get(buttonName);
+                button.removeAttribute('aria-busy');
+                button.removeAttribute('aria-expanded');
+                break;
+        }
+    }
+    
+    resetButton(buttonName) {
+        this.setButtonState(buttonName, BUTTON_STATES.NORMAL);
+    }
+    
+    isButtonInState(buttonName, state) {
+        return this.buttonStates.get(buttonName) === state;
+    }
+}
+
+/**
+ * Application State Manager
+ */
+class AppStateManager extends EventEmitter {
+    constructor() {
+        super();
+        this.state = {
+            currentDate: null,
+            connectionStatus: UI_STATES.DISCONNECTED,
+            messageCount: null,
+            sendingProgress: {
+                started: false,
+                finished: false,
+                total: 0,
+                sent: 0,
+                failed: 0
+            },
+            clientStatus: {
+                ready: false,
+                qrCode: null,
+                error: null
+            }
+        };
+    }
+
+    updateState(updates) {
+        const oldState = { ...this.state };
+        const originalUpdates = { ...updates }; // Keep original updates for the event
+        
+        // Deep merge for nested objects
+        if (updates.sendingProgress) {
+            this.state.sendingProgress = { ...this.state.sendingProgress, ...updates.sendingProgress };
+            delete updates.sendingProgress;
+        }
+        
+        if (updates.clientStatus) {
+            this.state.clientStatus = { ...this.state.clientStatus, ...updates.clientStatus };
+            delete updates.clientStatus;
+        }
+        
+        this.state = { ...this.state, ...updates };
+        this.emit('stateChanged', { oldState, newState: this.state, updates: originalUpdates });
+    }
+
+    getState() {
+        return JSON.parse(JSON.stringify(this.state)); // Deep clone
+    }
+
+    reset() {
+        const initialState = {
+            connectionStatus: UI_STATES.DISCONNECTED,
+            sendingProgress: {
+                started: false,
+                finished: false,
+                total: 0,
+                sent: 0,
+                failed: 0
+            },
+            clientStatus: {
+                ready: false,
+                qrCode: null,
+                error: null
+            }
+        };
+        this.updateState(initialState);
+    }
+}
+
+/**
+ * DOM Element Manager with Accessibility
+ */
+class DOMManager {
+    constructor() {
+        this.elements = {};
+        this.initialized = false;
+    }
+
+    initialize() {
+        if (this.initialized) return;
+
+        // Cache all DOM elements
+        this.elements = {
+            // Date controls
+            dateSelector: document.getElementById('dateSelector'),
+            refreshDateBtn: document.getElementById('refreshDateBtn'),
+            resetMessagingBtn: document.getElementById('resetMessagingBtn'),
+            messageCountElement: document.getElementById('messageCount'),
+
+            // Client controls  
+            restartClientBtn: document.getElementById('restartClientBtn'),
+            destroyClientBtn: document.getElementById('destroyClientBtn'),
+            logoutClientBtn: document.getElementById('logoutClientBtn'),
+
+            // Main UI
+            stateElement: document.getElementById('state'),
+            startButton: document.getElementById('startButton'),
+            qrImage: document.getElementById('qrImage'),
+            qrContainer: document.getElementById('qrContainer'),
+            tableContainer: document.getElementById('tableContainer'),
+            
+            // Header status
+            connectionText: document.querySelector('.connection-text')
+        };
+
+        // Validate required elements exist in DOM (even if hidden)
+        const requiredElements = ['dateSelector', 'stateElement', 'startButton'];
+        const missingElements = requiredElements.filter(id => {
+            const element = this.elements[id];
+            return !element || !document.contains(element);
+        });
+        
+        if (missingElements.length > 0) {
+            console.error('DOM elements found:', Object.keys(this.elements).filter(key => this.elements[key]));
+            console.error('Missing elements:', missingElements);
+            throw new Error(`Missing required DOM elements: ${missingElements.join(', ')}`);
+        }
+
+        // Setup accessibility
+        this.setupAccessibility();
+
+        this.initialized = true;
+        console.log('DOM Manager initialized successfully');
+    }
+    
+    setupAccessibility() {
+        // Setup ARIA live regions
+        if (this.elements.stateElement) {
+            this.elements.stateElement.setAttribute('aria-live', 'polite');
+            this.elements.stateElement.setAttribute('aria-atomic', 'true');
+        }
+        
+        if (this.elements.messageCountElement) {
+            this.elements.messageCountElement.setAttribute('aria-live', 'polite');
+        }
+        
+        // Setup button labels
+        const buttonLabels = {
+            refreshDateBtn: 'Refresh message count for selected date',
+            resetMessagingBtn: 'Reset all message statuses for selected date',
+            restartClientBtn: 'Restart WhatsApp client while preserving authentication',
+            destroyClientBtn: 'Close WhatsApp client browser but preserve authentication',
+            logoutClientBtn: 'Completely logout WhatsApp client and clear authentication',
+            startButton: 'Start sending WhatsApp messages to selected date appointments'
+        };
+        
+        Object.entries(buttonLabels).forEach(([elementName, label]) => {
+            const element = this.elements[elementName];
+            if (element && !element.getAttribute('aria-label')) {
+                element.setAttribute('aria-label', label);
+            }
+        });
+    }
+
+    getElement(elementName) {
+        if (!this.initialized) {
+            throw new Error('DOM Manager not initialized');
+        }
+        return this.elements[elementName];
+    }
+
+    setElementContent(elementName, content, options = {}) {
+        const element = this.getElement(elementName);
+        if (!element) {
+            console.error(`Element ${elementName} not found when trying to set content:`, content);
+            return;
+        }
+        
+        console.log(`Setting content for ${elementName}:`, content);
+        
+        if (typeof content === 'string') {
+            if (options.isHTML) {
+                element.innerHTML = content;
+            } else {
+                element.textContent = content;
+            }
+        } else {
+            element.textContent = String(content);
+        }
+        
+        console.log(`Content set successfully for ${elementName}. Current content:`, element.textContent);
+        
+        // Announce to screen readers if specified
+        if (options.announce && element.hasAttribute('aria-live')) {
+            // Force screen reader announcement by briefly changing aria-live
+            const originalLive = element.getAttribute('aria-live');
+            element.setAttribute('aria-live', 'assertive');
+            setTimeout(() => {
+                element.setAttribute('aria-live', originalLive);
+            }, 100);
+        }
+    }
+
+    setElementAttribute(elementName, attribute, value) {
+        const element = this.getElement(elementName);
+        if (element) {
+            element.setAttribute(attribute, value);
+        }
+    }
+
+    toggleElementVisibility(elementName, visible) {
+        const element = this.getElement(elementName);
+        if (element) {
+            element.style.display = visible ? 'block' : 'none';
+            element.setAttribute('aria-hidden', visible ? 'false' : 'true');
+        }
+    }
+
+    setElementDisabled(elementName, disabled) {
+        const element = this.getElement(elementName);
+        if (element) {
+            element.disabled = disabled;
+            element.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+        }
+    }
+}
+
+/**
+ * Message Display Manager with Auto-Clear
+ */
+class MessageDisplayManager {
+    constructor(domManager) {
+        this.domManager = domManager;
+        this.activeMessages = new Set();
+        this.messageTimers = new Map();
+    }
+
+    displayMessage(text, type = MESSAGE_TYPES.SUCCESS, duration = null) {
+        const messageElement = this.domManager.getElement('messageCountElement');
+        if (!messageElement) return;
+
+        // Clear existing timer
+        const existingTimer = this.messageTimers.get('messageCount');
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+        }
+
+        // Clear existing message classes
+        messageElement.className = `message-count-info ${type}`;
+        messageElement.textContent = text;
+
+        // Auto-clear after duration
+        const autoClearDuration = duration || (
+            type === MESSAGE_TYPES.ERROR ? CONFIG.ERROR_DISPLAY_DURATION_MS :
+            type === MESSAGE_TYPES.SUCCESS ? 5000 :
+            type === MESSAGE_TYPES.WARNING ? 7000 : null
+        );
+        
+        if (autoClearDuration) {
+            const timer = setTimeout(() => {
+                if (messageElement.textContent === text) {
+                    this.clearMessages();
+                }
+                this.messageTimers.delete('messageCount');
+            }, autoClearDuration);
+            
+            this.messageTimers.set('messageCount', timer);
+        }
+    }
+
+    displayError(error, context = '') {
+        const errorText = context 
+            ? `${context}: ${error.message || error}`
+            : (error.message || error);
+        
+        this.displayMessage(errorText, MESSAGE_TYPES.ERROR);
+        console.error(context || 'Error:', error);
+    }
+
+    displayLoading(text = 'Loading...') {
+        this.displayMessage(text, MESSAGE_TYPES.LOADING);
+    }
+
+    displayWarning(text, persistent = false) {
+        this.displayMessage(text, MESSAGE_TYPES.WARNING, persistent ? null : 7000);
+    }
+
+    clearMessages() {
+        const messageElement = this.domManager.getElement('messageCountElement');
+        if (messageElement) {
+            messageElement.textContent = '';
+            messageElement.className = 'message-count-info';
+        }
+        
+        // Clear any active timers
+        for (const [key, timer] of this.messageTimers) {
+            clearTimeout(timer);
+        }
+        this.messageTimers.clear();
+    }
+    
+    cleanup() {
+        this.clearMessages();
+    }
+}
+
+/**
+ * Date Management Service
+ */
+class DateManager extends EventEmitter {
+    constructor() {
+        super();
+        this.currentDate = this.getDefaultDate();
+        this.dateOptions = [];
+    }
+
+    getDefaultDate() {
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlDate = urlParams.get('date');
+            
+            if (urlDate) {
+                ValidationManager.validateDate(urlDate);
+                return urlDate;
+            }
+        } catch (error) {
+            console.warn('Invalid date in URL parameters:', error.message);
+        }
+        
+        // No URL date specified - use smart default
+        const today = new Date();
+        const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 5 = Friday, 6 = Saturday
+        
+        let defaultDate = new Date(today);
+        
+        if (dayOfWeek === 4) { // Today is Thursday
+            // Default to Saturday (skip Friday weekend)
+            defaultDate.setDate(today.getDate() + 2);
+        } else if (dayOfWeek === 5) { // Today is Friday (weekend)
+            // Default to Saturday (tomorrow)
+            defaultDate.setDate(today.getDate() + 1);
+        } else {
+            // Default to tomorrow for all other days
+            defaultDate.setDate(today.getDate() + 1);
+        }
+        
+        return defaultDate.toISOString().slice(0, 10);
+    }
+
+    generateDateOptions(daysForward = CONFIG.DATE_RANGE_DAYS_FORWARD) {
+        const today = new Date();
+        const dates = [];
+        
+        // Add today
+        dates.push(new Date(today));
+        
+        // Add future days
+        for (let i = 1; i <= daysForward; i++) {
+            const date = new Date(today);
+            date.setDate(today.getDate() + i);
+            dates.push(date);
+        }
+
+        this.dateOptions = dates.map(date => ({
+            value: date.toISOString().slice(0, 10),
+            label: this.formatDateLabel(date),
+            isToday: this.isToday(date),
+            isDefault: date.toISOString().slice(0, 10) === this.currentDate
+        }));
+
+        return this.dateOptions;
+    }
+
+    formatDateLabel(date) {
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const today = new Date();
+        const dateStr = date.toISOString().slice(0, 10);
+        const todayStr = today.toISOString().slice(0, 10);
+        
+        let label = `${dateStr} (${dayNames[date.getDay()]})`;
+        
+        if (dateStr === todayStr) {
+            label += ' - Today';
+        } else if (dateStr === new Date(today.getTime() - 86400000).toISOString().slice(0, 10)) {
+            label += ' - Yesterday';  
+        } else if (dateStr === new Date(today.getTime() + 86400000).toISOString().slice(0, 10)) {
+            label += ' - Tomorrow';
+        }
+        
+        return label;
+    }
+
+    isToday(date) {
+        const today = new Date();
+        return date.toISOString().slice(0, 10) === today.toISOString().slice(0, 10);
+    }
+
+    setCurrentDate(date) {
+        try {
+            ValidationManager.validateDate(date);
+            
+            if (date !== this.currentDate) {
+                const oldDate = this.currentDate;
+                this.currentDate = date;
+                this.emit('dateChanged', { oldDate, newDate: date });
+            }
+        } catch (error) {
+            console.error('Invalid date provided:', error.message);
+            throw error;
+        }
+    }
+
+    getCurrentDate() {
+        return this.currentDate;
+    }
+}
+
+/**
+ * WebSocket Connection Manager with Proper Cleanup
+ */
+class WebSocketConnectionManager extends EventEmitter {
+    constructor(websocketService, dateManager = null) {
+        super();
+        this.websocketService = websocketService;
+        this.dateManager = dateManager;
+        this.connectionState = UI_STATES.DISCONNECTED;
+        this.boundHandlers = {};
+        this.reconnectTimer = null;
+        this.setupEventHandlers();
+    }
+
+    setupEventHandlers() {
+        // Create bound handlers for proper cleanup
+        this.boundHandlers = {
+            connecting: () => this.setConnectionState(UI_STATES.CONNECTING),
+            connected: () => {
+                this.setConnectionState(UI_STATES.CONNECTED);
+                this.requestInitialState();
+            },
+            disconnected: () => this.setConnectionState(UI_STATES.DISCONNECTED),
+            error: (error) => {
+                this.setConnectionState(UI_STATES.ERROR);
+                this.emit('connectionError', error);
+            },
+            qrUpdate: (data) => this.emit('qrCodeReceived', data),
+            clientReady: (data) => this.emit('clientStatusChanged', data),
+            messageStatus: (data) => this.emit('messageStatusUpdate', data),
+            sendingFinished: (data) => this.emit('sendingCompleted', data),
+            initialStateResponse: (data) => this.emit('initialStateReceived', data)
+        };
+
+        // Register event handlers
+        this.websocketService.on('connecting', this.boundHandlers.connecting);
+        this.websocketService.on('connected', this.boundHandlers.connected);
+        this.websocketService.on('disconnected', this.boundHandlers.disconnected);
+        this.websocketService.on('error', this.boundHandlers.error);
+        
+        // Message events (handle both naming conventions)
+        this.websocketService.on('qrUpdate', this.boundHandlers.qrUpdate);
+        this.websocketService.on('qr_update', this.boundHandlers.qrUpdate);
+        this.websocketService.on('clientReady', this.boundHandlers.clientReady);
+        this.websocketService.on('client_ready', this.boundHandlers.clientReady);
+        this.websocketService.on('messageStatus', this.boundHandlers.messageStatus);
+        this.websocketService.on('message_status', this.boundHandlers.messageStatus);
+        this.websocketService.on('sendingFinished', this.boundHandlers.sendingFinished);
+        this.websocketService.on('sending_finished', this.boundHandlers.sendingFinished);
+        this.websocketService.on('initialStateResponse', this.boundHandlers.initialStateResponse);
+        this.websocketService.on('initial_state_response', this.boundHandlers.initialStateResponse);
+    }
+
+    setConnectionState(state) {
+        if (state !== this.connectionState) {
+            const oldState = this.connectionState;
+            this.connectionState = state;
+            this.emit('connectionStateChanged', { oldState, newState: state });
+        }
+    }
+
+    async connect(params = {}) {
+        try {
+            return await this.websocketService.connect(params);
+        } catch (error) {
+            console.error('WebSocket connection failed:', error);
+            this.scheduleReconnect();
+            throw error;
+        }
+    }
+
+    disconnect() {
+        this.clearReconnectTimer();
+        return this.websocketService.disconnect();
+    }
+
+    send(message, options = {}) {
+        return this.websocketService.send(message, options);
+    }
+
+    requestInitialState() {
+        console.log('Requesting initial state from server...');
+        this.send({
+            type: 'request_initial_state',
+            data: {
+                date: this.dateManager?.getCurrentDate() || new Date().toISOString().slice(0, 10),
+                timestamp: Date.now()
+            }
+        }).catch(error => {
+            console.error('Failed to request initial state:', error);
+        });
+    }
+
+    isConnected() {
+        return this.connectionState === UI_STATES.CONNECTED;
+    }
+    
+    scheduleReconnect(delay = CONFIG.WEBSOCKET_RECONNECT_DELAY_MS) {
+        this.clearReconnectTimer();
+        
+        this.reconnectTimer = setTimeout(() => {
+            console.log('Attempting WebSocket reconnection...');
+            this.connect().catch(error => {
+                console.error('Reconnection failed:', error);
+                // Schedule another attempt with exponential backoff
+                this.scheduleReconnect(Math.min(delay * 2, 30000));
+            });
+        }, delay);
+    }
+    
+    clearReconnectTimer() {
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+    }
+
+    cleanup() {
+        // Clear reconnect timer
+        this.clearReconnectTimer();
+        
+        // Remove all event listeners using bound handlers
+        Object.entries(this.boundHandlers).forEach(([eventName, handler]) => {
+            this.websocketService.off('connecting', handler);
+            this.websocketService.off('connected', handler);
+            this.websocketService.off('disconnected', handler);
+            this.websocketService.off('error', handler);
+            this.websocketService.off('qrUpdate', handler);
+            this.websocketService.off('qr_update', handler);
+            this.websocketService.off('clientReady', handler);
+            this.websocketService.off('client_ready', handler);
+            this.websocketService.off('messageStatus', handler);
+            this.websocketService.off('message_status', handler);
+            this.websocketService.off('sendingFinished', handler);
+            this.websocketService.off('sending_finished', handler);
+            this.websocketService.off('initialStateResponse', handler);
+            this.websocketService.off('initial_state_response', handler);
+        });
+        
+        // Disconnect
+        this.disconnect();
+    }
+}
+
+/**
+ * Main WhatsApp Messenger Application
+ */
+class WhatsAppMessengerApp extends EventEmitter {
+    constructor() {
+        super();
+        
+        // Initialize managers
+        this.stateManager = new AppStateManager();
+        this.domManager = new DOMManager();
+        this.messageDisplay = new MessageDisplayManager(this.domManager);
+        this.dateManager = new DateManager();
+        this.apiClient = new APIClient();
+        
+        // Will be initialized after websocket import
+        this.connectionManager = null;
+        this.buttonStateManager = null;
+        
+        // Cleanup tracking
+        this.cleanupTasks = [];
+        this.debounceTimers = new Map();
+    }
+
+    async initialize() {
+        try {
+            console.log('Initializing WhatsApp Messenger Application');
+            
+            // Initialize DOM
+            this.domManager.initialize();
+            
+            // Initialize button state manager
+            this.buttonStateManager = new ButtonStateManager(this.domManager);
+            
+            // Initialize WebSocket connection
+            await this.initializeWebSocket();
+            
+            // Setup date management
+            this.setupDateManagement();
+            
+            // Setup event handlers
+            this.setupEventHandlers();
+            
+            // Setup UI state management
+            this.setupUIStateManagement();
+            
+            // Load initial data
+            await this.loadInitialData();
+            
+            console.log('WhatsApp Messenger Application initialized successfully');
+            
+        } catch (error) {
+            console.error('Failed to initialize application:', error);
+            this.messageDisplay.displayError(error, 'Initialization failed');
+            throw error;
+        }
+    }
+
+    async initializeWebSocket() {
+        // Import websocket service
+        const websocketService = (await import('../services/websocket.js')).default;
+        
+        // Create connection manager
+        this.connectionManager = new WebSocketConnectionManager(websocketService, this.dateManager);
+        
+        // Setup connection event handlers
+        this.connectionManager.on('connectionStateChanged', ({ newState }) => {
+            this.stateManager.updateState({ connectionStatus: newState });
+        });
+
+        this.connectionManager.on('connectionError', (error) => {
+            this.messageDisplay.displayError(error, 'WebSocket connection error');
+        });
+
+        this.connectionManager.on('qrCodeReceived', (data) => {
+            this.handleQRCode(data);
+        });
+
+        this.connectionManager.on('clientStatusChanged', (data) => {
+            this.handleClientStatusChange(data);
+        });
+
+        this.connectionManager.on('messageStatusUpdate', (data) => {
+            this.handleMessageStatusUpdate(data);
+        });
+
+        this.connectionManager.on('sendingCompleted', (data) => {
+            this.handleSendingCompleted(data);
+        });
+
+        this.connectionManager.on('initialStateReceived', (data) => {
+            this.handleInitialState(data);
+        });
+    }
+
+    setupDateManagement() {
+        // Generate date options
+        this.dateManager.generateDateOptions();
+        
+        // Populate date selector
+        this.populateDateSelector();
+        
+        // Set initial date
+        this.dateManager.setCurrentDate(this.dateManager.getDefaultDate());
+        
+        // Listen for date changes with debouncing
+        this.dateManager.on('dateChanged', ({ newDate }) => {
+            this.debounceOperation('dateChange', () => {
+                this.stateManager.updateState({ currentDate: newDate });
+                this.onDateChanged(newDate);
+            }, CONFIG.DEBOUNCE_DELAY_MS);
+        });
+    }
+
+    setupEventHandlers() {
+        // Date selector
+        const dateSelector = this.domManager.getElement('dateSelector');
+        if (dateSelector) {
+            const dateChangeHandler = (event) => {
+                this.dateManager.setCurrentDate(event.target.value);
+            };
+            dateSelector.addEventListener('change', dateChangeHandler);
+            this.cleanupTasks.push(() => {
+                dateSelector.removeEventListener('change', dateChangeHandler);
+            });
+        }
+
+        // Control buttons
+        this.setupControlButtons();
+        
+        // Main action button
+        const startButton = this.domManager.getElement('startButton');
+        if (startButton) {
+            const startHandler = () => this.handleStartSending();
+            startButton.addEventListener('click', startHandler);
+            this.cleanupTasks.push(() => {
+                startButton.removeEventListener('click', startHandler);
+            });
+        }
+    }
+
+    setupControlButtons() {
+        const buttons = [
+            { element: 'refreshDateBtn', handler: () => this.handleRefresh() },
+            { element: 'resetMessagingBtn', handler: () => this.handleReset() },
+            { element: 'restartClientBtn', handler: () => this.handleRestart() },
+            { element: 'destroyClientBtn', handler: () => this.handleDestroy() },
+            { element: 'logoutClientBtn', handler: () => this.handleLogout() }
+        ];
+
+        buttons.forEach(({ element, handler }) => {
+            const btn = this.domManager.getElement(element);
+            if (btn) {
+                btn.addEventListener('click', handler);
+                this.cleanupTasks.push(() => {
+                    btn.removeEventListener('click', handler);
+                });
+            }
+        });
+    }
+
+    setupUIStateManagement() {
+        // Listen for state changes and update UI accordingly
+        const stateChangeHandler = ({ newState, updates }) => {
+            this.updateUI(newState, updates);
+        };
+        this.stateManager.on('stateChanged', stateChangeHandler);
+        this.cleanupTasks.push(() => {
+            this.stateManager.off('stateChanged', stateChangeHandler);
+        });
+    }
+
+    populateDateSelector() {
+        const dateSelector = this.domManager.getElement('dateSelector');
+        if (!dateSelector) return;
+
+        // Clear existing options
+        dateSelector.innerHTML = '';
+
+        // Add date options
+        this.dateManager.dateOptions.forEach(option => {
+            const optionElement = document.createElement('option');
+            optionElement.value = option.value;
+            optionElement.textContent = option.label;
+            optionElement.selected = option.isDefault;
+            dateSelector.appendChild(optionElement);
+        });
+    }
+
+    async loadInitialData() {
+        await this.loadMessageCount();
+        await this.connectWebSocket();
+    }
+
+    async loadMessageCount() {
+        const currentDate = this.dateManager.getCurrentDate();
+        this.messageDisplay.displayLoading('Loading message count...');
+
+        try {
+            const data = await this.apiClient.get(
+                API_ENDPOINTS.MESSAGE_COUNT(currentDate),
+                { 
+                    cancelPrevious: 'messageCount',
+                    expectedFields: ['success', 'data']
+                }
+            );
+
+            const count = ValidationManager.validateMessageCountResponse(data);
+            this.stateManager.updateState({ messageCount: count });
+            
+            const message = this.formatMessageCountDisplay(count);
+            this.messageDisplay.displayMessage(message, MESSAGE_TYPES.SUCCESS);
+            
+        } catch (error) {
+            this.messageDisplay.displayError(error, 'Failed to load message count');
+            this.stateManager.updateState({ messageCount: null });
+        }
+    }
+
+    formatMessageCountDisplay(count) {
+        const actualSendable = Math.max(0, count.eligibleForMessaging || 0);
+        let message = `${actualSendable} messages ready to send`;
+        
+        if (count.alreadySent > 0) {
+            message += ` (${count.alreadySent} already sent`;
+            if (count.pending && count.pending > 0) {
+                message += `, ${count.pending} pending`;
+            }
+            message += ')';
+        } else if (count.pending && count.pending > 0) {
+            message += ` (${count.pending} pending)`;
+        }
+        
+        return message;
+    }
+
+    async connectWebSocket() {
+        try {
+            const connectionParams = {
+                PDate: this.dateManager.getCurrentDate(),
+                clientType: 'waStatus',
+                needsQR: 'true'
+            };
+            
+            await this.connectionManager.connect(connectionParams);
+        } catch (error) {
+            this.messageDisplay.displayError(error, 'WebSocket connection failed');
+        }
+    }
+
+    // Utility Methods
+    debounceOperation(key, operation, delay) {
+        if (this.debounceTimers.has(key)) {
+            clearTimeout(this.debounceTimers.get(key));
+        }
+        
+        const timer = setTimeout(() => {
+            this.debounceTimers.delete(key);
+            operation();
+        }, delay);
+        
+        this.debounceTimers.set(key, timer);
+    }
+
+    // Event Handlers
+    handleQRCode(data) {
+        this.stateManager.updateState({
+            clientStatus: { 
+                ready: false, 
+                qrCode: data.qr, 
+                error: null 
+            }
+        });
+    }
+
+    handleClientStatusChange(data) {
+        console.log('Received client status change:', data);
+        
+        this.stateManager.updateState({
+            clientStatus: {
+                ready: data.clientReady || data.state === 'ready',
+                qrCode: data.clientReady ? null : this.stateManager.getState().clientStatus.qrCode,
+                error: data.error || null
+            }
+        });
+    }
+
+    handleMessageStatusUpdate(data) {
+        // Update message status in UI
+        this.emit('messageStatusUpdated', data);
+    }
+
+    handleSendingCompleted(data) {
+        this.stateManager.updateState({
+            sendingProgress: {
+                finished: true
+            }
+        });
+        
+        this.buttonStateManager.resetButton('startButton');
+        this.messageDisplay.displayMessage('Message sending completed!', MESSAGE_TYPES.SUCCESS);
+    }
+
+    handleInitialState(data) {
+        console.log('Received initial state:', data);
+        
+        if (data) {
+            console.log('Processing initial state - clientReady:', data.clientReady, 'qr:', !!data.qr);
+            
+            // Update client status
+            if (data.clientReady !== undefined || data.qr !== undefined) {
+                const newClientStatus = {
+                    ready: data.clientReady || false,
+                    qrCode: data.qr || null,
+                    error: data.error || null
+                };
+                
+                console.log('Updating client status to:', newClientStatus);
+                
+                this.stateManager.updateState({
+                    clientStatus: newClientStatus
+                });
+            }
+            
+            // Update sending progress if available
+            if (data.sendingProgress) {
+                console.log('Updating sending progress:', data.sendingProgress);
+                this.stateManager.updateState({
+                    sendingProgress: data.sendingProgress
+                });
+            }
+        }
+    }
+
+    async handleStartSending() {
+        const state = this.stateManager.getState();
+        
+        if (!state.clientStatus.ready) {
+            this.messageDisplay.displayError('WhatsApp client is not ready');
+            return;
+        }
+
+        this.buttonStateManager.setButtonState('startButton', BUTTON_STATES.LOADING, {
+            text: 'Starting...'
+        });
+
+        try {
+            this.stateManager.updateState({
+                sendingProgress: {
+                    started: true,
+                    finished: false,
+                    total: state.messageCount?.eligibleForMessaging || 0,
+                    sent: 0,
+                    failed: 0
+                }
+            });
+
+            const result = await this.apiClient.get(API_ENDPOINTS.WA_SEND(this.dateManager.getCurrentDate()));
+            this.messageDisplay.displayMessage('Messages sending started', MESSAGE_TYPES.SUCCESS);
+            
+        } catch (error) {
+            this.messageDisplay.displayError(error, 'Failed to start sending');
+            this.stateManager.updateState({
+                sendingProgress: {
+                    started: false,
+                    finished: false,
+                    total: 0,
+                    sent: 0,
+                    failed: 0
+                }
+            });
+            this.buttonStateManager.resetButton('startButton');
+        }
+    }
+
+    async handleRefresh() {
+        this.buttonStateManager.setButtonState('refreshDateBtn', BUTTON_STATES.LOADING, {
+            text: 'Refreshing...'
+        });
+        
+        try {
+            await this.loadMessageCount();
+        } finally {
+            this.buttonStateManager.resetButton('refreshDateBtn');
+        }
+    }
+
+    async handleReset() {
+        const currentDate = this.dateManager.getCurrentDate();
+        
+        // Handle confirmation state
+        if (!this.buttonStateManager.isButtonInState('resetMessagingBtn', BUTTON_STATES.CONFIRMING)) {
+            this.buttonStateManager.setButtonState('resetMessagingBtn', BUTTON_STATES.CONFIRMING, {
+                text: 'Click Again to Confirm',
+                timeout: 3000
+            });
+            return;
+        }
+
+        this.buttonStateManager.setButtonState('resetMessagingBtn', BUTTON_STATES.LOADING, {
+            text: 'Resetting...'
+        });
+
+        try {
+            const result = await this.apiClient.post(API_ENDPOINTS.MESSAGE_RESET(currentDate));
+            
+            if (result.success) {
+                this.messageDisplay.displayMessage(
+                    `Reset completed: ${result.data?.appointmentsReset || 0} appointments reset`, 
+                    MESSAGE_TYPES.SUCCESS
+                );
+                
+                // Reload message count
+                await this.loadMessageCount();
+            } else {
+                throw new Error(result.error || 'Reset failed');
+            }
+        } catch (error) {
+            this.messageDisplay.displayError(error, 'Failed to reset messaging');
+        } finally {
+            this.buttonStateManager.resetButton('resetMessagingBtn');
+        }
+    }
+
+    async handleRestart() {
+        this.buttonStateManager.setButtonState('restartClientBtn', BUTTON_STATES.LOADING, {
+            text: 'Restarting...'
+        });
+
+        try {
+            const result = await this.apiClient.post(API_ENDPOINTS.WA_RESTART);
+            
+            if (result.success) {
+                this.messageDisplay.displayMessage(result.message || 'Client restarted successfully', MESSAGE_TYPES.SUCCESS);
+                
+                // Reset client status to wait for reconnection
+                this.stateManager.updateState({
+                    clientStatus: {
+                        ready: false,
+                        qrCode: null,
+                        error: null
+                    }
+                });
+                
+                // Request new initial state after restart
+                setTimeout(() => {
+                    if (this.connectionManager.isConnected()) {
+                        this.connectionManager.requestInitialState();
+                    }
+                }, CONFIG.CLIENT_RESTART_DELAY_MS);
+            } else {
+                throw new Error(result.error || 'Restart failed');
+            }
+        } catch (error) {
+            this.messageDisplay.displayError(error, 'Failed to restart WhatsApp client');
+        } finally {
+            this.buttonStateManager.resetButton('restartClientBtn');
+        }
+    }
+
+    async handleDestroy() {
+        // Handle confirmation state
+        if (!this.buttonStateManager.isButtonInState('destroyClientBtn', BUTTON_STATES.CONFIRMING)) {
+            this.buttonStateManager.setButtonState('destroyClientBtn', BUTTON_STATES.CONFIRMING, {
+                text: 'Click Again to Confirm',
+                timeout: 3000
+            });
+            return;
+        }
+
+        this.buttonStateManager.setButtonState('destroyClientBtn', BUTTON_STATES.LOADING, {
+            text: 'Destroying...'
+        });
+
+        try {
+            const result = await this.apiClient.post(API_ENDPOINTS.WA_DESTROY);
+            
+            if (result.success) {
+                this.messageDisplay.displayMessage(result.message || 'Client destroyed successfully', MESSAGE_TYPES.SUCCESS);
+                
+                // Update client status
+                this.stateManager.updateState({
+                    clientStatus: {
+                        ready: false,
+                        qrCode: null,
+                        error: null
+                    }
+                });
+            } else {
+                throw new Error(result.error || 'Destroy failed');
+            }
+        } catch (error) {
+            this.messageDisplay.displayError(error, 'Failed to destroy WhatsApp client');
+        } finally {
+            this.buttonStateManager.resetButton('destroyClientBtn');
+        }
+    }
+
+    async handleLogout() {
+        // Handle confirmation state
+        if (!this.buttonStateManager.isButtonInState('logoutClientBtn', BUTTON_STATES.CONFIRMING)) {
+            this.buttonStateManager.setButtonState('logoutClientBtn', BUTTON_STATES.CONFIRMING, {
+                text: 'Click Again to Confirm',
+                timeout: 5000 // Longer timeout for logout
+            });
+            return;
+        }
+
+        this.buttonStateManager.setButtonState('logoutClientBtn', BUTTON_STATES.LOADING, {
+            text: 'Logging out...'
+        });
+
+        try {
+            const result = await this.apiClient.post(API_ENDPOINTS.WA_LOGOUT);
+            
+            if (result.success) {
+                this.messageDisplay.displayMessage(result.message || 'Client logged out successfully', MESSAGE_TYPES.SUCCESS);
+                
+                // Reset client status completely
+                this.stateManager.updateState({
+                    clientStatus: {
+                        ready: false,
+                        qrCode: null,
+                        error: null
+                    }
+                });
+                
+                // Request new QR code after logout
+                setTimeout(() => {
+                    if (this.connectionManager.isConnected()) {
+                        this.connectionManager.requestInitialState();
+                    }
+                }, CONFIG.LOGOUT_DELAY_MS);
+            } else {
+                throw new Error(result.error || 'Logout failed');
+            }
+        } catch (error) {
+            this.messageDisplay.displayError(error, 'Failed to logout WhatsApp client');
+        } finally {
+            this.buttonStateManager.resetButton('logoutClientBtn');
+        }
+    }
+
+    onDateChanged(newDate) {
+        console.log(`Date changed to: ${newDate}`);
+        this.loadMessageCount();
+        
+        // Reconnect WebSocket with new date parameters
+        if (this.connectionManager && this.connectionManager.isConnected()) {
+            // Disconnect and reconnect with new date
+            this.connectionManager.disconnect();
+            setTimeout(() => {
+                this.connectWebSocket();
+            }, CONFIG.WEBSOCKET_RECONNECT_DELAY_MS);
+        }
+    }
+
+    updateUI(state, updates) {
+        console.log('updateUI called with state:', state, 'updates:', updates);
+        
+        // Update connection status
+        if (updates.connectionStatus) {
+            console.log('Updating connection status to:', state.connectionStatus);
+            this.updateConnectionStatus(state.connectionStatus);
+        }
+
+        // Update client status
+        if (updates.clientStatus) {
+            console.log('Updating client status to:', state.clientStatus);
+            this.updateClientStatus(state.clientStatus);
+        }
+
+        // Update sending progress
+        if (updates.sendingProgress) {
+            console.log('Updating sending progress to:', state.sendingProgress);
+            this.updateSendingProgress(state.sendingProgress);
+        }
+    }
+
+    updateConnectionStatus(status) {
+        console.log(`Connection status: ${status}`);
+        
+        // Visual connection indicator could be added here
+        const statusMessages = {
+            [UI_STATES.CONNECTING]: 'Connecting to server...',
+            [UI_STATES.CONNECTED]: 'Connected to server',
+            [UI_STATES.DISCONNECTED]: 'Disconnected from server',
+            [UI_STATES.ERROR]: 'Connection error'
+        };
+        
+        if (status === UI_STATES.ERROR || status === UI_STATES.DISCONNECTED) {
+            this.messageDisplay.displayWarning(statusMessages[status]);
+        }
+    }
+
+    updateClientStatus(clientStatus) {
+        console.log('updateClientStatus called with:', clientStatus);
+        
+        // Update QR code display
+        if (clientStatus.qrCode) {
+            this.domManager.setElementAttribute('qrImage', 'src', clientStatus.qrCode);
+            this.domManager.setElementAttribute('qrImage', 'alt', 'WhatsApp QR Code for authentication');
+            this.domManager.toggleElementVisibility('qrImage', true);
+            this.domManager.toggleElementVisibility('qrContainer', true);
+        } else {
+            this.domManager.toggleElementVisibility('qrImage', false);
+            this.domManager.toggleElementVisibility('qrContainer', false);
+        }
+
+        // Update start button state
+        this.domManager.setElementDisabled('startButton', !clientStatus.ready);
+        this.domManager.toggleElementVisibility('startButton', clientStatus.ready);
+
+        // Update status text with accessibility
+        if (clientStatus.ready) {
+            console.log('Setting status to ready');
+            this.domManager.setElementContent('stateElement', '✅ WhatsApp client is ready!', { announce: true });
+            this.domManager.setElementContent('connectionText', 'Client Ready');
+        } else if (clientStatus.qrCode) {
+            console.log('Setting status to QR code needed');
+            this.domManager.setElementContent('stateElement', '📱 Please scan the QR code with WhatsApp', { announce: true });
+            this.domManager.setElementContent('connectionText', 'Scan QR Code');
+        } else if (clientStatus.error) {
+            console.log('Setting status to error:', clientStatus.error);
+            this.domManager.setElementContent('stateElement', `❌ Error: ${clientStatus.error}`, { announce: true });
+            this.domManager.setElementContent('connectionText', 'Error');
+        } else {
+            console.log('Setting status to initializing');
+            this.domManager.setElementContent('stateElement', '⏳ Initializing WhatsApp client...');
+            this.domManager.setElementContent('connectionText', 'Initializing...');
+        }
+    }
+
+    updateSendingProgress(progress) {
+        if (progress.started && !progress.finished) {
+            const progressText = `📤 Sending messages... ${progress.sent}/${progress.total}`;
+            this.domManager.setElementContent('stateElement', progressText, { announce: true });
+            
+            // Update button to show progress
+            this.buttonStateManager.setButtonState('startButton', BUTTON_STATES.LOADING, {
+                text: `Sending ${progress.sent}/${progress.total}`
+            });
+        } else if (progress.finished) {
+            const completedText = `✅ Completed! ${progress.sent} sent, ${progress.failed} failed`;
+            this.domManager.setElementContent('stateElement', completedText, { announce: true });
+        }
+    }
+
+    // Cleanup
+    cleanup() {
+        console.log('Cleaning up WhatsApp Messenger Application');
+        
+        // Cancel all API requests
+        this.apiClient.cancelAllRequests();
+        
+        // Clear all debounce timers
+        for (const [key, timer] of this.debounceTimers) {
+            clearTimeout(timer);
+        }
+        this.debounceTimers.clear();
+        
+        // Run all cleanup tasks
+        this.cleanupTasks.forEach(task => {
+            try {
+                task();
+            } catch (error) {
+                console.error('Error during cleanup:', error);
+            }
+        });
+        this.cleanupTasks = [];
+
+        // Cleanup managers
+        if (this.connectionManager) {
+            this.connectionManager.cleanup();
+        }
+        
+        if (this.messageDisplay) {
+            this.messageDisplay.cleanup();
+        }
+
+        // Clear state
+        if (this.stateManager) {
+            this.stateManager.reset();
+        }
+
+        console.log('Cleanup completed');
+    }
+}
+
+// Initialize application when DOM is loaded
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        window.whatsappMessenger = new WhatsAppMessengerApp();
+        await window.whatsappMessenger.initialize();
+        
+        // Handle page unload
+        window.addEventListener('beforeunload', () => {
+            if (window.whatsappMessenger) {
+                window.whatsappMessenger.cleanup();
+            }
+        });
+        
+    } catch (error) {
+        console.error('Failed to initialize WhatsApp Messenger:', error);
+        
+        // Show error to user
+        const errorElement = document.createElement('div');
+        errorElement.className = 'initialization-error';
+        errorElement.innerHTML = `
+            <h2>Initialization Failed</h2>
+            <p>Failed to initialize WhatsApp Messenger: ${error.message}</p>
+            <button onclick="location.reload()">Retry</button>
+        `;
+        errorElement.style.cssText = `
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; padding: 20px; border: 2px solid #dc3545;
+            border-radius: 8px; text-align: center; z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        `;
+        document.body.appendChild(errorElement);
+    }
 });
