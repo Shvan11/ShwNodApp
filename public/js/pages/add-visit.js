@@ -91,7 +91,7 @@ class AddVisitController {
       if (result.status === 'success') {
         alert('Visit added successfully!');
         // Redirect back to visits summary page
-        window.location.href = `visitsSummary.html?PID=${this.patientId}`;
+        window.location.href = `visits-summary?PID=${this.patientId}`;
       } else {
         alert('Failed to add visit. Please try again.');
       }

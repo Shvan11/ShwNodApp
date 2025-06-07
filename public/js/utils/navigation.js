@@ -16,7 +16,7 @@ export function gettimepoints(code, tp) {
         addTab(
           photoslist,
           `${timepoint.tpDescription} ${formatDate(timepoint.tpDateTime)}`,
-          `grid.html?code=${code}&tp=${timepoint.tpCode}`,
+          `grid?code=${code}&tp=${timepoint.tpCode}`,
           timepoint.tpCode === tp
         );
       });
@@ -24,10 +24,10 @@ export function gettimepoints(code, tp) {
   
     // Add static tabs
     const staticTabs = [
-      { label: "Compare", href: `canvas.html?code=${code}`, id: "compare" },
-      { label: "X-rays", href: `Xrays.html?code=${code}`, id: "xrays" },
-      { label: "Visit Summary", href: `visits-summary.html?PID=${code}`, id: "visitsSummary" },
-      { label: "Home", href: "index.html", id: "home" },
+      { label: "Compare", href: `canvas?code=${code}`, id: "compare" },
+      { label: "X-rays", href: `xrays?code=${code}`, id: "xrays" },
+      { label: "Visit Summary", href: `visits-summary?PID=${code}`, id: "visitsSummary" },
+      { label: "Home", href: "/", id: "home" },
     ];
   
     staticTabs.forEach((tab) => {

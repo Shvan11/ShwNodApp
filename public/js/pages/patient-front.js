@@ -20,7 +20,7 @@ class PatientDetailsController {
     document.getElementById("invisible").addEventListener("load", this.checkResponse.bind(this));
     
     // Set payment link
-    document.querySelector(".plink").href = `Payments.html?code=${this.patientId}`;
+    document.querySelector(".plink").href = `payments?code=${this.patientId}`;
     
     // Set photo source
     document.querySelector(".photo").src = `DolImgs/${this.patientId}00.I13`;
@@ -58,7 +58,7 @@ class PatientDetailsController {
   }
   
   compare() {
-    window.location.href = `${window.location.origin}/canvas.html?code=${this.patientId}&phone=${this.phone}`;
+    window.location.href = `canvas?code=${this.patientId}&phone=${this.phone}`;
   }
   
   // Rest of methods converted from original functions...

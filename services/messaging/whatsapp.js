@@ -896,6 +896,22 @@ class WhatsAppService extends EventEmitter {
       }
 
       console.log(`Sending ${numbers.length} messages`);
+      
+      // Broadcast sending started with total count
+      if (this.wsEmitter) {
+        const message = {
+          type: 'whatsapp_sending_started',
+          data: {
+            total: numbers.length,
+            sent: 0,
+            failed: 0,
+            started: true,
+            finished: false
+          },
+          timestamp: Date.now()
+        };
+        this.wsEmitter.emit('broadcast_message', message);
+      }
 
       const results = [];
       for (let i = 0; i < numbers.length; i++) {

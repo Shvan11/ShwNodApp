@@ -20,6 +20,7 @@ import { sendgramfile } from '../services/messaging/telegram.js';
 import qrcode from 'qrcode';
 import messageState from '../services/state/messageState.js';
 import { createWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
+import { WebSocketEvents, createStandardMessage } from '../services/messaging/websocket-events.js';
 import HealthCheck from '../services/monitoring/HealthCheck.js';
 import * as messagingQueries from '../services/database/queries/messaging-queries.js';
 import { getContacts } from '../services/authentication/google.js';
@@ -69,21 +70,30 @@ router.get("/getqrcode", async (req, res) => {
 router.get("/AppsUpdated", async (req, res) => {
     res.sendStatus(200);
     const { PDate } = req.query;
-    wsEmitter.emit("updated", PDate);
+    console.log(`AppsUpdated called with date: ${PDate}`);
+    
+    // Emit universal event only
+    wsEmitter.emit(WebSocketEvents.DATA_UPDATED, PDate);
 });
 
 // Handle patient loaded event
 router.get("/patientloaded", (req, res) => {
     res.sendStatus(200);
     const { pid, screenid: screenID } = req.query;
-    wsEmitter.emit("patientLoaded", pid, screenID);
+    console.log(`PatientLoaded called with pid: ${pid}, screenID: ${screenID}`);
+    
+    // Emit universal event only
+    wsEmitter.emit(WebSocketEvents.PATIENT_LOADED, pid, screenID);
 });
 
 // Handle patient unloaded event
 router.get("/patientunloaded", (req, res) => {
     res.sendStatus(200);
     const { screenid: screenID } = req.query;
-    wsEmitter.emit("patientUnLoaded", screenID);
+    console.log(`PatientUnloaded called with screenID: ${screenID}`);
+    
+    // Emit universal event only
+    wsEmitter.emit(WebSocketEvents.PATIENT_UNLOADED, screenID);
 });
 
 
@@ -232,14 +242,14 @@ router.get('/wa/send', async (req, res) => {
             
             // Broadcast error to clients
             if (wsEmitter) {
-                const message = createWebSocketMessage(
-                    MessageSchemas.WebSocketMessage.ERROR,
+                const message = createStandardMessage(
+                    WebSocketEvents.SYSTEM_ERROR,
                     { 
                         error: `Send process failed: ${error.message}`,
                         date: dateparam 
                     }
                 );
-                wsEmitter.emit('broadcast_message', message);
+                wsEmitter.emit(WebSocketEvents.BROADCAST_MESSAGE, message);
             }
         });
         
@@ -851,6 +861,52 @@ router.get('/messaging/status/:date', async (req, res) => {
     try {
         const { date } = req.params;
         const result = await messagingQueries.getMessageStatusByDate(date);
+        
+        // Transform the database format to frontend format
+        if (result && result.messages) {
+            result.messages = result.messages.map(msg => {
+                // Convert sentStatus (boolean) + deliveryStatus (string) to numeric status
+                let status = 0; // Default to pending
+                
+                if (!msg.sentStatus) {
+                    // Not sent yet
+                    status = 0;
+                } else if (msg.deliveryStatus === 'ERROR') {
+                    // Failed
+                    status = -1;
+                } else if (msg.deliveryStatus === 'SERVER') {
+                    // Received by WhatsApp server
+                    status = 1; // Server
+                } else if (msg.deliveryStatus === 'DEVICE') {
+                    // Delivered to user's device
+                    status = 2; // Device
+                } else if (msg.deliveryStatus === 'read' || msg.deliveryStatus === 'READ'.toUpperCase()) {
+                    // Read by user
+                    status = 3; // Read
+                } else if (msg.deliveryStatus === 'PLAYED') {
+                    // Voice message played
+                    status = 4; // Played
+                } else if (msg.sentStatus) {
+                    // Sent but no delivery status yet
+                    status = 1;
+                }
+                
+                return {
+                    ...msg,
+                    status: status,
+                    // Map field names to what frontend expects
+                    name: msg.patientName,
+                    phone: msg.phone,
+                    timeSent: msg.sentTimestamp,
+                    message: '', // Will be populated if needed
+                    messageId: msg.messageId,
+                    // Include original values for debugging
+                    originalSentStatus: msg.sentStatus,
+                    originalDeliveryStatus: msg.deliveryStatus
+                };
+            });
+        }
+        
         res.json(result);
     } catch (error) {
         console.error('Error getting message status:', error);

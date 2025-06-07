@@ -2,17 +2,18 @@
 /**
  * Message schemas and validation for WhatsApp system
  */
+import { WebSocketEvents } from './websocket-events.js';
 
 export const MessageSchemas = {
-  // WebSocket message formats
+  // WebSocket message formats - using universal event constants
   WebSocketMessage: {
-    QR_UPDATE: 'qr_update',
-    CLIENT_READY: 'client_ready', 
-    MESSAGE_STATUS: 'message_status',
-    BATCH_STATUS: 'batch_status',
-    ERROR: 'error',
-    PING: 'ping',
-    PONG: 'pong'
+    QR_UPDATE: WebSocketEvents.WHATSAPP_QR_UPDATED,
+    CLIENT_READY: WebSocketEvents.WHATSAPP_CLIENT_READY, 
+    MESSAGE_STATUS: WebSocketEvents.WHATSAPP_MESSAGE_STATUS,
+    BATCH_STATUS: WebSocketEvents.WHATSAPP_MESSAGE_BATCH_STATUS,
+    ERROR: WebSocketEvents.SYSTEM_ERROR,
+    PING: WebSocketEvents.HEARTBEAT_PING,
+    PONG: WebSocketEvents.HEARTBEAT_PONG
   },
 
   // Message status constants
@@ -68,7 +69,7 @@ export function validateWebSocketMessage(message) {
   // Validate type against known types
   const validTypes = [
     ...Object.values(MessageSchemas.WebSocketMessage),
-    'ping', 'pong', 'heartbeat', 'ack', 'error', 'sending_finished'
+    ...Object.values(WebSocketEvents)
   ];
   
   if (!validTypes.includes(message.type)) {
@@ -76,7 +77,12 @@ export function validateWebSocketMessage(message) {
   }
   
   // Allow messages without data field for simple ping/pong and other control messages
-  const simpleMessageTypes = ['ping', 'pong', 'heartbeat', 'ack'];
+  const simpleMessageTypes = [
+    WebSocketEvents.HEARTBEAT_PING, 
+    WebSocketEvents.HEARTBEAT_PONG, 
+    'heartbeat', 
+    'ack'
+  ];
   
   if (simpleMessageTypes.includes(message.type)) {
     // Simple messages don't require data or timestamp
@@ -191,10 +197,7 @@ export function createControlMessage(type, additionalData = {}) {
 export function isValidMessageType(type) {
   const allTypes = [
     ...Object.values(MessageSchemas.WebSocketMessage),
-    'ping', 'pong', 'heartbeat', 'ack', 'error',
-    'appointment_data', 'appointment_update', 
-    'patient_data', 'patient_loaded', 'patient_unloaded',
-    'sending_finished', 'updated'
+    ...Object.values(WebSocketEvents)
   ];
   
   return allTypes.includes(type);

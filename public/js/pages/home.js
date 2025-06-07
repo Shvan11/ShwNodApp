@@ -11,10 +11,10 @@ logo.addEventListener('mouseout', () => {
 const appointmentButton = document.getElementById('appointmentButton');
 
 appointmentButton.addEventListener('click', () => {
-    window.location.href = 'appointments2.html';
+    window.location.href = 'appointments';
 });
 const searchButton = document.getElementById('searchButton');
 
 searchButton.addEventListener('click', () => {
-    window.location.href = 'search.html';
+    window.location.href = 'search';
 });

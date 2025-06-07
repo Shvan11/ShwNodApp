@@ -80,10 +80,36 @@ The application can run as a Windows service using `node-windows`. Service scrip
 
 ## WebSocket Events
 
-Real-time communication for:
-- `patientLoaded` / `patientUnLoaded` - Patient screen management
-- `broadcast_message` - Messaging status updates
-- `updated` - General application updates
+The application uses a **universal naming convention** for WebSocket events to ensure consistency across frontend and backend communication. 
+
+### Universal Event Categories:
+
+**Connection Events:**
+- `connection_established` / `connection_lost` / `connection_error`
+- `heartbeat_ping` / `heartbeat_pong` - Connection health monitoring
+
+**Appointment System:**
+- `appointments_updated` / `appointments_data` - Appointment updates
+- `request_appointments` - Client requests appointment data
+
+**Patient Management:**
+- `patient_loaded` / `patient_unloaded` - Patient screen management  
+- `patient_data` / `request_patient` - Patient data exchange
+
+**WhatsApp Messaging:**
+- `whatsapp_client_ready` / `whatsapp_qr_updated` - Client status
+- `whatsapp_message_status` / `whatsapp_message_batch_status` - Message tracking
+- `whatsapp_initial_state_response` - Initial state for status clients
+
+**System Events:**
+- `system_error` / `data_updated` / `broadcast_message` - General system events
+
+### Clean Implementation:
+All WebSocket events use the universal naming convention exclusively. No legacy events are supported, ensuring clean and consistent code throughout the application.
+
+**Key Files:**
+- `services/messaging/websocket-events.js` - Universal event constants
+- `docs/websocket-events.md` - Complete documentation
 
 ## Development Notes
 

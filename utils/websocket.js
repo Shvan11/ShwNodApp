@@ -7,6 +7,7 @@ import messageState from '../services/state/messageState.js';
 import { getTimePointImgs } from '../services/database/queries/timepoint-queries.js';
 import { getLatestVisitsSum } from '../services/database/queries/visit-queries.js';
 import { createWebSocketMessage, validateWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
+import { WebSocketEvents, createStandardMessage } from '../services/messaging/websocket-events.js';
 /**
  * WebSocket Connection Manager
  * Manages different types of WebSocket connections
@@ -389,20 +390,11 @@ function setupWebSocketServer(server) {
   
           console.log(`Received message: ${typeof parsedMessage === 'string' ? parsedMessage : JSON.stringify(parsedMessage).substring(0, 100)}`);
   
-          // Handle message based on type
+          // Handle message based on type - only support universal typed messages
           if (typeof parsedMessage === 'object' && parsedMessage.type) {
             handleTypedMessage(ws, parsedMessage, date, connectionManager);
-          } else if (messageStr === 'updateMessage' && date) {
-            // Legacy support for 'updateMessage' string command
-            console.log(`Processing updateMessage request for date: ${date}`);
-            await sendAppointmentsData(ws, date);
-          } else if (messageStr === 'ping') {
-            // Legacy support for 'ping' string command
-            if (ws.readyState === ws.OPEN) {
-              ws.send(JSON.stringify({ type: 'pong' }));
-            }
           } else {
-            // Unrecognized message
+            // Unrecognized message format
             console.log('Unrecognized message format, ignoring');
           }
         } catch (msgError) {
@@ -468,44 +460,42 @@ function setupWebSocketServer(server) {
     return;
   }
 
-  // Handle different message types
+  // Handle different message types using universal event constants
   switch (message.type) {
-    case 'ping':
-      // ===== FIXED: Simple pong response =====
+    case WebSocketEvents.HEARTBEAT_PING:
       const pongMessage = {
-        type: 'pong',
+        type: WebSocketEvents.HEARTBEAT_PONG,
         timestamp: Date.now(),
         originalId: message.id
       };
       connectionManager.sendToClient(ws, pongMessage);
       break;
 
-    case 'pong':
+    case WebSocketEvents.HEARTBEAT_PONG:
       connectionManager.updateClientCapabilities(ws, {
         supportsPing: true,
         lastPong: Date.now()
       });
       break;
 
-
-    case 'getAppointments':
+    case WebSocketEvents.REQUEST_APPOINTMENTS:
       const requestDate = message.data?.date || date;
       if (requestDate) {
         await sendAppointmentsData(ws, requestDate, connectionManager);
       }
       break;
 
-    case 'getPatient':
+    case WebSocketEvents.REQUEST_PATIENT:
       if (message.data?.patientId) {
         await sendPatientData(ws, message.data.patientId, connectionManager);
       }
       break;
 
-    case 'capabilities':
+    case WebSocketEvents.CLIENT_CAPABILITIES:
       connectionManager.updateClientCapabilities(ws, message.data?.capabilities || {});
       break;
 
-    case 'request_initial_state':
+    case WebSocketEvents.REQUEST_WHATSAPP_INITIAL_STATE:
       console.log('Received request for initial state via WebSocket');
       await sendInitialStateForWaClient(ws, message.data, connectionManager);
       break;
@@ -588,8 +578,8 @@ function setupWebSocketServer(server) {
         timestamp: Date.now()
       };
 
-      const message = createWebSocketMessage(
-        'initial_state_response',
+      const message = createStandardMessage(
+        WebSocketEvents.WHATSAPP_INITIAL_STATE_RESPONSE,
         responseData
       );
 
@@ -621,8 +611,8 @@ function setupWebSocketServer(server) {
       const result = await getPresentAps(date);
       console.log(`Got appointments data for date ${date}: ${result.appointments ? result.appointments.length : 0} appointments`);
   
-      const message = createWebSocketMessage(
-        'appointment_data',
+      const message = createStandardMessage(
+        WebSocketEvents.APPOINTMENTS_DATA,
         { tableData: result },
         { date }
       );
@@ -654,8 +644,8 @@ function setupWebSocketServer(server) {
       const images = await getPatientImages(patientId);
       const latestVisit = await getLatestVisitsSum(patientId);
   
-      const message = createWebSocketMessage(
-        'patient_data',
+      const message = createStandardMessage(
+        WebSocketEvents.PATIENT_DATA,
         {
           pid: patientId,
           images,
@@ -724,15 +714,15 @@ function setupWebSocketServer(server) {
  */
 function setupGlobalEventHandlers(emitter, connectionManager) {
   // Handle appointment updates
-  emitter.on('updated', async (dateParam) => {
-    console.log(`Received 'updated' event for date: ${dateParam}`);
+  const handleAppointmentUpdate = async (dateParam) => {
+    console.log(`Received appointment update event for date: ${dateParam}`);
 
     try {
       const appointmentData = await getPresentAps(dateParam);
       console.log(`Fetched appointment data for date ${dateParam}: ${appointmentData.appointments ? appointmentData.appointments.length : 0} appointments`);
 
-      const message = createWebSocketMessage(
-        'appointment_update',
+      const message = createStandardMessage(
+        WebSocketEvents.APPOINTMENTS_UPDATED,
         { tableData: appointmentData },
         { date: dateParam }
       );
@@ -742,11 +732,14 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
     } catch (error) {
       console.error(`Error fetching appointment data for date ${dateParam}:`, error);
     }
-  });
+  };
+
+  // Listen to universal event names only
+  emitter.on(WebSocketEvents.DATA_UPDATED, handleAppointmentUpdate);
 
   // Handle patient loaded event
-  emitter.on('patientLoaded', async (pid, targetScreenID) => {
-    console.log(`Received 'patientLoaded' event for patient ${pid}, screen ${targetScreenID}`);
+  const handlePatientLoaded = async (pid, targetScreenID) => {
+    console.log(`Received patient loaded event for patient ${pid}, screen ${targetScreenID}`);
     
     // Check if target screen is connected and ready
     const screenConnection = connectionManager.screenConnections.get(targetScreenID);
@@ -781,8 +774,8 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
       
       const latestVisit = await getLatestVisitsSum(pid);
       
-      const message = createWebSocketMessage(
-        'patient_loaded',
+      const message = createStandardMessage(
+        WebSocketEvents.PATIENT_LOADED,
         {
           pid,
           images: filteredImages,
@@ -800,11 +793,14 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
     } catch (error) {
       console.error(`Error processing patient loaded event:`, error);
     }
-  });
+  };
+
+  // Listen to universal event names only
+  emitter.on(WebSocketEvents.PATIENT_LOADED, handlePatientLoaded);
 
   // Handle patient unloaded event
-  emitter.on('patientUnLoaded', (targetScreenID) => {
-    console.log(`Received 'patientUnLoaded' event for screen ${targetScreenID}`);
+  const handlePatientUnloaded = (targetScreenID) => {
+    console.log(`Received patient unloaded event for screen ${targetScreenID}`);
 
     // Check if target screen is connected and ready
     const screenConnection = connectionManager.screenConnections.get(targetScreenID);
@@ -820,19 +816,22 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
       return;
     }
 
-    const message = createWebSocketMessage(
-      'patient_unloaded',
+    const message = createStandardMessage(
+      WebSocketEvents.PATIENT_UNLOADED,
       {}
     );
 
     const success = connectionManager.sendToScreen(targetScreenID, message);
 
     if (success) {
-      console.log(`Sent patientunLoaded to screen ${targetScreenID}`);
+      console.log(`Sent patient unloaded to screen ${targetScreenID}`);
     } else {
-      console.log(`Failed to send patientunLoaded - screen ${targetScreenID} not found or not ready`);
+      console.log(`Failed to send patient unloaded - screen ${targetScreenID} not found or not ready`);
     }
-  });
+  };
+
+  // Listen to universal event names only
+  emitter.on(WebSocketEvents.PATIENT_UNLOADED, handlePatientUnloaded);
 
   // Handle WhatsApp message updates with batching
   const statusUpdateBuffer = new Map();

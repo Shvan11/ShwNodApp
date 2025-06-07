@@ -435,7 +435,7 @@ class AppointmentsPageController {
       console.error('WebSocket error:', error);
     });
 
-    // Handle appointment updates (both legacy 'updated' and new 'appointmentUpdate' events)
+    // Handle appointment updates
     const handleAppointmentUpdate = (data) => {
       console.log('Received WebSocket appointment update:', data);
 
@@ -472,28 +472,33 @@ class AppointmentsPageController {
       }
     };
 
-    // Handle legacy 'updated' event
-    websocketService.on('updated', handleAppointmentUpdate);
-    
-    // Handle new 'appointmentUpdate' event (from appointment_update server message)
-    websocketService.on('appointmentUpdate', handleAppointmentUpdate);
+    // Listen to universal appointment update events only
+    websocketService.on('appointments_updated', handleAppointmentUpdate);
+    websocketService.on('appointments_data', handleAppointmentUpdate);
 
     // Handle patient loaded event
-    websocketService.on('patientLoaded', async data => {
-      console.log('Received patientLoaded event:', data);
+    const handlePatientLoaded = async (data) => {
+      console.log('Received patient loaded event:', data);
       console.log('Current screen ID:', storage.screenId());
       
       this.activePID = data.pid;
       await this.showPatientData(data);
       this.highlightActivePatient();
-    });
+    };
+
+    // Listen to universal patient loaded events only
+    websocketService.on('patient_loaded', handlePatientLoaded);
 
     // Handle patient unloaded event
-    websocketService.on('patientUnloaded', () => {
+    const handlePatientUnloaded = () => {
+      console.log('Received patient unloaded event');
       this.activePID = null;
       this.unloadPatientData();
       this.highlightActivePatient();
-    });
+    };
+
+    // Listen to universal patient unloaded events only
+    websocketService.on('patient_unloaded', handlePatientUnloaded);
 
     websocketService.connect();
   }

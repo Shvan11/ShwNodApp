@@ -14,23 +14,24 @@ const router = express.Router();
 const pageRewrites = [
   // Messaging pages
   { url: '/send-message', file: '/views/messaging/send-message.html' },
+  { url: '/send', file: '/views/messaging/send.html' },
   
   // Patient pages
-  { url: '/patient-lookup', file: '/views/patient/lookup.html' },
-  { url: '/patient-details', file: '/views/patient/details.html' },
+  { url: '/details', file: '/views/patient/details.html' },
   { url: '/canvas', file: '/views/patient/canvas.html' },
   { url: '/visits-summary', file: '/views/patient/visits-summary.html' },
   { url: '/payments', file: '/views/patient/payments.html' },
   { url: '/grid', file: '/views/patient/grid.html' },
   { url: '/add-visit', file: '/views/patient/add-visit.html' },
   { url: '/search', file: '/views/patient/search.html' },
-  { url: '/send-message', file: '/views/messaging/send-message.html' },
-  { url: '/appointments.html', file: '/views/appointments.html' },
-  { url: '/send', file: '/views/messaging/send.html' },
-  { url: '/xrays.html', file: '/views/xrays.html' },
-
   
-  // Other pages
+  // Appointment pages
+  { url: '/appointments.html', file: '/views/appointments.html' },
+  { url: '/appointments', file: '/views/appointments.html' },
+  { url: '/appointments-simplified', file: '/views/appointments/simplified.html' },
+  
+  // X-ray pages
+  { url: '/xrays.html', file: '/views/xrays.html' },
   { url: '/xrays', file: '/views/xrays.html' },
   
   // Handle legacy URLs with new paths

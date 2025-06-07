@@ -5,6 +5,7 @@
  */
 import EventEmitter from '../core/events.js';
 import storage from '../core/storage.js';
+import { WebSocketEvents } from '../constants/websocket-events.js';
 
 class WebSocketService extends EventEmitter {
   /**
@@ -430,12 +431,15 @@ class WebSocketService extends EventEmitter {
       this.log(`Received message: ${typeof message === 'string' ? message : JSON.stringify(message).substring(0, 100)}`);
       
       // Check if it's a heartbeat/ping response
-      if (typeof message === 'object' && (message.type === 'pong' || message.type === 'ping')) {
+      if (typeof message === 'object' && (
+          message.type === WebSocketEvents.HEARTBEAT_PING || 
+          message.type === WebSocketEvents.HEARTBEAT_PONG
+        )) {
         // Handle ping/pong
-        if (message.type === 'ping') {
+        if (message.type === WebSocketEvents.HEARTBEAT_PING) {
           // Respond to ping with pong
-          this.send({ type: 'pong' }, { queueIfDisconnected: false });
-        } else if (message.type === 'pong') {
+          this.send({ type: WebSocketEvents.HEARTBEAT_PONG }, { queueIfDisconnected: false });
+        } else if (message.type === WebSocketEvents.HEARTBEAT_PONG) {
           this.log('Received heartbeat pong response');
   
           // Clear the timeout timer since we got a response
@@ -478,13 +482,13 @@ class WebSocketService extends EventEmitter {
         this.emit(message.messageType, message);
       }
       
-      // Handle new format messages with 'type' field
+      // Handle messages with 'type' field
       if (typeof message === 'object' && message.type) {
-        // Convert snake_case server message types to camelCase client events
-        const eventName = message.type.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
-        this.log(`Emitting event '${eventName}' from message type '${message.type}'`);
-        console.log(`WebSocket message received - Type: ${message.type}, EventName: ${eventName}, Data:`, message.data || message);
-        this.emit(eventName, message.data || message);
+        this.log(`Emitting event for message type '${message.type}'`);
+        console.log(`WebSocket message received - Type: ${message.type}, Data:`, message.data || message);
+        
+        // Emit the universal event
+        this.emit(message.type, message.data || message);
       }
       
       // Always emit generic message event
@@ -685,7 +689,7 @@ class WebSocketService extends EventEmitter {
     this.log('Sending heartbeat (ping)');
     
     // Send ping message
-    this.send({ type: 'ping' }, { queueIfDisconnected: false })
+    this.send({ type: WebSocketEvents.HEARTBEAT_PING }, { queueIfDisconnected: false })
       .then(() => {
         this.log('Heartbeat (ping) sent successfully');
         

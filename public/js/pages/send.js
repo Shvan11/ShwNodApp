@@ -3,6 +3,7 @@
  * Handles all WhatsApp messaging functionality with clean architecture
  */
 import EventEmitter from '../core/events.js';
+import { ProgressBar } from '../components/progress-bar.js';
 
 // Configuration Constants
 const CONFIG = {
@@ -35,6 +36,7 @@ const CONFIG = {
 const API_ENDPOINTS = {
     MESSAGE_COUNT: (date) => `/api/messaging/count/${date}`,
     MESSAGE_RESET: (date) => `/api/messaging/reset/${date}`,
+    MESSAGE_STATUS: (date) => `/api/messaging/status/${date}`,
     WA_SEND: (date) => `/api/wa/send?date=${date}`,
     WA_RESTART: '/api/wa/restart',
     WA_DESTROY: '/api/wa/destroy',
@@ -94,10 +96,20 @@ class ValidationManager {
     }
     
     static validateApiResponse(data, expectedFields = []) {
-        if (!data || typeof data !== 'object') {
+        if (!data) {
             throw new Error('Invalid response format');
         }
         
+        // Allow arrays as valid responses
+        if (Array.isArray(data)) {
+            return data;
+        }
+        
+        if (typeof data !== 'object') {
+            throw new Error('Invalid response format');
+        }
+        
+        // Only validate required fields if explicitly specified
         for (const field of expectedFields) {
             if (!(field in data)) {
                 throw new Error(`Missing required field: ${field}`);
@@ -198,8 +210,12 @@ class APIClient {
                 const data = await response.json();
                 return ValidationManager.validateApiResponse(data, options.expectedFields || []);
             }, {
+                maxAttempts: url.includes('/messaging/status/') ? 1 : CONFIG.RETRY_MAX_ATTEMPTS,
                 onRetry: (error, attempt, delay) => {
-                    console.warn(`API request retry ${attempt} for ${url} after ${delay}ms:`, error.message);
+                    // Only log retries for important requests, not message status
+                    if (!url.includes('/messaging/status/')) {
+                        console.warn(`API request retry ${attempt} for ${url} after ${delay}ms:`, error.message);
+                    }
                 }
             });
         } finally {
@@ -407,6 +423,12 @@ class DOMManager {
             qrImage: document.getElementById('qrImage'),
             qrContainer: document.getElementById('qrContainer'),
             tableContainer: document.getElementById('tableContainer'),
+            
+            // Progress bar elements  
+            progressContainer: document.getElementById('progressContainer'),
+            progressBarFill: document.getElementById('progressBarFill'),
+            progressStats: document.getElementById('progressStats'),
+            progressText: document.getElementById('progressText'),
             
             // Header status
             connectionText: document.querySelector('.connection-text')
@@ -643,12 +665,23 @@ class DateManager extends EventEmitter {
             defaultDate.setDate(today.getDate() + 1);
         }
         
-        return defaultDate.toISOString().slice(0, 10);
+        // Use a simple local date string method since this is called from constructor
+        const year = defaultDate.getFullYear();
+        const month = String(defaultDate.getMonth() + 1).padStart(2, '0');
+        const day = String(defaultDate.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 
     generateDateOptions(daysForward = CONFIG.DATE_RANGE_DAYS_FORWARD) {
         const today = new Date();
         const dates = [];
+        
+        // Add past days (7 days back) for historical message status viewing
+        for (let i = CONFIG.DATE_RANGE_DAYS_BACK; i > 0; i--) {
+            const date = new Date(today);
+            date.setDate(today.getDate() - i);
+            dates.push(date);
+        }
         
         // Add today
         dates.push(new Date(today));
@@ -661,10 +694,10 @@ class DateManager extends EventEmitter {
         }
 
         this.dateOptions = dates.map(date => ({
-            value: date.toISOString().slice(0, 10),
+            value: this.getLocalDateString(date),
             label: this.formatDateLabel(date),
             isToday: this.isToday(date),
-            isDefault: date.toISOString().slice(0, 10) === this.currentDate
+            isDefault: this.getLocalDateString(date) === this.currentDate
         }));
 
         return this.dateOptions;
@@ -672,26 +705,75 @@ class DateManager extends EventEmitter {
 
     formatDateLabel(date) {
         const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        
+        // Use local date strings to avoid timezone issues
+        const dateStr = this.getLocalDateString(date);
         const today = new Date();
-        const dateStr = date.toISOString().slice(0, 10);
-        const todayStr = today.toISOString().slice(0, 10);
+        const todayStr = this.getLocalDateString(today);
+        
+        // Calculate yesterday and tomorrow using proper date arithmetic
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        const yesterdayStr = this.getLocalDateString(yesterday);
+        
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+        const tomorrowStr = this.getLocalDateString(tomorrow);
         
         let label = `${dateStr} (${dayNames[date.getDay()]})`;
         
         if (dateStr === todayStr) {
             label += ' - Today';
-        } else if (dateStr === new Date(today.getTime() - 86400000).toISOString().slice(0, 10)) {
+        } else if (dateStr === yesterdayStr) {
             label += ' - Yesterday';  
-        } else if (dateStr === new Date(today.getTime() + 86400000).toISOString().slice(0, 10)) {
+        } else if (dateStr === tomorrowStr) {
             label += ' - Tomorrow';
+        } else {
+            // Calculate days difference using local dates
+            const daysDiff = this.calculateDaysDifference(date, today);
+            
+            if (daysDiff < 0) {
+                // Past dates
+                const absDays = Math.abs(daysDiff);
+                if (absDays <= 7) {
+                    label += ` - ${absDays} days ago`;
+                }
+            } else if (daysDiff > 0) {
+                // Future dates beyond tomorrow
+                if (daysDiff <= 7) {
+                    label += ` - In ${daysDiff} days`;
+                }
+            }
         }
         
         return label;
     }
 
+    /**
+     * Get local date string in YYYY-MM-DD format without timezone issues
+     */
+    getLocalDateString(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    /**
+     * Calculate days difference between two dates using local time
+     */
+    calculateDaysDifference(date1, date2) {
+        // Create dates at midnight local time to avoid time-of-day issues
+        const d1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate());
+        const d2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate());
+        
+        const timeDiff = d1.getTime() - d2.getTime();
+        return Math.round(timeDiff / (1000 * 60 * 60 * 24));
+    }
+
     isToday(date) {
         const today = new Date();
-        return date.toISOString().slice(0, 10) === today.toISOString().slice(0, 10);
+        return this.getLocalDateString(date) === this.getLocalDateString(today);
     }
 
     setCurrentDate(date) {
@@ -745,7 +827,9 @@ class WebSocketConnectionManager extends EventEmitter {
             clientReady: (data) => this.emit('clientStatusChanged', data),
             messageStatus: (data) => this.emit('messageStatusUpdate', data),
             sendingFinished: (data) => this.emit('sendingCompleted', data),
-            initialStateResponse: (data) => this.emit('initialStateReceived', data)
+            initialStateResponse: (data) => this.emit('initialStateReceived', data),
+            sendingStarted: (data) => this.emit('sendingStarted', data),
+            sendingProgress: (data) => this.emit('sendingProgress', data)
         };
 
         // Register event handlers
@@ -755,16 +839,14 @@ class WebSocketConnectionManager extends EventEmitter {
         this.websocketService.on('error', this.boundHandlers.error);
         
         // Message events (handle both naming conventions)
-        this.websocketService.on('qrUpdate', this.boundHandlers.qrUpdate);
-        this.websocketService.on('qr_update', this.boundHandlers.qrUpdate);
-        this.websocketService.on('clientReady', this.boundHandlers.clientReady);
-        this.websocketService.on('client_ready', this.boundHandlers.clientReady);
-        this.websocketService.on('messageStatus', this.boundHandlers.messageStatus);
-        this.websocketService.on('message_status', this.boundHandlers.messageStatus);
-        this.websocketService.on('sendingFinished', this.boundHandlers.sendingFinished);
-        this.websocketService.on('sending_finished', this.boundHandlers.sendingFinished);
-        this.websocketService.on('initialStateResponse', this.boundHandlers.initialStateResponse);
-        this.websocketService.on('initial_state_response', this.boundHandlers.initialStateResponse);
+        // Universal WebSocket events only
+        this.websocketService.on('whatsapp_qr_updated', this.boundHandlers.qrUpdate);
+        this.websocketService.on('whatsapp_client_ready', this.boundHandlers.clientReady);
+        this.websocketService.on('whatsapp_message_status', this.boundHandlers.messageStatus);
+        this.websocketService.on('whatsapp_sending_finished', this.boundHandlers.sendingFinished);
+        this.websocketService.on('whatsapp_initial_state_response', this.boundHandlers.initialStateResponse);
+        this.websocketService.on('whatsapp_sending_started', this.boundHandlers.sendingStarted);
+        this.websocketService.on('whatsapp_sending_progress', this.boundHandlers.sendingProgress);
     }
 
     setConnectionState(state) {
@@ -797,7 +879,7 @@ class WebSocketConnectionManager extends EventEmitter {
     requestInitialState() {
         console.log('Requesting initial state from server...');
         this.send({
-            type: 'request_initial_state',
+            type: 'request_whatsapp_initial_state',
             data: {
                 date: this.dateManager?.getCurrentDate() || new Date().toISOString().slice(0, 10),
                 timestamp: Date.now()
@@ -841,16 +923,14 @@ class WebSocketConnectionManager extends EventEmitter {
             this.websocketService.off('connected', handler);
             this.websocketService.off('disconnected', handler);
             this.websocketService.off('error', handler);
-            this.websocketService.off('qrUpdate', handler);
-            this.websocketService.off('qr_update', handler);
-            this.websocketService.off('clientReady', handler);
-            this.websocketService.off('client_ready', handler);
-            this.websocketService.off('messageStatus', handler);
-            this.websocketService.off('message_status', handler);
-            this.websocketService.off('sendingFinished', handler);
-            this.websocketService.off('sending_finished', handler);
-            this.websocketService.off('initialStateResponse', handler);
-            this.websocketService.off('initial_state_response', handler);
+            // Universal WebSocket events only
+            this.websocketService.off('whatsapp_qr_updated', handler);
+            this.websocketService.off('whatsapp_client_ready', handler);
+            this.websocketService.off('whatsapp_message_status', handler);
+            this.websocketService.off('whatsapp_sending_finished', handler);
+            this.websocketService.off('whatsapp_initial_state_response', handler);
+            this.websocketService.off('whatsapp_sending_started', handler);
+            this.websocketService.off('whatsapp_sending_progress', handler);
         });
         
         // Disconnect
@@ -875,6 +955,7 @@ class WhatsAppMessengerApp extends EventEmitter {
         // Will be initialized after websocket import
         this.connectionManager = null;
         this.buttonStateManager = null;
+        this.progressBar = null;
         
         // Cleanup tracking
         this.cleanupTasks = [];
@@ -890,6 +971,9 @@ class WhatsAppMessengerApp extends EventEmitter {
             
             // Initialize button state manager
             this.buttonStateManager = new ButtonStateManager(this.domManager);
+            
+            // Initialize progress bar
+            this.initializeProgressBar();
             
             // Initialize WebSocket connection
             await this.initializeWebSocket();
@@ -949,6 +1033,14 @@ class WhatsAppMessengerApp extends EventEmitter {
 
         this.connectionManager.on('initialStateReceived', (data) => {
             this.handleInitialState(data);
+        });
+        
+        this.connectionManager.on('sendingStarted', (data) => {
+            this.handleSendingStarted(data);
+        });
+        
+        this.connectionManager.on('sendingProgress', (data) => {
+            this.handleSendingProgress(data);
         });
     }
 
@@ -1018,6 +1110,23 @@ class WhatsAppMessengerApp extends EventEmitter {
         });
     }
 
+    initializeProgressBar() {
+        // Initialize progress bar if elements exist
+        const progressBarFill = this.domManager.getElement('progressBarFill');
+        const progressContainer = this.domManager.getElement('progressContainer');
+        
+        if (progressBarFill && progressContainer) {
+            this.progressBar = new ProgressBar({
+                filledBar: progressBarFill,
+                emptyBar: progressContainer, // Use container as the empty bar reference
+                interval: CONFIG.PROGRESS_BAR_INTERVAL_MS
+            });
+            console.log('Progress bar initialized successfully');
+        } else {
+            console.warn('Progress bar elements not found - progress bar disabled');
+        }
+    }
+
     setupUIStateManagement() {
         // Listen for state changes and update UI accordingly
         const stateChangeHandler = ({ newState, updates }) => {
@@ -1048,6 +1157,7 @@ class WhatsAppMessengerApp extends EventEmitter {
 
     async loadInitialData() {
         await this.loadMessageCount();
+        await this.loadMessageStatusTable();
         await this.connectWebSocket();
     }
 
@@ -1074,6 +1184,221 @@ class WhatsAppMessengerApp extends EventEmitter {
             this.messageDisplay.displayError(error, 'Failed to load message count');
             this.stateManager.updateState({ messageCount: null });
         }
+    }
+
+    async loadMessageStatusTable() {
+        const currentDate = this.dateManager.getCurrentDate();
+        
+        try {
+            console.log(`Loading message status table for date: ${currentDate}`);
+            
+            const data = await this.apiClient.get(
+                API_ENDPOINTS.MESSAGE_STATUS(currentDate),
+                { 
+                    cancelPrevious: 'messageStatus'
+                    // Don't require specific fields - let the API return what it has
+                }
+            );
+
+            console.log('Message status API response:', data);
+
+            // Handle different API response formats
+            let messages = null;
+            let hasValidResponse = false;
+
+            if (data && typeof data === 'object') {
+                // Try different possible response structures
+                if (data.success === true || data.success === undefined) {
+                    if (data.messages && Array.isArray(data.messages)) {
+                        messages = data.messages;
+                        hasValidResponse = true;
+                    } else if (data.data && Array.isArray(data.data)) {
+                        messages = data.data;
+                        hasValidResponse = true;
+                    } else if (Array.isArray(data)) {
+                        // API might return array directly
+                        messages = data;
+                        hasValidResponse = true;
+                    }
+                } else if (data.success === false) {
+                    console.log('API returned success=false:', data.error || 'No data available');
+                    hasValidResponse = true; // Valid response, just no data
+                }
+            }
+
+            if (hasValidResponse) {
+                if (messages && messages.length > 0) {
+                    this.displayMessageStatusTable(messages, currentDate);
+                } else {
+                    // No messages found for this date - this is normal
+                    this.clearMessageStatusTable();
+                    console.log(`No messages found for date: ${currentDate}`);
+                }
+            } else {
+                console.warn('Invalid API response structure:', data);
+                this.clearMessageStatusTable();
+            }
+            
+        } catch (error) {
+            // Don't show error for missing data - it's normal for dates with no messages
+            if (error.message.includes('HTTP 404') || error.message.includes('Not Found')) {
+                console.log(`No message data available for date: ${currentDate}`);
+                this.clearMessageStatusTable();
+            } else {
+                console.warn('Failed to load message status table:', error.message);
+                this.clearMessageStatusTable();
+            }
+        }
+    }
+
+    displayMessageStatusTable(messages, date) {
+        const tableContainer = this.domManager.getElement('tableContainer');
+        if (!tableContainer) return;
+
+        console.log(`Displaying ${messages.length} message statuses for ${date}`);
+
+        // Create table HTML
+        let html = `
+            <div class="message-status-table">
+                <h3>Message Status for ${this.formatDisplayDate(date)}</h3>
+                <div class="table-responsive">
+                    <table class="status-table">
+                        <thead>
+                            <tr>
+                                <th>Patient</th>
+                                <th>Phone</th>
+                                <th>Status</th>
+                                <th>Time Sent</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        messages.forEach(msg => {
+            const statusText = this.getStatusText(msg.status);
+            const statusClass = this.getStatusClass(msg.status);
+            
+            // Handle different time field names that might come from API
+            let timeSent = 'Not sent';
+            if (msg.timeSent) {
+                timeSent = new Date(msg.timeSent).toLocaleTimeString();
+            } else if (msg.sentAt) {
+                timeSent = new Date(msg.sentAt).toLocaleTimeString();
+            } else if (msg.timestamp) {
+                timeSent = new Date(msg.timestamp).toLocaleTimeString();
+            }
+            
+            // Handle different field names for patient info
+            const patientName = msg.patientName || msg.name || msg.patient || 'N/A';
+            const phoneNumber = msg.phone || msg.phoneNumber || msg.mobile || 'N/A';
+            const messageText = msg.message || msg.messageText || msg.content || '';
+            
+            const messagePreview = messageText.substring(0, 50) + (messageText.length > 50 ? '...' : '');
+
+            html += `
+                <tr class="status-row ${statusClass}">
+                    <td class="patient-name">${this.escapeHtml(patientName)}</td>
+                    <td class="phone-number">${this.escapeHtml(phoneNumber)}</td>
+                    <td class="status-cell">
+                        <span class="status-indicator ${statusClass}"></span>
+                        ${statusText}
+                    </td>
+                    <td class="time-sent">${timeSent}</td>
+                    <td class="message-preview" title="${this.escapeHtml(messageText)}">${this.escapeHtml(messagePreview)}</td>
+                </tr>
+            `;
+        });
+
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-summary">
+                    <span class="summary-item">Total: ${messages.length}</span>
+                    <span class="summary-item">Pending: ${messages.filter(m => m.status === 0).length}</span>
+                    <span class="summary-item">Server: ${messages.filter(m => m.status === 1).length}</span>
+                    <span class="summary-item">Device: ${messages.filter(m => m.status === 2).length}</span>
+                    <span class="summary-item">Read: ${messages.filter(m => m.status === 3).length}</span>
+                    <span class="summary-item">Played: ${messages.filter(m => m.status === 4).length}</span>
+                    <span class="summary-item">Failed: ${messages.filter(m => m.status < 0).length}</span>
+                </div>
+            </div>
+        `;
+
+        tableContainer.innerHTML = html;
+        tableContainer.style.display = 'block';
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text || '';
+        return div.innerHTML;
+    }
+
+    clearMessageStatusTable() {
+        const tableContainer = this.domManager.getElement('tableContainer');
+        if (tableContainer) {
+            const currentDate = this.dateManager.getCurrentDate();
+            const today = new Date();
+            const todayStr = this.dateManager.getLocalDateString(today);
+            const isToday = currentDate === todayStr;
+            const isPast = currentDate < todayStr;
+            
+            let message = '';
+            if (isPast) {
+                message = 'No messages were sent on this date';
+            } else if (isToday) {
+                message = 'No messages sent yet today';
+            } else {
+                message = 'No messages scheduled for this date';
+            }
+            
+            tableContainer.innerHTML = `
+                <div class="results-placeholder">
+                    <p class="placeholder-text">
+                        <span class="status-icon" aria-hidden="true">📊</span>
+                        ${message}
+                    </p>
+                </div>
+            `;
+        }
+    }
+
+    getStatusText(status) {
+        switch (status) {
+            case 0: return 'Pending';
+            case 1: return 'Server';
+            case 2: return 'Device';
+            case 3: return 'Read';
+            case 4: return 'Played';
+            case -1: return 'Failed';
+            case -2: return 'Invalid Phone';
+            default: return 'Unknown';
+        }
+    }
+
+    getStatusClass(status) {
+        switch (status) {
+            case 0: return 'status-pending';
+            case 1: return 'status-server';
+            case 2: return 'status-device';
+            case 3: return 'status-read';
+            case 4: return 'status-played';
+            case -1: return 'status-failed';
+            case -2: return 'status-invalid';
+            default: return 'status-unknown';
+        }
+    }
+
+    formatDisplayDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
     }
 
     formatMessageCountDisplay(count) {
@@ -1147,6 +1472,37 @@ class WhatsAppMessengerApp extends EventEmitter {
     handleMessageStatusUpdate(data) {
         // Update message status in UI
         this.emit('messageStatusUpdated', data);
+        
+        // Reload the message status table to show updated data
+        this.loadMessageStatusTable();
+    }
+    
+    handleSendingStarted(data) {
+        console.log('Sending started:', data);
+        
+        this.stateManager.updateState({
+            sendingProgress: {
+                started: true,
+                finished: false,
+                total: data.total,
+                sent: data.sent || 0,
+                failed: data.failed || 0
+            }
+        });
+    }
+    
+    handleSendingProgress(data) {
+        console.log('Sending progress:', data);
+        
+        const currentState = this.stateManager.getState();
+        this.stateManager.updateState({
+            sendingProgress: {
+                ...currentState.sendingProgress,
+                sent: data.sent,
+                failed: data.failed,
+                finished: data.finished || false
+            }
+        });
     }
 
     handleSendingCompleted(data) {
@@ -1181,13 +1537,33 @@ class WhatsAppMessengerApp extends EventEmitter {
                 });
             }
             
-            // Update sending progress if available
-            if (data.sendingProgress) {
-                console.log('Updating sending progress:', data.sendingProgress);
+            // Update sending progress if available and currently active
+            if (data.sendingProgress && data.sendingProgress.started && !data.sendingProgress.finished) {
+                console.log('Updating active sending progress:', data.sendingProgress);
                 this.stateManager.updateState({
                     sendingProgress: data.sendingProgress
                 });
+            } else if (data.sendingProgress && data.sendingProgress.finished) {
+                // If sending is finished, clear the progress state
+                console.log('Clearing finished sending progress');
+                this.stateManager.updateState({
+                    sendingProgress: {
+                        started: false,
+                        finished: false,
+                        total: 0,
+                        sent: 0,
+                        failed: 0
+                    }
+                });
             }
+
+            // Only display message status table if we have actual message data
+            if (data.messages && Array.isArray(data.messages)) {
+                // If messages array is provided directly
+                this.displayMessageStatusTable(data.messages, this.dateManager.getCurrentDate());
+            }
+            // DO NOT display htmltext from initial state - it contains stale sending status
+            // The proper message status table is loaded separately via loadMessageStatusTable()
         }
     }
 
@@ -1204,6 +1580,11 @@ class WhatsAppMessengerApp extends EventEmitter {
         });
 
         try {
+            // Reset progress bar if it exists
+            if (this.progressBar) {
+                this.progressBar.reset();
+            }
+            
             this.stateManager.updateState({
                 sendingProgress: {
                     started: true,
@@ -1229,6 +1610,12 @@ class WhatsAppMessengerApp extends EventEmitter {
                 }
             });
             this.buttonStateManager.resetButton('startButton');
+            
+            // Hide progress bar on error
+            if (this.progressBar) {
+                this.progressBar.reset();
+                this.domManager.toggleElementVisibility('progressContainer', false);
+            }
         }
     }
 
@@ -1402,7 +1789,26 @@ class WhatsAppMessengerApp extends EventEmitter {
 
     onDateChanged(newDate) {
         console.log(`Date changed to: ${newDate}`);
+        
+        // Clear any stale sending progress state when changing dates
+        this.stateManager.updateState({
+            sendingProgress: {
+                started: false,
+                finished: false,
+                total: 0,
+                sent: 0,
+                failed: 0
+            }
+        });
+        
+        // Hide progress bar if visible
+        if (this.progressBar) {
+            this.progressBar.reset();
+            this.domManager.toggleElementVisibility('progressContainer', false);
+        }
+        
         this.loadMessageCount();
+        this.loadMessageStatusTable(); // Load message status table for the new date
         
         // Reconnect WebSocket with new date parameters
         if (this.connectionManager && this.connectionManager.isConnected()) {
@@ -1470,28 +1876,37 @@ class WhatsAppMessengerApp extends EventEmitter {
         this.domManager.setElementDisabled('startButton', !clientStatus.ready);
         this.domManager.toggleElementVisibility('startButton', clientStatus.ready);
 
-        // Update status text with accessibility
-        if (clientStatus.ready) {
-            console.log('Setting status to ready');
-            this.domManager.setElementContent('stateElement', '✅ WhatsApp client is ready!', { announce: true });
-            this.domManager.setElementContent('connectionText', 'Client Ready');
-        } else if (clientStatus.qrCode) {
-            console.log('Setting status to QR code needed');
-            this.domManager.setElementContent('stateElement', '📱 Please scan the QR code with WhatsApp', { announce: true });
-            this.domManager.setElementContent('connectionText', 'Scan QR Code');
-        } else if (clientStatus.error) {
-            console.log('Setting status to error:', clientStatus.error);
-            this.domManager.setElementContent('stateElement', `❌ Error: ${clientStatus.error}`, { announce: true });
-            this.domManager.setElementContent('connectionText', 'Error');
-        } else {
-            console.log('Setting status to initializing');
-            this.domManager.setElementContent('stateElement', '⏳ Initializing WhatsApp client...');
-            this.domManager.setElementContent('connectionText', 'Initializing...');
+        // Only update status text if not currently showing sending progress
+        const currentState = this.stateManager.getState();
+        const isActivelySending = currentState.sendingProgress.started && 
+                                 !currentState.sendingProgress.finished && 
+                                 currentState.sendingProgress.total > 0;
+        
+        if (!isActivelySending) {
+            // Update status text with accessibility
+            if (clientStatus.ready) {
+                console.log('Setting status to ready');
+                this.domManager.setElementContent('stateElement', '✅ WhatsApp client is ready!', { announce: true });
+                this.domManager.setElementContent('connectionText', 'Client Ready');
+            } else if (clientStatus.qrCode) {
+                console.log('Setting status to QR code needed');
+                this.domManager.setElementContent('stateElement', '📱 Please scan the QR code with WhatsApp', { announce: true });
+                this.domManager.setElementContent('connectionText', 'Scan QR Code');
+            } else if (clientStatus.error) {
+                console.log('Setting status to error:', clientStatus.error);
+                this.domManager.setElementContent('stateElement', `❌ Error: ${clientStatus.error}`, { announce: true });
+                this.domManager.setElementContent('connectionText', 'Error');
+            } else {
+                console.log('Setting status to initializing');
+                this.domManager.setElementContent('stateElement', '⏳ Initializing WhatsApp client...');
+                this.domManager.setElementContent('connectionText', 'Initializing...');
+            }
         }
     }
 
     updateSendingProgress(progress) {
-        if (progress.started && !progress.finished) {
+        // Only show sending progress if actually sending and has valid total count
+        if (progress.started && !progress.finished && progress.total > 0) {
             const progressText = `📤 Sending messages... ${progress.sent}/${progress.total}`;
             this.domManager.setElementContent('stateElement', progressText, { announce: true });
             
@@ -1499,10 +1914,50 @@ class WhatsAppMessengerApp extends EventEmitter {
             this.buttonStateManager.setButtonState('startButton', BUTTON_STATES.LOADING, {
                 text: `Sending ${progress.sent}/${progress.total}`
             });
-        } else if (progress.finished) {
+            
+            // Update visual progress bar
+            if (this.progressBar) {
+                if (progress.sent === 0 && progress.total > 0) {
+                    // Start progress bar on first message
+                    this.progressBar.initiate();
+                    this.domManager.toggleElementVisibility('progressContainer', true);
+                }
+                
+                // Calculate and update progress percentage
+                if (progress.total > 0) {
+                    const percentage = Math.min((progress.sent / progress.total) * 100, 100);
+                    this.progressBar.width = `${percentage}%`;
+                    
+                    // Update progress stats and text
+                    this.domManager.setElementContent('progressStats', `${progress.sent}/${progress.total}`);
+                    this.domManager.setElementContent('progressText', `${progress.sent} of ${progress.total} messages sent`);
+                }
+            }
+        } else if (progress.finished && progress.total > 0) {
             const completedText = `✅ Completed! ${progress.sent} sent, ${progress.failed} failed`;
             this.domManager.setElementContent('stateElement', completedText, { announce: true });
+            
+            // Complete and hide progress bar
+            if (this.progressBar) {
+                this.progressBar.finish();
+                this.domManager.setElementContent('progressText', 'All messages sent!');
+                setTimeout(() => {
+                    this.progressBar.reset();
+                    this.domManager.toggleElementVisibility('progressContainer', false);
+                    // Clear the progress state after showing completion
+                    this.stateManager.updateState({
+                        sendingProgress: {
+                            started: false,
+                            finished: false,
+                            total: 0,
+                            sent: 0,
+                            failed: 0
+                        }
+                    });
+                }, 2000); // Hide after 2 seconds
+            }
         }
+        // If progress.total is 0 or invalid, don't show sending progress
     }
 
     // Cleanup
@@ -1535,6 +1990,10 @@ class WhatsAppMessengerApp extends EventEmitter {
         
         if (this.messageDisplay) {
             this.messageDisplay.cleanup();
+        }
+        
+        if (this.progressBar) {
+            this.progressBar.reset();
         }
 
         // Clear state

@@ -449,7 +449,7 @@ class Appointments2PageController {
       
       // Send capabilities update
       websocketService.send({
-        type: 'capabilities',
+        type: 'client_capabilities',
         capabilities: {
           supportsJson: true,
           supportsPing: true,
@@ -459,8 +459,8 @@ class Appointments2PageController {
       
       // Request initial appointments data
       websocketService.send({
-        type: 'getAppointments',
-        date: this.dateString
+        type: 'request_appointments',
+        data: { date: this.dateString }
       });
     });
     
@@ -475,17 +475,21 @@ class Appointments2PageController {
       this.showError('WebSocket connection error');
     });
     
-    // Handle 'updated' event (appointments data)
-    websocketService.on('updated', data => {
+    // Handle appointment update events
+    const handleAppointmentUpdate = (data) => {
       console.log('Received appointments update:', data);
       
       if (!data || !data.tableData) {
-        console.error('Invalid data in "updated" event:', data);
+        console.error('Invalid data in appointment update event:', data);
         return;
       }
       
       this.updateAppointmentsUI(data.tableData);
-    });
+    };
+
+    // Listen to universal appointment events
+    websocketService.on('appointments_updated', handleAppointmentUpdate);
+    websocketService.on('appointments_data', handleAppointmentUpdate);
     
     // Connect WebSocket
     websocketService.connect({

@@ -86,17 +86,35 @@ async function initializeApplication() {
             person.success = '&#10004;';
             await messageState.addPerson(person);
             
-            // Broadcast via WebSocket
+            // Broadcast via WebSocket using correct event name
             if (wsEmitter) {
-                const message = createWebSocketMessage(
-                    MessageSchemas.WebSocketMessage.MESSAGE_STATUS,
-                    {
+                const message = {
+                    type: 'whatsapp_message_status',
+                    data: {
                         messageId: person.messageId,
-                        status: MessageSchemas.MessageStatus.SERVER,
-                        person
-                    }
-                );
+                        status: 1, // MessageSchemas.MessageStatus.SERVER
+                        patientName: person.name,
+                        phone: person.number,
+                        timeSent: new Date().toISOString(),
+                        message: '', // Will be populated from database if needed
+                        appointmentId: person.appointmentId
+                    },
+                    timestamp: Date.now()
+                };
                 wsEmitter.emit('broadcast_message', message);
+                
+                // Also emit progress update
+                const stats = messageState.dump();
+                const progressMessage = {
+                    type: 'whatsapp_sending_progress',
+                    data: {
+                        sent: stats.sentMessages,
+                        failed: stats.failedMessages,
+                        finished: stats.finishedSending
+                    },
+                    timestamp: Date.now()
+                };
+                wsEmitter.emit('broadcast_message', progressMessage);
             }
             
             console.log("MessageSent processed successfully");
@@ -111,17 +129,36 @@ async function initializeApplication() {
             person.success = '&times;';
             await messageState.addPerson(person);
             
-            // Broadcast failure
+            // Broadcast failure using correct event name
             if (wsEmitter) {
-                const message = createWebSocketMessage(
-                    MessageSchemas.WebSocketMessage.MESSAGE_STATUS,
-                    {
+                const message = {
+                    type: 'whatsapp_message_status',
+                    data: {
                         messageId: person.messageId || `failed_${Date.now()}`,
-                        status: MessageSchemas.MessageStatus.ERROR,
-                        person
-                    }
-                );
+                        status: -1, // MessageSchemas.MessageStatus.ERROR
+                        patientName: person.name,
+                        phone: person.number,
+                        timeSent: null,
+                        message: '',
+                        error: person.error,
+                        appointmentId: person.appointmentId
+                    },
+                    timestamp: Date.now()
+                };
                 wsEmitter.emit('broadcast_message', message);
+                
+                // Also emit progress update
+                const stats = messageState.dump();
+                const progressMessage = {
+                    type: 'whatsapp_sending_progress',
+                    data: {
+                        sent: stats.sentMessages,
+                        failed: stats.failedMessages,
+                        finished: stats.finishedSending
+                    },
+                    timestamp: Date.now()
+                };
+                wsEmitter.emit('broadcast_message', progressMessage);
             }
             
             console.log("MessageFailed processed successfully");
@@ -135,12 +172,19 @@ async function initializeApplication() {
         try {
             await messageState.setFinishedSending(true);
             
-            // Broadcast completion
+            // Broadcast completion using correct event name
             if (wsEmitter) {
-                const message = createWebSocketMessage(
-                    'sending_finished',
-                    { finished: true, stats: messageState.dump() }
-                );
+                const stats = messageState.dump();
+                const message = {
+                    type: 'whatsapp_sending_finished',
+                    data: { 
+                        finished: true, 
+                        sent: stats.sentMessages,
+                        failed: stats.failedMessages,
+                        total: stats.sentMessages + stats.failedMessages
+                    },
+                    timestamp: Date.now()
+                };
                 wsEmitter.emit('broadcast_message', message);
             }
         } catch (error) {
@@ -153,12 +197,13 @@ async function initializeApplication() {
         try {
             await messageState.setClientReady(true);
             
-            // Broadcast client ready
+            // Broadcast client ready using correct event name
             if (wsEmitter) {
-                const message = createWebSocketMessage(
-                    MessageSchemas.WebSocketMessage.CLIENT_READY,
-                    { clientReady: true }
-                );
+                const message = {
+                    type: 'whatsapp_client_ready',
+                    data: { clientReady: true },
+                    timestamp: Date.now()
+                };
                 wsEmitter.emit('broadcast_message', message);
             }
             
@@ -175,10 +220,11 @@ async function initializeApplication() {
             
             // Only broadcast if there are active viewers
             if (messageState.activeQRViewers > 0 && wsEmitter) {
-                const message = createWebSocketMessage(
-                    MessageSchemas.WebSocketMessage.QR_UPDATE,
-                    { qr, clientReady: false }
-                );
+                const message = {
+                    type: 'whatsapp_qr_updated',
+                    data: { qr, clientReady: false },
+                    timestamp: Date.now()
+                };
                 wsEmitter.emit('broadcast_message', message);
             }
         } catch (error) {

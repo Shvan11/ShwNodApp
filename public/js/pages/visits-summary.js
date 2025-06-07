@@ -5,6 +5,7 @@
 import api from '../services/api.js';
 import { formatDate } from '../core/utils.js';
 import { Modal } from '../components/modal.js';
+import { gettimepoints } from '../utils/navigation.js';
 
 class VisitsSummaryController {
   constructor() {
@@ -79,14 +80,11 @@ class VisitsSummaryController {
   }
   
   loadTimepoints() {
-    // Use the existing module.js function for navigation
-    const script = document.createElement('script');
-    script.type = 'module';
-    script.textContent = `
-      import { gettimepoints } from "./module.js";
-      gettimepoints("${this.patientId}", "visitsSummary");
-    `;
-    document.body.appendChild(script);
+    // Use the universal navigation component
+    if (this.patientId) {
+      gettimepoints(this.patientId, "visitsSummary");
+    }
+
   }
   
   async loadWiresData() {

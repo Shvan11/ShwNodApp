@@ -104,7 +104,7 @@ class SearchPageController {
       this.idSelect.clear();
       
       // Redirect to grid page
-      window.location.href = `/grid.html?code=${value}`;
+      window.location.href = `grid?code=${value}`;
     };
     
     // Apply to all selects

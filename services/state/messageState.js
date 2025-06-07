@@ -173,10 +173,19 @@ class MessageStateManager {
       }];
     });
 
-    await StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, (stats) => ({
-      ...(stats || {}),
-      sent: (stats?.sent || 0) + 1
-    }));
+    // Only increment sent count if message was successfully sent
+    if (person.success === '&#10004;') {
+      await StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, (stats) => ({
+        ...(stats || {}),
+        sent: (stats?.sent || 0) + 1
+      }));
+    } else if (person.success === '&times;') {
+      // Increment failed count for failed messages
+      await StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, (stats) => ({
+        ...(stats || {}),
+        failed: (stats?.failed || 0) + 1
+      }));
+    }
 
     return true;
   }
