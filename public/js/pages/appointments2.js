@@ -1,14 +1,27 @@
 // pages/appointments2.js
 /**
  * Appointments2 Page Controller
- * A simplified version of the appointments page without patient images
+ * A simplified version of the appointments page without patient images or screen requirements
+ * Uses live WebSocket updates for real-time appointment data
  */
-import Clock from '../components/clock.js';
-import Table from '../components/table.js';
 import websocketService from '../services/websocket.js';
 import appointmentService from '../services/appointment.js';
-import storage from '../core/storage.js';
-import { getElement } from '../core/dom.js';
+import { 
+  formatDateString, 
+  findBasicElements,
+  updateAppointmentsUI,
+  updateAppointmentsTable,
+  createAppointmentsTable,
+  createConnectionIndicator,
+  showError,
+  setupDayChangeDetection,
+  setupClock,
+  updateTable,
+  loadAppointments,
+  handleDayChange,
+  destroyAppointmentsController,
+  initializeAppointmentsController
+} from '../components/appointments-shared.js';
 
 class Appointments2PageController {
   /**
@@ -17,247 +30,57 @@ class Appointments2PageController {
   constructor() {
     // Current date
     this.date = new Date();
-    this.dateString = this.formatDateString(this.date);
+    this.dateString = formatDateString(this.date);
     this.weekday = this.date.toLocaleDateString(undefined, { weekday: 'long' });
     
-    // Ensure screen ID is set
-    this.ensureScreenIdSet();
     
     // Create connection status indicator
-    this.createConnectionIndicator();
+    this.connectionIndicator = createConnectionIndicator();
     
-    // Initialize properties
-    this.findElements();
-    this.setupClock();
+    // Find DOM elements using shared utility
+    const elements = findBasicElements();
+    Object.assign(this, elements);
     
-    // Load appointments data
-    this.loadAppointments();
-    
+    // Initialize async setup
+    this.init();
+  }
+  
+  /**
+   * Initialize the page
+   * @private
+   */
+  async init() {
+    // Set up clock
+    this.clock = await setupClock('#canvas');
+
+    // Load initial appointments data
+    await loadAppointments(
+      this,
+      appointmentService,
+      this.updateUI.bind(this),
+      () => showError('Failed to load appointments data', this.tableContainer)
+    );
+
     // Set up WebSocket connection
     this.setupWebSocket();
-    
+
     // Set up day change detection
     this.setupDayChangeDetection();
   }
   
   /**
-   * Ensure screen ID is set in storage
-   * @private
-   */
-  ensureScreenIdSet() {
-    // This will prompt for screen ID if not already set
-    storage.screenId();
-  }
-  
-  /**
-   * Create connection status indicator
-   * @private
-   */
-  createConnectionIndicator() {
-    // Create connection status indicator
-    this.connectionIndicator = document.createElement('div');
-    this.connectionIndicator.id = 'connection-status';
-    this.connectionIndicator.className = 'connection-status';
-    this.connectionIndicator.title = 'WebSocket Connection Status';
-    
-    // Style the indicator
-    Object.assign(this.connectionIndicator.style, {
-      position: 'fixed',
-      bottom: '10px',
-      right: '10px',
-      width: '16px',
-      height: '16px',
-      borderRadius: '50%',
-      backgroundColor: '#cccccc', // Gray (initial state)
-      border: '2px solid white',
-      boxShadow: '0 0 4px rgba(0, 0, 0, 0.3)',
-      transition: 'background-color 0.3s ease',
-      zIndex: 1000
-    });
-    
-    // Add to document
-    document.body.appendChild(this.connectionIndicator);
-  }
-  
-  /**
-   * Update connection status indicator
-   * @param {string} status - Connection status
-   * @private
-   */
-  updateConnectionStatus(status) {
-    if (!this.connectionIndicator) return;
-    
-    const colors = {
-      disconnected: '#ff3d00', // Red
-      connecting: '#ffc107',   // Yellow/amber
-      connected: '#4caf50',    // Green
-      error: '#f44336'         // Error red
-    };
-    
-    this.connectionIndicator.style.backgroundColor = colors[status] || '#cccccc';
-    this.connectionIndicator.title = `WebSocket: ${status}`;
-  }
-  
-  /**
-   * Find DOM elements used by the controller
-   * @private
-   */
-  findElements() {
-    // Title element
-    this.titleElement = getElement('#title');
-    
-    // Appointment table container
-    this.tableContainer = getElement('#appointments-container');
-    
-    // Statistics elements
-    this.statsElements = {
-      all: getElement('#all'),
-      present: getElement('#present'),
-      waiting: getElement('#waiting'),
-      completed: getElement('#completed')
-    };
-  }
-  
-  /**
-   * Format date to YYYY-M-D string
-   * @param {Date} date - Date to format
-   * @returns {string} - Formatted date
-   * @private
-   */
-  formatDateString(date) {
-    return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
-  }
-  
-  /**
-   * Set up the analog clock
-   * @private
-   */
-  setupClock() {
-    const canvasElement = getElement('#canvas');
-    
-    if (canvasElement) {
-      this.clock = new Clock(canvasElement, {
-        updateInterval: 10000 // Update every 10 seconds
-      });
-    }
-  }
-  
-  /**
-   * Load appointments data
-   * @private
-   */
-  async loadAppointments() {
-    try {
-      // Update title
-      if (this.titleElement) {
-        this.titleElement.textContent = `${this.weekday} ${this.dateString}`;
-      }
-      
-      // Fetch appointments
-      const appointmentsData = await appointmentService.getAppointments(this.dateString);
-      
-      // Update UI with data
-      this.updateAppointmentsUI(appointmentsData);
-    } catch (error) {
-      console.error('Error loading appointments:', error);
-      this.showError('Failed to load appointments data');
-    }
-  }
-  
-  /**
-   * Update appointments UI
+   * Update UI with appointments data
    * @param {Object} data - Appointments data
    * @private
    */
-  updateAppointmentsUI(data) {
-    if (!data) {
-      console.error('Invalid appointments data:', data);
-      this.showError('Invalid appointments data');
-      return;
-    }
-    
-    // Update statistics
-    this.updateStatistics(data);
-    
-    // Update table
-    this.updateAppointmentsTable(data.appointments || []);
-  }
-  
-  /**
-   * Show error message
-   * @param {string} message - Error message
-   * @private
-   */
-  showError(message) {
-    // Check if error container exists
-    let errorContainer = document.getElementById('appointments-error');
-    
-    if (!errorContainer) {
-      // Create error container
-      errorContainer = document.createElement('div');
-      errorContainer.id = 'appointments-error';
-      errorContainer.className = 'error-message';
-      
-      // Style error container
-      Object.assign(errorContainer.style, {
-        backgroundColor: 'rgba(244, 67, 54, 0.1)',
-        color: '#f44336',
-        padding: '10px',
-        margin: '10px 0',
-        borderRadius: '4px',
-        border: '1px solid #f44336',
-        transition: 'opacity 0.5s ease'
-      });
-      
-      // Add to container
-      if (this.tableContainer) {
-        this.tableContainer.parentNode.insertBefore(errorContainer, this.tableContainer);
-      } else {
-        document.body.appendChild(errorContainer);
-      }
-    }
-    
-    // Update error message
-    errorContainer.textContent = message;
-    errorContainer.style.opacity = '1';
-    
-    // Auto-hide after 10 seconds
-    setTimeout(() => {
-      if (errorContainer.parentNode) {
-        errorContainer.style.opacity = '0';
-        
-        // Remove after fade out
-        setTimeout(() => {
-          if (errorContainer.parentNode) {
-            errorContainer.parentNode.removeChild(errorContainer);
-          }
-        }, 500);
-      }
-    }, 10000);
-  }
-  
-  /**
-   * Update statistics display
-   * @param {Object} data - Appointments data
-   * @private
-   */
-  updateStatistics(data) {
-    // Safely update statistics with defaults if values are missing
-    if (this.statsElements.all) {
-      this.statsElements.all.textContent = data.all || 0;
-    }
-    
-    if (this.statsElements.present) {
-      this.statsElements.present.textContent = data.present || 0;
-    }
-    
-    if (this.statsElements.waiting) {
-      this.statsElements.waiting.textContent = data.waiting || 0;
-    }
-    
-    if (this.statsElements.completed) {
-      this.statsElements.completed.textContent = data.completed || 0;
-    }
+  updateUI(data) {
+    updateAppointmentsUI(
+      data,
+      this.statsElements,
+      this.updateTable.bind(this),
+      null, // No highlighting for simplified view
+      this.tableContainer
+    );
   }
   
   /**
@@ -265,141 +88,27 @@ class Appointments2PageController {
    * @param {Array} appointments - Appointments data
    * @private
    */
-  updateAppointmentsTable(appointments) {
-    // Check if appointments is an array
-    if (!Array.isArray(appointments)) {
-      console.error('Invalid appointments format:', appointments);
-      this.showError('Invalid appointments format');
-      return;
-    }
-    
-    console.log(`Updating table with ${appointments.length} appointments`);
-    
-    try {
-      // Format appointment data for the table component
-      const formattedData = this.formatAppointmentsData(appointments);
-      
-      if (!formattedData || !formattedData.length) {
-        console.warn('No appointments data to display');
-      }
-      
-      // Initialize or update table component
-      if (!this.appointmentsTable) {
-        this.createTable(formattedData);
-      } else {
-        this.updateTable(formattedData);
-      }
-    } catch (error) {
-      console.error('Error updating appointments table:', error);
-      this.showError('Error updating appointments table');
-    }
+  updateTable(appointments) {
+    updateAppointmentsTable(
+      appointments,
+      { table: this.appointmentsTable },
+      this.createTable.bind(this),
+      this.updateExistingTable.bind(this),
+      this.tableContainer
+    );
   }
   
   /**
-   * Format appointments data for table component
-   * @param {Array} appointments - Raw appointments data
-   * @returns {Array} - Formatted data
-   * @private
-   */
-  formatAppointmentsData(appointments) {
-    return appointments.map(appointmentColumns => {
-      // Ensure appointmentColumns is an array
-      if (!Array.isArray(appointmentColumns)) {
-        console.warn('Invalid appointment row format:', appointmentColumns);
-        return {
-          patientName: 'Error: Invalid row format',
-          pid: ''
-        };
-      }
-      
-      // Extract values with safe defaults
-      return {
-        no: this.getColumnValue(appointmentColumns, 0, ''),
-        time: this.getColumnValue(appointmentColumns, 1, ''),
-        type: this.getColumnValue(appointmentColumns, 2, ''),
-        patientName: this.getColumnValue(appointmentColumns, 3, 'Unknown'),
-        detail: this.getColumnValue(appointmentColumns, 4, ''),
-        present: this.getColumnValue(appointmentColumns, 5, ''),
-        seated: this.getColumnValue(appointmentColumns, 6, ''),
-        dismissed: this.getColumnValue(appointmentColumns, 7, ''),
-        notes: this.getColumnValue(appointmentColumns, 8, '') === 'true',
-        pid: this.getColumnValue(appointmentColumns, 9, '')
-      };
-    });
-  }
-  
-  /**
-   * Get column value with error handling
-   * @param {Array} row - Row data
-   * @param {number} index - Column index
-   * @param {*} defaultValue - Default value if column is missing
-   * @returns {*} - Column value or default
-   * @private
-   */
-  getColumnValue(row, index, defaultValue) {
-    if (!row[index] || row[index].value === undefined) {
-      return defaultValue;
-    }
-    return row[index].value;
-  }
-  
-  /**
-   * Create appointments table
+   * Create new table
    * @param {Array} data - Table data
    * @private
    */
-  createTable(data) {
-    // Define table columns
-    const columns = [
-      { field: 'no', title: 'No', width: 50 },
-      { field: 'time', title: 'Time', width: 80 },
-      { field: 'type', title: 'Type', width: 100 },
-      { 
-        field: 'patientName', 
-        title: 'Patient Name',
-        render: (value, row) => {
-          return `<a href="/visits-summary?PID=${row.pid}">${value}</a>`;
-        }
-      },
-      { field: 'detail', title: 'Detail' },
-      { 
-        field: 'present', 
-        title: 'Present',
-        cellClassName: 'status-cell',
-        render: (value, row) => {
-          // Apply cell styling based on appointment status
-          let backgroundColor = 'pink'; // Default - waiting
-          
-          if (row.dismissed) {
-            backgroundColor = 'lightgreen'; // Completed
-          } else if (row.seated) {
-            backgroundColor = 'lightyellow'; // Seated
-          }
-          
-          return {
-            content: value || '',
-            style: { backgroundColor }
-          };
-        }
-      },
-      { field: 'seated', title: 'Seated' },
-      { field: 'dismissed', title: 'Dismissed' },
-      { 
-        field: 'notes', 
-        title: 'Notes',
-        render: value => value ? '✓' : '✗'
-      }
-    ];
-    
-    // Create table
-    this.appointmentsTable = new Table(this.tableContainer, {
-      columns,
+  async createTable(data) {
+    this.appointmentsTable = await createAppointmentsTable(
       data,
-      className: 'appointments-table',
-      responsive: true
-    });
-    
-    console.log('Created new appointments table');
+      this.tableContainer,
+      true // Include patient links for simplified interactive view
+    );
   }
   
   /**
@@ -407,100 +116,91 @@ class Appointments2PageController {
    * @param {Array} data - Table data
    * @private
    */
-  updateTable(data) {
-    if (!this.appointmentsTable) {
-      this.createTable(data);
-      return;
-    }
-    
-    try {
-      // Update table data
-      this.appointmentsTable.setData(data);
-      console.log('Updated existing appointments table');
-    } catch (error) {
-      console.error('Error updating table:', error);
-      
-      // Recreate table on error
+  updateExistingTable(data) {
+    updateTable(this.appointmentsTable, data, (data) => {
       this.appointmentsTable = null;
       this.createTable(data);
-    }
+    });
   }
   
   /**
-   * Set up WebSocket connection for real-time updates
+   * Set up WebSocket connection
    * @private
    */
   setupWebSocket() {
-    // Update connection status
-    this.updateConnectionStatus('connecting');
-    
-    // Configure WebSocket service
-    websocketService.options.debug = true;
-    
-    // Register event handlers
-    websocketService.on('connecting', () => {
-      this.updateConnectionStatus('connecting');
-      console.log('WebSocket connecting...');
-    });
-    
+    // Add status indicator to the page
+    const statusIndicator = document.createElement('div');
+    statusIndicator.id = 'ws-status';
+    statusIndicator.style.position = 'fixed';
+    statusIndicator.style.bottom = '10px';
+    statusIndicator.style.left = '10px';
+    statusIndicator.style.padding = '5px 10px';
+    statusIndicator.style.borderRadius = '5px';
+    statusIndicator.style.fontSize = '12px';
+    document.body.appendChild(statusIndicator);
+
+    const updateStatus = (status) => {
+      const colors = {
+        connecting: '#ffa500', // orange
+        connected: '#00c853',  // green
+        disconnected: '#ff3d00', // red
+        error: '#d50000'       // deep red
+      };
+
+      statusIndicator.textContent = `WebSocket: ${status}`;
+      statusIndicator.style.backgroundColor = colors[status] || '#9e9e9e';
+      statusIndicator.style.color = '#ffffff';
+    };
+
+    // Connect websocket
+    updateStatus('connecting');
+
+    // Handle connection events
     websocketService.on('connected', () => {
-      this.updateConnectionStatus('connected');
+      updateStatus('connected');
       console.log('WebSocket connected');
-      
-      // Send capabilities update
-      websocketService.send({
-        type: 'client_capabilities',
-        capabilities: {
-          supportsJson: true,
-          supportsPing: true,
-          handlesDisconnects: true
-        }
-      });
-      
-      // Request initial appointments data
-      websocketService.send({
-        type: 'request_appointments',
-        data: { date: this.dateString }
-      });
     });
-    
+
     websocketService.on('disconnected', () => {
-      this.updateConnectionStatus('disconnected');
+      updateStatus('disconnected');
       console.log('WebSocket disconnected');
     });
-    
+
     websocketService.on('error', (error) => {
-      this.updateConnectionStatus('error');
+      updateStatus('error');
       console.error('WebSocket error:', error);
-      this.showError('WebSocket connection error');
     });
-    
-    // Handle appointment update events
+
+    // Handle appointment updates
     const handleAppointmentUpdate = (data) => {
-      console.log('Received appointments update:', data);
-      
+      console.log('Received WebSocket appointment update:', data);
+
       if (!data || !data.tableData) {
         console.error('Invalid data in appointment update event:', data);
         return;
       }
-      
-      this.updateAppointmentsUI(data.tableData);
+
+      // Check appointments data structure
+      const appointments = data.tableData.appointments;
+      if (!appointments || !Array.isArray(appointments)) {
+        console.error('Invalid appointments data:', appointments);
+        return;
+      }
+
+      console.log(`Processing ${appointments.length} appointments from WebSocket update`);
+
+      try {
+        this.updateUI(data.tableData);
+      } catch (error) {
+        console.error('Error handling WebSocket update:', error);
+      }
     };
 
-    // Listen to universal appointment events
+    // Listen to universal appointment update events only
     websocketService.on('appointments_updated', handleAppointmentUpdate);
     websocketService.on('appointments_data', handleAppointmentUpdate);
-    
-    // Connect WebSocket
-    websocketService.connect({
-      clientType: 'screen'
-    }).catch(error => {
-      console.error('Error connecting WebSocket:', error);
-      this.showError('Failed to connect to server');
-      
-      // Fallback to regular API
-      this.loadAppointments();
-    });
+
+    websocketService.connect({ clientType: 'simplified' });
   }
   
   /**
@@ -508,77 +208,28 @@ class Appointments2PageController {
    * @private
    */
   setupDayChangeDetection() {
-    // Check for day change every minute
-    setInterval(() => {
-      const currentDate = new Date();
-      const currentDateString = this.formatDateString(currentDate);
-      
-      if (currentDateString !== this.dateString) {
-        console.log('Day changed, updating to new date:', currentDateString);
-        
-        // Update date properties
-        this.date = currentDate;
-        this.dateString = currentDateString;
-        this.weekday = currentDate.toLocaleDateString(undefined, { weekday: 'long' });
-        
-        // Update UI
-        if (this.titleElement) {
-          this.titleElement.textContent = `${this.weekday} ${this.dateString}`;
-        }
-        
-        // Request new data via WebSocket if connected
-        if (websocketService.isConnected) {
-          websocketService.send({
-            type: 'getAppointments',
-            date: this.dateString
-          });
-        } else {
-          // Fallback to API
-          this.loadAppointments();
-        }
-      }
-    }, 60000); // Check every minute
+    this.dayChangeCleanup = setupDayChangeDetection(
+      handleDayChange(
+        this,
+        () => {
+          if (this.titleElement) {
+            this.titleElement.textContent = `${this.weekday} ${this.dateString}`;
+          }
+        },
+        websocketService,
+        this.init.bind(this)
+      ),
+      this.dateString
+    );
   }
   
   /**
    * Clean up resources
    */
   destroy() {
-    // Remove event listeners
-    websocketService.off('connecting');
-    websocketService.off('connected');
-    websocketService.off('disconnected');
-    websocketService.off('error');
-    websocketService.off('updated');
-    
-    // Stop clock
-    if (this.clock) {
-      this.clock.destroy();
-    }
-    
-    // Destroy table
-    if (this.appointmentsTable) {
-      this.appointmentsTable.destroy();
-    }
-    
-    // Disconnect WebSocket
-    websocketService.disconnect();
-    
-    // Remove connection indicator
-    if (this.connectionIndicator) {
-      this.connectionIndicator.remove();
-    }
+    destroyAppointmentsController(this, websocketService);
   }
 }
 
-// Initialize controller when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  window.appointments2Controller = new Appointments2PageController();
-});
-
-// Handle page unload
-window.addEventListener('beforeunload', () => {
-  if (window.appointments2Controller) {
-    window.appointments2Controller.destroy();
-  }
-});
+// Initialize controller using shared utility
+initializeAppointmentsController(Appointments2PageController, 'appointments2Controller');

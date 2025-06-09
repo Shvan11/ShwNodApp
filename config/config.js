@@ -19,6 +19,21 @@ for (const envVar of requiredEnvVars) {
   }
 }
 
+// Platform-specific port configuration
+function getDefaultPort() {
+  // Check if running in WSL (Linux with WSL_DISTRO_NAME environment variable)
+  const isWSL = process.platform === 'linux' && process.env.WSL_DISTRO_NAME;
+  
+  // Force platform type if specified
+  const platformType = process.env.PLATFORM_TYPE;
+  
+  if (platformType === 'wsl' || (isWSL && platformType !== 'windows')) {
+    return 3000; // WSL/Ubuntu default port
+  } else {
+    return 80;   // Windows default port
+  }
+}
+
 export default {
   database: {
     server: process.env.DB_SERVER,
@@ -53,7 +68,7 @@ export default {
     machinePath: process.env.MACHINE_PATH
   },
   server: {
-    port: process.env.PORT || 80
+    port: process.env.PORT || getDefaultPort()
   },
   urls: {
     qrHost: process.env.QR_HOST_URL

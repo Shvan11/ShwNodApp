@@ -1863,10 +1863,7 @@ class WhatsAppMessengerApp extends EventEmitter {
         
         // Update QR code display
         if (clientStatus.qrCode) {
-            this.domManager.setElementAttribute('qrImage', 'src', clientStatus.qrCode);
-            this.domManager.setElementAttribute('qrImage', 'alt', 'WhatsApp QR Code for authentication');
-            this.domManager.toggleElementVisibility('qrImage', true);
-            this.domManager.toggleElementVisibility('qrContainer', true);
+            this.generateAndDisplayQRCode(clientStatus.qrCode);
         } else {
             this.domManager.toggleElementVisibility('qrImage', false);
             this.domManager.toggleElementVisibility('qrContainer', false);
@@ -1901,6 +1898,40 @@ class WhatsAppMessengerApp extends EventEmitter {
                 this.domManager.setElementContent('stateElement', '⏳ Initializing WhatsApp client...');
                 this.domManager.setElementContent('connectionText', 'Initializing...');
             }
+        }
+    }
+
+    async generateAndDisplayQRCode(qrData) {
+        try {
+            // Fetch QR code image from backend API
+            const response = await fetch('/api/wa/qr');
+            
+            if (!response.ok) {
+                if (response.status === 404) {
+                    console.log('QR code not available yet, hiding QR container');
+                    this.domManager.toggleElementVisibility('qrImage', false);
+                    this.domManager.toggleElementVisibility('qrContainer', false);
+                    return;
+                }
+                throw new Error(`Failed to fetch QR code: ${response.status}`);
+            }
+            
+            const qrResponse = await response.json();
+            
+            if (qrResponse.qr) {
+                this.domManager.setElementAttribute('qrImage', 'src', qrResponse.qr);
+                this.domManager.setElementAttribute('qrImage', 'alt', 'WhatsApp QR Code for authentication');
+                this.domManager.toggleElementVisibility('qrImage', true);
+                this.domManager.toggleElementVisibility('qrContainer', true);
+            } else {
+                this.domManager.toggleElementVisibility('qrImage', false);
+                this.domManager.toggleElementVisibility('qrContainer', false);
+            }
+        } catch (error) {
+            console.error('Failed to fetch QR code:', error);
+            // Fallback: hide QR container if generation fails
+            this.domManager.toggleElementVisibility('qrImage', false);
+            this.domManager.toggleElementVisibility('qrContainer', false);
         }
     }
 
@@ -1968,7 +1999,7 @@ class WhatsAppMessengerApp extends EventEmitter {
         this.apiClient.cancelAllRequests();
         
         // Clear all debounce timers
-        for (const [key, timer] of this.debounceTimers) {
+        for (const [, timer] of this.debounceTimers) {
             clearTimeout(timer);
         }
         this.debounceTimers.clear();

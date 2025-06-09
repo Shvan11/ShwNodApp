@@ -28,7 +28,7 @@ const pageRewrites = [
   // Appointment pages
   { url: '/appointments.html', file: '/views/appointments.html' },
   { url: '/appointments', file: '/views/appointments.html' },
-  { url: '/appointments-simplified', file: '/views/appointments/simplified.html' },
+  { url: '/simplified', file: '/views/appointments/simplified.html' },
   
   // X-ray pages
   { url: '/xrays.html', file: '/views/xrays.html' },
@@ -43,14 +43,13 @@ const pageRewrites = [
 // ==============================
 
 // Serve the main page at root
-router.get('/', (req, res) => {
+router.get('/', (_, res) => {
     res.sendFile(path.join(process.cwd(), './public/index.html'));
 });
 
 // Apply all page rewrites
 pageRewrites.forEach(({ url, file }) => {
-  router.get(url, (req, res) => {
-    // Forward query parameters
+  router.get(url, (_, res) => {
     res.sendFile(path.join(process.cwd(), `./public${file}`));
   });
 });

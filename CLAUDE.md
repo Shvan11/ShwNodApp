@@ -42,7 +42,10 @@ This is a Node.js/Express web application for **Shwan Orthodontics** - a dental 
 Essential for database connectivity:
 - `DB_SERVER`, `DB_INSTANCE`, `DB_USER`, `DB_PASSWORD`
 - `MACHINE_PATH` - File system path for patient images
-- `PORT` - Server port (defaults to 80)
+- `PORT` - Server port (defaults to platform-specific: Windows=80, WSL/Ubuntu=3000)
+
+Cross-platform configuration:
+- `PLATFORM_TYPE` - Force platform type: 'windows' or 'wsl' (optional, auto-detects if not set)
 
 Optional service integrations:
 - `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`
@@ -111,6 +114,41 @@ All WebSocket events use the universal naming convention exclusively. No legacy 
 - `services/messaging/websocket-events.js` - Universal event constants
 - `docs/websocket-events.md` - Complete documentation
 
+## Cross-Platform Path Configuration
+
+The application now supports both Windows and WSL environments with automatic path conversion:
+
+### Automatic Detection
+- **WSL**: Detected when running on Linux with `WSL_DISTRO_NAME` environment variable
+- **Windows**: Detected when running on Windows (`win32` platform)
+
+### Path Examples
+- **Windows UNC**: `\\\\server\\share\\folder` → `/mnt/server/share/folder` (WSL)
+- **Windows Drive**: `C:\\folder` → `/mnt/c/folder` (WSL)
+- **WSL Mount**: `/mnt/server/share/folder` → `\\\\server\\share\\folder` (Windows)
+
+### Environment Configuration
+Set `MACHINE_PATH` to your network path:
+- **Windows**: `\\\\your-server\\clinic1` or `C:\\clinic1`
+- **WSL**: `/mnt/your-server/clinic1` or `/mnt/c/clinic1`
+
+### Platform Override
+Force platform detection by setting:
+```bash
+export PLATFORM_TYPE=wsl    # Force WSL mode (port 3000)
+export PLATFORM_TYPE=windows # Force Windows mode (port 80)
+```
+
+### Port Configuration
+The application automatically selects the appropriate default port based on the platform:
+- **Windows**: Port 80 (standard HTTP port)
+- **WSL/Ubuntu**: Port 3000 (development-friendly port)
+
+You can override the port by setting the `PORT` environment variable:
+```bash
+export PORT=8080  # Use custom port
+```
+
 ## Development Notes
 
 - Uses ES modules (`"type": "module"` in package.json)
@@ -118,4 +156,4 @@ All WebSocket events use the universal naming convention exclusively. No legacy 
 - Graceful shutdown handling for all services
 - Circuit breaker pattern for messaging resilience
 - Connection pooling for database operations
-- File system integration for patient image storage over network paths
+- Cross-platform file system integration with automatic path conversion

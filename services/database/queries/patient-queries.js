@@ -5,6 +5,7 @@ import { executeQuery, executeStoredProcedure, TYPES } from '../index.js';
 import fs from 'fs';
 import * as readline from 'node:readline';
 import config from '../../../config/config.js';
+import { createPathResolver } from '../../../utils/path-resolver.js';
 
 /**
  * Retrieves patient information for a given patient ID.
@@ -37,12 +38,12 @@ export function getInfos(PID) {
  * @returns {Promise<Object>} - A promise that resolves with an object containing asset information.
  */
 async function getAssets(pid) {
-    const machinePath = config.fileSystem.machinePath;
-    const xrayDir = `\\\\${machinePath}\\clinic1\\${pid}\\opg`;
-    const assetsDir = `\\\\${machinePath}\\clinic1\\${pid}\\assets`;
+    const pathResolver = createPathResolver(config.fileSystem.machinePath);
+    const xrayDir = pathResolver(`clinic1/${pid}/opg`);
+    const assetsDir = pathResolver(`clinic1/${pid}/assets`);
 
     const xrays = fs.existsSync(xrayDir)
-        ? await getXrays(xrayDir)
+        ? await getXrays(xrayDir, pathResolver, pid)
         : [];
 
     const assets = fs.existsSync(assetsDir)
@@ -55,9 +56,11 @@ async function getAssets(pid) {
 /**
  * Retrieves X-ray information for a given directory.
  * @param {string} xrayDir - The directory path containing X-ray files.
+ * @param {function} pathResolver - Path resolver function.
+ * @param {string} pid - Patient ID.
  * @returns {Promise<Array>} - A promise that resolves with an array of X-ray objects.
  */
-async function getXrays(xrayDir) {
+async function getXrays(xrayDir, pathResolver, pid) {
     const xrayNames = fs.readdirSync(xrayDir).filter((xrayName) =>
         xrayName.endsWith('.dcm') ||
         xrayName.endsWith('.pano') ||
@@ -68,17 +71,17 @@ async function getXrays(xrayDir) {
     const xrays = await Promise.all(
         xrayNames.map(async (xrayName) => {
             const xray = { name: xrayName };
-            const parentDetailsDirPath = `${xrayDir}\\.csi_data\\.version_4.4`;
+            const parentDetailsDirPath = pathResolver(`clinic1/${pid}/opg/.csi_data/.version_4.4`);
             if (fs.existsSync(parentDetailsDirPath)) {
                 const subDirs = fs.readdirSync(parentDetailsDirPath);
                 for (const subDir of subDirs) {
                     if (subDir.endsWith(xrayName)) {
                         xray.detailsDirName = subDir;
-                        const detailsDirPath = `${parentDetailsDirPath}\\${subDir}`;
-                        if (fs.existsSync(`${detailsDirPath}\\t.png`)) {
-                            xray.previewImagePartialPath = `\\OPG\\.csi_data\\.version_4.4\\${subDir}\\t.png`;
+                        const detailsDirPath = pathResolver(`clinic1/${pid}/opg/.csi_data/.version_4.4/${subDir}`);
+                        if (fs.existsSync(pathResolver(`clinic1/${pid}/opg/.csi_data/.version_4.4/${subDir}/t.png`))) {
+                            xray.previewImagePartialPath = `/OPG/.csi_data/.version_4.4/${subDir}/t.png`;
                         }
-                        const metaFile = `${detailsDirPath}\\meta`;
+                        const metaFile = pathResolver(`clinic1/${pid}/opg/.csi_data/.version_4.4/${subDir}/meta`);
                         xray.date = await extractDate(metaFile);
                     }
                 }

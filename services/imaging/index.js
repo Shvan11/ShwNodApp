@@ -5,6 +5,7 @@ import { exec } from 'child_process';
 import config from '../../config/config.js';
 import { QRCodetoFile } from './qrcode.js';
 import sizeOf from "image-size";
+import { createPathResolver } from '../../utils/path-resolver.js';
 
 /**
  * Get image sizes
@@ -25,13 +26,13 @@ function getImageSizes(pid, tp) {
         pid + "0" + tp + ".i21",
     ];
 
-    const machinePath = config.fileSystem.machinePath;
+    const pathResolver = createPathResolver(config.fileSystem.machinePath);
     const imegsdims = [];
 
 
     for (let i = 0; i < imegs.length; i++) {
         try {
-            const filePath = `\\\\${machinePath}\\working\\${imegs[i]}`;
+            const filePath = pathResolver(`working/${imegs[i]}`);
             const dimensions = sizeOf(filePath); // Get image dimensions
             
             // Implement logic to get dimensions (you might need a library like image-size)
@@ -65,10 +66,10 @@ async function generateQRCode(pid) {
  * @returns {Promise<string>} - Path to the processed image
  */
 async function processXrayImage(pid, file, detailsDir) {
-    const machinePath = config.fileSystem.machinePath;
-    const source = `\\\\${machinePath}\\clinic1\\${pid}\\OPG\\${file}`;
-    const dir = `\\\\${machinePath}\\clinic1\\${pid}\\OPGIMG`;
-    const destination = `${dir}\\${path.parse(file).name}.png`;
+    const pathResolver = createPathResolver(config.fileSystem.machinePath);
+    const source = pathResolver(`clinic1/${pid}/OPG/${file}`);
+    const dir = pathResolver(`clinic1/${pid}/OPGIMG`);
+    const destination = pathResolver(`clinic1/${pid}/OPGIMG/${path.parse(file).name}.png`);
 
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
@@ -105,8 +106,8 @@ async function processXrayImage(pid, file, detailsDir) {
  * @returns {string} - Command to execute
  */
 function constructCommand(source, destination, pid, detailsDir) {
-    const machinePath = config.fileSystem.machinePath;
-    const pszip = `\\\\${machinePath}\\clinic1\\${pid}\\OPG\\.csi_data\\.version_4.4\\${detailsDir}\\ps.zip`;
+    const pathResolver = createPathResolver(config.fileSystem.machinePath);
+    const pszip = pathResolver(`clinic1/${pid}/OPG/.csi_data/.version_4.4/${detailsDir}/ps.zip`);
     
     if (detailsDir && detailsDir !== "undefined" && fs.existsSync(pszip)) {
         return `${config.cs_export} ${source} -o ${destination} -i ${pszip} -p`;

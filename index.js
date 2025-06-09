@@ -18,6 +18,7 @@ import ResourceManager from './services/core/ResourceManager.js';
 import HealthCheck from './services/monitoring/HealthCheck.js';
 import ConnectionPool from './services/database/ConnectionPool.js';
 import { testConnection, testConnectionWithRetry } from './services/database/index.js';
+import { createPathResolver } from './utils/path-resolver.js';
 
 // Get current file and directory name for ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -58,9 +59,12 @@ async function initializeApplication() {
     // Setup static files
     console.log('📁 Setting up static file serving...');
     app.use(express.static('./public'));
-    app.use('/DolImgs', express.static('\\\\' + config.fileSystem.machinePath + '\\working'));
-    app.use('/assets', express.static('\\\\' + config.fileSystem.machinePath + '\\clinic1'));
-    app.use('/photoswipe', express.static('photoswipe/'));
+    
+    // Use path resolver for cross-platform compatibility
+    const pathResolver = createPathResolver(config.fileSystem.machinePath);
+    app.use('/DolImgs', express.static(pathResolver('working')));
+    app.use('/assets', express.static(pathResolver('clinic1')));
+    app.use('/photoswipe', express.static('./public/photoswipe/'));
 
     // Setup WebSocket
     console.log('🔌 Setting up WebSocket server...');

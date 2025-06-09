@@ -52,7 +52,7 @@ class WebSocketService extends EventEmitter {
       messageQueue: [],         // Queue for messages to send when reconnected
       pendingMessages: new Map(), // Map of message ID -> { resolve, reject, timeout }
       forceClose: false,        // Whether close was requested (to prevent auto-reconnect)
-      screenId: storage.screenId() || 'unknown', // Screen ID for this connection
+      screenId: null, // Screen ID for this connection (loaded on demand)
     };
     
     // Bind methods to ensure correct 'this' context
@@ -771,8 +771,14 @@ class WebSocketService extends EventEmitter {
     // Start with base URL
     const url = new URL(this.options.baseUrl);
     
-    // Add screen ID
-    url.searchParams.append('screenID', this.state.screenId);
+    // Add screen ID only if needed (not for WhatsApp status clients or simplified clients)
+    if (params.clientType !== 'waStatus' && params.clientType !== 'simplified') {
+      // Load screen ID on demand
+      if (!this.state.screenId) {
+        this.state.screenId = storage.screenId() || 'unknown';
+      }
+      url.searchParams.append('screenID', this.state.screenId);
+    }
     
     // Add current date
     const now = new Date();
