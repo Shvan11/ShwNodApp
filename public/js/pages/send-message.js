@@ -19,6 +19,13 @@ class SendMessageController {
     
     // Initialize state
     this.selectedSource = 'pat';
+    this.clientStatus = {
+      ready: false,
+      error: null
+    };
+    
+    // WebSocket connection
+    this.connectionManager = null;
     
     // Initialize components
     this.progressBar = new ProgressBar({
@@ -50,8 +57,14 @@ class SendMessageController {
     // Set up event listeners
     this.setupEventListeners();
     
+    // Initialize WebSocket for real-time client status
+    await this.initializeWebSocket();
+    
     // Initialize select2 for contacts
     await this.initializeContactSelect();
+    
+    // Check initial client status
+    await this.checkInitialClientStatus();
   }
   
   /**
@@ -265,72 +278,155 @@ class SendMessageController {
   }
   
   /**
-   * Check WhatsApp client status
-   * @returns {Promise<boolean>} - True if ready to send
+   * Initialize WebSocket connection for real-time updates
    */
-  async checkClientStatus() {
+  async initializeWebSocket() {
+    try {
+      // Import websocket service
+      const websocketService = (await import('../services/websocket.js')).default;
+      this.connectionManager = websocketService;
+      
+      // Setup WebSocket event handlers - only listen to client ready events
+      this.connectionManager.on('whatsapp_client_ready', (data) => {
+        console.log('WhatsApp client ready:', data);
+        this.updateClientStatus({
+          ready: data.clientReady || data.state === 'ready',
+          error: null
+        });
+      });
+      
+      this.connectionManager.on('whatsapp_initial_state_response', (data) => {
+        console.log('Initial state received:', data);
+        if (data) {
+          this.updateClientStatus({
+            ready: data.clientReady || false,
+            error: data.error || null
+          });
+        }
+      });
+      
+      // Connect to WebSocket - no QR events needed
+      await this.connectionManager.connect({
+        clientType: 'send-message',
+        timestamp: Date.now()
+      });
+      
+      console.log('WebSocket connection established for send-message');
+      
+    } catch (error) {
+      console.error('Failed to initialize WebSocket:', error);
+      // Fallback to API-only mode
+      this.connectionManager = null;
+    }
+  }
+  
+  /**
+   * Update client status and UI
+   */
+  updateClientStatus(status) {
+    this.clientStatus = { ...this.clientStatus, ...status };
+    console.log('Client status updated:', this.clientStatus);
+    
+    // Clear any existing status messages
+    const existing = document.querySelector('.status-message');
+    if (existing) {
+      existing.remove();
+    }
+    
+    // Update UI based on new status
+    if (!this.clientStatus.ready) {
+      if (this.clientStatus.error) {
+        this.showErrorMessage(`WhatsApp Error: ${this.clientStatus.error}`);
+      } else {
+        this.showClientNotReadyMessage();
+      }
+    }
+  }
+  
+  /**
+   * Check initial client status
+   */
+  async checkInitialClientStatus() {
+    // Request initial state if WebSocket is connected
+    if (this.connectionManager && this.connectionManager.isConnected()) {
+      this.connectionManager.send({
+        type: 'request_whatsapp_initial_state',
+        data: { timestamp: Date.now() }
+      }).catch(error => {
+        console.error('Failed to request initial state:', error);
+        this.fallbackStatusCheck();
+      });
+    } else {
+      // Fallback to API check
+      this.fallbackStatusCheck();
+    }
+  }
+  
+  /**
+   * Fallback API status check
+   */
+  async fallbackStatusCheck() {
     try {
       const response = await fetch('/api/wa/status');
-      
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
       const data = await response.json();
+      this.updateClientStatus({
+        ready: data.clientReady || false,
+        error: data.error || null
+      });
       
-      console.log('Client status check result:', data);
-      
-      if (data.success === false) {
-        this.showErrorMessage(`WhatsApp service error: ${data.message || 'Unknown error'}`);
-        return false;
-      }
-      
-      if (data.clientReady) {
-        return true;
-      } else {
-        // Check if client is initializing
-        if (data.initializing) {
-          this.showClientInitializingMessage();
-        } else {
-          this.showClientNotReadyMessage();
-        }
-        return false;
-      }
     } catch (error) {
-      console.error('Error checking client status:', error);
-      this.showErrorMessage(`Unable to check WhatsApp client status: ${error.message}`);
+      console.error('Fallback status check failed:', error);
+      this.updateClientStatus({
+        ready: false,
+        error: error.message
+      });
+    }
+  }
+  
+  /**
+   * Check WhatsApp client status
+   * @returns {Promise<boolean>} - True if ready to send
+   */
+  async checkClientStatus() {
+    // Use real-time status instead of making API call
+    if (this.clientStatus.ready) {
+      return true;
+    } else {
+      // Status message is already shown by updateClientStatus
       return false;
     }
   }
   
   /**
-   * Show client not ready message
+   * Show client not ready message with authentication options
    */
   showClientNotReadyMessage() {
     const message = `
-      <div class="status-message error">
-        <h3>WhatsApp Client Not Ready</h3>
-        <p>The WhatsApp client is not logged in or not ready to send messages.</p>
-        <p>Please go to <a href="/send" target="_blank">Send Page</a> to authenticate and initialize the WhatsApp client.</p>
-        <button onclick="window.location.reload()" class="retry-btn">Retry</button>
+      <div class="status-message auth-required">
+        <h3>WhatsApp Authentication Required</h3>
+        <p>The WhatsApp client needs to be authenticated before sending messages.</p>
+        <div class="auth-actions">
+          <button onclick="window.open('/auth', 'whatsappAuth', 'width=600,height=700,resizable=yes,scrollbars=yes')" class="auth-popup-btn">
+            <span class="btn-icon">🔐</span>
+            Authenticate WhatsApp
+          </button>
+          <button onclick="window.location.reload()" class="retry-btn">
+            <span class="btn-icon">🔄</span>
+            Check Again
+          </button>
+        </div>
+        <div class="auth-help">
+          <p><small>Click "Authenticate WhatsApp" to scan QR code in a popup window</small></p>
+        </div>
       </div>
     `;
     this.showMessage(message);
   }
 
-  /**
-   * Show client initializing message
-   */
-  showClientInitializingMessage() {
-    const message = `
-      <div class="status-message warning">
-        <h3>WhatsApp Client Initializing</h3>
-        <p>The WhatsApp client is currently starting up. Please wait a moment and try again.</p>
-        <button onclick="window.location.reload()" class="retry-btn">Retry</button>
-      </div>
-    `;
-    this.showMessage(message);
-  }
   
   /**
    * Show success message
@@ -387,6 +483,9 @@ class SendMessageController {
    * Handle close button click
    */
   handleClose() {
+    // Cleanup WebSocket connection
+    this.cleanup();
+    
     // Close the modal/window
     if (window.opener) {
       // If opened from another window, close this window
@@ -396,13 +495,31 @@ class SendMessageController {
       window.location.href = '/';
     }
   }
+  
+  /**
+   * Cleanup resources
+   */
+  cleanup() {
+    console.log('Cleaning up send-message controller');
+    
+    // Disconnect WebSocket
+    if (this.connectionManager) {
+      this.connectionManager.disconnect();
+      this.connectionManager = null;
+    }
+  }
 }
 
 // Initialize controller when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   // Need to wait for jQuery and Select2 to be available
   if (typeof $ !== 'undefined' && $.fn.select2) {
-    new SendMessageController();
+    const controller = new SendMessageController();
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      controller.cleanup();
+    });
   } else {
     console.error('jQuery or Select2 not loaded. Required for this page.');
   }

@@ -49,26 +49,6 @@
                     </button>
                 </div>
                 
-                <div class="whatsapp-controls">
-                    <h2 class="sr-only">WhatsApp Client Controls</h2>
-                    <div class="secondary-actions">
-                        <button id="restartClientBtn" class="btn btn-success" 
-                                aria-label="Restart WhatsApp client while preserving authentication">
-                            <span class="btn-icon" aria-hidden="true">🔄</span>
-                            <span>Restart Client</span>
-                        </button>
-                        <button id="destroyClientBtn" class="btn btn-warning" 
-                                aria-label="Close WhatsApp client browser but preserve authentication">
-                            <span class="btn-icon" aria-hidden="true">⏹️</span>
-                            <span>Close Browser</span>
-                        </button>
-                        <button id="logoutClientBtn" class="btn btn-danger" 
-                                aria-label="Completely logout WhatsApp client requiring QR scan to reconnect">
-                            <span class="btn-icon" aria-hidden="true">🚪</span>
-                            <span>Logout Client</span>
-                        </button>
-                    </div>
-                </div>
                 
                 <div id="messageCount" class="message-count-info" role="status" aria-live="polite" aria-atomic="true">
                     <span class="loading-spinner" aria-hidden="true"></span>
@@ -96,14 +76,8 @@
                 <div id="progressText" class="sending-progress-text">Starting...</div>
             </div>
             
-            <!-- QR Code Display -->
-            <div id="qrContainer" class="qr-container" style="display: none;">
-                <img id="qrImage" class="qr-image" style="display: none;" alt="WhatsApp QR Code for authentication" aria-describedby="qr-instructions">
-                <p id="qr-instructions" class="qr-instructions">
-                    <span class="status-icon" aria-hidden="true">📱</span>
-                    Scan this QR code with your WhatsApp mobile app to authenticate
-                </p>
-            </div>
+            <!-- Authentication handled via redirect to standalone auth page -->
+            
             
             <!-- Main Action Button -->
             <div class="action-section">

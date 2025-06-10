@@ -53,6 +53,10 @@ class ConnectionManager {
     } else if (type === 'waStatus') {
       this.waStatusConnections.add(ws);
       console.log('Registered WhatsApp status connection');
+    } else if (type === 'auth') {
+      // Auth connections also need QR events, so add them to waStatusConnections
+      this.waStatusConnections.add(ws);
+      console.log('Registered authentication connection (QR events enabled)');
     }
   }
 
@@ -75,6 +79,9 @@ class ConnectionManager {
     } else if (capabilities.type === 'waStatus') {
       this.waStatusConnections.delete(ws);
       console.log('Unregistered WhatsApp status connection');
+    } else if (capabilities.type === 'auth') {
+      this.waStatusConnections.delete(ws);
+      console.log('Unregistered authentication connection');
     }
 
     // Remove capabilities
@@ -359,6 +366,23 @@ function setupWebSocketServer(server) {
   
         // Send initial data immediately
         sendInitialData(ws, date, connectionManager);
+      } else if (clientType === 'auth') {
+        // Authentication client - register for QR events if needed
+        console.log('Authentication client connected');
+        connectionManager.registerConnection(ws, 'auth', {
+          ipAddress: req.socket.remoteAddress,
+          viewerId: viewerId
+        });
+        
+        // Register as QR viewer if explicitly requested
+        const needsQR = url.searchParams.get('needsQR') === 'true';
+        if (needsQR && messageState && typeof messageState.registerQRViewer === 'function') {
+          const registered = messageState.registerQRViewer(viewerId);
+          ws.qrViewerRegistered = true; // Mark as registered
+          console.log(`QR viewer registered for auth client ${viewerId} (needsQR=true)`);
+        } else {
+          console.log(`Auth client connected without QR registration (needsQR=${needsQR})`);
+        }
       } else {
         // Generic connection
         connectionManager.registerConnection(ws, 'generic', {
@@ -406,9 +430,9 @@ function setupWebSocketServer(server) {
       ws.on('error', (error) => {
         console.error('WebSocket error:', error);
         
-        // If this was a WhatsApp status client AND was registered as QR viewer, unregister it
+        // If this was a QR viewer client (waStatus or auth), unregister it
         const capabilities = connectionManager.clientCapabilities.get(ws);
-        if (capabilities && capabilities.type === 'waStatus' && ws.qrViewerRegistered) {
+        if (capabilities && (capabilities.type === 'waStatus' || capabilities.type === 'auth') && ws.qrViewerRegistered) {
           if (messageState && typeof messageState.unregisterQRViewer === 'function') {
             messageState.unregisterQRViewer(ws.viewerId);
           }
@@ -419,9 +443,9 @@ function setupWebSocketServer(server) {
   
    // Handle close event
    ws.on('close', (code, reason) => {
-    // If this was a WhatsApp status client AND was registered as QR viewer, unregister it
+    // If this was a QR viewer client (waStatus or auth), unregister it
     const capabilities = connectionManager.clientCapabilities.get(ws);
-    if (capabilities && capabilities.type === 'waStatus' && ws.qrViewerRegistered) {
+    if (capabilities && (capabilities.type === 'waStatus' || capabilities.type === 'auth') && ws.qrViewerRegistered) {
       if (messageState && typeof messageState.unregisterQRViewer === 'function') {
         messageState.unregisterQRViewer(ws.viewerId);
         console.log(`Unregistered QR viewer ${ws.viewerId} on connection close`);

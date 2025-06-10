@@ -15,7 +15,8 @@ const pageRewrites = [
   // Messaging pages
   { url: '/send-message', file: '/views/messaging/send-message.html' },
   { url: '/send', file: '/views/messaging/send.html' },
-  
+  { url: '/auth', file: '/views/messaging/auth.html' },
+ 
   // Patient pages
   { url: '/details', file: '/views/patient/details.html' },
   { url: '/canvas', file: '/views/patient/canvas.html' },

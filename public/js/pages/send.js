@@ -37,11 +37,7 @@ const API_ENDPOINTS = {
     MESSAGE_COUNT: (date) => `/api/messaging/count/${date}`,
     MESSAGE_RESET: (date) => `/api/messaging/reset/${date}`,
     MESSAGE_STATUS: (date) => `/api/messaging/status/${date}`,
-    WA_SEND: (date) => `/api/wa/send?date=${date}`,
-    WA_RESTART: '/api/wa/restart',
-    WA_DESTROY: '/api/wa/destroy',
-    WA_LOGOUT: '/api/wa/logout',
-    WA_STATUS: '/api/wa/status'
+    WA_SEND: (date) => `/api/wa/send?date=${date}`
 };
 
 // State Constants
@@ -243,7 +239,7 @@ class APIClient {
     }
     
     cancelAllRequests() {
-        for (const [key, controller] of this.abortControllers) {
+        for (const [, controller] of this.abortControllers) {
             controller.abort();
         }
         this.abortControllers.clear();
@@ -343,7 +339,6 @@ class AppStateManager extends EventEmitter {
             },
             clientStatus: {
                 ready: false,
-                qrCode: null,
                 error: null
             }
         };
@@ -384,7 +379,6 @@ class AppStateManager extends EventEmitter {
             },
             clientStatus: {
                 ready: false,
-                qrCode: null,
                 error: null
             }
         };
@@ -412,16 +406,10 @@ class DOMManager {
             resetMessagingBtn: document.getElementById('resetMessagingBtn'),
             messageCountElement: document.getElementById('messageCount'),
 
-            // Client controls  
-            restartClientBtn: document.getElementById('restartClientBtn'),
-            destroyClientBtn: document.getElementById('destroyClientBtn'),
-            logoutClientBtn: document.getElementById('logoutClientBtn'),
 
             // Main UI
             stateElement: document.getElementById('state'),
             startButton: document.getElementById('startButton'),
-            qrImage: document.getElementById('qrImage'),
-            qrContainer: document.getElementById('qrContainer'),
             tableContainer: document.getElementById('tableContainer'),
             
             // Progress bar elements  
@@ -469,9 +457,6 @@ class DOMManager {
         const buttonLabels = {
             refreshDateBtn: 'Refresh message count for selected date',
             resetMessagingBtn: 'Reset all message statuses for selected date',
-            restartClientBtn: 'Restart WhatsApp client while preserving authentication',
-            destroyClientBtn: 'Close WhatsApp client browser but preserve authentication',
-            logoutClientBtn: 'Completely logout WhatsApp client and clear authentication',
             startButton: 'Start sending WhatsApp messages to selected date appointments'
         };
         
@@ -614,7 +599,7 @@ class MessageDisplayManager {
         }
         
         // Clear any active timers
-        for (const [key, timer] of this.messageTimers) {
+        for (const [, timer] of this.messageTimers) {
             clearTimeout(timer);
         }
         this.messageTimers.clear();
@@ -823,7 +808,6 @@ class WebSocketConnectionManager extends EventEmitter {
                 this.setConnectionState(UI_STATES.ERROR);
                 this.emit('connectionError', error);
             },
-            qrUpdate: (data) => this.emit('qrCodeReceived', data),
             clientReady: (data) => this.emit('clientStatusChanged', data),
             messageStatus: (data) => this.emit('messageStatusUpdate', data),
             sendingFinished: (data) => this.emit('sendingCompleted', data),
@@ -838,9 +822,7 @@ class WebSocketConnectionManager extends EventEmitter {
         this.websocketService.on('disconnected', this.boundHandlers.disconnected);
         this.websocketService.on('error', this.boundHandlers.error);
         
-        // Message events (handle both naming conventions)
-        // Universal WebSocket events only
-        this.websocketService.on('whatsapp_qr_updated', this.boundHandlers.qrUpdate);
+        // Sending-related events only (NO QR events - those belong to auth component)
         this.websocketService.on('whatsapp_client_ready', this.boundHandlers.clientReady);
         this.websocketService.on('whatsapp_message_status', this.boundHandlers.messageStatus);
         this.websocketService.on('whatsapp_sending_finished', this.boundHandlers.sendingFinished);
@@ -918,13 +900,12 @@ class WebSocketConnectionManager extends EventEmitter {
         this.clearReconnectTimer();
         
         // Remove all event listeners using bound handlers
-        Object.entries(this.boundHandlers).forEach(([eventName, handler]) => {
+        Object.entries(this.boundHandlers).forEach(([, handler]) => {
             this.websocketService.off('connecting', handler);
             this.websocketService.off('connected', handler);
             this.websocketService.off('disconnected', handler);
             this.websocketService.off('error', handler);
-            // Universal WebSocket events only
-            this.websocketService.off('whatsapp_qr_updated', handler);
+            // Sending-related events only (NO QR events)
             this.websocketService.off('whatsapp_client_ready', handler);
             this.websocketService.off('whatsapp_message_status', handler);
             this.websocketService.off('whatsapp_sending_finished', handler);
@@ -1015,9 +996,6 @@ class WhatsAppMessengerApp extends EventEmitter {
             this.messageDisplay.displayError(error, 'WebSocket connection error');
         });
 
-        this.connectionManager.on('qrCodeReceived', (data) => {
-            this.handleQRCode(data);
-        });
 
         this.connectionManager.on('clientStatusChanged', (data) => {
             this.handleClientStatusChange(data);
@@ -1093,10 +1071,7 @@ class WhatsAppMessengerApp extends EventEmitter {
     setupControlButtons() {
         const buttons = [
             { element: 'refreshDateBtn', handler: () => this.handleRefresh() },
-            { element: 'resetMessagingBtn', handler: () => this.handleReset() },
-            { element: 'restartClientBtn', handler: () => this.handleRestart() },
-            { element: 'destroyClientBtn', handler: () => this.handleDestroy() },
-            { element: 'logoutClientBtn', handler: () => this.handleLogout() }
+            { element: 'resetMessagingBtn', handler: () => this.handleReset() }
         ];
 
         buttons.forEach(({ element, handler }) => {
@@ -1126,7 +1101,7 @@ class WhatsAppMessengerApp extends EventEmitter {
             console.warn('Progress bar elements not found - progress bar disabled');
         }
     }
-
+    
     setupUIStateManagement() {
         // Listen for state changes and update UI accordingly
         const stateChangeHandler = ({ newState, updates }) => {
@@ -1422,8 +1397,8 @@ class WhatsAppMessengerApp extends EventEmitter {
         try {
             const connectionParams = {
                 PDate: this.dateManager.getCurrentDate(),
-                clientType: 'waStatus',
-                needsQR: 'true'
+                clientType: 'waStatus'
+                // NO needsQR - send.js only handles sending, not authentication
             };
             
             await this.connectionManager.connect(connectionParams);
@@ -1447,15 +1422,6 @@ class WhatsAppMessengerApp extends EventEmitter {
     }
 
     // Event Handlers
-    handleQRCode(data) {
-        this.stateManager.updateState({
-            clientStatus: { 
-                ready: false, 
-                qrCode: data.qr, 
-                error: null 
-            }
-        });
-    }
 
     handleClientStatusChange(data) {
         console.log('Received client status change:', data);
@@ -1463,7 +1429,6 @@ class WhatsAppMessengerApp extends EventEmitter {
         this.stateManager.updateState({
             clientStatus: {
                 ready: data.clientReady || data.state === 'ready',
-                qrCode: data.clientReady ? null : this.stateManager.getState().clientStatus.qrCode,
                 error: data.error || null
             }
         });
@@ -1505,7 +1470,7 @@ class WhatsAppMessengerApp extends EventEmitter {
         });
     }
 
-    handleSendingCompleted(data) {
+    handleSendingCompleted() {
         this.stateManager.updateState({
             sendingProgress: {
                 finished: true
@@ -1520,13 +1485,12 @@ class WhatsAppMessengerApp extends EventEmitter {
         console.log('Received initial state:', data);
         
         if (data) {
-            console.log('Processing initial state - clientReady:', data.clientReady, 'qr:', !!data.qr);
+            console.log('Processing initial state - clientReady:', data.clientReady);
             
             // Update client status
-            if (data.clientReady !== undefined || data.qr !== undefined) {
+            if (data.clientReady !== undefined) {
                 const newClientStatus = {
                     ready: data.clientReady || false,
-                    qrCode: data.qr || null,
                     error: data.error || null
                 };
                 
@@ -1595,7 +1559,7 @@ class WhatsAppMessengerApp extends EventEmitter {
                 }
             });
 
-            const result = await this.apiClient.get(API_ENDPOINTS.WA_SEND(this.dateManager.getCurrentDate()));
+            await this.apiClient.get(API_ENDPOINTS.WA_SEND(this.dateManager.getCurrentDate()));
             this.messageDisplay.displayMessage('Messages sending started', MESSAGE_TYPES.SUCCESS);
             
         } catch (error) {
@@ -1668,124 +1632,6 @@ class WhatsAppMessengerApp extends EventEmitter {
         }
     }
 
-    async handleRestart() {
-        this.buttonStateManager.setButtonState('restartClientBtn', BUTTON_STATES.LOADING, {
-            text: 'Restarting...'
-        });
-
-        try {
-            const result = await this.apiClient.post(API_ENDPOINTS.WA_RESTART);
-            
-            if (result.success) {
-                this.messageDisplay.displayMessage(result.message || 'Client restarted successfully', MESSAGE_TYPES.SUCCESS);
-                
-                // Reset client status to wait for reconnection
-                this.stateManager.updateState({
-                    clientStatus: {
-                        ready: false,
-                        qrCode: null,
-                        error: null
-                    }
-                });
-                
-                // Request new initial state after restart
-                setTimeout(() => {
-                    if (this.connectionManager.isConnected()) {
-                        this.connectionManager.requestInitialState();
-                    }
-                }, CONFIG.CLIENT_RESTART_DELAY_MS);
-            } else {
-                throw new Error(result.error || 'Restart failed');
-            }
-        } catch (error) {
-            this.messageDisplay.displayError(error, 'Failed to restart WhatsApp client');
-        } finally {
-            this.buttonStateManager.resetButton('restartClientBtn');
-        }
-    }
-
-    async handleDestroy() {
-        // Handle confirmation state
-        if (!this.buttonStateManager.isButtonInState('destroyClientBtn', BUTTON_STATES.CONFIRMING)) {
-            this.buttonStateManager.setButtonState('destroyClientBtn', BUTTON_STATES.CONFIRMING, {
-                text: 'Click Again to Confirm',
-                timeout: 3000
-            });
-            return;
-        }
-
-        this.buttonStateManager.setButtonState('destroyClientBtn', BUTTON_STATES.LOADING, {
-            text: 'Destroying...'
-        });
-
-        try {
-            const result = await this.apiClient.post(API_ENDPOINTS.WA_DESTROY);
-            
-            if (result.success) {
-                this.messageDisplay.displayMessage(result.message || 'Client destroyed successfully', MESSAGE_TYPES.SUCCESS);
-                
-                // Update client status
-                this.stateManager.updateState({
-                    clientStatus: {
-                        ready: false,
-                        qrCode: null,
-                        error: null
-                    }
-                });
-            } else {
-                throw new Error(result.error || 'Destroy failed');
-            }
-        } catch (error) {
-            this.messageDisplay.displayError(error, 'Failed to destroy WhatsApp client');
-        } finally {
-            this.buttonStateManager.resetButton('destroyClientBtn');
-        }
-    }
-
-    async handleLogout() {
-        // Handle confirmation state
-        if (!this.buttonStateManager.isButtonInState('logoutClientBtn', BUTTON_STATES.CONFIRMING)) {
-            this.buttonStateManager.setButtonState('logoutClientBtn', BUTTON_STATES.CONFIRMING, {
-                text: 'Click Again to Confirm',
-                timeout: 5000 // Longer timeout for logout
-            });
-            return;
-        }
-
-        this.buttonStateManager.setButtonState('logoutClientBtn', BUTTON_STATES.LOADING, {
-            text: 'Logging out...'
-        });
-
-        try {
-            const result = await this.apiClient.post(API_ENDPOINTS.WA_LOGOUT);
-            
-            if (result.success) {
-                this.messageDisplay.displayMessage(result.message || 'Client logged out successfully', MESSAGE_TYPES.SUCCESS);
-                
-                // Reset client status completely
-                this.stateManager.updateState({
-                    clientStatus: {
-                        ready: false,
-                        qrCode: null,
-                        error: null
-                    }
-                });
-                
-                // Request new QR code after logout
-                setTimeout(() => {
-                    if (this.connectionManager.isConnected()) {
-                        this.connectionManager.requestInitialState();
-                    }
-                }, CONFIG.LOGOUT_DELAY_MS);
-            } else {
-                throw new Error(result.error || 'Logout failed');
-            }
-        } catch (error) {
-            this.messageDisplay.displayError(error, 'Failed to logout WhatsApp client');
-        } finally {
-            this.buttonStateManager.resetButton('logoutClientBtn');
-        }
-    }
 
     onDateChanged(newDate) {
         console.log(`Date changed to: ${newDate}`);
@@ -1861,12 +1707,12 @@ class WhatsAppMessengerApp extends EventEmitter {
     updateClientStatus(clientStatus) {
         console.log('updateClientStatus called with:', clientStatus);
         
-        // Update QR code display
-        if (clientStatus.qrCode) {
-            this.generateAndDisplayQRCode(clientStatus.qrCode);
-        } else {
-            this.domManager.toggleElementVisibility('qrImage', false);
-            this.domManager.toggleElementVisibility('qrContainer', false);
+        // Determine if we should redirect to authentication
+        const needsAuth = !clientStatus.ready;
+        
+        // Redirect to standalone auth page when authentication is needed
+        if (needsAuth) {
+            this.redirectToAuthentication();
         }
 
         // Update start button state
@@ -1885,54 +1731,38 @@ class WhatsAppMessengerApp extends EventEmitter {
                 console.log('Setting status to ready');
                 this.domManager.setElementContent('stateElement', '✅ WhatsApp client is ready!', { announce: true });
                 this.domManager.setElementContent('connectionText', 'Client Ready');
-            } else if (clientStatus.qrCode) {
-                console.log('Setting status to QR code needed');
-                this.domManager.setElementContent('stateElement', '📱 Please scan the QR code with WhatsApp', { announce: true });
-                this.domManager.setElementContent('connectionText', 'Scan QR Code');
             } else if (clientStatus.error) {
                 console.log('Setting status to error:', clientStatus.error);
                 this.domManager.setElementContent('stateElement', `❌ Error: ${clientStatus.error}`, { announce: true });
                 this.domManager.setElementContent('connectionText', 'Error');
             } else {
-                console.log('Setting status to initializing');
-                this.domManager.setElementContent('stateElement', '⏳ Initializing WhatsApp client...');
-                this.domManager.setElementContent('connectionText', 'Initializing...');
+                console.log('Setting status to authentication required');
+                this.domManager.setElementContent('stateElement', '🔐 WhatsApp authentication required', { announce: true });
+                this.domManager.setElementContent('connectionText', 'Authentication Required');
             }
         }
     }
 
-    async generateAndDisplayQRCode(qrData) {
-        try {
-            // Fetch QR code image from backend API
-            const response = await fetch('/api/wa/qr');
-            
-            if (!response.ok) {
-                if (response.status === 404) {
-                    console.log('QR code not available yet, hiding QR container');
-                    this.domManager.toggleElementVisibility('qrImage', false);
-                    this.domManager.toggleElementVisibility('qrContainer', false);
-                    return;
-                }
-                throw new Error(`Failed to fetch QR code: ${response.status}`);
-            }
-            
-            const qrResponse = await response.json();
-            
-            if (qrResponse.qr) {
-                this.domManager.setElementAttribute('qrImage', 'src', qrResponse.qr);
-                this.domManager.setElementAttribute('qrImage', 'alt', 'WhatsApp QR Code for authentication');
-                this.domManager.toggleElementVisibility('qrImage', true);
-                this.domManager.toggleElementVisibility('qrContainer', true);
-            } else {
-                this.domManager.toggleElementVisibility('qrImage', false);
-                this.domManager.toggleElementVisibility('qrContainer', false);
-            }
-        } catch (error) {
-            console.error('Failed to fetch QR code:', error);
-            // Fallback: hide QR container if generation fails
-            this.domManager.toggleElementVisibility('qrImage', false);
-            this.domManager.toggleElementVisibility('qrContainer', false);
-        }
+    /**
+     * Redirect to standalone authentication page
+     */
+    redirectToAuthentication() {
+        console.log('Redirecting to standalone authentication page');
+        
+        // Build the authentication URL with return parameters
+        const currentUrl = new URL(window.location);
+        const authUrl = new URL('/auth', window.location.origin);
+        
+        // Add return URL so auth page can redirect back
+        authUrl.searchParams.set('returnTo', encodeURIComponent(currentUrl.pathname + currentUrl.search));
+        
+        // Add a timestamp to force refresh after auth
+        authUrl.searchParams.set('timestamp', Date.now().toString());
+        
+        console.log('Redirecting to:', authUrl.toString());
+        
+        // Perform the redirect
+        window.location.href = authUrl.toString();
     }
 
     updateSendingProgress(progress) {

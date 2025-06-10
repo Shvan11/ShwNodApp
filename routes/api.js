@@ -193,6 +193,130 @@ router.get('/updaterp', (req, res) => {
 
 
 
+/**
+ * Send WhatsApp message to specific patient
+ * Uses stored procedure to get personalized message
+ */
+router.get('/wa/send-to-patient', async (req, res) => {
+    try {
+        const { personId, appointmentId } = req.query;
+        
+        // Validate required parameters
+        if (!personId || !appointmentId) {
+            return res.status(400).json({
+                success: false,
+                message: "Both personId and appointmentId parameters are required"
+            });
+        }
+        
+        // Validate parameters are numeric
+        if (isNaN(parseInt(personId)) || isNaN(parseInt(appointmentId))) {
+            return res.status(400).json({
+                success: false,
+                message: "personId and appointmentId must be valid numbers"
+            });
+        }
+        
+        console.log(`WhatsApp send to patient request - PersonID: ${personId}, AppointmentID: ${appointmentId}`);
+        
+        // Check if WhatsApp client is ready
+        if (!whatsapp.isReady()) {
+            const status = whatsapp.getStatus();
+            return res.status(400).json({
+                success: false,
+                message: "WhatsApp client is not ready. Please wait for initialization to complete.",
+                clientStatus: status,
+                requiresRestart: status.circuitBreakerOpen
+            });
+        }
+        
+        // Get message data from stored procedure
+        const messageData = await database.executeStoredProcedure(
+            'GetNewAppointmentMessage',
+            [
+                ['PersonID', database.TYPES.Int, parseInt(personId)],
+                ['AppointmentID', database.TYPES.Int, parseInt(appointmentId)]
+            ],
+            null,
+            (columns) => {
+                return {
+                    result: columns[0].value,
+                    phone: columns[1] ? columns[1].value : null,
+                    message: columns[2] ? columns[2].value : null
+                };
+            },
+            (result) => result && result.length > 0 ? result[0] : null
+        );
+        
+        if (!messageData) {
+            return res.status(404).json({
+                success: false,
+                message: "No data returned from stored procedure"
+            });
+        }
+        
+        // Check stored procedure result
+        if (messageData.result !== 0) {
+            let errorMessage = "Unknown error";
+            if (messageData.result === -1) {
+                errorMessage = "Patient or appointment not found";
+            } else if (messageData.result === -2) {
+                errorMessage = "Invalid phone number";
+            }
+            
+            return res.status(400).json({
+                success: false,
+                message: errorMessage,
+                result: messageData.result
+            });
+        }
+        
+        // Extract phone number (remove 964 prefix for WhatsApp)
+        let phoneNumber = messageData.phone;
+        if (phoneNumber.startsWith('964')) {
+            phoneNumber = phoneNumber.substring(3);
+        }
+        
+        console.log(`Sending WhatsApp message to ${phoneNumber}: ${messageData.message.substring(0, 50)}...`);
+        
+        // Send single message using WhatsApp service
+        const result = await whatsapp.sendSingleMessage(
+            phoneNumber, 
+            messageData.message, 
+            `Patient ${personId}`, 
+            parseInt(appointmentId)
+        );
+        
+        if (result.success) {
+            res.json({
+                success: true,
+                message: "WhatsApp message sent successfully",
+                data: {
+                    personId: parseInt(personId),
+                    appointmentId: parseInt(appointmentId),
+                    phone: phoneNumber,
+                    messageId: result.messageId,
+                    messagePreview: messageData.message.substring(0, 100) + (messageData.message.length > 100 ? '...' : '')
+                }
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: "Failed to send WhatsApp message",
+                error: result.error
+            });
+        }
+        
+    } catch (error) {
+        console.error(`Error sending WhatsApp message to patient: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error while sending message",
+            error: error.message
+        });
+    }
+});
+
 router.get('/wa/send', async (req, res) => {
     const dateparam = req.query.date;
     
@@ -651,6 +775,56 @@ router.post('/wa/logout', async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to logout WhatsApp client",
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Initialize WhatsApp client asynchronously
+ * Returns 200 OK immediately and starts initialization in background
+ * Suitable for external applications that need to trigger initialization
+ */
+router.get('/wa/initialize', (req, res) => {
+  try {
+    console.log("WhatsApp initialization request received");
+    
+    // Immediately respond with 200 OK
+    res.json({
+      success: true,
+      message: "WhatsApp initialization started",
+      timestamp: Date.now(),
+      action: "initialize_requested"
+    });
+    
+    // Start initialization in background (non-blocking)
+    setImmediate(async () => {
+      try {
+        console.log("Starting WhatsApp client initialization in background");
+        await whatsapp.initialize();
+        console.log("Background WhatsApp initialization completed successfully");
+      } catch (error) {
+        console.error("Background WhatsApp initialization failed:", error.message);
+        
+        // Broadcast error to WebSocket clients if available
+        if (wsEmitter) {
+          const errorMessage = createStandardMessage(
+            WebSocketEvents.SYSTEM_ERROR,
+            { 
+              error: `WhatsApp initialization failed: ${error.message}`,
+              source: 'background_initialization'
+            }
+          );
+          wsEmitter.emit(WebSocketEvents.BROADCAST_MESSAGE, errorMessage);
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error("Error handling WhatsApp initialization request:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to process initialization request",
       error: error.message
     });
   }
