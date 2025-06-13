@@ -94,13 +94,18 @@ class Appointments2PageController {
       const allAppointments = await allAppointmentsResponse.json();
       console.log(`Got ${allAppointments.length} all appointments:`, allAppointments);
       
-      // Load checked-in appointments
+      // Load checked-in appointments (including dismissed)
       const checkedInResponse = await fetch(`/api/getWebApps?PDate=${this.dateString}`);
       const checkedInData = await checkedInResponse.json();
       console.log(`Got ${checkedInData.appointments?.length || 0} checked-in appointments:`, checkedInData.appointments);
       
+      // For simplified view, get all patients who have been checked in (including dismissed)
+      const allCheckedInPatients = allAppointments.filter(apt => 
+        apt.Present || apt.Seated || apt.Dismissed
+      );
+      
       this.updateAllAppointmentsTable(allAppointments);
-      this.updateCheckedInTable(checkedInData.appointments || []);
+      this.updateCheckedInTable(allCheckedInPatients);
       this.updateStats(checkedInData);
       
     } catch (error) {
@@ -177,6 +182,17 @@ class Appointments2PageController {
     appointments.forEach(appointment => {
       const row = document.createElement('tr');
       
+      // Add color coding for checked-in table based on patient status
+      if (!showCheckInButton) {
+        if (appointment.Dismissed) {
+          row.className = 'patient-status-dismissed';
+        } else if (appointment.Seated) {
+          row.className = 'patient-status-seated';
+        } else if (appointment.Present) {
+          row.className = 'patient-status-waiting';
+        }
+      }
+      
       // Time
       const timeCell = document.createElement('td');
       timeCell.textContent = appointment.apptime || appointment.time || '';
@@ -202,17 +218,24 @@ class Appointments2PageController {
         checkInBtn.onclick = () => this.checkInPatient(appointment.appointmentID);
         actionsCell.appendChild(checkInBtn);
       } else {
-        const seatedBtn = document.createElement('button');
-        seatedBtn.textContent = 'Seated';
-        seatedBtn.className = 'btn-secondary';
-        seatedBtn.onclick = () => this.updatePatientState(appointment.appointmentID, 'Seated');
-        actionsCell.appendChild(seatedBtn);
-        
-        const dismissedBtn = document.createElement('button');
-        dismissedBtn.textContent = 'Dismissed';
-        dismissedBtn.className = 'btn-danger';
-        dismissedBtn.onclick = () => this.updatePatientState(appointment.appointmentID, 'Dismissed');
-        actionsCell.appendChild(dismissedBtn);
+        // Show status or action buttons based on current state
+        if (appointment.Dismissed) {
+          actionsCell.textContent = 'Dismissed';
+          actionsCell.style.color = '#4caf50';
+          actionsCell.style.fontWeight = 'bold';
+        } else {
+          const seatedBtn = document.createElement('button');
+          seatedBtn.textContent = 'Seated';
+          seatedBtn.className = 'btn-secondary';
+          seatedBtn.onclick = () => this.updatePatientState(appointment.appointmentID, 'Seated');
+          actionsCell.appendChild(seatedBtn);
+          
+          const dismissedBtn = document.createElement('button');
+          dismissedBtn.textContent = 'Dismissed';
+          dismissedBtn.className = 'btn-danger';
+          dismissedBtn.onclick = () => this.updatePatientState(appointment.appointmentID, 'Dismissed');
+          actionsCell.appendChild(dismissedBtn);
+        }
       }
       
       row.appendChild(actionsCell);

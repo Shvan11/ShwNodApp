@@ -25,6 +25,42 @@ body {
   justify-content: space-evenly;
 }
 
+/* Full width layout for simplified view */
+.container.full-width {
+  margin: 0;
+  padding: 1rem;
+  min-height: calc(100vh - 100px);
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Appointments sections layout for simplified view */
+.appointments-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.appointments-section h3 {
+  margin-top: 0;
+  padding: 0.5rem;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 5px;
+  text-align: center;
+}
+
+/* Color coding for checked-in patients */
+.patient-status-waiting {
+  background-color: #ffebee !important; /* Light red */
+}
+
+.patient-status-seated {
+  background-color: #fff8e1 !important; /* Light yellow */
+}
+
+.patient-status-dismissed {
+  background-color: #e8f5e8 !important; /* Light green */
+}
+
 .container2 {
   display: flex;
   margin: 0.5cm;
