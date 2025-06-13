@@ -4,7 +4,7 @@
 import express from 'express';
 
 import * as database from '../services/database/index.js';
-import { getPresentAps } from '../services/database/queries/appointment-queries.js';
+import { getPresentAps, getAllTodayApps, updatePresent } from '../services/database/queries/appointment-queries.js';
 import {getTimePoints, getTimePointImgs } from '../services/database/queries/timepoint-queries.js';
 import { getWhatsAppMessages } from '../services/database/queries/messaging-queries.js';
 import { getPatientsPhones, getInfos } from '../services/database/queries/patient-queries.js';
@@ -553,6 +553,44 @@ router.get("/getWebApps", async (req, res) => {
     const { PDate } = req.query;
     const result = await getPresentAps(PDate);
     res.json(result);
+});
+
+// Get all today's appointments (not checked in)
+router.get("/getAllTodayApps", async (req, res) => {
+    try {
+        const { AppsDate } = req.query;
+        if (!AppsDate) {
+            return res.status(400).json({ error: "Missing required parameter: AppsDate" });
+        }
+        const result = await getAllTodayApps(AppsDate);
+        res.json(result);
+    } catch (error) {
+        console.error("Error fetching all today appointments:", error);
+        res.status(500).json({ error: "Failed to fetch appointments" });
+    }
+});
+
+// Update patient appointment state
+router.post("/updateAppointmentState", async (req, res) => {
+    try {
+        const { appointmentID, state, time } = req.body;
+        if (!appointmentID || !state) {
+            return res.status(400).json({ error: "Missing required parameters: appointmentID, state" });
+        }
+        
+        // Format time as string for the modified stored procedure
+        const now = new Date();
+        const currentTime = time || `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        console.log(`Updating appointment ${appointmentID} with state: ${state}, time: ${currentTime}`);
+        const result = await updatePresent(appointmentID, state, currentTime);
+        
+        wsEmitter.emit(WebSocketEvents.DATA_UPDATED, new Date().toISOString().split('T')[0]);
+        
+        res.json(result);
+    } catch (error) {
+        console.error("Error updating appointment state:", error);
+        res.status(500).json({ error: "Failed to update appointment state" });
+    }
 });
 
 // Get patient phone numbers

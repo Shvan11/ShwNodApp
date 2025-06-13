@@ -41,6 +41,14 @@ class Appointments2PageController {
     const elements = findBasicElements();
     Object.assign(this, elements);
     
+    // Find new containers
+    this.allAppointmentsContainer = document.getElementById('all-appointments-container');
+    this.checkedInContainer = document.getElementById('checked-in-container');
+    
+    // Find date picker elements
+    this.datePicker = document.getElementById('date-picker');
+    this.loadDateBtn = document.getElementById('load-date-btn');
+    
     // Initialize async setup
     this.init();
   }
@@ -50,16 +58,14 @@ class Appointments2PageController {
    * @private
    */
   async init() {
+    // Set up date picker
+    this.setupDatePicker();
+    
     // Set up clock
     this.clock = await setupClock('#canvas');
 
     // Load initial appointments data
-    await loadAppointments(
-      this,
-      appointmentService,
-      this.updateUI.bind(this),
-      () => showError('Failed to load appointments data', this.tableContainer)
-    );
+    await this.loadBothAppointmentLists();
 
     // Set up WebSocket connection
     this.setupWebSocket();
@@ -69,58 +75,288 @@ class Appointments2PageController {
   }
   
   /**
-   * Update UI with appointments data
-   * @param {Object} data - Appointments data
+   * Load both appointment lists
    * @private
    */
-  updateUI(data) {
-    updateAppointmentsUI(
-      data,
-      this.statsElements,
-      this.updateTable.bind(this),
-      null, // No highlighting for simplified view
-      this.tableContainer
-    );
+  async loadBothAppointmentLists() {
+    // Prevent multiple concurrent loads
+    if (this.isLoading) {
+      console.log('Already loading appointments, skipping...');
+      return;
+    }
+    
+    this.isLoading = true;
+    console.log(`Loading appointments for date: ${this.dateString}`);
+    
+    try {
+      // Load all appointments
+      const allAppointmentsResponse = await fetch(`/api/getAllTodayApps?AppsDate=${this.dateString}`);
+      const allAppointments = await allAppointmentsResponse.json();
+      console.log(`Got ${allAppointments.length} all appointments:`, allAppointments);
+      
+      // Load checked-in appointments
+      const checkedInResponse = await fetch(`/api/getWebApps?PDate=${this.dateString}`);
+      const checkedInData = await checkedInResponse.json();
+      console.log(`Got ${checkedInData.appointments?.length || 0} checked-in appointments:`, checkedInData.appointments);
+      
+      this.updateAllAppointmentsTable(allAppointments);
+      this.updateCheckedInTable(checkedInData.appointments || []);
+      this.updateStats(checkedInData);
+      
+    } catch (error) {
+      console.error('Failed to load appointments:', error);
+      showError('Failed to load appointments data', this.allAppointmentsContainer);
+    } finally {
+      this.isLoading = false;
+    }
   }
   
   /**
-   * Update appointments table
+   * Update all appointments table
+   * @param {Array} appointments - All appointments data
+   * @private
+   */
+  updateAllAppointmentsTable(appointments) {
+    console.log(`Updating all appointments table with ${appointments.length} appointments`);
+    
+    // Always clear the container first
+    this.allAppointmentsContainer.innerHTML = '';
+    
+    if (!appointments || appointments.length === 0) {
+      this.allAppointmentsContainer.innerHTML = '<p>No appointments scheduled for today</p>';
+      return;
+    }
+    
+    const table = this.createAppointmentTable(appointments, true);
+    this.allAppointmentsContainer.appendChild(table);
+  }
+  
+  /**
+   * Update checked-in appointments table
+   * @param {Array} appointments - Checked-in appointments data
+   * @private
+   */
+  updateCheckedInTable(appointments) {
+    console.log(`Updating checked-in table with ${appointments.length} appointments`);
+    
+    // Always clear the container first
+    this.checkedInContainer.innerHTML = '';
+    
+    if (!appointments || appointments.length === 0) {
+      this.checkedInContainer.innerHTML = '<p>No patients checked in yet</p>';
+      return;
+    }
+    
+    const table = this.createAppointmentTable(appointments, false);
+    this.checkedInContainer.appendChild(table);
+  }
+  
+  /**
+   * Create appointment table
    * @param {Array} appointments - Appointments data
+   * @param {boolean} showCheckInButton - Whether to show check-in button
    * @private
    */
-  updateTable(appointments) {
-    updateAppointmentsTable(
-      appointments,
-      { table: this.appointmentsTable },
-      this.createTable.bind(this),
-      this.updateExistingTable.bind(this),
-      this.tableContainer
-    );
-  }
-  
-  /**
-   * Create new table
-   * @param {Array} data - Table data
-   * @private
-   */
-  async createTable(data) {
-    this.appointmentsTable = await createAppointmentsTable(
-      data,
-      this.tableContainer,
-      true // Include patient links for simplified interactive view
-    );
-  }
-  
-  /**
-   * Update existing table
-   * @param {Array} data - Table data
-   * @private
-   */
-  updateExistingTable(data) {
-    updateTable(this.appointmentsTable, data, (data) => {
-      this.appointmentsTable = null;
-      this.createTable(data);
+  createAppointmentTable(appointments, showCheckInButton) {
+    const table = document.createElement('table');
+    table.className = 'appointments-table';
+    
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    const headers = ['Time', 'Patient', 'Type', 'Actions'];
+    
+    headers.forEach(header => {
+      const th = document.createElement('th');
+      th.textContent = header;
+      headerRow.appendChild(th);
     });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    
+    const tbody = document.createElement('tbody');
+    appointments.forEach(appointment => {
+      const row = document.createElement('tr');
+      
+      // Time
+      const timeCell = document.createElement('td');
+      timeCell.textContent = appointment.apptime || appointment.time || '';
+      row.appendChild(timeCell);
+      
+      // Patient
+      const patientCell = document.createElement('td');
+      patientCell.textContent = appointment.PatientName || appointment.name || '';
+      row.appendChild(patientCell);
+      
+      // Type
+      const typeCell = document.createElement('td');
+      typeCell.textContent = appointment.PatientType || appointment.type || '';
+      row.appendChild(typeCell);
+      
+      // Actions
+      const actionsCell = document.createElement('td');
+      
+      if (showCheckInButton) {
+        const checkInBtn = document.createElement('button');
+        checkInBtn.textContent = 'Check In';
+        checkInBtn.className = 'btn-primary';
+        checkInBtn.onclick = () => this.checkInPatient(appointment.appointmentID);
+        actionsCell.appendChild(checkInBtn);
+      } else {
+        const seatedBtn = document.createElement('button');
+        seatedBtn.textContent = 'Seated';
+        seatedBtn.className = 'btn-secondary';
+        seatedBtn.onclick = () => this.updatePatientState(appointment.appointmentID, 'Seated');
+        actionsCell.appendChild(seatedBtn);
+        
+        const dismissedBtn = document.createElement('button');
+        dismissedBtn.textContent = 'Dismissed';
+        dismissedBtn.className = 'btn-danger';
+        dismissedBtn.onclick = () => this.updatePatientState(appointment.appointmentID, 'Dismissed');
+        actionsCell.appendChild(dismissedBtn);
+      }
+      
+      row.appendChild(actionsCell);
+      tbody.appendChild(row);
+    });
+    
+    table.appendChild(tbody);
+    return table;
+  }
+  
+  /**
+   * Check in a patient
+   * @param {number} appointmentID - Appointment ID
+   * @private
+   */
+  async checkInPatient(appointmentID) {
+    try {
+      console.log(`✅ [CLIENT] Checking in patient with appointmentID: ${appointmentID}`);
+      const response = await fetch('/api/updateAppointmentState', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appointmentID,
+          state: 'Present'
+        })
+      });
+      
+      const result = await response.json();
+      console.log('✅ [CLIENT] Check-in API response:', result);
+      
+      if (response.ok) {
+        console.log('✅ [CLIENT] Check-in successful, waiting for WebSocket update...');
+        // Don't manually reload - wait for WebSocket event
+        // await this.loadBothAppointmentLists();
+      } else {
+        console.error('❌ [CLIENT] Failed to check in patient:', result);
+      }
+    } catch (error) {
+      console.error('❌ [CLIENT] Error checking in patient:', error);
+    }
+  }
+  
+  /**
+   * Update patient state
+   * @param {number} appointmentID - Appointment ID
+   * @param {string} state - New state (Seated, Dismissed)
+   * @private
+   */
+  async updatePatientState(appointmentID, state) {
+    try {
+      const response = await fetch('/api/updateAppointmentState', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appointmentID,
+          state
+        })
+      });
+      
+      if (response.ok) {
+        await this.loadBothAppointmentLists();
+      } else {
+        console.error(`Failed to update patient state to ${state}`);
+      }
+    } catch (error) {
+      console.error(`Error updating patient state to ${state}:`, error);
+    }
+  }
+  
+  /**
+   * Update stats display
+   * @param {Object} data - Stats data
+   * @private
+   */
+  updateStats(data) {
+    if (this.statsElements) {
+      this.statsElements.all.textContent = data.all || 0;
+      this.statsElements.present.textContent = data.present || 0;
+      this.statsElements.waiting.textContent = data.waiting || 0;
+      this.statsElements.completed.textContent = data.completed || 0;
+    }
+  }
+  
+  /**
+   * Set up date picker functionality
+   * @private
+   */
+  setupDatePicker() {
+    // Set current date as default
+    if (this.datePicker) {
+      this.datePicker.value = this.dateString;
+    }
+    
+    // Update title with current date
+    this.updateTitle();
+    
+    // Handle load button click
+    if (this.loadDateBtn) {
+      this.loadDateBtn.addEventListener('click', () => {
+        this.loadSelectedDate();
+      });
+    }
+    
+    // Handle enter key in date picker
+    if (this.datePicker) {
+      this.datePicker.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          this.loadSelectedDate();
+        }
+      });
+    }
+  }
+  
+  /**
+   * Load appointments for selected date
+   * @private
+   */
+  async loadSelectedDate() {
+    const selectedDate = this.datePicker.value;
+    if (!selectedDate) {
+      alert('Please select a date');
+      return;
+    }
+    
+    // Update internal date properties
+    this.date = new Date(selectedDate + 'T00:00:00');
+    this.dateString = selectedDate;
+    this.weekday = this.date.toLocaleDateString(undefined, { weekday: 'long' });
+    
+    // Update title
+    this.updateTitle();
+    
+    // Load appointments for new date
+    await this.loadBothAppointmentLists();
+  }
+  
+  /**
+   * Update page title with current date
+   * @private
+   */
+  updateTitle() {
+    if (this.titleElement) {
+      this.titleElement.textContent = `Appointments for ${this.weekday} ${this.dateString}`;
+    }
   }
   
   /**
@@ -172,33 +408,41 @@ class Appointments2PageController {
     });
 
     // Handle appointment updates
-    const handleAppointmentUpdate = (data) => {
-      console.log('Received WebSocket appointment update:', data);
-
-      if (!data || !data.tableData) {
-        console.error('Invalid data in appointment update event:', data);
+    const handleAppointmentUpdate = (eventData) => {
+      console.log('🔄 [CLIENT] Received WebSocket appointment update event');
+      console.log('🔄 [CLIENT] Event data:', JSON.stringify(eventData, null, 2));
+      console.log('🔄 [CLIENT] Current date string:', this.dateString);
+      
+      // Check if update is for current date
+      if (eventData && eventData.date && eventData.date !== this.dateString) {
+        console.log(`🔄 [CLIENT] Update is for different date (${eventData.date}), ignoring...`);
         return;
       }
-
-      // Check appointments data structure
-      const appointments = data.tableData.appointments;
-      if (!appointments || !Array.isArray(appointments)) {
-        console.error('Invalid appointments data:', appointments);
-        return;
-      }
-
-      console.log(`Processing ${appointments.length} appointments from WebSocket update`);
-
-      try {
-        this.updateUI(data.tableData);
-      } catch (error) {
-        console.error('Error handling WebSocket update:', error);
-      }
+      
+      console.log('🔄 [CLIENT] Reloading both appointment lists...');
+      this.loadBothAppointmentLists();
     };
 
+    // Handle all WebSocket messages for debugging
+    websocketService.on('message', (message) => {
+      console.log('📨 [CLIENT] Raw WebSocket message received:', JSON.stringify(message, null, 2));
+    });
+
     // Listen to universal appointment update events only
-    websocketService.on('appointments_updated', handleAppointmentUpdate);
-    websocketService.on('appointments_data', handleAppointmentUpdate);
+    console.log('📡 [CLIENT] Setting up WebSocket event listeners...');
+    websocketService.on('appointments_updated', (data) => {
+      console.log('📡 [CLIENT] Received appointments_updated event:', JSON.stringify(data, null, 2));
+      handleAppointmentUpdate(data);
+    });
+    websocketService.on('appointments_data', (data) => {
+      console.log('📡 [CLIENT] Received appointments_data event:', JSON.stringify(data, null, 2));
+      handleAppointmentUpdate(data);
+    });
+    websocketService.on('data_updated', (data) => {
+      console.log('📡 [CLIENT] Received data_updated event:', JSON.stringify(data, null, 2));
+      handleAppointmentUpdate(data);
+    });
+    console.log('📡 [CLIENT] WebSocket event listeners set up complete');
 
     websocketService.connect({ clientType: 'simplified' });
   }

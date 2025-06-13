@@ -18,7 +18,18 @@ export function getPresentAps(PDate) {
             request.addOutputParameter('waiting', TYPES.Int);
             request.addOutputParameter('completed', TYPES.Int);
         },
-        (columns) => columns,
+        (columns) => ({
+            Num: columns[0].value,
+            apptime: columns[1].value,
+            PatientType: columns[2].value,
+            PatientName: columns[3].value,
+            AppDetail: columns[4].value,
+            Present: columns[5].value,
+            Seated: columns[6].value,
+            Dismissed: columns[7].value,
+            HasVisit: columns[8].value,
+            appointmentID: columns[9].value
+        }),
         (result, outParams) => {
             const responseObject = {};
             responseObject.appointments = result;
@@ -29,5 +40,50 @@ export function getPresentAps(PDate) {
                 return responseObject;
             }
         }
+    );
+}
+
+/**
+ * Retrieves all appointments for a given date that are not checked in.
+ * @param {string} AppsDate - The date for which to retrieve appointments.
+ * @returns {Promise<Array>} - A promise that resolves with all appointments for the date.
+ */
+export function getAllTodayApps(AppsDate) {
+    return executeStoredProcedure(
+        'AllTodayApps',
+        [['AppsDate', TYPES.Date, AppsDate]],
+        null,
+        (columns) => ({
+            appointmentID: columns[0].value,
+            PersonID: columns[1].value,
+            AppDetail: columns[2].value,
+            AppDate: columns[3].value,
+            PatientType: columns[4].value,
+            PatientName: columns[5].value,
+            Alerts: columns[6].value,
+            apptime: columns[7].value
+        }),
+        (result) => result
+    );
+}
+
+/**
+ * Updates patient appointment state (Present, Seated, Dismissed).
+ * @param {number} Aid - The appointment ID.
+ * @param {string} state - The state field to update (Present, Seated, Dismissed).
+ * @param {string} Tim - The time value to set.
+ * @returns {Promise<Object>} - A promise that resolves with the update result.
+ */
+export function updatePresent(Aid, state, Tim) {
+    return executeStoredProcedure(
+        'UpdatePresent',
+        [
+            ['Aid', TYPES.Int, Aid],
+            ['state', TYPES.VarChar, state],
+            ['Tim', TYPES.VarChar, Tim]
+        ],
+        null,
+        (columns) => columns,
+        (result) => ({ success: true, appointmentID: Aid, state: state, time: Tim })
     );
 }

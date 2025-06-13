@@ -11,10 +11,26 @@
 </head>
  
 <body>
-  <p id="title">Appointments for Saturday 3-22-2022</p>
+  <div class="header-section">
+    <p id="title">Appointments for Saturday 3-22-2022</p>
+    <div class="date-picker-container">
+      <label for="date-picker">Select Date:</label>
+      <input type="date" id="date-picker" />
+      <button id="load-date-btn" class="btn-primary">Load</button>
+    </div>
+  </div>
   <div class="container">
-    <div id="appointments-container">
-      <!-- Appointments table will be rendered here -->
+    <div class="appointments-section">
+      <h3>All Appointments</h3>
+      <div id="all-appointments-container">
+        <!-- All appointments table will be rendered here -->
+      </div>
+    </div>
+    <div class="appointments-section">
+      <h3>Checked-In Patients</h3>
+      <div id="checked-in-container">
+        <!-- Checked-in appointments table will be rendered here -->
+      </div>
     </div>
     <div id="subcont">
       <ul>

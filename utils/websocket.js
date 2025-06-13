@@ -684,8 +684,7 @@ function setupWebSocketServer(server) {
   
       const message = createStandardMessage(
         WebSocketEvents.APPOINTMENTS_DATA,
-        { tableData: result },
-        { date }
+        { tableData: result, date }
       );
   
       connectionManager.sendToClient(ws, message);
@@ -794,8 +793,7 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
 
       const message = createStandardMessage(
         WebSocketEvents.APPOINTMENTS_UPDATED,
-        { tableData: appointmentData },
-        { date: dateParam }
+        { tableData: appointmentData, date: dateParam }
       );
 
       // Broadcast to screens and simplified clients specifically
