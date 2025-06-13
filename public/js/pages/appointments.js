@@ -260,21 +260,12 @@ class AppointmentsPageController {
 
     // Handle appointment updates
     const handleAppointmentUpdate = (data) => {
-      console.log('Received WebSocket appointment update:', data);
+      console.log('Received WebSocket appointment update');
 
       if (!data || !data.tableData) {
         console.error('Invalid data in appointment update event:', data);
         return;
       }
-
-      // Check appointments data structure
-      const appointments = data.tableData.appointments;
-      if (!appointments || !Array.isArray(appointments)) {
-        console.error('Invalid appointments data:', appointments);
-        return;
-      }
-
-      console.log(`Processing ${appointments.length} appointments from WebSocket update`);
 
       try {
         this.updateUI(data.tableData);

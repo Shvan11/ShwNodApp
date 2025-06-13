@@ -42,23 +42,9 @@ export function updateStatistics(statsElements, data) {
 }
 
 /**
- * Get column value with error handling
- * @param {Array} row - Row data
- * @param {number} index - Column index
- * @param {*} defaultValue - Default value if column is missing
- * @returns {*} - Column value or default
- */
-export function getColumnValue(row, index, defaultValue) {
-  if (!row[index] || row[index].value === undefined) {
-    return defaultValue;
-  }
-  return row[index].value;
-}
-
-/**
  * Format appointments data for table component
- * @param {Array} appointments - Raw appointments data
- * @returns {Array} - Formatted data
+ * @param {Array} appointments - Appointments data as objects
+ * @returns {Array} - Standardized appointment objects
  */
 export function formatAppointmentsData(appointments) {
   if (!Array.isArray(appointments)) {
@@ -66,28 +52,36 @@ export function formatAppointmentsData(appointments) {
     return [];
   }
 
-  return appointments.map(appointmentColumns => {
-    // Ensure appointmentColumns is an array
-    if (!Array.isArray(appointmentColumns)) {
-      console.warn('Invalid appointment row format:', appointmentColumns);
+  return appointments.map(appointment => {
+    // Expect modern object format
+    if (!appointment || typeof appointment !== 'object') {
+      console.warn('Invalid appointment object:', appointment);
       return {
-        patientName: 'Error: Invalid row format',
+        no: '',
+        time: '',
+        type: '',
+        patientName: 'Error: Invalid appointment',
+        detail: '',
+        present: '',
+        seated: '',
+        dismissed: '',
+        notes: false,
         pid: ''
       };
     }
 
-    // Extract values with safe defaults
+    // Standardize object properties
     return {
-      no: getColumnValue(appointmentColumns, 0, ''),
-      time: getColumnValue(appointmentColumns, 1, ''),
-      type: getColumnValue(appointmentColumns, 2, ''),
-      patientName: getColumnValue(appointmentColumns, 3, 'Unknown'),
-      detail: getColumnValue(appointmentColumns, 4, ''),
-      present: getColumnValue(appointmentColumns, 5, ''),
-      seated: getColumnValue(appointmentColumns, 6, ''),
-      dismissed: getColumnValue(appointmentColumns, 7, ''),
-      notes: getColumnValue(appointmentColumns, 8, '') === 'true',
-      pid: getColumnValue(appointmentColumns, 9, '')
+      no: appointment.Num || '',
+      time: appointment.apptime || '',
+      type: appointment.PatientType || '',
+      patientName: appointment.PatientName || 'Unknown',
+      detail: appointment.AppDetail || '',
+      present: appointment.Present || '',
+      seated: appointment.Seated || '',
+      dismissed: appointment.Dismissed || '',
+      notes: appointment.HasVisit || false,
+      pid: appointment.appointmentID || ''
     };
   });
 }
