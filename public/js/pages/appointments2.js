@@ -411,14 +411,6 @@ class Appointments2PageController {
     const handleAppointmentUpdate = (eventData) => {
       console.log('🔄 [CLIENT] Received WebSocket appointment update event');
       console.log('🔄 [CLIENT] Event data:', JSON.stringify(eventData, null, 2));
-      console.log('🔄 [CLIENT] Current date string:', this.dateString);
-      
-      // Check if update is for current date
-      if (eventData && eventData.date && eventData.date !== this.dateString) {
-        console.log(`🔄 [CLIENT] Update is for different date (${eventData.date}), ignoring...`);
-        return;
-      }
-      
       console.log('🔄 [CLIENT] Reloading both appointment lists...');
       this.loadBothAppointmentLists();
     };
