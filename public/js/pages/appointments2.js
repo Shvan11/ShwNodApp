@@ -94,18 +94,21 @@ class Appointments2PageController {
       const allAppointments = await allAppointmentsResponse.json();
       console.log(`Got ${allAppointments.length} all appointments:`, allAppointments);
       
-      // Load checked-in appointments (including dismissed)
+      // Load present appointments (including dismissed) using new endpoint
+      const presentResponse = await fetch(`/api/getPresentTodayApps?AppsDate=${this.dateString}`);
+      const presentAppointments = await presentResponse.json();
+      console.log(`Got present appointments response:`, presentAppointments);
+      
+      // Ensure we have an array
+      const presentAppointmentsArray = Array.isArray(presentAppointments) ? presentAppointments : [];
+      console.log(`Got ${presentAppointmentsArray.length} present appointments (including dismissed):`, presentAppointmentsArray);
+      
+      // Load checked-in stats from existing endpoint
       const checkedInResponse = await fetch(`/api/getWebApps?PDate=${this.dateString}`);
       const checkedInData = await checkedInResponse.json();
-      console.log(`Got ${checkedInData.appointments?.length || 0} checked-in appointments:`, checkedInData.appointments);
-      
-      // For simplified view, get all patients who have been checked in (including dismissed)
-      const allCheckedInPatients = allAppointments.filter(apt => 
-        apt.Present || apt.Seated || apt.Dismissed
-      );
       
       this.updateAllAppointmentsTable(allAppointments);
-      this.updateCheckedInTable(allCheckedInPatients);
+      this.updateCheckedInTable(presentAppointmentsArray);
       this.updateStats(checkedInData);
       
     } catch (error) {
@@ -218,23 +221,39 @@ class Appointments2PageController {
         checkInBtn.onclick = () => this.checkInPatient(appointment.appointmentID);
         actionsCell.appendChild(checkInBtn);
       } else {
-        // Show status or action buttons based on current state
+        // Show status with time or action buttons based on current state
         if (appointment.Dismissed) {
-          actionsCell.textContent = 'Dismissed';
+          actionsCell.innerHTML = `<strong>Dismissed</strong><br><small>${appointment.Dismissed || ''}</small>`;
           actionsCell.style.color = '#4caf50';
           actionsCell.style.fontWeight = 'bold';
+        } else if (appointment.Seated) {
+          const dismissedBtn = document.createElement('button');
+          dismissedBtn.textContent = 'Dismissed';
+          dismissedBtn.className = 'btn-danger';
+          dismissedBtn.onclick = () => this.updatePatientState(appointment.appointmentID, 'Dismissed');
+          
+          actionsCell.innerHTML = `<strong>Seated</strong><br><small>${appointment.Seated || ''}</small><br>`;
+          actionsCell.appendChild(dismissedBtn);
+          actionsCell.style.color = '#ff9800';
+          actionsCell.style.fontWeight = 'bold';
         } else {
+          // Waiting - show Present time and action buttons
           const seatedBtn = document.createElement('button');
           seatedBtn.textContent = 'Seated';
           seatedBtn.className = 'btn-secondary';
           seatedBtn.onclick = () => this.updatePatientState(appointment.appointmentID, 'Seated');
-          actionsCell.appendChild(seatedBtn);
           
           const dismissedBtn = document.createElement('button');
           dismissedBtn.textContent = 'Dismissed';
           dismissedBtn.className = 'btn-danger';
           dismissedBtn.onclick = () => this.updatePatientState(appointment.appointmentID, 'Dismissed');
+          
+          actionsCell.innerHTML = `<strong>Present</strong><br><small>${appointment.Present || ''}</small><br>`;
+          actionsCell.appendChild(seatedBtn);
+          actionsCell.appendChild(document.createTextNode(' '));
           actionsCell.appendChild(dismissedBtn);
+          actionsCell.style.color = '#f44336';
+          actionsCell.style.fontWeight = 'bold';
         }
       }
       
@@ -433,7 +452,6 @@ class Appointments2PageController {
     // Handle appointment updates
     const handleAppointmentUpdate = (eventData) => {
       console.log('🔄 [CLIENT] Received WebSocket appointment update event');
-      console.log('🔄 [CLIENT] Event data:', JSON.stringify(eventData, null, 2));
       console.log('🔄 [CLIENT] Reloading both appointment lists...');
       this.loadBothAppointmentLists();
     };

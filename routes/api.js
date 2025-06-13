@@ -4,7 +4,7 @@
 import express from 'express';
 
 import * as database from '../services/database/index.js';
-import { getPresentAps, getAllTodayApps, updatePresent } from '../services/database/queries/appointment-queries.js';
+import { getPresentAps, getAllTodayApps, getPresentTodayApps, updatePresent } from '../services/database/queries/appointment-queries.js';
 import {getTimePoints, getTimePointImgs } from '../services/database/queries/timepoint-queries.js';
 import { getWhatsAppMessages } from '../services/database/queries/messaging-queries.js';
 import { getPatientsPhones, getInfos } from '../services/database/queries/patient-queries.js';
@@ -567,6 +567,22 @@ router.get("/getAllTodayApps", async (req, res) => {
     } catch (error) {
         console.error("Error fetching all today appointments:", error);
         res.status(500).json({ error: "Failed to fetch appointments" });
+    }
+});
+
+// Get all present appointments (including dismissed) for simplified view
+router.get("/getPresentTodayApps", async (req, res) => {
+    try {
+        const { AppsDate } = req.query;
+        if (!AppsDate) {
+            return res.status(400).json({ error: "Missing required parameter: AppsDate" });
+        }
+        
+        const result = await getPresentTodayApps(AppsDate);
+        res.json(result);
+    } catch (error) {
+        console.error("Error fetching present appointments:", error);
+        res.status(500).json({ error: "Failed to fetch present appointments" });
     }
 });
 

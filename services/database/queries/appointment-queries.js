@@ -68,6 +68,35 @@ export function getAllTodayApps(AppsDate) {
 }
 
 /**
+ * Retrieves all present appointments for a given date (including dismissed).
+ * @param {string} AppsDate - The date for which to retrieve present appointments.
+ * @returns {Promise<Array>} - A promise that resolves with all present appointments for the date.
+ */
+export function getPresentTodayApps(AppsDate) {
+    return executeStoredProcedure(
+        'PresentTodayApps',
+        [['AppsDate', TYPES.Date, AppsDate]],
+        null,
+        (columns) => ({
+            appointmentID: columns[0].value,
+            PersonID: columns[1].value,
+            AppDetail: columns[2].value,
+            Present: columns[3].value,
+            Seated: columns[4].value,
+            Dismissed: columns[5].value,
+            AppDate: columns[6].value,
+            AppCost: columns[7].value,
+            apptime: columns[8].value,
+            PatientType: columns[9].value,
+            PatientName: columns[10].value,
+            Alerts: columns[11].value,
+            HasVisit: columns[12].value
+        }),
+        (result) => result
+    );
+}
+
+/**
  * Updates patient appointment state (Present, Seated, Dismissed).
  * @param {number} Aid - The appointment ID.
  * @param {string} state - The state field to update (Present, Seated, Dismissed).

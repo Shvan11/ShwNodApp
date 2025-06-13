@@ -14,6 +14,7 @@ body {
 /* Page title */
 #title {
   text-align: center;
+  margin: 0;
 }
 
 /* Layout containers specific to appointments */
@@ -25,19 +26,42 @@ body {
   justify-content: space-evenly;
 }
 
-/* Full width layout for simplified view */
+/* ===== SIMPLIFIED VIEW SPECIFIC STYLES ===== */
+
+/* Full width layout for simplified view only */
 .container.full-width {
-  margin: 0;
+  margin: 0 !important;
   padding: 1rem;
   min-height: calc(100vh - 100px);
-  flex-direction: column;
+  flex-direction: row;
   gap: 2rem;
+  width: 100vw !important;
+  box-sizing: border-box;
+  max-width: none !important;
+}
+
+/* Ensure full-width body for simplified view only */
+body.simplified-view {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100vw !important;
+  overflow-x: hidden;
+}
+
+/* Ensure header takes full width in simplified view */
+body.simplified-view .header-section {
+  width: 100vw !important;
+  margin: 0 !important;
+  padding: 1rem;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 /* Appointments sections layout for simplified view */
 .appointments-section {
   flex: 1;
   min-width: 0;
+  width: 50%;
 }
 
 .appointments-section h3 {
@@ -164,43 +188,43 @@ tr.active-patient td:last-child {
   border-right: 2px solid #2196f3;
 }
 
-/* Appointments section styling */
-.appointments-section {
+/* Appointments section styling - only for simplified view */
+body.simplified-view .appointments-section {
   margin-bottom: 2rem;
   flex: 1;
   margin-right: 1rem;
 }
 
-.appointments-section h3 {
+body.simplified-view .appointments-section h3 {
   margin-bottom: 1rem;
   color: #333;
   border-bottom: 2px solid #007bff;
   padding-bottom: 0.5rem;
 }
 
-.appointments-table {
+body.simplified-view .appointments-table {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 1rem;
 }
 
-.appointments-table th,
-.appointments-table td {
+body.simplified-view .appointments-table th,
+body.simplified-view .appointments-table td {
   border: 1px solid #ddd;
   padding: 8px;
   text-align: left;
 }
 
-.appointments-table th {
+body.simplified-view .appointments-table th {
   background-color: #f2f2f2;
   font-weight: bold;
 }
 
-.appointments-table tr:nth-child(even) {
+body.simplified-view .appointments-table tr:nth-child(even) {
   background-color: #f9f9f9;
 }
 
-.appointments-table button {
+body.simplified-view .appointments-table button {
   margin-right: 5px;
   padding: 4px 8px;
   border: none;
@@ -209,35 +233,35 @@ tr.active-patient td:last-child {
   font-size: 12px;
 }
 
-.btn-primary {
+body.simplified-view .btn-primary {
   background-color: #007bff;
   color: white;
 }
 
-.btn-secondary {
+body.simplified-view .btn-secondary {
   background-color: #6c757d;
   color: white;
 }
 
-.btn-danger {
+body.simplified-view .btn-danger {
   background-color: #dc3545;
   color: white;
 }
 
-.btn-primary:hover {
+body.simplified-view .btn-primary:hover {
   background-color: #0056b3;
 }
 
-.btn-secondary:hover {
+body.simplified-view .btn-secondary:hover {
   background-color: #545b62;
 }
 
-.btn-danger:hover {
+body.simplified-view .btn-danger:hover {
   background-color: #c82333;
 }
 
-/* Header section styling */
-.header-section {
+/* Header section styling - only for simplified view */
+body.simplified-view .header-section {
   text-align: center;
   margin-bottom: 1rem;
   padding: 1rem;
@@ -246,7 +270,7 @@ tr.active-patient td:last-child {
   margin: 0.5rem;
 }
 
-.date-picker-container {
+body.simplified-view .date-picker-container {
   margin-top: 1rem;
   display: flex;
   align-items: center;
@@ -254,18 +278,18 @@ tr.active-patient td:last-child {
   gap: 10px;
 }
 
-.date-picker-container label {
+body.simplified-view .date-picker-container label {
   font-weight: bold;
   color: #333;
 }
 
-#date-picker {
+body.simplified-view #date-picker {
   padding: 5px 10px;
   border: 1px solid #ddd;
   border-radius: 3px;
   font-size: 14px;
 }
 
-#load-date-btn {
+body.simplified-view #load-date-btn {
   padding: 5px 15px;
 }
