@@ -20,6 +20,9 @@ class ConnectionManager {
     // Set to store WhatsApp status connections
     this.waStatusConnections = new Set();
 
+    // Set to store simplified appointment connections
+    this.simplifiedConnections = new Set();
+
     // Set to store all active connections
     this.allConnections = new Set();
 
@@ -57,6 +60,9 @@ class ConnectionManager {
       // Auth connections also need QR events, so add them to waStatusConnections
       this.waStatusConnections.add(ws);
       console.log('Registered authentication connection (QR events enabled)');
+    } else if (type === 'simplified') {
+      this.simplifiedConnections.add(ws);
+      console.log('Registered simplified appointments connection');
     }
   }
 
@@ -82,6 +88,9 @@ class ConnectionManager {
     } else if (capabilities.type === 'auth') {
       this.waStatusConnections.delete(ws);
       console.log('Unregistered authentication connection');
+    } else if (capabilities.type === 'simplified') {
+      this.simplifiedConnections.delete(ws);
+      console.log('Unregistered simplified appointments connection');
     }
 
     // Remove capabilities
@@ -154,6 +163,33 @@ class ConnectionManager {
         sentCount++;
       } catch (error) {
         console.error(`Error sending to screen ${screenId}:`, error);
+      }
+    }
+
+    return sentCount;
+  }
+
+  /**
+   * Broadcast message to all simplified appointment connections
+   * @param {Object|string} message - Message to send
+   * @param {Function} [filter] - Filter function to determine which clients to send to
+   * @returns {number} - Number of clients message was sent to
+   */
+  broadcastToSimplified(message, filter = null) {
+    let sentCount = 0;
+
+    for (const ws of this.simplifiedConnections) {
+      if (ws.readyState !== ws.OPEN) continue;
+
+      // Apply filter if provided
+      const capabilities = this.clientCapabilities.get(ws);
+      if (filter && !filter(ws, capabilities)) continue;
+
+      try {
+        this.sendToClient(ws, message);
+        sentCount++;
+      } catch (error) {
+        console.error('Error sending to simplified client:', error);
       }
     }
 
@@ -285,7 +321,8 @@ class ConnectionManager {
     return {
       total: this.allConnections.size,
       screens: this.screenConnections.size,
-      waStatus: this.waStatusConnections.size
+      waStatus: this.waStatusConnections.size,
+      simplified: this.simplifiedConnections.size
     };
   }
 }
@@ -383,6 +420,16 @@ function setupWebSocketServer(server) {
         } else {
           console.log(`Auth client connected without QR registration (needsQR=${needsQR})`);
         }
+      } else if (clientType === 'simplified') {
+        // Simplified appointments view - register as simplified type
+        console.log('Simplified appointments client connected');
+        connectionManager.registerConnection(ws, 'simplified', {
+          date: date,
+          ipAddress: req.socket.remoteAddress
+        });
+        
+        // Send initial data immediately
+        sendInitialData(ws, date, connectionManager);
       } else {
         // Generic connection
         connectionManager.registerConnection(ws, 'generic', {
@@ -751,8 +798,10 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
         { date: dateParam }
       );
 
-      const updateCount = connectionManager.broadcastToScreens(message);
-      console.log(`Broadcast appointment updates to ${updateCount} screens`);
+      // Broadcast to screens and simplified clients specifically
+      const screenUpdates = connectionManager.broadcastToScreens(message);
+      const simplifiedUpdates = connectionManager.broadcastToSimplified(message);
+      console.log(`Broadcast appointment updates to ${screenUpdates} screens and ${simplifiedUpdates} simplified clients`);
     } catch (error) {
       console.error(`Error fetching appointment data for date ${dateParam}:`, error);
     }
@@ -958,7 +1007,7 @@ function setupPeriodicCleanup(connectionManager) {
 
     // Log active connection counts
     const counts = connectionManager.getConnectionCounts();
-    console.log(`Active connections: ${counts.total} total, ${counts.screens} screens, ${counts.waStatus} WhatsApp status`);
+    console.log(`Active connections: ${counts.total} total, ${counts.screens} screens, ${counts.simplified} simplified, ${counts.waStatus} WhatsApp status`);
   }, 10 * 60 * 1000); // Every 10 minutes
 
   
