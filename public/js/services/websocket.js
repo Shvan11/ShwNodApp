@@ -784,9 +784,12 @@ class WebSocketService extends EventEmitter {
       url.searchParams.append('screenID', this.state.screenId);
     }
     
-    // Add current date
+    // Add current date with zero padding to match client format
     const now = new Date();
-    const dateParam = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const dateParam = `${year}-${month}-${day}`;
     url.searchParams.append('PDate', dateParam);
     
     // Add additional parameters
