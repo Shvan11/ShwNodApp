@@ -100,6 +100,9 @@ export const WebSocketEvents = {
   /** Message sending process finished */
   WHATSAPP_SENDING_FINISHED: 'whatsapp_sending_finished',
   
+  /** Message sending progress update */
+  WHATSAPP_SENDING_PROGRESS: 'whatsapp_sending_progress',
+  
   /** Request initial WhatsApp state */
   REQUEST_WHATSAPP_INITIAL_STATE: 'request_whatsapp_initial_state',
   
@@ -376,6 +379,7 @@ export function getEventsByCategory() {
       WebSocketEvents.WHATSAPP_MESSAGE_STATUS,
       WebSocketEvents.WHATSAPP_MESSAGE_BATCH_STATUS,
       WebSocketEvents.WHATSAPP_SENDING_FINISHED,
+      WebSocketEvents.WHATSAPP_SENDING_PROGRESS,
       WebSocketEvents.REQUEST_WHATSAPP_INITIAL_STATE,
       WebSocketEvents.WHATSAPP_INITIAL_STATE_RESPONSE
     ],

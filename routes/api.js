@@ -18,6 +18,7 @@ import * as imaging from '../services/imaging/index.js';
 import multer from 'multer';
 import { sendgramfile } from '../services/messaging/telegram.js';
 import qrcode from 'qrcode';
+import PhoneFormatter from '../utils/phoneFormatter.js';
 import messageState from '../services/state/messageState.js';
 import { createWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
 import { WebSocketEvents, createStandardMessage } from '../services/messaging/websocket-events.js';
@@ -271,11 +272,9 @@ router.get('/wa/send-to-patient', async (req, res) => {
             });
         }
         
-        // Extract phone number (remove 964 prefix for WhatsApp)
-        let phoneNumber = messageData.phone;
-        if (phoneNumber.startsWith('964')) {
-            phoneNumber = phoneNumber.substring(3);
-        }
+        // Format phone number for WhatsApp (needs international format with + prefix)
+        const countryCode = messageData.countryCode || '964'; // Default to Iraq
+        const phoneNumber = PhoneFormatter.forWhatsApp(messageData.phone, countryCode);
         
         console.log(`Sending WhatsApp message to ${phoneNumber}: ${messageData.message.substring(0, 50)}...`);
         
@@ -435,7 +434,7 @@ router.post('/sendmedia2', upload.none(), async (req, res) => {
         let state = {};
 
         if (prog === "WhatsApp") {
-            phone = phone.startsWith("+") || phone.startsWith("0") ? phone.substring(1) : phone;
+            phone = PhoneFormatter.forWhatsApp(phone);
             console.log(`WhatsApp - Formatted phone: ${phone}`);
             
             for (const path of paths) {
@@ -447,16 +446,8 @@ router.post('/sendmedia2', upload.none(), async (req, res) => {
                 }
             }
         } else if (prog === "Telegram") {
-            // Improved phone number formatting for Telegram
             const originalPhone = phone;
-            if (phone.startsWith("0")) {
-                phone = "+964" + phone.substring(1);
-            } else if (phone.startsWith("964")) {
-                phone = "+" + phone;
-            } else if (!phone.startsWith("+964") && !phone.startsWith("+")) {
-                phone = "+964" + phone;
-            }
-            
+            phone = PhoneFormatter.forTelegram(phone);
             console.log(`Telegram - Original phone: ${originalPhone}, Formatted phone: ${phone}`);
 
             for (const path of paths) {

@@ -7,6 +7,7 @@ import * as database from '../database/index.js';
 import { getWhatsAppMessages } from '../database/queries/messaging-queries.js';
 import * as messagingQueries from '../database/queries/messaging-queries.js';
 import { createWebSocketMessage, MessageSchemas } from './schemas.js';
+import { logger } from '../core/Logger.js';
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth } = pkg;
 
@@ -44,7 +45,7 @@ class ClientStateManager {
     // Check if current lock has timed out (safety mechanism)
     const lockAge = Date.now() - this.initializationLock;
     if (lockAge > this.INITIALIZATION_TIMEOUT) {
-      console.warn(`Force releasing stale initialization lock (age: ${lockAge}ms)`);
+      logger.whatsapp.warn(`Force releasing stale lock`, { lockAge });
       this.forceReleaseLock();
       this.initializationLock = Date.now();
       return true;
@@ -96,7 +97,7 @@ class ClientStateManager {
           }
         });
       } catch (error) {
-        console.error('Error notifying next lock waiter:', error);
+        logger.whatsapp.error('Error notifying next lock waiter', error);
       }
     }
   }
@@ -112,19 +113,27 @@ class ClientStateManager {
           waiter.reject();
         }
       } catch (error) {
-        console.error('Error rejecting lock waiter:', error);
+        logger.whatsapp.error('Error rejecting lock waiter', error);
       }
     }
   }
 
   setState(newState, error = null) {
     const oldState = this.state;
+    
+    // Only proceed if state actually changes
+    if (oldState === newState && !error) {
+      return; // No change, no event emission, no resource waste
+    }
+    
     this.state = newState;
     this.lastError = error;
 
-    console.log(`WhatsApp client state: ${oldState} -> ${newState}${error ? ` (${error.message})` : ''}`);
+    if (oldState !== newState) {
+      logger.whatsapp.info(`State: ${oldState} → ${newState}`, error ? { error: error.message } : undefined);
+    }
 
-    // Emit state change event
+    // Only emit state change event when state actually changes or there's an error
     stateEvents.emit('whatsapp_state_changed', {
       from: oldState,
       to: newState,
@@ -162,7 +171,7 @@ class ClientStateManager {
   }
 
   cleanup() {
-    console.log('Cleaning up ClientStateManager');
+    logger.whatsapp.debug('Cleaning up ClientStateManager');
 
     // Clear all timers
     this.clearReconnectTimer();
@@ -173,7 +182,7 @@ class ClientStateManager {
       try {
         this.initializationAbortController.abort();
       } catch (error) {
-        console.error('Error aborting initialization:', error);
+        logger.whatsapp.error('Error aborting initialization', error);
       }
       this.initializationAbortController = null;
     }
@@ -192,7 +201,7 @@ class ClientStateManager {
     this.lastError = null;
     this.destroyInProgress = false;
 
-    console.log('ClientStateManager cleanup completed');
+    logger.whatsapp.debug('ClientStateManager cleanup completed');
   }
 }
 
@@ -239,7 +248,7 @@ class EnhancedCircuitBreaker {
 
   onSuccess(operationName) {
     if (this.state === 'HALF_OPEN') {
-      console.log(`Circuit breaker healing: successful ${operationName}`);
+      logger.whatsapp.debug(`Circuit breaker healing: ${operationName}`);
       this.transitionToClosed();
     } else if (this.state === 'CLOSED') {
       this.failureCount = Math.max(0, this.failureCount - 1); // Gradually reduce failure count
@@ -250,7 +259,7 @@ class EnhancedCircuitBreaker {
     this.failureCount++;
     this.lastFailureTime = Date.now();
 
-    console.error(`Circuit breaker failure ${this.failureCount}/${this.failureThreshold} for ${operationName}:`, error.message);
+    logger.whatsapp.warn(`Circuit breaker failure ${this.failureCount}/${this.failureThreshold} for ${operationName}`, { error: error.message });
 
     if (this.state === 'HALF_OPEN' || this.failureCount >= this.failureThreshold) {
       this.transitionToOpen();
@@ -262,26 +271,26 @@ class EnhancedCircuitBreaker {
     this.failureCount = 0;
     this.halfOpenCalls = 0;
     this.lastStateChange = Date.now();
-    console.log('Circuit breaker transitioned to CLOSED');
+    logger.whatsapp.info('Circuit breaker → CLOSED');
   }
 
   transitionToOpen() {
     this.state = 'OPEN';
     this.halfOpenCalls = 0;
     this.lastStateChange = Date.now();
-    console.log(`Circuit breaker OPENED after ${this.failureCount} failures`);
+    logger.whatsapp.warn(`Circuit breaker → OPEN`, { failures: this.failureCount });
   }
 
   transitionToHalfOpen() {
     this.state = 'HALF_OPEN';
     this.halfOpenCalls = 0;
     this.lastStateChange = Date.now();
-    console.log('Circuit breaker transitioned to HALF_OPEN');
+    logger.whatsapp.info('Circuit breaker → HALF_OPEN');
   }
 
   reset() {
     this.transitionToClosed();
-    console.log('Circuit breaker manually reset');
+    logger.whatsapp.info('Circuit breaker manually reset');
   }
 
   getStatus() {
@@ -335,7 +344,7 @@ class WhatsAppService extends EventEmitter {
 
   setEmitter(emitter) {
     this.wsEmitter = emitter;
-    console.log("WebSocket emitter set for WhatsApp service");
+    logger.whatsapp.debug('WebSocket emitter set');
   }
 
   isReady() {
@@ -360,7 +369,7 @@ class WhatsAppService extends EventEmitter {
   }
 
   async handleViewerConnected() {
-    console.log("QR viewer connected - checking if initialization needed");
+    logger.whatsapp.debug('QR viewer connected - checking initialization');
 
     // Only auto-initialize if we have actual QR viewers (not just status checkers)
     // and the client is in a clean DISCONNECTED state (not ERROR or INITIALIZING)
@@ -369,15 +378,15 @@ class WhatsAppService extends EventEmitter {
       !this.clientState.isState('ERROR') &&
       !this.clientState.isState('INITIALIZING')) {
 
-      console.log("Auto-initializing WhatsApp client for QR viewer");
+      logger.whatsapp.info('Auto-initializing for QR viewer');
       try {
         await this.initialize();
       } catch (error) {
-        console.error("Failed to auto-initialize for QR viewer:", error);
+        logger.whatsapp.error('Failed to auto-initialize for QR viewer', error);
         // Don't retry immediately on failure to avoid loops
       }
     } else {
-      console.log(`Skipping auto-initialization - State: ${this.clientState.currentState}, QR Viewers: ${this.messageState.activeQRViewers}`);
+      logger.whatsapp.debug('Skipping auto-initialization', { state: this.clientState.state, qrViewers: this.messageState.activeQRViewers });
     }
   }
 
@@ -385,12 +394,12 @@ class WhatsAppService extends EventEmitter {
   async initialize(forceRestart = false) {
     // Check if we should skip initialization
     if (!forceRestart && this.clientState.isState('CONNECTED')) {
-      console.log("WhatsApp client already connected");
+      logger.whatsapp.info('WhatsApp client already connected');
       return true;
     }
 
     if (!forceRestart && this.clientState.isState('INITIALIZING')) {
-      console.log("WhatsApp client already initializing, waiting for completion");
+      logger.whatsapp.info('WhatsApp client already initializing, waiting for completion');
       return this.clientState.initializationPromise;
     }
 
@@ -401,7 +410,7 @@ class WhatsAppService extends EventEmitter {
 
     try {
       // Acquire initialization lock
-      console.log("Acquiring initialization lock...");
+      logger.whatsapp.debug('Acquiring initialization lock');
       await this.clientState.acquireInitializationLock();
 
       // Double-check state after acquiring lock
@@ -417,7 +426,7 @@ class WhatsAppService extends EventEmitter {
       return result;
 
     } catch (error) {
-      console.error(`WhatsApp initialization failed: ${error.message}`);
+      logger.whatsapp.error('Initialization failed', error);
       throw error;
     } finally {
       // Always release lock and clean up
@@ -427,7 +436,7 @@ class WhatsAppService extends EventEmitter {
   }
 
   async performInitialization(forceRestart = false) {
-    console.log(`Starting WhatsApp client initialization (forceRestart: ${forceRestart})`);
+    logger.whatsapp.info('Starting initialization', { forceRestart });
 
     try {
       // Clean up existing client if restarting
@@ -459,11 +468,11 @@ class WhatsAppService extends EventEmitter {
         }
         // Don't call setClientReady here - the ready event handler will do it
         this.clientState.reconnectAttempts = 0;
-        console.log("WhatsApp client initialized successfully");
+        logger.whatsapp.info('Client initialized successfully');
         return true;
       } else if (success === false) {
         // QR timeout - keep client in QR mode, don't treat as error
-        console.log("WhatsApp client in QR mode - waiting for scan");
+        logger.whatsapp.info('Client in QR mode - waiting for scan');
         this.clientState.setState('INITIALIZING'); // Keep in initializing state
         // Don't broadcast here either - QR event handler will do it
         return false;
@@ -490,7 +499,7 @@ class WhatsAppService extends EventEmitter {
   }
 
   async createAndInitializeClient() {
-    console.log("Creating WhatsApp client instance");
+    logger.whatsapp.debug('Creating client instance');
 
     // Check if aborted
     if (this.clientState.initializationAbortController?.signal.aborted) {
@@ -547,13 +556,13 @@ class WhatsAppService extends EventEmitter {
 
       const onQR = (qr) => {
         // QR received is normal, extend timeout for user to scan
-        console.log('QR code received during initialization - extending timeout');
+        logger.whatsapp.debug('QR code received - extending timeout');
         clearTimeout(timeout);
         // Give user more time to scan QR code
         setTimeout(() => {
           if (!resolved) {
             resolved = true;
-            console.log('QR scan timeout - but keeping client alive for manual retry');
+            logger.whatsapp.warn('QR scan timeout - keeping client alive');
             client.removeListener('ready', onReady);
             client.removeListener('auth_failure', onAuthFailure);
             client.removeListener('disconnected', onDisconnected);
@@ -613,10 +622,10 @@ class WhatsAppService extends EventEmitter {
   }
 
   async setupClientEventHandlers(client) {
-    console.log("Setting up WhatsApp client event handlers");
+    logger.whatsapp.debug('Setting up event handlers');
 
     client.on('qr', async (qr) => {
-      console.log('QR code received');
+      logger.whatsapp.debug('QR code received');
 
       // Client is definitely not ready when QR is received
       if (this.messageState.clientReady) {
@@ -636,7 +645,7 @@ class WhatsAppService extends EventEmitter {
     });
 
     client.on('ready', async () => {
-      console.log('WhatsApp client is ready - broadcasting to frontend');
+      logger.whatsapp.info('Client ready - broadcasting to frontend');
       // IMPORTANT: Update client state to CONNECTED when ready event fires
       this.clientState.setState('CONNECTED');
       await this.messageState.setClientReady(true);
@@ -653,7 +662,7 @@ class WhatsAppService extends EventEmitter {
           }
         );
         this.broadcastToClients(message);
-        console.log('Broadcasted client ready state to frontend');
+        logger.whatsapp.debug('Broadcasted client ready state');
       }
     });
 
@@ -661,10 +670,10 @@ class WhatsAppService extends EventEmitter {
       const messageId = msg.id.id;
       const appointmentId = this.messageIdToAppointmentId.get(messageId);
 
-      console.log(`Message ${messageId} status updated to ${ack}, appointmentId: ${appointmentId}`);
+      logger.whatsapp.debug(`Message status updated`, { messageId, ack, appointmentId });
 
       if (!appointmentId) {
-        console.warn(`No appointment ID found for message ${messageId}, skipping database update`);
+        logger.whatsapp.warn('No appointment ID for message', { messageId });
         return;
       }
 
@@ -687,12 +696,12 @@ class WhatsAppService extends EventEmitter {
         }
 
       } catch (error) {
-        console.error(`Error updating message status: ${error.message}`);
+        logger.whatsapp.error('Error updating message status', error);
       }
     });
 
     client.on('disconnected', async (reason) => {
-      console.log(`WhatsApp client disconnected: ${reason}`);
+      logger.whatsapp.warn(`Client disconnected`, { reason });
       this.clientState.setState('DISCONNECTED');
       await this.messageState.setClientReady(false);
 
@@ -705,7 +714,7 @@ class WhatsAppService extends EventEmitter {
     });
 
     client.on('auth_failure', async (error) => {
-      console.error(`WhatsApp authentication failed: ${error}`);
+      logger.whatsapp.error('WhatsApp authentication failed', error);
       this.clientState.setState('ERROR', error);
       await this.messageState.setClientReady(false);
 
@@ -716,7 +725,7 @@ class WhatsAppService extends EventEmitter {
 
     // Handle loading screen
     client.on('loading_screen', (percent, message) => {
-      console.log(`WhatsApp loading: ${percent}% - ${message}`);
+      logger.whatsapp.debug(`WhatsApp loading: ${percent}% - ${message}`);
     });
   }
 
@@ -724,7 +733,7 @@ class WhatsAppService extends EventEmitter {
     this.clientState.reconnectAttempts++;
 
     if (this.clientState.reconnectAttempts > this.clientState.MAX_RECONNECT_ATTEMPTS) {
-      console.log(`Exceeded maximum reconnection attempts (${this.clientState.MAX_RECONNECT_ATTEMPTS})`);
+      logger.whatsapp.warn(`Exceeded maximum reconnection attempts (${this.clientState.MAX_RECONNECT_ATTEMPTS})`);
       this.circuitBreaker.onFailure('max-reconnect-attempts', error);
       return;
     }
@@ -734,21 +743,21 @@ class WhatsAppService extends EventEmitter {
       60000
     ) * (0.75 + Math.random() * 0.5);
 
-    console.log(`Scheduling reconnection attempt ${this.clientState.reconnectAttempts} in ${Math.round(delay)}ms`);
+    logger.whatsapp.info(`Scheduling reconnection attempt ${this.clientState.reconnectAttempts} in ${Math.round(delay)}ms`);
 
     this.clientState.clearReconnectTimer();
     this.clientState.reconnectTimer = setTimeout(async () => {
-      console.log(`Attempting to reconnect (attempt ${this.clientState.reconnectAttempts})`);
+      logger.whatsapp.info(`Attempting to reconnect (attempt ${this.clientState.reconnectAttempts})`);
       try {
         await this.initialize();
       } catch (err) {
-        console.error('Error during reconnection attempt:', err);
+        logger.whatsapp.error('Error during reconnection attempt', err);
       }
     }, delay);
   }
 
   async restart() {
-    console.log("Restarting WhatsApp client - preserving authentication");
+    logger.whatsapp.info('Restarting WhatsApp client - preserving authentication');
 
     this.messageState.manualDisconnect = true;
 
@@ -765,9 +774,9 @@ class WhatsAppService extends EventEmitter {
             }
           );
           this.wsEmitter.emit('broadcast_message', restartingMessage);
-          console.log('Broadcasted restarting state to clients');
+          logger.whatsapp.debug('Broadcasted restarting state to clients');
         } catch (error) {
-          console.error('Error broadcasting restarting state:', error);
+          logger.whatsapp.error('Error broadcasting restarting state', error);
         }
       }
 
@@ -775,9 +784,9 @@ class WhatsAppService extends EventEmitter {
       if (this.clientState.client) {
         try {
           await this.clientState.client.destroy();
-          console.log("Client destroyed for restart - authentication preserved");
+          logger.whatsapp.info('Client destroyed for restart - authentication preserved');
         } catch (error) {
-          console.error("Error destroying client during restart:", error.message);
+          logger.whatsapp.error('Error destroying client during restart', error);
         }
         this.clientState.client = null;
       }
@@ -805,9 +814,9 @@ class WhatsAppService extends EventEmitter {
             }
           );
           this.wsEmitter.emit('broadcast_message', initializingMessage);
-          console.log('Broadcasted initializing state to clients');
+          logger.whatsapp.debug('Broadcasted initializing state to clients');
         } catch (error) {
-          console.error('Error broadcasting initializing state:', error);
+          logger.whatsapp.error('Error broadcasting initializing state', error);
         }
       }
 
@@ -826,7 +835,7 @@ class WhatsAppService extends EventEmitter {
   }
 
   async destroyClient(reason = 'manual') {
-    console.log(`Destroying WhatsApp client (reason: ${reason})`);
+    logger.whatsapp.info(`Destroying WhatsApp client (reason: ${reason})`);
 
     this.clientState.destroyInProgress = true;
 
@@ -836,19 +845,19 @@ class WhatsAppService extends EventEmitter {
           // Only logout if explicitly requested, not during restart
           if (reason !== 'restart') {
             await this.clientState.client.logout();
-            console.log("WhatsApp client logged out successfully");
+            logger.whatsapp.info('WhatsApp client logged out successfully');
           } else {
             // For restart, just destroy without logout to preserve session
             await this.clientState.client.destroy();
-            console.log("WhatsApp client destroyed for restart (session preserved)");
+            logger.whatsapp.info('WhatsApp client destroyed for restart (session preserved)');
           }
         } catch (error) {
-          console.error(`Error during ${reason !== 'restart' ? 'logout' : 'destroy'}: ${error.message}`);
+          logger.whatsapp.error(`Error during ${reason !== 'restart' ? 'logout' : 'destroy'}`, error);
           // Try to destroy anyway
           try {
             await this.clientState.client.destroy();
           } catch (destroyError) {
-            console.error(`Error during destroy: ${destroyError.message}`);
+            logger.whatsapp.error('Error during destroy', destroyError);
           }
         }
 
@@ -859,7 +868,7 @@ class WhatsAppService extends EventEmitter {
       await this.messageState.setClientReady(false);
 
     } catch (error) {
-      console.error(`Error destroying client: ${error.message}`);
+      logger.whatsapp.error('Error destroying client', error);
     } finally {
       this.clientState.destroyInProgress = false;
     }
@@ -868,7 +877,7 @@ class WhatsAppService extends EventEmitter {
   scheduleClientCleanup() {
     // Automatic cleanup removed - preserve authenticated sessions permanently
     // Only manual destruction allowed to maintain authentication investment
-    console.log("Automatic cleanup disabled - client will persist until manually destroyed");
+    logger.whatsapp.debug('Automatic cleanup disabled - client will persist until manually destroyed');
   }
 
   broadcastToClients(message) {
@@ -884,18 +893,18 @@ class WhatsAppService extends EventEmitter {
     }
 
     return this.circuitBreaker.execute(async () => {
-      console.log(`Sending WhatsApp messages for date: ${date}`);
+      logger.whatsapp.info(`Sending WhatsApp messages for date: ${date}`);
 
       const [numbers, messages, ids, names] = await getWhatsAppMessages(date);
 
       if (!numbers || numbers.length === 0) {
-        console.log(`No messages to send for date ${date}`);
+        logger.whatsapp.info(`No messages to send for date ${date}`);
         await this.messageState.setFinishedSending(true);
         this.emit('finishedSending');
         return;
       }
 
-      console.log(`Sending ${numbers.length} messages`);
+      logger.whatsapp.info(`Sending ${numbers.length} messages`);
       
       // Broadcast sending started with total count
       if (this.wsEmitter) {
@@ -928,7 +937,7 @@ class WhatsAppService extends EventEmitter {
             await new Promise(resolve => setTimeout(resolve, 2000));
           }
         } catch (error) {
-          console.error(`Error sending message to ${numbers[i]}: ${error.message}`);
+          logger.whatsapp.error(`Error sending message to ${numbers[i]}`, error);
           results.push({ success: false, error: error.message });
         }
       }
@@ -941,12 +950,14 @@ class WhatsAppService extends EventEmitter {
   }
 
   async sendSingleMessage(number, message, name, appointmentId) {
-    const chatId = `${number}@c.us`;
+    // Remove + prefix if present for WhatsApp chat ID format
+    const cleanNumber = number.startsWith('+') ? number.substring(1) : number;
+    const chatId = `${cleanNumber}@c.us`;
 
     try {
       const sentMessage = await this.clientState.client.sendMessage(chatId, message);
 
-      console.log(`Message sent to ${number}`);
+      logger.whatsapp.debug(`Message sent to ${number}`);
 
       // Store mapping between WhatsApp message ID and appointment ID
       this.messageIdToAppointmentId.set(sentMessage.id.id, appointmentId);
@@ -964,9 +975,9 @@ class WhatsAppService extends EventEmitter {
       // Mark message as sent in database to prevent duplicates
       try {
         await messagingQueries.updateWhatsAppStatus([appointmentId], [sentMessage.id.id]);
-        console.log(`Marked appointment ${appointmentId} as sent in database`);
+        logger.whatsapp.debug(`Marked appointment ${appointmentId} as sent in database`);
       } catch (dbError) {
-        console.error(`Failed to mark appointment ${appointmentId} as sent:`, dbError.message);
+        logger.whatsapp.error(`Failed to mark appointment ${appointmentId} as sent`, dbError);
         // Continue anyway - don't fail the send because of database update issue
       }
 
@@ -997,7 +1008,7 @@ class WhatsAppService extends EventEmitter {
 
     return this.circuitBreaker.execute(async () => {
       try {
-        console.log(`Generating WhatsApp report for date: ${date}`);
+        logger.whatsapp.info(`Generating WhatsApp report for date: ${date}`);
 
         // Get delivery status and update database
         const messages = await database.getWhatsAppDeliveryStatus(date);
@@ -1021,7 +1032,7 @@ class WhatsAppService extends EventEmitter {
                 });
               }
             } catch (error) {
-              console.error(`Error checking message ${msg.wamid}:`, error);
+              logger.whatsapp.error(`Error checking message ${msg.wamid}`, error);
             }
           }
 
@@ -1034,49 +1045,49 @@ class WhatsAppService extends EventEmitter {
         await this.messageState.setFinishReport(true);
         this.emit('finishedSending');
 
-        console.log(`Report generated for ${messages.length} messages`);
+        logger.whatsapp.info(`Report generated for ${messages.length} messages`);
         return { success: true, messagesChecked: messages.length };
 
       } catch (error) {
-        console.error(`Error generating report: ${error.message}`);
+        logger.whatsapp.error('Error generating report', error);
         throw error;
       }
     }, 'generate-report');
   }
 
   async clear() {
-    console.log("Clearing message state");
+    logger.whatsapp.info('Clearing message state');
     await this.messageState.reset();
     return { success: true };
   }
 
   // Initialize on demand when QR viewers connect
   async initializeOnDemand() {
-    console.log("initializeOnDemand called - checking conditions");
+    logger.whatsapp.debug('initializeOnDemand called - checking conditions');
 
     // Don't initialize if already connected or initializing
     if (this.clientState.isState('CONNECTED') || this.clientState.isState('INITIALIZING')) {
-      console.log("Client already connected or initializing");
+      logger.whatsapp.debug('Client already connected or initializing');
       return this.clientState.initializationPromise || true;
     }
 
     // Only initialize if there are active QR viewers
     if (this.messageState.activeQRViewers === 0) {
-      console.log("No QR viewers, skipping initialization");
+      logger.whatsapp.debug('No QR viewers, skipping initialization');
       return false;
     }
 
     // Check if circuit breaker allows initialization
     if (this.circuitBreaker.getStatus().isOpen) {
-      console.log("Circuit breaker is open, cannot auto-initialize");
+      logger.whatsapp.warn('Circuit breaker is open, cannot auto-initialize');
       return false;
     }
 
-    console.log("Auto-initializing WhatsApp client");
+    logger.whatsapp.info('Auto-initializing WhatsApp client');
     try {
       return await this.initialize();
     } catch (error) {
-      console.error("Failed to auto-initialize:", error);
+      logger.whatsapp.error('Failed to auto-initialize', error);
       return false;
     }
   }
@@ -1094,19 +1105,19 @@ class WhatsAppService extends EventEmitter {
 
     return this.circuitBreaker.execute(async () => {
       try {
-        console.log(`Executing queued operation: ${operationName}`);
+        logger.whatsapp.debug(`Executing queued operation: ${operationName}`);
         const result = await operation(this.clientState.client);
-        console.log(`Queued operation completed successfully: ${operationName}`);
+        logger.whatsapp.debug(`Queued operation completed successfully: ${operationName}`);
         return result;
       } catch (error) {
-        console.error(`Queued operation failed: ${operationName}`, error);
+        logger.whatsapp.error(`Queued operation failed: ${operationName}`, error);
         throw error;
       }
     }, operationName);
   }
 
   async gracefulShutdown(signal = 'manual') {
-    console.log(`Graceful shutdown initiated (${signal})`);
+    logger.whatsapp.info(`Graceful shutdown initiated (${signal})`);
 
     try {
       // Set manual disconnect flag to prevent reconnection attempts
@@ -1121,9 +1132,9 @@ class WhatsAppService extends EventEmitter {
       // Clean up message state
       await this.messageState.cleanup();
 
-      console.log("Graceful shutdown completed");
+      logger.whatsapp.info('Graceful shutdown completed');
     } catch (error) {
-      console.error("Error during graceful shutdown:", error);
+      logger.whatsapp.error('Error during graceful shutdown', error);
     }
   }
 
@@ -1149,7 +1160,7 @@ class WhatsAppService extends EventEmitter {
 
   // Force client destruction (emergency use only)
   async forceDestroy() {
-    console.warn("Force destroying WhatsApp client");
+    logger.whatsapp.warn('Force destroying WhatsApp client');
 
     this.clientState.destroyInProgress = true;
 
@@ -1162,7 +1173,7 @@ class WhatsAppService extends EventEmitter {
         try {
           await this.clientState.client.destroy();
         } catch (error) {
-          console.error("Error during force destroy:", error);
+          logger.whatsapp.error('Error during force destroy', error);
         }
         this.clientState.client = null;
       }
@@ -1179,7 +1190,7 @@ class WhatsAppService extends EventEmitter {
 
   // Simple destroy - close browser but preserve authentication
   async simpleDestroy() {
-    console.log("Destroying WhatsApp client - closing browser but preserving authentication");
+    logger.whatsapp.info('Destroying WhatsApp client - closing browser but preserving authentication');
 
     this.clientState.destroyInProgress = true;
     this.messageState.manualDisconnect = true;
@@ -1188,9 +1199,9 @@ class WhatsAppService extends EventEmitter {
       if (this.clientState.client) {
         try {
           await this.clientState.client.destroy();
-          console.log("WhatsApp client destroyed successfully - authentication preserved");
+          logger.whatsapp.info('WhatsApp client destroyed successfully - authentication preserved');
         } catch (error) {
-          console.error("Error during destroy:", error.message);
+          logger.whatsapp.error('Error during destroy', error);
         }
         this.clientState.client = null;
       }
@@ -1205,7 +1216,7 @@ class WhatsAppService extends EventEmitter {
       return { success: true, message: "Client destroyed - browser closed, authentication preserved" };
 
     } catch (error) {
-      console.error("Error during simple destruction:", error);
+      logger.whatsapp.error('Error during simple destruction', error);
       return { success: false, error: "Destroy failed: " + error.message };
     } finally {
       this.clientState.destroyInProgress = false;
@@ -1215,7 +1226,7 @@ class WhatsAppService extends EventEmitter {
 
   // Complete logout with authentication cleanup
   async completeLogout() {
-    console.log("Starting complete WhatsApp client logout with authentication cleanup");
+    logger.whatsapp.info('Starting complete WhatsApp client logout with authentication cleanup');
 
     this.clientState.destroyInProgress = true;
     this.messageState.manualDisconnect = true;
@@ -1224,14 +1235,14 @@ class WhatsAppService extends EventEmitter {
       if (this.clientState.client) {
         try {
           await this.clientState.client.logout();
-          console.log("WhatsApp client logged out successfully - authentication cleared by logout()");
+          logger.whatsapp.info('WhatsApp client logged out successfully - authentication cleared by logout()');
         } catch (error) {
-          console.error("Error during logout:", error.message);
+          logger.whatsapp.error('Error during logout', error);
           // Try to destroy anyway
           try {
             await this.clientState.client.destroy();
           } catch (destroyError) {
-            console.error("Error during destroy:", destroyError.message);
+            logger.whatsapp.error('Error during destroy', destroyError);
           }
         }
         this.clientState.client = null;
@@ -1248,7 +1259,7 @@ class WhatsAppService extends EventEmitter {
       return { success: true, message: "Client logged out - authentication completely cleared" };
 
     } catch (error) {
-      console.error("Error during complete logout:", error);
+      logger.whatsapp.error('Error during complete logout', error);
       return { success: false, error: "Logout failed: " + error.message };
     } finally {
       this.clientState.destroyInProgress = false;

@@ -2,6 +2,7 @@
 import { Connection } from 'tedious';
 import config from '../../config/config.js';
 import ResourceManager from '../core/ResourceManager.js';
+import { logger } from '../core/Logger.js';
 
 /**
  * Database connection pool for better resource management
@@ -34,7 +35,7 @@ class ConnectionPool {
         );
         if (requestIndex >= 0) {
           this.waitingQueue.splice(requestIndex, 1);
-          console.warn(`Connection request timeout after ${timeoutMs}ms. Queue length: ${this.waitingQueue.length}`);
+          logger.database.warn(`Connection timeout after ${timeoutMs}ms`, { queueLength: this.waitingQueue.length });
         }
         reject(new Error(`Connection request timeout after ${timeoutMs}ms`));
       }, timeoutMs);
@@ -48,7 +49,7 @@ class ConnectionPool {
       if (availableConnection) {
         clearTimeout(timeout);
         this.activeConnections.add(availableConnection);
-        console.log(`Reusing existing connection. Active: ${this.activeConnections.size}/${this.connections.length}`);
+        logger.database.debug(`Reusing connection`, { active: this.activeConnections.size, total: this.connections.length });
         resolve(availableConnection);
         return;
       }
@@ -59,12 +60,12 @@ class ConnectionPool {
           .then(connection => {
             clearTimeout(timeout);
             this.activeConnections.add(connection);
-            console.log(`Created new connection. Active: ${this.activeConnections.size}/${this.connections.length}`);
+            logger.database.debug(`Created connection`, { active: this.activeConnections.size, total: this.connections.length });
             resolve(connection);
           })
           .catch(error => {
             clearTimeout(timeout);
-            console.error('Failed to create new connection:', error);
+            logger.database.error('Failed to create connection', error);
             reject(error);
           });
         return;
@@ -80,7 +81,7 @@ class ConnectionPool {
       };
       this.waitingQueue.push(queueEntry);
       
-      console.log(`Added to connection queue. Position: ${this.waitingQueue.length}, Pool: ${this.activeConnections.size}/${this.connections.length}`);
+      logger.database.debug(`Queued connection request`, { position: this.waitingQueue.length, active: this.activeConnections.size, total: this.connections.length });
     });
   }
 
@@ -119,17 +120,17 @@ class ConnectionPool {
         }
 
         this.connections.push(connection);
-        console.log(`Database connection created. Pool size: ${this.connections.length}`);
+        logger.database.info(`Connection created`, { poolSize: this.connections.length });
         resolve(connection);
       });
 
       connection.on('error', (error) => {
-        console.error('Database connection error:', error);
+        logger.database.error('Connection error', error);
         this.removeConnection(connection);
       });
 
       connection.on('end', () => {
-        console.log('Database connection ended');
+        logger.database.debug('Connection ended');
         this.removeConnection(connection);
       });
 
@@ -148,7 +149,7 @@ class ConnectionPool {
           connection.close();
         }
       } catch (error) {
-        console.error('Error closing connection:', error);
+        logger.database.error('Error closing connection', error);
       }
       this.connections.splice(index, 1);
       this.activeConnections.delete(connection);
@@ -185,7 +186,7 @@ class ConnectionPool {
    * Cleanup all connections
    */
   async cleanup() {
-    console.log('Shutting down database connection pool');
+    logger.database.info('Shutting down connection pool');
     this.isShuttingDown = true;
 
     // Reject all waiting requests
@@ -202,14 +203,14 @@ class ConnectionPool {
           connection.close();
           resolve();
         } catch (error) {
-          console.error('Error closing database connection:', error);
+          logger.database.error('Error closing connection during shutdown', error);
           resolve();
         }
       });
     });
 
     await Promise.allSettled(closePromises);
-    console.log('Database connection pool shutdown complete');
+    logger.database.info('Connection pool shutdown complete');
   }
 }
 

@@ -90,34 +90,32 @@ async function initializeApplication() {
             person.success = '&#10004;';
             await messageState.addPerson(person);
             
-            // Broadcast via WebSocket using correct event name
+            // Broadcast via WebSocket using proper WebSocket message creation
             if (wsEmitter) {
-                const message = {
-                    type: 'whatsapp_message_status',
-                    data: {
+                const message = createWebSocketMessage(
+                    MessageSchemas.WebSocketMessage.MESSAGE_STATUS,
+                    {
                         messageId: person.messageId,
-                        status: 1, // MessageSchemas.MessageStatus.SERVER
+                        status: MessageSchemas.MessageStatus.SERVER,
                         patientName: person.name,
                         phone: person.number,
                         timeSent: new Date().toISOString(),
                         message: '', // Will be populated from database if needed
                         appointmentId: person.appointmentId
-                    },
-                    timestamp: Date.now()
-                };
+                    }
+                );
                 wsEmitter.emit('broadcast_message', message);
                 
-                // Also emit progress update
+                // Also emit progress update using proper message creation
                 const stats = messageState.dump();
-                const progressMessage = {
-                    type: 'whatsapp_sending_progress',
-                    data: {
+                const progressMessage = createWebSocketMessage(
+                    'whatsapp_sending_progress',
+                    {
                         sent: stats.sentMessages,
                         failed: stats.failedMessages,
                         finished: stats.finishedSending
-                    },
-                    timestamp: Date.now()
-                };
+                    }
+                );
                 wsEmitter.emit('broadcast_message', progressMessage);
             }
             
@@ -133,35 +131,33 @@ async function initializeApplication() {
             person.success = '&times;';
             await messageState.addPerson(person);
             
-            // Broadcast failure using correct event name
+            // Broadcast failure using proper WebSocket message creation
             if (wsEmitter) {
-                const message = {
-                    type: 'whatsapp_message_status',
-                    data: {
+                const message = createWebSocketMessage(
+                    MessageSchemas.WebSocketMessage.MESSAGE_STATUS,
+                    {
                         messageId: person.messageId || `failed_${Date.now()}`,
-                        status: -1, // MessageSchemas.MessageStatus.ERROR
+                        status: MessageSchemas.MessageStatus.ERROR,
                         patientName: person.name,
                         phone: person.number,
                         timeSent: null,
                         message: '',
                         error: person.error,
                         appointmentId: person.appointmentId
-                    },
-                    timestamp: Date.now()
-                };
+                    }
+                );
                 wsEmitter.emit('broadcast_message', message);
                 
-                // Also emit progress update
+                // Also emit progress update using proper message creation
                 const stats = messageState.dump();
-                const progressMessage = {
-                    type: 'whatsapp_sending_progress',
-                    data: {
+                const progressMessage = createWebSocketMessage(
+                    'whatsapp_sending_progress', // This might need to be added to WebSocketEvents
+                    {
                         sent: stats.sentMessages,
                         failed: stats.failedMessages,
                         finished: stats.finishedSending
-                    },
-                    timestamp: Date.now()
-                };
+                    }
+                );
                 wsEmitter.emit('broadcast_message', progressMessage);
             }
             
@@ -176,19 +172,18 @@ async function initializeApplication() {
         try {
             await messageState.setFinishedSending(true);
             
-            // Broadcast completion using correct event name
+            // Broadcast completion using proper WebSocket message creation
             if (wsEmitter) {
                 const stats = messageState.dump();
-                const message = {
-                    type: 'whatsapp_sending_finished',
-                    data: { 
+                const message = createWebSocketMessage(
+                    'whatsapp_sending_finished', // Use the correct constant
+                    { 
                         finished: true, 
                         sent: stats.sentMessages,
                         failed: stats.failedMessages,
                         total: stats.sentMessages + stats.failedMessages
-                    },
-                    timestamp: Date.now()
-                };
+                    }
+                );
                 wsEmitter.emit('broadcast_message', message);
             }
         } catch (error) {
@@ -201,13 +196,12 @@ async function initializeApplication() {
         try {
             await messageState.setClientReady(true);
             
-            // Broadcast client ready using correct event name
+            // Broadcast client ready using proper WebSocket message creation
             if (wsEmitter) {
-                const message = {
-                    type: 'whatsapp_client_ready',
-                    data: { clientReady: true },
-                    timestamp: Date.now()
-                };
+                const message = createWebSocketMessage(
+                    MessageSchemas.WebSocketMessage.CLIENT_READY,
+                    { clientReady: true }
+                );
                 wsEmitter.emit('broadcast_message', message);
             }
             
@@ -224,11 +218,10 @@ async function initializeApplication() {
             
             // Only broadcast if there are active viewers
             if (messageState.activeQRViewers > 0 && wsEmitter) {
-                const message = {
-                    type: 'whatsapp_qr_updated',
-                    data: { qr, clientReady: false },
-                    timestamp: Date.now()
-                };
+                const message = createWebSocketMessage(
+                    MessageSchemas.WebSocketMessage.QR_UPDATE,
+                    { qr, clientReady: false }
+                );
                 wsEmitter.emit('broadcast_message', message);
             }
         } catch (error) {
@@ -250,6 +243,9 @@ async function initializeApplication() {
 
     // Start server
     await startServer();
+
+    // ===== ADDED: Automatic WhatsApp client initialization =====
+    await initializeWhatsAppOnStartup();
 
     console.log('🎉 Application started successfully!');
     console.log(`🌐 Server running at http://localhost:${port}`);
@@ -379,6 +375,66 @@ app.get('/health/basic', (req, res) => {
 const { wsEmitter } = await initializeApplication();
 
 // Export WebSocket emitter for other modules (maintain existing functionality)
+// ===== ADDED: Automatic WhatsApp initialization function =====
+/**
+ * Initialize WhatsApp client automatically on startup
+ * Can be controlled via WHATSAPP_AUTO_INIT environment variable
+ */
+async function initializeWhatsAppOnStartup() {
+  // Check if auto-initialization is enabled (default: true)
+  const autoInit = process.env.WHATSAPP_AUTO_INIT !== 'false';
+  
+  if (!autoInit) {
+    console.log('📱 WhatsApp auto-initialization disabled via WHATSAPP_AUTO_INIT=false');
+    return;
+  }
+
+  console.log('📱 Starting automatic WhatsApp client initialization...');
+  
+  try {
+    // Add a small delay to ensure all services are ready
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Check if WhatsApp service is ready
+    if (!whatsappService) {
+      console.log('⚠️  WhatsApp service not available, skipping auto-initialization');
+      return;
+    }
+
+    // Check current state
+    const currentState = whatsappService.getStatus();
+    console.log(`📱 Current WhatsApp state: ${currentState.state || 'unknown'}`);
+    
+    // Only initialize if client is disconnected
+    if (currentState.state === 'DISCONNECTED' || currentState.state === 'ERROR') {
+      console.log('📱 Initializing WhatsApp client...');
+      
+      // Initialize with a timeout
+      const initPromise = whatsappService.initialize();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Initialization timeout')), 30000)
+      );
+      
+      await Promise.race([initPromise, timeoutPromise]);
+      
+      console.log('✅ WhatsApp client initialization started successfully');
+      console.log('📱 WhatsApp client will be ready when QR code is scanned');
+      
+    } else if (currentState.state === 'CONNECTED') {
+      console.log('✅ WhatsApp client already connected');
+    } else if (currentState.state === 'INITIALIZING') {
+      console.log('📱 WhatsApp client already initializing');
+    } else {
+      console.log(`📱 WhatsApp client in state: ${currentState.state}, skipping initialization`);
+    }
+    
+  } catch (error) {
+    // Don't fail the entire application if WhatsApp initialization fails
+    console.warn('⚠️  WhatsApp auto-initialization failed (application will continue):', error.message);
+    console.log('💡 WhatsApp can be initialized manually later via the web interface');
+  }
+}
+
 export { wsEmitter };
 
 // ===== ADDED: Simple background database retry mechanism =====

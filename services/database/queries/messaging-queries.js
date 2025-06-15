@@ -8,6 +8,7 @@ import { executeQuery, executeStoredProcedure } from '../index.js';
 import TransactionManager from '../TransactionManager.js';
 import ConnectionPool from '../ConnectionPool.js';
 import { createWebSocketMessage, MessageSchemas } from '../../messaging/schemas.js';
+import { logger } from '../../core/Logger.js';
 
 // Circuit breaker for database operations
 class DatabaseCircuitBreaker {
@@ -23,7 +24,7 @@ class DatabaseCircuitBreaker {
     if (this.state === 'OPEN') {
       if (Date.now() - this.lastFailureTime > this.timeout) {
         this.state = 'HALF_OPEN';
-        console.log(`Circuit breaker half-open for ${operationName}`);
+        logger.message.info('Circuit breaker half-open', { operation: operationName });
       } else {
         throw new Error(`Circuit breaker is OPEN for ${operationName}`);
       }
@@ -41,7 +42,7 @@ class DatabaseCircuitBreaker {
 
   onSuccess(operationName) {
     if (this.state === 'HALF_OPEN') {
-      console.log(`Circuit breaker closed for ${operationName} after successful operation`);
+      logger.message.info('Circuit breaker closed after success', { operation: operationName });
     }
     this.failureCount = 0;
     this.state = 'CLOSED';
@@ -51,11 +52,15 @@ class DatabaseCircuitBreaker {
     this.failureCount++;
     this.lastFailureTime = Date.now();
     
-    console.error(`Circuit breaker failure ${this.failureCount}/${this.failureThreshold} for ${operationName}:`, error.message);
+    logger.message.error('Circuit breaker failure threshold approaching', { 
+      operationName, 
+      failureCount: this.failureCount, 
+      failureThreshold: this.failureThreshold 
+    }, error);
     
     if (this.failureCount >= this.failureThreshold) {
       this.state = 'OPEN';
-      console.error(`Circuit breaker OPENED for ${operationName}`);
+      logger.message.error('Circuit breaker opened due to threshold exceeded', { operationName });
     }
   }
 
@@ -151,7 +156,7 @@ function convertAckStatus(ack) {
     case 4:
       return 'PLAYED';
     default:
-      console.warn(`Unknown WhatsApp status code: ${ack}`);
+      logger.message.warn('Unknown WhatsApp status code encountered', { statusCode: ack });
       return `UNKNOWN_${ack}`;
   }
 }
@@ -163,7 +168,7 @@ export async function updateWhatsAppDeliveryStatus(messages) {
   const operationName = 'updateWhatsAppDeliveryStatus';
   
   return dbCircuitBreaker.execute(async () => {
-    console.log(`Updating WhatsApp delivery status for ${messages.length} messages`);
+    logger.message.info('Starting WhatsApp delivery status update', { messageCount: messages.length });
     
     if (!messages || messages.length === 0) {
       return { success: true, updatedCount: 0 };
@@ -177,17 +182,23 @@ export async function updateWhatsAppDeliveryStatus(messages) {
       statusGroups[status]++;
     });
     
-    console.log(`Status distribution:`, statusGroups);
-    console.log(`Input messages data:`, messages.map(m => ({
-      id: m.id,
-      ack: m.ack, 
-      whatsappMessageId: m.whatsappMessageId
-    })));
+    logger.message.debug('WhatsApp status distribution', { statusGroups });
+    logger.message.debug('Processing message batch data', { 
+      messages: messages.map(m => ({ 
+        id: m.id, 
+        ack: m.ack, 
+        whatsappMessageId: m.whatsappMessageId 
+      })) 
+    });
 
     const rows = messages.map(message => {
       const status = convertAckStatus(message.ack);
       const waMessageId = message.whatsappMessageId || '';
-      console.log(`Processing message: appointmentId=${message.id}, whatsappMessageId=${waMessageId}, status=${status}`);
+      logger.message.debug('Processing individual message', { 
+        appointmentId: message.id, 
+        whatsappMessageId: waMessageId, 
+        status 
+      });
       
       return [
         message.id,                           // AppointmentID
@@ -232,7 +243,12 @@ export async function updateWhatsAppDeliveryStatus(messages) {
           (result) => {
             if (result && result.length > 0) {
               const stats = result[0];
-              console.log(`Status update summary: Total=${stats.totalUpdated}, Read=${stats.readCount}, Delivered=${stats.deliveredCount}, Server=${stats.serverCount}`);
+              logger.message.info('WhatsApp status update completed', { 
+                totalUpdated: stats.totalUpdated, 
+                readCount: stats.readCount, 
+                deliveredCount: stats.deliveredCount, 
+                serverCount: stats.serverCount 
+              });
               return {
                 success: true,
                 updatedCount: stats.totalUpdated,
@@ -250,7 +266,7 @@ export async function updateWhatsAppDeliveryStatus(messages) {
       });
 
   }, operationName).catch(error => {
-    console.error(`Error in ${operationName}: ${error.message}`);
+    logger.message.error('WhatsApp delivery status update failed', { operationName }, error);
     return {
       success: false,
       error: error.message,
@@ -266,7 +282,7 @@ export async function getWhatsAppMessages(date) {
   const operationName = 'getWhatsAppMessages';
   
   return dbCircuitBreaker.execute(async () => {
-    console.log(`Getting WhatsApp messages for date: ${date}`);
+    logger.message.info('Retrieving WhatsApp messages', { date });
     
     return ConnectionPool.withConnection(async (connection) => {
       return executeStoredProcedureWithConnection(
@@ -292,7 +308,10 @@ export async function getWhatsAppMessages(date) {
           const ids = result.map(r => r.id || '');
           const names = result.map(r => r.name || '');
           
-          console.log(`Retrieved ${result.length} WhatsApp messages for date ${date}`);
+          logger.message.info('WhatsApp messages retrieved successfully', { 
+            messageCount: result.length, 
+            date 
+          });
           
           if (result.length > 0) {
             // Log appointment time distribution for insights
@@ -303,14 +322,20 @@ export async function getWhatsAppMessages(date) {
               timeGroups[hour]++;
             });
             
-            console.log(`Appointment distribution by hour:`, timeGroups);
+            logger.message.debug('Appointment time distribution analysis', { timeGroups });
             
             // Log sample messages for debugging
             const sampleCount = Math.min(3, result.length);
             for (let i = 0; i < sampleCount; i++) {
               const message = result[i].message || '';
               const msgPreview = message.length > 30 ? message.substring(0, 30) + '...' : message;
-              console.log(`Sample ${i + 1}: ID=${result[i].id}, Time=${new Date(result[i].appTime).toLocaleTimeString()}, Phone=${result[i].number}, Preview=${msgPreview}`);
+              logger.message.debug('Sample message preview', { 
+                sampleNumber: i + 1, 
+                appointmentId: result[i].id, 
+                appointmentTime: new Date(result[i].appTime).toLocaleTimeString(), 
+                phoneNumber: result[i].number, 
+                messagePreview: msgPreview 
+              });
             }
           }
           
@@ -320,7 +345,7 @@ export async function getWhatsAppMessages(date) {
     });
     
   }, operationName).catch(error => {
-    console.error(`Error in ${operationName}: ${error.message}`);
+    logger.message.error('Failed to retrieve WhatsApp messages', { operationName }, error);
     return [[], [], [], []];
   });
 }
@@ -333,19 +358,22 @@ export async function updateWhatsAppStatus(appointmentIds, messageIds) {
   const operationName = 'updateWhatsAppStatus';
   
   if (!appointmentIds || !appointmentIds.length) {
-    console.log('No messages to update');
+    logger.message.debug('No WhatsApp messages to update');
     return { success: true, updatedCount: 0 };
   }
   
   return dbCircuitBreaker.execute(async () => {
-    console.log(`Updating WhatsApp status for ${appointmentIds.length} messages`);
+    logger.message.info('Starting WhatsApp status update', { messageCount: appointmentIds.length });
     
     // Log sample IDs for debugging
     if (appointmentIds.length <= 5) {
-      console.log(`Appointment IDs: ${appointmentIds.join(', ')}`);
-      console.log(`Message IDs: ${messageIds.join(', ')}`);
+      logger.message.debug('WhatsApp appointment IDs to update', { appointmentIds });
+      logger.message.debug('WhatsApp message IDs to update', { messageIds });
     } else {
-      console.log(`First few Appointment IDs: ${appointmentIds.slice(0, 3).join(', ')}... (${appointmentIds.length} total)`);
+      logger.message.debug('WhatsApp appointment IDs sample', { 
+        sampleIds: appointmentIds.slice(0, 3), 
+        totalCount: appointmentIds.length 
+      });
     }
     
     const rows = [];
@@ -390,7 +418,7 @@ export async function updateWhatsAppStatus(appointmentIds, messageIds) {
           },
           (result) => {
             const updatedCount = result && result.length > 0 ? result[0].updatedCount : rows.length;
-            console.log(`Successfully updated ${updatedCount} message IDs in database`);
+            logger.message.info('WhatsApp status update completed successfully', { updatedCount });
             
             return {
               success: true,
@@ -401,7 +429,7 @@ export async function updateWhatsAppStatus(appointmentIds, messageIds) {
       });
     
   }, operationName).catch(error => {
-    console.error(`Error in ${operationName}: ${error.message}`);
+    logger.message.error('WhatsApp status update failed', { operationName }, error);
     return {
       success: false,
       error: error.message,
@@ -417,7 +445,7 @@ export async function updateSingleMessageStatus(messageId, status) {
   const operationName = 'updateSingleMessageStatus';
   
   return dbCircuitBreaker.execute(async () => {
-    console.log(`Updating single message status: ${messageId} -> ${status}`);
+    logger.message.info('Updating single message status', { messageId, status });
     
     const statusText = convertAckStatus(status);
     
@@ -450,7 +478,11 @@ export async function updateSingleMessageStatus(messageId, status) {
             
             if (success && result && result.length > 0) {
               const appointment = result[0];
-              console.log(`Successfully updated status for message ${messageId} (AppointmentID: ${appointment.appointmentId}, Patient: ${appointment.patientName})`);
+              logger.message.info('Single message status updated successfully', { 
+                messageId, 
+                appointmentId: appointment.appointmentId, 
+                patientName: appointment.patientName 
+              });
               
               return {
                 success: true,
@@ -458,13 +490,13 @@ export async function updateSingleMessageStatus(messageId, status) {
                 appointment
               };
             } else if (success) {
-              console.log(`Successfully updated status for message ${messageId}`);
+              logger.message.info('Single message status updated successfully', { messageId });
               return {
                 success: true,
                 found: true
               };
             } else {
-              console.log(`Message ID ${messageId} not found in database`);
+              logger.message.warn('Message ID not found in database', { messageId });
               return {
                 success: true,
                 found: false
@@ -476,7 +508,7 @@ export async function updateSingleMessageStatus(messageId, status) {
     ]);
     
   }, operationName).catch(error => {
-    console.error(`Error in ${operationName}: ${error.message}`);
+    logger.message.error('Single message status update failed', { operationName }, error);
     return {
       success: false,
       error: error.message
@@ -491,7 +523,7 @@ export async function getWhatsAppDeliveryStatus(date) {
   const operationName = 'getWhatsAppDeliveryStatus';
   
   return dbCircuitBreaker.execute(async () => {
-    console.log(`Getting WhatsApp delivery status for date: ${date}`);
+    logger.message.info('Retrieving WhatsApp delivery status', { date });
     
     return ConnectionPool.withConnection(async (connection) => {
       return executeStoredProcedureWithConnection(
@@ -505,14 +537,23 @@ export async function getWhatsAppDeliveryStatus(date) {
           wamid: columns[2].value      // WaMessageID
         }),
         (result) => {
-          console.log(`Retrieved ${result.length} WhatsApp messages for status checking from date ${date}`);
+          logger.message.info('WhatsApp messages retrieved for status checking', { 
+            messageCount: result.length, 
+            date 
+          });
           
           if (result.length > 0) {
             // Log the first few for debugging
             const sampleCount = Math.min(5, result.length);
-            console.log(`Sample messages for status check (${sampleCount} of ${result.length}):`);
+            logger.message.debug('Sample messages for status check', { 
+              sampleCount, 
+              totalCount: result.length 
+            });
             for (let i = 0; i < sampleCount; i++) {
-              console.log(`ID: ${result[i].id}, Message ID: ${result[i].wamid}`);
+              logger.message.debug('Status check message sample', { 
+                appointmentId: result[i].id, 
+                messageId: result[i].wamid 
+              });
             }
           }
           
@@ -522,7 +563,7 @@ export async function getWhatsAppDeliveryStatus(date) {
     });
     
   }, operationName).catch(error => {
-    console.error(`Error in ${operationName}: ${error.message}`);
+    logger.message.error('Failed to retrieve WhatsApp delivery status', { operationName }, error);
     return [];
   });
 }
@@ -538,7 +579,7 @@ export async function batchUpdateMessageStatuses(updates, wsEmitter = null) {
   }
 
   return dbCircuitBreaker.execute(async () => {
-    console.log(`Batch updating ${updates.length} message statuses`);
+    logger.message.info('Starting batch message status update', { updateCount: updates.length });
     
     // Group updates by status for insights
     const statusGroups = {};
@@ -548,10 +589,12 @@ export async function batchUpdateMessageStatuses(updates, wsEmitter = null) {
       statusGroups[status].push(update);
     });
 
-    console.log(`Batch update status distribution:`, Object.keys(statusGroups).reduce((acc, status) => {
-      acc[status] = statusGroups[status].length;
-      return acc;
-    }, {}));
+    logger.message.debug('Batch update status distribution', { 
+      statusDistribution: Object.keys(statusGroups).reduce((acc, status) => { 
+        acc[status] = statusGroups[status].length; 
+        return acc; 
+      }, {}) 
+    });
 
     // Execute database update
     const result = await updateWhatsAppDeliveryStatus(updates);
@@ -568,7 +611,7 @@ export async function batchUpdateMessageStatuses(updates, wsEmitter = null) {
       );
       
       wsEmitter.emit('broadcast_message', message);
-      console.log(`Broadcasted batch status update for ${updates.length} messages`);
+      logger.message.info('Batch status update broadcasted via WebSocket', { messageCount: updates.length });
     }
 
     return result;
@@ -583,7 +626,7 @@ export async function getSmsMessages(date) {
   const operationName = 'getSmsMessages';
   
   return dbCircuitBreaker.execute(async () => {
-    console.log(`Getting SMS messages for date: ${date}`);
+    logger.message.info('Retrieving SMS messages', { date });
     
     return executeStoredProcedure(
       'ProcSMS',
@@ -595,13 +638,16 @@ export async function getSmsMessages(date) {
         body: columns[2].value
       }),
       (result) => {
-        console.log(`Retrieved ${result.length} SMS messages for date ${date}`);
+        logger.message.info('SMS messages retrieved successfully', { 
+          messageCount: result.length, 
+          date 
+        });
         return result;
       }
     );
     
   }, operationName).catch(error => {
-    console.error(`Error in ${operationName}: ${error.message}`);
+    logger.message.error('Failed to retrieve SMS messages', { operationName }, error);
     return [];
   });
 }
@@ -610,7 +656,7 @@ export async function updateSmsIds(messages) {
   const operationName = 'updateSmsIds';
   
   return dbCircuitBreaker.execute(async () => {
-    console.log(`Updating SMS IDs for ${messages.length} messages`);
+    logger.message.info('Starting SMS ID update', { messageCount: messages.length });
     
     const rows = messages.map(message => [
       message.id,   // AppointmentID
@@ -633,7 +679,7 @@ export async function updateSmsIds(messages) {
       null,
       null,
       () => {
-        console.log(`Successfully updated SMS IDs for ${rows.length} messages`);
+        logger.message.info('SMS IDs updated successfully', { updatedCount: rows.length });
         return {
           success: true,
           updatedCount: rows.length
@@ -642,7 +688,7 @@ export async function updateSmsIds(messages) {
     );
     
   }, operationName).catch(error => {
-    console.error(`Error in ${operationName}: ${error.message}`);
+    logger.message.error('SMS ID update failed', { operationName }, error);
     return {
       success: false,
       error: error.message,
@@ -655,7 +701,7 @@ export async function getSmsIds(date) {
   const operationName = 'getSmsIds';
   
   return dbCircuitBreaker.execute(async () => {
-    console.log(`Getting SMS IDs for date: ${date}`);
+    logger.message.info('Retrieving SMS IDs for status checking', { date });
     
     return executeStoredProcedure(
       'Procgetsids',
@@ -666,13 +712,13 @@ export async function getSmsIds(date) {
         sid: columns[1].value
       }),
       (result) => {
-        console.log(`Retrieved ${result.length} SMS IDs for status checking`);
+        logger.message.info('SMS IDs retrieved for status checking', { idCount: result.length });
         return result;
       }
     );
     
   }, operationName).catch(error => {
-    console.error(`Error in ${operationName}: ${error.message}`);
+    logger.message.error('Failed to retrieve SMS IDs', { operationName }, error);
     return [];
   });
 }
@@ -681,7 +727,7 @@ export async function updateSmsStatus(messages) {
   const operationName = 'updateSmsStatus';
   
   return dbCircuitBreaker.execute(async () => {
-    console.log(`Updating SMS status for ${messages.length} messages`);
+    logger.message.info('Starting SMS status update', { messageCount: messages.length });
     
     const rows = messages.map(message => [
       message.id,        // AppointmentID
@@ -704,7 +750,7 @@ export async function updateSmsStatus(messages) {
       null,
       null,
       () => {
-        console.log(`Successfully updated ${rows.length} SMS message statuses`);
+        logger.message.info('SMS status update completed successfully', { updatedCount: rows.length });
         return {
           success: true,
           updatedCount: rows.length
@@ -713,7 +759,7 @@ export async function updateSmsStatus(messages) {
     );
     
   }, operationName).catch(error => {
-    console.error(`Error in ${operationName}: ${error.message}`);
+    logger.message.error('SMS status update failed', { operationName }, error);
     return {
       success: false,
       error: error.message,
@@ -729,7 +775,7 @@ export async function getMessageStatusByDate(date) {
   const operationName = 'getMessageStatusByDate';
   
   return dbCircuitBreaker.execute(async () => {
-    console.log(`Getting message status summary for date: ${date}`);
+    logger.message.info('Retrieving message status summary', { date });
     
     return executeStoredProcedure(
       'GetMessageStatusByDate',
@@ -761,7 +807,12 @@ export async function getMessageStatusByDate(date) {
           failed: result.filter(r => r.deliveryStatus === 'ERROR').length
         };
         
-        console.log(`Message status summary for ${date}: Total=${summary.total}, Sent=${summary.sent}, Read=${summary.read}`);
+        logger.message.info('Message status summary retrieved', { 
+          date, 
+          total: summary.total, 
+          sent: summary.sent, 
+          read: summary.read 
+        });
         
         return {
           date: date,
@@ -772,7 +823,7 @@ export async function getMessageStatusByDate(date) {
     );
     
   }, operationName).catch(error => {
-    console.error(`Error in ${operationName}: ${error.message}`);
+    logger.message.error('Failed to retrieve message status summary', { operationName }, error);
     return {
       date: date,
       error: error.message,
@@ -799,7 +850,7 @@ export function resetCircuitBreaker() {
   dbCircuitBreaker.failureCount = 0;
   dbCircuitBreaker.state = 'CLOSED';
   dbCircuitBreaker.lastFailureTime = null;
-  console.log('Database circuit breaker has been manually reset');
+  logger.message.info('Database circuit breaker manually reset');
   
   return {
     success: true,

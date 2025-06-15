@@ -21,6 +21,7 @@ const AUTH_STATES = {
     INITIALIZING: 'initializing',
     CONNECTING: 'connecting',
     CONNECTED: 'connected',
+    CHECKING_SESSION: 'checking_session',
     QR_REQUIRED: 'qr_required',
     AUTHENTICATED: 'authenticated',
     ERROR: 'error',
@@ -302,6 +303,20 @@ export class WhatsAppAuthComponent extends EventEmitter {
     handleQRUpdate(data) {
         console.log('handleQRUpdate - QR Code updated:', !!data.qr, 'length:', data.qr?.length);
         console.log('handleQRUpdate - Raw QR data preview:', data.qr?.substring(0, 50) + '...');
+        
+        // Don't immediately show QR if we're checking for session or already authenticated
+        if (this.state.currentState === AUTH_STATES.AUTHENTICATED) {
+            console.log('handleQRUpdate - Already authenticated, ignoring QR update');
+            return;
+        }
+        
+        if (this.state.currentState === AUTH_STATES.CHECKING_SESSION) {
+            console.log('handleQRUpdate - Still checking session, storing QR for later');
+            this.state.qrCode = data.qr; // Store but don't show yet
+            return;
+        }
+        
+        // If we're not checking session, show the QR requirement
         this.setState(AUTH_STATES.QR_REQUIRED, { qrCode: data.qr });
         
         // Immediately update the QR code display if we're in QR_REQUIRED state
@@ -336,15 +351,32 @@ export class WhatsAppAuthComponent extends EventEmitter {
             console.log('handleInitialState - Client is ready, setting AUTHENTICATED state');
             this.setState(AUTH_STATES.AUTHENTICATED, { clientReady: true });
         } else if (data.qr) {
-            console.log('handleInitialState - QR code found, setting QR_REQUIRED state');
-            this.setState(AUTH_STATES.QR_REQUIRED, { qrCode: data.qr });
+            console.log('handleInitialState - QR code found, checking if session might exist');
+            // Show "Checking for existing session..." first to give WhatsApp time to restore session
+            this.setState(AUTH_STATES.CHECKING_SESSION, { qrCode: data.qr });
+            
+            // Wait a bit to see if client becomes ready (session restoration)
+            setTimeout(() => {
+                // Only show QR if we're still not authenticated after giving session time to restore
+                if (this.state.currentState === AUTH_STATES.CHECKING_SESSION) {
+                    console.log('handleInitialState - Session not restored, showing QR requirement');
+                    this.setState(AUTH_STATES.QR_REQUIRED, { qrCode: data.qr });
+                }
+            }, 3000); // Wait 3 seconds for potential session restoration
         } else if (data.error) {
             console.log('handleInitialState - Error found:', data.error);
             this.setState(AUTH_STATES.ERROR, { error: data.error });
         } else {
-            console.log('handleInitialState - No specific state, requesting QR code via API fallback');
-            // If no initial state but connected, try to get QR via API
-            this.setState(AUTH_STATES.QR_REQUIRED, { qrCode: null });
+            console.log('handleInitialState - No specific state, checking for session first');
+            // Show session check instead of immediately requiring QR
+            this.setState(AUTH_STATES.CHECKING_SESSION, { qrCode: null });
+            
+            // After a delay, if still not ready, request QR
+            setTimeout(() => {
+                if (this.state.currentState === AUTH_STATES.CHECKING_SESSION) {
+                    this.setState(AUTH_STATES.QR_REQUIRED, { qrCode: null });
+                }
+            }, 3000);
         }
     }
     
@@ -373,6 +405,10 @@ export class WhatsAppAuthComponent extends EventEmitter {
                 
             case AUTH_STATES.CONNECTING:
                 this.showConnecting();
+                break;
+                
+            case AUTH_STATES.CHECKING_SESSION:
+                this.showSessionCheck();
                 break;
                 
             case AUTH_STATES.QR_REQUIRED:
@@ -432,6 +468,21 @@ export class WhatsAppAuthComponent extends EventEmitter {
                 <div class="status-text">
                     <h2>Connecting...</h2>
                     <p>Establishing connection to server</p>
+                </div>
+            `;
+        }
+    }
+    
+    showSessionCheck() {
+        if (this.elements.authStatus) {
+            this.elements.authStatus.style.display = 'block';
+            this.elements.authStatus.innerHTML = `
+                <div class="status-icon-container">
+                    <span class="status-icon" aria-hidden="true">🔍</span>
+                </div>
+                <div class="status-text">
+                    <h2>Checking for Existing Session...</h2>
+                    <p>Looking for saved WhatsApp authentication</p>
                 </div>
             `;
         }

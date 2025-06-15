@@ -11,7 +11,9 @@ export async function sendImg_(number, base64Image) {
     const media = new MessageMedia("image/png", base64Image);
 
     return waInstance.queueOperation(async (client) => {
-      let targetNumber = number;
+      // Remove + prefix if present for WhatsApp number validation
+      const cleanNumber = number.startsWith('+') ? number.substring(1) : number;
+      let targetNumber = cleanNumber;
       if (!targetNumber.includes('@c.us')) {
         const numberDetails = await client.getNumberId(targetNumber);
         if (!numberDetails) return "ERROR";
@@ -39,7 +41,9 @@ export async function sendXray_(number, file) {
     return waInstance.queueOperation(async (client) => {
       const media = MessageMedia.fromFilePath(file);
 
-      let targetNumber = number;
+      // Remove + prefix if present for WhatsApp number validation
+      const cleanNumber = number.startsWith('+') ? number.substring(1) : number;
+      let targetNumber = cleanNumber;
       if (!targetNumber.includes('@c.us')) {
         const numberDetails = await client.getNumberId(targetNumber);
         if (!numberDetails) {
