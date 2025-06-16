@@ -970,8 +970,6 @@ class WhatsAppService extends EventEmitter {
         success: '&#10004;'
       };
 
-      await this.messageState.addPerson(person);
-
       // Mark message as sent in database to prevent duplicates
       try {
         await messagingQueries.updateWhatsAppStatus([appointmentId], [sentMessage.id.id]);
