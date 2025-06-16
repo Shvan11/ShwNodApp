@@ -758,14 +758,36 @@ export class WhatsAppAuthComponent extends EventEmitter {
 
     async handleLogout() {
         try {
+            console.log('Starting WhatsApp logout process...');
             const response = await fetch('/api/wa/logout', { method: 'POST' });
             const result = await response.json();
             
             if (result.success) {
+                console.log('Logout successful, triggering client restart...');
                 this.setState(AUTH_STATES.INITIALIZING);
-                setTimeout(() => {
-                    this.requestInitialState();
-                }, CONFIG.LOGOUT_DELAY_MS);
+                
+                // After logout, restart the client to generate new QR code
+                try {
+                    const restartResponse = await fetch('/api/wa/restart', { method: 'POST' });
+                    const restartResult = await restartResponse.json();
+                    
+                    if (restartResult.success) {
+                        console.log('Client restart successful, requesting initial state...');
+                        setTimeout(() => {
+                            this.requestInitialState();
+                        }, CONFIG.LOGOUT_DELAY_MS);
+                    } else {
+                        console.warn('Restart failed, falling back to initial state request');
+                        setTimeout(() => {
+                            this.requestInitialState();
+                        }, CONFIG.LOGOUT_DELAY_MS);
+                    }
+                } catch (restartError) {
+                    console.warn('Restart request failed, falling back to initial state request:', restartError);
+                    setTimeout(() => {
+                        this.requestInitialState();
+                    }, CONFIG.LOGOUT_DELAY_MS);
+                }
             } else {
                 throw new Error(result.error || 'Logout failed');
             }
