@@ -614,9 +614,21 @@ function setupWebSocketServer(server) {
       
       // Try to get whatsapp status - handle case where service might not be ready
       let clientStatus;
+      let whatsappService;
       try {
-        const whatsappService = await import('../services/messaging/whatsapp.js');
-        clientStatus = whatsappService.default.getStatus();
+        whatsappService = (await import('../services/messaging/whatsapp.js')).default;
+        clientStatus = whatsappService.getStatus();
+        
+        // If client is disconnected and has no instance, but has active QR viewers, initialize
+        if (clientStatus.state === 'DISCONNECTED' && 
+            !clientStatus.hasClient && 
+            messageState.activeQRViewers > 0) {
+          logger.websocket.info('No client instance with active QR viewers - triggering initialization');
+          // Trigger initialization asynchronously without waiting
+          whatsappService.initialize().catch(error => {
+            logger.websocket.error('Failed to initialize WhatsApp client', error);
+          });
+        }
       } catch (error) {
         logger.websocket.warn('Could not get WhatsApp status', error);
         clientStatus = { active: false };

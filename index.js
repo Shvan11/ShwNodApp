@@ -407,18 +407,28 @@ async function initializeWhatsAppOnStartup() {
     
     // Only initialize if client is disconnected
     if (currentState.state === 'DISCONNECTED' || currentState.state === 'ERROR') {
-      console.log('📱 Initializing WhatsApp client...');
+      // Check for existing session first
+      const hasExistingSession = await whatsappService.checkExistingSession();
+      
+      if (hasExistingSession) {
+        console.log('📱 Found existing session - initializing WhatsApp client...');
+      } else {
+        console.log('📱 No existing session - initializing WhatsApp client (will require QR scan)...');
+      }
       
       // Initialize with a timeout
       const initPromise = whatsappService.initialize();
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Initialization timeout')), 30000)
+        setTimeout(() => reject(new Error('Initialization timeout')), 60000) // Increased timeout for session restoration
       );
       
       await Promise.race([initPromise, timeoutPromise]);
       
-      console.log('✅ WhatsApp client initialization started successfully');
-      console.log('📱 WhatsApp client will be ready when QR code is scanned');
+      if (hasExistingSession) {
+        console.log('✅ WhatsApp client initialization completed - session should be restored');
+      } else {
+        console.log('✅ WhatsApp client initialization started - waiting for QR scan');
+      }
       
     } else if (currentState.state === 'CONNECTED') {
       console.log('✅ WhatsApp client already connected');
