@@ -448,64 +448,61 @@ export async function updateSingleMessageStatus(messageId, status) {
     logger.message.info('Updating single message status', { messageId, status });
     
     const statusText = convertAckStatus(status);
+    const currentTimestamp = new Date();
     
-    return TransactionManager.withTransaction([
-      async (connection) => {
-        return executeStoredProcedureWithConnection(
-          connection,
-          'UpdateSingleMessageStatus',
-          [
-            ['MessageId', TYPES.NVarChar, messageId],
-            ['Status', TYPES.NVarChar, statusText]
-          ],
-          (request) => {
-            request.addOutputParameter('Result', TYPES.Int);
-          },
-          (columns) => {
-            if (columns.length >= 5) {
-              return {
-                appointmentId: columns[0].value,
-                patientName: columns[1].value,
-                phone: columns[2].value,
-                status: columns[3].value,
-                lastUpdated: columns[4].value
-              };
-            }
-            return null;
-          },
-          (result, outParams) => {
-            const success = outParams && outParams.length > 0 && outParams[0].value === 1;
-            
-            if (success && result && result.length > 0) {
-              const appointment = result[0];
-              logger.message.info('Single message status updated successfully', { 
-                messageId, 
-                appointmentId: appointment.appointmentId, 
-                patientName: appointment.patientName 
-              });
-              
-              return {
-                success: true,
-                found: true,
-                appointment
-              };
-            } else if (success) {
-              logger.message.info('Single message status updated successfully', { messageId });
-              return {
-                success: true,
-                found: true
-              };
-            } else {
-              logger.message.warn('Message ID not found in database', { messageId });
-              return {
-                success: true,
-                found: false
-              };
-            }
-          }
-        );
+    return executeStoredProcedure(
+      'UpdateSingleMessageStatus',
+      [
+        ['MessageId', TYPES.NVarChar, messageId],
+        ['Status', TYPES.NVarChar, statusText],
+        ['LastUpdated', TYPES.DateTime, currentTimestamp]
+      ],
+      (request) => {
+        request.addOutputParameter('Result', TYPES.Int);
+      },
+      (columns) => {
+        if (columns.length >= 5) {
+          return {
+            appointmentId: columns[0].value,
+            patientName: columns[1].value,
+            phone: columns[2].value,
+            status: columns[3].value,
+            lastUpdated: columns[4].value
+          };
+        }
+        return null;
+      },
+      (result, outParams) => {
+        const success = outParams && outParams.length > 0 && outParams[0].value === 1;
+        
+        if (success && result && result.length > 0) {
+          const appointment = result[0];
+          logger.message.info('Single message status updated successfully', { 
+            messageId, 
+            appointmentId: appointment.appointmentId, 
+            patientName: appointment.patientName 
+          });
+          
+          return {
+            success: true,
+            found: true,
+            appointment
+          };
+        } else if (success) {
+          logger.message.info('Single message status updated successfully', { messageId });
+          return {
+            success: true,
+            found: true
+          };
+        } else {
+          logger.message.warn('Message ID not found in database', { messageId });
+          return {
+            success: true,
+            found: false
+          };
+        }
       }
-    ]);
+    );
     
   }, operationName).catch(error => {
     logger.message.error('Single message status update failed', { operationName }, error);

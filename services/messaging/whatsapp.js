@@ -1,4 +1,4 @@
-// services/messaging/whatsapp.js - Comprehensive Fix
+// services/messaging/whatsapp.js - Comprehensive Fix with MessageSession Architecture
 import EventEmitter from 'events';
 import messageState from '../state/messageState.js';
 import stateEvents from '../state/stateEvents.js';
@@ -7,6 +7,7 @@ import * as database from '../database/index.js';
 import { getWhatsAppMessages } from '../database/queries/messaging-queries.js';
 import * as messagingQueries from '../database/queries/messaging-queries.js';
 import { createWebSocketMessage, MessageSchemas } from './schemas.js';
+import { messageSessionManager } from './MessageSessionManager.js';
 import { logger } from '../core/Logger.js';
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth } = pkg;
@@ -314,7 +315,8 @@ class WhatsAppService extends EventEmitter {
     this.messageState = messageState;
 
     // Map WhatsApp message IDs to appointment IDs
-    this.messageIdToAppointmentId = new Map();
+    // Remove old mapping system - now handled by MessageSessionManager
+    // this.messageIdToAppointmentId = new Map();
 
     this.setupCleanupHandlers();
     this.setupEventListeners();
@@ -745,35 +747,64 @@ class WhatsAppService extends EventEmitter {
 
     client.on('message_ack', async (msg, ack) => {
       const messageId = msg.id.id;
-      const appointmentId = this.messageIdToAppointmentId.get(messageId);
+      
+      // Use MessageSessionManager to get appointment ID with date validation
+      const messageInfo = messageSessionManager.getAppointmentIdForMessage(messageId);
 
-      logger.whatsapp.debug(`Message status updated`, { messageId, ack, appointmentId });
+      logger.whatsapp.debug(`Message status updated`, { 
+        messageId, 
+        ack, 
+        messageInfo
+      });
 
-      if (!appointmentId) {
-        logger.whatsapp.warn('No appointment ID for message', { messageId });
+      if (!messageInfo) {
+        logger.whatsapp.debug('Message not found in any active session - may be from previous session or external message', { 
+          messageId,
+          ackStatus: ack
+        });
         return;
       }
 
+      const { appointmentId, sessionDate, sessionId } = messageInfo;
+
       try {
+        // Record the delivery status update in the session
+        messageSessionManager.recordDeliveryStatusUpdate(messageId, ack);
+
         await this.messageState.updateMessageStatus(messageId, ack, async () => {
-          // Use the original function with appointment ID and WhatsApp message ID
-          return await messagingQueries.updateWhatsAppDeliveryStatus([{
-            id: appointmentId, // Use appointment ID for database lookup
-            ack: ack,
-            whatsappMessageId: messageId // Store WhatsApp message ID for reference
-          }]);
+          // Use the optimized single message update function
+          logger.whatsapp.debug('Updating database status', {
+            messageId,
+            appointmentId,
+            sessionDate,
+            sessionId,
+            ackStatus: ack
+          });
+          
+          return await messagingQueries.updateSingleMessageStatus(messageId, ack);
         });
 
         if (this.wsEmitter) {
           const message = createWebSocketMessage(
             MessageSchemas.WebSocketMessage.MESSAGE_STATUS,
-            { messageId, status: ack }
+            { 
+              messageId, 
+              appointmentId,
+              sessionDate,
+              status: ack 
+            }
           );
           this.broadcastToClients(message);
         }
 
       } catch (error) {
-        logger.whatsapp.error('Error updating message status', error);
+        logger.whatsapp.error('Error updating message status', {
+          messageId,
+          appointmentId,
+          sessionDate,
+          sessionId,
+          error: error.message
+        });
       }
     });
 
@@ -963,70 +994,95 @@ class WhatsAppService extends EventEmitter {
     }
   }
 
-  // Send functionality with proper state management
+  // Send functionality with proper state management and MessageSession
   async send(date) {
     if (!this.isReady()) {
       throw new Error("WhatsApp client not ready to send messages");
     }
 
     return this.circuitBreaker.execute(async () => {
-      logger.whatsapp.info(`Sending WhatsApp messages for date: ${date}`);
+      logger.whatsapp.info(`Starting message sending session for date: ${date}`);
 
-      const [numbers, messages, ids, names] = await getWhatsAppMessages(date);
+      // Create and start a new message session for this date
+      const session = messageSessionManager.startSession(date, this);
 
-      if (!numbers || numbers.length === 0) {
-        logger.whatsapp.info(`No messages to send for date ${date}`);
+      try {
+        const [numbers, messages, ids, names] = await getWhatsAppMessages(date);
+
+        if (!numbers || numbers.length === 0) {
+          logger.whatsapp.info(`No messages to send for date ${date}`);
+          await this.messageState.setFinishedSending(true);
+          this.emit('finishedSending');
+          
+          // Complete the session even if no messages
+          messageSessionManager.completeSession(date);
+          return;
+        }
+
+        logger.whatsapp.info(`Sending ${numbers.length} messages with session ${session.sessionId}`);
+        
+        // Broadcast sending started with total count
+        if (this.wsEmitter) {
+          const message = {
+            type: 'whatsapp_sending_started',
+            data: {
+              total: numbers.length,
+              sent: 0,
+              failed: 0,
+              started: true,
+              finished: false,
+              sessionId: session.sessionId,
+              date: date
+            },
+            timestamp: Date.now()
+          };
+          this.wsEmitter.emit('broadcast_message', message);
+        }
+
+        const results = [];
+        for (let i = 0; i < numbers.length; i++) {
+          // Check if client is still ready before each message
+          if (!this.isReady()) {
+            throw new Error('Client disconnected during sending');
+          }
+
+          try {
+            const result = await this.sendSingleMessage(numbers[i], messages[i], names[i], ids[i], date, session);
+            results.push(result);
+
+            if (i < numbers.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+          } catch (error) {
+            logger.whatsapp.error(`Error sending message to ${numbers[i]}`, error);
+            results.push({ success: false, error: error.message });
+          }
+        }
+
         await this.messageState.setFinishedSending(true);
         this.emit('finishedSending');
-        return;
+
+        // Complete the session after successful sending
+        messageSessionManager.completeSession(date);
+        
+        logger.whatsapp.info(`Message sending session completed`, {
+          sessionId: session.sessionId,
+          date: date,
+          totalResults: results.length,
+          sessionStats: session.getStats()
+        });
+
+        return results;
+        
+      } catch (error) {
+        // Complete session on error too
+        messageSessionManager.completeSession(date);
+        throw error;
       }
-
-      logger.whatsapp.info(`Sending ${numbers.length} messages`);
-      
-      // Broadcast sending started with total count
-      if (this.wsEmitter) {
-        const message = {
-          type: 'whatsapp_sending_started',
-          data: {
-            total: numbers.length,
-            sent: 0,
-            failed: 0,
-            started: true,
-            finished: false
-          },
-          timestamp: Date.now()
-        };
-        this.wsEmitter.emit('broadcast_message', message);
-      }
-
-      const results = [];
-      for (let i = 0; i < numbers.length; i++) {
-        // Check if client is still ready before each message
-        if (!this.isReady()) {
-          throw new Error('Client disconnected during sending');
-        }
-
-        try {
-          const result = await this.sendSingleMessage(numbers[i], messages[i], names[i], ids[i]);
-          results.push(result);
-
-          if (i < numbers.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          }
-        } catch (error) {
-          logger.whatsapp.error(`Error sending message to ${numbers[i]}`, error);
-          results.push({ success: false, error: error.message });
-        }
-      }
-
-      await this.messageState.setFinishedSending(true);
-      this.emit('finishedSending');
-
-      return results;
     }, 'send-messages');
   }
 
-  async sendSingleMessage(number, message, name, appointmentId) {
+  async sendSingleMessage(number, message, name, appointmentId, appointmentDate, session) {
     // Remove + prefix if present for WhatsApp chat ID format
     const cleanNumber = number.startsWith('+') ? number.substring(1) : number;
     const chatId = `${cleanNumber}@c.us`;
@@ -1036,8 +1092,20 @@ class WhatsAppService extends EventEmitter {
 
       logger.whatsapp.debug(`Message sent to ${number}`);
 
-      // Store mapping between WhatsApp message ID and appointment ID
-      this.messageIdToAppointmentId.set(sentMessage.id.id, appointmentId);
+      // Register message in session with date validation
+      const registered = session.registerMessage(sentMessage.id.id, appointmentId, appointmentDate);
+      
+      if (!registered) {
+        logger.whatsapp.warn('Failed to register message in session', {
+          messageId: sentMessage.id.id,
+          appointmentId,
+          appointmentDate,
+          sessionId: session.sessionId
+        });
+      }
+      
+      // Record successful send in session
+      session.recordMessageSent(sentMessage.id.id);
 
       const person = {
         messageId: sentMessage.id.id,
@@ -1061,6 +1129,11 @@ class WhatsAppService extends EventEmitter {
       return { success: true, messageId: sentMessage.id.id };
 
     } catch (error) {
+      // Record failure in session if we have one
+      if (session) {
+        session.recordMessageFailed(null, error.message); // No messageId since send failed
+      }
+      
       // Add failed person to state
       const person = {
         name,
@@ -1286,6 +1359,9 @@ class WhatsAppService extends EventEmitter {
       this.clientState.setState('DISCONNECTED');
       await this.messageState.setClientReady(false);
       await this.messageState.setQR(null);
+      
+      // Complete all active message sessions
+      messageSessionManager.completeAllSessions();
       this.circuitBreaker.reset();
 
       return { success: true, message: "Client destroyed - browser closed, authentication preserved" };
@@ -1328,6 +1404,9 @@ class WhatsAppService extends EventEmitter {
       this.clientState.setState('DISCONNECTED');
       await this.messageState.setClientReady(false);
       await this.messageState.setQR(null);
+      
+      // Complete all active message sessions
+      messageSessionManager.completeAllSessions();
       this.circuitBreaker.reset();
 
       // Note: No need to manually delete folders - logout() method handles this
