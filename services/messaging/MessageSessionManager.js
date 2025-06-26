@@ -15,6 +15,10 @@ export class MessageSessionManager {
     this.maxHistorySize = options.maxHistorySize || 30;  // Reduced from 100 to 30
     this.keepHistory = options.keepHistory !== false;    // Allow disabling history completely
     
+    // Memory leak protection - session limits (more realistic for medical practice)
+    this.maxActiveSessions = options.maxActiveSessions || 25;  // Realistic limit for appointment dates
+    this.maxMessagesPerSession = options.maxMessagesPerSession || 1000;  // Typical appointment volume per date
+    
     // Time-based ACK tracking configuration
     this.ackTrackingWindow = options.ackTrackingWindow || (24 * 60 * 60 * 1000); // 24 hours default
     this.autoExpireEnabled = options.autoExpireEnabled !== false; // Default enabled
@@ -64,10 +68,31 @@ export class MessageSessionManager {
       }
     }
 
+    // Memory leak protection: Check active session limit
+    if (this.activeSessions.size >= this.maxActiveSessions) {
+      logger.whatsapp.warn('Maximum active sessions reached, forcing cleanup', {
+        currentSessions: this.activeSessions.size,
+        maxSessions: this.maxActiveSessions
+      });
+      this.performPeriodicCleanup();
+      
+      // If still at limit after cleanup, remove oldest session
+      if (this.activeSessions.size >= this.maxActiveSessions) {
+        const oldestDate = this.activeSessions.keys().next().value;
+        const oldestSession = this.activeSessions.get(oldestDate);
+        this.completeSession(oldestDate);
+        logger.whatsapp.warn('Forcibly removed oldest session to prevent memory leak', {
+          removedDate: oldestDate,
+          removedSessionId: oldestSession?.sessionId
+        });
+      }
+    }
+
     // Create new session with time-based tracking configuration
     const sessionOptions = {
       ackTrackingWindow: this.ackTrackingWindow,
-      autoExpireEnabled: this.autoExpireEnabled
+      autoExpireEnabled: this.autoExpireEnabled,
+      maxMessages: this.maxMessagesPerSession  // Pass message limit to session
     };
     
     const session = new MessageSession(normalizedDate, whatsappService, sessionOptions);
@@ -390,7 +415,7 @@ export class MessageSessionManager {
 export const messageSessionManager = new MessageSessionManager({
   maxHistorySize: 10,        // Keep only 10 days of history
   keepHistory: true,         // Keep minimal history for debugging
-  ackTrackingWindow: 24 * 60 * 60 * 1000,  // 24 hours
-  cleanupInterval: 6 * 60 * 60 * 1000,     // 6 hours
-  maxSessionAge: 48 * 60 * 60 * 1000       // 48 hours
+  ackTrackingWindow: 24 * 60 * 60 * 1000,  // 24 hours (sufficient for most status updates)
+  cleanupInterval: 6 * 60 * 60 * 1000,     // 6 hours (original cleanup frequency)
+  maxSessionAge: 48 * 60 * 60 * 1000       // 48 hours (original session lifetime)
 });

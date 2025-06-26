@@ -337,6 +337,15 @@ class AppStateManager extends EventEmitter {
                 sent: 0,
                 failed: 0
             },
+            // Real-time message status tracking (matches detailed table logic)
+            messageStatusCounts: {
+                pending: 0,     // status === 0
+                server: 0,      // status === 1
+                device: 0,      // status === 2
+                read: 0,        // status === 3
+                played: 0,      // status === 4
+                failed: 0       // status < 0
+            },
             clientStatus: {
                 ready: false,
                 error: null
@@ -352,6 +361,11 @@ class AppStateManager extends EventEmitter {
         if (updates.sendingProgress) {
             this.state.sendingProgress = { ...this.state.sendingProgress, ...updates.sendingProgress };
             delete updates.sendingProgress;
+        }
+        
+        if (updates.messageStatusCounts) {
+            this.state.messageStatusCounts = { ...this.state.messageStatusCounts, ...updates.messageStatusCounts };
+            delete updates.messageStatusCounts;
         }
         
         if (updates.clientStatus) {
@@ -375,6 +389,14 @@ class AppStateManager extends EventEmitter {
                 finished: false,
                 total: 0,
                 sent: 0,
+                failed: 0
+            },
+            messageStatusCounts: {
+                pending: 0,
+                server: 0,
+                device: 0,
+                read: 0,
+                played: 0,
                 failed: 0
             },
             clientStatus: {
@@ -1438,13 +1460,44 @@ class WhatsAppMessengerApp extends EventEmitter {
         // Update message status in UI
         this.emit('messageStatusUpdated', data);
         
+        // Update real-time status counts based on actual delivery status
+        this.updateMessageStatusCounts(data.status);
+        
         // Reload the message status table to show updated data
         this.loadMessageStatusTable();
+    }
+    
+    /**
+     * Update real-time message status counts (matches detailed table logic)
+     */
+    updateMessageStatusCounts(status) {
+        const currentCounts = this.stateManager.getState().messageStatusCounts;
+        const updates = { ...currentCounts };
+        
+        // Use same logic as detailed table statistics
+        if (status === 0) {
+            updates.pending = currentCounts.pending + 1;
+        } else if (status === 1) {
+            updates.server = currentCounts.server + 1;
+        } else if (status === 2) {
+            updates.device = currentCounts.device + 1;
+        } else if (status === 3) {
+            updates.read = currentCounts.read + 1;
+        } else if (status === 4) {
+            updates.played = currentCounts.played + 1;
+        } else if (status < 0) {
+            updates.failed = currentCounts.failed + 1;
+        }
+        
+        this.stateManager.updateState({
+            messageStatusCounts: updates
+        });
     }
     
     handleSendingStarted(data) {
         console.log('Sending started:', data);
         
+        // Reset status counts when sending starts
         this.stateManager.updateState({
             sendingProgress: {
                 started: true,
@@ -1452,6 +1505,14 @@ class WhatsAppMessengerApp extends EventEmitter {
                 total: data.total,
                 sent: data.sent || 0,
                 failed: data.failed || 0
+            },
+            messageStatusCounts: {
+                pending: 0,
+                server: 0,
+                device: 0,
+                read: 0,
+                played: 0,
+                failed: 0
             }
         });
     }
@@ -1644,6 +1705,14 @@ class WhatsAppMessengerApp extends EventEmitter {
                 total: 0,
                 sent: 0,
                 failed: 0
+            },
+            messageStatusCounts: {
+                pending: 0,
+                server: 0,
+                device: 0,
+                read: 0,
+                played: 0,
+                failed: 0
             }
         });
         
@@ -1682,8 +1751,9 @@ class WhatsAppMessengerApp extends EventEmitter {
         }
 
         // Update sending progress
-        if (updates.sendingProgress) {
+        if (updates.sendingProgress || updates.messageStatusCounts) {
             console.log('Updating sending progress to:', state.sendingProgress);
+            console.log('Updating message status counts to:', state.messageStatusCounts);
             this.updateSendingProgress(state.sendingProgress);
         }
     }
@@ -1766,42 +1836,51 @@ class WhatsAppMessengerApp extends EventEmitter {
     }
 
     updateSendingProgress(progress) {
+        // Get current state for accurate message status counts
+        const currentState = this.stateManager.getState();
+        const statusCounts = currentState.messageStatusCounts;
+        
+        // Calculate accurate progress using same logic as detailed table
+        const actualSent = statusCounts.server + statusCounts.device + statusCounts.read + statusCounts.played;
+        const actualFailed = statusCounts.failed;
+        const totalProcessed = actualSent + actualFailed;
+        
         // Only show sending progress if actually sending and has valid total count
         if (progress.started && !progress.finished && progress.total > 0) {
-            const progressText = `📤 Sending messages... ${progress.sent}/${progress.total}`;
+            const progressText = `📤 Sending messages... ${actualSent}/${progress.total}`;
             this.domManager.setElementContent('stateElement', progressText, { announce: true });
             
-            // Update button to show progress
+            // Update button to show accurate progress
             this.buttonStateManager.setButtonState('startButton', BUTTON_STATES.LOADING, {
-                text: `Sending ${progress.sent}/${progress.total}`
+                text: `Sending ${actualSent}/${progress.total}`
             });
             
-            // Update visual progress bar
+            // Update visual progress bar with accurate counts
             if (this.progressBar) {
-                if (progress.sent === 0 && progress.total > 0) {
+                if (totalProcessed === 0 && progress.total > 0) {
                     // Start progress bar on first message
                     this.progressBar.initiate();
                     this.domManager.toggleElementVisibility('progressContainer', true);
                 }
                 
-                // Calculate and update progress percentage
+                // Calculate and update progress percentage using accurate counts
                 if (progress.total > 0) {
-                    const percentage = Math.min((progress.sent / progress.total) * 100, 100);
+                    const percentage = Math.min((actualSent / progress.total) * 100, 100);
                     this.progressBar.width = `${percentage}%`;
                     
-                    // Update progress stats and text
-                    this.domManager.setElementContent('progressStats', `${progress.sent}/${progress.total}`);
-                    this.domManager.setElementContent('progressText', `${progress.sent} of ${progress.total} messages sent`);
+                    // Update progress stats and text with accurate counts
+                    this.domManager.setElementContent('progressStats', `${actualSent}/${progress.total}`);
+                    this.domManager.setElementContent('progressText', `${actualSent} of ${progress.total} messages delivered`);
                 }
             }
         } else if (progress.finished && progress.total > 0) {
-            const completedText = `✅ Completed! ${progress.sent} sent, ${progress.failed} failed`;
+            const completedText = `✅ Completed! ${actualSent} delivered, ${actualFailed} failed`;
             this.domManager.setElementContent('stateElement', completedText, { announce: true });
             
             // Complete and hide progress bar
             if (this.progressBar) {
                 this.progressBar.finish();
-                this.domManager.setElementContent('progressText', 'All messages sent!');
+                this.domManager.setElementContent('progressText', 'All messages processed!');
                 setTimeout(() => {
                     this.progressBar.reset();
                     this.domManager.toggleElementVisibility('progressContainer', false);
@@ -1812,6 +1891,14 @@ class WhatsAppMessengerApp extends EventEmitter {
                             finished: false,
                             total: 0,
                             sent: 0,
+                            failed: 0
+                        },
+                        messageStatusCounts: {
+                            pending: 0,
+                            server: 0,
+                            device: 0,
+                            read: 0,
+                            played: 0,
                             failed: 0
                         }
                     });

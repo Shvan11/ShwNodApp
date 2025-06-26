@@ -1062,10 +1062,11 @@ class WhatsAppService extends EventEmitter {
         await this.messageState.setFinishedSending(true);
         this.emit('finishedSending');
 
-        // Complete the session after successful sending
-        messageSessionManager.completeSession(date);
+        // DO NOT complete session immediately - let it stay active to receive status updates
+        // Session will auto-expire after ackTrackingWindow (extended to 7 days)
+        // messageSessionManager.completeSession(date);
         
-        logger.whatsapp.info(`Message sending session completed`, {
+        logger.whatsapp.info(`Message sending finished - session remains active for status updates`, {
           sessionId: session.sessionId,
           date: date,
           totalResults: results.length,

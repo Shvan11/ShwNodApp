@@ -21,6 +21,9 @@ export class MessageSession {
     this.expiresAt = new Date(this.startTime.getTime() + this.ackTrackingWindow);
     this.autoExpireEnabled = options.autoExpireEnabled !== false; // Default enabled
     
+    // Memory leak protection - message limits
+    this.maxMessages = options.maxMessages || 1000;  // Realistic limit for daily appointments
+    
     // Message tracking for this session only
     this.messageIdToAppointmentMap = new Map();
     this.appointmentIdToMessageMap = new Map();
@@ -141,6 +144,18 @@ export class MessageSession {
         messageId
       });
       throw error;
+    }
+
+    // Memory leak protection: Check message limit
+    if (this.messageIdToAppointmentMap.size >= this.maxMessages) {
+      logger.whatsapp.error('Session message limit reached, rejecting new message', {
+        sessionId: this.sessionId,
+        currentMessages: this.messageIdToAppointmentMap.size,
+        maxMessages: this.maxMessages,
+        rejectedMessageId: messageId,
+        rejectedAppointmentId: appointmentId
+      });
+      return false;
     }
 
     // Prevent duplicate registrations
