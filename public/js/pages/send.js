@@ -1552,6 +1552,7 @@ class WhatsAppMessengerApp extends EventEmitter {
             if (data.clientReady !== undefined) {
                 const newClientStatus = {
                     ready: data.clientReady || false,
+                    initializing: data.initializing || false,
                     error: data.error || null
                 };
                 
@@ -1780,8 +1781,9 @@ class WhatsAppMessengerApp extends EventEmitter {
         // Determine if we should redirect to authentication
         const needsAuth = !clientStatus.ready;
         
-        // Redirect to standalone auth page when authentication is needed
-        if (needsAuth) {
+        // Only redirect if we're not in the initial startup phase
+        // This prevents premature redirect during session restoration
+        if (needsAuth && !clientStatus.initializing) {
             this.redirectToAuthentication();
         }
 

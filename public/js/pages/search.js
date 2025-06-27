@@ -103,8 +103,8 @@ class SearchPageController {
       this.phoneSelect.clear();
       this.idSelect.clear();
       
-      // Redirect to grid page
-      window.location.href = `grid?code=${value}`;
+      // Redirect to React shell patient page
+      window.location.href = `/patient/${value}/grid`;
     };
     
     // Apply to all selects

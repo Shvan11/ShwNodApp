@@ -1,9 +1,11 @@
 // services/messaging/telegram.js
 import TelegramBot from 'node-telegram-bot-api';
-import { TelegramClient } from "telegram";
+import { TelegramClient, Api } from "telegram";
+import { CustomFile } from "telegram/client/uploads.js";
 import { StringSession } from "telegram/sessions/index.js";
+import fs from 'fs';
 import config from '../../config/config.js';
-
+import { getPhoneCompatibleFilename } from '../../utils/filename-converter.js';
 
 /**
  * Send a document via Telegram bot
@@ -82,19 +84,36 @@ export async function sendgramfile(phone, filepath) {
             console.warn(`File path seems invalid: ${filepath}`);
         }
 
-        // Send the file with force document option to prevent image compression
-        const result = await client.sendFile(phone, {
-            file: filepath,
-            forceDocument: true,
-            progressCallback: (progress) => {
-                // Only log progress at significant milestones to reduce spam
-                const percent = Math.round(progress * 100);
-                if (percent % 25 === 0 || percent === 100) {
-                    console.log(`Upload progress: ${percent}%`);
-                }
-            },
-            workers: 1 // Limit concurrent uploads
+        // Convert filename to phone-compatible format
+        const originalFilename = filepath.split(/[/\\]/).pop(); // Get filename from path
+        const convertedFilename = getPhoneCompatibleFilename(originalFilename);
+        
+        // Force as photo using CustomFile with .jpg extension and InputMediaUploadedPhoto
+        const fileStats = fs.statSync(filepath);
+        
+        console.log(`=== TELEGRAM PHOTO FORCE ===`);
+        console.log(`Original file: ${originalFilename}`);
+        console.log(`Converted filename: ${convertedFilename}`);
+        console.log(`File size: ${fileStats.size} bytes`);
+
+        // Create CustomFile with .jpg filename to force photo recognition
+        const customFile = new CustomFile(convertedFilename, fileStats.size, filepath);
+        
+        // Upload file first
+        const uploadedFile = await client.uploadFile({
+            file: customFile,
+            workers: 1
         });
+
+        // Send as photo using InputMediaUploadedPhoto
+        const result = await client.invoke(new Api.messages.SendMedia({
+            peer: phone,
+            media: new Api.InputMediaUploadedPhoto({
+                file: uploadedFile
+            }),
+            message: "", // Required message parameter (empty string for no caption)
+            randomId: Math.floor(Math.random() * 1000000000) // Required random ID
+        }));
 
         console.log(`File sent successfully: ${filepath}`);
         console.log(`Message ID: ${result?.id}`);

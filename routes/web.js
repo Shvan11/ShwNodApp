@@ -18,22 +18,12 @@ const pageRewrites = [
   { url: '/auth', file: '/views/messaging/auth.html' },
  
   // Patient pages
-  { url: '/details', file: '/views/patient/details.html' },
-  { url: '/canvas', file: '/views/patient/canvas.html' },
-  { url: '/visits-summary', file: '/views/patient/visits-summary.html' },
-  { url: '/payments', file: '/views/patient/payments.html' },
-  { url: '/grid', file: '/views/patient/grid.html' },
-  { url: '/add-visit', file: '/views/patient/add-visit.html' },
   { url: '/search', file: '/views/patient/search.html' },
   
   // Appointment pages
   { url: '/appointments.html', file: '/views/appointments.html' },
   { url: '/appointments', file: '/views/appointments.html' },
   { url: '/simplified', file: '/views/appointments/simplified.html' },
-  
-  // X-ray pages
-  { url: '/xrays.html', file: '/views/xrays.html' },
-  { url: '/xrays', file: '/views/xrays.html' },
   
   // Handle legacy URLs with new paths
   { url: '/wa', file: '/views/messaging/send-message.html' } // Replace old /wa route
@@ -46,6 +36,43 @@ const pageRewrites = [
 // Serve the main page at root
 router.get('/', (_, res) => {
     res.sendFile(path.join(process.cwd(), './public/index.html'));
+});
+
+// Redirect old standalone page URLs to React shell
+router.get('/canvas', (req, res) => {
+  const patientId = req.query.code;
+  if (patientId) {
+    res.redirect(`/patient/${patientId}/compare`);
+  } else {
+    res.status(400).send('Patient code required');
+  }
+});
+
+router.get('/xrays', (req, res) => {
+  const patientId = req.query.code;
+  if (patientId) {
+    res.redirect(`/patient/${patientId}/xrays`);
+  } else {
+    res.status(400).send('Patient code required');
+  }
+});
+
+router.get('/visits-summary', (req, res) => {
+  const patientId = req.query.PID;
+  if (patientId) {
+    res.redirect(`/patient/${patientId}/visits`);
+  } else {
+    res.status(400).send('Patient ID required');
+  }
+});
+
+// React Shell route for patient pages (using refactored components)
+router.get('/patient/:patientId/*', (req, res) => {
+  res.sendFile(path.join(process.cwd(), './public/views/patient/react-shell-refactored.html'));
+});
+
+router.get('/patient/:patientId', (req, res) => {
+  res.sendFile(path.join(process.cwd(), './public/views/patient/react-shell-refactored.html'));
 });
 
 // Apply all page rewrites

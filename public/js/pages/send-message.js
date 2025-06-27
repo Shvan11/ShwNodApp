@@ -348,7 +348,7 @@ class SendMessageController {
    */
   async checkInitialClientStatus() {
     // Request initial state if WebSocket is connected
-    if (this.connectionManager && this.connectionManager.isConnected()) {
+    if (this.connectionManager && this.connectionManager.isConnected) {
       this.connectionManager.send({
         type: 'request_whatsapp_initial_state',
         data: { timestamp: Date.now() }

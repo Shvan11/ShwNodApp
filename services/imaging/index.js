@@ -79,19 +79,51 @@ async function processXrayImage(pid, file, detailsDir) {
         return destination;
     }
 
+    // Check if cs_export tool is available
+    if (!config.cs_export) {
+        console.warn(`⚠️  X-ray processing tool (cs_export) not configured. Skipping conversion for ${file}`);
+        // Return the original file path or a placeholder
+        if (fs.existsSync(source)) {
+            return source;
+        } else {
+            throw new Error(`X-ray processing tool not available and source file not found: ${source}`);
+        }
+    }
+
     const command = constructCommand(source, destination, pid, detailsDir);
     
     return new Promise((resolve, reject) => {
         const cmd = exec(command);
         
-        cmd.stdout.on("data", (data) => console.log("stdout: " + data));
-        cmd.stderr.on("data", (data) => console.log("stderr: " + data));
+        cmd.stdout.on("data", (data) => console.log("X-ray processing stdout:", data));
+        cmd.stderr.on("data", (data) => console.log("X-ray processing stderr:", data));
         
         cmd.on("exit", (code) => {
             if (code === 0) {
+                console.log(`✅ X-ray processed successfully: ${destination}`);
                 resolve(destination);
             } else {
-                reject(new Error(`Command exited with code ${code}`));
+                console.error(`❌ X-ray processing failed with exit code ${code} for file: ${file}`);
+                console.error(`Command: ${command}`);
+                
+                // Graceful fallback - return original file if it exists
+                if (fs.existsSync(source)) {
+                    console.log(`📄 Falling back to original file: ${source}`);
+                    resolve(source);
+                } else {
+                    reject(new Error(`X-ray processing failed (exit code ${code}) and source file not found: ${source}`));
+                }
+            }
+        });
+
+        cmd.on("error", (error) => {
+            console.error(`❌ X-ray processing command error:`, error);
+            // Graceful fallback - return original file if it exists
+            if (fs.existsSync(source)) {
+                console.log(`📄 Falling back to original file: ${source}`);
+                resolve(source);
+            } else {
+                reject(new Error(`X-ray processing command failed: ${error.message}`));
             }
         });
     });

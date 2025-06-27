@@ -2,6 +2,7 @@ import whatsapp from "whatsapp-web.js";
 const { MessageMedia } = whatsapp;
 import fs from 'fs';
 import waInstance from './whatsapp.js';
+import { getPhoneCompatibleFilename } from '../../utils/filename-converter.js';
 
 /**
  * Send an image to a WhatsApp number (base64)
@@ -39,7 +40,20 @@ export async function sendXray_(number, file) {
     }
 
     return waInstance.queueOperation(async (client) => {
+      // Create media with custom filename for phone compatibility
       const media = MessageMedia.fromFilePath(file);
+      
+      // Convert filename to .jpg for phone compatibility
+      const originalFilename = file.split(/[/\\]/).pop(); // Get filename from path
+      const convertedFilename = getPhoneCompatibleFilename(originalFilename);
+      
+      // Set the filename that recipients will see
+      media.filename = convertedFilename;
+      
+      // Ensure correct MIME type for images (critical for WhatsApp to display as photo)
+      media.mimetype = 'image/jpeg';
+      
+      console.log(`Sending file: ${originalFilename} as ${convertedFilename} with MIME type: ${media.mimetype}`);
 
       // Remove + prefix if present for WhatsApp number validation
       const cleanNumber = number.startsWith('+') ? number.substring(1) : number;

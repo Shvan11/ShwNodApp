@@ -162,29 +162,51 @@ class MessageStateManager {
   }
 
   /**
-   * Add person atomically
+   * Add person atomically with deduplication
    */
   async addPerson(person) {
+    let wasNewMessage = false;
+    
     await StateManager.atomicOperation(this.stateKeys.PERSONS, (persons) => {
-      return [...(persons || []), {
-        ...person,
-        addedAt: Date.now(),
-        status: MessageSchemas.MessageStatus.PENDING
-      }];
+      const existingPersons = persons || [];
+      
+      // Check if this message has already been processed
+      const existingIndex = existingPersons.findIndex(p => p.messageId === person.messageId);
+      
+      if (existingIndex >= 0) {
+        // Update existing person instead of adding duplicate
+        const updatedPersons = [...existingPersons];
+        updatedPersons[existingIndex] = {
+          ...updatedPersons[existingIndex],
+          ...person,
+          lastUpdated: Date.now()
+        };
+        return updatedPersons;
+      } else {
+        // New message - add to array
+        wasNewMessage = true;
+        return [...existingPersons, {
+          ...person,
+          addedAt: Date.now(),
+          status: MessageSchemas.MessageStatus.PENDING
+        }];
+      }
     });
 
-    // Only increment sent count if message was successfully sent
-    if (person.success === '&#10004;') {
-      await StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, (stats) => ({
-        ...(stats || {}),
-        sent: (stats?.sent || 0) + 1
-      }));
-    } else if (person.success === '&times;') {
-      // Increment failed count for failed messages
-      await StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, (stats) => ({
-        ...(stats || {}),
-        failed: (stats?.failed || 0) + 1
-      }));
+    // Only increment counters for new messages
+    if (wasNewMessage) {
+      if (person.success === '&#10004;') {
+        await StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, (stats) => ({
+          ...(stats || {}),
+          sent: (stats?.sent || 0) + 1
+        }));
+      } else if (person.success === '&times;') {
+        // Increment failed count for failed messages
+        await StateManager.atomicOperation(this.stateKeys.MESSAGE_STATS, (stats) => ({
+          ...(stats || {}),
+          failed: (stats?.failed || 0) + 1
+        }));
+      }
     }
 
     return true;

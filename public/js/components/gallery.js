@@ -62,6 +62,9 @@ class Gallery {
       // Add download button
       this.addDownloadButton();
       
+      // Add send message button
+      this.addSendMessageButton();
+      
       // Initialize the lightbox
       this.lightbox.init();
     } catch (error) {
@@ -114,6 +117,83 @@ class Gallery {
     });
   }
   
+  /**
+   * Add send message button to lightbox
+   * @private
+   */
+  addSendMessageButton() {
+    if (!this.lightbox) return;
+    
+    this.lightbox.on('uiRegister', () => {
+      this.lightbox.pswp.ui.registerElement({
+        name: 'send-message-button',
+        order: 9,
+        isButton: true,
+        tagName: 'button',
+        
+        // SVG icon for send message
+        html: {
+          isCustomSVG: true,
+          inner: '<path d="M2 21l21-9L2 3v7l15 2-15 2v7z" id="pswp__icn-send"/>',
+          outlineID: 'pswp__icn-send'
+        },
+        
+        // Setup send message button
+        onInit: (el, pswp) => {
+          el.setAttribute('title', 'Send Message');
+          el.setAttribute('aria-label', 'Send Message');
+          
+          // Handle click event
+          el.addEventListener('click', () => {
+            const imageSrc = pswp.currSlide.data.src;
+            this.openSendMessagePage(imageSrc);
+          });
+        }
+      });
+    });
+  }
+  
+  /**
+   * Open send message page with pre-filled attachment
+   * @param {string} imagePath - Path to the image
+   * @private
+   */
+  async openSendMessagePage(imagePath) {
+    try {
+      // Extract path from full URL if needed
+      let webPath = imagePath;
+      if (imagePath.includes('://')) {
+        // Full URL like "http://localhost:3000/DolImgs/200.i13"
+        const url = new URL(imagePath);
+        webPath = url.pathname.startsWith('/') ? url.pathname.substring(1) : url.pathname;
+      }
+      
+      console.log('Original path:', imagePath);
+      console.log('Extracted web path:', webPath);
+      
+      // Convert web path to full UNC path via API (use original filename)
+      const response = await fetch(`/api/convert-path?path=${encodeURIComponent(webPath)}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to convert path: ${response.statusText}`);
+      }
+      
+      const { fullPath } = await response.json();
+      console.log('Converted to full path:', fullPath);
+      
+      // Open send-message.html with converted UNC path
+      const sendMessageUrl = `/views/messaging/send-message.html?file=${encodeURIComponent(fullPath)}`;
+      window.open(sendMessageUrl, '_blank');
+      
+    } catch (error) {
+      console.error('Error converting path for send message:', error);
+      
+      // Fallback: use original path
+      const sendMessageUrl = `/views/messaging/send-message.html?file=${encodeURIComponent(imagePath)}`;
+      window.open(sendMessageUrl, '_blank');
+    }
+  }
+
   /**
    * Get download filename based on image type
    * @param {string} extension - File extension

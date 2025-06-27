@@ -8,6 +8,11 @@ export function gettimepoints(code, tp) {
   
   function filltimepoints(timepoints, code, tp) {
     const photoslist = document.querySelector(".nav");
+    if (!photoslist) {
+      // No navigation element found - likely in iframe content mode
+      console.log('Navigation element not found - skipping timepoints navigation');
+      return;
+    }
     photoslist.innerHTML = ""; // Clear existing content to avoid duplication
   
     // Add timepoints from the fetched data
@@ -27,6 +32,7 @@ export function gettimepoints(code, tp) {
       { label: "Compare", href: `canvas?code=${code}`, id: "compare" },
       { label: "X-rays", href: `xrays?code=${code}`, id: "xrays" },
       { label: "Visit Summary", href: `visits-summary?PID=${code}`, id: "visitsSummary" },
+      { label: "Payments", href: `payments?code=${code}`, id: "payments" },
       { label: "Home", href: "/", id: "home" },
     ];
   

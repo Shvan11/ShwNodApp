@@ -18,6 +18,8 @@ import * as imaging from '../services/imaging/index.js';
 import multer from 'multer';
 import { sendgramfile } from '../services/messaging/telegram.js';
 import qrcode from 'qrcode';
+import config from '../config/config.js';
+import { createPathResolver } from '../utils/path-resolver.js';
 import PhoneFormatter from '../utils/phoneFormatter.js';
 import messageState from '../services/state/messageState.js';
 import { createWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
@@ -107,9 +109,23 @@ router.get("/getgal", (req, res) => {
 
 // Get and process X-ray image
 router.get("/getxray", async (req, res) => {
-    const { code: pid, file, detailsDir } = req.query;
-    const imagePath = await imaging.processXrayImage(pid, file, detailsDir);
-    res.sendFile(imagePath);
+    try {
+        const { code: pid, file, detailsDir } = req.query;
+        
+        if (!pid || !file) {
+            return res.status(400).json({ error: 'Missing required parameters: code and file' });
+        }
+        
+        const imagePath = await imaging.processXrayImage(pid, file, detailsDir);
+        res.sendFile(imagePath);
+    } catch (error) {
+        console.error('Error processing X-ray:', error);
+        res.status(500).json({ 
+            error: 'X-ray processing failed', 
+            message: error.message,
+            details: 'X-ray processing tool may not be available in this environment'
+        });
+    }
 });
 
 // WhatsApp messaging routes
@@ -1355,6 +1371,45 @@ router.get('/messaging/details/:date', async (req, res) => {
             success: false,
             error: error.message,
             timestamp: Date.now()
+        });
+    }
+});
+
+// Convert web path to full UNC path
+router.get('/convert-path', async (req, res) => {
+    try {
+        const { path: webPath } = req.query;
+        
+        if (!webPath) {
+            return res.status(400).json({
+                error: "Missing path parameter"
+            });
+        }
+
+        // Create path resolver
+        const pathResolver = createPathResolver(config.fileSystem.machinePath);
+        
+        // Convert DolImgs path to full file system path
+        if (webPath.startsWith('DolImgs/')) {
+            const fileName = webPath.replace('DolImgs/', '');
+            const fullPath = pathResolver(`working/${fileName}`);
+            
+            res.json({
+                webPath: webPath,
+                fullPath: fullPath
+            });
+        } else {
+            // If not a DolImgs path, return as-is (could be already a full path)
+            res.json({
+                webPath: webPath,
+                fullPath: webPath
+            });
+        }
+        
+    } catch (error) {
+        console.error('Error converting path:', error);
+        res.status(500).json({
+            error: error.message || "Internal server error"
         });
     }
 });

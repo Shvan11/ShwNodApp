@@ -656,6 +656,7 @@ function setupWebSocketServer(server) {
         htmltext: html,
         finished,
         clientReady: isClientReady,
+        initializing: clientStatus.initializing || false,
         clientStatus: clientStatus,
         persons: messageState.persons || [],
         qr: isClientReady ? null : messageState.qr,

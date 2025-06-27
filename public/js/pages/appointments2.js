@@ -203,7 +203,33 @@ class Appointments2PageController {
       
       // Patient
       const patientCell = document.createElement('td');
-      patientCell.textContent = appointment.PatientName || appointment.name || '';
+      const patientName = appointment.PatientName || appointment.name || '';
+      
+      // Use PersonID as the patient code for grid.html
+      const patientCode = appointment.PersonID;
+      
+      // Make patient name clickable to open grid.html
+      if (patientName && patientCode) {
+        const patientLink = document.createElement('a');
+        patientLink.textContent = patientName;
+        patientLink.href = `/patient/${patientCode}/grid`;
+        patientLink.style.color = '#0066cc';
+        patientLink.style.textDecoration = 'none';
+        patientLink.style.cursor = 'pointer';
+        
+        // Add hover effect
+        patientLink.addEventListener('mouseenter', () => {
+          patientLink.style.textDecoration = 'underline';
+        });
+        patientLink.addEventListener('mouseleave', () => {
+          patientLink.style.textDecoration = 'none';
+        });
+        
+        patientCell.appendChild(patientLink);
+      } else {
+        patientCell.textContent = patientName;
+      }
+      
       row.appendChild(patientCell);
       
       // Type

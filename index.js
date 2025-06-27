@@ -87,7 +87,6 @@ async function initializeApplication() {
     whatsappService.on('MessageSent', async (person) => {
         console.log("MessageSent event fired:", person);
         try {
-            person.success = '&#10004;';
             await messageState.addPerson(person);
             
             // Broadcast via WebSocket using proper WebSocket message creation
