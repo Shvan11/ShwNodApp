@@ -432,6 +432,7 @@ class DOMManager {
             // Main UI
             stateElement: document.getElementById('state'),
             startButton: document.getElementById('startButton'),
+            authButton: document.getElementById('authButton'),
             tableContainer: document.getElementById('tableContainer'),
             
             // Progress bar elements  
@@ -1086,6 +1087,16 @@ class WhatsAppMessengerApp extends EventEmitter {
             startButton.addEventListener('click', startHandler);
             this.cleanupTasks.push(() => {
                 startButton.removeEventListener('click', startHandler);
+            });
+        }
+        
+        // Auth redirect button
+        const authButton = this.domManager.getElement('authButton');
+        if (authButton) {
+            const authHandler = () => this.handleLoginClick();
+            authButton.addEventListener('click', authHandler);
+            this.cleanupTasks.push(() => {
+                authButton.removeEventListener('click', authHandler);
             });
         }
     }
@@ -1778,18 +1789,12 @@ class WhatsAppMessengerApp extends EventEmitter {
     updateClientStatus(clientStatus) {
         console.log('updateClientStatus called with:', clientStatus);
         
-        // Determine if we should redirect to authentication
-        const needsAuth = !clientStatus.ready;
-        
-        // Only redirect if we're not in the initial startup phase
-        // This prevents premature redirect during session restoration
-        if (needsAuth && !clientStatus.initializing) {
-            this.redirectToAuthentication();
-        }
-
         // Update start button state
         this.domManager.setElementDisabled('startButton', !clientStatus.ready);
         this.domManager.toggleElementVisibility('startButton', clientStatus.ready);
+        
+        // Show/hide login button based on authentication status
+        this.domManager.toggleElementVisibility('loginButton', !clientStatus.ready);
 
         // Only update status text if not currently showing sending progress
         const currentState = this.stateManager.getState();
@@ -1816,10 +1821,10 @@ class WhatsAppMessengerApp extends EventEmitter {
     }
 
     /**
-     * Redirect to standalone authentication page
+     * Handle manual login button click
      */
-    redirectToAuthentication() {
-        console.log('Redirecting to standalone authentication page');
+    handleLoginClick() {
+        console.log('Manual login button clicked');
         
         // Build the authentication URL with return parameters
         const currentUrl = new URL(window.location);
@@ -1831,7 +1836,7 @@ class WhatsAppMessengerApp extends EventEmitter {
         // Add a timestamp to force refresh after auth
         authUrl.searchParams.set('timestamp', Date.now().toString());
         
-        console.log('Redirecting to:', authUrl.toString());
+        console.log('Navigating to:', authUrl.toString());
         
         // Perform the redirect
         window.location.href = authUrl.toString();
