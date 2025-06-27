@@ -1065,6 +1065,9 @@ class WhatsAppMessengerApp extends EventEmitter {
     }
 
     setupEventHandlers() {
+        // Clean up existing handlers first to avoid duplicates
+        this.cleanupEventHandlers();
+        
         // Date selector
         const dateSelector = this.domManager.getElement('dateSelector');
         if (dateSelector) {
@@ -1093,12 +1096,39 @@ class WhatsAppMessengerApp extends EventEmitter {
         // Auth redirect button
         const authButton = this.domManager.getElement('authButton');
         if (authButton) {
-            const authHandler = () => this.handleLoginClick();
+            const authHandler = () => {
+                console.log('Auth button clicked via event handler');
+                this.handleLoginClick();
+            };
             authButton.addEventListener('click', authHandler);
             this.cleanupTasks.push(() => {
                 authButton.removeEventListener('click', authHandler);
             });
+            
+            // Also attach a direct onclick as a backup
+            authButton.onclick = () => {
+                console.log('Auth button clicked via direct onclick');
+                this.handleLoginClick();
+            };
+            
+            // Test if the button is actually clickable
+            console.log('Auth button handler attached successfully');
+            console.log('Auth button element:', authButton);
+            console.log('Auth button disabled?', authButton.disabled);
+            console.log('Auth button style.display:', authButton.style.display);
         }
+    }
+    
+    cleanupEventHandlers() {
+        // Run all existing cleanup tasks
+        this.cleanupTasks.forEach(task => {
+            try {
+                task();
+            } catch (error) {
+                console.error('Error during event handler cleanup:', error);
+            }
+        });
+        this.cleanupTasks = [];
     }
 
     setupControlButtons() {
@@ -1793,8 +1823,8 @@ class WhatsAppMessengerApp extends EventEmitter {
         this.domManager.setElementDisabled('startButton', !clientStatus.ready);
         this.domManager.toggleElementVisibility('startButton', clientStatus.ready);
         
-        // Show/hide login button based on authentication status
-        this.domManager.toggleElementVisibility('loginButton', !clientStatus.ready);
+        // Show/hide auth button based on authentication status
+        this.domManager.toggleElementVisibility('authButton', !clientStatus.ready);
 
         // Only update status text if not currently showing sending progress
         const currentState = this.stateManager.getState();
@@ -1824,22 +1854,39 @@ class WhatsAppMessengerApp extends EventEmitter {
      * Handle manual login button click
      */
     handleLoginClick() {
-        console.log('Manual login button clicked');
+        console.log('Manual login button clicked - START');
         
-        // Build the authentication URL with return parameters
-        const currentUrl = new URL(window.location);
-        const authUrl = new URL('/auth', window.location.origin);
+        try {
+            // Build the authentication URL with return parameters
+            const currentUrl = new URL(window.location);
+            const authUrl = new URL('/auth', window.location.origin);
+            
+            // Add return URL so auth page can redirect back
+            authUrl.searchParams.set('returnTo', encodeURIComponent(currentUrl.pathname + currentUrl.search));
+            
+            // Add a timestamp to force refresh after auth
+            authUrl.searchParams.set('timestamp', Date.now().toString());
+            
+            console.log('Current URL:', currentUrl.toString());
+            console.log('Auth URL:', authUrl.toString());
+            console.log('About to navigate...');
+            
+            // Perform the redirect - try multiple methods to ensure it works
+            if (window.location.assign) {
+                console.log('Using window.location.assign');
+                window.location.assign(authUrl.toString());
+            } else {
+                console.log('Using window.location.href');
+                window.location.href = authUrl.toString();
+            }
+            
+        } catch (error) {
+            console.error('Error in handleLoginClick:', error);
+            // Fallback: simple navigation
+            window.location.href = '/auth';
+        }
         
-        // Add return URL so auth page can redirect back
-        authUrl.searchParams.set('returnTo', encodeURIComponent(currentUrl.pathname + currentUrl.search));
-        
-        // Add a timestamp to force refresh after auth
-        authUrl.searchParams.set('timestamp', Date.now().toString());
-        
-        console.log('Navigating to:', authUrl.toString());
-        
-        // Perform the redirect
-        window.location.href = authUrl.toString();
+        console.log('Manual login button clicked - END');
     }
 
     updateSendingProgress(progress) {
@@ -1915,6 +1962,40 @@ class WhatsAppMessengerApp extends EventEmitter {
         // If progress.total is 0 or invalid, don't show sending progress
     }
 
+    /**
+     * Handle page becoming visible (from browser back/forward or tab switching)
+     */
+    async handlePageVisible() {
+        console.log('Handling page visible event - checking connection state');
+        
+        try {
+            // Re-initialize DOM elements to ensure they're fresh
+            this.domManager.initialize();
+            
+            // Re-setup event handlers to ensure they're properly bound
+            this.setupEventHandlers();
+            
+            // Check if WebSocket is still connected
+            if (this.connectionManager && !this.connectionManager.isConnected()) {
+                console.log('WebSocket disconnected, attempting to reconnect...');
+                await this.connectWebSocket();
+            }
+            
+            // Refresh the current data to ensure it's up to date
+            await this.loadMessageCount();
+            await this.loadMessageStatusTable();
+            
+            // Request fresh initial state from server
+            if (this.connectionManager && this.connectionManager.isConnected()) {
+                this.connectionManager.requestInitialState();
+            }
+            
+        } catch (error) {
+            console.error('Error handling page visible:', error);
+            this.messageDisplay.displayError(error, 'Failed to reconnect after page navigation');
+        }
+    }
+
     // Cleanup
     cleanup() {
         console.log('Cleaning up WhatsApp Messenger Application');
@@ -1970,6 +2051,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.addEventListener('beforeunload', () => {
             if (window.whatsappMessenger) {
                 window.whatsappMessenger.cleanup();
+            }
+        });
+        
+        // Handle page visibility changes (browser back/forward, tab switching)
+        document.addEventListener('visibilitychange', () => {
+            if (window.whatsappMessenger && !document.hidden) {
+                console.log('Page became visible, reconnecting...');
+                window.whatsappMessenger.handlePageVisible();
+            }
+        });
+        
+        // Handle pageshow event (triggered when page is loaded from cache)
+        window.addEventListener('pageshow', (event) => {
+            if (window.whatsappMessenger && event.persisted) {
+                console.log('Page restored from cache, reconnecting...');
+                window.whatsappMessenger.handlePageVisible();
             }
         });
         
