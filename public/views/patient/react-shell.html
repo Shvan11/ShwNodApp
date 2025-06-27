@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Patient Portal</title>
-    
+
     <!-- Existing CSS -->
     <link rel="stylesheet" href="../../css/main.css" />
     <link rel="stylesheet" href="../../css/layouts/navigation.css" />
@@ -15,11 +16,13 @@
     <link rel="stylesheet" href="../../css/pages/visits-summary.css" />
     <link rel="stylesheet" href="../../css/pages/canvas.css" />
     <link rel="stylesheet" href="../../photoswipe/dist/photoswipe.css" />
-    
+
     <!-- React CDN -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    
+    <!-- <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script> -->
+    <!-- <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script> -->
+    <script crossorigin src="../../js/vendor/react.production.min.js"></script>
+    <script crossorigin src="../../js/vendor/react-dom.production.min.js"></script>
+
     <style>
         /* React shell specific styles */
         #react-root {
@@ -27,29 +30,30 @@
             display: flex;
             flex-direction: column;
         }
-        
+
         #patient-shell {
             height: 100%;
             display: flex;
             flex-direction: column;
         }
-        
+
         .navigation-header {
             flex-shrink: 0;
             position: sticky;
             top: 0;
             z-index: 1000;
             background: var(--gradient-accent);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
-        
+
         .content-area {
             flex: 1;
             overflow: hidden;
             position: relative;
-            min-height: 0; /* Important for flex child */
+            min-height: 0;
+            /* Important for flex child */
         }
-        
+
         .content-iframe {
             width: 100%;
             height: 100%;
@@ -57,7 +61,7 @@
             background: transparent;
             display: block;
         }
-        
+
         .loading-spinner {
             display: flex;
             justify-content: center;
@@ -66,7 +70,7 @@
             font-size: 18px;
             color: var(--text-color);
         }
-        
+
         .loading-spinner::after {
             content: "";
             width: 20px;
@@ -77,24 +81,30 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-        
+
         .error-message {
             padding: 20px;
             text-align: center;
             color: #e74c3c;
             font-size: 16px;
         }
-        
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
+
 <body>
     <!-- React will mount here -->
     <div id="react-root"></div>
-    
+
     <!-- React Components - Imported in correct order -->
     <script src="../../js/components/react/Navigation.js"></script>
     <script src="../../js/components/react/GridComponent.js"></script>
@@ -105,20 +115,20 @@
     <script src="../../js/components/react/ContentRenderer.js"></script>
     <script src="../../js/components/react/PatientShell.js"></script>
     <script src="../../js/components/react/App.js"></script>
-    
+
     <!-- Initialize React App -->
     <script>
         console.log('🚀 Initializing React Patient Portal...');
-        
+
         // Verify all components are loaded
         const requiredComponents = [
-            'Navigation', 'GridComponent', 'PaymentsComponent', 
+            'Navigation', 'GridComponent', 'PaymentsComponent',
             'XraysComponent', 'VisitsComponent', 'CompareComponent',
             'ContentRenderer', 'PatientShell', 'App'
         ];
-        
+
         const missingComponents = requiredComponents.filter(name => !window[name]);
-        
+
         if (missingComponents.length > 0) {
             console.error('❌ Missing components:', missingComponents);
             document.getElementById('react-root').innerHTML = `
@@ -130,13 +140,14 @@
             `;
         } else {
             console.log('✅ All components loaded successfully');
-            
+
             // Mount React App
             const root = ReactDOM.createRoot(document.getElementById('react-root'));
             root.render(React.createElement(window.App));
-            
+
             console.log('✅ React Patient Portal initialized successfully');
         }
     </script>
 </body>
+
 </html>

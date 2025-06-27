@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="../../css/main.css" />
+  <link rel="stylesheet" href="../../css/pages/grid.css" />
+  <link rel="stylesheet" href="../../photoswipe/dist/photoswipe.css" />
+  <title>Patient Images</title>
+</head>
+
+<body>
+  <!-- Header -->
+  <div class="header">
+    <ul class="nav">
+      <!-- Navigation tabs will be loaded dynamically -->
+    </ul>
+  </div>
+
+  <!-- React Grid Component Container -->
+  <div id="grid-root"></div>
+
+  <!-- Load React and the Grid Component (Local Files for Offline Use) -->
+  <script crossorigin src="../../js/vendor/react.production.min.js"></script>
+  <script crossorigin src="../../js/vendor/react-dom.production.min.js"></script>
+  <script src="../../js/components/react/GridComponent.js"></script>
+  <script src="../../js/services/navigation.js"></script>
+  
+  <script>
+    // Extract patient ID and timepoint from URL
+    function getPatientIdFromUrl() {
+      const pathParts = window.location.pathname.split('/');
+      const patientIndex = pathParts.indexOf('patient');
+      return patientIndex !== -1 && pathParts[patientIndex + 1] ? pathParts[patientIndex + 1] : null;
+    }
+    
+    function getTimepointFromUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('tp') || '0';
+    }
+
+    // Initialize the React component when page loads
+    document.addEventListener('DOMContentLoaded', async () => {
+      const patientId = getPatientIdFromUrl();
+      const tpCode = getTimepointFromUrl();
+      
+      if (!patientId) {
+        console.error('No patient ID found in URL');
+        return;
+      }
+
+      // Setup navigation if available
+      if (window.setupNavigation) {
+        try {
+          await window.setupNavigation(patientId);
+        } catch (error) {
+          console.warn('Navigation setup failed:', error);
+        }
+      }
+
+      // Render the React component using modern createRoot API
+      const gridContainer = document.getElementById('grid-root');
+      if (gridContainer && window.GridComponent) {
+        const root = ReactDOM.createRoot(gridContainer);
+        const gridElement = React.createElement(window.GridComponent, {
+          patientId: patientId,
+          tpCode: tpCode
+        });
+        
+        root.render(gridElement);
+      } else {
+        console.error('GridComponent or container not found');
+      }
+    });
+  </script>
+</body>
+
+</html>

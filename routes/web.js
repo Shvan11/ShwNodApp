@@ -68,11 +68,11 @@ router.get('/visits-summary', (req, res) => {
 
 // React Shell route for patient pages (using refactored components)
 router.get('/patient/:patientId/*', (req, res) => {
-  res.sendFile(path.join(process.cwd(), './public/views/patient/react-shell-refactored.html'));
+  res.sendFile(path.join(process.cwd(), './public/views/patient/react-shell.html'));
 });
 
 router.get('/patient/:patientId', (req, res) => {
-  res.sendFile(path.join(process.cwd(), './public/views/patient/react-shell-refactored.html'));
+  res.sendFile(path.join(process.cwd(), './public/views/patient/react-shell.html'));
 });
 
 // Apply all page rewrites

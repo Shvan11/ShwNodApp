@@ -24,7 +24,6 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
     const loadGalleryImages = async () => {
         try {
             setLoading(true);
-            console.log('Loading grid content for patient:', patientId, 'tp:', tpCode);
             
             const response = await fetch(`/api/getgal?code=${patientId}&tp=${tpCode}`);
             if (!response.ok) {
@@ -32,7 +31,6 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
             }
             
             const galleryImages = await response.json();
-            console.log('Gallery images received:', galleryImages);
             setImages(galleryImages);
         } catch (err) {
             console.error('Error loading grid:', err);
@@ -80,8 +78,6 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
         if (!loading && images.length > 0 && componentRef.current) {
             const initPhotoSwipe = async () => {
                 try {
-                    console.log('🔍 Starting PhotoSwipe initialization after images loaded...');
-                    
                     // Clean up any existing lightbox
                     if (lightbox) {
                         lightbox.destroy();
@@ -93,11 +89,8 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                     // Check if our component's DOM elements exist (more specific check)
                     const galleryElement = componentRef.current?.querySelector('#dolph_gallery');
                     const links = componentRef.current?.querySelectorAll('#dolph_gallery a');
-                    console.log('🔍 Gallery element:', galleryElement);
-                    console.log('🔍 Found gallery links:', links?.length || 0);
                     
                     if (!galleryElement || !links || links.length === 0) {
-                        console.log('ℹ️ Gallery elements not ready yet, skipping PhotoSwipe initialization');
                         return;
                     }
                     
@@ -116,8 +109,6 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                         document.head.appendChild(script1);
                     });
                     
-                    console.log('✅ PhotoSwipe UMD modules loaded');
-                    console.log('Available:', window.PhotoSwipe, window.PhotoSwipeLightbox);
                     
                     if (!window.PhotoSwipeLightbox) {
                         throw new Error('PhotoSwipeLightbox not available');
@@ -130,7 +121,6 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                         bgOpacity: 0.9,
                         showHideOpacity: true
                     });
-                    console.log('✅ PhotoSwipe instance created:', lightboxInstance);
                     
                     // Add custom buttons
                     lightboxInstance.on('uiRegister', () => {
@@ -222,25 +212,12 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                         });
                     });
                     
-                    lightboxInstance.on('beforeOpen', () => {
-                        console.log('🎯 PhotoSwipe beforeOpen event fired');
-                    });
-                    
-                    lightboxInstance.on('change', () => {
-                        console.log('🎯 PhotoSwipe change event fired');
-                    });
                     
                     lightboxInstance.init();
                     setLightbox(lightboxInstance);
                     
-                    console.log('✅ PhotoSwipe initialized successfully with', links.length, 'links');
-                    
-                    links.forEach((link, index) => {
-                        console.log(`Link ${index}:`, link.href, 'width:', link.dataset.pswpWidth);
-                    });
-                    
                 } catch (error) {
-                    console.error('❌ Error initializing PhotoSwipe:', error);
+                    console.error('Error initializing PhotoSwipe:', error);
                 }
             };
             
@@ -253,7 +230,7 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                 lightbox.destroy();
             }
         };
-    }, [loading, images, lightbox, patientId, componentRef]);
+    }, [loading, images.length, patientId]);
     
     // Load data
     useEffect(() => {
@@ -272,7 +249,6 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
         }, `Error: ${error}`);
     }
     
-    console.log('🎯 Grid Component Rendering:', { patientId, tpCode, imagesCount: images.length });
     
     return React.createElement('div', { 
         ref: componentRef,
