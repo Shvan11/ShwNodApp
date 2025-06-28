@@ -63,7 +63,7 @@ const PaymentsComponent = ({ patientId }) => {
     }, [
         React.createElement('h1', { 
             key: 'title',
-            className: 'page-title' 
+            className: 'page-title',
         }, 'Payment History'),
         
         // Add Invoice Component

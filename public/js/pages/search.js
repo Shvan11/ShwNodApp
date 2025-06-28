@@ -137,4 +137,12 @@ class SearchPageController {
 // Initialize controller when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   new SearchPageController();
+  
+  // Setup cross-navigation
+  const appointmentsBtn = document.getElementById('view-appointments-btn');
+  if (appointmentsBtn) {
+    appointmentsBtn.addEventListener('click', () => {
+      window.navigationContext?.navigateToPage('appointments');
+    });
+  }
 });

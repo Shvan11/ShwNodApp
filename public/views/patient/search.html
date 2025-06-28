@@ -8,8 +8,13 @@
     <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
     <link rel="stylesheet" href="../../css/main.css" />
     <link rel="stylesheet" href="../../css/pages/search.css" />
+    <link rel="stylesheet" href="../../css/components/universal-header.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <script crossorigin src="../../js/vendor/react.production.min.js"></script>
+    <script crossorigin src="../../js/vendor/react-dom.production.min.js"></script>
 </head>
 <body>
+    <div id="universal-header-root"></div>
     <div class="container">
         <h1>Search Database</h1>
         <form id="searchForm">
@@ -29,8 +34,32 @@
         </form>
         <div id="results" role="alert" aria-live="polite"></div>
         <div id="error-message" class="error-message" role="alert"></div>
+        
+        <!-- Cross-navigation buttons -->
+        <div class="cross-nav-section">
+            <button type="button" id="view-appointments-btn" class="nav-action-btn">
+                <i class="fas fa-calendar-alt"></i>
+                View Today's Appointments
+            </button>
+        </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+    
+    <!-- Load navigation components -->
+    <script src="../../js/services/navigationContext.js"></script>
+    <script src="../../js/components/shared/UniversalHeader.js"></script>
+    
+    <!-- Initialize Universal Header -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const headerRoot = document.getElementById('universal-header-root');
+            if (headerRoot && window.React && window.ReactDOM && window.UniversalHeader) {
+                const root = ReactDOM.createRoot(headerRoot);
+                root.render(React.createElement(UniversalHeader));
+            }
+        });
+    </script>
+    
     <script type="module" src="../../js/pages/search.js"></script>
 </body>
 </html>

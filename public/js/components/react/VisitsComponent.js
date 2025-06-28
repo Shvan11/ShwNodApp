@@ -199,7 +199,9 @@ const VisitsComponent = ({ patientId }) => {
     return React.createElement('div', { 
         style: { padding: '20px' }
     }, [
-        React.createElement('h1', { key: 'title' }, 'Visits Summary'),
+        React.createElement('h1', { 
+            key: 'title',
+        }, 'Visits Summary'),
         
         React.createElement('button', {
             key: 'add-btn',

@@ -42,7 +42,8 @@ const PatientShell = () => {
     };
     
     return React.createElement('div', {
-        id: 'patient-shell'
+        id: 'patient-shell',
+        className: 'patient-shell-container'
     }, [
         React.createElement(window.Navigation, {
             key: 'navigation',
@@ -50,12 +51,17 @@ const PatientShell = () => {
             currentPath: currentUrl.fullPath,
             onNavigate: handleNavigate
         }),
-        React.createElement(window.ContentRenderer, {
-            key: 'content',
-            patientId: currentUrl.patientId,
-            page: currentUrl.page,
-            params: params
-        })
+        React.createElement('div', {
+            key: 'main-content',
+            className: 'main-content-area'
+        },
+            React.createElement(window.ContentRenderer, {
+                key: 'content',
+                patientId: currentUrl.patientId,
+                page: currentUrl.page,
+                params: params
+            })
+        )
     ]);
 };
 

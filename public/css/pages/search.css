@@ -148,3 +148,44 @@ button:focus {
     background-color: var(--primary-color);
     color: white;
 }
+
+/* Cross-navigation section */
+.cross-nav-section {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid #e2e8f0;
+    text-align: center;
+}
+
+.nav-action-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    text-decoration: none;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    max-width: none;
+    width: auto;
+}
+
+.nav-action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    background: linear-gradient(135deg, #5a67d8 0%, #6c5ce7 100%);
+}
+
+.nav-action-btn:active {
+    transform: translateY(0);
+}
+
+.nav-action-btn i {
+    font-size: 1.1rem;
+}

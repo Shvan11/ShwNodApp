@@ -22,3 +22,37 @@
   height: 100%;
   object-fit: contain; /* ✅ Show entire image without cropping */
 }
+
+/* Fit to Screen Controls */
+.fit-to-screen-controls {
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.fit-toggle-btn {
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.fit-toggle-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.fit-toggle-btn.active:hover {
+  background: linear-gradient(135deg, #5a67d8 0%, #6c5ce7 100%) !important;
+}
+
+.fit-toggle-btn:active {
+  transform: translateY(0);
+}
+
+/* Responsive: Hide fit-to-screen on mobile/tablet */
+@media (max-width: 1023px) {
+  .fit-to-screen-controls {
+    display: none !important;
+  }
+}
