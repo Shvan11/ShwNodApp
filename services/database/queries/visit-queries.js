@@ -169,6 +169,7 @@ export async function getLatestWire(PID) {
         (columns) => ({
             upperWireID: columns[0].value,
             lowerWireID: columns[1].value,
-        })
+        }),
+        (result) => result && result.length > 0 ? result[0] : null
     );
 }

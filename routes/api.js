@@ -8,7 +8,7 @@ import { getPresentAps, getAllTodayApps, getPresentTodayApps, updatePresent } fr
 import {getTimePoints, getTimePointImgs } from '../services/database/queries/timepoint-queries.js';
 import { getWhatsAppMessages } from '../services/database/queries/messaging-queries.js';
 import { getPatientsPhones, getInfos } from '../services/database/queries/patient-queries.js';
-import { getPayments } from '../services/database/queries/payment-queries.js';
+import { getPayments, getActiveWorkForInvoice, getCurrentExchangeRate, addInvoice, updateExchangeRate } from '../services/database/queries/payment-queries.js';
 import { getWires, getVisitsSummary, addVisit, updateVisit, deleteVisit, getVisitDetailsByID, getLatestWire } from '../services/database/queries/visit-queries.js';
 import whatsapp from '../services/messaging/whatsapp.js';
 import { sendImg_, sendXray_ } from '../services/messaging/whatsapp-api.js';
@@ -718,6 +718,86 @@ router.delete("/deleteVisit", async (req, res) => {
         res.json({ status: 'success', data: result });
     } catch (error) {
         console.error("Error deleting visit:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+// Invoice-related routes
+router.get("/getActiveWorkForInvoice", async (req, res) => {
+    try {
+        const { PID } = req.query;
+        if (!PID) {
+            return res.status(400).json({ status: 'error', message: 'Missing required parameter: PID' });
+        }
+
+        const workData = await getActiveWorkForInvoice(PID);
+        res.json({ status: 'success', data: workData });
+    } catch (error) {
+        console.error("Error getting active work for invoice:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+router.get("/getCurrentExchangeRate", async (req, res) => {
+    try {
+        const exchangeRate = await getCurrentExchangeRate();
+        
+        if (exchangeRate === null || exchangeRate === undefined) {
+            return res.status(404).json({ 
+                status: 'error', 
+                message: 'No exchange rate set for today. Please set today\'s exchange rate first.' 
+            });
+        }
+        
+        res.json({ status: 'success', exchangeRate });
+    } catch (error) {
+        console.error("Error getting exchange rate:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+router.post("/addInvoice", async (req, res) => {
+    try {
+        const { workid, amountPaid, paymentDate, actualAmount, actualCurrency, change } = req.body;
+        
+        if (!workid || !amountPaid || !paymentDate) {
+            return res.status(400).json({ 
+                status: 'error', 
+                message: 'Missing required parameters: workid, amountPaid, paymentDate' 
+            });
+        }
+
+        const result = await addInvoice({
+            workid,
+            amountPaid,
+            paymentDate,
+            actualAmount,
+            actualCurrency,
+            change
+        });
+        
+        res.json({ status: 'success', data: result });
+    } catch (error) {
+        console.error("Error adding invoice:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+router.post("/updateExchangeRate", async (req, res) => {
+    try {
+        const { exchangeRate } = req.body;
+        
+        if (!exchangeRate || exchangeRate <= 0) {
+            return res.status(400).json({ 
+                status: 'error', 
+                message: 'Valid exchange rate is required' 
+            });
+        }
+
+        const result = await updateExchangeRate(exchangeRate);
+        res.json({ status: 'success', data: result });
+    } catch (error) {
+        console.error("Error updating exchange rate:", error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 });

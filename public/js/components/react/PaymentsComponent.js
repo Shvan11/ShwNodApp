@@ -66,6 +66,12 @@ const PaymentsComponent = ({ patientId }) => {
             className: 'page-title' 
         }, 'Payment History'),
         
+        // Add Invoice Component
+        React.createElement(window.InvoiceComponent, {
+            key: 'invoice-component',
+            patientId: patientId
+        }),
+        
         React.createElement('table', { key: 'table' }, [
             React.createElement('thead', { key: 'thead' },
                 React.createElement('tr', { key: 'header-row' }, [
