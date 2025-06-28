@@ -5,7 +5,7 @@ const Navigation = ({ patientId, currentPath, onNavigate }) => {
     const [timepoints, setTimepoints] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(true);
     const [isMobile, setIsMobile] = useState(false);
     
     // Cache for timepoints

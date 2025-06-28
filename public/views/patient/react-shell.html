@@ -23,11 +23,24 @@
 
     <style>
         /* React shell specific styles for sidebar layout */
+        html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden; /* Prevent body scroll */
+        }
+        
+        #universal-header-root {
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 0; /* Remove any line-height spacing */
+        }
+        
         #react-root {
             height: 100vh;
             display: flex;
             flex-direction: column;
             position: relative;
+            overflow: hidden; /* Prevent root scroll */
         }
 
         .patient-shell-container {
@@ -38,19 +51,18 @@
 
         .main-content-area {
             flex: 1;
-            margin-left: 280px; /* Account for sidebar width */
-            overflow-y: auto;
-            overflow-x: hidden;
+            margin-left: 64px; /* Start with collapsed sidebar width */
+            overflow: hidden; /* Prevent main scroll, let content handle its own */
             position: relative;
             min-height: 0;
             background: #ffffff;
             transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            height: calc(100vh - 70px); /* Account for universal header */
+            height: calc(100vh - 50px); /* Account for reduced universal header */
         }
 
-        /* Adjust content area when sidebar is collapsed */
-        .patient-sidebar.collapsed ~ .main-content-area {
-            margin-left: 64px;
+        /* Adjust content area when sidebar is expanded */
+        .patient-sidebar:not(.collapsed) ~ .main-content-area {
+            margin-left: 280px;
         }
 
         /* Mobile adjustments */

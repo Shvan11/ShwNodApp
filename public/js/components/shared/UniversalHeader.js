@@ -139,10 +139,13 @@ class UniversalHeader extends React.Component {
         }
     }
 
+
     render() {
         const { currentPatient, navigationContext, isSearchVisible, searchResults, searchTerm } = this.state;
 
-        return React.createElement('div', { className: 'universal-header' },
+        return React.createElement('div', { 
+            className: 'universal-header'
+        },
             React.createElement('div', { className: 'header-container' },
                 React.createElement('div', { className: 'header-left' },
                     React.createElement('div', { className: 'logo-section' },
@@ -150,19 +153,6 @@ class UniversalHeader extends React.Component {
                             className: 'clinic-name',
                             onClick: () => window.location.href = '/'
                         }, 'Shwan Orthodontics')
-                    ),
-                    navigationContext?.breadcrumb.length > 0 && 
-                    React.createElement('div', { className: 'breadcrumb' },
-                        navigationContext.breadcrumb.map((crumb, index) => 
-                            React.createElement('span', { key: index, className: 'breadcrumb-item' },
-                                React.createElement('a', { 
-                                    href: crumb.url,
-                                    className: 'breadcrumb-link'
-                                }, crumb.name),
-                                index < navigationContext.breadcrumb.length - 1 && 
-                                React.createElement('span', { className: 'breadcrumb-separator' }, ' › ')
-                            )
-                        )
                     )
                 ),
                 

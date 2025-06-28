@@ -6,7 +6,6 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [lightbox, setLightbox] = useState(null);
-    const [fitToScreen, setFitToScreen] = useState(false);
     const [isDesktop, setIsDesktop] = useState(false);
     const componentRef = useRef(null);
     
@@ -244,9 +243,6 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
         const checkIsDesktop = () => {
             const desktop = window.innerWidth >= 1024;
             setIsDesktop(desktop);
-            if (!desktop) {
-                setFitToScreen(false); // Reset fit-to-screen on mobile/tablet
-            }
         };
         
         checkIsDesktop();
@@ -254,16 +250,16 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
         return () => window.removeEventListener('resize', checkIsDesktop);
     }, []);
 
-    // Calculate optimal grid size for fit-to-screen
-    const calculateFitToScreenStyle = () => {
-        if (!fitToScreen || !isDesktop) return {};
+    // Calculate optimal grid size to fill screen
+    const calculateGridStyle = () => {
+        if (!isDesktop) return {};
         
         const sidebar = document.querySelector('.patient-sidebar');
-        const sidebarWidth = sidebar ? (sidebar.classList.contains('collapsed') ? 64 : 280) : 280;
-        const universalHeader = 70; // Universal header height
+        const sidebarWidth = sidebar ? (sidebar.classList.contains('collapsed') ? 64 : 280) : 64;
+        const universalHeader = 50; // Universal header height
         
         const availableWidth = window.innerWidth - sidebarWidth - 40; // 40px for padding
-        const availableHeight = window.innerHeight - universalHeader - 100; // 100px buffer
+        const availableHeight = window.innerHeight - universalHeader - 40; // 40px for padding
         
         // 9 images total in 3x3 grid
         const totalImages = 9;
@@ -286,12 +282,6 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
             overflow: 'visible'
         };
     };
-
-    const toggleFitToScreen = () => {
-        if (isDesktop) {
-            setFitToScreen(!fitToScreen);
-        }
-    };
     
     if (loading) {
         return React.createElement('div', { 
@@ -308,63 +298,18 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
     
     return React.createElement('div', { 
         ref: componentRef,
-        style: { padding: '20px' }
+        style: { 
+            padding: '20px',
+            height: '100%',
+            overflowY: 'auto',
+            overflowX: 'hidden'
+        }
     }, [
-        // Fit to screen toggle button (desktop only)
-        isDesktop && React.createElement('div', {
-            key: 'fit-toggle',
-            className: 'fit-to-screen-controls',
-            style: {
-                marginBottom: '15px',
-                display: 'flex',
-                justifyContent: 'flex-end',
-                alignItems: 'center',
-                gap: '10px'
-            }
-        }, [
-            React.createElement('span', {
-                key: 'label',
-                style: {
-                    fontSize: '14px',
-                    color: '#4a5568',
-                    fontWeight: '500'
-                }
-            }, 'Fit to Screen:'),
-            React.createElement('button', {
-                key: 'button',
-                onClick: toggleFitToScreen,
-                className: `fit-toggle-btn ${fitToScreen ? 'active' : ''}`,
-                style: {
-                    background: fitToScreen ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#e2e8f0',
-                    color: fitToScreen ? 'white' : '#4a5568',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                }
-            }, [
-                React.createElement('i', {
-                    key: 'icon',
-                    className: fitToScreen ? 'fas fa-compress-alt' : 'fas fa-expand-alt',
-                    style: { fontSize: '12px' }
-                }),
-                React.createElement('span', {
-                    key: 'text'
-                }, fitToScreen ? 'Fit On' : 'Fit Off')
-            ])
-        ]),
-
         React.createElement('div', {
             key: 'gallery',
             id: 'dolph_gallery', 
             className: 'pswp-gallery',
-            style: fitToScreen ? calculateFitToScreenStyle() : {}
+            style: calculateGridStyle()
         },
             imageElements.map(element => {
                 const imageSrc = getImageSrc(element);
