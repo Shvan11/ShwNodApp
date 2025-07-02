@@ -17,9 +17,7 @@
     <link rel="stylesheet" href="../../css/components/sidebar-navigation.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
-    <!-- React Local Files -->
-    <script crossorigin src="../../js/vendor/react.production.min.js"></script>
-    <script crossorigin src="../../js/vendor/react-dom.production.min.js"></script>
+    <!-- React handled by Vite -->
 
     <style>
         /* React shell specific styles for sidebar layout */
@@ -133,6 +131,19 @@
             }
         }
 
+        /* Fix breadcrumb visibility - override white text on white background */
+        .breadcrumb {
+            color: #333 !important;
+            background: rgba(0, 0, 0, 0.02);
+            padding: 8px 16px 2px 16px;
+            margin: 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .breadcrumb-item {
+            color: #333 !important;
+        }
+
     </style>
 </head>
 
@@ -142,119 +153,12 @@
     <!-- React will mount here -->
     <div id="react-root"></div>
 
-    <!-- Navigation Context -->
-    <script src="../../js/services/navigationContext.js"></script>
-    <script src="../../js/components/shared/UniversalHeader.js"></script>
-    
-    <!-- React Components - Imported in correct order -->
-    <script src="../../js/components/react/Navigation.js"></script>
-    <script src="../../js/components/react/GridComponent.js"></script>
-    <script src="../../js/components/react/InvoiceComponent.js"></script>
-    <script src="../../js/components/react/PaymentsComponent.js"></script>
-    <script src="../../js/components/react/XraysComponent.js"></script>
-    <script src="../../js/components/react/VisitsComponent.js"></script>
-    <script src="../../js/components/react/CompareComponent.js"></script>
-    <script src="../../js/components/react/ContentRenderer.js"></script>
-    <script src="../../js/components/react/PatientShell.js"></script>
-    <script src="../../js/components/react/App.js"></script>
+    <!-- Modern JSX entry point -->
+    <script type="module" src="../../js/pages/patient-shell.jsx"></script>
 
-    <!-- Initialize React App -->
+    <!-- Modern initialization is handled by patient-shell.jsx -->
     <script>
-        console.log('🚀 Initializing React Patient Portal...');
-
-        // Verify all components are loaded
-        const requiredComponents = [
-            'Navigation', 'GridComponent', 'InvoiceComponent', 'PaymentsComponent',
-            'XraysComponent', 'VisitsComponent', 'CompareComponent',
-            'ContentRenderer', 'PatientShell', 'App'
-        ];
-
-        const missingComponents = requiredComponents.filter(name => !window[name]);
-
-        if (missingComponents.length > 0) {
-            console.error('❌ Missing components:', missingComponents);
-            document.getElementById('react-root').innerHTML = `
-                <div style="padding: 20px; text-align: center; color: red;">
-                    <h2>Error: Missing Components</h2>
-                    <p>The following components failed to load: ${missingComponents.join(', ')}</p>
-                    <p>Please check the console for more details.</p>
-                </div>
-            `;
-        } else {
-            console.log('✅ All components loaded successfully');
-
-            // Mount Universal Header
-            const headerRoot = document.getElementById('universal-header-root');
-            if (headerRoot && window.UniversalHeader) {
-                const headerReactRoot = ReactDOM.createRoot(headerRoot);
-                headerReactRoot.render(React.createElement(window.UniversalHeader));
-                console.log('✅ Universal Header initialized');
-            }
-
-            // Mount React App
-            const root = ReactDOM.createRoot(document.getElementById('react-root'));
-            root.render(React.createElement(window.App));
-
-            // Add mobile sidebar overlay handling
-            const addMobileOverlay = () => {
-                let overlay = document.querySelector('.sidebar-overlay');
-                if (!overlay) {
-                    overlay = document.createElement('div');
-                    overlay.className = 'sidebar-overlay';
-                    overlay.addEventListener('click', () => {
-                        // Trigger sidebar collapse on overlay click
-                        const sidebar = document.querySelector('.patient-sidebar');
-                        if (sidebar && sidebar.classList.contains('mobile')) {
-                            const toggleBtn = sidebar.querySelector('.sidebar-toggle');
-                            if (toggleBtn) toggleBtn.click();
-                        }
-                    });
-                    document.body.appendChild(overlay);
-                }
-            };
-
-            // Add observer to handle content area margin adjustments
-            const setupContentAreaObserver = () => {
-                const adjustContentMargin = () => {
-                    const sidebar = document.querySelector('.patient-sidebar');
-                    const contentArea = document.querySelector('.main-content-area');
-                    
-                    if (sidebar && contentArea) {
-                        const isMobile = window.innerWidth <= 768;
-                        const isCollapsed = sidebar.classList.contains('collapsed');
-                        
-                        if (isMobile) {
-                            contentArea.style.marginLeft = '0';
-                        } else {
-                            contentArea.style.marginLeft = isCollapsed ? '64px' : '280px';
-                        }
-                    }
-                };
-
-                // Watch for changes in sidebar classes
-                const observer = new MutationObserver(adjustContentMargin);
-                const sidebar = document.querySelector('.patient-sidebar');
-                
-                if (sidebar) {
-                    observer.observe(sidebar, { 
-                        attributes: true, 
-                        attributeFilter: ['class'] 
-                    });
-                }
-
-                // Initial adjustment and window resize handling
-                adjustContentMargin();
-                window.addEventListener('resize', adjustContentMargin);
-            };
-
-            // Setup content area observer after a delay
-            setTimeout(setupContentAreaObserver, 200);
-
-            // Add overlay after a short delay to ensure DOM is ready
-            setTimeout(addMobileOverlay, 100);
-
-            console.log('✅ React Patient Portal initialized successfully');
-        }
+        console.log('🚀 React Patient Portal will be initialized by JSX module...');
     </script>
 </body>
 

@@ -21,8 +21,8 @@ class ConnectionManager {
     // Set to store WhatsApp status connections
     this.waStatusConnections = new Set();
 
-    // Set to store simplified appointment connections
-    this.simplifiedConnections = new Set();
+    // Set to store daily appointment connections
+    this.dailyAppointmentsConnections = new Set();
 
     // Set to store all active connections
     this.allConnections = new Set();
@@ -61,9 +61,9 @@ class ConnectionManager {
       // Auth connections also need QR events, so add them to waStatusConnections
       this.waStatusConnections.add(ws);
       logger.websocket.debug('Registered auth connection (QR enabled)');
-    } else if (type === 'simplified') {
-      this.simplifiedConnections.add(ws);
-      logger.websocket.debug('Registered simplified appointments connection');
+    } else if (type === 'daily-appointments') {
+      this.dailyAppointmentsConnections.add(ws);
+      logger.websocket.debug('Registered daily appointments connection');
     }
   }
 
@@ -89,9 +89,9 @@ class ConnectionManager {
     } else if (capabilities.type === 'auth') {
       this.waStatusConnections.delete(ws);
       logger.websocket.debug('Unregistered auth connection');
-    } else if (capabilities.type === 'simplified') {
-      this.simplifiedConnections.delete(ws);
-      logger.websocket.debug('Unregistered simplified appointments connection');
+    } else if (capabilities.type === 'daily-appointments') {
+      this.dailyAppointmentsConnections.delete(ws);
+      logger.websocket.debug('Unregistered daily appointments connection');
     }
 
     // Remove capabilities
@@ -171,15 +171,15 @@ class ConnectionManager {
   }
 
   /**
-   * Broadcast message to all simplified appointment connections
+   * Broadcast message to all daily appointment connections
    * @param {Object|string} message - Message to send
    * @param {Function} [filter] - Filter function to determine which clients to send to
    * @returns {number} - Number of clients message was sent to
    */
-  broadcastToSimplified(message, filter = null) {
+  broadcastToDailyAppointments(message, filter = null) {
     let sentCount = 0;
 
-    for (const ws of this.simplifiedConnections) {
+    for (const ws of this.dailyAppointmentsConnections) {
       if (ws.readyState !== ws.OPEN) continue;
 
       // Apply filter if provided
@@ -190,7 +190,7 @@ class ConnectionManager {
         this.sendToClient(ws, message);
         sentCount++;
       } catch (error) {
-        logger.websocket.error('Error sending to simplified client', error);
+        logger.websocket.error('Error sending to daily appointments client', error);
       }
     }
 
@@ -323,7 +323,7 @@ class ConnectionManager {
       total: this.allConnections.size,
       screens: this.screenConnections.size,
       waStatus: this.waStatusConnections.size,
-      simplified: this.simplifiedConnections.size
+      dailyAppointments: this.dailyAppointmentsConnections.size
     };
   }
 }
@@ -421,10 +421,10 @@ function setupWebSocketServer(server) {
         } else {
           logger.websocket.debug('Auth client connected without QR', { needsQR });
         }
-      } else if (clientType === 'simplified') {
-        // Simplified appointments view - register as simplified type
-        logger.websocket.debug('Simplified appointments client connected');
-        connectionManager.registerConnection(ws, 'simplified', {
+      } else if (clientType === 'daily-appointments') {
+        // Daily appointments view - register as daily appointments type
+        logger.websocket.debug('Daily appointments client connected');
+        connectionManager.registerConnection(ws, 'daily-appointments', {
           date: date,
           ipAddress: req.socket.remoteAddress
         });
@@ -819,12 +819,12 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
         { tableData: appointmentData, date: dateParam }
       );
 
-      // Broadcast to screens and simplified clients specifically
+      // Broadcast to screens and daily appointments clients specifically
       const screenUpdates = connectionManager.broadcastToScreens(message);
-      const simplifiedUpdates = connectionManager.broadcastToSimplified(message);
+      const dailyAppointmentsUpdates = connectionManager.broadcastToDailyAppointments(message);
       logger.websocket.info('Broadcast appointment updates', { 
         screenUpdates, 
-        simplifiedUpdates 
+        dailyAppointmentsUpdates 
       });
     } catch (error) {
       logger.websocket.error('Error fetching appointment data', error, { date: dateParam });

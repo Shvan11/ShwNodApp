@@ -11,7 +11,7 @@ logo.addEventListener('mouseout', () => {
 const appointmentButton = document.getElementById('appointmentButton');
 
 appointmentButton.addEventListener('click', () => {
-    window.location.href = 'simplified';
+    window.location.href = 'daily-appointments';
 });
 const searchButton = document.getElementById('searchButton');
 

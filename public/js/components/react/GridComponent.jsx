@@ -1,12 +1,11 @@
-// GridComponent.js - Grid component for patient gallery
+import React, { useState, useEffect, useRef } from 'react'
+
 const GridComponent = ({ patientId, tpCode = '0' }) => {
-    const { useState, useEffect, useRef } = React;
-    
     const [images, setImages] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [lightbox, setLightbox] = useState(null);
-    const [isDesktop, setIsDesktop] = useState(false);
+    const [screenSize, setScreenSize] = useState('desktop');
     const componentRef = useRef(null);
     
     // Image elements configuration
@@ -110,11 +109,11 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                         document.head.appendChild(script1);
                     });
                     
-                    
                     if (!window.PhotoSwipeLightbox) {
                         throw new Error('PhotoSwipeLightbox not available');
                     }
                     
+                    // Initialize PhotoSwipe
                     let lightboxInstance = new window.PhotoSwipeLightbox({
                         gallery: '#dolph_gallery',
                         children: 'a',
@@ -147,12 +146,25 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                                 pswp.on('change', () => {
                                     const downloadLink = pswp.currSlide.data.src;
                                     const fileName = downloadLink.substring(downloadLink.lastIndexOf('/') + 1);
-                                    const extension = fileName.slice(-3);
                                     
-                                    let downloadFileName = fileName;
-                                    if (extension === 'png' || extension === 'jpg' || extension === 'jpeg') {
-                                        downloadFileName = `patient_${patientId}_${fileName}`;
-                                    }
+                                    // Extract the extension code (like i10, i12, etc.)
+                                    const extensionMatch = fileName.match(/\.([^.]+)$/);
+                                    const extension = extensionMatch ? extensionMatch[1] : '';
+                                    
+                                    // Map extension codes to descriptive names
+                                    const fileNameMap = {
+                                        'i10': 'Profile.jpg',
+                                        'i12': 'Rest.jpg',
+                                        'i13': 'Smile.jpg',
+                                        'i23': 'Upper.jpg',
+                                        'i24': 'Lower.jpg',
+                                        'i20': 'Right.jpg',
+                                        'i22': 'Center.jpg',
+                                        'i21': 'Left.jpg'
+                                    };
+                                    
+                                    // Get descriptive name or use original with patient prefix
+                                    const downloadFileName = fileNameMap[extension] || `patient_${patientId}_${fileName}`;
                                     
                                     el.setAttribute('download', downloadFileName);
                                     el.href = downloadLink;
@@ -197,9 +209,29 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                                         }
                                         
                                         const { fullPath } = await response.json();
-                                        console.log('Converted to full path:', fullPath);
                                         
-                                        const sendMessageUrl = `/views/messaging/send-message.html?file=${encodeURIComponent(fullPath)}`;
+                                        // Apply same descriptive renaming as download
+                                        const fileName = webPath.substring(webPath.lastIndexOf('/') + 1);
+                                        const extensionMatch = fileName.match(/\.([^.]+)$/);
+                                        const extension = extensionMatch ? extensionMatch[1] : '';
+                                        
+                                        const fileNameMap = {
+                                            'i10': 'Profile.jpg',
+                                            'i12': 'Rest.jpg',
+                                            'i13': 'Smile.jpg',
+                                            'i23': 'Upper.jpg',
+                                            'i24': 'Lower.jpg',
+                                            'i20': 'Right.jpg',
+                                            'i22': 'Center.jpg',
+                                            'i21': 'Left.jpg'
+                                        };
+                                        
+                                        const patientPrefix = fileName.split('.')[0]; // e.g., "21400"
+                                        const descriptiveName = fileNameMap[extension] || `${patientPrefix}.jpg`;
+                                        const convertedPath = fullPath.replace(/[^/\\]+$/, descriptiveName);
+                                        console.log('Converted to full path:', convertedPath);
+                                        
+                                        const sendMessageUrl = `/views/messaging/send-message.html?file=${encodeURIComponent(convertedPath)}`;
                                         window.open(sendMessageUrl, '_blank');
                                         
                                     } catch (error) {
@@ -213,68 +245,118 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                         });
                     });
                     
-                    
                     lightboxInstance.init();
                     setLightbox(lightboxInstance);
                     
                 } catch (error) {
-                    console.error('Error initializing PhotoSwipe:', error);
+                    console.error('Failed to initialize PhotoSwipe:', error);
                 }
             };
             
             initPhotoSwipe();
         }
+    }, [loading, images]);
+    
+    // Screen size detection
+    useEffect(() => {
+        const checkScreenSize = () => {
+            const width = window.innerWidth;
+            if (width < 576) {
+                setScreenSize('mobile');
+            } else if (width < 992) {
+                setScreenSize('tablet');
+            } else {
+                setScreenSize('desktop');
+            }
+        };
         
-        // Cleanup function
+        checkScreenSize();
+        window.addEventListener('resize', checkScreenSize);
+        return () => window.removeEventListener('resize', checkScreenSize);
+    }, []);
+
+    // Load images when component mounts or dependencies change
+    useEffect(() => {
+        if (patientId) {
+            loadGalleryImages();
+        }
+    }, [patientId, tpCode]);
+    
+    // Cleanup on unmount
+    useEffect(() => {
         return () => {
             if (lightbox) {
                 lightbox.destroy();
             }
         };
-    }, [loading, images.length, patientId]);
+    }, [lightbox]);
     
-    // Load data
-    useEffect(() => {
-        loadGalleryImages();
-    }, [patientId, tpCode]);
-
-    // Desktop detection effect
-    useEffect(() => {
-        const checkIsDesktop = () => {
-            const desktop = window.innerWidth >= 1024;
-            setIsDesktop(desktop);
-        };
-        
-        checkIsDesktop();
-        window.addEventListener('resize', checkIsDesktop);
-        return () => window.removeEventListener('resize', checkIsDesktop);
-    }, []);
-
-    // Calculate optimal grid size to fill screen
     const calculateGridStyle = () => {
-        if (!isDesktop) return {};
-        
-        const sidebar = document.querySelector('.patient-sidebar');
-        const sidebarWidth = sidebar ? (sidebar.classList.contains('collapsed') ? 64 : 280) : 64;
-        const universalHeader = 50; // Universal header height
-        
-        const availableWidth = window.innerWidth - sidebarWidth - 40; // 40px for padding
-        const availableHeight = window.innerHeight - universalHeader - 40; // 40px for padding
-        
-        // 9 images total in 3x3 grid
-        const totalImages = 9;
-        const cols = 3;
-        const rows = Math.ceil(totalImages / cols);
-        
-        // Calculate image size to fit all images
-        const maxImageWidth = (availableWidth - (cols - 1) * 10) / cols; // 10px gap
-        const maxImageHeight = (availableHeight - (rows - 1) * 10) / rows; // 10px gap
-        
-        const imageSize = Math.min(maxImageWidth, maxImageHeight);
-        
+        // Get responsive grid configuration
+        const getGridConfig = () => {
+            switch (screenSize) {
+                case 'mobile':
+                    return { columns: 1, maxWidth: '100%' };
+                case 'tablet':
+                    return { columns: 2, maxWidth: '600px' };
+                case 'desktop':
+                default:
+                    return { columns: 3, maxWidth: '900px' };
+            }
+        };
+
+        const { columns, maxWidth } = getGridConfig();
+
+        // For single column (mobile), just use auto heights
+        if (columns === 1) {
+            return {
+                display: 'grid',
+                gridTemplateColumns: '1fr',
+                gridTemplateRows: 'repeat(9, auto)',
+                width: '100%',
+                maxWidth: maxWidth,
+                margin: '0 auto',
+                gap: '15px',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: 'auto',
+                overflow: 'visible'
+            };
+        }
+
+        // Calculate row heights based on tallest image in each row (excluding logo)
+        const getRowHeight = (rowIndex, cols) => {
+            const rowElements = imageElements.filter((_, index) => Math.floor(index / cols) === rowIndex);
+            let maxHeight = 0;
+            
+            rowElements.forEach(element => {
+                if (!element.isLogo) {
+                    const image = images[element.index];
+                    if (image && image.height && image.width) {
+                        // Calculate height for responsive standard width
+                        const containerWidth = Math.min(window.innerWidth * 0.9, parseInt(maxWidth));
+                        const standardWidth = (containerWidth - ((cols - 1) * 10)) / cols;
+                        const aspectRatio = image.height / image.width;
+                        const calculatedHeight = standardWidth * aspectRatio;
+                        maxHeight = Math.max(maxHeight, calculatedHeight);
+                    }
+                }
+            });
+            
+            return maxHeight > 0 ? `${maxHeight}px` : 'auto';
+        };
+
+        // Calculate number of rows needed
+        const totalRows = Math.ceil(imageElements.length / columns);
+        const rowHeights = Array.from({ length: totalRows }, (_, i) => getRowHeight(i, columns));
+
         return {
-            gridTemplateColumns: `repeat(3, ${imageSize}px)`,
-            gridTemplateRows: `repeat(3, ${imageSize}px)`,
+            display: 'grid',
+            gridTemplateColumns: `repeat(${columns}, 1fr)`,
+            gridTemplateRows: rowHeights.join(' '),
+            width: '100%',
+            maxWidth: maxWidth,
+            margin: '0 auto',
             gap: '10px',
             justifyContent: 'center',
             alignItems: 'center',
@@ -283,56 +365,79 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
         };
     };
     
+    
     if (loading) {
-        return React.createElement('div', { 
-            className: 'loading-spinner' 
-        }, 'Loading gallery...');
+        return (
+            <div className="loading-spinner">
+                Loading gallery...
+            </div>
+        );
     }
     
     if (error) {
-        return React.createElement('div', { 
-            className: 'error-message' 
-        }, `Error: ${error}`);
+        return (
+            <div className="error-message">
+                Error: {error}
+            </div>
+        );
     }
     
-    
-    return React.createElement('div', { 
-        ref: componentRef,
-        style: { 
-            padding: '20px',
-            height: '100%',
-            overflowY: 'auto',
-            overflowX: 'hidden'
-        }
-    }, [
-        React.createElement('div', {
-            key: 'gallery',
-            id: 'dolph_gallery', 
-            className: 'pswp-gallery',
-            style: calculateGridStyle()
-        },
-            imageElements.map(element => {
-                const imageSrc = getImageSrc(element);
-                const imageProps = getImageProps(element);
-                
-                return React.createElement('a', {
-                    key: `dolph_gallery-${element.index}`,
-                    id: `a${element.id}`,
-                    href: imageSrc,
-                    'data-pswp-width': imageProps.width,
-                    'data-pswp-height': imageProps.height,
-                    target: '_blank',
-                    rel: 'noreferrer'
-                }, 
-                    React.createElement('img', {
-                        id: element.id,
-                        src: imageSrc,
-                        alt: element.alt
-                    })
-                );
-            })
-        )
-    ]);
+    return (
+        <div 
+            ref={componentRef}
+            style={{ 
+                padding: '20px',
+                height: '100%',
+                overflowY: 'auto',
+                overflowX: 'hidden'
+            }}
+        >
+            <div
+                id="dolph_gallery" 
+                className="pswp-gallery"
+                style={calculateGridStyle()}
+            >
+                {imageElements.map(element => {
+                    const imageSrc = getImageSrc(element);
+                    const imageProps = getImageProps(element);
+                    
+                    
+                    return (
+                        <a
+                            key={`dolph_gallery-${element.index}`}
+                            id={`a${element.id}`}
+                            href={imageSrc}
+                            data-pswp-width={imageProps.width}
+                            data-pswp-height={imageProps.height}
+                            target="_blank"
+                            rel="noreferrer"
+                        >
+                            <img
+                                id={element.id}
+                                src={imageSrc}
+                                alt={element.alt}
+                                style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'contain',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    transition: 'transform 0.2s ease',
+                                    border: element.isLogo ? '2px solid #ddd' : 'none'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.target.style.transform = 'scale(1.05)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.target.style.transform = 'scale(1)';
+                                }}
+                            />
+                        </a>
+                    );
+                })}
+            </div>
+        </div>
+    );
 };
 
-window.GridComponent = GridComponent;
+export default GridComponent;

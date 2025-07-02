@@ -9,6 +9,7 @@ import { setupWebSocketServer } from './utils/websocket.js';
 import { setupMiddleware } from './middlewares/index.js';
 import apiRoutes from './routes/api.js';
 import webRoutes from './routes/web.js';
+import calendarRoutes from './routes/calendar.js';
 import whatsappService from './services/messaging/whatsapp.js';
 import messageState from './services/state/messageState.js';
 import { createWebSocketMessage, MessageSchemas } from './services/messaging/schemas.js';
@@ -73,6 +74,7 @@ async function initializeApplication() {
     // Use routes
     console.log('🛣️  Setting up routes...');
     app.use('/api', apiRoutes);
+    app.use('/api/calendar', calendarRoutes);
     app.use('/', webRoutes);
 
     // ===== ADDED: Initialize health monitoring =====

@@ -457,7 +457,7 @@ export function createAppointmentsTable(data, container, includePatientLinks = f
 }
 
 /**
- * Setup WebSocket for appointments with simplified or full features
+ * Setup WebSocket for appointments with daily appointments or full features
  * @param {Object} context - Context with dateString and other properties
  * @param {Object} websocketService - WebSocket service instance
  * @param {Function} updateUIFn - Function to update UI
@@ -468,7 +468,7 @@ export function createAppointmentsTable(data, container, includePatientLinks = f
  */
 export function setupAppointmentsWebSocket(context, websocketService, updateUIFn, loadAppointmentsFn, connectionIndicator, errorContainer, options = {}) {
   const {
-    clientType = 'simplified',
+    clientType = 'daily-appointments',
     includePatientEvents = false
   } = options;
 

@@ -7,7 +7,7 @@ import * as database from '../services/database/index.js';
 import { getPresentAps, getAllTodayApps, getPresentTodayApps, updatePresent } from '../services/database/queries/appointment-queries.js';
 import {getTimePoints, getTimePointImgs } from '../services/database/queries/timepoint-queries.js';
 import { getWhatsAppMessages } from '../services/database/queries/messaging-queries.js';
-import { getPatientsPhones, getInfos } from '../services/database/queries/patient-queries.js';
+import { getPatientsPhones, getInfos, createPatient, getReferralSources, getPatientTypes, getAddresses, getGenders } from '../services/database/queries/patient-queries.js';
 import { getPayments, getActiveWorkForInvoice, getCurrentExchangeRate, addInvoice, updateExchangeRate } from '../services/database/queries/payment-queries.js';
 import { getWires, getVisitsSummary, addVisit, updateVisit, deleteVisit, getVisitDetailsByID, getLatestWire } from '../services/database/queries/visit-queries.js';
 import whatsapp from '../services/messaging/whatsapp.js';
@@ -577,7 +577,7 @@ router.get("/getAllTodayApps", async (req, res) => {
     }
 });
 
-// Get all present appointments (including dismissed) for simplified view
+// Get all present appointments (including dismissed) for daily appointments view
 router.get("/getPresentTodayApps", async (req, res) => {
     try {
         const { AppsDate } = req.query;
@@ -1490,6 +1490,98 @@ router.get('/convert-path', async (req, res) => {
         console.error('Error converting path:', error);
         res.status(500).json({
             error: error.message || "Internal server error"
+        });
+    }
+});
+
+// Get referral sources for dropdowns
+router.get('/referral-sources', async (req, res) => {
+    try {
+        const referralSources = await getReferralSources();
+        res.json(referralSources);
+    } catch (error) {
+        console.error('Error fetching referral sources:', error);
+        res.status(500).json({
+            error: error.message || "Failed to fetch referral sources"
+        });
+    }
+});
+
+// Get patient types for dropdowns
+router.get('/patient-types', async (req, res) => {
+    try {
+        const patientTypes = await getPatientTypes();
+        res.json(patientTypes);
+    } catch (error) {
+        console.error('Error fetching patient types:', error);
+        res.status(500).json({
+            error: error.message || "Failed to fetch patient types"
+        });
+    }
+});
+
+// Get addresses for dropdowns
+router.get('/addresses', async (req, res) => {
+    try {
+        const addresses = await getAddresses();
+        res.json(addresses);
+    } catch (error) {
+        console.error('Error fetching addresses:', error);
+        res.status(500).json({
+            error: error.message || "Failed to fetch addresses"
+        });
+    }
+});
+
+// Get genders for dropdowns
+router.get('/genders', async (req, res) => {
+    try {
+        const genders = await getGenders();
+        res.json(genders);
+    } catch (error) {
+        console.error('Error fetching genders:', error);
+        res.status(500).json({
+            error: error.message || "Failed to fetch genders"
+        });
+    }
+});
+
+// Create new patient
+router.post('/patients', async (req, res) => {
+    try {
+        const patientData = req.body;
+        
+        // Basic validation
+        if (!patientData.patientName || !patientData.patientName.trim()) {
+            return res.status(400).json({
+                error: "Patient name is required"
+            });
+        }
+
+        // Trim string values
+        Object.keys(patientData).forEach(key => {
+            if (typeof patientData[key] === 'string') {
+                patientData[key] = patientData[key].trim();
+                // Convert empty strings to null for optional fields
+                if (patientData[key] === '' && key !== 'patientName') {
+                    patientData[key] = null;
+                }
+            }
+        });
+
+        // Create the patient
+        const result = await createPatient(patientData);
+        
+        res.json({
+            success: true,
+            personId: result.personId,
+            message: "Patient created successfully"
+        });
+        
+    } catch (error) {
+        console.error('Error creating patient:', error);
+        res.status(500).json({
+            error: error.message || "Failed to create patient"
         });
     }
 });

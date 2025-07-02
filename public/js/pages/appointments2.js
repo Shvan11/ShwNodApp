@@ -1,7 +1,7 @@
 // pages/appointments2.js
 /**
  * Appointments2 Page Controller
- * A simplified version of the appointments page without patient images or screen requirements
+ * Daily appointments management page without patient images or screen requirements
  * Uses live WebSocket updates for real-time appointment data
  */
 import websocketService from '../services/websocket.js';
@@ -25,7 +25,7 @@ import {
 
 class Appointments2PageController {
   /**
-   * Initialize the simplified appointments page controller
+   * Initialize the daily appointments page controller
    */
   constructor() {
     // Current date
@@ -503,7 +503,7 @@ class Appointments2PageController {
     });
     console.log('📡 [CLIENT] WebSocket event listeners set up complete');
 
-    websocketService.connect({ clientType: 'simplified' });
+    websocketService.connect({ clientType: 'daily-appointments' });
   }
   
   /**

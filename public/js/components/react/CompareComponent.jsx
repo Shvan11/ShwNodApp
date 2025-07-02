@@ -1,7 +1,12 @@
-// CompareComponent.js - Image comparison component for patient portal
+/**
+ * CompareComponent - Advanced image comparison tool for patient portal
+ * 
+ * Provides sophisticated image comparison with canvas manipulation tools
+ */
+
+import React, { useState, useEffect, useRef } from 'react'
+
 const CompareComponent = ({ patientId, phone }) => {
-    const { useState, useEffect, useRef } = React;
-    
     const [timepoints, setTimepoints] = useState([]);
     const [selectedTimepoints, setSelectedTimepoints] = useState([]);
     const [selectedPhotoType, setSelectedPhotoType] = useState('');
@@ -127,7 +132,7 @@ const CompareComponent = ({ patientId, phone }) => {
     const initializeComparison = () => {
         if (!canvasRef.current) return;
         
-        // Create comparison handler
+        // Create comparison handler (keeping original complex logic)
         const comparisonHandler = {
             canvas: canvasRef.current,
             context: canvasRef.current.getContext('2d'),
@@ -641,68 +646,62 @@ const CompareComponent = ({ patientId, phone }) => {
     };
     
     if (loading && timepoints.length === 0) {
-        return React.createElement('div', { 
-            className: 'loading-spinner' 
-        }, 'Loading compare page...');
+        return (
+            <div className="loading-spinner">
+                Loading compare page...
+            </div>
+        );
     }
     
     if (error) {
-        return React.createElement('div', { 
-            className: 'error-message' 
-        }, [
-            React.createElement('h3', { key: 'title' }, 'Error'),
-            React.createElement('p', { key: 'message' }, error),
-            React.createElement('button', { 
-                key: 'retry',
-                onClick: () => window.location.reload() 
-            }, 'Retry')
-        ]);
+        return (
+            <div className="error-message">
+                <h3>Error</h3>
+                <p>{error}</p>
+                <button onClick={() => window.location.reload()}>Retry</button>
+            </div>
+        );
     }
     
-    return React.createElement('div', { 
-        className: 'compare-container',
-        style: { padding: '20px', maxWidth: '1400px', margin: '0 auto' }
-    }, [
-        // Status indicator
-        React.createElement('div', { 
-            key: 'status',
-            style: { 
-                padding: '15px',
-                marginBottom: '20px',
-                backgroundColor: selectedTimepoints.length === 2 && selectedPhotoType ? '#d4edda' : '#fff3cd',
-                border: '2px solid',
-                borderColor: selectedTimepoints.length === 2 && selectedPhotoType ? '#c3e6cb' : '#ffeaa7',
-                borderRadius: '8px',
-                color: selectedTimepoints.length === 2 && selectedPhotoType ? '#155724' : '#856404',
-                fontSize: '16px',
-                fontWeight: '500',
-                textAlign: 'center'
-            }
-        }, [
-            React.createElement('strong', { key: 'title' }, 'Status: '),
-            React.createElement('span', { key: 'message' }, 
-                selectedTimepoints.length === 0 ? 'Select 2 timepoints to begin' :
-                selectedTimepoints.length === 1 ? 'Select 1 more timepoint' :
-                selectedTimepoints.length === 2 && !selectedPhotoType ? 'Now select a photo type' :
-                selectedTimepoints.length === 2 && selectedPhotoType ? 'Ready! Images should appear in canvas below' :
-                'Please select timepoints and photo type'
-            )
-        ]),
-        
-        // Main Content Area - Canvas, Controls, and Selection
-        React.createElement('div', {
-            key: 'main-content',
-            style: {
+    return (
+        <div 
+            className="compare-container"
+            style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}
+        >
+            {/* Status indicator */}
+            <div 
+                style={{ 
+                    padding: '15px',
+                    marginBottom: '20px',
+                    backgroundColor: selectedTimepoints.length === 2 && selectedPhotoType ? '#d4edda' : '#fff3cd',
+                    border: '2px solid',
+                    borderColor: selectedTimepoints.length === 2 && selectedPhotoType ? '#c3e6cb' : '#ffeaa7',
+                    borderRadius: '8px',
+                    color: selectedTimepoints.length === 2 && selectedPhotoType ? '#155724' : '#856404',
+                    fontSize: '16px',
+                    fontWeight: '500',
+                    textAlign: 'center'
+                }}
+            >
+                <strong>Status: </strong>
+                <span>
+                    {selectedTimepoints.length === 0 ? 'Select 2 timepoints to begin' :
+                    selectedTimepoints.length === 1 ? 'Select 1 more timepoint' :
+                    selectedTimepoints.length === 2 && !selectedPhotoType ? 'Now select a photo type' :
+                    selectedTimepoints.length === 2 && selectedPhotoType ? 'Ready! Images should appear in canvas below' :
+                    'Please select timepoints and photo type'}
+                </span>
+            </div>
+            
+            {/* Main Content Area - Canvas, Controls, and Selection */}
+            <div style={{
                 display: 'flex',
                 gap: '20px',
                 marginBottom: '20px',
                 flexWrap: 'wrap' // Allow wrapping on narrow screens
-            }
-        }, [
-            // Canvas Container
-            React.createElement('div', {
-                key: 'canvas-container',
-                style: {
+            }}>
+                {/* Canvas Container */}
+                <div style={{
                     flex: '1',
                     minWidth: '600px', // Increased minimum width
                     display: 'flex',
@@ -712,243 +711,239 @@ const CompareComponent = ({ patientId, phone }) => {
                     borderRadius: '8px',
                     border: '1px solid #dee2e6',
                     overflow: 'auto' // Allow scrolling if needed
-                }
-            }, React.createElement('canvas', {
-                ref: canvasRef,
-                id: 'comparison-canvas',
-                width: 800,
-                height: 600,
-                style: {
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    backgroundColor: 'white',
-                    display: 'block',
-                    // Responsive sizing with max dimensions to prevent huge display
-                    maxWidth: '600px',
-                    maxHeight: '800px', // Increased for vertical layouts
-                    width: 'auto',
-                    height: 'auto',
-                    objectFit: 'contain'
-                }
-            })),
-            
-            // Controls Panel
-            React.createElement('div', {
-                key: 'controls',
-                style: {
+                }}>
+                    <canvas
+                        ref={canvasRef}
+                        id="comparison-canvas"
+                        width={800}
+                        height={600}
+                        style={{
+                            border: '1px solid #ccc',
+                            borderRadius: '4px',
+                            backgroundColor: 'white',
+                            display: 'block',
+                            // Responsive sizing with max dimensions to prevent huge display
+                            maxWidth: '600px',
+                            maxHeight: '800px', // Increased for vertical layouts
+                            width: 'auto',
+                            height: 'auto',
+                            objectFit: 'contain'
+                        }}
+                    />
+                </div>
+                
+                {/* Controls Panel */}
+                <div style={{
                     width: '280px',
                     backgroundColor: '#ffffff',
                     border: '1px solid #dee2e6',
                     borderRadius: '8px',
                     padding: '20px',
                     height: 'fit-content'
-                }
-            }, [
-                React.createElement('h3', { 
-                    key: 'title',
-                    style: { margin: '0 0 15px 0', color: '#495057' }
-                }, 'Canvas Controls'),
-                
-                // Canvas Dimensions Display
-                React.createElement('div', { 
-                    key: 'dimensions-display',
-                    style: {
+                }}>
+                    <h3 style={{ margin: '0 0 15px 0', color: '#495057' }}>
+                        Canvas Controls
+                    </h3>
+                    
+                    {/* Canvas Dimensions Display */}
+                    <div style={{
                         marginBottom: '20px',
                         padding: '10px',
                         backgroundColor: '#f8f9fa',
                         border: '1px solid #dee2e6',
                         borderRadius: '6px',
                         textAlign: 'center'
-                    }
-                }, [
-                    React.createElement('div', { 
-                        key: 'label',
-                        style: { 
+                    }}>
+                        <div style={{ 
                             fontSize: '12px', 
                             fontWeight: 'bold', 
                             color: '#6c757d',
                             marginBottom: '5px'
-                        }
-                    }, 'Canvas Size'),
-                    React.createElement('div', { 
-                        key: 'dimensions',
-                        style: { 
+                        }}>
+                            Canvas Size
+                        </div>
+                        <div style={{ 
                             fontSize: '16px', 
                             fontWeight: 'bold', 
                             color: '#495057',
                             fontFamily: 'monospace'
-                        }
-                    }, `${canvasDimensions.width} × ${canvasDimensions.height}`)
-                ]),
-                
-                // Canvas Size
-                React.createElement('div', { key: 'size-control', style: { marginBottom: '15px' } }, [
-                    React.createElement('label', { 
-                        key: 'size-label',
-                        style: { display: 'block', marginBottom: '5px', fontWeight: 'bold' }
-                    }, 'Canvas Size:'),
-                    React.createElement('select', {
-                        key: 'size-select',
-                        value: canvasSize,
-                        onChange: (e) => handleCanvasSizeChange(e.target.value),
-                        title: 'Choose canvas dimensions - Auto fits to container, other options set specific pixel dimensions for social media',
-                        style: {
-                            width: '100%',
-                            padding: '8px',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                        }
-                    }, canvasSizes.map(size =>
-                        React.createElement('option', {
-                            key: size.value,
-                            value: size.value
-                        }, size.label)
-                    ))
-                ]),
-                
-                // Tool Selection
-                React.createElement('div', { key: 'tool-control', style: { marginBottom: '15px' } }, [
-                    React.createElement('label', { 
-                        key: 'tool-label',
-                        style: { display: 'block', marginBottom: '5px', fontWeight: 'bold' }
-                    }, 'Selected Tool:'),
-                    React.createElement('select', {
-                        key: 'tool-select',
-                        value: selectedTool,
-                        onChange: (e) => {
-                            setSelectedTool(Number(e.target.value));
-                            if (comparison) comparison.selectedImage = Number(e.target.value);
-                        },
-                        title: 'Choose which element to manipulate - Image 1 (top/left), Image 2 (bottom/right), or Logo (overlay)',
-                        style: {
-                            width: '100%',
-                            padding: '8px',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                        }
-                    }, tools.map(tool =>
-                        React.createElement('option', {
-                            key: tool.value,
-                            value: tool.value
-                        }, tool.label)
-                    ))
-                ]),
-                
-                // Movement Controls
-                React.createElement('div', { key: 'movement', style: { marginBottom: '15px' } }, [
-                    React.createElement('label', { 
-                        key: 'movement-label',
-                        style: { display: 'block', marginBottom: '10px', fontWeight: 'bold', textAlign: 'center' }
-                    }, 'Move Selected Image:'),
-                    React.createElement('div', { 
-                        key: 'movement-grid',
-                        style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', maxWidth: '120px', margin: '0 auto' }
-                    }, [
-                        React.createElement('div', { key: 'empty1' }),
-                        React.createElement('button', {
-                            key: 'move-up',
-                            onClick: () => comparison && comparison.moveImage('up'),
-                            title: 'Move Up - Move the selected image upward',
-                            style: { padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }
-                        }, '↑'),
-                        React.createElement('div', { key: 'empty2' }),
-                        React.createElement('button', {
-                            key: 'move-left',
-                            onClick: () => comparison && comparison.moveImage('left'),
-                            title: 'Move Left - Move the selected image to the left',
-                            style: { padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }
-                        }, '←'),
-                        React.createElement('div', { 
-                            key: 'center',
-                            style: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#666' }
-                        }, '⊕'),
-                        React.createElement('button', {
-                            key: 'move-right',
-                            onClick: () => comparison && comparison.moveImage('right'),
-                            title: 'Move Right - Move the selected image to the right',
-                            style: { padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }
-                        }, '→'),
-                        React.createElement('div', { key: 'empty3' }),
-                        React.createElement('button', {
-                            key: 'move-down',
-                            onClick: () => comparison && comparison.moveImage('down'),
-                            title: 'Move Down - Move the selected image downward',
-                            style: { padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }
-                        }, '↓'),
-                        React.createElement('div', { key: 'empty4' })
-                    ])
-                ]),
+                        }}>
+                            {canvasDimensions.width} × {canvasDimensions.height}
+                        </div>
+                    </div>
+                    
+                    {/* Canvas Size */}
+                    <div style={{ marginBottom: '15px' }}>
+                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                            Canvas Size:
+                        </label>
+                        <select
+                            value={canvasSize}
+                            onChange={(e) => handleCanvasSizeChange(e.target.value)}
+                            title="Choose canvas dimensions - Auto fits to container, other options set specific pixel dimensions for social media"
+                            style={{
+                                width: '100%',
+                                padding: '8px',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {canvasSizes.map(size => (
+                                <option key={size.value} value={size.value}>
+                                    {size.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    
+                    {/* Tool Selection */}
+                    <div style={{ marginBottom: '15px' }}>
+                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                            Selected Tool:
+                        </label>
+                        <select
+                            value={selectedTool}
+                            onChange={(e) => {
+                                setSelectedTool(Number(e.target.value));
+                                if (comparison) comparison.selectedImage = Number(e.target.value);
+                            }}
+                            title="Choose which element to manipulate - Image 1 (top/left), Image 2 (bottom/right), or Logo (overlay)"
+                            style={{
+                                width: '100%',
+                                padding: '8px',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {tools.map(tool => (
+                                <option key={tool.value} value={tool.value}>
+                                    {tool.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    
+                    {/* Movement Controls */}
+                    <div style={{ marginBottom: '15px' }}>
+                        <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', textAlign: 'center' }}>
+                            Move Selected Image:
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', maxWidth: '120px', margin: '0 auto' }}>
+                            <div />
+                            <button
+                                onClick={() => comparison && comparison.moveImage('up')}
+                                title="Move Up - Move the selected image upward"
+                                style={{ padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            >
+                                ↑
+                            </button>
+                            <div />
+                            <button
+                                onClick={() => comparison && comparison.moveImage('left')}
+                                title="Move Left - Move the selected image to the left"
+                                style={{ padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            >
+                                ←
+                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#666' }}>
+                                ⊕
+                            </div>
+                            <button
+                                onClick={() => comparison && comparison.moveImage('right')}
+                                title="Move Right - Move the selected image to the right"
+                                style={{ padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            >
+                                →
+                            </button>
+                            <div />
+                            <button
+                                onClick={() => comparison && comparison.moveImage('down')}
+                                title="Move Down - Move the selected image downward"
+                                style={{ padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            >
+                                ↓
+                            </button>
+                            <div />
+                        </div>
+                    </div>
 
-                // Control Buttons
-                React.createElement('div', { key: 'buttons', style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' } }, [
-                    React.createElement('button', {
-                        key: 'zoom-in',
-                        onClick: () => comparison && comparison.zoomImage('in'),
-                        title: 'Zoom In - Enlarge the selected image',
-                        style: { padding: '8px', fontSize: '12px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }
-                    }, '🔍+'),
-                    React.createElement('button', {
-                        key: 'zoom-out',
-                        onClick: () => comparison && comparison.zoomImage('out'),
-                        title: 'Zoom Out - Shrink the selected image',
-                        style: { padding: '8px', fontSize: '12px', backgroundColor: '#17a2b8', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }
-                    }, '🔍-'),
-                    React.createElement('button', {
-                        key: 'rotate-cw',
-                        onClick: () => comparison && comparison.rotateImage('clockwise'),
-                        title: 'Rotate Clockwise - Rotate the selected image 15° clockwise',
-                        style: { padding: '8px', fontSize: '12px', backgroundColor: '#fd7e14', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }
-                    }, '↻'),
-                    React.createElement('button', {
-                        key: 'rotate-ccw',
-                        onClick: () => comparison && comparison.rotateImage('counterclockwise'),
-                        title: 'Rotate Counter-Clockwise - Rotate the selected image 15° counter-clockwise',
-                        style: { padding: '8px', fontSize: '12px', backgroundColor: '#6f42c1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }
-                    }, '↺'),
-                    React.createElement('button', {
-                        key: 'toggle-orientation',
-                        onClick: () => comparison && comparison.toggleOrientation(),
-                        title: 'Toggle Layout - Switch between vertical and horizontal image arrangement',
-                        style: { padding: '8px', fontSize: '12px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }
-                    }, '⟲'),
-                    React.createElement('button', {
-                        key: 'toggle-bisect',
-                        onClick: () => comparison && comparison.toggleBisect(),
-                        title: 'Toggle Bisect Line - Show/hide alignment line between images',
-                        style: { padding: '8px', fontSize: '12px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }
-                    }, '═'),
-                    React.createElement('button', {
-                        key: 'toggle-logo',
-                        onClick: () => {
-                            setShowLogo(!showLogo);
-                            if (comparison) {
-                                comparison.toggleLogo();
-                            }
-                        },
-                        title: showLogo ? 'Hide Logo - Remove logo from comparison' : 'Show Logo - Add logo to comparison',
-                        style: { padding: '8px', fontSize: '12px', backgroundColor: showLogo ? '#ffc107' : '#28a745', color: showLogo ? '#212529' : 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }
-                    }, showLogo ? 'Hide Logo' : 'Show Logo'),
-                    React.createElement('button', {
-                        key: 'reset',
-                        onClick: () => comparison && comparison.reset(),
-                        title: 'Reset All - Return all images to their original position, size, and rotation',
-                        style: { padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }
-                    }, 'Reset'),
-                    React.createElement('button', {
-                        key: 'whatsapp',
-                        onClick: () => setShowWhatsAppModal(true),
-                        title: 'Send to WhatsApp - Export the comparison image and send via WhatsApp',
-                        style: { padding: '8px', fontSize: '12px', backgroundColor: '#25d366', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }
-                    }, 'WhatsApp')
-                ])
-            ]),
-            
-            // Merged Selection Panel (Timepoints + Photo Types)
-            React.createElement('div', {
-                key: 'selection-panel',
-                style: {
+                    {/* Control Buttons */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                        <button
+                            onClick={() => comparison && comparison.zoomImage('in')}
+                            title="Zoom In - Enlarge the selected image"
+                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                            🔍+
+                        </button>
+                        <button
+                            onClick={() => comparison && comparison.zoomImage('out')}
+                            title="Zoom Out - Shrink the selected image"
+                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#17a2b8', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                            🔍-
+                        </button>
+                        <button
+                            onClick={() => comparison && comparison.rotateImage('clockwise')}
+                            title="Rotate Clockwise - Rotate the selected image 15° clockwise"
+                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#fd7e14', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                            ↻
+                        </button>
+                        <button
+                            onClick={() => comparison && comparison.rotateImage('counterclockwise')}
+                            title="Rotate Counter-Clockwise - Rotate the selected image 15° counter-clockwise"
+                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#6f42c1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                            ↺
+                        </button>
+                        <button
+                            onClick={() => comparison && comparison.toggleOrientation()}
+                            title="Toggle Layout - Switch between vertical and horizontal image arrangement"
+                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                            ⟲
+                        </button>
+                        <button
+                            onClick={() => comparison && comparison.toggleBisect()}
+                            title="Toggle Bisect Line - Show/hide alignment line between images"
+                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                            ═
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowLogo(!showLogo);
+                                if (comparison) {
+                                    comparison.toggleLogo();
+                                }
+                            }}
+                            title={showLogo ? 'Hide Logo - Remove logo from comparison' : 'Show Logo - Add logo to comparison'}
+                            style={{ padding: '8px', fontSize: '12px', backgroundColor: showLogo ? '#ffc107' : '#28a745', color: showLogo ? '#212529' : 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                            {showLogo ? 'Hide Logo' : 'Show Logo'}
+                        </button>
+                        <button
+                            onClick={() => comparison && comparison.reset()}
+                            title="Reset All - Return all images to their original position, size, and rotation"
+                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                            Reset
+                        </button>
+                        <button
+                            onClick={() => setShowWhatsAppModal(true)}
+                            title="Send to WhatsApp - Export the comparison image and send via WhatsApp"
+                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#25d366', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                            WhatsApp
+                        </button>
+                    </div>
+                </div>
+                
+                {/* Merged Selection Panel (Timepoints + Photo Types) */}
+                <div style={{
                     width: '320px',
                     backgroundColor: '#ffffff',
                     border: '1px solid #dee2e6',
@@ -957,37 +952,27 @@ const CompareComponent = ({ patientId, phone }) => {
                     height: 'fit-content',
                     maxHeight: '600px',
                     overflowY: 'auto'
-                }
-            }, [
-                React.createElement('h3', { 
-                    key: 'title',
-                    style: { margin: '0 0 20px 0', color: '#495057', textAlign: 'center' }
-                }, 'Image Selection'),
-                
-                // Step 1: Timepoints Selection
-                React.createElement('div', { 
-                    key: 'timepoints-section',
-                    style: {
+                }}>
+                    <h3 style={{ margin: '0 0 20px 0', color: '#495057', textAlign: 'center' }}>
+                        Image Selection
+                    </h3>
+                    
+                    {/* Step 1: Timepoints Selection */}
+                    <div style={{
                         marginBottom: '25px',
                         padding: '15px',
                         backgroundColor: '#f8f9fa',
                         borderRadius: '6px',
                         border: '1px solid #e9ecef'
-                    }
-                }, [
-                    React.createElement('h4', { 
-                        key: 'timepoints-title',
-                        style: { 
+                    }}>
+                        <h4 style={{ 
                             margin: '0 0 15px 0', 
                             color: '#495057',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px'
-                        }
-                    }, [
-                        React.createElement('span', { 
-                            key: 'step',
-                            style: {
+                        }}>
+                            <span style={{
                                 backgroundColor: selectedTimepoints.length === 2 ? '#28a745' : '#6c757d',
                                 color: 'white',
                                 borderRadius: '50%',
@@ -998,67 +983,56 @@ const CompareComponent = ({ patientId, phone }) => {
                                 justifyContent: 'center',
                                 fontSize: '12px',
                                 fontWeight: 'bold'
-                            }
-                        }, '1'),
-                        React.createElement('span', { key: 'title' }, 'Select 2 Timepoints')
-                    ]),
-                    React.createElement('div', { 
-                        key: 'timepoints-list',
-                        style: { maxHeight: '180px', overflowY: 'auto' }
-                    }, 
-                        timepoints.map(tp =>
-                            React.createElement('label', {
-                                key: tp.tpCode,
-                                style: { 
-                                    display: 'block', 
-                                    marginBottom: '8px',
-                                    padding: '8px',
-                                    backgroundColor: selectedTimepoints.includes(tp.tpCode) ? '#e3f2fd' : 'white',
-                                    border: '1px solid #ddd',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    fontSize: '14px'
-                                }
-                            }, [
-                                React.createElement('input', {
-                                    key: 'checkbox',
-                                    type: 'checkbox',
-                                    checked: selectedTimepoints.includes(tp.tpCode),
-                                    onChange: (e) => handleTimepointSelection(tp.tpCode, e.target.checked),
-                                    style: { marginRight: '8px' }
-                                }),
-                                React.createElement('span', { key: 'label' }, 
-                                    `${tp.tpDescription} (${new Date(tp.tpDateTime).toLocaleDateString()})`
-                                )
-                            ])
-                        )
-                    )
-                ]),
-                
-                // Step 2: Photo Type Selection
-                React.createElement('div', { 
-                    key: 'photo-types-section',
-                    style: {
+                            }}>
+                                1
+                            </span>
+                            <span>Select 2 Timepoints</span>
+                        </h4>
+                        <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                            {timepoints.map(tp => (
+                                <label
+                                    key={tp.tpCode}
+                                    style={{ 
+                                        display: 'block', 
+                                        marginBottom: '8px',
+                                        padding: '8px',
+                                        backgroundColor: selectedTimepoints.includes(tp.tpCode) ? '#e3f2fd' : 'white',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontSize: '14px'
+                                    }}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedTimepoints.includes(tp.tpCode)}
+                                        onChange={(e) => handleTimepointSelection(tp.tpCode, e.target.checked)}
+                                        style={{ marginRight: '8px' }}
+                                    />
+                                    <span>
+                                        {tp.tpDescription} ({new Date(tp.tpDateTime).toLocaleDateString()})
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    {/* Step 2: Photo Type Selection */}
+                    <div style={{
                         padding: '15px',
                         backgroundColor: selectedTimepoints.length === 2 ? '#f8f9fa' : '#f1f3f4',
                         borderRadius: '6px',
                         border: '1px solid #e9ecef',
                         opacity: selectedTimepoints.length === 2 ? 1 : 0.6
-                    }
-                }, [
-                    React.createElement('h4', { 
-                        key: 'photo-types-title',
-                        style: { 
+                    }}>
+                        <h4 style={{ 
                             margin: '0 0 15px 0', 
                             color: '#495057',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px'
-                        }
-                    }, [
-                        React.createElement('span', { 
-                            key: 'step',
-                            style: {
+                        }}>
+                            <span style={{
                                 backgroundColor: selectedTimepoints.length === 2 && selectedPhotoType ? '#28a745' : '#6c757d',
                                 color: 'white',
                                 borderRadius: '50%',
@@ -1069,151 +1043,140 @@ const CompareComponent = ({ patientId, phone }) => {
                                 justifyContent: 'center',
                                 fontSize: '12px',
                                 fontWeight: 'bold'
-                            }
-                        }, '2'),
-                        React.createElement('span', { key: 'title' }, 'Select Photo Type')
-                    ]),
-                    selectedTimepoints.length < 2 && React.createElement('p', {
-                        key: 'instruction',
-                        style: { 
-                            margin: '0 0 15px 0', 
-                            fontSize: '13px', 
-                            color: '#6c757d',
-                            fontStyle: 'italic'
-                        }
-                    }, 'Select 2 timepoints first'),
-                    React.createElement('div', { 
-                        key: 'photo-types-list',
-                        style: { maxHeight: '200px', overflowY: 'auto' }
-                    }, 
-                        ['facial', 'occlusal', 'intraoral'].map(category =>
-                            React.createElement('div', { 
-                                key: category,
-                                style: { marginBottom: '12px' }
-                            }, [
-                                React.createElement('h5', { 
-                                    key: 'category-title',
-                                    style: { 
+                            }}>
+                                2
+                            </span>
+                            <span>Select Photo Type</span>
+                        </h4>
+                        {selectedTimepoints.length < 2 && (
+                            <p style={{ 
+                                margin: '0 0 15px 0', 
+                                fontSize: '13px', 
+                                color: '#6c757d',
+                                fontStyle: 'italic'
+                            }}>
+                                Select 2 timepoints first
+                            </p>
+                        )}
+                        <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                            {['facial', 'occlusal', 'intraoral'].map(category => (
+                                <div key={category} style={{ marginBottom: '12px' }}>
+                                    <h5 style={{ 
                                         margin: '0 0 8px 0', 
                                         textTransform: 'capitalize',
                                         color: '#495057',
                                         fontSize: '13px',
                                         fontWeight: '600'
-                                    }
-                                }, category),
-                                React.createElement('div', { key: 'options' },
-                                    photoTypes.filter(pt => pt.category === category).map(photoType =>
-                                        React.createElement('label', {
-                                            key: photoType.id,
-                                            style: { 
-                                                display: 'block', 
-                                                marginBottom: '4px',
-                                                padding: '6px 8px',
-                                                backgroundColor: selectedPhotoType === photoType.id ? '#e3f2fd' : 'white',
-                                                border: '1px solid #ddd',
-                                                borderRadius: '4px',
-                                                cursor: isPhotoTypeAvailable(photoType.code) && selectedTimepoints.length === 2 ? 'pointer' : 'not-allowed',
-                                                opacity: isPhotoTypeAvailable(photoType.code) && selectedTimepoints.length === 2 ? 1 : 0.5,
-                                                fontSize: '13px'
-                                            }
-                                        }, [
-                                            React.createElement('input', {
-                                                key: 'radio',
-                                                type: 'radio',
-                                                name: 'photoType',
-                                                value: photoType.id,
-                                                checked: selectedPhotoType === photoType.id,
-                                                disabled: !isPhotoTypeAvailable(photoType.code) || selectedTimepoints.length !== 2,
-                                                onChange: (e) => setSelectedPhotoType(e.target.value),
-                                                style: { marginRight: '6px' }
-                                            }),
-                                            React.createElement('span', { key: 'label' }, photoType.label)
-                                        ])
-                                    )
-                                )
-                            ])
-                        )
-                    )
-                ])
-            ])
-        ]),
-        
-        // WhatsApp Modal
-        showWhatsAppModal && React.createElement('div', {
-            key: 'whatsapp-modal',
-            style: {
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0,0,0,0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1000
-            }
-        }, React.createElement('div', {
-            style: {
-                backgroundColor: 'white',
-                padding: '30px',
-                borderRadius: '8px',
-                width: '400px',
-                maxWidth: '90vw'
-            }
-        }, [
-            React.createElement('h3', { key: 'title' }, 'Send to WhatsApp'),
-            React.createElement('form', {
-                key: 'form',
-                onSubmit: handleWhatsAppSend
-            }, [
-                React.createElement('input', {
-                    key: 'phone',
-                    type: 'tel',
-                    placeholder: 'Phone number',
-                    value: phoneNumber,
-                    onChange: (e) => setPhoneNumber(e.target.value),
-                    required: true,
-                    style: {
-                        width: '100%',
-                        padding: '10px',
-                        marginBottom: '20px',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px'
-                    }
-                }),
-                React.createElement('div', { 
-                    key: 'buttons',
-                    style: { display: 'flex', gap: '10px', justifyContent: 'flex-end' }
-                }, [
-                    React.createElement('button', {
-                        key: 'cancel',
-                        type: 'button',
-                        onClick: () => setShowWhatsAppModal(false),
-                        style: {
-                            padding: '10px 20px',
-                            backgroundColor: '#6c757d',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px'
-                        }
-                    }, 'Cancel'),
-                    React.createElement('button', {
-                        key: 'send',
-                        type: 'submit',
-                        disabled: sendingMessage,
-                        style: {
-                            padding: '10px 20px',
-                            backgroundColor: '#25d366',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px'
-                        }
-                    }, sendingMessage ? 'Sending...' : 'Send')
-                ])
-            ])
-        ]))
-    ]);
+                                    }}>
+                                        {category}
+                                    </h5>
+                                    <div>
+                                        {photoTypes.filter(pt => pt.category === category).map(photoType => (
+                                            <label
+                                                key={photoType.id}
+                                                style={{ 
+                                                    display: 'block', 
+                                                    marginBottom: '4px',
+                                                    padding: '6px 8px',
+                                                    backgroundColor: selectedPhotoType === photoType.id ? '#e3f2fd' : 'white',
+                                                    border: '1px solid #ddd',
+                                                    borderRadius: '4px',
+                                                    cursor: isPhotoTypeAvailable(photoType.code) && selectedTimepoints.length === 2 ? 'pointer' : 'not-allowed',
+                                                    opacity: isPhotoTypeAvailable(photoType.code) && selectedTimepoints.length === 2 ? 1 : 0.5,
+                                                    fontSize: '13px'
+                                                }}
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    name="photoType"
+                                                    value={photoType.id}
+                                                    checked={selectedPhotoType === photoType.id}
+                                                    disabled={!isPhotoTypeAvailable(photoType.code) || selectedTimepoints.length !== 2}
+                                                    onChange={(e) => setSelectedPhotoType(e.target.value)}
+                                                    style={{ marginRight: '6px' }}
+                                                />
+                                                <span>{photoType.label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {/* WhatsApp Modal */}
+            {showWhatsAppModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                }}>
+                    <div style={{
+                        backgroundColor: 'white',
+                        padding: '30px',
+                        borderRadius: '8px',
+                        width: '400px',
+                        maxWidth: '90vw'
+                    }}>
+                        <h3>Send to WhatsApp</h3>
+                        <form onSubmit={handleWhatsAppSend}>
+                            <input
+                                type="tel"
+                                placeholder="Phone number"
+                                value={phoneNumber}
+                                onChange={(e) => setPhoneNumber(e.target.value)}
+                                required
+                                style={{
+                                    width: '100%',
+                                    padding: '10px',
+                                    marginBottom: '20px',
+                                    border: '1px solid #ddd',
+                                    borderRadius: '4px'
+                                }}
+                            />
+                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowWhatsAppModal(false)}
+                                    style={{
+                                        padding: '10px 20px',
+                                        backgroundColor: '#6c757d',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px'
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={sendingMessage}
+                                    style={{
+                                        padding: '10px 20px',
+                                        backgroundColor: '#25d366',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px'
+                                    }}
+                                >
+                                    {sendingMessage ? 'Sending...' : 'Send'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 };
 
-window.CompareComponent = CompareComponent;
+export default CompareComponent;

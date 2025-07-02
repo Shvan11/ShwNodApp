@@ -145,4 +145,11 @@ document.addEventListener('DOMContentLoaded', () => {
       window.navigationContext?.navigateToPage('appointments');
     });
   }
+  
+  const calendarBtn = document.getElementById('view-calendar-btn');
+  if (calendarBtn) {
+    calendarBtn.addEventListener('click', () => {
+      window.location.href = '/calendar.html';
+    });
+  }
 });

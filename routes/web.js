@@ -12,18 +12,21 @@ const router = express.Router();
 
 // Define clean URL mappings to actual file paths
 const pageRewrites = [
+  // Main application pages
+  { url: '/dashboard', file: '/index.html' },
+  { url: '/appointments', file: '/views/appointments/daily-appointments.html' },
+  
+  // Patient pages
+  { url: '/search', file: '/views/patient/search.html' },
+  
   // Messaging pages
   { url: '/send-message', file: '/views/messaging/send-message.html' },
   { url: '/send', file: '/views/messaging/send.html' },
   { url: '/auth', file: '/views/messaging/auth.html' },
- 
-  // Patient pages
-  { url: '/search', file: '/views/patient/search.html' },
   
-  // Appointment pages
+  // Legacy appointment pages (keep for backward compatibility)
   { url: '/appointments.html', file: '/views/appointments.html' },
-  { url: '/appointments', file: '/views/appointments.html' },
-  { url: '/simplified', file: '/views/appointments/simplified.html' },
+  { url: '/daily-appointments', file: '/views/appointments/daily-appointments.html' },
   
   // Handle legacy URLs with new paths
   { url: '/wa', file: '/views/messaging/send-message.html' } // Replace old /wa route
@@ -36,6 +39,13 @@ const pageRewrites = [
 // Serve the main page at root
 router.get('/', (_, res) => {
     res.sendFile(path.join(process.cwd(), './public/index.html'));
+});
+
+// Patient pages with clean URLs
+router.get('/patient/:id', (req, res) => {
+    const patientId = req.params.id;
+    const page = req.query.page || 'grid';
+    res.redirect(`/views/patient/react-shell.html?code=${patientId}&page=${page}`);
 });
 
 // Redirect old standalone page URLs to React shell

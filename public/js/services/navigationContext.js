@@ -35,7 +35,7 @@ class NavigationContext {
 
     getPageTypeFromPath(path) {
         if (path === '/' || path === '/index.html') return 'home';
-        if (path.includes('/simplified')) return 'appointments';
+        if (path.includes('/daily-appointments')) return 'appointments';
         if (path.includes('/search')) return 'search';
         if (path.includes('/patient/')) return 'patient';
         if (path.includes('/send-message')) return 'messaging';
@@ -55,8 +55,8 @@ class NavigationContext {
 
         if (currentPage === 'patient' && currentPatient) {
             const referrer = document.referrer;
-            if (referrer.includes('/simplified')) {
-                breadcrumb.push({ name: 'Appointments', url: '/simplified', icon: 'fas fa-calendar-alt' });
+            if (referrer.includes('/daily-appointments')) {
+                breadcrumb.push({ name: 'Appointments', url: '/daily-appointments', icon: 'fas fa-calendar-alt' });
             } else if (referrer.includes('/search')) {
                 breadcrumb.push({ name: 'Search', url: '/search', icon: 'fas fa-search' });
             }
@@ -263,7 +263,7 @@ class NavigationContext {
                 url = '/';
                 break;
             case 'appointments':
-                url = '/simplified';
+                url = '/daily-appointments';
                 break;
             case 'search':
                 url = '/search';

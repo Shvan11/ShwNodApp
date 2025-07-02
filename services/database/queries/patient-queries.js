@@ -164,3 +164,115 @@ export async function getActiveWID(PID) {
     );
     return result[0] || null;
 }
+
+/**
+ * Creates a new patient record in the database.
+ * @param {Object} patientData - The patient data object.
+ * @returns {Promise<Object>} - A promise that resolves with the created patient information.
+ */
+export async function createPatient(patientData) {
+    const query = `
+        INSERT INTO dbo.tblpatients (
+            patientID, PatientName, Phone, FirstName, LastName, 
+            DateofBirth, Gender, Phone2, Email, AddressID,
+            ReferralSourceID, PatientTypeID, Notes, Alerts, 
+            Language, CountryCode
+        ) 
+        OUTPUT INSERTED.PersonID
+        VALUES (
+            @patientID, @patientName, @phone, @firstName, @lastName,
+            @dateOfBirth, @gender, @phone2, @email, @addressID,
+            @referralSourceID, @patientTypeID, @notes, @alerts, 
+            @language, @countryCode
+        )
+    `;
+
+    const parameters = [
+        ['patientID', TYPES.NVarChar, patientData.patientID || null],
+        ['patientName', TYPES.NVarChar, patientData.patientName],
+        ['phone', TYPES.NVarChar, patientData.phone || null],
+        ['firstName', TYPES.NVarChar, patientData.firstName || null],
+        ['lastName', TYPES.NVarChar, patientData.lastName || null],
+        ['dateOfBirth', TYPES.Date, patientData.dateOfBirth || null],
+        ['gender', TYPES.Int, patientData.gender ? parseInt(patientData.gender) : null],
+        ['phone2', TYPES.NVarChar, patientData.phone2 || null],
+        ['email', TYPES.NChar, patientData.email || null],
+        ['addressID', TYPES.Int, patientData.addressID ? parseInt(patientData.addressID) : null],
+        ['referralSourceID', TYPES.Int, patientData.referralSourceID ? parseInt(patientData.referralSourceID) : null],
+        ['patientTypeID', TYPES.Int, patientData.patientTypeID ? parseInt(patientData.patientTypeID) : null],
+        ['notes', TYPES.NVarChar, patientData.notes || null],
+        ['alerts', TYPES.NVarChar, patientData.alerts || null],
+        ['language', TYPES.TinyInt, patientData.language ? parseInt(patientData.language) : 0],
+        ['countryCode', TYPES.NVarChar, patientData.countryCode || null]
+    ];
+
+    const result = await executeQuery(
+        query,
+        parameters,
+        (columns) => ({
+            personId: columns[0].value
+        })
+    );
+
+    return result[0];
+}
+
+/**
+ * Retrieves all referral sources for dropdown lists.
+ * @returns {Promise<Array>} - A promise that resolves with an array of referral sources.
+ */
+export function getReferralSources() {
+    return executeQuery(
+        'SELECT ID, Referral FROM dbo.tblReferrals ORDER BY Referral',
+        [],
+        (columns) => ({
+            id: columns[0].value,
+            name: columns[1].value
+        })
+    );
+}
+
+/**
+ * Retrieves all patient types for dropdown lists.
+ * @returns {Promise<Array>} - A promise that resolves with an array of patient types.
+ */
+export function getPatientTypes() {
+    return executeQuery(
+        'SELECT ID, PatientType FROM dbo.tblPatientType ORDER BY PatientType',
+        [],
+        (columns) => ({
+            id: columns[0].value,
+            name: columns[1].value
+        })
+    );
+}
+
+/**
+ * Retrieves all addresses for dropdown lists.
+ * @returns {Promise<Array>} - A promise that resolves with an array of addresses.
+ */
+export function getAddresses() {
+    return executeQuery(
+        'SELECT ID, Zone FROM dbo.tblAddress ORDER BY Zone',
+        [],
+        (columns) => ({
+            id: columns[0].value,
+            name: columns[1].value
+        })
+    );
+}
+
+/**
+ * Retrieves all genders for dropdown lists.
+ * @returns {Promise<Array>} - A promise that resolves with an array of genders.
+ */
+export function getGenders() {
+    return executeQuery(
+        'SELECT Gender_ID, Gender FROM dbo.tblGender ORDER BY Gender',
+        [],
+        (columns) => ({
+            id: columns[0].value,
+            name: columns[1].value
+        })
+    );
+}

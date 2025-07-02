@@ -10,8 +10,7 @@
     <link rel="stylesheet" href="../../css/pages/search.css" />
     <link rel="stylesheet" href="../../css/components/universal-header.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
-    <script crossorigin src="../../js/vendor/react.production.min.js"></script>
-    <script crossorigin src="../../js/vendor/react-dom.production.min.js"></script>
+    <!-- React handled by Vite -->
 </head>
 <body>
     <div id="universal-header-root"></div>
@@ -38,8 +37,12 @@
         <!-- Cross-navigation buttons -->
         <div class="cross-nav-section">
             <button type="button" id="view-appointments-btn" class="nav-action-btn">
-                <i class="fas fa-calendar-alt"></i>
+                <i class="fas fa-calendar-day"></i>
                 View Today's Appointments
+            </button>
+            <button type="button" id="view-calendar-btn" class="nav-action-btn">
+                <i class="fas fa-calendar-alt"></i>
+                View Full Calendar
             </button>
         </div>
     </div>
@@ -47,7 +50,19 @@
     
     <!-- Load navigation components -->
     <script src="../../js/services/navigationContext.js"></script>
-    <script src="../../js/components/shared/UniversalHeader.js"></script>
+    <script type="module">
+        import React from 'react';
+        import ReactDOM from 'react-dom/client';
+        import UniversalHeader from '../../js/components/shared/UniversalHeader.jsx';
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const headerRoot = document.getElementById('universal-header-root');
+            if (headerRoot) {
+                const root = ReactDOM.createRoot(headerRoot);
+                root.render(React.createElement(UniversalHeader));
+            }
+        });
+    </script>
     
     <!-- Initialize Universal Header -->
     <script>
