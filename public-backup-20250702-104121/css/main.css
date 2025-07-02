@@ -4,12 +4,17 @@
 @import 'base/variables.css';
 @import 'base/typography.css';
 
-/* Component styles - only existing files */
+/* Layout styles */
+@import 'layouts/grid.css';
+@import 'layouts/containers.css';
+@import 'layouts/navigation.css';
+
+/* Component styles */
 @import 'components/buttons.css';
-@import 'components/universal-header.css';
-@import 'components/whatsapp-auth.css';
-@import 'components/appointment-calendar.css';
-@import 'components/sidebar-navigation.css';
+@import 'components/forms.css';
+@import 'components/tables.css';
+@import 'components/modal.css';
+@import 'components/cards.css';
 
 /* Page-specific styles (uncomment as needed) */
 /* @import 'pages/appointments.css'; */

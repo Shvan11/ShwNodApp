@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Portal</title>
+
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/pages/grid.css">
+    <link rel="stylesheet" href="../../css/pages/payments.css">
+    <link rel="stylesheet" href="../../css/pages/xrays.css">
+    <link rel="stylesheet" href="../../css/pages/visits-summary.css">
+    <link rel="stylesheet" href="../../css/pages/canvas.css">
+    <link rel="stylesheet" href="../../photoswipe/dist/photoswipe.css">
+    <link rel="stylesheet" href="../../css/components/universal-header.css">
+    <link rel="stylesheet" href="../../css/components/sidebar-navigation.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <!-- React handled by Vite -->
+
+    <style>
+        /* React shell specific styles for sidebar layout */
+        html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden; /* Prevent body scroll */
+        }
+        
+        #universal-header-root {
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 0; /* Remove any line-height spacing */
+        }
+        
+        #react-root {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden; /* Prevent root scroll */
+        }
+
+        .patient-shell-container {
+            height: 100%;
+            display: flex;
+            position: relative;
+        }
+
+        .main-content-area {
+            flex: 1;
+            margin-left: 64px; /* Start with collapsed sidebar width */
+            overflow: hidden; /* Prevent main scroll, let content handle its own */
+            position: relative;
+            min-height: 0;
+            background: #ffffff;
+            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            height: calc(100vh - 50px); /* Account for reduced universal header */
+        }
+
+        /* Adjust content area when sidebar is expanded */
+        .patient-sidebar:not(.collapsed) ~ .main-content-area {
+            margin-left: 280px;
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .main-content-area {
+                margin-left: 0;
+            }
+            
+            .patient-sidebar.mobile:not(.collapsed) ~ .main-content-area {
+                filter: blur(2px);
+                pointer-events: none;
+            }
+        }
+
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            font-size: 18px;
+            color: var(--text-color);
+        }
+
+        .loading-spinner::after {
+            content: "";
+            width: 20px;
+            height: 20px;
+            margin-left: 10px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .error-message {
+            padding: 20px;
+            text-align: center;
+            color: #e74c3c;
+            font-size: 16px;
+        }
+
+        /* Mobile overlay for sidebar */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 70px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1050;
+            backdrop-filter: blur(2px);
+        }
+
+        @media (max-width: 768px) {
+            .patient-sidebar.mobile:not(.collapsed) + .sidebar-overlay {
+                display: block;
+            }
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Fix breadcrumb visibility - override white text on white background */
+        .breadcrumb {
+            color: #333 !important;
+            background: rgba(0, 0, 0, 0.02);
+            padding: 8px 16px 2px 16px;
+            margin: 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .breadcrumb-item {
+            color: #333 !important;
+        }
+
+    </style>
+</head>
+
+<body>
+    <!-- Universal header mount point -->
+    <div id="universal-header-root"></div>
+    <!-- React will mount here -->
+    <div id="react-root"></div>
+
+    <!-- Modern JSX entry point -->
+    <script type="module" src="../../js/pages/patient-shell.jsx"></script>
+
+    <!-- Modern initialization is handled by patient-shell.jsx -->
+    <script>
+        console.log('🚀 React Patient Portal will be initialized by JSX module...');
+    </script>
+</body>
+
+</html>

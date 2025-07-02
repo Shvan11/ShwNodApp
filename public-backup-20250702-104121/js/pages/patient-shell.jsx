@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import UniversalHeader from '../components/shared/UniversalHeader.jsx'
-import PatientShell from '../components/react/PatientShell.jsx'
+import App from '../components/react/App.jsx'
 import '../../css/main.css'
 import '../../css/pages/grid.css'
 import '../../css/pages/payments.css'
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const reactRoot = document.getElementById('react-root');
     if (reactRoot) {
         const root = ReactDOM.createRoot(reactRoot);
-        root.render(React.createElement(PatientShell));
+        root.render(React.createElement(App));
         console.log('✅ Patient shell initialized');
     }
 });

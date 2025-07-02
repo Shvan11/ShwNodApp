@@ -1,0 +1,459 @@
+/* Add Patient Page - Beautiful Form Styling */
+
+/* Main container with improved spacing and centering */
+.add-patient-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: var(--spacing-xl) var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Header styling */
+.add-patient-header {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    color: white;
+    padding: var(--spacing-lg) 0;
+    width: 100%;
+    margin-bottom: var(--spacing-xl);
+    box-shadow: var(--shadow-lg);
+}
+
+.add-patient-header .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-md);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.add-patient-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.add-patient-logo img {
+    height: 50px;
+    width: auto;
+}
+
+.add-patient-logo h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: var(--font-weight-bold);
+}
+
+.add-patient-nav {
+    font-size: 0.9rem;
+}
+
+.add-patient-nav a {
+    color: white;
+    text-decoration: none;
+    opacity: 0.9;
+    transition: opacity 0.3s ease;
+}
+
+.add-patient-nav a:hover {
+    opacity: 1;
+}
+
+/* Form container with beautiful card design - optimized for PC */
+.add-patient-form-container {
+    background: var(--background-light);
+    border-radius: 16px;
+    padding: var(--spacing-xl);
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle background pattern */
+.add-patient-form-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color), var(--accent-color));
+}
+
+/* Form title styling */
+.add-patient-title {
+    text-align: center;
+    margin-bottom: var(--spacing-xl);
+    color: var(--text-color);
+    font-size: 2rem;
+    font-weight: var(--font-weight-bold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+}
+
+.add-patient-title i {
+    color: var(--primary-color);
+    font-size: 1.8rem;
+}
+
+/* Main form layout - two columns on desktop */
+.form-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: calc(var(--spacing-xl) * 1.5);
+    margin-top: var(--spacing-xl);
+}
+
+/* Form sections for better organization */
+.form-section {
+    margin-bottom: var(--spacing-xl);
+    position: relative;
+}
+
+/* Full width sections that span both columns */
+.form-section.full-width {
+    grid-column: 1 / -1;
+}
+
+.form-section-title {
+    font-size: 1.2rem;
+    font-weight: var(--font-weight-medium);
+    color: var(--text-color);
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 2px solid #f0f0f0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.form-section-title i {
+    color: var(--primary-color);
+    font-size: 1rem;
+}
+
+/* Improved form rows with better alignment */
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.form-row.single-column {
+    grid-template-columns: 1fr;
+}
+
+.form-row.three-columns {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+/* Beautiful form groups */
+.form-group {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-label {
+    font-weight: var(--font-weight-medium);
+    color: var(--text-color);
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.form-label i {
+    color: var(--text-light);
+    font-size: 0.85rem;
+}
+
+.required {
+    color: var(--error-color);
+    font-weight: var(--font-weight-bold);
+}
+
+/* Enhanced form controls */
+.form-control {
+    padding: var(--spacing-md);
+    border: 2px solid #e9ecef;
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-base);
+    font-family: var(--font-primary);
+    background-color: var(--background-light);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    transform: translateY(-1px);
+}
+
+.form-control:hover {
+    border-color: var(--primary-hover);
+}
+
+/* Select styling */
+select.form-control {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right var(--spacing-md) center;
+    background-repeat: no-repeat;
+    background-size: 16px 12px;
+    padding-right: calc(var(--spacing-xl) + var(--spacing-md));
+    cursor: pointer;
+}
+
+select.form-control:hover {
+    background-color: #f8f9fa;
+}
+
+/* Textarea specific styling */
+.form-control textarea {
+    resize: vertical;
+    min-height: 100px;
+    font-family: var(--font-primary);
+}
+
+/* Alert messages with better styling */
+.alert {
+    padding: var(--spacing-md) var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-weight: var(--font-weight-medium);
+    box-shadow: var(--shadow-sm);
+}
+
+.alert i {
+    font-size: 1.1rem;
+}
+
+.alert-success {
+    background-color: #d1f2eb;
+    color: #0f5132;
+    border: 1px solid #a3d9cc;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f1aeb5;
+}
+
+/* Beautiful form actions - spans full width */
+.form-actions {
+    margin-top: var(--spacing-xl);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid #f0f0f0;
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: center;
+    flex-wrap: wrap;
+    grid-column: 1 / -1; /* Span full width in grid layout */
+}
+
+/* Enhanced button styling */
+.btn {
+    padding: var(--spacing-md) var(--spacing-xl);
+    border: none;
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    min-width: 140px;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn:hover::before {
+    left: 100%;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    background: linear-gradient(135deg, var(--primary-hover), var(--primary-color));
+}
+
+.btn-primary:disabled {
+    opacity: 0.6;
+    transform: none;
+    cursor: not-allowed;
+    background: #6c757d;
+}
+
+.btn-secondary {
+    background: linear-gradient(135deg, #6c757d, #5a6268);
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: linear-gradient(135deg, #5a6268, #545b62);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* Loading spinner animation */
+.loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+    .add-patient-form-container {
+        max-width: 1000px;
+    }
+    
+    .form-content {
+        gap: var(--spacing-xl);
+    }
+}
+
+@media (max-width: 900px) {
+    /* Switch to single column on tablets */
+    .form-content {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-lg);
+    }
+    
+    .form-section.full-width {
+        grid-column: 1;
+    }
+}
+
+@media (max-width: 768px) {
+    .add-patient-container {
+        padding: var(--spacing-md);
+    }
+    
+    .add-patient-form-container {
+        padding: var(--spacing-lg);
+        margin: 0;
+        max-width: none;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+    
+    .form-row.three-columns {
+        grid-template-columns: 1fr;
+    }
+    
+    .add-patient-title {
+        font-size: 1.5rem;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .btn {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .add-patient-header .container {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+        text-align: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .add-patient-logo {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+    
+    .add-patient-logo img {
+        height: 40px;
+    }
+    
+    .add-patient-logo h1 {
+        font-size: 1.25rem;
+    }
+}
+
+/* Smooth transitions for form interactions */
+.form-group {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Focus management for accessibility */
+.form-control:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* Enhanced visual hierarchy */
+.form-section:not(:last-child) {
+    margin-bottom: calc(var(--spacing-xl) + var(--spacing-md));
+}
+
+/* Subtle hover effects for better UX */
+.form-group:hover .form-label {
+    color: var(--primary-color);
+    transition: color 0.3s ease;
+}

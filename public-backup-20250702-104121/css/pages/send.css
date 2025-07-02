@@ -1,0 +1,1290 @@
+/* css/pages/send.css */
+
+/* Container and Base Layout */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+/* Critical DOM Element IDs that JavaScript expects */
+#dateSelector {
+  width: 100%;
+  max-width: 300px;
+}
+
+#refreshDateBtn,
+#resetMessagingBtn,
+#restartClientBtn,
+#destroyClientBtn,
+#logoutClientBtn {
+  margin: 0 8px 8px 0;
+}
+
+#messageCount {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+}
+
+#state {
+  font-size: 18px;
+  font-weight: 600;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#startSendingBtn {
+  padding: 16px 32px;
+  font-size: 18px;
+  font-weight: 600;
+  min-width: 200px;
+  margin: 20px auto;
+  display: block;
+}
+
+#qr {
+  max-width: 300px;
+  height: auto;
+  border: 3px solid #007bff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+#qr-container {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+#table-container {
+  margin-top: 30px;
+  overflow-x: auto;
+}
+
+h1 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 30px;
+}
+
+.status-panel {
+  background-color: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  font-size: 16px;
+}
+
+.loader {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid #f3f3f3;
+  border-radius: 50%;
+  border-top: 3px solid #3498db;
+  margin-right: 10px;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+#qr-container {
+  text-align: center;
+  margin: 20px 0;
+}
+
+#qr {
+  max-width: 300px;
+  margin: 0 auto;
+  border: 10px solid white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.action-button {
+  display: none;
+  margin: 20px auto;
+  padding: 12px 30px;
+  background-color: #25D366;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  text-align: center;
+}
+
+.action-button:hover {
+  background-color: #128C7E;
+}
+
+.action-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.results-container {
+  margin-top: 30px;
+}
+
+.message-count {
+  background-color: #f5f5f5;
+  padding: 10px 15px;
+  border-radius: 4px;
+  font-weight: 500;
+  margin-bottom: 15px;
+  border-left: 4px solid #25D366;
+}
+
+/* Status colors - Enhanced with better contrast */
+.status-pending {
+  color: #f39c12; /* Improved orange for better readability */
+  font-weight: 600;
+}
+
+.status-sent {
+  color: #27ae60; /* Green */
+  font-weight: 600;
+}
+
+.status-delivered {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.status-read {
+  color: #8e44ad; /* Purple for better distinction */
+  font-weight: 600;
+}
+
+.status-error {
+  color: var(--danger-color);
+  font-weight: 600;
+}
+
+/* Table styling */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+table th {
+  background-color: #25D366;
+  color: white;
+  padding: 12px;
+  text-align: left;
+}
+
+table td {
+  padding: 10px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+tr:hover {
+  background-color: #f1f1f1;
+}
+
+/* Row status classes */
+tr.true {
+  border-left: 4px solid #27ae60;
+}
+
+tr.false {
+  border-left: 4px solid #c0392b;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  table {
+      font-size: 14px;
+  }
+  
+  table th, table td {
+      padding: 8px;
+  }
+  
+  .status-panel {
+      font-size: 14px;
+  }
+}
+
+/* Status badges - consolidated and enhanced */
+
+/* Legacy action button styles - integrated with new btn system */
+
+.warning-button {
+  background-color: #f0ad4e;
+  border-color: #eea236;
+}
+
+.warning-button:hover {
+  background-color: #ec971f;
+  border-color: #d58512;
+}
+
+/* Animation for urgent restart button */
+.attention {
+  animation: pulse 1.5s infinite;
+  box-shadow: 0 0 10px rgba(240, 173, 78, 0.7);
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* ==============================================
+   ADD THESE STYLES TO YOUR EXISTING send.css
+   ============================================== */
+
+/* Date Selection Panel Styles */
+.date-selection-panel {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 24px;
+    margin: 20px 0;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.date-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.date-controls:last-child {
+    margin-bottom: 0;
+}
+
+.date-controls label {
+    font-weight: 600;
+    color: #333;
+    min-width: 100px;
+    font-size: 14px;
+}
+
+.date-dropdown {
+    padding: 10px 14px;
+    border: 2px solid #ced4da;
+    border-radius: 6px;
+    font-size: 14px;
+    background: white;
+    min-width: 200px;
+    transition: border-color 0.2s ease;
+}
+
+.date-dropdown:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+}
+
+/* Enhanced Button System */
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    line-height: 1.4;
+    position: relative;
+}
+
+.btn:disabled {
+    background-color: #adb5bd !important;
+    color: #6c757d !important;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.btn:not(:disabled):active {
+    transform: translateY(0);
+}
+
+/* Button Color Variants */
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: #0056b3;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: #5a6268;
+}
+
+.btn-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background-color: #218838;
+}
+
+.btn-warning {
+    background-color: #ffc107;
+    color: #212529;
+    border: 1px solid #f0ad4e;
+}
+
+.btn-warning:hover:not(:disabled) {
+    background-color: #e0a800;
+    border-color: #d58512;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background-color: #c82333;
+}
+
+/* Button State Classes - CRITICAL FOR JAVASCRIPT */
+.btn-loading {
+    background-color: #6c757d !important;
+    color: white !important;
+    pointer-events: none;
+    position: relative;
+    cursor: wait;
+}
+
+.btn-loading::after {
+    content: "";
+    width: 12px;
+    height: 12px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-left: 8px;
+    display: inline-block;
+}
+
+.btn-loading::before {
+    content: "⏳ ";
+    animation: pulse 1.5s infinite;
+}
+
+.btn-confirming {
+    background-color: #fd7e14 !important;
+    color: white !important;
+    animation: pulse-attention 1.2s infinite;
+    border: 2px solid #f0ad4e;
+    box-shadow: 0 0 0 3px rgba(253, 126, 20, 0.3);
+}
+
+.btn-disabled {
+    background-color: #adb5bd !important;
+    color: #6c757d !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    opacity: 0.65;
+}
+
+.btn-normal {
+    /* Uses base button styles - ensures clean state */
+    animation: none;
+    box-shadow: none;
+    opacity: 1;
+}
+
+/* Enhanced Success State Animation */
+.btn-success-flash {
+    animation: flash-green 0.8s ease-in-out;
+}
+
+@keyframes flash-green {
+    0% { background-color: var(--original-bg, #28a745); }
+    50% { background-color: #20c997; transform: scale(1.05); }
+    100% { background-color: var(--original-bg, #28a745); }
+}
+
+/* Message Count Info States */
+.message-count-info {
+    background: #e9ecef;
+    border-radius: 6px;
+    padding: 16px;
+    font-size: 14px;
+    color: #495057;
+    border-left: 4px solid #007bff;
+    margin-top: 16px;
+    line-height: 1.5;
+}
+
+.message-count-info.loading {
+    color: #6c757d;
+    font-style: italic;
+    background: #f8f9fa;
+    border-left-color: #adb5bd;
+}
+
+.message-count-info.error {
+    background: #f8d7da;
+    border-left-color: #dc3545;
+    color: #721c24;
+}
+
+.message-count-info.success {
+    background: #d4edda;
+    border-left-color: #28a745;
+    color: #155724;
+}
+
+.message-count-info.warning {
+    background: #fff3cd;
+    border-left-color: #ffc107;
+    color: #856404;
+}
+
+/* Enhanced Animations */
+@keyframes pulse-attention {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(253, 126, 20, 0.7); }
+    50% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(253, 126, 20, 0.3); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(253, 126, 20, 0); }
+}
+
+/* QR Container Improvements */
+.qr-container {
+    text-align: center;
+    margin: 20px 0;
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.qr-image {
+    max-width: 300px;
+    height: auto;
+    border: 2px solid #007bff;
+    border-radius: 8px;
+    display: none;
+}
+
+.qr-image.visible {
+    display: block;
+    margin: 0 auto 16px;
+}
+
+.qr-instructions {
+    color: #6c757d;
+    font-size: 14px;
+    margin: 12px 0 0;
+    line-height: 1.4;
+}
+
+/* Error States */
+.initialization-error {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 30px;
+    border: 2px solid #dc3545;
+    border-radius: 12px;
+    text-align: center;
+    max-width: 400px;
+    margin: 20px;
+    z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.initialization-error h2 {
+    color: #dc3545;
+    margin: 0 0 16px;
+}
+
+.initialization-error p {
+    color: #6c757d;
+    margin: 0 0 20px;
+}
+
+.initialization-error button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.initialization-error button:hover {
+    background-color: #0056b3;
+}
+
+/* Status Panel Enhancements */
+.status-panel[aria-live] {
+    /* Enhanced for screen readers */
+    position: relative;
+}
+
+/* Enhanced Accessibility Improvements */
+.btn[aria-busy="true"] {
+    cursor: wait;
+    position: relative;
+}
+
+.btn[aria-busy="true"]::after {
+    content: "";
+    width: 12px;
+    height: 12px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-left: 8px;
+    display: inline-block;
+}
+
+.btn[aria-expanded="true"] {
+    box-shadow: 0 0 0 2px rgba(253, 126, 20, 0.5);
+    outline: none;
+}
+
+/* Focus management for better keyboard navigation */
+.btn:focus-visible {
+    outline: 2px solid #007bff;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.25);
+}
+
+/* Live region styling for screen readers */
+[aria-live] {
+    min-height: 1.5em;
+    transition: all 0.3s ease;
+}
+
+[aria-live="assertive"] {
+    border-left: 4px solid #007bff;
+    padding-left: 12px;
+}
+
+/* Hidden but accessible content */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Screen reader announcements */
+.announce {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+/* Responsive Enhancements */
+@media (max-width: 768px) {
+    .date-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .date-controls label {
+        min-width: auto;
+        margin-bottom: 8px;
+    }
+    
+    .date-dropdown {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .btn {
+        width: 100%;
+        justify-content: center;
+        margin-bottom: 8px;
+    }
+    
+    .btn:last-child {
+        margin-bottom: 0;
+    }
+    
+    .date-selection-panel {
+        padding: 16px;
+    }
+    
+    .qr-image {
+        max-width: 250px;
+    }
+}
+
+@media (max-width: 480px) {
+    .container {
+        padding: 10px;
+    }
+    
+    .status-panel {
+        padding: 12px;
+        font-size: 14px;
+    }
+    
+    #state {
+        font-size: 16px;
+        min-height: 40px;
+    }
+    
+    #startSendingBtn {
+        padding: 12px 24px;
+        font-size: 16px;
+        min-width: auto;
+    }
+}
+
+/* ==========================================
+   MODERN CSS ENHANCEMENTS
+   ========================================== */
+
+/* CSS Custom Properties for consistent theming */
+:root {
+    --primary-color: #007bff;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --secondary-color: #6c757d;
+    --whatsapp-green: #25D366;
+    --whatsapp-dark: #128C7E;
+    
+    --border-radius: 8px;
+    --border-radius-lg: 12px;
+    --box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    --box-shadow-lg: 0 4px 12px rgba(0,0,0,0.15);
+    
+    --transition-fast: 0.2s ease;
+    --transition-normal: 0.3s ease;
+    --transition-slow: 0.5s ease;
+}
+
+/* Enhanced Container with CSS Grid for main layout */
+.main-layout {
+    display: grid;
+    grid-template-areas: 
+        "header header"
+        "controls status"
+        "content content";
+    grid-template-columns: 1fr 1fr;
+    grid-gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+@media (max-width: 768px) {
+    .main-layout {
+        grid-template-areas: 
+            "header"
+            "controls"
+            "status"
+            "content";
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Enhanced Button Focus for Better UX */
+.btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(var(--primary-color), 0.25);
+}
+
+/* Loading State with Better Visual Feedback */
+.loading-state {
+    position: relative;
+    overflow: hidden;
+}
+
+.loading-state::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.3),
+        transparent
+    );
+    animation: loading-shimmer 1.5s infinite;
+}
+
+@keyframes loading-shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+/* Success/Error Message Animations */
+.message-slide-in {
+    animation: slideInFromTop 0.4s ease-out;
+}
+
+@keyframes slideInFromTop {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Enhanced QR Code Section */
+.qr-section {
+    position: relative;
+    text-align: center;
+    padding: 24px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: var(--border-radius-lg);
+    border: 1px solid #dee2e6;
+    box-shadow: var(--box-shadow);
+}
+
+.qr-section::before {
+    content: '📱';
+    font-size: 24px;
+    display: block;
+    margin-bottom: 12px;
+}
+
+/* Progress Indicator for Messages */
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 16px 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--whatsapp-green), var(--success-color));
+    border-radius: 3px;
+    transition: width var(--transition-normal);
+    position: relative;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.3),
+        transparent
+    );
+    animation: progress-shimmer 2s infinite;
+}
+
+@keyframes progress-shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Enhanced Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-color: #1a1a1a;
+        --text-color: #e9ecef;
+        --border-color: #343a40;
+        --panel-bg: #212529;
+    }
+    
+    .container {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+    }
+    
+    .status-panel {
+        background-color: var(--panel-bg);
+        border-color: var(--border-color);
+        color: var(--text-color);
+    }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+    .btn {
+        border: 2px solid currentColor;
+    }
+    
+    .status-panel {
+        border: 2px solid;
+    }
+    
+    #qr {
+        border-width: 4px;
+    }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    .btn:hover {
+        transform: none;
+    }
+}
+
+/* ==============================================
+   CRITICAL MISSING STYLES FOR PRODUCTION SEND.JS
+   ============================================== */
+
+/* Connection Status Visual Indicators */
+.connection-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+    transition: all 0.3s ease;
+    vertical-align: middle;
+}
+
+.connection-status-connected .connection-indicator {
+    background-color: var(--success-color);
+    box-shadow: 0 0 4px rgba(40, 167, 69, 0.5);
+}
+
+.connection-status-connecting .connection-indicator {
+    background-color: var(--warning-color);
+    animation: pulse-connect 1s infinite;
+}
+
+.connection-status-disconnected .connection-indicator {
+    background-color: var(--secondary-color);
+}
+
+.connection-status-error .connection-indicator {
+    background-color: var(--danger-color);
+    animation: blink-error 0.8s infinite;
+}
+
+@keyframes pulse-connect {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.6; }
+}
+
+@keyframes blink-error {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.4; }
+}
+
+/* Enhanced Message Sending Progress */
+.sending-progress-container {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: var(--border-radius);
+    padding: 16px;
+    margin: 16px 0;
+    position: relative;
+}
+
+.sending-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.sending-progress-title {
+    font-weight: 600;
+    color: #495057;
+    font-size: 14px;
+}
+
+.sending-progress-stats {
+    font-size: 12px;
+    color: var(--secondary-color);
+    background: #e9ecef;
+    padding: 4px 8px;
+    border-radius: 12px;
+}
+
+.sending-progress-bar-container {
+    position: relative;
+    background: #e9ecef;
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+}
+
+.sending-progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color) 0%, var(--success-color) 100%);
+    border-radius: 4px;
+    transition: width 0.4s ease;
+    position: relative;
+}
+
+.sending-progress-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+    animation: progress-shine 2s infinite;
+}
+
+@keyframes progress-shine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.sending-progress-text {
+    font-size: 13px;
+    color: #6c757d;
+    margin-top: 8px;
+    text-align: center;
+}
+
+/* Toast Notification System for Auto-Clearing Messages */
+.toast-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow-lg);
+    padding: 16px 20px;
+    min-width: 300px;
+    max-width: 400px;
+    z-index: 1050;
+    transform: translateX(100%);
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    opacity: 0;
+}
+
+.toast-notification.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.toast-notification.success {
+    border-left: 4px solid var(--success-color);
+}
+
+.toast-notification.error {
+    border-left: 4px solid var(--danger-color);
+}
+
+.toast-notification.warning {
+    border-left: 4px solid var(--warning-color);
+}
+
+.toast-notification.info {
+    border-left: 4px solid var(--primary-color);
+}
+
+.toast-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    font-size: 14px;
+}
+
+.toast-message {
+    font-size: 13px;
+    color: #6c757d;
+    line-height: 1.4;
+}
+
+.toast-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: #adb5bd;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    line-height: 1;
+}
+
+.toast-close:hover {
+    color: #6c757d;
+}
+
+/* Enhanced Status Icons with Emojis */
+.status-icon {
+    margin-right: 8px;
+    font-size: 1.2em;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.status-ready .status-icon::before { content: "✅"; }
+.status-qr .status-icon::before { content: "📱"; }
+.status-error .status-icon::before { content: "❌"; }
+.status-loading .status-icon::before { content: "⏳"; }
+.status-sending .status-icon::before { content: "📤"; }
+.status-completed .status-icon::before { content: "✅"; }
+.status-connecting .status-icon::before { content: "🔄"; }
+.status-disconnected .status-icon::before { content: "🔌"; }
+
+/* Enhanced Control Panel Layout */
+.whatsapp-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin: 24px 0;
+    padding: 24px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: var(--border-radius-lg);
+    border: 1px solid #dee2e6;
+    box-shadow: var(--box-shadow);
+}
+
+.primary-action {
+    grid-column: 1 / -1;
+    font-size: 18px;
+    padding: 16px 24px;
+    font-weight: 600;
+    min-height: 50px;
+    background: var(--whatsapp-green) !important;
+    color: white !important;
+    border: none !important;
+}
+
+.primary-action:hover:not(:disabled) {
+    background: var(--whatsapp-dark) !important;
+}
+
+.secondary-actions {
+    display: contents;
+}
+
+/* Enhanced QR Code Container */
+.qr-container {
+    text-align: center;
+    margin: 24px 0;
+    padding: 24px;
+    background: white;
+    border-radius: var(--border-radius-lg);
+    border: 2px solid var(--primary-color);
+    box-shadow: var(--box-shadow);
+    position: relative;
+}
+
+.qr-container::before {
+    content: "📱 WhatsApp QR Code";
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    padding: 4px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary-color);
+    border-radius: 12px;
+}
+
+.qr-image {
+    max-width: 280px;
+    height: auto;
+    border: 3px solid #f8f9fa;
+    border-radius: var(--border-radius);
+    display: none;
+    margin: 0 auto 16px;
+    box-shadow: var(--box-shadow);
+}
+
+.qr-image.visible {
+    display: block;
+    animation: fadeInScale 0.5s ease;
+}
+
+@keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.qr-instructions {
+    color: #6c757d;
+    font-size: 14px;
+    margin: 16px 0 0;
+    line-height: 1.5;
+    font-style: italic;
+}
+
+/* Button Confirmation States */
+.btn-confirming {
+    background-color: #fd7e14 !important;
+    color: white !important;
+    animation: pulse-confirm 1s infinite;
+    position: relative;
+}
+
+.btn-confirming::after {
+    content: ' ⚠️';
+}
+
+@keyframes pulse-confirm {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(253, 126, 20, 0.7); }
+    50% { transform: scale(1.03); box-shadow: 0 0 0 6px rgba(253, 126, 20, 0.3); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(253, 126, 20, 0); }
+}
+
+/* Enhanced Loading Spinner */
+.loading-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin-smooth 1s linear infinite;
+    margin-right: 8px;
+}
+
+@keyframes spin-smooth {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Accessibility Enhancements */
+.btn[aria-busy="true"] {
+    cursor: wait;
+    position: relative;
+}
+
+.btn[aria-expanded="true"] {
+    box-shadow: 0 0 0 3px rgba(253, 126, 20, 0.5);
+    transform: scale(1.02);
+}
+
+/* Live regions for screen readers */
+[aria-live="polite"] {
+    position: relative;
+}
+
+[aria-live="assertive"] {
+    border-left: 4px solid var(--primary-color);
+    padding-left: 12px;
+}
+
+/* Mobile Enhancements */
+@media (max-width: 576px) {
+    .whatsapp-controls {
+        grid-template-columns: 1fr;
+        padding: 16px;
+        margin: 16px 0;
+    }
+    
+    .primary-action {
+        font-size: 18px;
+        padding: 18px 24px;
+        min-height: 56px;
+    }
+    
+    .toast-notification {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+        min-width: auto;
+    }
+    
+    .qr-container {
+        margin: 16px -10px;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+    }
+    
+    .qr-image {
+        max-width: 220px;
+    }
+    
+    .sending-progress-container {
+        margin: 16px -10px;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+    }
+}
+
+/* Performance Optimizations */
+.btn, .message-count-info, .qr-container, .sending-progress-container {
+    will-change: transform;
+}
+
+.sending-progress-bar-fill::after, .btn-loading::before {
+    will-change: transform;
+}
+
+/* ==============================================
+   AUTHENTICATION NOW HANDLED VIA REDIRECT
+   ============================================== */
+
+/* Authentication iframe styles removed - now using redirect approach */

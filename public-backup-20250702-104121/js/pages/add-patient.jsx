@@ -2,28 +2,36 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import AddPatientForm from '../components/react/AddPatientForm.jsx'
 import '../../css/main.css'
-import '../../css/pages/add-patient.css'
+import '../../css/pages/dashboard.css'
 
 const AddPatientPage = () => {
     return (
-        <div className="add-patient-container">
-            <header className="add-patient-header">
+        <div id="app">
+            <header className="header">
                 <div className="container">
-                    <div className="add-patient-logo">
+                    <div className="logo">
                         <img src="/images/logo.png" alt="Shwan Orthodontics" />
                         <h1>Shwan Orthodontics</h1>
                     </div>
-                    <div className="add-patient-nav">
-                        <a href="/">
+                    <div className="user-info">
+                        <a href="/" style={{ color: 'white', textDecoration: 'none' }}>
                             <i className="fas fa-home"></i> Back to Dashboard
                         </a>
                     </div>
                 </div>
             </header>
 
-            <main className="add-patient-main">
-                <AddPatientForm />
+            <main className="main-content">
+                <div className="container">
+                    <AddPatientForm />
+                </div>
             </main>
+
+            <footer className="footer">
+                <div className="container">
+                    <p>&copy; 2024 Shwan Orthodontics - All Rights Reserved</p>
+                </div>
+            </footer>
         </div>
     );
 };

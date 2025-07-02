@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointment Calendar - Shwan Orthodontics</title>
+    <meta name="description" content="Modern appointment calendar system for Shwan Orthodontics with real-time updates and 6-day working week view.">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    
+    <!-- CSS Dependencies -->
+    <link rel="stylesheet" href="css/base/variables.css">
+    <link rel="stylesheet" href="css/base/reset.css">
+    <link rel="stylesheet" href="css/base/typography.css">
+    <link rel="stylesheet" href="css/components/buttons.css">
+    <link rel="stylesheet" href="css/components/appointment-calendar.css">
+    
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        /* Page-specific styles */
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+        }
+        
+        .calendar-container {
+            height: calc(100vh - 50px);
+            display: flex;
+            flex-direction: column;
+            margin-top: 0;
+        }
+        
+        .page-header {
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .page-title {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-dark, #333);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .page-title i {
+            color: var(--primary-color, #007bff);
+        }
+        
+        .page-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .refresh-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            color: #666;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+        }
+        
+        .refresh-btn:hover {
+            background: #f8f9fa;
+            border-color: #007bff;
+            color: #007bff;
+        }
+        
+        .calendar-main {
+            flex: 1;
+            padding: 16px;
+            overflow: hidden;
+        }
+        
+        /* Loading screen */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-screen.hidden {
+            display: none;
+        }
+        
+        .loading-logo {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Error handling */
+        .error-banner {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px 24px;
+            border-bottom: 1px solid #f5c6cb;
+            display: none;
+        }
+        
+        .error-banner.show {
+            display: block;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .page-header {
+                padding: 12px 16px;
+                flex-direction: column;
+                gap: 12px;
+                align-items: stretch;
+            }
+            
+            .page-title {
+                font-size: 20px;
+                justify-content: center;
+            }
+            
+            .page-actions {
+                justify-content: center;
+            }
+            
+            .calendar-main {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-logo"></div>
+        <h3>Loading Appointment Calendar</h3>
+        <p>Connecting to your existing calendar system...</p>
+    </div>
+    
+    <!-- Error Banner -->
+    <div id="error-banner" class="error-banner">
+        <strong>Error:</strong> <span id="error-message"></span>
+        <button onclick="window.location.reload()" style="margin-left: 12px; padding: 4px 8px; border: 1px solid #721c24; background: transparent; color: #721c24; border-radius: 3px; cursor: pointer;">Refresh</button>
+    </div>
+    
+    <!-- Universal Header Container -->
+    <div id="header-root"></div>
+    
+    <!-- Main Calendar Container -->
+    <div class="calendar-container">
+        <!-- Page Header -->
+        <header class="page-header">
+            <h1 class="page-title">
+                <i class="fas fa-calendar-alt"></i>
+                Appointment Calendar
+            </h1>
+            
+            <div class="page-actions">
+                <button class="refresh-btn" onclick="refreshCalendar()" title="Refresh calendar data">
+                    <i class="fas fa-sync-alt"></i>
+                    Refresh
+                </button>
+            </div>
+        </header>
+        
+        <!-- Calendar Main Content -->
+        <main class="calendar-main">
+            <div id="calendar-root"></div>
+        </main>
+    </div>
+    
+    <!-- Modern JSX entry point -->
+    <script type="module" src="/js/pages/calendar.jsx"></script>
+    
+    <script>
+        // Enhanced error handler
+        window.addEventListener('error', function(event) {
+            console.error('Global error:', event.error);
+            console.error('Error details:', {
+                message: event.error.message,
+                stack: event.error.stack,
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno
+            });
+            showError('An unexpected error occurred: ' + event.error.message);
+        });
+        
+        // Unhandled promise rejection handler
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Unhandled promise rejection:', event.reason);
+            showError('Network error: ' + (event.reason.message || 'Failed to load calendar data'));
+        });
+        
+        // Error display function
+        function showError(message) {
+            const errorBanner = document.getElementById('error-banner');
+            const errorMessage = document.getElementById('error-message');
+            errorMessage.textContent = message;
+            errorBanner.classList.add('show');
+            
+            // Auto-hide after 10 seconds
+            setTimeout(() => {
+                errorBanner.classList.remove('show');
+            }, 10000);
+        }
+        
+        // Refresh calendar function
+        function refreshCalendar() {
+            window.location.reload();
+        }
+        
+        // Calendar initialization handled by entry point
+        
+        // Page visibility change handler (refresh when page becomes visible)
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && window.AppointmentCalendar) {
+                // Optionally refresh calendar when user returns to the page
+                console.log('📱 Page became visible, calendar might auto-refresh');
+            }
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            // F5 or Ctrl+R for refresh
+            if (event.key === 'F5' || (event.ctrlKey && event.key === 'r')) {
+                event.preventDefault();
+                refreshCalendar();
+            }
+            
+            // Escape to clear errors
+            if (event.key === 'Escape') {
+                const errorBanner = document.getElementById('error-banner');
+                errorBanner.classList.remove('show');
+            }
+        });
+        
+        // Service worker registration (optional - for future PWA features)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                // Register service worker if available (placeholder for future)
+                // navigator.serviceWorker.register('/sw.js');
+            });
+        }
+        
+        console.log('📅 Appointment Calendar page loaded - Shwan Orthodontics');
+    </script>
+</body>
+</html>

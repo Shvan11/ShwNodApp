@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Patient Database Search Interface">
+    <title>Database Search</title>
+    <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+    <link rel="stylesheet" href="../../css/main.css" />
+    <link rel="stylesheet" href="../../css/pages/search.css" />
+    <link rel="stylesheet" href="../../css/components/universal-header.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <!-- React handled by Vite -->
+</head>
+<body>
+    <div id="universal-header-root"></div>
+    <div class="container">
+        <h1>Search Database</h1>
+        <form id="searchForm">
+            <div class="form-group">
+                <label for="firstName">First Name:</label>
+                <select id="firstName" name="firstName" aria-label="Select patient name"></select>
+            </div>
+            <div class="form-group">
+                <label for="phone">Phone:</label>
+                <select id="phone" name="phone" aria-label="Select patient phone"></select>
+            </div>
+            <div class="form-group">
+                <label for="patientId">Patient ID:</label>
+                <select id="id" name="patientId" aria-label="Select patient ID"></select>
+            </div>
+            <button type="submit">Search</button>
+        </form>
+        <div id="results" role="alert" aria-live="polite"></div>
+        <div id="error-message" class="error-message" role="alert"></div>
+        
+        <!-- Cross-navigation buttons -->
+        <div class="cross-nav-section">
+            <button type="button" id="view-appointments-btn" class="nav-action-btn">
+                <i class="fas fa-calendar-day"></i>
+                View Today's Appointments
+            </button>
+            <button type="button" id="view-calendar-btn" class="nav-action-btn">
+                <i class="fas fa-calendar-alt"></i>
+                View Full Calendar
+            </button>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+    
+    <!-- Load navigation components -->
+    <script src="../../js/services/navigationContext.js"></script>
+    <script type="module">
+        import React from 'react';
+        import ReactDOM from 'react-dom/client';
+        import UniversalHeader from '../../js/components/shared/UniversalHeader.jsx';
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const headerRoot = document.getElementById('universal-header-root');
+            if (headerRoot) {
+                const root = ReactDOM.createRoot(headerRoot);
+                root.render(React.createElement(UniversalHeader));
+            }
+        });
+    </script>
+    
+    <!-- Initialize Universal Header -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const headerRoot = document.getElementById('universal-header-root');
+            if (headerRoot && window.React && window.ReactDOM && window.UniversalHeader) {
+                const root = ReactDOM.createRoot(headerRoot);
+                root.render(React.createElement(UniversalHeader));
+            }
+        });
+    </script>
+    
+    <script type="module" src="../../js/pages/search.js"></script>
+</body>
+</html>

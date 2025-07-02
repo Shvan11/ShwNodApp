@@ -3,7 +3,7 @@
  * Search page controller
  * Handles patient search functionality
  */
-import { fetchJSON } from '../core/http.js';
+import api from '../services/api.js';
 
 class SearchPageController {
   /**
@@ -25,7 +25,7 @@ class SearchPageController {
   async init() {
     try {
       // Fetch patient data
-      const patients = await fetchJSON('/api/patientsPhones');
+      const patients = await api.getPatientPhones();
       
       // Format data for selects
       const formattedData = this.formatDataForSelects(patients);
