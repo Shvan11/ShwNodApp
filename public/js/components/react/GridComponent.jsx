@@ -324,36 +324,39 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
             };
         }
 
-        // Calculate row heights based on tallest image in each row (excluding logo)
-        const getRowHeight = (rowIndex, cols) => {
-            const rowElements = imageElements.filter((_, index) => Math.floor(index / cols) === rowIndex);
-            let maxHeight = 0;
+        // For desktop: Calculate available height with proper ratios
+        if (screenSize === 'desktop') {
+            const availableHeight = window.innerHeight - 120; // Reduce padding for less waste
+            const gap = 10;
             
-            rowElements.forEach(element => {
-                if (!element.isLogo) {
-                    const image = images[element.index];
-                    if (image && image.height && image.width) {
-                        // Calculate height for responsive standard width
-                        const containerWidth = Math.min(window.innerWidth * 0.9, parseInt(maxWidth));
-                        const standardWidth = (containerWidth - ((cols - 1) * 10)) / cols;
-                        const aspectRatio = image.height / image.width;
-                        const calculatedHeight = standardWidth * aspectRatio;
-                        maxHeight = Math.max(maxHeight, calculatedHeight);
-                    }
-                }
-            });
+            // Define row ratios: first row 44%, others 28% each
+            const rowRatios = [0.44, 0.28, 0.28]; // 3 rows total
+            const totalGapHeight = (rowRatios.length - 1) * gap;
+            const usableHeight = availableHeight - totalGapHeight;
             
-            return maxHeight > 0 ? `${maxHeight}px` : 'auto';
-        };
+            // Calculate row heights based on ratios
+            const rowHeights = rowRatios.map(ratio => `${usableHeight * ratio}px`);
 
-        // Calculate number of rows needed
-        const totalRows = Math.ceil(imageElements.length / columns);
-        const rowHeights = Array.from({ length: totalRows }, (_, i) => getRowHeight(i, columns));
+            return {
+                display: 'grid',
+                gridTemplateColumns: `repeat(${columns}, 1fr)`,
+                gridTemplateRows: rowHeights.join(' '),
+                width: '100%',
+                maxWidth: maxWidth,
+                margin: '0 auto',
+                gap: `${gap}px`,
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: `${availableHeight}px`,
+                overflow: 'visible' // Keep visible as safety net
+            };
+        }
 
+        // For tablet: use auto heights
         return {
             display: 'grid',
             gridTemplateColumns: `repeat(${columns}, 1fr)`,
-            gridTemplateRows: rowHeights.join(' '),
+            gridTemplateRows: 'repeat(3, auto)',
             width: '100%',
             maxWidth: maxWidth,
             margin: '0 auto',
@@ -420,6 +423,8 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                                     width: '100%',
                                     height: '100%',
                                     objectFit: 'contain',
+                                    objectPosition: 'center',
+                                    backgroundColor: '#f8f9fa',
                                     borderRadius: '8px',
                                     cursor: 'pointer',
                                     transition: 'transform 0.2s ease',

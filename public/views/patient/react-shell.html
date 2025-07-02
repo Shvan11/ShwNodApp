@@ -50,7 +50,8 @@
         .main-content-area {
             flex: 1;
             margin-left: 64px; /* Start with collapsed sidebar width */
-            overflow: hidden; /* Prevent main scroll, let content handle its own */
+            overflow-y: auto; /* Allow vertical scrolling for content */
+            overflow-x: hidden; /* Prevent horizontal scroll */
             position: relative;
             min-height: 0;
             background: #ffffff;
