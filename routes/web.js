@@ -41,6 +41,17 @@ router.get('/', (_, res) => {
     res.sendFile(path.join(process.cwd(), './public/index.html'));
 });
 
+// Patient page with query parameters
+router.get('/patient', (req, res) => {
+    const patientId = req.query.code;
+    if (patientId) {
+        // Serve the built version from dist
+        res.sendFile(path.join(process.cwd(), './dist/views/patient/react-shell.html'));
+    } else {
+        res.status(400).send('Patient code required');
+    }
+});
+
 // Patient pages with clean URLs
 router.get('/patient/:id', (req, res) => {
     const patientId = req.params.id;

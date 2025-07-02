@@ -10,7 +10,11 @@ export default defineConfig({
     outDir: '../dist',
     emptyOutDir: true,
     rollupOptions: {
-      input: resolve(__dirname, 'public/index.html')
+      input: {
+        main: resolve(__dirname, 'public/index.html'),
+        'daily-appointments': resolve(__dirname, 'public/views/appointments/daily-appointments.html'),
+        'react-shell': resolve(__dirname, 'public/views/patient/react-shell.html')
+      }
     }
   },
   server: {

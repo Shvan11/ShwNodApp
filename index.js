@@ -59,6 +59,12 @@ async function initializeApplication() {
 
     // Setup static files
     console.log('📁 Setting up static file serving...');
+    
+    // Configure MIME type for JSX files to be served as JavaScript modules
+    express.static.mime.define({'application/javascript': ['jsx']});
+    
+    // Serve built files first (dist), then fallback to source files (public)
+    app.use(express.static('./dist'));
     app.use(express.static('./public'));
     
     // Use path resolver for cross-platform compatibility
