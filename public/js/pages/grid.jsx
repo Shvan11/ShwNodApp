@@ -1,7 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import GridComponent from '../components/react/GridComponent.jsx'
-import '../services/navigationContext.js'
 import '../../css/pages/grid.css'
 import '../../photoswipe/dist/photoswipe.css'
 

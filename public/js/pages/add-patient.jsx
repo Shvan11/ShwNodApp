@@ -1,26 +1,14 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import UniversalHeader from '../components/react/UniversalHeader.jsx'
 import AddPatientForm from '../components/react/AddPatientForm.jsx'
 import '../../css/main.css'
 import '../../css/pages/add-patient.css'
+import '../../css/components/universal-header.css'
 
 const AddPatientPage = () => {
     return (
         <div className="add-patient-container">
-            <header className="add-patient-header">
-                <div className="container">
-                    <div className="add-patient-logo">
-                        <img src="/images/logo.png" alt="Shwan Orthodontics" />
-                        <h1>Shwan Orthodontics</h1>
-                    </div>
-                    <div className="add-patient-nav">
-                        <a href="/">
-                            <i className="fas fa-home"></i> Back to Dashboard
-                        </a>
-                    </div>
-                </div>
-            </header>
-
             <main className="add-patient-main">
                 <AddPatientForm />
             </main>
@@ -32,7 +20,15 @@ const AddPatientPage = () => {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Initializing React Add Patient Page...');
     
-    // Mount React App
+    // Mount Universal Header
+    const headerRoot = document.getElementById('universal-header-root');
+    if (headerRoot) {
+        const headerReactRoot = ReactDOM.createRoot(headerRoot);
+        headerReactRoot.render(React.createElement(UniversalHeader));
+        console.log('✅ Universal Header initialized');
+    }
+    
+    // Mount Add Patient Form
     const reactRoot = document.getElementById('react-root');
     if (reactRoot) {
         const root = ReactDOM.createRoot(reactRoot);

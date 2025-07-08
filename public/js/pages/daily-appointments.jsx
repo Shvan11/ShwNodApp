@@ -6,7 +6,7 @@ import '../../css/pages/appointments.css'
 import '../../css/components/universal-header.css'
 
 // Initialize the daily appointments page
-document.addEventListener('DOMContentLoaded', function() {
+function initializePage() {
     // Mount Universal Header
     const headerRoot = document.getElementById('universal-header-root');
     if (headerRoot) {
@@ -25,7 +25,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     datePicker.value = dateString;
                     loadAppointments(dateString);
                 }
-            }
+            },
+            className: 'daily-appointments-mini-calendar',
+            showHeader: true,
+            highlightToday: true
         }));
     }
     
@@ -41,7 +44,14 @@ document.addEventListener('DOMContentLoaded', function() {
     loadAppointments(today);
     
     console.log('✅ Daily appointments page initialized');
-});
+}
+
+// Initialize when DOM is ready or immediately if already loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializePage);
+} else {
+    initializePage();
+}
 
 // Initialize date picker functionality
 function initializeDatePicker() {

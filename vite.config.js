@@ -15,7 +15,10 @@ export default defineConfig({
         dashboard: resolve(__dirname, 'public/views/dashboard.html'),
         'daily-appointments': resolve(__dirname, 'public/views/appointments/daily-appointments.html'),
         'react-shell': resolve(__dirname, 'public/views/patient/react-shell.html'),
-        calendar: resolve(__dirname, 'public/views/appointments/calendar.html')
+        calendar: resolve(__dirname, 'public/views/appointments/calendar.html'),
+        search: resolve(__dirname, 'public/views/patient/search.html'),
+        'add-patient': resolve(__dirname, 'public/views/patient/add-patient.html'),
+        'grid': resolve(__dirname, 'public/views/patient/grid_.html')
       }
     }
   },
