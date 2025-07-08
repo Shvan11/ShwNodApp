@@ -79,9 +79,23 @@ export async function sendgramfile(phone, filepath) {
         console.log('Connected to Telegram successfully');
         console.log('Sending to phone:', phone);
 
-        // Check if file exists (basic validation)
-        if (!filepath.includes('/') && !filepath.includes('\\')) {
-            console.warn(`File path seems invalid: ${filepath}`);
+        // Validate file path
+        if (!filepath || typeof filepath !== 'string') {
+            return { result: "ERROR", error: "Invalid file path" };
+        }
+
+        // Check if file exists
+        if (!fs.existsSync(filepath)) {
+            console.error(`File not found: ${filepath}`);
+            return { result: "ERROR", error: `File not found: ${filepath}` };
+        }
+
+        // Check if file is readable
+        try {
+            fs.accessSync(filepath, fs.constants.R_OK);
+        } catch (accessError) {
+            console.error(`File not readable: ${filepath}`, accessError);
+            return { result: "ERROR", error: `File not readable: ${filepath}` };
         }
 
         // Convert filename to phone-compatible format

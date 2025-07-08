@@ -20,7 +20,7 @@ import multer from 'multer';
 import { sendgramfile } from '../services/messaging/telegram.js';
 import qrcode from 'qrcode';
 import config from '../config/config.js';
-import { createPathResolver } from '../utils/path-resolver.js';
+import path from 'path';
 import PhoneFormatter from '../utils/phoneFormatter.js';
 import messageState from '../services/state/messageState.js';
 import { createWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
@@ -491,6 +491,20 @@ router.post('/sendmedia2', upload.none(), async (req, res) => {
             });
         }
 
+        // Simple Windows path resolution
+        function resolveWindowsPath(inputPath) {
+            const trimmedPath = inputPath.trim();
+            
+            // If it's already an absolute path, return as-is
+            if (trimmedPath.startsWith('\\\\') || trimmedPath.match(/^[A-Za-z]:/)) {
+                return trimmedPath;
+            }
+            
+            // For relative paths, join with machine path
+            const basePath = config.fileSystem.machinePath || '';
+            return path.win32.join(basePath, trimmedPath);
+        }
+
         let sentMessages = 0;
         let state = {};
 
@@ -498,9 +512,11 @@ router.post('/sendmedia2', upload.none(), async (req, res) => {
             phone = PhoneFormatter.forWhatsApp(phone);
             console.log(`WhatsApp - Formatted phone: ${phone}`);
             
-            for (const path of paths) {
-                console.log(`Sending WhatsApp file: ${path}`);
-                state = await sendXray_(phone, path);
+            for (const filePath of paths) {
+                // Resolve Windows path
+                const resolvedPath = resolveWindowsPath(filePath);
+                console.log(`Sending WhatsApp file: ${filePath} -> ${resolvedPath}`);
+                state = await sendXray_(phone, resolvedPath);
                 console.log(`WhatsApp result:`, state);
                 if (state.result === "OK") {
                     sentMessages += 1;
@@ -511,9 +527,11 @@ router.post('/sendmedia2', upload.none(), async (req, res) => {
             phone = PhoneFormatter.forTelegram(phone);
             console.log(`Telegram - Original phone: ${originalPhone}, Formatted phone: ${phone}`);
 
-            for (const path of paths) {
-                console.log(`Sending Telegram file: ${path}`);
-                state = await sendgramfile(phone, path);
+            for (const filePath of paths) {
+                // Resolve Windows path
+                const resolvedPath = resolveWindowsPath(filePath);
+                console.log(`Sending Telegram file: ${filePath} -> ${resolvedPath}`);
+                state = await sendgramfile(phone, resolvedPath);
                 console.log(`Telegram result:`, state);
                 if (state.result === "OK") {
                     sentMessages += 1;

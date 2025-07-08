@@ -35,8 +35,23 @@ export async function sendImg_(number, base64Image) {
  */
 export async function sendXray_(number, file) {
   try {
+    // Validate file path
+    if (!file || typeof file !== 'string') {
+      return { result: "ERROR", error: "Invalid file path" };
+    }
+
+    // Check if file exists
     if (!fs.existsSync(file)) {
-      return { result: "ERROR", error: "File not found" };
+      console.error(`File not found: ${file}`);
+      return { result: "ERROR", error: `File not found: ${file}` };
+    }
+
+    // Check if file is readable
+    try {
+      fs.accessSync(file, fs.constants.R_OK);
+    } catch (accessError) {
+      console.error(`File not readable: ${file}`, accessError);
+      return { result: "ERROR", error: `File not readable: ${file}` };
     }
 
     return waInstance.queueOperation(async (client) => {
