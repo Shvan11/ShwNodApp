@@ -9,8 +9,8 @@ const PatientShell = () => {
         const search = window.location.search;
         const urlParams = new URLSearchParams(search);
         
-        // Get patient ID from query param ?code=214
-        const patientId = urlParams.get('code') || '';
+        // Get patient ID from query param ?patient=214 or ?code=214
+        const patientId = urlParams.get('patient') || urlParams.get('code') || '';
         
         // Get page from query param ?page=grid or default to grid
         const page = urlParams.get('page') || 'grid';
@@ -29,7 +29,7 @@ const PatientShell = () => {
     const handleNavigate = useCallback((page) => {
         // Build new URL with current patient ID and new page
         const currentPatientId = currentUrl.patientId;
-        const newUrl = `${window.location.pathname}?code=${currentPatientId}&page=${page}`;
+        const newUrl = `${window.location.pathname}?patient=${currentPatientId}&page=${page}`;
         
         // Update browser URL without reload
         window.history.pushState({}, '', newUrl);

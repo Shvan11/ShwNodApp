@@ -4,6 +4,8 @@ import PaymentsComponent from './PaymentsComponent.jsx'
 import XraysComponent from './XraysComponent.jsx'
 import VisitsComponent from './VisitsComponent.jsx'
 import CompareComponent from './CompareComponent.jsx'
+import AppointmentForm from './AppointmentForm.jsx'
+import WorkComponent from './WorkComponent.jsx'
 
 const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
     const renderContent = () => {
@@ -34,6 +36,13 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
             case 'visits':
                 return (
                     <VisitsComponent
+                        patientId={patientId}
+                    />
+                );
+            
+            case 'works':
+                return (
+                    <WorkComponent
                         patientId={patientId}
                     />
                 );
@@ -77,6 +86,23 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
                             <p>Patient messaging view coming soon...</p>
                         </div>
                     </div>
+                );
+            
+            case 'new-appointment':
+                return (
+                    <AppointmentForm
+                        patientId={patientId}
+                        onClose={() => {
+                            // Navigate back to grid page
+                            const newUrl = `${window.location.pathname}?code=${patientId}&page=grid`;
+                            window.history.pushState({}, '', newUrl);
+                            window.dispatchEvent(new CustomEvent('urlChanged'));
+                        }}
+                        onSuccess={(result) => {
+                            console.log('Appointment created successfully:', result);
+                            // Could show success message here
+                        }}
+                    />
                 );
             
             default:

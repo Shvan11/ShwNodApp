@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import UniversalHeader from '../components/shared/UniversalHeader.jsx'
+import UniversalHeader from '../components/react/UniversalHeader.jsx'
 import MiniCalendar from '../components/react/MiniCalendar.jsx'
 import '../../css/pages/appointments.css'
 import '../../css/components/universal-header.css'
@@ -308,7 +308,7 @@ function showError(message) {
 // Action functions
 window.viewPatient = function(patientId) {
     if (patientId) {
-        window.location.href = `/patient/${patientId}`;
+        window.location.href = `/views/patient/react-shell.html?patient=${patientId}`;
     }
 };
 
@@ -316,7 +316,7 @@ window.viewPatient = function(patientId) {
 window.viewPatientPhotos = function(patientId) {
     console.log('Clicking patient ID:', patientId);
     if (patientId && patientId !== 'undefined' && patientId !== 'null') {
-        const url = `/patient/${patientId}`;
+        const url = `/views/patient/react-shell.html?patient=${patientId}`;
         console.log('Navigating to patient app:', url);
         window.location.href = url;
     } else {

@@ -96,7 +96,9 @@ const Navigation = ({ patientId, currentPath, onNavigate }) => {
         { key: 'compare', page: 'compare', label: 'Compare', icon: 'fas fa-exchange-alt' },
         { key: 'xrays', page: 'xrays', label: 'X-rays', icon: 'fas fa-x-ray' },
         { key: 'visits', page: 'visits', label: 'Visit Summary', icon: 'fas fa-clipboard-list' },
-        { key: 'payments', page: 'payments', label: 'Payments', icon: 'fas fa-credit-card' }
+        { key: 'works', page: 'works', label: 'Works', icon: 'fas fa-tooth' },
+        { key: 'payments', page: 'payments', label: 'Payments', icon: 'fas fa-credit-card' },
+        { key: 'new-appointment', page: 'new-appointment', label: 'New Appointment', icon: 'fas fa-plus-circle' }
     ];
 
     const renderNavItem = (item, isActive = false) => {
@@ -109,6 +111,8 @@ const Navigation = ({ patientId, currentPath, onNavigate }) => {
                     handleNavigation(item.page);
                     if (isMobile) setIsCollapsed(true);
                 }}
+                title={isCollapsed ? item.label : undefined}
+                data-tooltip={isCollapsed ? item.label : undefined}
             >
                 <div className="nav-item-icon">
                     <i className={item.icon} />
@@ -125,6 +129,7 @@ const Navigation = ({ patientId, currentPath, onNavigate }) => {
         const urlParams = new URLSearchParams(window.location.search);
         const currentTp = urlParams.get('tp') || '0';
         const isActive = currentTp === timepoint.tpCode;
+        const tooltipText = isCollapsed ? `${timepoint.tpDescription} (${formatDate(timepoint.tpDateTime)})` : undefined;
         
         return (
             <div
@@ -139,6 +144,8 @@ const Navigation = ({ patientId, currentPath, onNavigate }) => {
                     window.dispatchEvent(new CustomEvent('urlChanged'));
                     if (isMobile) setIsCollapsed(true);
                 }}
+                title={tooltipText}
+                data-tooltip={tooltipText}
             >
                 <div className="nav-item-icon">
                     <i className="fas fa-camera" />
@@ -225,6 +232,8 @@ const Navigation = ({ patientId, currentPath, onNavigate }) => {
                         e.preventDefault();
                         window.location.href = '/daily-appointments';
                     }}
+                    title={isCollapsed ? "Today's Appointments" : undefined}
+                    data-tooltip={isCollapsed ? "Today's Appointments" : undefined}
                 >
                     <div className="nav-item-icon">
                         <i className="fas fa-calendar-day" />
@@ -239,9 +248,10 @@ const Navigation = ({ patientId, currentPath, onNavigate }) => {
                     className="sidebar-nav-item calendar-item"
                     onClick={(e) => {
                         e.preventDefault();
-                        window.location.href = '/calendar.html';
+                        window.location.href = '/calendar';
                     }}
-                    title="Full Calendar View"
+                    title={isCollapsed ? "Full Calendar View" : undefined}
+                    data-tooltip={isCollapsed ? "Full Calendar View" : undefined}
                 >
                     <div className="nav-item-icon">
                         <i className="fas fa-calendar-alt" />

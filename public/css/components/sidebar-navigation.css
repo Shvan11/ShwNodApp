@@ -384,3 +384,93 @@
         animation: none;
     }
 }
+
+/* Tooltip Styles for Collapsed Sidebar */
+.patient-sidebar.collapsed .sidebar-nav-item {
+    position: relative;
+}
+
+.patient-sidebar.collapsed .sidebar-nav-item[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+    z-index: 1000;
+    max-width: 200px;
+    word-wrap: break-word;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+    opacity: 0;
+    animation: tooltipFadeIn 0.2s ease-out forwards;
+}
+
+.patient-sidebar.collapsed .sidebar-nav-item[data-tooltip]:hover::before {
+    content: '';
+    position: absolute;
+    left: calc(100% + 2px);
+    top: 50%;
+    transform: translateY(-50%);
+    border: 6px solid transparent;
+    border-right-color: rgba(0, 0, 0, 0.9);
+    z-index: 1001;
+    pointer-events: none;
+    opacity: 0;
+    animation: tooltipFadeIn 0.2s ease-out forwards;
+}
+
+@keyframes tooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50%) translateX(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0);
+    }
+}
+
+/* Ensure tooltips don't appear on mobile or when sidebar is expanded */
+.patient-sidebar:not(.collapsed) .sidebar-nav-item[data-tooltip]:hover::after,
+.patient-sidebar:not(.collapsed) .sidebar-nav-item[data-tooltip]:hover::before,
+.patient-sidebar.mobile .sidebar-nav-item[data-tooltip]:hover::after,
+.patient-sidebar.mobile .sidebar-nav-item[data-tooltip]:hover::before {
+    display: none;
+}
+
+/* Accessibility: Focus states for keyboard navigation */
+.patient-sidebar.collapsed .sidebar-nav-item[data-tooltip]:focus::after,
+.patient-sidebar.collapsed .sidebar-nav-item[data-tooltip]:focus::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+    z-index: 1000;
+    max-width: 200px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    opacity: 1;
+}
+
+.patient-sidebar.collapsed .sidebar-nav-item[data-tooltip]:focus::before {
+    content: '';
+    left: calc(100% + 2px);
+    border: 6px solid transparent;
+    border-right-color: rgba(0, 0, 0, 0.9);
+    padding: 0;
+    background: transparent;
+}

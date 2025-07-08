@@ -13,7 +13,8 @@ const router = express.Router();
 // Define clean URL mappings to actual file paths
 const pageRewrites = [
   // Main application pages
-  { url: '/dashboard', file: '/index.html' },
+  { url: '/dashboard', file: '/views/dashboard.html' },
+  { url: '/calendar', file: '/views/appointments/calendar.html' },
   { url: '/appointments', file: '/views/appointments/daily-appointments.html' },
   
   // Patient pages
@@ -38,7 +39,7 @@ const pageRewrites = [
 
 // Serve the main page at root
 router.get('/', (_, res) => {
-    res.sendFile(path.join(process.cwd(), './public/index.html'));
+    res.sendFile(path.join(process.cwd(), './public/views/dashboard.html'));
 });
 
 // Patient page with query parameters

@@ -534,7 +534,7 @@ const CompareComponent = ({ patientId, phone }) => {
             const urls = [
                 `/DolImgs/${patientId}0${sortedTimepoints[0]}${categoryCode}`,
                 `/DolImgs/${patientId}0${sortedTimepoints[1]}${categoryCode}`,
-                '/logo_white.png'
+                '/images/logo_white.png'
             ];
             
             await comparison.loadImages(urls);

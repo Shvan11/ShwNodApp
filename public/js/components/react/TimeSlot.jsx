@@ -7,7 +7,7 @@
 
 import React, { useCallback, useMemo } from 'react'
 
-const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight }) => {
+const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view', showOnlyAvailable = false }) => {
     const {
         date,
         time,
@@ -39,14 +39,31 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight }) => {
         if (validAppointmentsCount > 1) classes.push('multiple-appointments');
         if (validAppointmentsCount > 2) classes.push('many-appointments');
         
+        // Add selection mode classes
+        if (mode === 'selection') {
+            classes.push('selection-mode');
+            
+            if (slotStatus === 'available') {
+                classes.push('selectable');
+            } else {
+                classes.push('non-selectable');
+            }
+        }
+        
         return classes.join(' ');
-    }, [slotStatus, isSelected, appointments]);
+    }, [slotStatus, isSelected, appointments, mode]);
     
     // Click handler
     const handleClick = useCallback(() => {
         if (slotStatus === 'past') return; // Don't allow clicks on past slots
+        
+        // In selection mode, only allow clicking on available slots
+        if (mode === 'selection' && showOnlyAvailable && slotStatus !== 'available') {
+            return;
+        }
+        
         onClick(slotData);
-    }, [onClick, slotData, slotStatus]);
+    }, [onClick, slotData, slotStatus, mode, showOnlyAvailable]);
     
     // Render appointment content - SUPPORTS MULTIPLE APPOINTMENTS
     const renderAppointmentContent = () => {
@@ -112,6 +129,18 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight }) => {
     const renderEmptySlotContent = () => {
         if (slotStatus === 'past') {
             return null;
+        }
+        
+        // Different content based on mode
+        if (mode === 'selection') {
+            return (
+                <div className="empty-slot-content selection">
+                    <div className="selection-icon">
+                        <i className="fas fa-mouse-pointer"></i>
+                    </div>
+                    <div className="selection-text">Click to Select</div>
+                </div>
+            );
         }
         
         return (

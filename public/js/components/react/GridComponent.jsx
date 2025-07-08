@@ -330,7 +330,7 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
             const gap = 10;
             
             // Define row ratios: first row 44%, others 28% each
-            const rowRatios = [0.44, 0.28, 0.28]; // 3 rows total
+            const rowRatios = [0.44, 0.30, 0.26]; // 3 rows total
             const totalGapHeight = (rowRatios.length - 1) * gap;
             const usableHeight = availableHeight - totalGapHeight;
             

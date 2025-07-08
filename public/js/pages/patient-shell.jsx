@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import UniversalHeader from '../components/shared/UniversalHeader.jsx'
+import UniversalHeader from '../components/react/UniversalHeader.jsx'
 import PatientShell from '../components/react/PatientShell.jsx'
 import '../../css/main.css'
 import '../../css/pages/grid.css'
@@ -11,6 +11,8 @@ import '../../css/pages/canvas.css'
 import '../../photoswipe/dist/photoswipe.css'
 import '../../css/components/universal-header.css'
 import '../../css/components/sidebar-navigation.css'
+import '../../css/components/appointment-form.css'
+import '../../css/components/calendar-picker-modal.css'
 
 // Initialize the patient shell page
 document.addEventListener('DOMContentLoaded', function() {

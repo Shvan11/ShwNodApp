@@ -12,16 +12,18 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'public/index.html'),
+        dashboard: resolve(__dirname, 'public/views/dashboard.html'),
         'daily-appointments': resolve(__dirname, 'public/views/appointments/daily-appointments.html'),
-        'react-shell': resolve(__dirname, 'public/views/patient/react-shell.html')
+        'react-shell': resolve(__dirname, 'public/views/patient/react-shell.html'),
+        calendar: resolve(__dirname, 'public/views/appointments/calendar.html')
       }
     }
   },
   server: {
     port: 5173,
     host: true,
+    open: true,
     proxy: {
-      // Proxy API calls to your Node.js server
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true
@@ -31,19 +33,6 @@ export default defineConfig({
         changeOrigin: true
       },
       '/DolImgs': {
-        target: 'http://localhost:3000',
-        changeOrigin: true
-      },
-      // Proxy clean URLs to Node.js server for redirects
-      '/patient': {
-        target: 'http://localhost:3000',
-        changeOrigin: true
-      },
-      '/dashboard': {
-        target: 'http://localhost:3000',
-        changeOrigin: true
-      },
-      '/appointments': {
         target: 'http://localhost:3000',
         changeOrigin: true
       }

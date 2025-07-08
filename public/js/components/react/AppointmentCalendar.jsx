@@ -8,15 +8,25 @@ import CalendarGrid from './CalendarGrid.jsx'
  * Integrates with existing tblcalender system via optimized API endpoints
  */
 
-const AppointmentCalendar = ({ initialDate, initialViewMode = 'week' }) => {
+const AppointmentCalendar = ({ 
+    initialDate, 
+    initialViewMode = 'week',
+    mode = 'view', // 'view' or 'selection'
+    onSlotSelect,
+    selectedSlot: externalSelectedSlot,
+    showOnlyAvailable = false
+}) => {
     // State management
     const [currentDate, setCurrentDate] = useState(initialDate ? new Date(initialDate) : new Date());
     const [calendarData, setCalendarData] = useState(null);
     const [calendarStats, setCalendarStats] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [selectedSlot, setSelectedSlot] = useState(null);
+    const [internalSelectedSlot, setInternalSelectedSlot] = useState(null);
     const [viewMode, setViewMode] = useState(initialViewMode);
+    
+    // Use external selected slot if provided (for controlled mode)
+    const selectedSlot = externalSelectedSlot || internalSelectedSlot;
     
     // Utility functions
     const getWeekStart = (date) => {
@@ -144,8 +154,26 @@ const AppointmentCalendar = ({ initialDate, initialViewMode = 'week' }) => {
     }, []);
     
     const handleSlotClick = useCallback((slot) => {
-        setSelectedSlot(slot);
-    }, []);
+        if (mode === 'selection') {
+            // In selection mode, filter available slots and call external handler
+            if (showOnlyAvailable && slot.slotStatus !== 'available') {
+                return; // Don't allow selection of non-available slots
+            }
+            
+            // Update internal state if no external control
+            if (!externalSelectedSlot) {
+                setInternalSelectedSlot(slot);
+            }
+            
+            // Call external selection handler
+            if (onSlotSelect) {
+                onSlotSelect(slot);
+            }
+        } else {
+            // Normal view mode behavior
+            setInternalSelectedSlot(slot);
+        }
+    }, [mode, showOnlyAvailable, externalSelectedSlot, onSlotSelect]);
     
     // Effects
     useEffect(() => {
@@ -237,6 +265,8 @@ const AppointmentCalendar = ({ initialDate, initialViewMode = 'week' }) => {
                 calendarData={calendarData}
                 selectedSlot={selectedSlot}
                 onSlotClick={handleSlotClick}
+                mode={mode}
+                showOnlyAvailable={showOnlyAvailable}
             />
         </div>
     );

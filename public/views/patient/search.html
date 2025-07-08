@@ -14,38 +14,7 @@
 </head>
 <body>
     <div id="universal-header-root"></div>
-    <div class="container">
-        <h1>Search Database</h1>
-        <form id="searchForm">
-            <div class="form-group">
-                <label for="firstName">First Name:</label>
-                <select id="firstName" name="firstName" aria-label="Select patient name"></select>
-            </div>
-            <div class="form-group">
-                <label for="phone">Phone:</label>
-                <select id="phone" name="phone" aria-label="Select patient phone"></select>
-            </div>
-            <div class="form-group">
-                <label for="patientId">Patient ID:</label>
-                <select id="id" name="patientId" aria-label="Select patient ID"></select>
-            </div>
-            <button type="submit">Search</button>
-        </form>
-        <div id="results" role="alert" aria-live="polite"></div>
-        <div id="error-message" class="error-message" role="alert"></div>
-        
-        <!-- Cross-navigation buttons -->
-        <div class="cross-nav-section">
-            <button type="button" id="view-appointments-btn" class="nav-action-btn">
-                <i class="fas fa-calendar-day"></i>
-                View Today's Appointments
-            </button>
-            <button type="button" id="view-calendar-btn" class="nav-action-btn">
-                <i class="fas fa-calendar-alt"></i>
-                View Full Calendar
-            </button>
-        </div>
-    </div>
+    <div id="search-component-root"></div>
     <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
     
     <!-- Load navigation components -->
@@ -53,7 +22,8 @@
     <script type="module">
         import React from 'react';
         import ReactDOM from 'react-dom/client';
-        import UniversalHeader from '../../js/components/shared/UniversalHeader.jsx';
+        import UniversalHeader from '../../js/components/react/UniversalHeader.jsx';
+        import SearchComponent from '../../js/components/react/SearchComponent.jsx';
         
         document.addEventListener('DOMContentLoaded', function() {
             const headerRoot = document.getElementById('universal-header-root');
@@ -61,20 +31,14 @@
                 const root = ReactDOM.createRoot(headerRoot);
                 root.render(React.createElement(UniversalHeader));
             }
-        });
-    </script>
-    
-    <!-- Initialize Universal Header -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const headerRoot = document.getElementById('universal-header-root');
-            if (headerRoot && window.React && window.ReactDOM && window.UniversalHeader) {
-                const root = ReactDOM.createRoot(headerRoot);
-                root.render(React.createElement(UniversalHeader));
+            
+            const searchRoot = document.getElementById('search-component-root');
+            if (searchRoot) {
+                const root = ReactDOM.createRoot(searchRoot);
+                root.render(React.createElement(SearchComponent));
             }
         });
     </script>
     
-    <script type="module" src="../../js/pages/search.js"></script>
 </body>
 </html>

@@ -8,7 +8,7 @@
 import React from 'react'
 import TimeSlot from './TimeSlot.jsx'
 
-const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick }) => {
+const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', showOnlyAvailable = false }) => {
     if (!calendarData || !calendarData.days || !calendarData.timeSlots) {
         return (
             <div className="calendar-grid loading">
@@ -141,6 +141,27 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick }) => {
                                 patientName: appointments.length > 0 ? appointments[0].patientName : null
                             };
 
+                            // In selection mode with showOnlyAvailable, hide non-available slots
+                            const shouldHideSlot = mode === 'selection' && showOnlyAvailable && 
+                                                 slotData.slotStatus !== 'available';
+                            
+                            if (shouldHideSlot) {
+                                return (
+                                    <div 
+                                        key={`${day.date}-${timeSlot}`}
+                                        className="time-slot unavailable-hidden"
+                                        style={{
+                                            minHeight: `${uniformHeight}px`,
+                                            height: `${uniformHeight}px`
+                                        }}
+                                    >
+                                        <div className="unavailable-content">
+                                            <span className="unavailable-text">Not Available</span>
+                                        </div>
+                                    </div>
+                                );
+                            }
+
                             return (
                                 <TimeSlot
                                     key={`${day.date}-${timeSlot}`}
@@ -150,6 +171,8 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick }) => {
                                                selectedSlot.date === day.date && 
                                                selectedSlot.time === timeSlot}
                                     uniformHeight={uniformHeight}
+                                    mode={mode}
+                                    showOnlyAvailable={showOnlyAvailable}
                                 />
                             );
                         })}

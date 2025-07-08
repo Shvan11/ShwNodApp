@@ -10,6 +10,7 @@ import { getWhatsAppMessages } from '../services/database/queries/messaging-quer
 import { getPatientsPhones, getInfos, createPatient, getReferralSources, getPatientTypes, getAddresses, getGenders } from '../services/database/queries/patient-queries.js';
 import { getPayments, getActiveWorkForInvoice, getCurrentExchangeRate, addInvoice, updateExchangeRate } from '../services/database/queries/payment-queries.js';
 import { getWires, getVisitsSummary, addVisit, updateVisit, deleteVisit, getVisitDetailsByID, getLatestWire } from '../services/database/queries/visit-queries.js';
+import { getWorksByPatient, getWorkDetails, addWork, updateWork, finishWork, getActiveWork, getWorkTypes, getWorkKeywords, getWorkDetailsList, addWorkDetail, updateWorkDetail, deleteWorkDetail } from '../services/database/queries/work-queries.js';
 import whatsapp from '../services/messaging/whatsapp.js';
 import { sendImg_, sendXray_ } from '../services/messaging/whatsapp-api.js';
 import { wsEmitter } from '../index.js';
@@ -40,6 +41,50 @@ router.get("/getinfos", async (req, res) => {
     const { code: pid } = req.query;
     const infos = await getInfos(pid);
     res.json(infos);
+});
+
+// Get doctors only (Position = Doctor)
+router.get("/doctors", async (req, res) => {
+    try {
+        const query = `
+            SELECT e.ID, e.employeeName 
+            FROM tblEmployees e 
+            INNER JOIN tblPositions p ON e.Position = p.ID 
+            WHERE p.PositionName = 'Doctor'
+            ORDER BY e.employeeName
+        `;
+        const doctors = await database.executeQuery(
+            query,
+            [],
+            (columns) => ({
+                ID: columns[0].value,
+                employeeName: columns[1].value
+            })
+        );
+        res.json(doctors);
+    } catch (error) {
+        console.error('Error fetching doctors:', error);
+        res.status(500).json({ error: 'Failed to fetch doctors' });
+    }
+});
+
+// Get appointment details
+router.get("/appointment-details", async (req, res) => {
+    try {
+        const query = `SELECT ID, Detail FROM tblDetail ORDER BY Detail`;
+        const details = await database.executeQuery(
+            query,
+            [],
+            (columns) => ({
+                ID: columns[0].value,
+                Detail: columns[1].value
+            })
+        );
+        res.json(details);
+    } catch (error) {
+        console.error('Error fetching appointment details:', error);
+        res.status(500).json({ error: 'Failed to fetch appointment details' });
+    }
 });
 
 // Get time points
@@ -799,6 +844,115 @@ router.post("/updateExchangeRate", async (req, res) => {
     } catch (error) {
         console.error("Error updating exchange rate:", error);
         res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+// Create new appointment
+router.post("/appointments", async (req, res) => {
+    try {
+        const { PersonID, AppDate, AppDetail, DrID } = req.body;
+        
+        // Validate required fields
+        if (!PersonID || !AppDate || !AppDetail || !DrID) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required fields: PersonID, AppDate, AppDetail, DrID'
+            });
+        }
+        
+        // Validate data types
+        if (isNaN(parseInt(PersonID)) || isNaN(parseInt(DrID))) {
+            return res.status(400).json({
+                success: false,
+                error: 'PersonID and DrID must be valid numbers'
+            });
+        }
+        
+        // Validate date format
+        const appointmentDate = new Date(AppDate);
+        if (isNaN(appointmentDate.getTime())) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid date format for AppDate'
+            });
+        }
+        
+        // Check if doctor exists and is actually a doctor
+        const doctorCheck = await database.executeQuery(`
+            SELECT e.ID, e.employeeName, p.PositionName 
+            FROM tblEmployees e 
+            INNER JOIN tblPositions p ON e.Position = p.ID 
+            WHERE e.ID = ? AND p.PositionName = 'Doctor'
+        `, [parseInt(DrID)]);
+        
+        if (!doctorCheck || doctorCheck.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid doctor ID or employee is not a doctor'
+            });
+        }
+        
+        // Check for appointment conflicts (same patient, same day)
+        const conflictCheck = await database.executeQuery(`
+            SELECT appointmentID 
+            FROM tblappointments 
+            WHERE PersonID = ? AND CAST(AppDate AS DATE) = CAST(? AS DATE)
+        `, [parseInt(PersonID), AppDate]);
+        
+        if (conflictCheck && conflictCheck.length > 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'Patient already has an appointment on this date'
+            });
+        }
+        
+        // Insert new appointment (defaults will be applied automatically)
+        const insertQuery = `
+            INSERT INTO tblappointments (
+                PersonID, 
+                AppDate, 
+                AppDetail, 
+                DrID,
+                LastUpdated
+            ) VALUES (?, ?, ?, ?, GETDATE())
+        `;
+        
+        const result = await database.executeQuery(insertQuery, [
+            parseInt(PersonID),
+            AppDate,
+            AppDetail,
+            parseInt(DrID)
+        ]);
+        
+        // Get the newly created appointment ID
+        const newAppointmentId = result.insertId || result.recordset?.[0]?.appointmentID;
+        
+        console.log(`New appointment created - ID: ${newAppointmentId}, Patient: ${PersonID}, Doctor: ${doctorCheck[0].employeeName}, Date: ${AppDate}`);
+        
+        // Emit WebSocket event for real-time updates
+        const appointmentDay = appointmentDate.toISOString().split('T')[0];
+        wsEmitter.emit('appointments_updated', appointmentDay);
+        
+        res.json({
+            success: true,
+            appointmentID: newAppointmentId,
+            message: 'Appointment created successfully',
+            appointment: {
+                PersonID: parseInt(PersonID),
+                AppDate,
+                AppDetail,
+                DrID: parseInt(DrID),
+                doctorName: doctorCheck[0].employeeName
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error creating appointment:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to create appointment',
+            details: error.message
+        });
     }
 });
 
@@ -1583,6 +1737,313 @@ router.post('/patients', async (req, res) => {
         res.status(500).json({
             error: error.message || "Failed to create patient"
         });
+    }
+});
+
+// ===== WORK MANAGEMENT API ENDPOINTS =====
+
+// Get all works for a patient
+router.get('/getworks', async (req, res) => {
+    try {
+        const { code: personId } = req.query;
+        if (!personId) {
+            return res.status(400).json({ error: "Missing required parameter: code (PersonID)" });
+        }
+
+        const works = await getWorksByPatient(parseInt(personId));
+        res.json(works);
+    } catch (error) {
+        console.error("Error fetching works:", error);
+        res.status(500).json({ error: "Failed to fetch works" });
+    }
+});
+
+// Get specific work details
+router.get('/getworkdetails', async (req, res) => {
+    try {
+        const { workId } = req.query;
+        if (!workId) {
+            return res.status(400).json({ error: "Missing required parameter: workId" });
+        }
+
+        const workDetails = await getWorkDetails(parseInt(workId));
+        if (!workDetails) {
+            return res.status(404).json({ error: "Work not found" });
+        }
+        
+        res.json(workDetails);
+    } catch (error) {
+        console.error("Error fetching work details:", error);
+        res.status(500).json({ error: "Failed to fetch work details" });
+    }
+});
+
+// Add new work
+router.post('/addwork', async (req, res) => {
+    try {
+        const workData = req.body;
+        
+        // Validate required fields
+        if (!workData.PersonID || !workData.DrID) {
+            return res.status(400).json({ 
+                error: "Missing required fields: PersonID and DrID are required" 
+            });
+        }
+
+        // Validate data types
+        if (isNaN(parseInt(workData.PersonID)) || isNaN(parseInt(workData.DrID))) {
+            return res.status(400).json({
+                error: "PersonID and DrID must be valid numbers"
+            });
+        }
+
+        // Convert date strings to proper Date objects if provided
+        ['StartDate', 'DebondDate', 'FPhotoDate', 'IPhotoDate', 'NotesDate'].forEach(field => {
+            if (workData[field] && typeof workData[field] === 'string') {
+                const date = new Date(workData[field]);
+                if (isNaN(date.getTime())) {
+                    return res.status(400).json({
+                        error: `Invalid date format for ${field}`
+                    });
+                }
+                workData[field] = date;
+            }
+        });
+
+        const result = await addWork(workData);
+        res.json({ 
+            success: true, 
+            workId: result.workid,
+            message: "Work added successfully" 
+        });
+    } catch (error) {
+        console.error("Error adding work:", error);
+        res.status(500).json({ error: "Failed to add work", details: error.message });
+    }
+});
+
+// Update existing work
+router.put('/updatework', async (req, res) => {
+    try {
+        const { workId, ...workData } = req.body;
+        
+        if (!workId) {
+            return res.status(400).json({ error: "Missing required field: workId" });
+        }
+
+        // Validate DrID is provided
+        if (!workData.DrID) {
+            return res.status(400).json({ error: "DrID is required" });
+        }
+
+        // Validate data types
+        if (isNaN(parseInt(workId)) || isNaN(parseInt(workData.DrID))) {
+            return res.status(400).json({
+                error: "workId and DrID must be valid numbers"
+            });
+        }
+
+        // Convert date strings to proper Date objects if provided
+        ['StartDate', 'DebondDate', 'FPhotoDate', 'IPhotoDate', 'NotesDate'].forEach(field => {
+            if (workData[field] && typeof workData[field] === 'string') {
+                const date = new Date(workData[field]);
+                if (isNaN(date.getTime())) {
+                    return res.status(400).json({
+                        error: `Invalid date format for ${field}`
+                    });
+                }
+                workData[field] = date;
+            }
+        });
+
+        const result = await updateWork(parseInt(workId), workData);
+        res.json({ 
+            success: true, 
+            message: "Work updated successfully",
+            rowsAffected: result.rowCount
+        });
+    } catch (error) {
+        console.error("Error updating work:", error);
+        res.status(500).json({ error: "Failed to update work", details: error.message });
+    }
+});
+
+// Finish/Complete work
+router.post('/finishwork', async (req, res) => {
+    try {
+        const { workId } = req.body;
+        
+        if (!workId) {
+            return res.status(400).json({ error: "Missing required field: workId" });
+        }
+
+        if (isNaN(parseInt(workId))) {
+            return res.status(400).json({ error: "workId must be a valid number" });
+        }
+
+        const result = await finishWork(parseInt(workId));
+        res.json({ 
+            success: true, 
+            message: "Work completed successfully",
+            rowsAffected: result.rowCount
+        });
+    } catch (error) {
+        console.error("Error finishing work:", error);
+        res.status(500).json({ error: "Failed to finish work", details: error.message });
+    }
+});
+
+// Get active work for a patient
+router.get('/getactivework', async (req, res) => {
+    try {
+        const { code: personId } = req.query;
+        if (!personId) {
+            return res.status(400).json({ error: "Missing required parameter: code (PersonID)" });
+        }
+
+        const activeWork = await getActiveWork(parseInt(personId));
+        res.json(activeWork);
+    } catch (error) {
+        console.error("Error fetching active work:", error);
+        res.status(500).json({ error: "Failed to fetch active work" });
+    }
+});
+
+// Get work types for dropdown
+router.get('/getworktypes', async (req, res) => {
+    try {
+        const workTypes = await getWorkTypes();
+        res.json(workTypes);
+    } catch (error) {
+        console.error("Error fetching work types:", error);
+        res.status(500).json({ error: "Failed to fetch work types" });
+    }
+});
+
+// Get work keywords for dropdown
+router.get('/getworkkeywords', async (req, res) => {
+    try {
+        const keywords = await getWorkKeywords();
+        res.json(keywords);
+    } catch (error) {
+        console.error("Error fetching work keywords:", error);
+        res.status(500).json({ error: "Failed to fetch work keywords" });
+    }
+});
+
+// ===== WORK DETAILS API ENDPOINTS =====
+
+// Get work details list for a specific work
+router.get('/getworkdetailslist', async (req, res) => {
+    try {
+        const { workId } = req.query;
+        if (!workId) {
+            return res.status(400).json({ error: "Missing required parameter: workId" });
+        }
+
+        const workDetailsList = await getWorkDetailsList(parseInt(workId));
+        res.json(workDetailsList);
+    } catch (error) {
+        console.error("Error fetching work details list:", error);
+        res.status(500).json({ error: "Failed to fetch work details list" });
+    }
+});
+
+// Add new work detail
+router.post('/addworkdetail', async (req, res) => {
+    try {
+        const workDetailData = req.body;
+        
+        // Validate required fields
+        if (!workDetailData.WorkID) {
+            return res.status(400).json({ 
+                error: "Missing required field: WorkID" 
+            });
+        }
+
+        // Validate data types
+        if (isNaN(parseInt(workDetailData.WorkID))) {
+            return res.status(400).json({
+                error: "WorkID must be a valid number"
+            });
+        }
+
+        // Validate CanalsNo if provided
+        if (workDetailData.CanalsNo && isNaN(parseInt(workDetailData.CanalsNo))) {
+            return res.status(400).json({
+                error: "CanalsNo must be a valid number"
+            });
+        }
+
+        const result = await addWorkDetail(workDetailData);
+        res.json({ 
+            success: true, 
+            detailId: result.ID,
+            message: "Work detail added successfully" 
+        });
+    } catch (error) {
+        console.error("Error adding work detail:", error);
+        res.status(500).json({ error: "Failed to add work detail", details: error.message });
+    }
+});
+
+// Update existing work detail
+router.put('/updateworkdetail', async (req, res) => {
+    try {
+        const { detailId, ...workDetailData } = req.body;
+        
+        if (!detailId) {
+            return res.status(400).json({ error: "Missing required field: detailId" });
+        }
+
+        // Validate data types
+        if (isNaN(parseInt(detailId))) {
+            return res.status(400).json({
+                error: "detailId must be a valid number"
+            });
+        }
+
+        // Validate CanalsNo if provided
+        if (workDetailData.CanalsNo && isNaN(parseInt(workDetailData.CanalsNo))) {
+            return res.status(400).json({
+                error: "CanalsNo must be a valid number"
+            });
+        }
+
+        const result = await updateWorkDetail(parseInt(detailId), workDetailData);
+        res.json({ 
+            success: true, 
+            message: "Work detail updated successfully",
+            rowsAffected: result.rowCount
+        });
+    } catch (error) {
+        console.error("Error updating work detail:", error);
+        res.status(500).json({ error: "Failed to update work detail", details: error.message });
+    }
+});
+
+// Delete work detail
+router.delete('/deleteworkdetail', async (req, res) => {
+    try {
+        const { detailId } = req.body;
+        
+        if (!detailId) {
+            return res.status(400).json({ error: "Missing required field: detailId" });
+        }
+
+        if (isNaN(parseInt(detailId))) {
+            return res.status(400).json({ error: "detailId must be a valid number" });
+        }
+
+        const result = await deleteWorkDetail(parseInt(detailId));
+        res.json({ 
+            success: true, 
+            message: "Work detail deleted successfully",
+            rowsAffected: result.rowCount
+        });
+    } catch (error) {
+        console.error("Error deleting work detail:", error);
+        res.status(500).json({ error: "Failed to delete work detail", details: error.message });
     }
 });
 

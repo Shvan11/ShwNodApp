@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import AppointmentCalendar from '../components/react/AppointmentCalendar.jsx'
-import UniversalHeader from '../components/shared/UniversalHeader.jsx'
+import UniversalHeader from '../components/react/UniversalHeader.jsx'
 import '../../css/base/variables.css'
 import '../../css/base/reset.css'
 import '../../css/base/typography.css'
