@@ -20,9 +20,10 @@ const serviceConfig = {
     '--harmony',
     '--max_old_space_size=4096'
   ],
-  env: {
-    NODE_ENV: 'production'
-  }
+  env: [{
+    name: 'NODE_ENV',
+    value: 'production'
+  }]
 };
 
 /**
