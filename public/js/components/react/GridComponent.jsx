@@ -210,25 +210,8 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                                         
                                         const { fullPath } = await response.json();
                                         
-                                        // Apply same descriptive renaming as download
-                                        const fileName = webPath.substring(webPath.lastIndexOf('/') + 1);
-                                        const extensionMatch = fileName.match(/\.([^.]+)$/);
-                                        const extension = extensionMatch ? extensionMatch[1] : '';
-                                        
-                                        const fileNameMap = {
-                                            'i10': 'Profile.jpg',
-                                            'i12': 'Rest.jpg',
-                                            'i13': 'Smile.jpg',
-                                            'i23': 'Upper.jpg',
-                                            'i24': 'Lower.jpg',
-                                            'i20': 'Right.jpg',
-                                            'i22': 'Center.jpg',
-                                            'i21': 'Left.jpg'
-                                        };
-                                        
-                                        const patientPrefix = fileName.split('.')[0]; // e.g., "21400"
-                                        const descriptiveName = fileNameMap[extension] || `${patientPrefix}.jpg`;
-                                        const convertedPath = fullPath.replace(/[^/\\]+$/, descriptiveName);
+                                        // Use actual file path - backend will handle filename conversion
+                                        const convertedPath = fullPath;
                                         console.log('Converted to full path:', convertedPath);
                                         
                                         const sendMessageUrl = `/views/messaging/send-message.html?file=${encodeURIComponent(convertedPath)}`;
