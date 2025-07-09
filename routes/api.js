@@ -28,6 +28,7 @@ import { WebSocketEvents, createStandardMessage } from '../services/messaging/we
 import HealthCheck from '../services/monitoring/HealthCheck.js';
 import * as messagingQueries from '../services/database/queries/messaging-queries.js';
 import { getContacts } from '../services/authentication/google.js';
+import { createPathResolver } from '../utils/path-resolver.js';
 
 const router = express.Router();
 const upload = multer();
@@ -1632,9 +1633,18 @@ router.get('/convert-path', async (req, res) => {
     try {
         const { path: webPath } = req.query;
         
+        console.log('Convert-path request received:', { webPath, machinePath: config.fileSystem.machinePath });
+        
         if (!webPath) {
             return res.status(400).json({
                 error: "Missing path parameter"
+            });
+        }
+
+        if (!config.fileSystem.machinePath) {
+            console.error('MACHINE_PATH environment variable not set');
+            return res.status(500).json({
+                error: "MACHINE_PATH environment variable not configured"
             });
         }
 
@@ -1646,12 +1656,15 @@ router.get('/convert-path', async (req, res) => {
             const fileName = webPath.replace('DolImgs/', '');
             const fullPath = pathResolver(`working/${fileName}`);
             
+            console.log('Path conversion successful:', { webPath, fileName, fullPath });
+            
             res.json({
                 webPath: webPath,
                 fullPath: fullPath
             });
         } else {
             // If not a DolImgs path, return as-is (could be already a full path)
+            console.log('Path not a DolImgs path, returning as-is:', webPath);
             res.json({
                 webPath: webPath,
                 fullPath: webPath

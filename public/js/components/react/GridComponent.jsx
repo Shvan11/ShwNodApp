@@ -236,9 +236,7 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                                         
                                     } catch (error) {
                                         console.error('Error converting path for send message:', error);
-                                        
-                                        const sendMessageUrl = `/views/messaging/send-message.html?file=${encodeURIComponent(imageSrc)}`;
-                                        window.open(sendMessageUrl, '_blank');
+                                        alert('Failed to convert file path for messaging. Please check the console for details.');
                                     }
                                 });
                             }
