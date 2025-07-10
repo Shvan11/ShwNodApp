@@ -776,7 +776,8 @@ class WebSocketService extends EventEmitter {
     const url = new URL(this.options.baseUrl);
     
     // Add screen ID only if needed (not for WhatsApp status clients or daily appointments clients)
-    if (params.clientType !== 'waStatus' && params.clientType !== 'daily-appointments') {
+    // Only add screen ID for appointments page
+    if (params.clientType === 'appointments') {
       // Load screen ID on demand
       if (!this.state.screenId) {
         this.state.screenId = storage.screenId() || 'unknown';

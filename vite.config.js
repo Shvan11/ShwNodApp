@@ -18,7 +18,8 @@ export default defineConfig({
         calendar: resolve(__dirname, 'public/views/appointments/calendar.html'),
         search: resolve(__dirname, 'public/views/patient/search.html'),
         'add-patient': resolve(__dirname, 'public/views/patient/add-patient.html'),
-        'grid': resolve(__dirname, 'public/views/patient/grid_.html')
+        'grid': resolve(__dirname, 'public/views/patient/grid_.html'),
+        'send-message': resolve(__dirname, 'public/views/messaging/send-message.html')
       }
     }
   },
@@ -27,6 +28,7 @@ export default defineConfig({
     host: true,
     open: true,
     proxy: {
+      // Proxy API and data routes to Express server
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true
@@ -36,6 +38,42 @@ export default defineConfig({
         changeOrigin: true
       },
       '/DolImgs': {
+        target: 'http://localhost:3000',
+        changeOrigin: true
+      },
+      // Proxy routes that need Express routing but serve pages through Vite
+      '/dashboard': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        rewrite: (path) => '/views/dashboard.html'
+      },
+      '/calendar': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        rewrite: (path) => '/views/appointments/calendar.html'
+      },
+      '/appointments': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        rewrite: (path) => '/views/appointments/daily-appointments.html'
+      },
+      '/search': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        rewrite: (path) => '/views/patient/search.html'
+      },
+      '/send-message': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        rewrite: (path) => '/views/messaging/send-message.html'
+      },
+      '/auth': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        rewrite: (path) => '/views/messaging/auth.html'
+      },
+      // Patient routes need Express for dynamic handling
+      '/patient': {
         target: 'http://localhost:3000',
         changeOrigin: true
       }

@@ -30,6 +30,7 @@
     "qrcode": "^1.5.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-select": "^5.10.1",
     "tedious": "^16.6.1",
     "telegram": "^2.19.10",
     "twilio": "^4.21.0",

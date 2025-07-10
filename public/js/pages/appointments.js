@@ -715,7 +715,7 @@ class AppointmentsPageController {
 
     websocketService.on('patient_unloaded', handlePatientUnloaded);
 
-    websocketService.connect();
+    websocketService.connect({ clientType: 'appointments' });
   }
 
   /**
@@ -833,7 +833,7 @@ class AppointmentsPageController {
         () => {
           this.init();
           websocketService.disconnect();
-          websocketService.connect();
+          websocketService.connect({ clientType: 'appointments' });
         }
       ),
       this.dateString
