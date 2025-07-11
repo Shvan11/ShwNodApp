@@ -81,6 +81,14 @@ web_modules/
 .env.production.local
 .env.local
 
+# SSL certificates and private keys (SECURITY: Never commit these!)
+ssl/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache

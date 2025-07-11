@@ -19,8 +19,16 @@ for (const envVar of requiredEnvVars) {
   }
 }
 
-// Platform-specific port configuration
+// Platform-specific port configuration with HTTPS support
 function getDefaultPort() {
+  // Check if HTTPS is enabled
+  const httpsEnabled = process.env.ENABLE_HTTPS === 'true';
+  
+  // If HTTPS is enabled, use standard HTTPS port regardless of platform
+  if (httpsEnabled) {
+    return 443; // Standard HTTPS port
+  }
+  
   // Check if running in WSL (Linux with WSL_DISTRO_NAME environment variable)
   const isWSL = process.platform === 'linux' && process.env.WSL_DISTRO_NAME;
   
@@ -28,9 +36,9 @@ function getDefaultPort() {
   const platformType = process.env.PLATFORM_TYPE;
   
   if (platformType === 'wsl' || (isWSL && platformType !== 'windows')) {
-    return 3000; // WSL/Ubuntu default port
+    return 3000; // WSL/Ubuntu default port (HTTP)
   } else {
-    return 80;   // Windows default port
+    return 80;   // Windows default port (HTTP)
   }
 }
 
