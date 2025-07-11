@@ -2,9 +2,11 @@
 import express from 'express';
 import path from 'path';
 import { createServer } from 'http';
+import { createServer as createHttpsServer } from 'https';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import config from './config/config.js';
+import sslConfig from './config/ssl.js';
 import { setupWebSocketServer } from './utils/websocket.js';
 import { setupMiddleware } from './middlewares/index.js';
 import apiRoutes from './routes/api.js';
@@ -31,7 +33,24 @@ dotenv.config();
 // Create Express app
 const app = express();
 const port = config.server.port || 80;
-const server = createServer(app);
+
+// ===== ADDED: Conditional HTTPS/HTTP server creation =====
+let server;
+const useHttps = process.env.ENABLE_HTTPS === 'true' && sslConfig.isAvailable();
+
+if (useHttps) {
+  const sslOptions = sslConfig.getOptions();
+  if (sslOptions) {
+    server = createHttpsServer(sslOptions, app);
+    console.log('🔒 HTTPS server will be created');
+  } else {
+    console.warn('⚠️  HTTPS requested but SSL certificates not available, falling back to HTTP');
+    server = createServer(app);
+  }
+} else {
+  server = createServer(app);
+  console.log('🌐 HTTP server will be created');
+}
 
 // ===== ADDED: Enhanced startup sequence with error handling =====
 async function initializeApplication() {
@@ -255,8 +274,9 @@ async function initializeApplication() {
     await initializeWhatsAppOnStartup();
 
     console.log('🎉 Application started successfully!');
-    console.log(`🌐 Server running at http://localhost:${port}`);
-    console.log(`📊 Health check available at http://localhost:${port}/api/health`);
+    const protocol = useHttps ? 'https' : 'http';
+    console.log(`🌐 Server running at ${protocol}://localhost:${port}`);
+    console.log(`📊 Health check available at ${protocol}://localhost:${port}/api/health`);
     
     return { wsEmitter };
 
@@ -474,11 +494,12 @@ export { gracefulShutdown };
 
 // ===== ADDED: Log application readiness =====
 console.log('🎯 Application initialization complete - ready to serve requests');
+const protocol = useHttps ? 'https' : 'http';
 console.log(`📋 Available endpoints:
-  • Main Application: http://localhost:${port}
-  • API Health Check: http://localhost:${port}/api/health
-  • Basic Health: http://localhost:${port}/health/basic
-  • WhatsApp Status: http://localhost:${port}/api/wa/status
+  • Main Application: ${protocol}://localhost:${port}
+  • API Health Check: ${protocol}://localhost:${port}/api/health
+  • Basic Health: ${protocol}://localhost:${port}/health/basic
+  • WhatsApp Status: ${protocol}://localhost:${port}/api/wa/status
 `);
 
 // ===== ADDED: Optional performance monitoring =====
