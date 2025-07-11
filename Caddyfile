@@ -1,0 +1,88 @@
+# Caddyfile for Shwan Orthodontics Application
+# This configuration sets up HTTPS reverse proxy for LAN use
+
+# Primary domain configuration
+clinic.local {
+    reverse_proxy localhost:3000
+    tls internal
+    
+    # Enable compression
+    encode gzip
+    
+    # Security headers
+    header {
+        # Prevent clickjacking
+        X-Frame-Options "SAMEORIGIN"
+        # XSS protection
+        X-XSS-Protection "1; mode=block"
+        # Content type sniffing protection
+        X-Content-Type-Options "nosniff"
+        # Referrer policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # Remove server info
+        -Server
+    }
+    
+    # WebSocket support for real-time messaging
+    @websocket {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @websocket localhost:3000
+    
+    # Logging for debugging
+    log {
+        output file /var/log/caddy/clinic.log
+        level INFO
+    }
+}
+
+# IP-based fallback configuration
+192.168.100.2 {
+    reverse_proxy localhost:3000
+    tls internal
+    
+    # Same configuration as above
+    encode gzip
+    
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-XSS-Protection "1; mode=block"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+    
+    @websocket {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @websocket localhost:3000
+    
+    log {
+        output file /var/log/caddy/clinic-ip.log
+        level INFO
+    }
+}
+
+# Alternative port configuration for development
+:8443 {
+    reverse_proxy localhost:3000
+    tls internal
+    
+    encode gzip
+    
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-XSS-Protection "1; mode=block"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+    
+    @websocket {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @websocket localhost:3000
+}

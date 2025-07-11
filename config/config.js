@@ -19,27 +19,11 @@ for (const envVar of requiredEnvVars) {
   }
 }
 
-// Platform-specific port configuration with HTTPS support
+// Universal port configuration for Caddy reverse proxy setup
 function getDefaultPort() {
-  // Check if HTTPS is enabled
-  const httpsEnabled = process.env.ENABLE_HTTPS === 'true';
-  
-  // If HTTPS is enabled, use standard HTTPS port regardless of platform
-  if (httpsEnabled) {
-    return 443; // Standard HTTPS port
-  }
-  
-  // Check if running in WSL (Linux with WSL_DISTRO_NAME environment variable)
-  const isWSL = process.platform === 'linux' && process.env.WSL_DISTRO_NAME;
-  
-  // Force platform type if specified
-  const platformType = process.env.PLATFORM_TYPE;
-  
-  if (platformType === 'wsl' || (isWSL && platformType !== 'windows')) {
-    return 3000; // WSL/Ubuntu default port (HTTP)
-  } else {
-    return 80;   // Windows default port (HTTP)
-  }
+  // Since Caddy handles HTTPS termination, use consistent port 3000
+  // for both Windows and Ubuntu environments
+  return 3000;
 }
 
 export default {
