@@ -390,12 +390,6 @@ const WorkComponent = ({ patientId }) => {
                     <h3>Completed</h3>
                     <span className="summary-value">{works.filter(w => w.Finished).length}</span>
                 </div>
-                <div className="summary-card">
-                    <h3>Total Value</h3>
-                    <span className="summary-value">
-                        {formatCurrency(works.reduce((sum, w) => sum + (w.TotalRequired || 0), 0), 'USD')}
-                    </span>
-                </div>
             </div>
 
             <div className="work-table-container">

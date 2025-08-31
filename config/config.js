@@ -29,6 +29,7 @@ function getDefaultPort() {
 export default {
   database: {
     server: process.env.DB_SERVER,
+    database: process.env.DB_DATABASE || 'ShwanNew',
     options: {
       instanceName: process.env.DB_INSTANCE,
       encrypt: false,

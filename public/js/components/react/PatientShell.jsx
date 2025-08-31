@@ -25,6 +25,7 @@ const PatientShell = () => {
     
     const [currentUrl, setCurrentUrl] = useState(parseCurrentUrl());
     const [isNavigationCollapsed, setIsNavigationCollapsed] = useState(false);
+    const [patientData, setPatientData] = useState({ name: '', loading: true, error: null });
     
     const handleNavigate = useCallback((page) => {
         // Build new URL with current patient ID and new page
@@ -37,6 +38,42 @@ const PatientShell = () => {
         // Update component state to trigger re-render
         setCurrentUrl(parseCurrentUrl());
     }, [currentUrl.patientId]);
+
+    // Fetch patient data when patient ID changes
+    const fetchPatientData = useCallback(async (patientId) => {
+        if (!patientId) {
+            setPatientData({ name: '', loading: false, error: 'No patient ID provided' });
+            return;
+        }
+
+        try {
+            setPatientData(prev => ({ ...prev, loading: true, error: null }));
+            const response = await fetch(`/api/getinfos?code=${patientId}`);
+            
+            if (!response.ok) {
+                throw new Error(`Failed to fetch patient data: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            const patientName = data.name || `Patient ${patientId}`;
+            
+            setPatientData({ name: patientName, loading: false, error: null });
+        } catch (error) {
+            console.error('Error fetching patient data:', error);
+            setPatientData({ 
+                name: `Patient ${patientId}`, 
+                loading: false, 
+                error: error.message 
+            });
+        }
+    }, []);
+
+    // Fetch patient data when patient ID changes
+    useEffect(() => {
+        if (currentUrl.patientId) {
+            fetchPatientData(currentUrl.patientId);
+        }
+    }, [currentUrl.patientId, fetchPatientData]);
     
     // Listen for browser back/forward events and custom URL changes
     useEffect(() => {
@@ -111,7 +148,8 @@ const PatientShell = () => {
                     <nav className="breadcrumb">
                         <span className="breadcrumb-item">
                             <i className="fas fa-user"></i>
-                            Patient {currentUrl.patientId}
+                            {' '}
+                            {patientData.loading ? `Patient ${currentUrl.patientId}` : patientData.name}
                         </span>
                         {currentUrl.page !== 'grid' && (
                             <>

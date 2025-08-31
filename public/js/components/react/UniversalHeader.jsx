@@ -142,6 +142,7 @@ const UniversalHeader = () => {
         window.location.href = '/appointments';
     };
 
+
     // Header navigation items configuration
     const getNavigationItems = () => {
         return [
@@ -165,7 +166,7 @@ const UniversalHeader = () => {
                 icon: 'fas fa-search',
                 onClick: navigateToSearch,
                 isActive: window.location.pathname.includes('/search')
-            }
+            },
         ];
     };
 

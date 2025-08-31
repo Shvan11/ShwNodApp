@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="System Settings Interface">
+    <title>Settings - Shwan Orthodontics</title>
+    <link rel="stylesheet" href="../css/main.css" />
+    <link rel="stylesheet" href="../css/pages/settings.css" />
+    <link rel="stylesheet" href="../css/components/universal-header.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <!-- React handled by Vite -->
+</head>
+<body>
+    <div id="universal-header-root"></div>
+    <div id="settings-component-root"></div>
+    
+    <!-- Load navigation components -->
+    <script type="module">
+        import React from 'react';
+        import ReactDOM from 'react-dom/client';
+        import UniversalHeader from '../js/components/react/UniversalHeader.jsx';
+        import SettingsComponent from '../js/components/react/SettingsComponent.jsx';
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const headerRoot = document.getElementById('universal-header-root');
+            if (headerRoot) {
+                const root = ReactDOM.createRoot(headerRoot);
+                root.render(React.createElement(UniversalHeader));
+            }
+            
+            const settingsRoot = document.getElementById('settings-component-root');
+            if (settingsRoot) {
+                const root = ReactDOM.createRoot(settingsRoot);
+                root.render(React.createElement(SettingsComponent));
+            }
+        });
+    </script>
+    
+</body>
+</html>

@@ -13,7 +13,16 @@ import { getWires, getVisitsSummary, addVisit, updateVisit, deleteVisit, getVisi
 import { getWorksByPatient, getWorkDetails, addWork, updateWork, finishWork, getActiveWork, getWorkTypes, getWorkKeywords, getWorkDetailsList, addWorkDetail, updateWorkDetail, deleteWorkDetail } from '../services/database/queries/work-queries.js';
 import whatsapp from '../services/messaging/whatsapp.js';
 import { sendImg_, sendXray_ } from '../services/messaging/whatsapp-api.js';
-import { wsEmitter } from '../index.js';
+// WebSocket emitter will be injected to avoid circular imports
+let wsEmitter = null;
+
+/**
+ * Set the WebSocket emitter reference
+ * @param {EventEmitter} emitter - WebSocket event emitter
+ */
+export function setWebSocketEmitter(emitter) {
+    wsEmitter = emitter;
+}
 import sms from '../services/messaging/sms.js';
 import * as imaging from '../services/imaging/index.js';
 import multer from 'multer';
@@ -29,6 +38,8 @@ import HealthCheck from '../services/monitoring/HealthCheck.js';
 import * as messagingQueries from '../services/database/queries/messaging-queries.js';
 import { getContacts } from '../services/authentication/google.js';
 import { createPathResolver } from '../utils/path-resolver.js';
+import { getAllOptions, getOption, updateOption, getOptionsByPattern, bulkUpdateOptions } from '../services/database/queries/options-queries.js';
+import DatabaseConfigService from '../services/config/DatabaseConfigService.js';
 
 const router = express.Router();
 const upload = multer();
@@ -901,8 +912,8 @@ router.post("/appointments", async (req, res) => {
             SELECT e.ID, e.employeeName, p.PositionName 
             FROM tblEmployees e 
             INNER JOIN tblPositions p ON e.Position = p.ID 
-            WHERE e.ID = ? AND p.PositionName = 'Doctor'
-        `, [parseInt(DrID)]);
+            WHERE e.ID = @drID AND p.PositionName = 'Doctor'
+        `, [['drID', database.TYPES.Int, parseInt(DrID)]]);
         
         if (!doctorCheck || doctorCheck.length === 0) {
             return res.status(400).json({
@@ -915,8 +926,11 @@ router.post("/appointments", async (req, res) => {
         const conflictCheck = await database.executeQuery(`
             SELECT appointmentID 
             FROM tblappointments 
-            WHERE PersonID = ? AND CAST(AppDate AS DATE) = CAST(? AS DATE)
-        `, [parseInt(PersonID), AppDate]);
+            WHERE PersonID = @personID AND CAST(AppDate AS DATE) = CAST(@appDate AS DATE)
+        `, [
+            ['personID', database.TYPES.Int, parseInt(PersonID)],
+            ['appDate', database.TYPES.DateTime, AppDate]
+        ]);
         
         if (conflictCheck && conflictCheck.length > 0) {
             return res.status(400).json({
@@ -933,24 +947,28 @@ router.post("/appointments", async (req, res) => {
                 AppDetail, 
                 DrID,
                 LastUpdated
-            ) VALUES (?, ?, ?, ?, GETDATE())
+            ) VALUES (@personID, @appDate, @appDetail, @drID, GETDATE())
         `;
         
         const result = await database.executeQuery(insertQuery, [
-            parseInt(PersonID),
-            AppDate,
-            AppDetail,
-            parseInt(DrID)
+            ['personID', database.TYPES.Int, parseInt(PersonID)],
+            ['appDate', database.TYPES.DateTime, AppDate],
+            ['appDetail', database.TYPES.NVarChar, AppDetail],
+            ['drID', database.TYPES.Int, parseInt(DrID)]
         ]);
         
         // Get the newly created appointment ID
         const newAppointmentId = result.insertId || result.recordset?.[0]?.appointmentID;
         
-        console.log(`New appointment created - ID: ${newAppointmentId}, Patient: ${PersonID}, Doctor: ${doctorCheck[0].employeeName}, Date: ${AppDate}`);
+        console.log(`New appointment created - ID: ${newAppointmentId}, Patient: ${PersonID}, Doctor: ${doctorCheck[0]?.employeeName || 'Unknown'}, Date: ${AppDate}`);
+        console.log('Result object:', result);
+        console.log('Doctor check result:', doctorCheck);
         
         // Emit WebSocket event for real-time updates
-        const appointmentDay = appointmentDate.toISOString().split('T')[0];
-        wsEmitter.emit('appointments_updated', appointmentDay);
+        if (wsEmitter) {
+            const appointmentDay = appointmentDate.toISOString().split('T')[0];
+            wsEmitter.emit('appointments_updated', appointmentDay);
+        }
         
         res.json({
             success: true,
@@ -2075,6 +2093,334 @@ router.delete('/deleteworkdetail', async (req, res) => {
     } catch (error) {
         console.error("Error deleting work detail:", error);
         res.status(500).json({ error: "Failed to delete work detail", details: error.message });
+    }
+});
+
+// Settings/Options routes
+router.get("/options", async (req, res) => {
+    try {
+        const options = await getAllOptions();
+        res.json({ status: 'success', options });
+    } catch (error) {
+        console.error("Error getting options:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+router.get("/options/:optionName", async (req, res) => {
+    try {
+        const { optionName } = req.params;
+        const value = await getOption(optionName);
+        
+        if (value === null) {
+            return res.status(404).json({ 
+                status: 'error', 
+                message: 'Option not found' 
+            });
+        }
+        
+        res.json({ status: 'success', optionName, value });
+    } catch (error) {
+        console.error("Error getting option:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+router.put("/options/:optionName", async (req, res) => {
+    try {
+        const { optionName } = req.params;
+        const { value } = req.body;
+        
+        if (!value) {
+            return res.status(400).json({ 
+                status: 'error', 
+                message: 'Value is required' 
+            });
+        }
+        
+        const updated = await updateOption(optionName, value);
+        
+        if (!updated) {
+            return res.status(404).json({ 
+                status: 'error', 
+                message: 'Option not found or could not be updated' 
+            });
+        }
+        
+        res.json({ status: 'success', message: 'Option updated successfully' });
+    } catch (error) {
+        console.error("Error updating option:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+router.get("/options/pattern/:pattern", async (req, res) => {
+    try {
+        const { pattern } = req.params;
+        const options = await getOptionsByPattern(pattern);
+        res.json({ status: 'success', options });
+    } catch (error) {
+        console.error("Error getting options by pattern:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+router.put("/options/bulk", async (req, res) => {
+    try {
+        const { options } = req.body;
+        
+        if (!options || !Array.isArray(options)) {
+            return res.status(400).json({ 
+                status: 'error', 
+                message: 'Options array is required' 
+            });
+        }
+        
+        const result = await bulkUpdateOptions(options);
+        res.json({ 
+            status: 'success', 
+            message: 'Bulk update completed',
+            updated: result.updated,
+            failed: result.failed
+        });
+    } catch (error) {
+        console.error("Error bulk updating options:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+// ===== DATABASE CONFIGURATION ENDPOINTS =====
+
+const dbConfigService = new DatabaseConfigService();
+
+/**
+ * Get current database configuration
+ */
+router.get('/config/database', async (req, res) => {
+    try {
+        const result = await dbConfigService.getCurrentConfig(false); // Mask sensitive data
+        
+        if (result.success) {
+            res.json({
+                success: true,
+                config: result.config,
+                timestamp: result.timestamp
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'Failed to get database configuration',
+                error: result.error
+            });
+        }
+    } catch (error) {
+        console.error('Error getting database configuration:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Test database connection with provided configuration
+ */
+router.post('/config/database/test', async (req, res) => {
+    try {
+        const testConfig = req.body;
+        
+        if (!testConfig || typeof testConfig !== 'object') {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid configuration provided'
+            });
+        }
+        
+        console.log('Testing database connection...');
+        const result = await dbConfigService.testConnection(testConfig);
+        
+        // Return appropriate status code based on test result
+        const statusCode = result.success ? 200 : 400;
+        res.status(statusCode).json(result);
+        
+    } catch (error) {
+        console.error('Error testing database connection:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Connection test failed',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Update database configuration
+ */
+router.put('/config/database', async (req, res) => {
+    try {
+        const newConfig = req.body;
+        
+        if (!newConfig || typeof newConfig !== 'object') {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid configuration provided'
+            });
+        }
+        
+        console.log('Updating database configuration...');
+        const result = await dbConfigService.updateConfiguration(newConfig);
+        
+        if (result.success) {
+            // Mask password in response
+            if (result.config && result.config.DB_PASSWORD) {
+                result.config.DB_PASSWORD = '••••••••';
+            }
+            
+            res.json(result);
+        } else {
+            res.status(400).json(result);
+        }
+        
+    } catch (error) {
+        console.error('Error updating database configuration:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Configuration update failed',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Get database configuration status and diagnostics
+ */
+router.get('/config/database/status', async (req, res) => {
+    try {
+        const result = await dbConfigService.getConfigurationStatus();
+        res.json(result);
+    } catch (error) {
+        console.error('Error getting configuration status:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get configuration status',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Create backup of current database configuration
+ */
+router.post('/config/database/backup', async (req, res) => {
+    try {
+        const result = await dbConfigService.createBackup();
+        
+        const statusCode = result.success ? 200 : 400;
+        res.status(statusCode).json(result);
+        
+    } catch (error) {
+        console.error('Error creating configuration backup:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Backup creation failed',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Restore database configuration from backup
+ */
+router.post('/config/database/restore', async (req, res) => {
+    try {
+        const result = await dbConfigService.restoreFromBackup();
+        
+        const statusCode = result.success ? 200 : 400;
+        res.status(statusCode).json(result);
+        
+    } catch (error) {
+        console.error('Error restoring configuration from backup:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Restore failed',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Export current database configuration (sanitized)
+ */
+router.get('/config/database/export', async (req, res) => {
+    try {
+        const result = await dbConfigService.exportConfiguration();
+        
+        if (result.success) {
+            res.json(result);
+        } else {
+            res.status(500).json(result);
+        }
+        
+    } catch (error) {
+        console.error('Error exporting configuration:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Export failed',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Get database connection presets
+ */
+router.get('/config/database/presets', (req, res) => {
+    try {
+        const presets = dbConfigService.getConnectionPresets();
+        res.json({
+            success: true,
+            presets: presets
+        });
+    } catch (error) {
+        console.error('Error getting connection presets:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get presets',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Application restart endpoint (for database configuration changes)
+ */
+router.post('/system/restart', async (req, res) => {
+    try {
+        const { reason } = req.body;
+        
+        console.log(`Application restart requested. Reason: ${reason || 'Manual restart'}`);
+        
+        // Send response before restarting
+        res.json({
+            success: true,
+            message: 'Application restart initiated',
+            timestamp: new Date().toISOString()
+        });
+        
+        // Give time for response to be sent
+        setTimeout(() => {
+            console.log('Restarting application...');
+            process.exit(0); // This will trigger the process manager to restart
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Error initiating restart:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Restart failed',
+            error: error.message
+        });
     }
 });
 

@@ -45,6 +45,7 @@ const pageRewrites = [
   { url: '/dashboard', file: '/views/dashboard.html' },
   { url: '/calendar', file: '/views/appointments/calendar.html' },
   { url: '/appointments', file: '/views/appointments/daily-appointments.html' },
+  { url: '/settings', file: '/views/settings.html' },
   
   // Patient pages - clean URLs
   { url: '/search', file: '/views/patient/search.html' },

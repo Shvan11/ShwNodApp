@@ -80,6 +80,10 @@ async function initializeApplication() {
     console.log('🔌 Setting up WebSocket server...');
     const wsEmitter = setupWebSocketServer(server);
 
+    // Inject WebSocket emitter into API routes to avoid circular imports
+    const { setWebSocketEmitter } = await import('./routes/api.js');
+    setWebSocketEmitter(wsEmitter);
+
     // Use routes
     console.log('🛣️  Setting up routes...');
     app.use('/api', apiRoutes);

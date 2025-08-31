@@ -80,7 +80,7 @@ const SearchComponent = () => {
         const handleChange = (value, selectType) => {
             clearAllSelects();
             if (value) {
-                window.location.href = `/patient/${value}/grid`;
+                window.location.href = `/views/patient/react-shell.html?patient=${value}`;
             }
         };
 
