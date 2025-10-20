@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Aligner Management System">
+    <title>Aligner Management</title>
+    <link rel="stylesheet" href="../css/main.css" />
+    <link rel="stylesheet" href="../css/pages/aligner.css" />
+    <link rel="stylesheet" href="../css/components/universal-header.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+</head>
+<body>
+    <div id="universal-header-root"></div>
+    <div id="aligner-component-root"></div>
+
+    <!-- Load React components -->
+    <script type="module">
+        import React from 'react';
+        import ReactDOM from 'react-dom/client';
+        import UniversalHeader from '../js/components/react/UniversalHeader.jsx';
+        import AlignerComponent from '../js/components/react/AlignerComponent.jsx';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const headerRoot = document.getElementById('universal-header-root');
+            if (headerRoot) {
+                const root = ReactDOM.createRoot(headerRoot);
+                root.render(React.createElement(UniversalHeader));
+            }
+
+            const alignerRoot = document.getElementById('aligner-component-root');
+            if (alignerRoot) {
+                const root = ReactDOM.createRoot(alignerRoot);
+                root.render(React.createElement(AlignerComponent));
+            }
+        });
+    </script>
+
+</body>
+</html>

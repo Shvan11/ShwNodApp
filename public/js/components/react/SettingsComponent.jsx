@@ -2,29 +2,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 import SettingsTabNavigation from './SettingsTabNavigation.jsx';
 import GeneralSettings from './GeneralSettings.jsx';
 import DatabaseSettings from './DatabaseSettings.jsx';
+import AlignerDoctorsSettings from './AlignerDoctorsSettings.jsx';
 
 const SettingsComponent = () => {
     const [activeTab, setActiveTab] = useState('general');
     const [tabData, setTabData] = useState({
         general: { hasChanges: false },
         database: { hasChanges: false },
+        alignerDoctors: { hasChanges: false },
         messaging: { hasChanges: false },
         system: { hasChanges: false },
         security: { hasChanges: false }
     });
-
-    // Load saved active tab from localStorage
-    useEffect(() => {
-        const savedTab = localStorage.getItem('settings-active-tab');
-        if (savedTab && tabs.find(tab => tab.id === savedTab && !tab.disabled)) {
-            setActiveTab(savedTab);
-        }
-    }, []);
-
-    // Save active tab to localStorage
-    useEffect(() => {
-        localStorage.setItem('settings-active-tab', activeTab);
-    }, [activeTab]);
 
     // Tab configuration
     const tabs = [
@@ -41,6 +30,13 @@ const SettingsComponent = () => {
             icon: 'fas fa-database',
             component: DatabaseSettings,
             description: 'Database connection and configuration'
+        },
+        {
+            id: 'alignerDoctors',
+            label: 'Aligner Doctors',
+            icon: 'fas fa-user-md',
+            component: AlignerDoctorsSettings,
+            description: 'Manage aligner doctors and portal access'
         },
         {
             id: 'messaging',
@@ -67,6 +63,28 @@ const SettingsComponent = () => {
             disabled: true
         }
     ];
+
+    // Load active tab from URL query parameter or localStorage
+    useEffect(() => {
+        // Check for tab query parameter in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab');
+
+        if (tabParam && tabs.find(tab => tab.id === tabParam && !tab.disabled)) {
+            setActiveTab(tabParam);
+        } else {
+            // Fall back to saved tab from localStorage
+            const savedTab = localStorage.getItem('settings-active-tab');
+            if (savedTab && tabs.find(tab => tab.id === savedTab && !tab.disabled)) {
+                setActiveTab(savedTab);
+            }
+        }
+    }, []);
+
+    // Save active tab to localStorage
+    useEffect(() => {
+        localStorage.setItem('settings-active-tab', activeTab);
+    }, [activeTab]);
 
     const handleTabChange = (tabId) => {
         const tab = tabs.find(t => t.id === tabId);

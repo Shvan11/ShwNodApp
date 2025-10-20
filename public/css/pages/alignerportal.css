@@ -1,0 +1,928 @@
+/* Aligner Portal - Doctor View Styles */
+/* Clean, modern, mobile-friendly design */
+
+:root {
+    --portal-primary: #00897B;
+    --portal-primary-dark: #00695C;
+    --portal-primary-light: #4DB6AC;
+    --portal-secondary: #FF6F00;
+    --portal-accent: #1976D2;
+    --portal-success: #43A047;
+    --portal-warning: #FFA726;
+    --portal-error: #E53935;
+    --portal-grey: #78909C;
+    --portal-grey-light: #ECEFF1;
+    --portal-grey-dark: #455A64;
+    --portal-bg: #F5F7FA;
+    --portal-card: #FFFFFF;
+    --portal-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --portal-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: var(--portal-bg);
+    margin: 0;
+    padding: 0;
+    color: #333;
+}
+
+.portal-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ===== PORTAL HEADER ===== */
+.portal-header {
+    background: linear-gradient(135deg, var(--portal-primary) 0%, var(--portal-primary-dark) 100%);
+    color: white;
+    padding: 1rem 2rem;
+    box-shadow: var(--portal-shadow);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.portal-header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.portal-branding {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.portal-logo {
+    font-size: 1.8rem;
+}
+
+.portal-title {
+    display: flex;
+    flex-direction: column;
+}
+
+.portal-title h1 {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+.portal-subtitle {
+    font-size: 0.85rem;
+    opacity: 0.9;
+    margin-top: 0.1rem;
+}
+
+.portal-doctor-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.doctor-name {
+    font-weight: 500;
+    font-size: 1rem;
+}
+
+.logout-btn {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.logout-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* ===== MAIN CONTENT ===== */
+.portal-main {
+    flex: 1;
+    max-width: 1400px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* ===== LOADING & ERROR STATES ===== */
+.loading-container,
+.error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    text-align: center;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid var(--portal-grey-light);
+    border-top-color: var(--portal-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.error-container {
+    color: var(--portal-error);
+}
+
+.error-container i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.error-container .logout-btn {
+    background: var(--portal-primary);
+    color: white;
+    border: none;
+}
+
+/* ===== DASHBOARD VIEW ===== */
+.dashboard-header {
+    margin-bottom: 2rem;
+}
+
+.dashboard-title {
+    font-size: 1.8rem;
+    margin: 0 0 0.5rem 0;
+    color: var(--portal-grey-dark);
+}
+
+.dashboard-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: var(--portal-card);
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: var(--portal-shadow);
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--portal-primary);
+    margin-bottom: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: var(--portal-grey);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ===== SEARCH BOX ===== */
+.search-container {
+    margin-bottom: 2rem;
+    position: relative;
+}
+
+.search-input {
+    width: 100%;
+    padding: 1rem 1rem 1rem 3rem;
+    font-size: 1rem;
+    border: 2px solid var(--portal-grey-light);
+    border-radius: 12px;
+    background: white;
+    transition: all 0.2s;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--portal-primary);
+    box-shadow: 0 0 0 3px rgba(0, 137, 123, 0.1);
+}
+
+.search-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--portal-grey);
+    font-size: 1.1rem;
+}
+
+/* ===== CASES GRID ===== */
+.cases-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
+.case-card {
+    background: var(--portal-card);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: var(--portal-shadow);
+    cursor: pointer;
+    transition: all 0.3s;
+    border: 2px solid transparent;
+}
+
+.case-card:hover {
+    box-shadow: var(--portal-shadow-hover);
+    transform: translateY(-4px);
+    border-color: var(--portal-primary-light);
+}
+
+.case-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--portal-grey-light);
+}
+
+.case-patient-info h3 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.2rem;
+    color: var(--portal-grey-dark);
+}
+
+.case-patient-id {
+    font-size: 0.85rem;
+    color: var(--portal-grey);
+}
+
+.case-active-badge {
+    background: var(--portal-success);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.case-inactive-badge {
+    background: var(--portal-grey);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.case-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.case-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--portal-grey);
+}
+
+.case-meta-item i {
+    width: 16px;
+    color: var(--portal-primary);
+}
+
+.case-stats {
+    display: flex;
+    gap: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--portal-grey-light);
+}
+
+.case-stat {
+    flex: 1;
+    text-align: center;
+}
+
+.case-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--portal-primary);
+}
+
+.case-stat-label {
+    font-size: 0.75rem;
+    color: var(--portal-grey);
+    margin-top: 0.25rem;
+}
+
+/* ===== CASE DETAIL VIEW ===== */
+.case-detail-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.back-button {
+    background: none;
+    border: none;
+    color: var(--portal-primary);
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    padding: 0.5rem;
+    transition: all 0.2s;
+}
+
+.back-button:hover {
+    background: var(--portal-grey-light);
+    border-radius: 6px;
+}
+
+.patient-header-card {
+    background: linear-gradient(135deg, var(--portal-primary) 0%, var(--portal-primary-dark) 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    box-shadow: var(--portal-shadow);
+}
+
+.patient-header-card h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.8rem;
+}
+
+.patient-meta-row {
+    display: flex;
+    gap: 2rem;
+    font-size: 0.95rem;
+    opacity: 0.95;
+}
+
+.patient-meta-row span {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* ===== SETS LIST ===== */
+.sets-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.set-card {
+    background: var(--portal-card);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: var(--portal-shadow);
+    border-left: 4px solid var(--portal-primary);
+}
+
+.set-card.inactive {
+    opacity: 0.7;
+    border-left-color: var(--portal-grey);
+}
+
+.set-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    cursor: pointer;
+}
+
+.set-title-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.set-title-row h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: var(--portal-grey-dark);
+}
+
+.set-type-badge {
+    background: var(--portal-accent);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.set-expand-btn {
+    background: none;
+    border: none;
+    color: var(--portal-primary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    transition: transform 0.3s;
+}
+
+.set-expand-btn.expanded {
+    transform: rotate(180deg);
+}
+
+.set-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.set-info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--portal-grey);
+}
+
+.set-info-item i {
+    color: var(--portal-primary);
+    width: 20px;
+}
+
+.set-info-item strong {
+    color: var(--portal-grey-dark);
+    font-weight: 600;
+}
+
+.set-progress {
+    margin-top: 1rem;
+}
+
+.progress-bar-container {
+    background: var(--portal-grey-light);
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-bar {
+    background: linear-gradient(90deg, var(--portal-primary) 0%, var(--portal-primary-light) 100%);
+    height: 100%;
+    transition: width 0.3s;
+}
+
+.progress-text {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: var(--portal-grey);
+}
+
+/* ===== BATCHES SECTION ===== */
+.batches-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--portal-grey-light);
+}
+
+.batches-section h4 {
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+    color: var(--portal-grey-dark);
+}
+
+.batch-card {
+    background: var(--portal-bg);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    border-left: 3px solid var(--portal-grey);
+}
+
+.batch-card.delivered {
+    border-left-color: var(--portal-success);
+}
+
+.batch-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.batch-title {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--portal-grey-dark);
+}
+
+.batch-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.batch-status.delivered {
+    background: var(--portal-success);
+    color: white;
+}
+
+.batch-status.pending {
+    background: var(--portal-warning);
+    color: white;
+}
+
+.batch-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    color: var(--portal-grey);
+}
+
+.batch-info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.batch-info-item i {
+    color: var(--portal-primary);
+    width: 14px;
+}
+
+/* ===== DAYS EDITOR ===== */
+.days-editor {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.days-input {
+    width: 70px;
+    padding: 0.4rem 0.6rem;
+    border: 2px solid var(--portal-grey-light);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.days-input:focus {
+    outline: none;
+    border-color: var(--portal-primary);
+}
+
+.days-save-btn {
+    background: var(--portal-primary);
+    color: white;
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.days-save-btn:hover {
+    background: var(--portal-primary-dark);
+}
+
+.days-save-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ===== NOTES SECTION ===== */
+.notes-section {
+    margin-top: 2rem;
+    background: var(--portal-card);
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: var(--portal-shadow);
+}
+
+.notes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.notes-header h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: var(--portal-grey-dark);
+}
+
+.notes-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.note-item {
+    padding: 1rem;
+    background: var(--portal-bg);
+    border-radius: 8px;
+    border-left: 3px solid var(--portal-primary);
+}
+
+.note-item.lab-note {
+    border-left-color: var(--portal-accent);
+}
+
+.note-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.note-author {
+    font-weight: 600;
+    color: var(--portal-grey-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.note-author i {
+    color: var(--portal-primary);
+}
+
+.note-author.lab i {
+    color: var(--portal-accent);
+}
+
+.note-date {
+    font-size: 0.8rem;
+    color: var(--portal-grey);
+}
+
+.note-text {
+    color: var(--portal-grey-dark);
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* ===== ADD NOTE FORM ===== */
+.add-note-form {
+    padding: 1rem;
+    background: var(--portal-bg);
+    border-radius: 8px;
+}
+
+.note-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid var(--portal-grey-light);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: vertical;
+    min-height: 80px;
+    margin-bottom: 0.75rem;
+}
+
+.note-textarea:focus {
+    outline: none;
+    border-color: var(--portal-primary);
+}
+
+.note-form-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.btn-cancel {
+    background: var(--portal-grey-light);
+    color: var(--portal-grey-dark);
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.btn-cancel:hover {
+    background: #CFD8DC;
+}
+
+.btn-submit {
+    background: var(--portal-primary);
+    color: white;
+    border: none;
+    padding: 0.6rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+}
+
+.btn-submit:hover {
+    background: var(--portal-primary-dark);
+}
+
+.btn-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-add-note {
+    background: var(--portal-primary);
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+}
+
+.btn-add-note:hover {
+    background: var(--portal-primary-dark);
+}
+
+/* ===== EMPTY STATES ===== */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--portal-grey);
+}
+
+.empty-state i {
+    font-size: 3rem;
+    color: var(--portal-grey-light);
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    color: var(--portal-grey);
+    margin-bottom: 0.5rem;
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 768px) {
+    .portal-main {
+        padding: 1rem;
+    }
+
+    .portal-header {
+        padding: 1rem;
+    }
+
+    .portal-header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .portal-doctor-info {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .cases-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .set-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .batch-info-grid,
+    .set-info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .patient-meta-row {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
+
+/* ===== PAYMENT INFO ===== */
+.set-payment-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+    padding: 1rem;
+    background: rgba(59, 130, 246, 0.05);
+    border-radius: 8px;
+    margin-top: 1rem;
+}
+
+.payment-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.payment-item i {
+    color: var(--portal-primary);
+    width: 16px;
+}
+
+.payment-status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.payment-status-badge.paid {
+    background: var(--portal-success);
+    color: white;
+}
+
+.payment-status-badge.partial {
+    background: var(--portal-warning);
+    color: white;
+}
+
+.payment-status-badge.unpaid {
+    background: var(--portal-error);
+    color: white;
+}
+
+.payment-status-badge.no {
+    background: var(--portal-grey);
+    color: white;
+}
+
+/* ===== URLs ===== */
+.set-urls {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.url-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--portal-primary);
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.url-btn:hover {
+    background: var(--portal-primary-dark);
+    transform: translateY(-1px);
+}
+
+.url-btn.pdf {
+    background: var(--portal-error);
+}
+
+.url-btn.pdf:hover {
+    background: #dc2626;
+}

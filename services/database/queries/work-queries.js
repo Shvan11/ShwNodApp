@@ -203,16 +203,16 @@ export const addWork = async (workData) => {
         SELECT SCOPE_IDENTITY() as workid;`,
         [
             ['PersonID', TYPES.Int, workData.PersonID],
-            ['TotalRequired', TYPES.Int, workData.TotalRequired || null],
+            ['TotalRequired', TYPES.Int, workData.TotalRequired ?? null], // Use ?? to allow 0 as valid value
             ['Currency', TYPES.NVarChar, workData.Currency || null],
-            ['Typeofwork', TYPES.Int, workData.Typeofwork || null],
+            ['Typeofwork', TYPES.Int, workData.Typeofwork ?? null], // Use ?? to allow 0 as valid value if needed
             ['Notes', TYPES.NVarChar, workData.Notes || null],
             ['Finished', TYPES.Bit, workData.Finished || 0],
             ['StartDate', TYPES.Date, workData.StartDate || null],
             ['DebondDate', TYPES.Date, workData.DebondDate || null],
             ['FPhotoDate', TYPES.Date, workData.FPhotoDate || null],
             ['IPhotoDate', TYPES.Date, workData.IPhotoDate || null],
-            ['EstimatedDuration', TYPES.TinyInt, workData.EstimatedDuration || null],
+            ['EstimatedDuration', TYPES.TinyInt, workData.EstimatedDuration ?? null], // Use ?? to allow 0 as valid value
             ['DrID', TYPES.Int, workData.DrID],
             ['NotesDate', TYPES.Date, workData.NotesDate || null],
             ['KeyWordID1', TYPES.Int, workData.KeyWordID1 || null],

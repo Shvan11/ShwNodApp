@@ -9,7 +9,7 @@ import {getTimePoints, getTimePointImgs } from '../services/database/queries/tim
 import { getWhatsAppMessages } from '../services/database/queries/messaging-queries.js';
 import { getPatientsPhones, getInfos, createPatient, getReferralSources, getPatientTypes, getAddresses, getGenders } from '../services/database/queries/patient-queries.js';
 import { getPayments, getActiveWorkForInvoice, getCurrentExchangeRate, addInvoice, updateExchangeRate } from '../services/database/queries/payment-queries.js';
-import { getWires, getVisitsSummary, addVisit, updateVisit, deleteVisit, getVisitDetailsByID, getLatestWire } from '../services/database/queries/visit-queries.js';
+import { getWires, getVisitsSummary, addVisit, updateVisit, deleteVisit, getVisitDetailsByID, getLatestWire, getVisitsByWorkId, getVisitById, addVisitByWorkId, updateVisitByWorkId, deleteVisitByWorkId } from '../services/database/queries/visit-queries.js';
 import { getWorksByPatient, getWorkDetails, addWork, updateWork, finishWork, getActiveWork, getWorkTypes, getWorkKeywords, getWorkDetailsList, addWorkDetail, updateWorkDetail, deleteWorkDetail } from '../services/database/queries/work-queries.js';
 import whatsapp from '../services/messaging/whatsapp.js';
 import { sendImg_, sendXray_ } from '../services/messaging/whatsapp-api.js';
@@ -627,6 +627,125 @@ router.get("/getWires", async (req, res) => {
     } catch (error) {
         console.error("Error fetching wires:", error);
         res.status(500).json({ error: "Failed to fetch wires" });
+    }
+});
+
+// Get all visits for a specific work ID
+router.get("/getvisitsbywork", async (req, res) => {
+    try {
+        const { workId } = req.query;
+        if (!workId) {
+            return res.status(400).json({ error: "Missing required parameter: workId" });
+        }
+        const visits = await getVisitsByWorkId(parseInt(workId));
+        res.json(visits);
+    } catch (error) {
+        console.error("Error fetching visits by work:", error);
+        res.status(500).json({ error: "Failed to fetch visits" });
+    }
+});
+
+// Get a single visit by ID
+router.get("/getvisitbyid", async (req, res) => {
+    try {
+        const { visitId } = req.query;
+        if (!visitId) {
+            return res.status(400).json({ error: "Missing required parameter: visitId" });
+        }
+        const visit = await getVisitById(parseInt(visitId));
+        if (!visit) {
+            return res.status(404).json({ error: "Visit not found" });
+        }
+        res.json(visit);
+    } catch (error) {
+        console.error("Error fetching visit by ID:", error);
+        res.status(500).json({ error: "Failed to fetch visit" });
+    }
+});
+
+// Add a new visit for a specific work
+router.post("/addvisitbywork", async (req, res) => {
+    try {
+        const visitData = req.body;
+        if (!visitData.WorkID || !visitData.VisitDate) {
+            return res.status(400).json({ error: "Missing required fields: WorkID and VisitDate" });
+        }
+        const result = await addVisitByWorkId(visitData);
+        res.json({ success: true, visitId: result.ID });
+    } catch (error) {
+        console.error("Error adding visit:", error);
+        res.status(500).json({ error: "Failed to add visit" });
+    }
+});
+
+// Update a visit
+router.put("/updatevisitbywork", async (req, res) => {
+    try {
+        const { visitId, ...visitData } = req.body;
+        if (!visitId || !visitData.VisitDate) {
+            return res.status(400).json({ error: "Missing required fields: visitId and VisitDate" });
+        }
+        await updateVisitByWorkId(parseInt(visitId), visitData);
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Error updating visit:", error);
+        res.status(500).json({ error: "Failed to update visit" });
+    }
+});
+
+// Delete a visit
+router.delete("/deletevisitbywork", async (req, res) => {
+    try {
+        const { visitId } = req.body;
+        if (!visitId) {
+            return res.status(400).json({ error: "Missing required field: visitId" });
+        }
+        await deleteVisitByWorkId(parseInt(visitId));
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Error deleting visit:", error);
+        res.status(500).json({ error: "Failed to delete visit" });
+    }
+});
+
+// Get all operators (employees who can perform visits)
+router.get("/operators", async (req, res) => {
+    try {
+        const query = `
+            SELECT e.ID, e.employeeName
+            FROM tblEmployees e
+            ORDER BY e.employeeName
+        `;
+        const operators = await database.executeQuery(
+            query,
+            [],
+            (columns) => ({
+                ID: columns[0].value,
+                employeeName: columns[1].value
+            })
+        );
+        res.json(operators);
+    } catch (error) {
+        console.error('Error fetching operators:', error);
+        res.status(500).json({ error: 'Failed to fetch operators' });
+    }
+});
+
+// Get work details (for visit page header)
+router.get("/getworkdetails", async (req, res) => {
+    try {
+        const { workId } = req.query;
+        if (!workId) {
+            return res.status(400).json({ error: "Missing required parameter: workId" });
+        }
+        const work = await getWorkDetails(parseInt(workId));
+        if (!work) {
+            return res.status(404).json({ error: "Work not found" });
+        }
+        res.json(work);
+    } catch (error) {
+        console.error('Error fetching work details:', error);
+        res.status(500).json({ error: 'Failed to fetch work details' });
     }
 });
 
@@ -1697,6 +1816,49 @@ router.get('/convert-path', async (req, res) => {
     }
 });
 
+// Photo server status and management
+router.get('/photo-server/status', async (req, res) => {
+    try {
+        const { default: photoServer } = await import('../middlewares/photo-server.js');
+        const { default: photoPathDetector } = await import('../services/imaging/path-detector.js');
+        
+        const status = photoServer.getStatus();
+        const allPaths = photoPathDetector.getAllDetectedPaths();
+        
+        res.json({
+            status,
+            detectedPaths: allPaths,
+            isDetectionFresh: photoPathDetector.isDetectionFresh()
+        });
+    } catch (error) {
+        console.error('Error getting photo server status:', error);
+        res.status(500).json({
+            error: error.message || "Failed to get photo server status"
+        });
+    }
+});
+
+router.post('/photo-server/re-detect', async (req, res) => {
+    try {
+        const { default: photoServer } = await import('../middlewares/photo-server.js');
+        
+        console.log('🔍 Manual photo path re-detection requested');
+        await photoServer.initialize();
+        
+        const status = photoServer.getStatus();
+        res.json({
+            success: true,
+            message: 'Photo paths re-detected successfully',
+            status
+        });
+    } catch (error) {
+        console.error('Error re-detecting photo paths:', error);
+        res.status(500).json({
+            error: error.message || "Failed to re-detect photo paths"
+        });
+    }
+});
+
 // Get referral sources for dropdowns
 router.get('/referral-sources', async (req, res) => {
     try {
@@ -1807,6 +1969,106 @@ router.get('/getworks', async (req, res) => {
     }
 });
 
+// Get single work by ID
+router.get('/getwork/:workId', async (req, res) => {
+    try {
+        const { workId } = req.params;
+        if (!workId) {
+            return res.status(400).json({ error: "Missing required parameter: workId" });
+        }
+
+        const query = `
+            SELECT
+                w.workid,
+                w.PersonID,
+                w.TotalRequired,
+                w.Currency,
+                w.Typeofwork,
+                w.Notes,
+                w.Finished,
+                w.DrID,
+                e.employeeName as DoctorName,
+                wt.WorkType as TypeName
+            FROM tblwork w
+            LEFT JOIN tblEmployees e ON w.DrID = e.ID
+            LEFT JOIN tblWorkType wt ON w.Typeofwork = wt.ID
+            WHERE w.workid = @WorkID
+        `;
+
+        const work = await database.executeQuery(
+            query,
+            [['WorkID', database.TYPES.Int, parseInt(workId)]],
+            (columns) => ({
+                workid: columns[0].value,
+                PersonID: columns[1].value,
+                TotalRequired: columns[2].value,
+                Currency: columns[3].value,
+                Typeofwork: columns[4].value,
+                Notes: columns[5].value,
+                Finished: columns[6].value,
+                DrID: columns[7].value,
+                DoctorName: columns[8].value,
+                TypeName: columns[9].value
+            }),
+            (results) => results.length > 0 ? results[0] : null
+        );
+
+        if (!work) {
+            return res.status(404).json({ success: false, error: "Work not found" });
+        }
+
+        res.json({ success: true, work });
+    } catch (error) {
+        console.error("Error fetching work:", error);
+        res.status(500).json({ success: false, error: "Failed to fetch work" });
+    }
+});
+
+// Get single patient by ID (for aligner workflow)
+router.get('/getpatient/:personId', async (req, res) => {
+    try {
+        const { personId } = req.params;
+        if (!personId) {
+            return res.status(400).json({ error: "Missing required parameter: personId" });
+        }
+
+        const query = `
+            SELECT
+                p.PersonID,
+                p.FirstName,
+                p.LastName,
+                p.PatientName,
+                p.Phone,
+                p.patientID
+            FROM tblpatients p
+            WHERE p.PersonID = @PersonID
+        `;
+
+        const patient = await database.executeQuery(
+            query,
+            [['PersonID', database.TYPES.Int, parseInt(personId)]],
+            (columns) => ({
+                PersonID: columns[0].value,
+                FirstName: columns[1].value,
+                LastName: columns[2].value,
+                PatientName: columns[3].value,
+                Phone: columns[4].value,
+                patientID: columns[5].value
+            }),
+            (results) => results.length > 0 ? results[0] : null
+        );
+
+        if (!patient) {
+            return res.status(404).json({ error: "Patient not found" });
+        }
+
+        res.json(patient);
+    } catch (error) {
+        console.error("Error fetching patient:", error);
+        res.status(500).json({ error: "Failed to fetch patient" });
+    }
+});
+
 // Get specific work details
 router.get('/getworkdetails', async (req, res) => {
     try {
@@ -1834,8 +2096,22 @@ router.post('/addwork', async (req, res) => {
         
         // Validate required fields
         if (!workData.PersonID || !workData.DrID) {
-            return res.status(400).json({ 
-                error: "Missing required fields: PersonID and DrID are required" 
+            return res.status(400).json({
+                error: "Missing required fields: PersonID and DrID are required"
+            });
+        }
+
+        // Validate and ensure TotalRequired is a valid number (required field)
+        if (workData.TotalRequired === '' || workData.TotalRequired === null || workData.TotalRequired === undefined) {
+            return res.status(400).json({
+                error: "TotalRequired is required and must be a valid number"
+            });
+        }
+
+        // Validate Typeofwork is required
+        if (!workData.Typeofwork) {
+            return res.status(400).json({
+                error: "Typeofwork is required"
             });
         }
 
@@ -2398,28 +2674,1294 @@ router.get('/config/database/presets', (req, res) => {
 router.post('/system/restart', async (req, res) => {
     try {
         const { reason } = req.body;
-        
+
         console.log(`Application restart requested. Reason: ${reason || 'Manual restart'}`);
-        
+
         // Send response before restarting
         res.json({
             success: true,
             message: 'Application restart initiated',
             timestamp: new Date().toISOString()
         });
-        
+
         // Give time for response to be sent
         setTimeout(() => {
             console.log('Restarting application...');
             process.exit(0); // This will trigger the process manager to restart
         }, 1000);
-        
+
     } catch (error) {
         console.error('Error initiating restart:', error);
         res.status(500).json({
             success: false,
             message: 'Restart failed',
             error: error.message
+        });
+    }
+});
+
+// ===== ALIGNER MANAGEMENT API ENDPOINTS =====
+
+/**
+ * Get list of aligner doctors
+ */
+router.get('/aligner/doctors', async (req, res) => {
+    try {
+        console.log('Fetching aligner doctors');
+
+        const query = `
+            SELECT DISTINCT
+                ad.DrID,
+                ad.DoctorName
+            FROM AlignerDoctors ad
+            ORDER BY ad.DoctorName
+        `;
+
+        const doctors = await database.executeQuery(
+            query,
+            [],
+            (columns) => ({
+                DrID: columns[0].value,
+                DoctorName: columns[1].value
+            })
+        );
+
+        res.json({
+            success: true,
+            doctors: doctors || [],
+            count: doctors ? doctors.length : 0
+        });
+
+    } catch (error) {
+        console.error('Error fetching aligner doctors:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch aligner doctors',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Get all aligner patients (all doctors)
+ * Returns all patients with aligner sets
+ */
+router.get('/aligner/patients/all', async (req, res) => {
+    try {
+        console.log('Fetching all aligner patients');
+
+        const query = `
+            SELECT DISTINCT
+                p.PersonID,
+                p.FirstName,
+                p.LastName,
+                p.PatientName,
+                p.Phone,
+                p.patientID,
+                w.workid,
+                wt.WorkType,
+                w.Typeofwork as WorkTypeID,
+                COUNT(DISTINCT s.AlignerSetID) as TotalSets,
+                SUM(CASE WHEN s.IsActive = 1 THEN 1 ELSE 0 END) as ActiveSets
+            FROM tblpatients p
+            INNER JOIN tblwork w ON p.PersonID = w.PersonID
+            INNER JOIN tblWorkType wt ON w.Typeofwork = wt.ID
+            INNER JOIN tblAlignerSets s ON w.workid = s.WorkID
+            WHERE wt.ID IN (19, 20, 21)
+            GROUP BY
+                p.PersonID, p.FirstName, p.LastName, p.PatientName,
+                p.Phone, p.patientID, w.workid, wt.WorkType, w.Typeofwork
+            ORDER BY p.PatientName, p.FirstName, p.LastName
+        `;
+
+        const patients = await database.executeQuery(
+            query,
+            [],
+            (columns) => ({
+                PersonID: columns[0].value,
+                FirstName: columns[1].value,
+                LastName: columns[2].value,
+                PatientName: columns[3].value,
+                Phone: columns[4].value,
+                patientID: columns[5].value,
+                workid: columns[6].value,
+                WorkType: columns[7].value,
+                WorkTypeID: columns[8].value,
+                TotalSets: columns[9].value,
+                ActiveSets: columns[10].value
+            })
+        );
+
+        res.json({
+            success: true,
+            patients: patients || [],
+            count: patients ? patients.length : 0
+        });
+
+    } catch (error) {
+        console.error('Error fetching all aligner patients:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch all aligner patients',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Get all patients by doctor ID
+ * Returns all patients with aligner sets assigned to a specific doctor
+ */
+router.get('/aligner/patients/by-doctor/:doctorId', async (req, res) => {
+    try {
+        const { doctorId } = req.params;
+
+        if (!doctorId || isNaN(parseInt(doctorId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid doctorId is required'
+            });
+        }
+
+        console.log(`Fetching all patients for doctor ID: ${doctorId}`);
+
+        const query = `
+            SELECT DISTINCT
+                p.PersonID,
+                p.FirstName,
+                p.LastName,
+                p.PatientName,
+                p.Phone,
+                p.patientID,
+                w.workid,
+                wt.WorkType,
+                w.Typeofwork as WorkTypeID,
+                COUNT(DISTINCT s.AlignerSetID) as TotalSets,
+                SUM(CASE WHEN s.IsActive = 1 THEN 1 ELSE 0 END) as ActiveSets
+            FROM tblpatients p
+            INNER JOIN tblwork w ON p.PersonID = w.PersonID
+            INNER JOIN tblWorkType wt ON w.Typeofwork = wt.ID
+            INNER JOIN tblAlignerSets s ON w.workid = s.WorkID
+            WHERE wt.ID IN (19, 20, 21)
+                AND s.AlignerDrID = @doctorId
+            GROUP BY
+                p.PersonID, p.FirstName, p.LastName, p.PatientName,
+                p.Phone, p.patientID, w.workid, wt.WorkType, w.Typeofwork
+            ORDER BY p.PatientName, p.FirstName, p.LastName
+        `;
+
+        const patients = await database.executeQuery(
+            query,
+            [['doctorId', database.TYPES.Int, parseInt(doctorId)]],
+            (columns) => ({
+                PersonID: columns[0].value,
+                FirstName: columns[1].value,
+                LastName: columns[2].value,
+                PatientName: columns[3].value,
+                Phone: columns[4].value,
+                patientID: columns[5].value,
+                workid: columns[6].value,
+                WorkType: columns[7].value,
+                WorkTypeID: columns[8].value,
+                TotalSets: columns[9].value,
+                ActiveSets: columns[10].value
+            })
+        );
+
+        res.json({
+            success: true,
+            patients: patients || [],
+            count: patients ? patients.length : 0
+        });
+
+    } catch (error) {
+        console.error('Error fetching patients by doctor:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch patients by doctor',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Search for aligner patients
+ * Returns patients who have aligner work types (19, 20, 21)
+ * Optional doctor filter
+ */
+router.get('/aligner/patients', async (req, res) => {
+    try {
+        const { search, doctorId } = req.query;
+
+        if (!search || search.trim().length < 2) {
+            return res.status(400).json({
+                success: false,
+                error: 'Search term must be at least 2 characters'
+            });
+        }
+
+        const searchTerm = search.trim();
+        console.log(`Searching for aligner patients: ${searchTerm}${doctorId ? ` (Doctor ID: ${doctorId})` : ''}`);
+
+        // Build query with optional doctor filter
+        let query = `
+            SELECT DISTINCT
+                p.PersonID,
+                p.FirstName,
+                p.LastName,
+                p.PatientName,
+                p.Phone,
+                p.patientID,
+                w.workid,
+                wt.WorkType,
+                w.Typeofwork as WorkTypeID
+            FROM tblpatients p
+            INNER JOIN tblwork w ON p.PersonID = w.PersonID
+            INNER JOIN tblWorkType wt ON w.Typeofwork = wt.ID
+            INNER JOIN tblAlignerSets s ON w.workid = s.WorkID
+            WHERE wt.ID IN (19, 20, 21)
+                AND (
+                    p.FirstName LIKE @search
+                    OR p.LastName LIKE @search
+                    OR p.PatientName LIKE @search
+                    OR p.Phone LIKE @search
+                    OR p.patientID LIKE @search
+                    OR (p.FirstName + ' ' + p.LastName) LIKE @search
+                )
+        `;
+
+        // Add doctor filter if provided
+        const params = [['search', database.TYPES.NVarChar, `%${searchTerm}%`]];
+        if (doctorId && !isNaN(parseInt(doctorId))) {
+            query += ` AND s.AlignerDrID = @doctorId`;
+            params.push(['doctorId', database.TYPES.Int, parseInt(doctorId)]);
+        }
+
+        query += ` ORDER BY p.FirstName, p.LastName`;
+
+        const patients = await database.executeQuery(
+            query,
+            params,
+            (columns) => ({
+                PersonID: columns[0].value,
+                FirstName: columns[1].value,
+                LastName: columns[2].value,
+                PatientName: columns[3].value,
+                Phone: columns[4].value,
+                patientID: columns[5].value,
+                workid: columns[6].value,
+                WorkType: columns[7].value,
+                WorkTypeID: columns[8].value
+            })
+        );
+
+        res.json({
+            success: true,
+            patients: patients || [],
+            count: patients ? patients.length : 0
+        });
+
+    } catch (error) {
+        console.error('Error searching aligner patients:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to search aligner patients',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Get aligner sets for a specific work
+ */
+router.get('/aligner/sets/:workId', async (req, res) => {
+    try {
+        const { workId } = req.params;
+
+        if (!workId || isNaN(parseInt(workId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid workId is required'
+            });
+        }
+
+        console.log(`Fetching aligner sets for work ID: ${workId}`);
+
+        // Query aligner sets with batch summary and payment info
+        const query = `
+            SELECT
+                s.AlignerSetID,
+                s.WorkID,
+                s.SetSequence,
+                s.Type,
+                s.UpperAlignersCount,
+                s.LowerAlignersCount,
+                s.RemainingUpperAligners,
+                s.RemainingLowerAligners,
+                s.CreationDate,
+                s.Days,
+                s.IsActive,
+                s.Notes,
+                s.FolderPath,
+                s.AlignerDrID,
+                s.SetUrl,
+                s.SetPdfUrl,
+                s.SetCost,
+                s.Currency,
+                ad.DoctorName as AlignerDoctorName,
+                COUNT(b.AlignerBatchID) as TotalBatches,
+                SUM(CASE WHEN b.DeliveredToPatientDate IS NOT NULL THEN 1 ELSE 0 END) as DeliveredBatches,
+                vp.TotalPaid,
+                vp.Balance,
+                vp.PaymentStatus
+            FROM tblAlignerSets s
+            LEFT JOIN tblAlignerBatches b ON s.AlignerSetID = b.AlignerSetID
+            LEFT JOIN AlignerDoctors ad ON s.AlignerDrID = ad.DrID
+            LEFT JOIN vw_AlignerSetPayments vp ON s.AlignerSetID = vp.AlignerSetID
+            WHERE s.WorkID = @workId
+            GROUP BY
+                s.AlignerSetID, s.WorkID, s.SetSequence, s.Type,
+                s.UpperAlignersCount, s.LowerAlignersCount,
+                s.RemainingUpperAligners, s.RemainingLowerAligners,
+                s.CreationDate, s.Days, s.IsActive, s.Notes,
+                s.FolderPath, s.AlignerDrID, s.SetUrl, s.SetPdfUrl,
+                s.SetCost, s.Currency, ad.DoctorName,
+                vp.TotalPaid, vp.Balance, vp.PaymentStatus
+            ORDER BY s.SetSequence
+        `;
+
+        const sets = await database.executeQuery(
+            query,
+            [['workId', database.TYPES.Int, parseInt(workId)]],
+            (columns) => ({
+                AlignerSetID: columns[0].value,
+                WorkID: columns[1].value,
+                SetSequence: columns[2].value,
+                Type: columns[3].value,
+                UpperAlignersCount: columns[4].value,
+                LowerAlignersCount: columns[5].value,
+                RemainingUpperAligners: columns[6].value,
+                RemainingLowerAligners: columns[7].value,
+                CreationDate: columns[8].value,
+                Days: columns[9].value,
+                IsActive: columns[10].value,
+                Notes: columns[11].value,
+                FolderPath: columns[12].value,
+                AlignerDrID: columns[13].value,
+                SetUrl: columns[14].value,
+                SetPdfUrl: columns[15].value,
+                SetCost: columns[16].value,
+                Currency: columns[17].value,
+                AlignerDoctorName: columns[18].value,
+                TotalBatches: columns[19].value,
+                DeliveredBatches: columns[20].value,
+                TotalPaid: columns[21].value,
+                Balance: columns[22].value,
+                PaymentStatus: columns[23].value
+            })
+        );
+
+        res.json({
+            success: true,
+            sets: sets || [],
+            count: sets ? sets.length : 0
+        });
+
+    } catch (error) {
+        console.error('Error fetching aligner sets:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch aligner sets',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Add payment for an aligner set
+ */
+router.post('/aligner/payments', async (req, res) => {
+    try {
+        const { workid, AlignerSetID, Amountpaid, Dateofpayment, ActualAmount, ActualCur, Change } = req.body;
+
+        if (!workid || !Amountpaid || !Dateofpayment) {
+            return res.status(400).json({
+                success: false,
+                error: 'workid, Amountpaid, and Dateofpayment are required'
+            });
+        }
+
+        console.log(`Adding payment for work ID: ${workid}, Set ID: ${AlignerSetID || 'general'}, Amount: ${Amountpaid}`);
+
+        // Insert payment into tblInvoice
+        const query = `
+            INSERT INTO tblInvoice (workid, Amountpaid, Dateofpayment, ActualAmount, ActualCur, Change, AlignerSetID)
+            VALUES (@workid, @Amountpaid, @Dateofpayment, @ActualAmount, @ActualCur, @Change, @AlignerSetID);
+            SELECT SCOPE_IDENTITY() AS invoiceID;
+        `;
+
+        const result = await database.executeQuery(
+            query,
+            [
+                ['workid', database.TYPES.Int, parseInt(workid)],
+                ['Amountpaid', database.TYPES.Decimal, parseFloat(Amountpaid)],
+                ['Dateofpayment', database.TYPES.Date, new Date(Dateofpayment)],
+                ['ActualAmount', database.TYPES.Decimal, ActualAmount ? parseFloat(ActualAmount) : null],
+                ['ActualCur', database.TYPES.NVarChar, ActualCur || null],
+                ['Change', database.TYPES.Decimal, Change ? parseFloat(Change) : null],
+                ['AlignerSetID', database.TYPES.Int, AlignerSetID || null]
+            ],
+            (columns) => ({
+                invoiceID: columns[0].value
+            })
+        );
+
+        const invoiceID = result && result.length > 0 ? result[0].invoiceID : null;
+
+        res.json({
+            success: true,
+            invoiceID: invoiceID,
+            message: 'Payment added successfully'
+        });
+
+    } catch (error) {
+        console.error('Error adding payment:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to add payment',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Get batches for a specific aligner set
+ */
+router.get('/aligner/batches/:setId', async (req, res) => {
+    try {
+        const { setId } = req.params;
+
+        if (!setId || isNaN(parseInt(setId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid setId is required'
+            });
+        }
+
+        console.log(`Fetching batches for aligner set ID: ${setId}`);
+
+        // Query batches for the set
+        const query = `
+            SELECT
+                AlignerBatchID,
+                AlignerSetID,
+                BatchSequence,
+                UpperAlignerCount,
+                LowerAlignerCount,
+                UpperAlignerStartSequence,
+                UpperAlignerEndSequence,
+                LowerAlignerStartSequence,
+                LowerAlignerEndSequence,
+                ManufactureDate,
+                DeliveredToPatientDate,
+                Days,
+                ValidityPeriod,
+                NextBatchReadyDate,
+                Notes,
+                IsActive
+            FROM tblAlignerBatches
+            WHERE AlignerSetID = @setId
+            ORDER BY BatchSequence
+        `;
+
+        const batches = await database.executeQuery(
+            query,
+            [['setId', database.TYPES.Int, parseInt(setId)]],
+            (columns) => ({
+                AlignerBatchID: columns[0].value,
+                AlignerSetID: columns[1].value,
+                BatchSequence: columns[2].value,
+                UpperAlignerCount: columns[3].value,
+                LowerAlignerCount: columns[4].value,
+                UpperAlignerStartSequence: columns[5].value,
+                UpperAlignerEndSequence: columns[6].value,
+                LowerAlignerStartSequence: columns[7].value,
+                LowerAlignerEndSequence: columns[8].value,
+                ManufactureDate: columns[9].value,
+                DeliveredToPatientDate: columns[10].value,
+                Days: columns[11].value,
+                ValidityPeriod: columns[12].value,
+                NextBatchReadyDate: columns[13].value,
+                Notes: columns[14].value,
+                IsActive: columns[15].value
+            })
+        );
+
+        res.json({
+            success: true,
+            batches: batches || [],
+            count: batches ? batches.length : 0
+        });
+
+    } catch (error) {
+        console.error('Error fetching aligner batches:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch aligner batches',
+            message: error.message
+        });
+    }
+});
+
+// ===== ALIGNER SETS CRUD OPERATIONS =====
+
+/**
+ * Create a new aligner set
+ */
+router.post('/aligner/sets', async (req, res) => {
+    try {
+        const {
+            WorkID,
+            SetSequence,
+            Type,
+            UpperAlignersCount,
+            LowerAlignersCount,
+            Days,
+            AlignerDrID,
+            SetUrl,
+            SetPdfUrl,
+            SetCost,
+            Currency,
+            Notes,
+            IsActive
+        } = req.body;
+
+        // Validation
+        if (!WorkID || !AlignerDrID) {
+            return res.status(400).json({
+                success: false,
+                error: 'WorkID and AlignerDrID are required'
+            });
+        }
+
+        console.log('Creating new aligner set:', req.body);
+
+        const query = `
+            INSERT INTO tblAlignerSets (
+                WorkID, SetSequence, Type, UpperAlignersCount, LowerAlignersCount,
+                RemainingUpperAligners, RemainingLowerAligners, Days, AlignerDrID,
+                SetUrl, SetPdfUrl, SetCost, Currency, Notes, IsActive, CreationDate
+            )
+            OUTPUT INSERTED.AlignerSetID
+            VALUES (
+                @WorkID, @SetSequence, @Type, @UpperAlignersCount, @LowerAlignersCount,
+                @UpperAlignersCount, @LowerAlignersCount, @Days, @AlignerDrID,
+                @SetUrl, @SetPdfUrl, @SetCost, @Currency, @Notes, @IsActive, GETDATE()
+            )
+        `;
+
+        const result = await database.executeQuery(
+            query,
+            [
+                ['WorkID', database.TYPES.Int, parseInt(WorkID)],
+                ['SetSequence', database.TYPES.Int, SetSequence ? parseInt(SetSequence) : null],
+                ['Type', database.TYPES.NVarChar, Type || null],
+                ['UpperAlignersCount', database.TYPES.Int, UpperAlignersCount ? parseInt(UpperAlignersCount) : 0],
+                ['LowerAlignersCount', database.TYPES.Int, LowerAlignersCount ? parseInt(LowerAlignersCount) : 0],
+                ['Days', database.TYPES.Int, Days ? parseInt(Days) : null],
+                ['AlignerDrID', database.TYPES.Int, parseInt(AlignerDrID)],
+                ['SetUrl', database.TYPES.NVarChar, SetUrl || null],
+                ['SetPdfUrl', database.TYPES.NVarChar, SetPdfUrl || null],
+                ['SetCost', database.TYPES.Decimal, SetCost ? parseFloat(SetCost) : null],
+                ['Currency', database.TYPES.NVarChar, Currency || null],
+                ['Notes', database.TYPES.NVarChar, Notes || null],
+                ['IsActive', database.TYPES.Bit, IsActive !== undefined ? IsActive : true]
+            ],
+            (columns) => columns[0].value
+        );
+
+        const newSetId = result && result.length > 0 ? result[0] : null;
+
+        res.json({
+            success: true,
+            setId: newSetId,
+            message: 'Aligner set created successfully'
+        });
+
+    } catch (error) {
+        console.error('Error creating aligner set:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to create aligner set',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Update an existing aligner set
+ */
+router.put('/aligner/sets/:setId', async (req, res) => {
+    try {
+        const { setId } = req.params;
+        const {
+            SetSequence,
+            Type,
+            UpperAlignersCount,
+            LowerAlignersCount,
+            Days,
+            AlignerDrID,
+            SetUrl,
+            SetPdfUrl,
+            SetCost,
+            Currency,
+            Notes,
+            IsActive
+        } = req.body;
+
+        if (!setId || isNaN(parseInt(setId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid setId is required'
+            });
+        }
+
+        console.log(`Updating aligner set ${setId}:`, req.body);
+
+        const query = `
+            UPDATE tblAlignerSets
+            SET
+                SetSequence = @SetSequence,
+                Type = @Type,
+                UpperAlignersCount = @UpperAlignersCount,
+                LowerAlignersCount = @LowerAlignersCount,
+                Days = @Days,
+                AlignerDrID = @AlignerDrID,
+                SetUrl = @SetUrl,
+                SetPdfUrl = @SetPdfUrl,
+                SetCost = @SetCost,
+                Currency = @Currency,
+                Notes = @Notes,
+                IsActive = @IsActive
+            WHERE AlignerSetID = @setId
+        `;
+
+        await database.executeQuery(
+            query,
+            [
+                ['SetSequence', database.TYPES.Int, SetSequence ? parseInt(SetSequence) : null],
+                ['Type', database.TYPES.NVarChar, Type || null],
+                ['UpperAlignersCount', database.TYPES.Int, UpperAlignersCount ? parseInt(UpperAlignersCount) : 0],
+                ['LowerAlignersCount', database.TYPES.Int, LowerAlignersCount ? parseInt(LowerAlignersCount) : 0],
+                ['Days', database.TYPES.Int, Days ? parseInt(Days) : null],
+                ['AlignerDrID', database.TYPES.Int, AlignerDrID ? parseInt(AlignerDrID) : null],
+                ['SetUrl', database.TYPES.NVarChar, SetUrl || null],
+                ['SetPdfUrl', database.TYPES.NVarChar, SetPdfUrl || null],
+                ['SetCost', database.TYPES.Decimal, SetCost ? parseFloat(SetCost) : null],
+                ['Currency', database.TYPES.NVarChar, Currency || null],
+                ['Notes', database.TYPES.NVarChar, Notes || null],
+                ['IsActive', database.TYPES.Bit, IsActive !== undefined ? IsActive : true],
+                ['setId', database.TYPES.Int, parseInt(setId)]
+            ]
+        );
+
+        res.json({
+            success: true,
+            message: 'Aligner set updated successfully'
+        });
+
+    } catch (error) {
+        console.error('Error updating aligner set:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update aligner set',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Delete an aligner set (and its batches)
+ */
+router.delete('/aligner/sets/:setId', async (req, res) => {
+    try {
+        const { setId } = req.params;
+
+        if (!setId || isNaN(parseInt(setId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid setId is required'
+            });
+        }
+
+        console.log(`Deleting aligner set ${setId}`);
+
+        // Delete batches first (foreign key constraint)
+        const deleteBatchesQuery = `
+            DELETE FROM tblAlignerBatches WHERE AlignerSetID = @setId
+        `;
+
+        await database.executeQuery(
+            deleteBatchesQuery,
+            [['setId', database.TYPES.Int, parseInt(setId)]]
+        );
+
+        // Then delete the set
+        const deleteSetQuery = `
+            DELETE FROM tblAlignerSets WHERE AlignerSetID = @setId
+        `;
+
+        await database.executeQuery(
+            deleteSetQuery,
+            [['setId', database.TYPES.Int, parseInt(setId)]]
+        );
+
+        res.json({
+            success: true,
+            message: 'Aligner set and its batches deleted successfully'
+        });
+
+    } catch (error) {
+        console.error('Error deleting aligner set:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete aligner set',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Get notes for an aligner set
+ */
+router.get('/aligner/notes/:setId', async (req, res) => {
+    try {
+        const { setId } = req.params;
+
+        if (!setId || isNaN(parseInt(setId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid setId is required'
+            });
+        }
+
+        const query = `
+            SELECT
+                n.NoteID,
+                n.AlignerSetID,
+                n.NoteType,
+                n.NoteText,
+                n.CreatedAt,
+                n.IsEdited,
+                n.EditedAt,
+                d.DoctorName
+            FROM tblAlignerNotes n
+            INNER JOIN tblAlignerSets s ON n.AlignerSetID = s.AlignerSetID
+            INNER JOIN AlignerDoctors d ON s.AlignerDrID = d.DrID
+            WHERE n.AlignerSetID = @setId
+            ORDER BY n.CreatedAt DESC
+        `;
+
+        const notes = await database.executeQuery(
+            query,
+            [['setId', database.TYPES.Int, parseInt(setId)]],
+            (columns) => ({
+                NoteID: columns[0].value,
+                AlignerSetID: columns[1].value,
+                NoteType: columns[2].value,
+                NoteText: columns[3].value,
+                CreatedAt: columns[4].value,
+                IsEdited: columns[5].value,
+                EditedAt: columns[6].value,
+                DoctorName: columns[7].value
+            })
+        );
+
+        res.json({
+            success: true,
+            notes: notes || [],
+            count: notes ? notes.length : 0
+        });
+
+    } catch (error) {
+        console.error('Error fetching aligner set notes:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch notes',
+            message: error.message
+        });
+    }
+});
+
+// ===== ALIGNER BATCHES CRUD OPERATIONS =====
+
+/**
+ * Create a new aligner batch
+ */
+router.post('/aligner/batches', async (req, res) => {
+    try {
+        const {
+            AlignerSetID,
+            BatchSequence,
+            UpperAlignerCount,
+            LowerAlignerCount,
+            UpperAlignerStartSequence,
+            UpperAlignerEndSequence,
+            LowerAlignerStartSequence,
+            LowerAlignerEndSequence,
+            ManufactureDate,
+            ValidityPeriod,
+            NextBatchReadyDate,
+            Notes,
+            IsActive
+        } = req.body;
+
+        // Validation
+        if (!AlignerSetID) {
+            return res.status(400).json({
+                success: false,
+                error: 'AlignerSetID is required'
+            });
+        }
+
+        console.log('Creating new aligner batch:', req.body);
+
+        const query = `
+            INSERT INTO tblAlignerBatches (
+                AlignerSetID, BatchSequence, UpperAlignerCount, LowerAlignerCount,
+                UpperAlignerStartSequence, UpperAlignerEndSequence,
+                LowerAlignerStartSequence, LowerAlignerEndSequence,
+                ManufactureDate, ValidityPeriod, NextBatchReadyDate,
+                Notes, IsActive
+            )
+            OUTPUT INSERTED.AlignerBatchID
+            VALUES (
+                @AlignerSetID, @BatchSequence, @UpperAlignerCount, @LowerAlignerCount,
+                @UpperAlignerStartSequence, @UpperAlignerEndSequence,
+                @LowerAlignerStartSequence, @LowerAlignerEndSequence,
+                @ManufactureDate, @ValidityPeriod, @NextBatchReadyDate,
+                @Notes, @IsActive
+            )
+        `;
+
+        const result = await database.executeQuery(
+            query,
+            [
+                ['AlignerSetID', database.TYPES.Int, parseInt(AlignerSetID)],
+                ['BatchSequence', database.TYPES.Int, BatchSequence ? parseInt(BatchSequence) : null],
+                ['UpperAlignerCount', database.TYPES.Int, UpperAlignerCount ? parseInt(UpperAlignerCount) : 0],
+                ['LowerAlignerCount', database.TYPES.Int, LowerAlignerCount ? parseInt(LowerAlignerCount) : 0],
+                ['UpperAlignerStartSequence', database.TYPES.Int, UpperAlignerStartSequence ? parseInt(UpperAlignerStartSequence) : null],
+                ['UpperAlignerEndSequence', database.TYPES.Int, UpperAlignerEndSequence ? parseInt(UpperAlignerEndSequence) : null],
+                ['LowerAlignerStartSequence', database.TYPES.Int, LowerAlignerStartSequence ? parseInt(LowerAlignerStartSequence) : null],
+                ['LowerAlignerEndSequence', database.TYPES.Int, LowerAlignerEndSequence ? parseInt(LowerAlignerEndSequence) : null],
+                ['ManufactureDate', database.TYPES.Date, ManufactureDate || null],
+                ['ValidityPeriod', database.TYPES.Int, ValidityPeriod ? parseInt(ValidityPeriod) : null],
+                ['NextBatchReadyDate', database.TYPES.Date, NextBatchReadyDate || null],
+                ['Notes', database.TYPES.NVarChar, Notes || null],
+                ['IsActive', database.TYPES.Bit, IsActive !== undefined ? IsActive : true]
+            ],
+            (columns) => columns[0].value
+        );
+
+        const newBatchId = result && result.length > 0 ? result[0] : null;
+
+        res.json({
+            success: true,
+            batchId: newBatchId,
+            message: 'Aligner batch created successfully'
+        });
+
+    } catch (error) {
+        console.error('Error creating aligner batch:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to create aligner batch',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Update an existing aligner batch
+ */
+router.put('/aligner/batches/:batchId', async (req, res) => {
+    try {
+        const { batchId } = req.params;
+        const {
+            BatchSequence,
+            UpperAlignerCount,
+            LowerAlignerCount,
+            UpperAlignerStartSequence,
+            UpperAlignerEndSequence,
+            LowerAlignerStartSequence,
+            LowerAlignerEndSequence,
+            ManufactureDate,
+            DeliveredToPatientDate,
+            ValidityPeriod,
+            NextBatchReadyDate,
+            Notes,
+            IsActive
+        } = req.body;
+
+        if (!batchId || isNaN(parseInt(batchId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid batchId is required'
+            });
+        }
+
+        console.log(`Updating aligner batch ${batchId}:`, req.body);
+
+        const query = `
+            UPDATE tblAlignerBatches
+            SET
+                BatchSequence = @BatchSequence,
+                UpperAlignerCount = @UpperAlignerCount,
+                LowerAlignerCount = @LowerAlignerCount,
+                UpperAlignerStartSequence = @UpperAlignerStartSequence,
+                UpperAlignerEndSequence = @UpperAlignerEndSequence,
+                LowerAlignerStartSequence = @LowerAlignerStartSequence,
+                LowerAlignerEndSequence = @LowerAlignerEndSequence,
+                ManufactureDate = @ManufactureDate,
+                DeliveredToPatientDate = @DeliveredToPatientDate,
+                ValidityPeriod = @ValidityPeriod,
+                NextBatchReadyDate = @NextBatchReadyDate,
+                Notes = @Notes,
+                IsActive = @IsActive
+            WHERE AlignerBatchID = @batchId
+        `;
+
+        await database.executeQuery(
+            query,
+            [
+                ['BatchSequence', database.TYPES.Int, BatchSequence ? parseInt(BatchSequence) : null],
+                ['UpperAlignerCount', database.TYPES.Int, UpperAlignerCount ? parseInt(UpperAlignerCount) : 0],
+                ['LowerAlignerCount', database.TYPES.Int, LowerAlignerCount ? parseInt(LowerAlignerCount) : 0],
+                ['UpperAlignerStartSequence', database.TYPES.Int, UpperAlignerStartSequence ? parseInt(UpperAlignerStartSequence) : null],
+                ['UpperAlignerEndSequence', database.TYPES.Int, UpperAlignerEndSequence ? parseInt(UpperAlignerEndSequence) : null],
+                ['LowerAlignerStartSequence', database.TYPES.Int, LowerAlignerStartSequence ? parseInt(LowerAlignerStartSequence) : null],
+                ['LowerAlignerEndSequence', database.TYPES.Int, LowerAlignerEndSequence ? parseInt(LowerAlignerEndSequence) : null],
+                ['ManufactureDate', database.TYPES.Date, ManufactureDate || null],
+                ['DeliveredToPatientDate', database.TYPES.Date, DeliveredToPatientDate || null],
+                ['ValidityPeriod', database.TYPES.Int, ValidityPeriod ? parseInt(ValidityPeriod) : null],
+                ['NextBatchReadyDate', database.TYPES.Date, NextBatchReadyDate || null],
+                ['Notes', database.TYPES.NVarChar, Notes || null],
+                ['IsActive', database.TYPES.Bit, IsActive !== undefined ? IsActive : true],
+                ['batchId', database.TYPES.Int, parseInt(batchId)]
+            ]
+        );
+
+        res.json({
+            success: true,
+            message: 'Aligner batch updated successfully'
+        });
+
+    } catch (error) {
+        console.error('Error updating aligner batch:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update aligner batch',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Mark batch as delivered
+ */
+router.patch('/aligner/batches/:batchId/deliver', async (req, res) => {
+    try {
+        const { batchId } = req.params;
+
+        if (!batchId || isNaN(parseInt(batchId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid batchId is required'
+            });
+        }
+
+        console.log(`Marking batch ${batchId} as delivered`);
+
+        const query = `
+            UPDATE tblAlignerBatches
+            SET DeliveredToPatientDate = GETDATE()
+            WHERE AlignerBatchID = @batchId
+        `;
+
+        await database.executeQuery(
+            query,
+            [['batchId', database.TYPES.Int, parseInt(batchId)]]
+        );
+
+        res.json({
+            success: true,
+            message: 'Batch marked as delivered'
+        });
+
+    } catch (error) {
+        console.error('Error marking batch as delivered:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to mark batch as delivered',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Delete an aligner batch
+ */
+router.delete('/aligner/batches/:batchId', async (req, res) => {
+    try {
+        const { batchId } = req.params;
+
+        if (!batchId || isNaN(parseInt(batchId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid batchId is required'
+            });
+        }
+
+        console.log(`Deleting aligner batch ${batchId}`);
+
+        const query = `
+            DELETE FROM tblAlignerBatches WHERE AlignerBatchID = @batchId
+        `;
+
+        await database.executeQuery(
+            query,
+            [['batchId', database.TYPES.Int, parseInt(batchId)]]
+        );
+
+        res.json({
+            success: true,
+            message: 'Aligner batch deleted successfully'
+        });
+
+    } catch (error) {
+        console.error('Error deleting aligner batch:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete aligner batch',
+            message: error.message
+        });
+    }
+});
+
+// ==============================
+// ALIGNER DOCTORS MANAGEMENT
+// ==============================
+
+/**
+ * Get all aligner doctors
+ */
+router.get('/aligner-doctors', async (req, res) => {
+    try {
+        const query = `
+            SELECT DrID, DoctorName, DoctorEmail, LogoPath
+            FROM AlignerDoctors
+            ORDER BY DoctorName
+        `;
+
+        const doctors = await database.executeQuery(
+            query,
+            [],
+            (columns) => ({
+                DrID: columns[0].value,
+                DoctorName: columns[1].value,
+                DoctorEmail: columns[2].value,
+                LogoPath: columns[3].value
+            })
+        );
+
+        res.json({
+            success: true,
+            doctors: doctors || []
+        });
+
+    } catch (error) {
+        console.error('Error fetching aligner doctors:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch aligner doctors',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Add new aligner doctor
+ */
+router.post('/aligner-doctors', async (req, res) => {
+    try {
+        const { DoctorName, DoctorEmail, LogoPath } = req.body;
+
+        if (!DoctorName || DoctorName.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                error: 'Doctor name is required'
+            });
+        }
+
+        // Check if email already exists (if provided)
+        if (DoctorEmail && DoctorEmail.trim() !== '') {
+            const emailCheck = await database.executeQuery(
+                'SELECT DrID FROM AlignerDoctors WHERE DoctorEmail = @email',
+                [['email', database.TYPES.NVarChar, DoctorEmail.trim()]],
+                (columns) => columns[0].value
+            );
+
+            if (emailCheck && emailCheck.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'A doctor with this email already exists'
+                });
+            }
+        }
+
+        const insertQuery = `
+            INSERT INTO AlignerDoctors (DoctorName, DoctorEmail, LogoPath)
+            OUTPUT INSERTED.DrID
+            VALUES (@name, @email, @logo)
+        `;
+
+        const result = await database.executeQuery(
+            insertQuery,
+            [
+                ['name', database.TYPES.NVarChar, DoctorName.trim()],
+                ['email', database.TYPES.NVarChar, DoctorEmail && DoctorEmail.trim() !== '' ? DoctorEmail.trim() : null],
+                ['logo', database.TYPES.NVarChar, LogoPath && LogoPath.trim() !== '' ? LogoPath.trim() : null]
+            ],
+            (columns) => columns[0].value
+        );
+
+        const newDrID = result && result.length > 0 ? result[0] : null;
+
+        res.json({
+            success: true,
+            message: 'Doctor added successfully',
+            drID: newDrID
+        });
+
+    } catch (error) {
+        console.error('Error adding aligner doctor:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to add aligner doctor',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Update aligner doctor
+ */
+router.put('/aligner-doctors/:drID', async (req, res) => {
+    try {
+        const { drID } = req.params;
+        const { DoctorName, DoctorEmail, LogoPath } = req.body;
+
+        if (!DoctorName || DoctorName.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                error: 'Doctor name is required'
+            });
+        }
+
+        // Check if email already exists for another doctor (if provided)
+        if (DoctorEmail && DoctorEmail.trim() !== '') {
+            const emailCheck = await database.executeQuery(
+                'SELECT DrID FROM AlignerDoctors WHERE DoctorEmail = @email AND DrID != @drID',
+                [
+                    ['email', database.TYPES.NVarChar, DoctorEmail.trim()],
+                    ['drID', database.TYPES.Int, parseInt(drID)]
+                ],
+                (columns) => columns[0].value
+            );
+
+            if (emailCheck && emailCheck.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Another doctor with this email already exists'
+                });
+            }
+        }
+
+        const updateQuery = `
+            UPDATE AlignerDoctors
+            SET DoctorName = @name,
+                DoctorEmail = @email,
+                LogoPath = @logo
+            WHERE DrID = @drID
+        `;
+
+        await database.executeQuery(
+            updateQuery,
+            [
+                ['name', database.TYPES.NVarChar, DoctorName.trim()],
+                ['email', database.TYPES.NVarChar, DoctorEmail && DoctorEmail.trim() !== '' ? DoctorEmail.trim() : null],
+                ['logo', database.TYPES.NVarChar, LogoPath && LogoPath.trim() !== '' ? LogoPath.trim() : null],
+                ['drID', database.TYPES.Int, parseInt(drID)]
+            ]
+        );
+
+        res.json({
+            success: true,
+            message: 'Doctor updated successfully'
+        });
+
+    } catch (error) {
+        console.error('Error updating aligner doctor:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update aligner doctor',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Delete aligner doctor
+ */
+router.delete('/aligner-doctors/:drID', async (req, res) => {
+    try {
+        const { drID } = req.params;
+
+        // Check if doctor has any aligner sets
+        const setsCheck = await database.executeQuery(
+            'SELECT COUNT(*) as SetCount FROM tblAlignerSets WHERE AlignerDrID = @drID',
+            [['drID', database.TYPES.Int, parseInt(drID)]],
+            (columns) => columns[0].value
+        );
+
+        const setCount = setsCheck && setsCheck.length > 0 ? setsCheck[0] : 0;
+
+        if (setCount > 0) {
+            return res.status(400).json({
+                success: false,
+                error: `Cannot delete doctor. They have ${setCount} aligner set(s) associated with them. Please reassign or delete those sets first.`
+            });
+        }
+
+        const deleteQuery = 'DELETE FROM AlignerDoctors WHERE DrID = @drID';
+
+        await database.executeQuery(
+            deleteQuery,
+            [['drID', database.TYPES.Int, parseInt(drID)]]
+        );
+
+        res.json({
+            success: true,
+            message: 'Doctor deleted successfully'
+        });
+
+    } catch (error) {
+        console.error('Error deleting aligner doctor:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete aligner doctor',
+            message: error.message
         });
     }
 });

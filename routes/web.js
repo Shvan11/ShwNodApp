@@ -46,7 +46,9 @@ const pageRewrites = [
   { url: '/calendar', file: '/views/appointments/calendar.html' },
   { url: '/appointments', file: '/views/appointments/daily-appointments.html' },
   { url: '/settings', file: '/views/settings.html' },
-  
+  { url: '/aligner', file: '/views/aligner.html' },
+  { url: '/portal', file: '/views/alignerportal.html' }, // Doctor portal
+
   // Patient pages - clean URLs
   { url: '/search', file: '/views/patient/search.html' },
   
@@ -93,13 +95,6 @@ router.get('/patient', (req, res) => {
     }
 });
 
-// Patient pages with clean URLs (use numeric patient IDs only)
-router.get('/patient/:id(\\d+)', (req, res) => {
-    const patientId = req.params.id;
-    const page = req.query.page || 'grid';
-    res.redirect(`/views/patient/react-shell.html?code=${patientId}&page=${page}`);
-});
-
 // Redirect old standalone page URLs to React shell
 router.get('/canvas', (req, res) => {
   const patientId = req.query.code;
@@ -128,13 +123,18 @@ router.get('/visits-summary', (req, res) => {
   }
 });
 
-// React Shell route for patient pages (using refactored components) - numeric IDs only
-router.get('/patient/:patientId(\\d+)/*', (_, res) => {
-  serveWithFallback(res, '/views/patient/react-shell.html', 'Patient shell not found');
+// React Shell route for patient pages with page parameter - redirect to proper URL format
+router.get('/patient/:patientId(\\d+)/:page', (req, res) => {
+  const patientId = req.params.patientId;
+  const page = req.params.page;
+  res.redirect(`/views/patient/react-shell.html?code=${patientId}&page=${page}`);
 });
 
-router.get('/patient/:patientId(\\d+)', (_, res) => {
-  serveWithFallback(res, '/views/patient/react-shell.html', 'Patient shell not found');
+// React Shell route for patient pages with query parameter
+router.get('/patient/:id(\\d+)', (req, res) => {
+  const patientId = req.params.id;
+  const page = req.query.page || 'grid';
+  res.redirect(`/views/patient/react-shell.html?code=${patientId}&page=${page}`);
 });
 
 // Apply all page rewrites

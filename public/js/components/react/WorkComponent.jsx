@@ -16,6 +16,8 @@ const WorkComponent = ({ patientId }) => {
     const [workDetails, setWorkDetails] = useState([]);
     const [showDetailForm, setShowDetailForm] = useState(false);
     const [editingDetail, setEditingDetail] = useState(null);
+    const [successMessage, setSuccessMessage] = useState(null);
+    const [newAlignerWorkId, setNewAlignerWorkId] = useState(null);
 
     // Work detail form state
     const [detailFormData, setDetailFormData] = useState({
@@ -30,7 +32,7 @@ const WorkComponent = ({ patientId }) => {
     // Form state
     const [formData, setFormData] = useState({
         PersonID: patientId,
-        TotalRequired: '',
+        TotalRequired: 0, // Default to 0 as it's required (NOT NULL)
         Currency: 'USD',
         Typeofwork: '',
         Notes: '',
@@ -99,7 +101,7 @@ const WorkComponent = ({ patientId }) => {
         setEditingWork(null);
         setFormData({
             PersonID: patientId,
-            TotalRequired: '',
+            TotalRequired: 0, // Default to 0 as it's required (NOT NULL)
             Currency: 'USD',
             Typeofwork: '',
             Notes: '',
@@ -147,10 +149,11 @@ const WorkComponent = ({ patientId }) => {
 
     const handleFormSubmit = async (e) => {
         e.preventDefault();
-        
+
         try {
             let response;
-            
+            const isNewAlignerWork = !editingWork && isAlignerWork({ Typeofwork: parseInt(formData.Typeofwork) });
+
             if (editingWork) {
                 // Update existing work
                 response = await fetch('/api/updatework', {
@@ -172,8 +175,20 @@ const WorkComponent = ({ patientId }) => {
                 throw new Error(errorData.error || 'Failed to save work');
             }
 
+            const result = await response.json();
             await loadWorks();
             setShowModal(false);
+
+            // Show success message for new aligner works
+            if (isNewAlignerWork && result.workId) {
+                setNewAlignerWorkId(result.workId);
+                setSuccessMessage('Work created successfully!');
+                // Auto-hide message after 10 seconds
+                setTimeout(() => {
+                    setSuccessMessage(null);
+                    setNewAlignerWorkId(null);
+                }, 10000);
+            }
         } catch (err) {
             setError(err.message);
         }
@@ -320,16 +335,23 @@ const WorkComponent = ({ patientId }) => {
         return progress;
     };
 
-    const filteredWorks = works.filter(work => {
-        const matchesSearch = work.Notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            work.DoctorName?.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        const matchesFilter = filterStatus === 'all' || 
-                            (filterStatus === 'active' && !work.Finished) ||
-                            (filterStatus === 'completed' && work.Finished);
-        
-        return matchesSearch && matchesFilter;
-    });
+    const filteredWorks = works
+        .filter(work => {
+            const matchesSearch = work.Notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                work.DoctorName?.toLowerCase().includes(searchTerm.toLowerCase());
+
+            const matchesFilter = filterStatus === 'all' ||
+                                (filterStatus === 'active' && !work.Finished) ||
+                                (filterStatus === 'completed' && work.Finished);
+
+            return matchesSearch && matchesFilter;
+        })
+        .sort((a, b) => {
+            // Sort by AdditionDate ascending (oldest first)
+            const dateA = new Date(a.AdditionDate || 0);
+            const dateB = new Date(b.AdditionDate || 0);
+            return dateA - dateB;
+        });
 
     const formatCurrency = (amount, currency) => {
         if (!amount) return 'N/A';
@@ -339,6 +361,17 @@ const WorkComponent = ({ patientId }) => {
     const formatDate = (dateString) => {
         if (!dateString) return 'Not set';
         return new Date(dateString).toLocaleDateString();
+    };
+
+    // Check if work is aligner-related (IDs: 19=Ortho(Aligners), 20=Ortho(Mixed), 21=Aligner(Lab))
+    const isAlignerWork = (work) => {
+        return [19, 20, 21].includes(work.Typeofwork);
+    };
+
+    // Navigate to aligner page with pre-selected work
+    const handleAddAlignerSet = (work) => {
+        // Redirect to aligner page with workId parameter
+        window.location.href = `/aligner?workId=${work.workid}`;
     };
 
     if (loading) return <div className="work-loading">Loading works...</div>;
@@ -377,6 +410,55 @@ const WorkComponent = ({ patientId }) => {
                 </div>
             )}
 
+            {successMessage && newAlignerWorkId && (
+                <div className="work-success" style={{
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                }}>
+                    <div>
+                        <strong>{successMessage}</strong>
+                        <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem' }}>
+                            This is an aligner work. Would you like to add aligner sets now?
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                            onClick={() => handleAddAlignerSet({ workid: newAlignerWorkId })}
+                            className="btn btn-sm"
+                            style={{
+                                backgroundColor: 'white',
+                                color: '#10b981',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            <i className="fas fa-tooth"></i> Add Aligner Set
+                        </button>
+                        <button
+                            onClick={() => {
+                                setSuccessMessage(null);
+                                setNewAlignerWorkId(null);
+                            }}
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'white',
+                                cursor: 'pointer',
+                                fontSize: '1.5rem',
+                                padding: '0 0.5rem'
+                            }}
+                        >
+                            ×
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div className="work-summary">
                 <div className="summary-card">
                     <h3>Total Works</h3>
@@ -396,7 +478,7 @@ const WorkComponent = ({ patientId }) => {
                 <table className="work-table">
                     <thead>
                         <tr>
-                            <th>Work ID</th>
+                            <th>Addition Date</th>
                             <th>Type</th>
                             <th>Doctor</th>
                             <th>Status</th>
@@ -409,16 +491,24 @@ const WorkComponent = ({ patientId }) => {
                     </thead>
                     <tbody>
                         {filteredWorks.map((work) => (
-                            <tr key={work.workid} className={work.Finished ? 'completed-row' : ''}>
-                                <td>{work.workid}</td>
+                            <tr
+                                key={work.workid}
+                                className={work.Finished ? 'completed-row' : 'active-row'}
+                                style={!work.Finished ? {
+                                    background: '#f0fdf4',
+                                    backgroundColor: '#f0fdf4',
+                                    borderLeft: '4px solid #059669'
+                                } : undefined}
+                            >
+                                <td>{formatDate(work.AdditionDate)}</td>
                                 <td>
-                                    {work.TypeName || 'Other'}
+                                    <strong>{work.TypeName || 'Other'}</strong>
                                 </td>
                                 <td>{work.DoctorName || 'Not assigned'}</td>
                                 <td>{getStatusBadge(work)}</td>
                                 <td>
                                     <div className="progress-container">
-                                        <div 
+                                        <div
                                             className="progress-bar"
                                             style={{ width: `${getProgressPercentage(work)}%` }}
                                         ></div>
@@ -430,22 +520,51 @@ const WorkComponent = ({ patientId }) => {
                                 <td>{formatCurrency(work.TotalPaid, work.Currency)}</td>
                                 <td>
                                     <div className="action-buttons">
-                                        <button 
+                                        <button
+                                            onClick={() => window.location.href = `/views/visits.html?workId=${work.workid}&patient=${patientId}`}
+                                            className="btn btn-sm"
+                                            style={{
+                                                backgroundColor: '#059669',
+                                                color: 'white',
+                                                border: 'none'
+                                            }}
+                                            title="View visits for this work"
+                                        >
+                                            <i className="fas fa-calendar-check"></i> Visits
+                                        </button>
+                                        <button
                                             onClick={() => handleViewDetails(work)}
                                             className="btn btn-sm btn-info"
+                                            title="View work details"
                                         >
                                             Details
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={() => handleEditWork(work)}
                                             className="btn btn-sm btn-secondary"
+                                            title="Edit work"
                                         >
                                             Edit
                                         </button>
+                                        {isAlignerWork(work) && (
+                                            <button
+                                                onClick={() => handleAddAlignerSet(work)}
+                                                className="btn btn-sm"
+                                                style={{
+                                                    backgroundColor: '#8b5cf6',
+                                                    color: 'white',
+                                                    border: 'none'
+                                                }}
+                                                title="Add or manage aligner sets"
+                                            >
+                                                <i className="fas fa-tooth"></i> Add Set
+                                            </button>
+                                        )}
                                         {!work.Finished && (
-                                            <button 
+                                            <button
                                                 onClick={() => handleCompleteWork(work.workid)}
                                                 className="btn btn-sm btn-success"
+                                                title="Mark work as completed"
                                             >
                                                 Complete
                                             </button>
@@ -470,45 +589,243 @@ const WorkComponent = ({ patientId }) => {
             {/* Work Details Modal */}
             {showDetailsModal && selectedWork && (
                 <div className="modal-overlay">
-                    <div className="work-modal details-modal">
+                    <div className="work-modal details-modal" style={{ maxWidth: '900px', maxHeight: '90vh', overflow: 'auto' }}>
                         <div className="modal-header">
-                            <h3>Work Details - {selectedWork.DoctorName || 'Work #' + selectedWork.workid}</h3>
-                            <button 
+                            <h3>Work Details - {selectedWork.TypeName || 'Work #' + selectedWork.workid}</h3>
+                            <button
                                 onClick={() => setShowDetailsModal(false)}
                                 className="modal-close"
                             >
                                 ×
                             </button>
                         </div>
-                        
+
                         <div className="work-details-content">
-                            {/* Work Summary */}
+                            {/* Comprehensive Work Information */}
                             <div className="work-summary-info">
-                                <div className="info-grid">
+                                <h4 style={{ marginBottom: '1rem', color: '#4f46e5', borderBottom: '2px solid #e0e7ff', paddingBottom: '0.5rem' }}>
+                                    <i className="fas fa-info-circle"></i> General Information
+                                </h4>
+                                <div className="info-grid" style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                                    gap: '1rem',
+                                    marginBottom: '1.5rem'
+                                }}>
                                     <div className="info-item">
-                                        <label>Work Type:</label>
-                                        <span>{selectedWork.TypeName || 'Other'}</span>
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Work ID:</label>
+                                        <span style={{ fontSize: '1rem' }}>{selectedWork.workid}</span>
                                     </div>
                                     <div className="info-item">
-                                        <label>Doctor:</label>
-                                        <span>{selectedWork.DoctorName || 'Not assigned'}</span>
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Work Type:</label>
+                                        <span style={{ fontSize: '1rem' }}>{selectedWork.TypeName || 'Other'}</span>
                                     </div>
                                     <div className="info-item">
-                                        <label>Status:</label>
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Doctor:</label>
+                                        <span style={{ fontSize: '1rem' }}>{selectedWork.DoctorName || 'Not assigned'}</span>
+                                    </div>
+                                    <div className="info-item">
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Status:</label>
                                         <span>{getStatusBadge(selectedWork)}</span>
                                     </div>
                                     <div className="info-item">
-                                        <label>Total:</label>
-                                        <span>{formatCurrency(selectedWork.TotalRequired, selectedWork.Currency)}</span>
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Progress:</label>
+                                        <span style={{ fontSize: '1rem', fontWeight: '600', color: '#4f46e5' }}>{getProgressPercentage(selectedWork)}%</span>
                                     </div>
                                     <div className="info-item">
-                                        <label>Start Date:</label>
-                                        <span>{formatDate(selectedWork.StartDate)}</span>
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Finished:</label>
+                                        <span style={{ fontSize: '1rem' }}>{selectedWork.Finished ? '✓ Yes' : '✗ No'}</span>
+                                    </div>
+                                </div>
+
+                                <h4 style={{ marginBottom: '1rem', color: '#059669', borderBottom: '2px solid #d1fae5', paddingBottom: '0.5rem' }}>
+                                    <i className="fas fa-dollar-sign"></i> Financial Information
+                                </h4>
+                                <div className="info-grid" style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                                    gap: '1rem',
+                                    marginBottom: '1.5rem'
+                                }}>
+                                    <div className="info-item">
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Total Required:</label>
+                                        <span style={{ fontWeight: '600', color: '#059669', fontSize: '1.1rem' }}>
+                                            {formatCurrency(selectedWork.TotalRequired, selectedWork.Currency)}
+                                        </span>
                                     </div>
                                     <div className="info-item">
-                                        <label>Progress:</label>
-                                        <span>{getProgressPercentage(selectedWork)}%</span>
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Total Paid:</label>
+                                        <span style={{ fontWeight: '600', color: '#0891b2', fontSize: '1.1rem' }}>
+                                            {formatCurrency(selectedWork.TotalPaid, selectedWork.Currency)}
+                                        </span>
                                     </div>
+                                    <div className="info-item">
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Balance:</label>
+                                        <span style={{ fontWeight: '600', color: '#dc2626', fontSize: '1.1rem' }}>
+                                            {formatCurrency((selectedWork.TotalRequired || 0) - (selectedWork.TotalPaid || 0), selectedWork.Currency)}
+                                        </span>
+                                    </div>
+                                    <div className="info-item">
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Currency:</label>
+                                        <span style={{ fontSize: '1rem' }}>{selectedWork.Currency || 'USD'}</span>
+                                    </div>
+                                </div>
+
+                                <h4 style={{ marginBottom: '1rem', color: '#7c3aed', borderBottom: '2px solid #ede9fe', paddingBottom: '0.5rem' }}>
+                                    <i className="fas fa-calendar-alt"></i> Timeline & Dates
+                                </h4>
+                                <div className="info-grid" style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                                    gap: '1rem',
+                                    marginBottom: '1.5rem'
+                                }}>
+                                    <div className="info-item">
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Addition Date:</label>
+                                        <span style={{ fontSize: '1rem' }}>{formatDate(selectedWork.AdditionDate)}</span>
+                                    </div>
+                                    <div className="info-item">
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Start Date:</label>
+                                        <span style={{ fontSize: '1rem' }}>{formatDate(selectedWork.StartDate)}</span>
+                                    </div>
+                                    <div className="info-item">
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Initial Photo Date:</label>
+                                        <span style={{ fontSize: '1rem' }}>{formatDate(selectedWork.IPhotoDate)}</span>
+                                    </div>
+                                    <div className="info-item">
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Debond Date:</label>
+                                        <span style={{ fontSize: '1rem' }}>{formatDate(selectedWork.DebondDate)}</span>
+                                    </div>
+                                    <div className="info-item">
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Final Photo Date:</label>
+                                        <span style={{ fontSize: '1rem' }}>{formatDate(selectedWork.FPhotoDate)}</span>
+                                    </div>
+                                    <div className="info-item">
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Notes Date:</label>
+                                        <span style={{ fontSize: '1rem' }}>{formatDate(selectedWork.NotesDate)}</span>
+                                    </div>
+                                    <div className="info-item">
+                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Estimated Duration:</label>
+                                        <span style={{ fontSize: '1rem' }}>{selectedWork.EstimatedDuration ? `${selectedWork.EstimatedDuration} months` : 'Not set'}</span>
+                                    </div>
+                                </div>
+
+                                {/* Keywords Section */}
+                                {(selectedWork.Keyword1 || selectedWork.Keyword2 || selectedWork.Keyword3 || selectedWork.Keyword4 || selectedWork.Keyword5) && (
+                                    <>
+                                        <h4 style={{ marginBottom: '1rem', color: '#ea580c', borderBottom: '2px solid #fed7aa', paddingBottom: '0.5rem' }}>
+                                            <i className="fas fa-tags"></i> Keywords
+                                        </h4>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                                            {selectedWork.Keyword1 && (
+                                                <span style={{
+                                                    backgroundColor: '#e0e7ff',
+                                                    color: '#4f46e5',
+                                                    padding: '0.5rem 1rem',
+                                                    borderRadius: '9999px',
+                                                    fontSize: '0.875rem',
+                                                    fontWeight: '500'
+                                                }}>
+                                                    {selectedWork.Keyword1}
+                                                </span>
+                                            )}
+                                            {selectedWork.Keyword2 && (
+                                                <span style={{
+                                                    backgroundColor: '#dbeafe',
+                                                    color: '#1e40af',
+                                                    padding: '0.5rem 1rem',
+                                                    borderRadius: '9999px',
+                                                    fontSize: '0.875rem',
+                                                    fontWeight: '500'
+                                                }}>
+                                                    {selectedWork.Keyword2}
+                                                </span>
+                                            )}
+                                            {selectedWork.Keyword3 && (
+                                                <span style={{
+                                                    backgroundColor: '#d1fae5',
+                                                    color: '#065f46',
+                                                    padding: '0.5rem 1rem',
+                                                    borderRadius: '9999px',
+                                                    fontSize: '0.875rem',
+                                                    fontWeight: '500'
+                                                }}>
+                                                    {selectedWork.Keyword3}
+                                                </span>
+                                            )}
+                                            {selectedWork.Keyword4 && (
+                                                <span style={{
+                                                    backgroundColor: '#fef3c7',
+                                                    color: '#92400e',
+                                                    padding: '0.5rem 1rem',
+                                                    borderRadius: '9999px',
+                                                    fontSize: '0.875rem',
+                                                    fontWeight: '500'
+                                                }}>
+                                                    {selectedWork.Keyword4}
+                                                </span>
+                                            )}
+                                            {selectedWork.Keyword5 && (
+                                                <span style={{
+                                                    backgroundColor: '#fce7f3',
+                                                    color: '#9f1239',
+                                                    padding: '0.5rem 1rem',
+                                                    borderRadius: '9999px',
+                                                    fontSize: '0.875rem',
+                                                    fontWeight: '500'
+                                                }}>
+                                                    {selectedWork.Keyword5}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Notes Section */}
+                                {selectedWork.Notes && (
+                                    <>
+                                        <h4 style={{ marginBottom: '0.5rem', color: '#0891b2', borderBottom: '2px solid #cffafe', paddingBottom: '0.5rem' }}>
+                                            <i className="fas fa-sticky-note"></i> Notes
+                                        </h4>
+                                        <div style={{
+                                            backgroundColor: '#f0fdfa',
+                                            padding: '1rem',
+                                            borderRadius: '8px',
+                                            borderLeft: '4px solid #0891b2',
+                                            marginBottom: '1.5rem'
+                                        }}>
+                                            <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{selectedWork.Notes}</p>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* View Visits Button */}
+                                <div style={{
+                                    marginTop: '2rem',
+                                    paddingTop: '1.5rem',
+                                    borderTop: '2px solid #e5e7eb',
+                                    display: 'flex',
+                                    gap: '1rem'
+                                }}>
+                                    <button
+                                        onClick={() => window.location.href = `/views/visits.html?workId=${selectedWork.workid}&patient=${patientId}`}
+                                        className="btn btn-primary"
+                                        style={{
+                                            backgroundColor: '#059669',
+                                            padding: '0.75rem 1.5rem',
+                                            fontSize: '1rem',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            color: 'white',
+                                            fontWeight: '600'
+                                        }}
+                                    >
+                                        <i className="fas fa-calendar-check"></i> View All Visits
+                                    </button>
                                 </div>
                             </div>
 
@@ -695,10 +1012,11 @@ const WorkComponent = ({ patientId }) => {
                         <form onSubmit={handleFormSubmit} className="work-form">
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label>Work Type</label>
+                                    <label>Work Type <span style={{ color: '#dc2626' }}>*</span></label>
                                     <select
                                         value={formData.Typeofwork}
                                         onChange={(e) => setFormData({...formData, Typeofwork: e.target.value})}
+                                        required
                                     >
                                         <option value="">Select Type</option>
                                         {workTypes.map(type => (
@@ -708,9 +1026,9 @@ const WorkComponent = ({ patientId }) => {
                                         ))}
                                     </select>
                                 </div>
-                                
+
                                 <div className="form-group">
-                                    <label>Doctor *</label>
+                                    <label>Doctor <span style={{ color: '#dc2626' }}>*</span></label>
                                     <select
                                         value={formData.DrID}
                                         onChange={(e) => setFormData({...formData, DrID: e.target.value})}
@@ -728,16 +1046,17 @@ const WorkComponent = ({ patientId }) => {
 
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label>Total Required</label>
+                                    <label>Total Required <span style={{ color: '#dc2626' }}>*</span></label>
                                     <input
                                         type="number"
                                         value={formData.TotalRequired}
                                         onChange={(e) => setFormData({...formData, TotalRequired: e.target.value})}
                                         min="0"
                                         step="0.01"
+                                        required
                                     />
                                 </div>
-                                
+
                                 <div className="form-group">
                                     <label>Currency</label>
                                     <select

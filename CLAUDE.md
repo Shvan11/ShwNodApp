@@ -6,6 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Node.js/Express web application for **Shwan Orthodontics** - a dental practice management system with multi-channel messaging capabilities (WhatsApp, SMS, Telegram). The application manages patient records, appointments, treatment photos, payments, and provides automated messaging for appointment reminders.
 
+## MCP Servers
+
+This project uses Model Context Protocol (MCP) servers to enable AI-assisted development:
+
+- **MSSQL MCP Server** (`@wener/mssql-mcp`) - Provides direct database access for schema exploration, queries, and data analysis
+- **React MCP Server** - Assists with React component development
+
+Configuration is in `.mcp.json`. See `docs/mcp-mssql-setup.md` for MSSQL MCP server usage.
+
 ## Core Commands
 
 - **Start Application**: `node index.js`

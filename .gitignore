@@ -76,10 +76,12 @@ web_modules/
 
 # dotenv environment variable files
 .env
+.env.*
 .env.development.local
 .env.test.local
 .env.production.local
 .env.local
+.env.backup
 
 # SSL certificates and private keys (SECURITY: Never commit these!)
 ssl/
@@ -157,3 +159,6 @@ tokens/
 credentials.json
 pngwing.com.png
 public/photoswipe
+
+# MCP Configuration (may contain sensitive connection strings)
+.mcp.json

@@ -8,8 +8,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "service:install": "node utils/windows-service/cli.js install",
     "service:uninstall": "node utils/windows-service/cli.js uninstall",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "vite",
-    "dev:server": "node index.js",
+    "dev:server": "NODE_ENV=development node index.js",
     "build": "vite build",
     "preview": "vite preview",
     "start": "node index.js",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.6.0",
+    "concurrently": "^9.2.1",
     "vite": "^7.0.0"
   }
 }

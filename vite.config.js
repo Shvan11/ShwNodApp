@@ -13,13 +13,17 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'public/index.html'),
         dashboard: resolve(__dirname, 'public/views/dashboard.html'),
+        settings: resolve(__dirname, 'public/views/settings.html'),
         'daily-appointments': resolve(__dirname, 'public/views/appointments/daily-appointments.html'),
         'react-shell': resolve(__dirname, 'public/views/patient/react-shell.html'),
         calendar: resolve(__dirname, 'public/views/appointments/calendar.html'),
         search: resolve(__dirname, 'public/views/patient/search.html'),
         'add-patient': resolve(__dirname, 'public/views/patient/add-patient.html'),
         'grid': resolve(__dirname, 'public/views/patient/grid_.html'),
-        'send-message': resolve(__dirname, 'public/views/messaging/send-message.html')
+        'send-message': resolve(__dirname, 'public/views/messaging/send-message.html'),
+        aligner: resolve(__dirname, 'public/views/aligner.html'),
+        alignerportal: resolve(__dirname, 'public/views/alignerportal.html'),
+        visits: resolve(__dirname, 'public/views/visits.html')
       }
     }
   },
@@ -31,7 +35,8 @@ export default defineConfig({
       // Proxy API and data routes to Express server
       '/api': {
         target: 'http://localhost:3000',
-        changeOrigin: true
+        changeOrigin: true,
+        secure: false
       },
       '/health': {
         target: 'http://localhost:3000',
@@ -62,6 +67,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => '/views/patient/search.html'
       },
+      '/settings': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        rewrite: (path) => '/views/settings.html'
+      },
       '/send-message': {
         target: 'http://localhost:5173',
         changeOrigin: true,
@@ -71,6 +81,16 @@ export default defineConfig({
         target: 'http://localhost:5173',
         changeOrigin: true,
         rewrite: (path) => '/views/messaging/auth.html'
+      },
+      '/aligner': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        rewrite: (path) => '/views/aligner.html'
+      },
+      '/portal': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        rewrite: (path) => '/views/alignerportal.html'
       },
       // Patient routes need Express for dynamic handling
       '/patient': {
