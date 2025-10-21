@@ -37,8 +37,35 @@ router.get('/api/portal/cases', authMiddleware, async (req, res) => {
     try {
         const drID = req.doctor.DrID;
 
-        // Get all aligner works for this doctor
+        // Get all aligner works for this doctor with active set details and payment summary
         const query = `
+            WITH ActiveSetInfo AS (
+                SELECT
+                    s.WorkID,
+                    s.AlignerSetID,
+                    s.SetSequence,
+                    s.UpperAlignersCount,
+                    s.LowerAlignersCount,
+                    s.RemainingUpperAligners,
+                    s.RemainingLowerAligners,
+                    s.SetCost,
+                    s.Currency,
+                    s.SetUrl,
+                    s.SetPdfUrl,
+                    ROW_NUMBER() OVER (PARTITION BY s.WorkID ORDER BY s.SetSequence DESC) as rn
+                FROM tblAlignerSets s
+                WHERE s.IsActive = 1 AND s.AlignerDrID = @drID
+            ),
+            PaymentInfo AS (
+                SELECT
+                    asi.WorkID,
+                    vp.TotalPaid,
+                    vp.Balance,
+                    vp.PaymentStatus
+                FROM ActiveSetInfo asi
+                LEFT JOIN vw_AlignerSetPayments vp ON asi.AlignerSetID = vp.AlignerSetID
+                WHERE asi.rn = 1
+            )
             SELECT
                 w.workid,
                 p.patientID,
@@ -50,14 +77,32 @@ router.get('/api/portal/cases', authMiddleware, async (req, res) => {
                 w.AdditionDate as WorkDate,
                 COUNT(DISTINCT s.AlignerSetID) as TotalSets,
                 SUM(CASE WHEN s.IsActive = 1 THEN 1 ELSE 0 END) as ActiveSets,
-                MAX(s.CreationDate) as LastSetDate
+                MAX(s.CreationDate) as LastSetDate,
+                asi.SetSequence as ActiveSetSequence,
+                asi.UpperAlignersCount as ActiveUpperCount,
+                asi.LowerAlignersCount as ActiveLowerCount,
+                asi.RemainingUpperAligners as ActiveRemainingUpper,
+                asi.RemainingLowerAligners as ActiveRemainingLower,
+                asi.SetCost,
+                asi.Currency,
+                asi.SetUrl,
+                asi.SetPdfUrl,
+                pi.TotalPaid,
+                pi.Balance,
+                pi.PaymentStatus
             FROM tblWork w
             INNER JOIN tblPatients p ON w.PersonID = p.PersonID
             LEFT JOIN tblAlignerSets s ON w.workid = s.WorkID
+            LEFT JOIN ActiveSetInfo asi ON w.workid = asi.WorkID AND asi.rn = 1
+            LEFT JOIN PaymentInfo pi ON w.workid = pi.WorkID
             WHERE s.AlignerDrID = @drID
             GROUP BY
                 w.workid, p.patientID, p.PatientName, p.FirstName,
-                p.LastName, p.Phone, w.Typeofwork, w.AdditionDate
+                p.LastName, p.Phone, w.Typeofwork, w.AdditionDate,
+                asi.SetSequence, asi.UpperAlignersCount, asi.LowerAlignersCount,
+                asi.RemainingUpperAligners, asi.RemainingLowerAligners,
+                asi.SetCost, asi.Currency, asi.SetUrl, asi.SetPdfUrl,
+                pi.TotalPaid, pi.Balance, pi.PaymentStatus
             ORDER BY MAX(s.CreationDate) DESC
         `;
 
@@ -75,7 +120,19 @@ router.get('/api/portal/cases', authMiddleware, async (req, res) => {
                 WorkDate: columns[7].value,
                 TotalSets: columns[8].value,
                 ActiveSets: columns[9].value,
-                LastSetDate: columns[10].value
+                LastSetDate: columns[10].value,
+                ActiveSetSequence: columns[11].value,
+                ActiveUpperCount: columns[12].value,
+                ActiveLowerCount: columns[13].value,
+                ActiveRemainingUpper: columns[14].value,
+                ActiveRemainingLower: columns[15].value,
+                SetCost: columns[16].value,
+                Currency: columns[17].value,
+                SetUrl: columns[18].value,
+                SetPdfUrl: columns[19].value,
+                TotalPaid: columns[20].value,
+                Balance: columns[21].value,
+                PaymentStatus: columns[22].value
             })
         );
 
@@ -472,10 +529,11 @@ router.post('/api/portal/notes', authMiddleware, async (req, res) => {
         }
 
         // Insert note (doctors can only add 'Doctor' type notes from portal)
+        // Doctor notes should be UNREAD by default (IsRead = 0) to trigger highlighting
         const insertQuery = `
-            INSERT INTO tblAlignerNotes (AlignerSetID, NoteType, NoteText)
-            OUTPUT INSERTED.NoteID
-            VALUES (@setId, 'Doctor', @noteText)
+            INSERT INTO tblAlignerNotes (AlignerSetID, NoteType, NoteText, IsRead)
+            VALUES (@setId, 'Doctor', @noteText, 0);
+            SELECT SCOPE_IDENTITY() AS NoteID;
         `;
 
         const result = await executeQuery(
@@ -505,5 +563,6 @@ router.post('/api/portal/notes', authMiddleware, async (req, res) => {
         });
     }
 });
+
 
 export default router;

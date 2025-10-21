@@ -101,6 +101,15 @@ const AlignerPortalComponent = () => {
 
             if (data.success) {
                 setSets(data.sets || []);
+
+                // Auto-expand the active set
+                const activeSet = data.sets?.find(set => set.IsActive);
+                if (activeSet) {
+                    // Load batches and notes for the active set and expand it
+                    await loadBatches(activeSet.AlignerSetID);
+                    await loadNotes(activeSet.AlignerSetID);
+                    setExpandedSets(prev => ({ ...prev, [activeSet.AlignerSetID]: true }));
+                }
             } else {
                 throw new Error(data.error || 'Failed to load sets');
             }
@@ -266,6 +275,7 @@ const AlignerPortalComponent = () => {
         return caseData.PatientName || `${caseData.FirstName} ${caseData.LastName}`;
     };
 
+
     // Calculate progress
     const calculateProgress = (set) => {
         const delivered = set.UpperAlignersCount + set.LowerAlignersCount -
@@ -420,20 +430,72 @@ const AlignerPortalComponent = () => {
                                             )}
                                         </div>
 
-                                        <div className="case-meta">
-                                            <div className="case-meta-item">
-                                                <i className="fas fa-phone"></i>
-                                                {caseData.Phone || 'N/A'}
+                                        {/* Active Set Info */}
+                                        {caseData.ActiveSets > 0 ? (
+                                            <div className="case-active-set-info">
+                                                <div className="active-set-header">
+                                                    <i className="fas fa-layer-group"></i>
+                                                    <strong>Active Set Info</strong>
+                                                </div>
+                                                <div className="active-set-details">
+                                                    <span><i className="fas fa-hashtag"></i> Set #{caseData.ActiveSetSequence || '?'}</span>
+                                                    <span><i className="fas fa-teeth"></i> {caseData.ActiveUpperCount || 0}U / {caseData.ActiveLowerCount || 0}L</span>
+                                                    <span><i className="fas fa-box-open"></i> Remaining: {caseData.ActiveRemainingUpper || 0}U / {caseData.ActiveRemainingLower || 0}L</span>
+                                                </div>
                                             </div>
-                                            <div className="case-meta-item">
-                                                <i className="fas fa-tooth"></i>
-                                                {caseData.WorkType}
+                                        ) : (
+                                            <div className="case-no-active-set">
+                                                <i className="fas fa-check-circle"></i> No active sets
                                             </div>
-                                            <div className="case-meta-item">
-                                                <i className="fas fa-calendar"></i>
-                                                Started: {formatDate(caseData.LastSetDate)}
+                                        )}
+
+                                        {/* Payment Summary */}
+                                        <div className="case-payment-summary">
+                                            <div className="case-payment-item">
+                                                <div className="case-payment-label">Total Required</div>
+                                                <div className="case-payment-value">{caseData.SetCost || 0} {caseData.Currency || 'USD'}</div>
+                                            </div>
+                                            <div className="case-payment-divider"></div>
+                                            <div className="case-payment-item">
+                                                <div className="case-payment-label">Total Paid</div>
+                                                <div className="case-payment-value paid">{caseData.TotalPaid || 0} {caseData.Currency || 'USD'}</div>
+                                            </div>
+                                            <div className="case-payment-divider"></div>
+                                            <div className="case-payment-item">
+                                                <div className="case-payment-label">Balance</div>
+                                                <div className="case-payment-value balance">{caseData.Balance !== null && caseData.Balance !== undefined ? caseData.Balance : (caseData.SetCost || 0)} {caseData.Currency || 'USD'}</div>
                                             </div>
                                         </div>
+
+                                        {/* URLs for Active Set */}
+                                        {(caseData.SetUrl || caseData.SetPdfUrl) && (
+                                            <div className="case-urls">
+                                                {caseData.SetUrl && (
+                                                    <a
+                                                        href={caseData.SetUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="case-url-btn"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <i className="fas fa-link"></i>
+                                                        Setup URL
+                                                    </a>
+                                                )}
+                                                {caseData.SetPdfUrl && (
+                                                    <a
+                                                        href={caseData.SetPdfUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="case-url-btn pdf"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <i className="fas fa-file-pdf"></i>
+                                                        View PDF
+                                                    </a>
+                                                )}
+                                            </div>
+                                        )}
 
                                         <div className="case-stats">
                                             <div className="case-stat">
@@ -463,9 +525,7 @@ const AlignerPortalComponent = () => {
                         <div className="patient-header-card">
                             <h2>{formatPatientName(selectedCase)}</h2>
                             <div className="patient-meta-row">
-                                <span><i className="fas fa-id-card"></i> {selectedCase.patientID}</span>
-                                <span><i className="fas fa-phone"></i> {selectedCase.Phone || 'N/A'}</span>
-                                <span><i className="fas fa-tooth"></i> {selectedCase.WorkType}</span>
+                                <span><i className="fas fa-id-card"></i> Patient ID: {selectedCase.patientID}</span>
                             </div>
                         </div>
 
@@ -519,46 +579,44 @@ const AlignerPortalComponent = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Cost and Payment Info */}
-                                            {set.SetCost && (
-                                                <div className="set-payment-info">
-                                                    <div className="payment-item">
-                                                        <i className="fas fa-dollar-sign"></i>
-                                                        <span>Cost: <strong>{set.SetCost} {set.Currency || 'USD'}</strong></span>
-                                                    </div>
-                                                    <div className="payment-item">
-                                                        <i className="fas fa-money-bill-wave"></i>
-                                                        <span>Paid: <strong>{set.TotalPaid || 0} {set.Currency || 'USD'}</strong></span>
-                                                    </div>
-                                                    <div className="payment-item">
-                                                        <i className="fas fa-balance-scale"></i>
-                                                        <span>Balance: <strong>{set.Balance || set.SetCost} {set.Currency || 'USD'}</strong></span>
-                                                    </div>
-                                                    <div className="payment-item">
-                                                        <span className={`payment-status-badge ${set.PaymentStatus?.toLowerCase() || 'unpaid'}`}>
-                                                            {set.PaymentStatus || 'Unpaid'}
-                                                        </span>
-                                                    </div>
+                                            {/* Payment Summary */}
+                                            <div className="set-payment-summary">
+                                                <div className="payment-summary-item">
+                                                    <div className="payment-summary-label">Total Required</div>
+                                                    <div className="payment-summary-value">{set.SetCost || 0} {set.Currency || 'USD'}</div>
                                                 </div>
-                                            )}
+                                                <div className="payment-summary-divider"></div>
+                                                <div className="payment-summary-item">
+                                                    <div className="payment-summary-label">Total Paid</div>
+                                                    <div className="payment-summary-value paid">{set.TotalPaid || 0} {set.Currency || 'USD'}</div>
+                                                </div>
+                                                <div className="payment-summary-divider"></div>
+                                                <div className="payment-summary-item">
+                                                    <div className="payment-summary-label">Balance</div>
+                                                    <div className="payment-summary-value balance">{set.Balance !== null && set.Balance !== undefined ? set.Balance : (set.SetCost || 0)} {set.Currency || 'USD'}</div>
+                                                </div>
+                                                <div className="payment-summary-status">
+                                                    <span className={`payment-status-badge ${set.PaymentStatus?.toLowerCase() || 'unpaid'}`}>
+                                                        {set.PaymentStatus || 'Unpaid'}
+                                                    </span>
+                                                </div>
+                                            </div>
 
                                             {/* URLs */}
-                                            {(set.SetUrl || set.SetPdfUrl) && (
-                                                <div className="set-urls">
-                                                    {set.SetUrl && (
-                                                        <a href={set.SetUrl} target="_blank" rel="noopener noreferrer" className="url-btn">
-                                                            <i className="fas fa-link"></i>
-                                                            Setup URL
-                                                        </a>
-                                                    )}
-                                                    {set.SetPdfUrl && (
-                                                        <a href={set.SetPdfUrl} target="_blank" rel="noopener noreferrer" className="url-btn pdf">
-                                                            <i className="fas fa-file-pdf"></i>
-                                                            PDF
-                                                        </a>
-                                                    )}
-                                                </div>
-                                            )}
+                                            <div className="set-urls">
+                                                {set.SetUrl && (
+                                                    <a href={set.SetUrl} target="_blank" rel="noopener noreferrer" className="url-btn">
+                                                        <i className="fas fa-link"></i>
+                                                        Setup URL
+                                                    </a>
+                                                )}
+                                                {set.SetPdfUrl && (
+                                                    <a href={set.SetPdfUrl} target="_blank" rel="noopener noreferrer" className="url-btn pdf">
+                                                        <i className="fas fa-file-pdf"></i>
+                                                        View PDF
+                                                    </a>
+                                                )}
+                                            </div>
 
                                             <div className="set-progress">
                                                 <div className="progress-bar-container">

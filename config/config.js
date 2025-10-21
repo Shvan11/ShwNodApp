@@ -19,10 +19,8 @@ for (const envVar of requiredEnvVars) {
   }
 }
 
-// Universal port configuration for Caddy reverse proxy setup
+// Port configuration - always use 3000
 function getDefaultPort() {
-  // Since Caddy handles HTTPS termination, use consistent port 3000
-  // for both Windows and Ubuntu environments
   return 3000;
 }
 
@@ -56,6 +54,13 @@ export default {
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET
+  },
+  googleDrive: {
+    clientId: process.env.GOOGLE_DRIVE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_DRIVE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET,
+    redirectUri: process.env.GOOGLE_DRIVE_REDIRECT_URI || `http://localhost:${process.env.PORT || 3000}/api/admin/google-drive/callback`,
+    refreshToken: process.env.GOOGLE_DRIVE_REFRESH_TOKEN,
+    folderId: process.env.GOOGLE_DRIVE_FOLDER_ID
   },
   fileSystem: {
     machinePath: process.env.MACHINE_PATH

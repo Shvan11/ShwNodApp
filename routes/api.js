@@ -28,6 +28,8 @@ import * as imaging from '../services/imaging/index.js';
 import multer from 'multer';
 import { sendgramfile } from '../services/messaging/telegram.js';
 import qrcode from 'qrcode';
+import { uploadSinglePdf, handleUploadError } from '../middleware/upload.js';
+import driveUploadService from '../services/google-drive/drive-upload.js';
 import config from '../config/config.js';
 import path from 'path';
 import PhoneFormatter from '../utils/phoneFormatter.js';
@@ -2712,7 +2714,14 @@ router.get('/aligner/doctors', async (req, res) => {
         const query = `
             SELECT DISTINCT
                 ad.DrID,
-                ad.DoctorName
+                ad.DoctorName,
+                (SELECT COUNT(*)
+                 FROM tblAlignerNotes n
+                 INNER JOIN tblAlignerSets s ON n.AlignerSetID = s.AlignerSetID
+                 WHERE s.AlignerDrID = ad.DrID
+                   AND n.NoteType = 'Doctor'
+                   AND n.IsRead = 0
+                ) AS UnreadDoctorNotes
             FROM AlignerDoctors ad
             ORDER BY ad.DoctorName
         `;
@@ -2722,7 +2731,8 @@ router.get('/aligner/doctors', async (req, res) => {
             [],
             (columns) => ({
                 DrID: columns[0].value,
-                DoctorName: columns[1].value
+                DoctorName: columns[1].value,
+                UnreadDoctorNotes: columns[2].value || 0
             })
         );
 
@@ -2837,7 +2847,14 @@ router.get('/aligner/patients/by-doctor/:doctorId', async (req, res) => {
                 wt.WorkType,
                 w.Typeofwork as WorkTypeID,
                 COUNT(DISTINCT s.AlignerSetID) as TotalSets,
-                SUM(CASE WHEN s.IsActive = 1 THEN 1 ELSE 0 END) as ActiveSets
+                SUM(CASE WHEN s.IsActive = 1 THEN 1 ELSE 0 END) as ActiveSets,
+                (SELECT COUNT(*)
+                 FROM tblAlignerNotes n
+                 INNER JOIN tblAlignerSets sets ON n.AlignerSetID = sets.AlignerSetID
+                 WHERE sets.WorkID = w.workid
+                   AND n.NoteType = 'Doctor'
+                   AND n.IsRead = 0
+                ) AS UnreadDoctorNotes
             FROM tblpatients p
             INNER JOIN tblwork w ON p.PersonID = w.PersonID
             INNER JOIN tblWorkType wt ON w.Typeofwork = wt.ID
@@ -2864,7 +2881,8 @@ router.get('/aligner/patients/by-doctor/:doctorId', async (req, res) => {
                 WorkType: columns[7].value,
                 WorkTypeID: columns[8].value,
                 TotalSets: columns[9].value,
-                ActiveSets: columns[10].value
+                ActiveSets: columns[10].value,
+                UnreadDoctorNotes: columns[11].value || 0
             })
         );
 
@@ -2987,7 +3005,7 @@ router.get('/aligner/sets/:workId', async (req, res) => {
 
         console.log(`Fetching aligner sets for work ID: ${workId}`);
 
-        // Query aligner sets with batch summary and payment info
+        // Query aligner sets with batch summary, payment info, and activity flags
         const query = `
             SELECT
                 s.AlignerSetID,
@@ -3013,7 +3031,13 @@ router.get('/aligner/sets/:workId', async (req, res) => {
                 SUM(CASE WHEN b.DeliveredToPatientDate IS NOT NULL THEN 1 ELSE 0 END) as DeliveredBatches,
                 vp.TotalPaid,
                 vp.Balance,
-                vp.PaymentStatus
+                vp.PaymentStatus,
+                (SELECT COUNT(*)
+                 FROM tblAlignerNotes n
+                 WHERE n.AlignerSetID = s.AlignerSetID
+                   AND n.NoteType = 'Doctor'
+                   AND n.IsRead = 0
+                ) AS UnreadActivityCount
             FROM tblAlignerSets s
             LEFT JOIN tblAlignerBatches b ON s.AlignerSetID = b.AlignerSetID
             LEFT JOIN AlignerDoctors ad ON s.AlignerDrID = ad.DrID
@@ -3057,9 +3081,21 @@ router.get('/aligner/sets/:workId', async (req, res) => {
                 DeliveredBatches: columns[20].value,
                 TotalPaid: columns[21].value,
                 Balance: columns[22].value,
-                PaymentStatus: columns[23].value
+                PaymentStatus: columns[23].value,
+                UnreadActivityCount: columns[24].value || 0
             })
         );
+
+        // DEBUG: Log unread activity counts
+        const setsWithUnread = (sets || []).filter(s => s.UnreadActivityCount > 0);
+        if (setsWithUnread.length > 0) {
+            console.log('🔔 [MAIN APP] Sets with unread doctor notes:', setsWithUnread.map(s => ({
+                SetID: s.AlignerSetID,
+                UnreadCount: s.UnreadActivityCount
+            })));
+        } else {
+            console.log('📭 [MAIN APP] No sets with unread doctor notes for workId:', workId);
+        }
 
         res.json({
             success: true,
@@ -3454,6 +3490,7 @@ router.get('/aligner/notes/:setId', async (req, res) => {
                 n.CreatedAt,
                 n.IsEdited,
                 n.EditedAt,
+                n.IsRead,
                 d.DoctorName
             FROM tblAlignerNotes n
             INNER JOIN tblAlignerSets s ON n.AlignerSetID = s.AlignerSetID
@@ -3473,7 +3510,8 @@ router.get('/aligner/notes/:setId', async (req, res) => {
                 CreatedAt: columns[4].value,
                 IsEdited: columns[5].value,
                 EditedAt: columns[6].value,
-                DoctorName: columns[7].value
+                IsRead: columns[7].value,
+                DoctorName: columns[8].value
             })
         );
 
@@ -3488,6 +3526,455 @@ router.get('/aligner/notes/:setId', async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to fetch notes',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Add a new note from lab staff
+ */
+router.post('/aligner/notes', async (req, res) => {
+    try {
+        const { AlignerSetID, NoteText } = req.body;
+
+        if (!AlignerSetID || !NoteText || NoteText.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                error: 'Set ID and note text are required'
+            });
+        }
+
+        // Verify that the set exists
+        const setCheckQuery = `
+            SELECT AlignerSetID
+            FROM tblAlignerSets
+            WHERE AlignerSetID = @setId
+        `;
+
+        const setExists = await database.executeQuery(
+            setCheckQuery,
+            [['setId', database.TYPES.Int, parseInt(AlignerSetID)]],
+            (columns) => columns[0].value
+        );
+
+        if (!setExists || setExists.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Aligner set not found'
+            });
+        }
+
+        // Insert note as 'Lab' type
+        // Note: Using SCOPE_IDENTITY() instead of OUTPUT clause because table has triggers
+        const insertQuery = `
+            INSERT INTO tblAlignerNotes (AlignerSetID, NoteType, NoteText)
+            VALUES (@setId, 'Lab', @noteText);
+            SELECT SCOPE_IDENTITY() AS NoteID;
+        `;
+
+        const result = await database.executeQuery(
+            insertQuery,
+            [
+                ['setId', database.TYPES.Int, parseInt(AlignerSetID)],
+                ['noteText', database.TYPES.NVarChar, NoteText.trim()]
+            ],
+            (columns) => columns[0].value
+        );
+
+        const noteId = result && result.length > 0 ? result[0] : null;
+
+        console.log(`Lab added note to aligner set ${AlignerSetID}`);
+
+        res.json({
+            success: true,
+            noteId: noteId,
+            message: 'Note added successfully'
+        });
+
+    } catch (error) {
+        console.error('Error adding lab note:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to add note',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Update an existing note
+ */
+router.patch('/aligner/notes/:noteId', async (req, res) => {
+    try {
+        const { noteId } = req.params;
+        const { NoteText } = req.body;
+
+        if (!noteId || isNaN(parseInt(noteId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid note ID is required'
+            });
+        }
+
+        if (!NoteText || NoteText.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                error: 'Note text is required'
+            });
+        }
+
+        // Verify note exists
+        const noteCheckQuery = `
+            SELECT NoteID, NoteType
+            FROM tblAlignerNotes
+            WHERE NoteID = @noteId
+        `;
+
+        const existingNote = await database.executeQuery(
+            noteCheckQuery,
+            [['noteId', database.TYPES.Int, parseInt(noteId)]],
+            (columns) => ({
+                NoteID: columns[0].value,
+                NoteType: columns[1].value
+            })
+        );
+
+        if (!existingNote || existingNote.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Note not found'
+            });
+        }
+
+        // Update note
+        const updateQuery = `
+            UPDATE tblAlignerNotes
+            SET NoteText = @noteText,
+                IsEdited = 1,
+                EditedAt = GETDATE()
+            WHERE NoteID = @noteId
+        `;
+
+        await database.executeQuery(
+            updateQuery,
+            [
+                ['noteId', database.TYPES.Int, parseInt(noteId)],
+                ['noteText', database.TYPES.NVarChar, NoteText.trim()]
+            ]
+        );
+
+        console.log(`Note ${noteId} updated`);
+
+        res.json({
+            success: true,
+            message: 'Note updated successfully'
+        });
+
+    } catch (error) {
+        console.error('Error updating note:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update note',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Delete a note
+ */
+router.delete('/aligner/notes/:noteId', async (req, res) => {
+    try {
+        const { noteId } = req.params;
+
+        if (!noteId || isNaN(parseInt(noteId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid note ID is required'
+            });
+        }
+
+        // Verify note exists
+        const noteCheckQuery = `
+            SELECT NoteID
+            FROM tblAlignerNotes
+            WHERE NoteID = @noteId
+        `;
+
+        const existingNote = await database.executeQuery(
+            noteCheckQuery,
+            [['noteId', database.TYPES.Int, parseInt(noteId)]],
+            (columns) => columns[0].value
+        );
+
+        if (!existingNote || existingNote.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Note not found'
+            });
+        }
+
+        // Delete note
+        const deleteQuery = `
+            DELETE FROM tblAlignerNotes
+            WHERE NoteID = @noteId
+        `;
+
+        await database.executeQuery(
+            deleteQuery,
+            [['noteId', database.TYPES.Int, parseInt(noteId)]]
+        );
+
+        console.log(`Note ${noteId} deleted`);
+
+        res.json({
+            success: true,
+            message: 'Note deleted successfully'
+        });
+
+    } catch (error) {
+        console.error('Error deleting note:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete note',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Get note read status
+ */
+router.get('/aligner/notes/:noteId/status', async (req, res) => {
+    try {
+        const { noteId } = req.params;
+
+        if (!noteId || isNaN(parseInt(noteId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid note ID is required'
+            });
+        }
+
+        const query = `
+            SELECT IsRead
+            FROM tblAlignerNotes
+            WHERE NoteID = @noteId
+        `;
+
+        const results = await database.executeQuery(
+            query,
+            [['noteId', database.TYPES.Int, parseInt(noteId)]],
+            (columns) => ({
+                IsRead: columns[0].value
+            })
+        );
+
+        if (results && results.length > 0) {
+            res.json({
+                success: true,
+                isRead: results[0].IsRead
+            });
+        } else {
+            res.status(404).json({
+                success: false,
+                error: 'Note not found'
+            });
+        }
+
+    } catch (error) {
+        console.error('Error getting note status:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get note status',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Toggle note read/unread status
+ */
+router.patch('/aligner/notes/:noteId/toggle-read', async (req, res) => {
+    try {
+        const { noteId } = req.params;
+
+        if (!noteId || isNaN(parseInt(noteId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid note ID is required'
+            });
+        }
+
+        // Toggle IsRead status
+        const updateQuery = `
+            UPDATE tblAlignerNotes
+            SET IsRead = CASE WHEN IsRead = 1 THEN 0 ELSE 1 END
+            WHERE NoteID = @noteId
+        `;
+
+        await database.executeQuery(
+            updateQuery,
+            [['noteId', database.TYPES.Int, parseInt(noteId)]]
+        );
+
+        res.json({
+            success: true,
+            message: 'Note read status toggled successfully'
+        });
+
+    } catch (error) {
+        console.error('Error toggling note read status:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to toggle read status',
+            message: error.message
+        });
+    }
+});
+
+// ===== ALIGNER ACTIVITY FLAGS =====
+
+/**
+ * Get unread activities for a specific aligner set
+ */
+router.get('/aligner/activity/:setId', async (req, res) => {
+    try {
+        const { setId } = req.params;
+
+        if (!setId || isNaN(parseInt(setId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid setId is required'
+            });
+        }
+
+        const query = `
+            SELECT
+                ActivityID,
+                AlignerSetID,
+                ActivityType,
+                ActivityDescription,
+                CreatedAt,
+                IsRead,
+                ReadAt,
+                RelatedRecordID
+            FROM tblAlignerActivityFlags
+            WHERE AlignerSetID = @setId AND IsRead = 0
+            ORDER BY CreatedAt DESC
+        `;
+
+        const activities = await database.executeQuery(
+            query,
+            [['setId', database.TYPES.Int, parseInt(setId)]],
+            (columns) => ({
+                ActivityID: columns[0].value,
+                AlignerSetID: columns[1].value,
+                ActivityType: columns[2].value,
+                ActivityDescription: columns[3].value,
+                CreatedAt: columns[4].value,
+                IsRead: columns[5].value,
+                ReadAt: columns[6].value,
+                RelatedRecordID: columns[7].value
+            })
+        );
+
+        res.json({
+            success: true,
+            activities: activities || [],
+            count: activities ? activities.length : 0
+        });
+
+    } catch (error) {
+        console.error('Error fetching activities:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch activities',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Mark a single activity as read
+ */
+router.patch('/aligner/activity/:activityId/mark-read', async (req, res) => {
+    try {
+        const { activityId } = req.params;
+
+        if (!activityId || isNaN(parseInt(activityId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid activityId is required'
+            });
+        }
+
+        const query = `
+            UPDATE tblAlignerActivityFlags
+            SET IsRead = 1, ReadAt = GETDATE()
+            WHERE ActivityID = @activityId
+        `;
+
+        await database.executeQuery(
+            query,
+            [['activityId', database.TYPES.Int, parseInt(activityId)]]
+        );
+
+        console.log(`Activity ${activityId} marked as read`);
+
+        res.json({
+            success: true,
+            message: 'Activity marked as read'
+        });
+
+    } catch (error) {
+        console.error('Error marking activity as read:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to mark activity as read',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Mark all activities for a set as read
+ */
+router.patch('/aligner/activity/set/:setId/mark-all-read', async (req, res) => {
+    try {
+        const { setId } = req.params;
+
+        if (!setId || isNaN(parseInt(setId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid setId is required'
+            });
+        }
+
+        const query = `
+            UPDATE tblAlignerActivityFlags
+            SET IsRead = 1, ReadAt = GETDATE()
+            WHERE AlignerSetID = @setId AND IsRead = 0
+        `;
+
+        await database.executeQuery(
+            query,
+            [['setId', database.TYPES.Int, parseInt(setId)]]
+        );
+
+        console.log(`All activities for set ${setId} marked as read`);
+
+        res.json({
+            success: true,
+            message: 'All activities marked as read'
+        });
+
+    } catch (error) {
+        console.error('Error marking all activities as read:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to mark all activities as read',
             message: error.message
         });
     }
@@ -3745,6 +4232,194 @@ router.delete('/aligner/batches/:batchId', async (req, res) => {
             success: false,
             error: 'Failed to delete aligner batch',
             message: error.message
+        });
+    }
+});
+
+// ==============================
+// ALIGNER PDF UPLOAD/DELETE
+// ==============================
+
+/**
+ * Upload PDF for an aligner set (staff page)
+ */
+router.post('/aligner/sets/:setId/upload-pdf', uploadSinglePdf, handleUploadError, async (req, res) => {
+    try {
+        const setId = parseInt(req.params.setId);
+        const uploaderEmail = 'staff@shwan.local'; // Staff uploads (no auth required)
+
+        // Validate file exists
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No file uploaded. Please select a PDF file.'
+            });
+        }
+
+        // Validate PDF
+        const validation = driveUploadService.validatePdfFile(req.file.buffer, req.file.mimetype);
+        if (!validation.valid) {
+            return res.status(400).json({
+                success: false,
+                error: validation.error
+            });
+        }
+
+        // Get set information
+        const setQuery = `
+            SELECT
+                s.AlignerSetID,
+                s.WorkID,
+                s.SetSequence,
+                s.DriveFileId,
+                w.PersonID,
+                p.PatientName,
+                p.FirstName,
+                p.LastName
+            FROM tblAlignerSets s
+            INNER JOIN tblWork w ON s.WorkID = w.workid
+            INNER JOIN tblPatients p ON w.PersonID = p.PersonID
+            WHERE s.AlignerSetID = @setId
+        `;
+
+        const setResult = await database.executeQuery(setQuery, [
+            ['setId', database.TYPES.Int, setId]
+        ]);
+
+        if (!setResult || setResult.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Aligner set not found'
+            });
+        }
+
+        const setInfo = setResult[0];
+        const patientName = setInfo.PatientName || `${setInfo.FirstName} ${setInfo.LastName}`;
+
+        // Delete old file from Drive if exists
+        if (setInfo.DriveFileId) {
+            try {
+                await driveUploadService.deletePdf(setInfo.DriveFileId);
+            } catch (error) {
+                console.warn('Failed to delete old PDF from Drive:', error);
+                // Continue with upload even if deletion fails
+            }
+        }
+
+        // Upload to Google Drive
+        const uploadResult = await driveUploadService.uploadPdfForSet(
+            {
+                buffer: req.file.buffer,
+                originalName: req.file.originalname
+            },
+            {
+                patientId: setInfo.PersonID,
+                patientName: patientName,
+                workId: setInfo.WorkID,
+                setSequence: setInfo.SetSequence
+            },
+            uploaderEmail
+        );
+
+        // Update database
+        const updateQuery = `
+            UPDATE tblAlignerSets
+            SET
+                SetPdfUrl = @url,
+                DriveFileId = @fileId,
+                PdfUploadedAt = GETDATE(),
+                PdfUploadedBy = @uploadedBy
+            WHERE AlignerSetID = @setId
+        `;
+
+        await database.executeQuery(updateQuery, [
+            ['url', database.TYPES.NVarChar, uploadResult.url],
+            ['fileId', database.TYPES.NVarChar, uploadResult.fileId],
+            ['uploadedBy', database.TYPES.NVarChar, uploaderEmail],
+            ['setId', database.TYPES.Int, setId]
+        ]);
+
+        res.json({
+            success: true,
+            message: 'PDF uploaded successfully',
+            data: {
+                url: uploadResult.url,
+                fileName: uploadResult.fileName,
+                size: uploadResult.size
+            }
+        });
+
+    } catch (error) {
+        console.error('Error uploading PDF:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to upload PDF'
+        });
+    }
+});
+
+/**
+ * Delete PDF from an aligner set (staff page)
+ */
+router.delete('/aligner/sets/:setId/pdf', async (req, res) => {
+    try {
+        const setId = parseInt(req.params.setId);
+
+        // Get set information
+        const setQuery = `
+            SELECT DriveFileId
+            FROM tblAlignerSets
+            WHERE AlignerSetID = @setId
+        `;
+
+        const setResult = await database.executeQuery(setQuery, [
+            ['setId', database.TYPES.Int, setId]
+        ]);
+
+        if (!setResult || setResult.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Aligner set not found'
+            });
+        }
+
+        const driveFileId = setResult[0].DriveFileId;
+
+        // Delete from Google Drive if exists
+        if (driveFileId) {
+            try {
+                await driveUploadService.deletePdf(driveFileId);
+            } catch (error) {
+                console.warn('Failed to delete from Drive:', error);
+                // Continue with database update even if Drive deletion fails
+            }
+        }
+
+        // Update database
+        const updateQuery = `
+            UPDATE tblAlignerSets
+            SET
+                SetPdfUrl = NULL,
+                DriveFileId = NULL,
+                PdfUploadedAt = NULL,
+                PdfUploadedBy = NULL
+            WHERE AlignerSetID = @setId
+        `;
+
+        await database.executeQuery(updateQuery, [
+            ['setId', database.TYPES.Int, setId]
+        ]);
+
+        res.json({
+            success: true,
+            message: 'PDF deleted successfully'
+        });
+
+    } catch (error) {
+        console.error('Error deleting PDF:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete PDF'
         });
     }
 });

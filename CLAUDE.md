@@ -51,16 +51,22 @@ Configuration is in `.mcp.json`. See `docs/mcp-mssql-setup.md` for MSSQL MCP ser
 Essential for database connectivity:
 - `DB_SERVER`, `DB_INSTANCE`, `DB_USER`, `DB_PASSWORD`
 - `MACHINE_PATH` - File system path for patient images
-- `PORT` - Server port (defaults to platform-specific: Windows=80, WSL/Ubuntu=3000)
-
-Cross-platform configuration:
-- `PLATFORM_TYPE` - Force platform type: 'windows' or 'wsl' (optional, auto-detects if not set)
+- `PORT` - Server port (defaults to 3000)
 
 Optional service integrations:
 - `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`
 - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NAME`
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 - `QR_HOST_URL`
+
+Sync system configuration (Supabase):
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
+- `REVERSE_SYNC_ENABLED` - Enable/disable reverse sync (default: true)
+- `REVERSE_SYNC_INTERVAL_MINUTES` - Polling interval (default: 60 minutes)
+- `REVERSE_SYNC_LOOKBACK_HOURS` - Startup lookback window (default: 24 hours)
+- `REVERSE_SYNC_MAX_RECORDS` - Max records per poll (default: 500)
+
+See `docs/REVERSE_SYNC_CONFIGURATION.md` for detailed sync configuration guide.
 
 ## Key API Patterns
 
@@ -141,17 +147,8 @@ Set `MACHINE_PATH` to your network path:
 - **Windows**: `\\\\your-server\\clinic1` or `C:\\clinic1`
 - **WSL**: `/mnt/your-server/clinic1` or `/mnt/c/clinic1`
 
-### Platform Override
-Force platform detection by setting:
-```bash
-export PLATFORM_TYPE=wsl    # Force WSL mode (port 3000)
-export PLATFORM_TYPE=windows # Force Windows mode (port 80)
-```
-
 ### Port Configuration
-The application automatically selects the appropriate default port based on the platform:
-- **Windows**: Port 80 (standard HTTP port)
-- **WSL/Ubuntu**: Port 3000 (development-friendly port)
+The application runs on **port 3000** by default.
 
 You can override the port by setting the `PORT` environment variable:
 ```bash

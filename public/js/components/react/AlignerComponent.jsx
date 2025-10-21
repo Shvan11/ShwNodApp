@@ -35,6 +35,14 @@ const AlignerComponent = () => {
     const [showPaymentDrawer, setShowPaymentDrawer] = useState(false);
     const [currentSetForPayment, setCurrentSetForPayment] = useState(null);
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+    const [uploadingPdf, setUploadingPdf] = useState({});
+
+    // Note states for lab communication
+    const [showAddLabNote, setShowAddLabNote] = useState({});
+    const [labNoteText, setLabNoteText] = useState('');
+    const [editingNoteId, setEditingNoteId] = useState(null);
+    const [editNoteText, setEditNoteText] = useState('');
+
 
     // Load doctors on mount and check for workId URL parameter
     useEffect(() => {
@@ -202,7 +210,26 @@ const AlignerComponent = () => {
                 throw new Error(data.error || 'Failed to load aligner sets');
             }
 
-            setAlignerSets(data.sets || []);
+            const sets = data.sets || [];
+            setAlignerSets(sets);
+
+            // Auto-expand the active set with communication section
+            const activeSet = sets.find(s => s.IsActive === true);
+            if (activeSet) {
+                const setId = activeSet.AlignerSetID;
+
+                // Load batches and notes for the active set
+                if (!batchesData[setId]) {
+                    await loadBatches(setId);
+                }
+                if (!notesData[setId]) {
+                    await loadNotes(setId, workId);
+                }
+
+                // Expand the active set and its communication section
+                setExpandedSets(prev => ({ ...prev, [setId]: true }));
+                setExpandedCommunication(prev => ({ ...prev, [setId]: true }));
+            }
         } catch (error) {
             console.error('Error loading aligner sets:', error);
             alert('Failed to load aligner sets: ' + error.message);
@@ -215,6 +242,7 @@ const AlignerComponent = () => {
     const toggleBatches = async (setId) => {
         if (expandedSets[setId]) {
             setExpandedSets(prev => ({ ...prev, [setId]: false }));
+            setExpandedCommunication(prev => ({ ...prev, [setId]: false }));
             return;
         }
 
@@ -222,7 +250,13 @@ const AlignerComponent = () => {
             await loadBatches(setId);
         }
 
+        // Auto-expand communication section and load notes
+        if (!notesData[setId]) {
+            await loadNotes(setId, selectedPatient?.workid);
+        }
+
         setExpandedSets(prev => ({ ...prev, [setId]: true }));
+        setExpandedCommunication(prev => ({ ...prev, [setId]: true }));
     };
 
     // Load batches for a set
@@ -243,7 +277,7 @@ const AlignerComponent = () => {
     };
 
     // Load notes for a set
-    const loadNotes = async (setId) => {
+    const loadNotes = async (setId, workId = null, autoMarkRead = true) => {
         try {
             const response = await fetch(`/api/aligner/notes/${setId}`);
             const data = await response.json();
@@ -253,9 +287,66 @@ const AlignerComponent = () => {
             }
 
             setNotesData(prev => ({ ...prev, [setId]: data.notes || [] }));
+
+            // Auto-mark unread doctor notes as read when viewing (only if autoMarkRead is true)
+            if (autoMarkRead) {
+                const unreadDoctorNotes = (data.notes || []).filter(note =>
+                    note.NoteType === 'Doctor' && note.IsRead === false
+                );
+
+                if (unreadDoctorNotes.length > 0) {
+                    // Mark all unread doctor notes as read
+                    for (const note of unreadDoctorNotes) {
+                        await markNoteAsRead(note.NoteID);
+                    }
+                    // Reload notes ONLY (not the whole sets) to get updated read status
+                    await loadNotes(setId, workId, false); // false = don't auto-mark again (prevent loop)
+                }
+            }
         } catch (error) {
             console.error('Error loading notes:', error);
             setNotesData(prev => ({ ...prev, [setId]: [] }));
+        }
+    };
+
+    // Mark a note as read (without toggling)
+    const markNoteAsRead = async (noteId) => {
+        try {
+            // First check current status
+            const checkResponse = await fetch(`/api/aligner/notes/${noteId}/status`);
+            const checkData = await checkResponse.json();
+
+            // Only toggle if it's currently unread
+            if (checkData.success && checkData.isRead === false) {
+                await fetch(`/api/aligner/notes/${noteId}/toggle-read`, {
+                    method: 'PATCH'
+                });
+            }
+        } catch (error) {
+            console.error('Error marking note as read:', error);
+        }
+    };
+
+    // Toggle note read/unread status
+    const handleToggleNoteRead = async (noteId, setId) => {
+        try {
+            const response = await fetch(`/api/aligner/notes/${noteId}/toggle-read`, {
+                method: 'PATCH'
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                // Reload notes WITHOUT auto-marking (user is manually toggling)
+                await loadNotes(setId, selectedPatient?.workid, false);
+                if (selectedPatient?.workid) {
+                    await loadAlignerSets(selectedPatient.workid); // Refresh to update highlighting
+                }
+            } else {
+                throw new Error(data.error || 'Failed to toggle read status');
+            }
+        } catch (error) {
+            console.error('Error toggling note read status:', error);
+            alert('Error updating read status: ' + error.message);
         }
     };
 
@@ -267,7 +358,7 @@ const AlignerComponent = () => {
         }
 
         if (!notesData[setId]) {
-            await loadNotes(setId);
+            await loadNotes(setId, selectedPatient?.workid);
         }
 
         setExpandedCommunication(prev => ({ ...prev, [setId]: true }));
@@ -532,6 +623,76 @@ const AlignerComponent = () => {
         }
     };
 
+    // Handle PDF upload
+    const handlePdfUpload = async (setId, file) => {
+        if (!file) return;
+
+        // Validate file type
+        if (file.type !== 'application/pdf') {
+            alert('Please select a PDF file');
+            return;
+        }
+
+        // Validate file size (100MB max)
+        if (file.size > 100 * 1024 * 1024) {
+            alert('File is too large. Maximum size is 100MB.');
+            return;
+        }
+
+        setUploadingPdf(prev => ({ ...prev, [setId]: true }));
+
+        try {
+            const formData = new FormData();
+            formData.append('pdf', file);
+
+            const response = await fetch(`/api/aligner/sets/${setId}/upload-pdf`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                alert('PDF uploaded successfully!');
+                // Reload sets to get updated PDF URL
+                await loadAlignerSets(selectedPatient.workid);
+            } else {
+                throw new Error(data.error || 'Failed to upload PDF');
+            }
+        } catch (error) {
+            console.error('Error uploading PDF:', error);
+            alert(`Failed to upload PDF: ${error.message}`);
+        } finally {
+            setUploadingPdf(prev => ({ ...prev, [setId]: false }));
+        }
+    };
+
+    // Handle PDF delete
+    const handlePdfDelete = async (setId) => {
+        if (!confirm('Are you sure you want to delete this PDF?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/aligner/sets/${setId}/pdf`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                alert('PDF deleted successfully');
+                // Reload sets to remove PDF URL
+                await loadAlignerSets(selectedPatient.workid);
+            } else {
+                throw new Error(data.error || 'Failed to delete PDF');
+            }
+        } catch (error) {
+            console.error('Error deleting PDF:', error);
+            alert(`Failed to delete PDF: ${error.message}`);
+        }
+    };
+
     // Open folder - try to open directly or copy to clipboard
     const openSetFolder = async (set) => {
         const folderPath = generateFolderPath(set);
@@ -584,6 +745,114 @@ const AlignerComponent = () => {
 
             alert(message);
         }
+    };
+
+    // Add lab note to communicate with doctor
+    const handleAddLabNote = async (setId) => {
+        if (!labNoteText.trim()) {
+            alert('Please enter a note');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/aligner/notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    AlignerSetID: setId,
+                    NoteText: labNoteText.trim()
+                })
+            });
+
+            const data = await response.json();
+            console.log('Add note response:', data);
+
+            if (data.success) {
+                setLabNoteText('');
+                setShowAddLabNote(prev => ({ ...prev, [setId]: false }));
+                await loadNotes(setId, selectedPatient?.workid, false); // Don't auto-mark when adding notes
+                alert('Note sent to doctor successfully!');
+            } else {
+                console.error('Server error:', data);
+                throw new Error(data.error || data.message || 'Failed to add note');
+            }
+        } catch (error) {
+            console.error('Error adding lab note:', error);
+            alert('Failed to send note: ' + error.message);
+        }
+    };
+
+    // Start editing a note
+    const handleStartEditNote = (note) => {
+        setEditingNoteId(note.NoteID);
+        setEditNoteText(note.NoteText);
+    };
+
+    // Cancel editing
+    const handleCancelEditNote = () => {
+        setEditingNoteId(null);
+        setEditNoteText('');
+    };
+
+    // Save edited note
+    const handleSaveEditNote = async (noteId, setId) => {
+        if (!editNoteText.trim()) {
+            alert('Please enter note text');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/aligner/notes/${noteId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    NoteText: editNoteText.trim()
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setEditingNoteId(null);
+                setEditNoteText('');
+                await loadNotes(setId, selectedPatient?.workid, false); // Don't auto-mark when editing notes
+                alert('Note updated successfully!');
+            } else {
+                throw new Error(data.error || 'Failed to update note');
+            }
+        } catch (error) {
+            console.error('Error updating note:', error);
+            alert('Failed to update note: ' + error.message);
+        }
+    };
+
+    // Delete a note
+    const handleDeleteNote = (noteId, setId) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Delete Note',
+            message: 'Are you sure you want to delete this note? This action cannot be undone.',
+            onConfirm: async () => {
+                try {
+                    const response = await fetch(`/api/aligner/notes/${noteId}`, {
+                        method: 'DELETE'
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        await loadNotes(setId, selectedPatient?.workid, false); // Don't auto-mark when deleting notes
+                        setConfirmDialog({ isOpen: false });
+                        alert('Note deleted successfully!');
+                    } else {
+                        throw new Error(data.error || 'Failed to delete note');
+                    }
+                } catch (error) {
+                    console.error('Error deleting note:', error);
+                    alert('Failed to delete note: ' + error.message);
+                }
+            }
+        });
     };
 
     // Close search results when clicking outside
@@ -740,9 +1009,15 @@ const AlignerComponent = () => {
                                     {getFilteredPatients().map((patient) => (
                                         <div
                                             key={patient.PersonID}
-                                            className="patient-card"
+                                            className={`patient-card ${patient.UnreadDoctorNotes > 0 ? 'has-activity' : ''}`}
                                             onClick={() => selectPatient(patient)}
                                         >
+                                            {patient.UnreadDoctorNotes > 0 && (
+                                                <div className="activity-banner">
+                                                    <i className="fas fa-bell"></i>
+                                                    <strong>{patient.UnreadDoctorNotes}</strong> unread {patient.UnreadDoctorNotes === 1 ? 'note' : 'notes'}
+                                                </div>
+                                            )}
                                             <div className="patient-card-header">
                                                 <div className="patient-card-photo">
                                                     <img
@@ -837,9 +1112,15 @@ const AlignerComponent = () => {
                                 {doctors.map((doctor) => (
                                     <div
                                         key={doctor.DrID}
-                                        className="doctor-card"
+                                        className={`doctor-card ${doctor.UnreadDoctorNotes > 0 ? 'has-activity' : ''}`}
                                         onClick={() => selectDoctor(doctor)}
                                     >
+                                        {doctor.UnreadDoctorNotes > 0 && (
+                                            <div className="activity-banner">
+                                                <i className="fas fa-bell"></i>
+                                                <strong>{doctor.UnreadDoctorNotes}</strong> unread {doctor.UnreadDoctorNotes === 1 ? 'note' : 'notes'}
+                                            </div>
+                                        )}
                                         <i className="fas fa-user-md doctor-icon"></i>
                                         <h3>{doctor.DoctorName}</h3>
                                         <i className="fas fa-chevron-right arrow-icon"></i>
@@ -1039,8 +1320,25 @@ const AlignerComponent = () => {
                             const delivered = set.UpperAlignersCount + set.LowerAlignersCount - set.RemainingUpperAligners - set.RemainingLowerAligners;
                             const total = set.UpperAlignersCount + set.LowerAlignersCount;
 
+                            // DEBUG: Log highlighting status
+                            if (set.UnreadActivityCount > 0) {
+                                console.log('🎨 [FRONTEND] Applying has-activity class to set:', {
+                                    SetID: set.AlignerSetID,
+                                    SetSequence: set.SetSequence,
+                                    UnreadCount: set.UnreadActivityCount
+                                });
+                            }
+
                             return (
-                                <div key={set.AlignerSetID} className={`aligner-set-card ${set.IsActive ? 'active' : 'inactive'}`}>
+                                <div key={set.AlignerSetID} className={`aligner-set-card ${set.IsActive ? 'active' : 'inactive'} ${set.UnreadActivityCount > 0 ? 'has-activity' : ''}`}>
+                                    {/* Activity Banner */}
+                                    {set.UnreadActivityCount > 0 && (
+                                        <div className="activity-banner">
+                                            <i className="fas fa-bell"></i>
+                                            <strong>{set.UnreadActivityCount}</strong> new {set.UnreadActivityCount === 1 ? 'update' : 'updates'} from doctor
+                                        </div>
+                                    )}
+
                                     <div className="set-header" onClick={() => toggleBatches(set.AlignerSetID)}>
                                         <div className="set-title">
                                             <h4>
@@ -1092,18 +1390,81 @@ const AlignerComponent = () => {
                                                     <span>View Online</span>
                                                 </button>
                                             )}
-                                            {set.SetPdfUrl && (
-                                                <button
-                                                    className="pdf-btn"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        window.open(set.SetPdfUrl, '_blank');
-                                                    }}
-                                                    title={set.SetPdfUrl}
+                                            {set.SetPdfUrl ? (
+                                                <>
+                                                    <button
+                                                        className="pdf-btn"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            window.open(set.SetPdfUrl, '_blank');
+                                                        }}
+                                                        title={set.SetPdfUrl}
+                                                    >
+                                                        <i className="fas fa-file-pdf"></i>
+                                                        <span>View PDF</span>
+                                                    </button>
+                                                    <label
+                                                        className="replace-pdf-btn"
+                                                        style={{ cursor: 'pointer' }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <i className="fas fa-upload"></i>
+                                                        <span>Replace PDF</span>
+                                                        <input
+                                                            type="file"
+                                                            accept=".pdf,application/pdf"
+                                                            style={{ display: 'none' }}
+                                                            onChange={(e) => {
+                                                                if (e.target.files && e.target.files[0]) {
+                                                                    handlePdfUpload(set.AlignerSetID, e.target.files[0]);
+                                                                    e.target.value = '';
+                                                                }
+                                                            }}
+                                                            disabled={uploadingPdf[set.AlignerSetID]}
+                                                        />
+                                                    </label>
+                                                    <button
+                                                        className="delete-pdf-btn"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handlePdfDelete(set.AlignerSetID);
+                                                        }}
+                                                        title="Delete PDF"
+                                                    >
+                                                        <i className="fas fa-trash"></i>
+                                                        <span>Delete PDF</span>
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <label
+                                                    className="upload-pdf-btn"
+                                                    style={{ cursor: 'pointer' }}
+                                                    onClick={(e) => e.stopPropagation()}
                                                 >
-                                                    <i className="fas fa-file-pdf"></i>
-                                                    <span>View PDF</span>
-                                                </button>
+                                                    {uploadingPdf[set.AlignerSetID] ? (
+                                                        <>
+                                                            <i className="fas fa-spinner fa-spin"></i>
+                                                            <span>Uploading...</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <i className="fas fa-upload"></i>
+                                                            <span>Upload PDF</span>
+                                                        </>
+                                                    )}
+                                                    <input
+                                                        type="file"
+                                                        accept=".pdf,application/pdf"
+                                                        style={{ display: 'none' }}
+                                                        onChange={(e) => {
+                                                            if (e.target.files && e.target.files[0]) {
+                                                                handlePdfUpload(set.AlignerSetID, e.target.files[0]);
+                                                                e.target.value = '';
+                                                            }
+                                                        }}
+                                                        disabled={uploadingPdf[set.AlignerSetID]}
+                                                    />
+                                                </label>
                                             )}
                                             {set.SetCost && set.Balance > 0 && (
                                                 <button
@@ -1329,7 +1690,7 @@ const AlignerComponent = () => {
                                             onClick={() => toggleCommunication(set.AlignerSetID)}
                                         >
                                             <i className="fas fa-comments"></i>
-                                            <span>Communication with Lab</span>
+                                            <span>Communication with Doctor</span>
                                             <i className="fas fa-chevron-down"></i>
                                         </button>
 
@@ -1340,30 +1701,161 @@ const AlignerComponent = () => {
                                                         <div className="spinner"></div>
                                                         <p>Loading communication...</p>
                                                     </div>
-                                                ) : notesData[set.AlignerSetID].length === 0 ? (
-                                                    <div className="empty-communication">
-                                                        <i className="fas fa-inbox"></i>
-                                                        <p>No messages yet</p>
-                                                        <p className="hint">Communication between doctor and lab will appear here</p>
-                                                    </div>
                                                 ) : (
-                                                    <div className="notes-timeline">
-                                                        {notesData[set.AlignerSetID].map((note) => (
-                                                            <div key={note.NoteID} className={`note-item ${note.NoteType === 'Lab' ? 'lab-note' : 'doctor-note'}`}>
-                                                                <div className="note-header-row">
-                                                                    <div className={`note-author ${note.NoteType === 'Lab' ? 'lab' : 'doctor'}`}>
-                                                                        <i className={note.NoteType === 'Lab' ? 'fas fa-flask' : 'fas fa-user-md'}></i>
-                                                                        {note.NoteType === 'Lab' ? 'Shwan Lab' : `Dr. ${note.DoctorName}`}
-                                                                    </div>
-                                                                    <div className="note-date">
-                                                                        {formatDateTime(note.CreatedAt)}
-                                                                        {note.IsEdited && ' (edited)'}
+                                                    <>
+                                                        {/* Add Note Form */}
+                                                        <div className="add-note-section" style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+                                                            {!showAddLabNote[set.AlignerSetID] ? (
+                                                                <button
+                                                                    className="add-batch-btn"
+                                                                    onClick={() => setShowAddLabNote(prev => ({ ...prev, [set.AlignerSetID]: true }))}
+                                                                    style={{ width: 'auto' }}
+                                                                >
+                                                                    <i className="fas fa-plus"></i> Send Note to Doctor
+                                                                </button>
+                                                            ) : (
+                                                                <div className="note-form">
+                                                                    <textarea
+                                                                        className="note-textarea"
+                                                                        placeholder="Type your message to the doctor..."
+                                                                        value={labNoteText}
+                                                                        onChange={(e) => setLabNoteText(e.target.value)}
+                                                                        style={{
+                                                                            width: '100%',
+                                                                            minHeight: '100px',
+                                                                            padding: '0.75rem',
+                                                                            border: '1px solid #d1d5db',
+                                                                            borderRadius: '6px',
+                                                                            fontSize: '0.875rem',
+                                                                            resize: 'vertical',
+                                                                            marginBottom: '0.75rem'
+                                                                        }}
+                                                                    />
+                                                                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                                                        <button
+                                                                            className="btn-cancel"
+                                                                            onClick={() => {
+                                                                                setShowAddLabNote(prev => ({ ...prev, [set.AlignerSetID]: false }));
+                                                                                setLabNoteText('');
+                                                                            }}
+                                                                            style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                        <button
+                                                                            className="add-batch-btn"
+                                                                            onClick={() => handleAddLabNote(set.AlignerSetID)}
+                                                                            style={{ width: 'auto' }}
+                                                                        >
+                                                                            <i className="fas fa-paper-plane"></i> Send Note
+                                                                        </button>
                                                                     </div>
                                                                 </div>
-                                                                <p className="note-text">{note.NoteText}</p>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Notes Timeline */}
+                                                        {notesData[set.AlignerSetID].length === 0 ? (
+                                                            <div className="empty-communication">
+                                                                <i className="fas fa-inbox"></i>
+                                                                <p>No messages yet</p>
+                                                                <p className="hint">Communication between doctor and lab will appear here</p>
                                                             </div>
-                                                        ))}
-                                                    </div>
+                                                        ) : (
+                                                            <div className="notes-timeline">
+                                                                {notesData[set.AlignerSetID].map((note) => (
+                                                                    <div key={note.NoteID} className={`note-item ${note.NoteType === 'Lab' ? 'lab-note' : 'doctor-note'}`}>
+                                                                        {editingNoteId === note.NoteID ? (
+                                                                            /* Editing Mode */
+                                                                            <div className="note-edit-form">
+                                                                                <textarea
+                                                                                    className="note-textarea"
+                                                                                    value={editNoteText}
+                                                                                    onChange={(e) => setEditNoteText(e.target.value)}
+                                                                                    style={{
+                                                                                        width: '100%',
+                                                                                        minHeight: '80px',
+                                                                                        padding: '0.75rem',
+                                                                                        border: '1px solid #d1d5db',
+                                                                                        borderRadius: '6px',
+                                                                                        fontSize: '0.875rem',
+                                                                                        resize: 'vertical',
+                                                                                        marginBottom: '0.5rem'
+                                                                                    }}
+                                                                                />
+                                                                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                                                                    <button
+                                                                                        className="btn-cancel"
+                                                                                        onClick={handleCancelEditNote}
+                                                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                                                                                    >
+                                                                                        Cancel
+                                                                                    </button>
+                                                                                    <button
+                                                                                        className="days-save-btn"
+                                                                                        onClick={() => handleSaveEditNote(note.NoteID, set.AlignerSetID)}
+                                                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                                                                                    >
+                                                                                        Save
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                        ) : (
+                                                                            /* View Mode */
+                                                                            <>
+                                                                                <div className="note-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                                                        {/* Read/Unread Checkbox */}
+                                                                                        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '0.95rem' }}>
+                                                                                            <input
+                                                                                                type="checkbox"
+                                                                                                checked={note.IsRead !== false}
+                                                                                                onChange={() => handleToggleNoteRead(note.NoteID, set.AlignerSetID)}
+                                                                                                style={{ marginRight: '0.5rem', cursor: 'pointer', width: '16px', height: '16px' }}
+                                                                                                title={note.IsRead !== false ? 'Mark as unread' : 'Mark as read'}
+                                                                                            />
+                                                                                        </label>
+                                                                                        <div className={`note-author ${note.NoteType === 'Lab' ? 'lab' : 'doctor'}`} style={{ fontWeight: note.IsRead === false ? 'bold' : 'normal' }}>
+                                                                                            <i className={note.NoteType === 'Lab' ? 'fas fa-flask' : 'fas fa-user-md'}></i>
+                                                                                            {note.NoteType === 'Lab' ? 'Shwan Lab' : `Dr. ${note.DoctorName}`}
+                                                                                        </div>
+                                                                                        <div className="note-date">
+                                                                                            {formatDateTime(note.CreatedAt)}
+                                                                                            {note.IsEdited && ' (edited)'}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    {/* Show edit/delete buttons */}
+                                                                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                                                        {/* Only Lab notes can be edited */}
+                                                                                        {note.NoteType === 'Lab' && (
+                                                                                            <button
+                                                                                                className="action-icon-btn edit"
+                                                                                                onClick={() => handleStartEditNote(note)}
+                                                                                                title="Edit Note"
+                                                                                                style={{ padding: '0.25rem 0.5rem' }}
+                                                                                            >
+                                                                                                <i className="fas fa-edit"></i>
+                                                                                            </button>
+                                                                                        )}
+                                                                                        {/* All notes can be deleted */}
+                                                                                        <button
+                                                                                            className="action-icon-btn delete"
+                                                                                            onClick={() => handleDeleteNote(note.NoteID, set.AlignerSetID)}
+                                                                                            title="Delete Note"
+                                                                                            style={{ padding: '0.25rem 0.5rem' }}
+                                                                                        >
+                                                                                            <i className="fas fa-trash"></i>
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <p className="note-text" style={{ fontWeight: note.IsRead === false ? 'bold' : 'normal' }}>{note.NoteText}</p>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </>
                                                 )}
                                             </div>
                                         )}

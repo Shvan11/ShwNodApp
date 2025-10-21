@@ -11,26 +11,19 @@ const router = express.Router();
 // ==============================
 
 /**
- * Serve file with environment-aware fallback (production prefers dist, development prefers public)
+ * Serve file from dist directory (built files only)
+ * Express server always serves from dist/
+ * For development with HMR, use Vite dev server on port 5173
  * @param {Object} res - Express response object
  * @param {string} filePath - Relative file path from project root
  * @param {string} errorMessage - Custom error message if file not found
  */
 function serveWithFallback(res, filePath, errorMessage = 'File not found') {
   const builtFile = path.join(process.cwd(), `./dist${filePath}`);
-  const sourceFile = path.join(process.cwd(), `./public${filePath}`);
-  
-  const isProduction = process.env.NODE_ENV === 'production';
-  const primaryFile = isProduction ? builtFile : sourceFile;
-  const fallbackFile = isProduction ? sourceFile : builtFile;
-  
-  res.sendFile(primaryFile, (err) => {
+
+  res.sendFile(builtFile, (err) => {
     if (err) {
-      res.sendFile(fallbackFile, (fallbackErr) => {
-        if (fallbackErr) {
-          res.status(404).send(errorMessage);
-        }
-      });
+      res.status(404).send(errorMessage);
     }
   });
 }
@@ -82,7 +75,7 @@ const pageRewrites = [
 
 // Serve the main page at root
 router.get('/', (_, res) => {
-    res.sendFile(path.join(process.cwd(), './public/views/dashboard.html'));
+    res.sendFile(path.join(process.cwd(), './dist/views/dashboard.html'));
 });
 
 // Patient page with query parameters
@@ -148,23 +141,14 @@ pageRewrites.forEach(({ url, file }) => {
 router.get('/:page.html', (req, res, next) => {
   const page = req.params.page;
   const rewrite = pageRewrites.find(r => r.url === `/${page}`);
-  
+
   if (rewrite) {
-    // Use environment-aware file serving with custom fallback to next()
+    // Serve from dist directory only
     const builtFile = path.join(process.cwd(), `./dist${rewrite.file}`);
-    const sourceFile = path.join(process.cwd(), `./public${rewrite.file}`);
-    
-    const isProduction = process.env.NODE_ENV === 'production';
-    const primaryFile = isProduction ? builtFile : sourceFile;
-    const fallbackFile = isProduction ? sourceFile : builtFile;
-    
-    res.sendFile(primaryFile, (err) => {
+
+    res.sendFile(builtFile, (err) => {
       if (err) {
-        res.sendFile(fallbackFile, (fallbackErr) => {
-          if (fallbackErr) {
-            next(); // Continue to static file handling
-          }
-        });
+        next(); // Continue to static file handling
       }
     });
   } else {

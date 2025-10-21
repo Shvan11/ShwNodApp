@@ -841,29 +841,76 @@ body {
         flex-direction: column;
         gap: 0.5rem;
     }
+
+    .set-payment-summary {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .payment-summary-divider {
+        width: 100%;
+        height: 2px;
+    }
+
+    .payment-summary-status {
+        padding-left: 0;
+        justify-content: center;
+    }
 }
 
-/* ===== PAYMENT INFO ===== */
-.set-payment-info {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 0.75rem;
-    padding: 1rem;
-    background: rgba(59, 130, 246, 0.05);
-    border-radius: 8px;
+/* ===== PAYMENT SUMMARY ===== */
+.set-payment-summary {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, rgba(255, 111, 0, 0.1) 0%, rgba(255, 111, 0, 0.05) 100%);
+    border: 2px solid rgba(255, 111, 0, 0.3);
+    border-radius: 10px;
     margin-top: 1rem;
 }
 
-.payment-item {
+.payment-summary-item {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9rem;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
 }
 
-.payment-item i {
-    color: var(--portal-primary);
-    width: 16px;
+.payment-summary-label {
+    font-size: 0.8rem;
+    color: var(--portal-grey);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+.payment-summary-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--portal-grey-dark);
+}
+
+.payment-summary-value.paid {
+    color: var(--portal-success);
+}
+
+.payment-summary-value.balance {
+    color: var(--portal-secondary);
+}
+
+.payment-summary-divider {
+    width: 2px;
+    height: 40px;
+    background: rgba(255, 111, 0, 0.2);
+    border-radius: 2px;
+}
+
+.payment-summary-status {
+    display: flex;
+    align-items: center;
+    padding-left: 0.5rem;
 }
 
 .payment-status-badge {
@@ -897,6 +944,7 @@ body {
 /* ===== URLs ===== */
 .set-urls {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.75rem;
     margin-top: 1rem;
 }
@@ -912,6 +960,8 @@ body {
     border-radius: 6px;
     font-size: 0.9rem;
     transition: all 0.2s;
+    border: none;
+    font-family: inherit;
 }
 
 .url-btn:hover {
@@ -926,3 +976,251 @@ body {
 .url-btn.pdf:hover {
     background: #dc2626;
 }
+
+.url-btn.upload {
+    background: var(--portal-success);
+}
+
+.url-btn.upload:hover {
+    background: #2E7D32;
+}
+
+.url-btn.delete {
+    background: var(--portal-warning);
+}
+
+.url-btn.delete:hover {
+    background: #F57C00;
+}
+
+.url-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.url-btn i.fa-spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* ===== ACTIVE SET INFO IN CASE CARDS ===== */
+.case-active-set-info {
+    margin-bottom: 1rem;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, rgba(0, 137, 123, 0.15) 0%, rgba(0, 137, 123, 0.08) 100%);
+    border-radius: 10px;
+    border: 2px solid rgba(0, 137, 123, 0.35);
+    box-shadow: 0 2px 8px rgba(0, 137, 123, 0.1);
+}
+
+.active-set-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.9rem;
+    color: var(--portal-primary-dark);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.active-set-header i {
+    font-size: 1.2rem;
+}
+
+.active-set-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.active-set-details span {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.95rem;
+    color: var(--portal-grey-dark);
+    font-weight: 500;
+}
+
+.active-set-details i {
+    width: 18px;
+    color: var(--portal-primary);
+    font-size: 0.95rem;
+}
+
+.case-no-active-set {
+    padding: 0.75rem;
+    text-align: center;
+    background: var(--portal-grey-light);
+    border-radius: 8px;
+    color: var(--portal-grey);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.case-no-active-set i {
+    font-size: 1rem;
+}
+
+/* ===== CASE CARD PAYMENT SUMMARY ===== */
+.case-payment-summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem;
+    background: rgba(255, 111, 0, 0.04);
+    border: 1px solid rgba(255, 111, 0, 0.15);
+    border-radius: 6px;
+    margin-bottom: 1rem;
+}
+
+.case-payment-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    flex: 1;
+}
+
+.case-payment-label {
+    font-size: 0.65rem;
+    color: var(--portal-grey);
+    text-transform: uppercase;
+    letter-spacing: 0.2px;
+    font-weight: 400;
+}
+
+.case-payment-value {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--portal-grey-dark);
+}
+
+.case-payment-value.paid {
+    color: var(--portal-success);
+}
+
+.case-payment-value.balance {
+    color: var(--portal-secondary);
+}
+
+.case-payment-divider {
+    width: 1px;
+    height: 30px;
+    background: rgba(255, 111, 0, 0.15);
+    border-radius: 1px;
+}
+
+/* ===== CASE CARD URLs ===== */
+.case-urls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.case-url-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.9rem;
+    background: var(--portal-primary);
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.case-url-btn:hover {
+    background: var(--portal-primary-dark);
+    transform: translateY(-1px);
+}
+
+.case-url-btn.pdf {
+    background: var(--portal-error);
+}
+
+.case-url-btn.pdf:hover {
+    background: #c62828;
+}
+
+/* ===== Activity Notifications ===== */
+
+/* Activity Banner at top of set card */
+.activity-banner {
+    background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+    color: #000;
+    padding: 0.75rem 1rem;
+    border-radius: 6px 6px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    animation: pulse-soft 2s infinite;
+    font-weight: 500;
+}
+
+.activity-banner i {
+    font-size: 1.1rem;
+}
+
+/* Pulse animation for attention */
+@keyframes pulse-soft {
+    0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4);
+    }
+    50% {
+        opacity: 0.9;
+        box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+    }
+}
+
+/* Set card with activity */
+.aligner-set-card.has-activity {
+    background: linear-gradient(135deg, #fff9e6 0%, #ffffff 100%);
+    border-left: 5px solid #ffc107;
+    box-shadow: 0 4px 16px rgba(255, 193, 7, 0.2);
+    transition: all 0.3s ease;
+}
+
+.aligner-set-card.has-activity:hover {
+    box-shadow: 0 6px 20px rgba(255, 193, 7, 0.3);
+    transform: translateY(-2px);
+}
+
+/* Activity Feed Styles */
+.activity-feed {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.activity-item {
+    transition: all 0.2s ease;
+}
+
+.activity-item:hover {
+    transform: translateX(4px);
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+}
+

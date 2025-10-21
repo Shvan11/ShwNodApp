@@ -11,7 +11,10 @@ import apiRoutes from './routes/api.js';
 import webRoutes from './routes/web.js';
 import calendarRoutes from './routes/calendar.js';
 import portalRoutes from './routes/portal.js';
+import adminRoutes from './routes/admin.js';
+import syncWebhookRoutes from './routes/sync-webhook.js';
 import whatsappService from './services/messaging/whatsapp.js';
+import driveClient from './services/google-drive/google-drive-client.js';
 import messageState from './services/state/messageState.js';
 import { createWebSocketMessage, MessageSchemas } from './services/messaging/schemas.js';
 
@@ -21,6 +24,8 @@ import HealthCheck from './services/monitoring/HealthCheck.js';
 import ConnectionPool from './services/database/ConnectionPool.js';
 import { testConnection, testConnectionWithRetry } from './services/database/index.js';
 import { createPathResolver } from './utils/path-resolver.js';
+import queueProcessor from './services/sync/queue-processor.js';
+import { startPeriodicPolling, stopPeriodicPolling } from './services/sync/reverse-sync-poller.js';
 
 // Get current file and directory name for ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -31,11 +36,11 @@ dotenv.config();
 
 // Create Express app
 const app = express();
-const port = config.server.port || 80;
+const port = config.server.port || 3000;
 
-// Create HTTP server (HTTPS handled by Caddy reverse proxy)
+// Create HTTP server
 const server = createServer(app);
-console.log('🌐 HTTP server created (HTTPS handled by Caddy)');
+console.log('🌐 HTTP server created');
 
 // ===== ADDED: Enhanced startup sequence with error handling =====
 async function initializeApplication() {
@@ -63,13 +68,12 @@ async function initializeApplication() {
 
     // Setup static files
     console.log('📁 Setting up static file serving...');
-    
-    // Configure MIME type for JSX files to be served as JavaScript modules
-    express.static.mime.define({'application/javascript': ['jsx']});
-    
-    // Serve built files first (dist), then fallback to source files (public)
+
+    // IMPORTANT: Express server (port 3000) always serves built files from dist/
+    // For development: Use Vite dev server at http://localhost:5173 (npm run dev)
+    // For production: Use Express server at http://localhost:3000 (after npm run build)
+    console.log('🚀 Serving built files from dist directory');
     app.use(express.static('./dist'));
-    app.use(express.static('./public'));
     
     // Use path resolver for cross-platform compatibility
     const pathResolver = createPathResolver(config.fileSystem.machinePath);
@@ -89,12 +93,24 @@ async function initializeApplication() {
     console.log('🛣️  Setting up routes...');
     app.use('/api', apiRoutes);
     app.use('/api/calendar', calendarRoutes);
+    app.use('/', syncWebhookRoutes); // Sync webhook endpoints (SQL Server ↔ Supabase)
+    app.use('/', adminRoutes); // Admin routes
     app.use('/', portalRoutes); // Portal routes (includes auth middleware)
     app.use('/', webRoutes);
 
     // ===== ADDED: Initialize health monitoring =====
     console.log('🏥 Starting health monitoring...');
     HealthCheck.start();
+
+    // Initialize Google Drive client
+    console.log('📁 Initializing Google Drive client...');
+    const driveInitialized = driveClient.initialize();
+    if (driveInitialized) {
+      console.log('✅ Google Drive client initialized successfully');
+    } else {
+      console.log('⚠️  Google Drive not configured. PDF upload will be disabled.');
+      console.log('💡 To enable PDF uploads, configure Google Drive credentials in .env');
+    }
 
     // Connect WhatsApp service to WebSocket emitter
     console.log('💬 Connecting WhatsApp service...');
@@ -286,6 +302,30 @@ function startServer() {
         reject(error);
       } else {
         console.log(`✅ Server listening on port: ${port}`);
+
+        // Start SQL Server → PostgreSQL sync (webhook-based, zero polling)
+        try {
+          queueProcessor.start();
+          console.log('✅ Queue processor started - Webhook-based sync enabled (SQL Server → Supabase)');
+          console.log('   Real-time: SQL Server triggers webhook on data changes');
+          console.log('   Reverse sync: Supabase webhooks handle doctor edits (see routes/sync-webhook.js)');
+        } catch (error) {
+          console.warn('⚠️  Queue processor failed to start:', error.message);
+          console.log('   Sync will not be available. Check Supabase credentials.');
+        }
+
+        // Start reverse sync poller (Supabase → SQL Server)
+        // Catches missed changes when server was offline + periodic hourly checks
+        try {
+          startPeriodicPolling(); // Uses env config or defaults to 60 min
+          console.log('✅ Reverse sync poller started (Supabase → SQL Server)');
+          console.log('   Startup: Catches changes missed while server was offline');
+          console.log('   Periodic: Hourly checks as fallback for webhook failures');
+        } catch (error) {
+          console.warn('⚠️  Reverse sync poller failed to start:', error.message);
+          console.log('   Missed changes will not be recovered. Check Supabase configuration.');
+        }
+
         resolve(serverInstance);
       }
     });
@@ -319,6 +359,10 @@ async function gracefulShutdown(signal) {
     // Stop health monitoring
     console.log('🏥 Stopping health monitoring...');
     HealthCheck.stop();
+
+    // Stop reverse sync poller
+    console.log('🔄 Stopping reverse sync poller...');
+    stopPeriodicPolling();
 
     // Clean up WhatsApp service
     if (whatsappService) {
