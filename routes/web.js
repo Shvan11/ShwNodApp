@@ -130,6 +130,20 @@ router.get('/patient/:id(\\d+)', (req, res) => {
   res.redirect(`/views/patient/react-shell.html?code=${patientId}&page=${page}`);
 });
 
+// ==============================
+// REACT ROUTER SECTIONS - CATCH-ALL ROUTES
+// ==============================
+
+// Portal section - All /portal/* routes serve the same HTML (React Router handles client-side routing)
+router.get('/portal/*', (_, res) => {
+  serveWithFallback(res, '/views/alignerportal.html', 'Portal not found');
+});
+
+// Aligner section - All /aligner/* routes serve the same HTML (React Router handles client-side routing)
+router.get('/aligner/*', (_, res) => {
+  serveWithFallback(res, '/views/aligner.html', 'Aligner management not found');
+});
+
 // Apply all page rewrites
 pageRewrites.forEach(({ url, file }) => {
   router.get(url, (_, res) => {

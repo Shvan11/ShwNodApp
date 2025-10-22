@@ -12,19 +12,7 @@
 <body>
     <div id="portal-root"></div>
 
-    <!-- Load React components -->
-    <script type="module">
-        import React from 'react';
-        import ReactDOM from 'react-dom/client';
-        import AlignerPortalComponent from '../js/components/react/AlignerPortalComponent.jsx';
-
-        document.addEventListener('DOMContentLoaded', function() {
-            const portalRoot = document.getElementById('portal-root');
-            if (portalRoot) {
-                const root = ReactDOM.createRoot(portalRoot);
-                root.render(React.createElement(AlignerPortalComponent));
-            }
-        });
-    </script>
+    <!-- Load Portal App with React Router -->
+    <script type="module" src="../js/pages/portal.jsx"></script>
 </body>
 </html>

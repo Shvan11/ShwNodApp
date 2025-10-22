@@ -1,11 +1,13 @@
 /* Aligner Management Page Styles */
 
 /* View Mode Toggle */
-.view-mode-toggle {
+.view-mode-toggle,
+.mode-toggle {
     display: flex;
     gap: 1rem;
     margin-bottom: 2rem;
     justify-content: center;
+    padding: 0 1rem;
 }
 
 .mode-btn {
@@ -538,6 +540,36 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+}
+
+.btn-add-set {
+    background: linear-gradient(135deg, #4caf50, #45a049);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: all 0.3s;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.btn-add-set:hover {
+    background: linear-gradient(135deg, #45a049, #3d8b40);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+}
+
+.btn-add-set:active {
+    transform: translateY(0);
+}
+
+.btn-add-set i {
+    font-size: 1.1rem;
 }
 
 .btn-clear {
@@ -1426,9 +1458,33 @@
     display: none !important;
 }
 
+/* Toast Notification Animations */
+@keyframes slideIn {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
-    .view-mode-toggle {
+    .view-mode-toggle,
+    .mode-toggle {
         flex-direction: column;
         gap: 0.75rem;
     }
