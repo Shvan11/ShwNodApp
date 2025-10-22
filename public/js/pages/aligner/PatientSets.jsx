@@ -6,6 +6,7 @@ import ConfirmDialog from '../../components/react/ConfirmDialog.jsx';
 import SetFormDrawer from '../../components/react/SetFormDrawer.jsx';
 import BatchFormDrawer from '../../components/react/BatchFormDrawer.jsx';
 import PaymentFormDrawer from '../../components/react/PaymentFormDrawer.jsx';
+import { copyToClipboard } from '../../core/utils.js';
 
 const PatientSets = () => {
     const { doctorId, workId } = useParams();
@@ -225,10 +226,10 @@ const PatientSets = () => {
             return;
         }
 
-        try {
-            // Copy to clipboard
-            await navigator.clipboard.writeText(folderPath);
+        // Use the utility function to copy to clipboard
+        const success = await copyToClipboard(folderPath);
 
+        if (success) {
             // Show success notification
             const notification = document.createElement('div');
             notification.style.cssText = `
@@ -262,9 +263,8 @@ const PatientSets = () => {
                 notification.style.animation = 'slideOut 0.3s ease-out';
                 setTimeout(() => notification.remove(), 300);
             }, 4000);
-
-        } catch (error) {
-            console.error('Error copying to clipboard:', error);
+        } else {
+            // Fallback - show path in alert
             alert(`Folder path:\n${folderPath}\n\nCould not copy to clipboard automatically.`);
         }
     };

@@ -3,6 +3,7 @@ import ConfirmDialog from './ConfirmDialog.jsx';
 import SetFormDrawer from './SetFormDrawer.jsx';
 import BatchFormDrawer from './BatchFormDrawer.jsx';
 import PaymentFormDrawer from './PaymentFormDrawer.jsx';
+import { copyToClipboard } from '../../core/utils.js';
 
 const AlignerComponent = () => {
     const [viewMode, setViewMode] = useState('doctor'); // 'doctor' or 'search'
@@ -714,29 +715,40 @@ const AlignerComponent = () => {
                 const newWindow = window.open(fileUrl, '_blank');
 
                 if (newWindow) {
-                    // Also copy to clipboard as backup
-                    await navigator.clipboard.writeText(folderPath);
+                    // Also copy to clipboard as backup using the utility
+                    await copyToClipboard(folderPath);
                     return;
                 }
             }
 
-            // For network paths or if opening failed, copy to clipboard
-            await navigator.clipboard.writeText(folderPath);
+            // For network paths or if opening failed, copy to clipboard using the utility
+            const success = await copyToClipboard(folderPath);
 
-            // Show success message with instructions
-            const message = `Folder path copied to clipboard!\n\n${folderPath}\n\n` +
-                          `To open in File Explorer:\n` +
-                          `1. Press Win+R (or Win+E)\n` +
-                          `2. Paste (Ctrl+V) the path\n` +
-                          `3. Press Enter\n\n` +
-                          `If the folder doesn't exist, you'll be prompted to create it.`;
+            if (success) {
+                // Show success message with instructions
+                const message = `Folder path copied to clipboard!\n\n${folderPath}\n\n` +
+                              `To open in File Explorer:\n` +
+                              `1. Press Win+R (or Win+E)\n` +
+                              `2. Paste (Ctrl+V) the path\n` +
+                              `3. Press Enter\n\n` +
+                              `If the folder doesn't exist, you'll be prompted to create it.`;
 
-            alert(message);
+                alert(message);
+            } else {
+                // Fallback if clipboard utility fails
+                const message = `Folder Path:\n\n${folderPath}\n\n` +
+                              `Please copy this path and open it in File Explorer:\n` +
+                              `1. Press Win+R (or Win+E)\n` +
+                              `2. Paste the path above\n` +
+                              `3. Press Enter`;
+
+                alert(message);
+            }
 
         } catch (error) {
             console.error('Error accessing folder:', error);
 
-            // Fallback if clipboard fails
+            // Fallback if everything fails
             const message = `Folder Path:\n\n${folderPath}\n\n` +
                           `Please copy this path and open it in File Explorer:\n` +
                           `1. Press Win+R (or Win+E)\n` +

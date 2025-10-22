@@ -159,6 +159,64 @@ export function formatPhoneNumber(phoneNumber, countryCode = '964') {
   return digits;
 }
 
+/**
+ * Copy text to clipboard with fallback support
+ * Tries modern Clipboard API first (works on HTTPS/localhost),
+ * then falls back to document.execCommand for HTTP contexts
+ *
+ * @param {string} text - Text to copy to clipboard
+ * @returns {Promise<boolean>} - True if successful, false otherwise
+ *
+ * @example
+ * const success = await copyToClipboard('Hello World');
+ * if (success) {
+ *   console.log('Copied successfully');
+ * } else {
+ *   console.log('Copy failed');
+ * }
+ */
+export async function copyToClipboard(text) {
+  if (!text) {
+    console.warn('copyToClipboard: No text provided');
+    return false;
+  }
+
+  try {
+    // Try modern Clipboard API first (HTTPS/localhost only)
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+
+    // Fallback for HTTP contexts using execCommand
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+
+    // Make textarea invisible and non-interactive
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    textarea.style.top = '-9999px';
+    textarea.style.opacity = '0';
+    textarea.setAttribute('readonly', '');
+
+    document.body.appendChild(textarea);
+
+    // Select and copy
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+
+    const successful = document.execCommand('copy');
+
+    // Clean up
+    document.body.removeChild(textarea);
+
+    return successful;
+  } catch (error) {
+    console.error('Failed to copy to clipboard:', error);
+    return false;
+  }
+}
+
 
   export default {
     formatPhoneNumber,
@@ -167,5 +225,6 @@ export function formatPhoneNumber(phoneNumber, countryCode = '964') {
     debounce,
     throttle,
     generateId,
-    deepClone
+    deepClone,
+    copyToClipboard
   };

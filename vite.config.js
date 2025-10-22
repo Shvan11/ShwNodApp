@@ -21,6 +21,8 @@ export default defineConfig({
         'add-patient': resolve(__dirname, 'public/views/patient/add-patient.html'),
         'grid': resolve(__dirname, 'public/views/patient/grid_.html'),
         'send-message': resolve(__dirname, 'public/views/messaging/send-message.html'),
+        'send': resolve(__dirname, 'public/views/messaging/send.html'),
+        'auth': resolve(__dirname, 'public/views/messaging/auth.html'),
         aligner: resolve(__dirname, 'public/views/aligner.html'),
         alignerportal: resolve(__dirname, 'public/views/alignerportal.html'),
         visits: resolve(__dirname, 'public/views/visits.html')
@@ -76,6 +78,11 @@ export default defineConfig({
         target: 'http://localhost:5173',
         changeOrigin: true,
         rewrite: (path) => '/views/messaging/send-message.html'
+      },
+      '/send': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        rewrite: (path) => '/views/messaging/send.html'
       },
       '/auth': {
         target: 'http://localhost:5173',
