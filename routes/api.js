@@ -3603,6 +3603,49 @@ router.post('/aligner/notes', async (req, res) => {
 });
 
 /**
+ * Toggle note read/unread status
+ * NOTE: This route MUST come before the generic PATCH /aligner/notes/:noteId route
+ * to ensure Express matches the more specific route first
+ */
+router.patch('/aligner/notes/:noteId/toggle-read', async (req, res) => {
+    try {
+        const { noteId } = req.params;
+
+        if (!noteId || isNaN(parseInt(noteId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid note ID is required'
+            });
+        }
+
+        // Toggle IsRead status
+        const updateQuery = `
+            UPDATE tblAlignerNotes
+            SET IsRead = CASE WHEN IsRead = 1 THEN 0 ELSE 1 END
+            WHERE NoteID = @noteId
+        `;
+
+        await database.executeQuery(
+            updateQuery,
+            [['noteId', database.TYPES.Int, parseInt(noteId)]]
+        );
+
+        res.json({
+            success: true,
+            message: 'Note read status toggled successfully'
+        });
+
+    } catch (error) {
+        console.error('Error toggling note read status:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to toggle read status',
+            message: error.message
+        });
+    }
+});
+
+/**
  * Update an existing note
  */
 router.patch('/aligner/notes/:noteId', async (req, res) => {
@@ -3788,47 +3831,6 @@ router.get('/aligner/notes/:noteId/status', async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to get note status',
-            message: error.message
-        });
-    }
-});
-
-/**
- * Toggle note read/unread status
- */
-router.patch('/aligner/notes/:noteId/toggle-read', async (req, res) => {
-    try {
-        const { noteId } = req.params;
-
-        if (!noteId || isNaN(parseInt(noteId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid note ID is required'
-            });
-        }
-
-        // Toggle IsRead status
-        const updateQuery = `
-            UPDATE tblAlignerNotes
-            SET IsRead = CASE WHEN IsRead = 1 THEN 0 ELSE 1 END
-            WHERE NoteID = @noteId
-        `;
-
-        await database.executeQuery(
-            updateQuery,
-            [['noteId', database.TYPES.Int, parseInt(noteId)]]
-        );
-
-        res.json({
-            success: true,
-            message: 'Note read status toggled successfully'
-        });
-
-    } catch (error) {
-        console.error('Error toggling note read status:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to toggle read status',
             message: error.message
         });
     }

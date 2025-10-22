@@ -40,6 +40,16 @@ const PatientSets = () => {
     const [editingNoteId, setEditingNoteId] = useState(null);
     const [editNoteText, setEditNoteText] = useState('');
 
+    // Quick URL editing
+    const [editingUrlForSet, setEditingUrlForSet] = useState(null);
+    const [quickUrlValue, setQuickUrlValue] = useState('');
+    const [savingUrl, setSavingUrl] = useState(false);
+
+    // Quick PDF URL editing
+    const [editingPdfUrlForSet, setEditingPdfUrlForSet] = useState(null);
+    const [quickPdfUrlValue, setQuickPdfUrlValue] = useState('');
+    const [savingPdfUrl, setSavingPdfUrl] = useState(false);
+
     // Load patient and sets on mount
     useEffect(() => {
         loadPatientAndSets();
@@ -154,7 +164,16 @@ const PatientSets = () => {
 
     const markNoteAsRead = async (noteId) => {
         try {
-            await fetch(`/api/aligner/notes/${noteId}/read`, { method: 'PUT' });
+            // First check current status
+            const checkResponse = await fetch(`/api/aligner/notes/${noteId}/status`);
+            const checkData = await checkResponse.json();
+
+            // Only toggle if it's currently unread
+            if (checkData.success && checkData.isRead === false) {
+                await fetch(`/api/aligner/notes/${noteId}/toggle-read`, {
+                    method: 'PATCH'
+                });
+            }
         } catch (error) {
             console.error('Error marking note as read:', error);
         }
@@ -470,6 +489,106 @@ const PatientSets = () => {
         }
     };
 
+    // Quick URL handlers
+    const handleStartEditUrl = (set, e) => {
+        e.stopPropagation();
+        setEditingUrlForSet(set.AlignerSetID);
+        setQuickUrlValue(set.SetUrl || '');
+    };
+
+    const handleCancelEditUrl = () => {
+        setEditingUrlForSet(null);
+        setQuickUrlValue('');
+    };
+
+    const handleSaveUrl = async (setId) => {
+        try {
+            setSavingUrl(true);
+
+            // Get current set data
+            const currentSet = alignerSets.find(s => s.AlignerSetID === setId);
+            if (!currentSet) {
+                throw new Error('Set not found');
+            }
+
+            // Update the set with new URL
+            const response = await fetch(`/api/aligner/sets/${setId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...currentSet,
+                    SetUrl: quickUrlValue.trim() || null
+                })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to update URL');
+            }
+
+            await loadAlignerSets(patient.workid);
+            setEditingUrlForSet(null);
+            setQuickUrlValue('');
+
+        } catch (error) {
+            console.error('Error saving URL:', error);
+            alert('Failed to save URL: ' + error.message);
+        } finally {
+            setSavingUrl(false);
+        }
+    };
+
+    // Quick PDF URL handlers
+    const handleStartEditPdfUrl = (set, e) => {
+        e.stopPropagation();
+        setEditingPdfUrlForSet(set.AlignerSetID);
+        setQuickPdfUrlValue(set.SetPdfUrl || '');
+    };
+
+    const handleCancelEditPdfUrl = () => {
+        setEditingPdfUrlForSet(null);
+        setQuickPdfUrlValue('');
+    };
+
+    const handleSavePdfUrl = async (setId) => {
+        try {
+            setSavingPdfUrl(true);
+
+            // Get current set data
+            const currentSet = alignerSets.find(s => s.AlignerSetID === setId);
+            if (!currentSet) {
+                throw new Error('Set not found');
+            }
+
+            // Update the set with new PDF URL
+            const response = await fetch(`/api/aligner/sets/${setId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...currentSet,
+                    SetPdfUrl: quickPdfUrlValue.trim() || null
+                })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to update PDF URL');
+            }
+
+            await loadAlignerSets(patient.workid);
+            setEditingPdfUrlForSet(null);
+            setQuickPdfUrlValue('');
+
+        } catch (error) {
+            console.error('Error saving PDF URL:', error);
+            alert('Failed to save PDF URL: ' + error.message);
+        } finally {
+            setSavingPdfUrl(false);
+        }
+    };
+
     // Notes Operations
     const handleAddLabNote = async (setId) => {
         if (!labNoteText.trim()) {
@@ -548,7 +667,7 @@ const PatientSets = () => {
     const handleToggleNoteRead = async (noteId, setId) => {
         try {
             const response = await fetch(`/api/aligner/notes/${noteId}/toggle-read`, {
-                method: 'PUT'
+                method: 'PATCH'
             });
             const data = await response.json();
 
@@ -741,19 +860,6 @@ const PatientSets = () => {
                                                 <i className="fas fa-folder-open"></i>
                                                 <span>Open Folder</span>
                                             </button>
-                                            {set.SetUrl && (
-                                                <button
-                                                    className="url-btn"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        window.open(set.SetUrl, '_blank');
-                                                    }}
-                                                    title={set.SetUrl}
-                                                >
-                                                    <i className="fas fa-external-link-alt"></i>
-                                                    <span>View Online</span>
-                                                </button>
-                                            )}
                                             {set.SetPdfUrl ? (
                                                 <>
                                                     <button
@@ -904,25 +1010,137 @@ const PatientSets = () => {
                                                 </div>
                                             </>
                                         )}
-                                        <div className="set-info-item" style={{ gridColumn: '1 / -1' }}>
+                                        <div className="set-info-item" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                             <i className="fas fa-external-link-alt"></i>
-                                            <span>Set URL: {set.SetUrl ? (
-                                                <a href={set.SetUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'underline' }}>
-                                                    {set.SetUrl}
-                                                </a>
+                                            <span style={{ flex: 1 }}>
+                                                Set URL: {editingUrlForSet === set.AlignerSetID ? (
+                                                    <div style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center', marginLeft: '0.5rem' }}>
+                                                        <input
+                                                            type="url"
+                                                            value={quickUrlValue}
+                                                            onChange={(e) => setQuickUrlValue(e.target.value)}
+                                                            placeholder="https://..."
+                                                            style={{
+                                                                padding: '0.4rem 0.6rem',
+                                                                border: '1px solid #d1d5db',
+                                                                borderRadius: '4px',
+                                                                fontSize: '0.875rem',
+                                                                minWidth: '350px'
+                                                            }}
+                                                            autoFocus
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                    </div>
+                                                ) : set.SetUrl ? (
+                                                    <a href={set.SetUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'underline' }}>
+                                                        {set.SetUrl}
+                                                    </a>
+                                                ) : (
+                                                    <em style={{ color: '#6b7280' }}>Not set</em>
+                                                )}
+                                            </span>
+                                            {editingUrlForSet === set.AlignerSetID ? (
+                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <button
+                                                        className="action-icon-btn edit"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleSaveUrl(set.AlignerSetID);
+                                                        }}
+                                                        disabled={savingUrl}
+                                                        title="Save URL"
+                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}
+                                                    >
+                                                        {savingUrl ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
+                                                    </button>
+                                                    <button
+                                                        className="action-icon-btn delete"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleCancelEditUrl();
+                                                        }}
+                                                        title="Cancel"
+                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}
+                                                    >
+                                                        <i className="fas fa-times"></i>
+                                                    </button>
+                                                </div>
                                             ) : (
-                                                <em style={{ color: '#6b7280' }}>Not set</em>
-                                            )}</span>
+                                                <button
+                                                    className="action-icon-btn edit"
+                                                    onClick={(e) => handleStartEditUrl(set, e)}
+                                                    title={set.SetUrl ? "Edit URL" : "Add URL"}
+                                                    style={{ padding: '0.5rem 1rem', fontSize: '1.1rem' }}
+                                                >
+                                                    <i className={set.SetUrl ? "fas fa-edit" : "fas fa-plus"}></i>
+                                                </button>
+                                            )}
                                         </div>
-                                        <div className="set-info-item" style={{ gridColumn: '1 / -1' }}>
+                                        <div className="set-info-item" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                             <i className="fas fa-file-pdf"></i>
-                                            <span>PDF URL: {set.SetPdfUrl ? (
-                                                <a href={set.SetPdfUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'underline' }}>
-                                                    {set.SetPdfUrl}
-                                                </a>
+                                            <span style={{ flex: 1 }}>
+                                                PDF URL: {editingPdfUrlForSet === set.AlignerSetID ? (
+                                                    <div style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center', marginLeft: '0.5rem' }}>
+                                                        <input
+                                                            type="url"
+                                                            value={quickPdfUrlValue}
+                                                            onChange={(e) => setQuickPdfUrlValue(e.target.value)}
+                                                            placeholder="https://..."
+                                                            style={{
+                                                                padding: '0.4rem 0.6rem',
+                                                                border: '1px solid #d1d5db',
+                                                                borderRadius: '4px',
+                                                                fontSize: '0.875rem',
+                                                                minWidth: '350px'
+                                                            }}
+                                                            autoFocus
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                    </div>
+                                                ) : set.SetPdfUrl ? (
+                                                    <a href={set.SetPdfUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'underline' }}>
+                                                        {set.SetPdfUrl}
+                                                    </a>
+                                                ) : (
+                                                    <em style={{ color: '#6b7280' }}>Not set</em>
+                                                )}
+                                            </span>
+                                            {editingPdfUrlForSet === set.AlignerSetID ? (
+                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <button
+                                                        className="action-icon-btn edit"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleSavePdfUrl(set.AlignerSetID);
+                                                        }}
+                                                        disabled={savingPdfUrl}
+                                                        title="Save PDF URL"
+                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}
+                                                    >
+                                                        {savingPdfUrl ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
+                                                    </button>
+                                                    <button
+                                                        className="action-icon-btn delete"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleCancelEditPdfUrl();
+                                                        }}
+                                                        title="Cancel"
+                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}
+                                                    >
+                                                        <i className="fas fa-times"></i>
+                                                    </button>
+                                                </div>
                                             ) : (
-                                                <em style={{ color: '#6b7280' }}>Not set</em>
-                                            )}</span>
+                                                <button
+                                                    className="action-icon-btn edit"
+                                                    onClick={(e) => handleStartEditPdfUrl(set, e)}
+                                                    title={set.SetPdfUrl ? "Edit PDF URL" : "Add PDF URL"}
+                                                    style={{ padding: '0.5rem 1rem', fontSize: '1.1rem' }}
+                                                >
+                                                    <i className={set.SetPdfUrl ? "fas fa-edit" : "fas fa-plus"}></i>
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
 
@@ -1237,7 +1455,7 @@ const PatientSets = () => {
                     isOpen={showSetDrawer}
                     onClose={() => setShowSetDrawer(false)}
                     onSave={handleSetSaved}
-                    editingSet={editingSet}
+                    set={editingSet}
                     workId={patient.workid}
                 />
             )}

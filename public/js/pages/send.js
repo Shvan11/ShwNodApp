@@ -1890,25 +1890,22 @@ class WhatsAppMessengerApp extends EventEmitter {
     }
 
     updateSendingProgress(progress) {
-        // Get current state for accurate message status counts
-        const currentState = this.stateManager.getState();
-        const statusCounts = currentState.messageStatusCounts;
-        
-        // Calculate accurate progress using same logic as detailed table
-        const actualSent = statusCounts.server + statusCounts.device + statusCounts.read + statusCounts.played;
-        const actualFailed = statusCounts.failed;
-        const totalProcessed = actualSent + actualFailed;
-        
+        // Use progress object's own sent/failed counts for accuracy
+        // These represent the CURRENT batch being sent, not accumulated counts from the table
+        const currentBatchSent = progress.sent || 0;
+        const currentBatchFailed = progress.failed || 0;
+        const totalProcessed = currentBatchSent + currentBatchFailed;
+
         // Only show sending progress if actually sending and has valid total count
         if (progress.started && !progress.finished && progress.total > 0) {
-            const progressText = `📤 Sending messages... ${actualSent}/${progress.total}`;
+            const progressText = `📤 Sending messages... ${currentBatchSent}/${progress.total}`;
             this.domManager.setElementContent('stateElement', progressText, { announce: true });
-            
+
             // Update button to show accurate progress
             this.buttonStateManager.setButtonState('startButton', BUTTON_STATES.LOADING, {
-                text: `Sending ${actualSent}/${progress.total}`
+                text: `Sending ${currentBatchSent}/${progress.total}`
             });
-            
+
             // Update visual progress bar with accurate counts
             if (this.progressBar) {
                 if (totalProcessed === 0 && progress.total > 0) {
@@ -1916,19 +1913,19 @@ class WhatsAppMessengerApp extends EventEmitter {
                     this.progressBar.initiate();
                     this.domManager.toggleElementVisibility('progressContainer', true);
                 }
-                
+
                 // Calculate and update progress percentage using accurate counts
                 if (progress.total > 0) {
-                    const percentage = Math.min((actualSent / progress.total) * 100, 100);
+                    const percentage = Math.min((currentBatchSent / progress.total) * 100, 100);
                     this.progressBar.width = `${percentage}%`;
-                    
+
                     // Update progress stats and text with accurate counts
-                    this.domManager.setElementContent('progressStats', `${actualSent}/${progress.total}`);
-                    this.domManager.setElementContent('progressText', `${actualSent} of ${progress.total} messages delivered`);
+                    this.domManager.setElementContent('progressStats', `${currentBatchSent}/${progress.total}`);
+                    this.domManager.setElementContent('progressText', `${currentBatchSent} of ${progress.total} messages delivered`);
                 }
             }
         } else if (progress.finished && progress.total > 0) {
-            const completedText = `✅ Completed! ${actualSent} delivered, ${actualFailed} failed`;
+            const completedText = `✅ Completed! ${currentBatchSent} delivered, ${currentBatchFailed} failed`;
             this.domManager.setElementContent('stateElement', completedText, { announce: true });
             
             // Complete and hide progress bar
