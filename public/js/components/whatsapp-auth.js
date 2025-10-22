@@ -201,7 +201,7 @@ export class WhatsAppAuthComponent extends EventEmitter {
             try {
                 const message = JSON.parse(event.data);
                 console.log('Auth WebSocket received message type:', message.type);
-                
+
                 switch (message.type) {
                     case 'whatsapp_qr_updated':
                         console.log('Auth WebSocket received QR update!', message);
@@ -329,7 +329,7 @@ export class WhatsAppAuthComponent extends EventEmitter {
     handleClientReady(data) {
         console.log('Client ready:', data);
         const isReady = data.clientReady || data.state === 'ready';
-        
+
         if (isReady) {
             this.setState(AUTH_STATES.AUTHENTICATED, { clientReady: true });
         } else {
@@ -549,10 +549,10 @@ export class WhatsAppAuthComponent extends EventEmitter {
         if (this.elements.successContainer) {
             this.elements.successContainer.style.display = 'block';
         }
-        
+
         this.stopQRRefreshTimer();
         this.emit('authenticated', { clientReady: true });
-        
+
         // Handle successful authentication and redirect back if needed
         this.handleSuccessfulAuthentication();
     }
@@ -840,15 +840,15 @@ export class WhatsAppAuthComponent extends EventEmitter {
         // Check for return URL in query parameters
         const urlParams = new URLSearchParams(window.location.search);
         const returnTo = urlParams.get('returnTo');
-        
+
         if (returnTo) {
             console.log('Authentication successful, redirecting to:', returnTo);
-            
+
             // Update success message to show redirecting
             if (this.elements.successMessage) {
                 this.elements.successMessage.textContent = 'Redirecting you back to the messaging page...';
             }
-            
+
             // Show success message briefly before redirect
             setTimeout(() => {
                 try {
@@ -856,7 +856,7 @@ export class WhatsAppAuthComponent extends EventEmitter {
                     // Add a timestamp to force refresh
                     const returnUrl = new URL(decodedUrl, window.location.origin);
                     returnUrl.searchParams.set('authCompleted', Date.now().toString());
-                    
+
                     window.location.href = returnUrl.toString();
                 } catch (error) {
                     console.error('Error parsing return URL:', error);

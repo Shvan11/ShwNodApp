@@ -574,8 +574,11 @@ class WhatsAppService extends EventEmitter {
         setTimeout(() => {
           if (!resolved) {
             resolved = true;
-            logger.whatsapp.warn('QR scan timeout - keeping client alive');
-            client.removeListener('ready', onReady);
+            logger.whatsapp.warn('QR scan timeout - keeping client alive for future scans');
+            // IMPORTANT: Do NOT remove the ready listener!
+            // The client is still alive and the ready event will fire when user scans QR
+            // Remove QR, auth_failure and disconnected listeners to clean up
+            client.removeListener('qr', onQR);
             client.removeListener('auth_failure', onAuthFailure);
             client.removeListener('disconnected', onDisconnected);
             // Don't reject here - let the client stay in QR mode
