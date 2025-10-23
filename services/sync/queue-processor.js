@@ -77,7 +77,9 @@ class QueueProcessor {
             'aligner_sets': 'aligner_set_id',
             'aligner_batches': 'aligner_batch_id',
             'aligner_notes': 'note_id',
-            'aligner_set_payments': 'aligner_set_id'
+            'aligner_set_payments': 'aligner_set_id',
+            'patients': 'person_id',
+            'work': 'work_id'
         };
         return keys[tableName] || 'id';
     }
