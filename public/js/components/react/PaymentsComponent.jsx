@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import InvoiceComponent from './InvoiceComponent.jsx'
 
 const PaymentsComponent = ({ patientId }) => {
     const [payments, setPayments] = useState([]);
@@ -83,7 +84,10 @@ const PaymentsComponent = ({ patientId }) => {
     return (
         <div style={{ padding: '20px' }}>
             <h1 className="page-title">Payment History</h1>
-            
+
+            {/* Invoice Actions */}
+            <InvoiceComponent patientId={patientId} />
+
             {/* Payment Summary */}
             <div className="payment-summary">
                 <div className="summary-card">

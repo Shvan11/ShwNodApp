@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets = [] }) => {
+const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets = [], defaultDoctorId }) => {
     const [formData, setFormData] = useState({
         SetSequence: '',
         Type: '',
@@ -62,14 +62,43 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                 IsActive: set.IsActive !== undefined ? set.IsActive : true
             });
         } else if (isOpen) {
-            // Add mode - reset form
+            // Add mode - reset form with auto-populated values
+
+            // Calculate next SetSequence as max existing sequence + 1
+            const maxSequence = allSets.length > 0
+                ? Math.max(...allSets.map(s => s.SetSequence || 0))
+                : 0;
+            const nextSequence = maxSequence + 1;
+
+            // Determine default doctor ID
+            let defaultDoctor = '';
+            if (defaultDoctorId) {
+                // If doctorId is provided from URL, use it
+                const doctorExists = doctors && doctors.find(d => d.DrID === parseInt(defaultDoctorId));
+                if (doctorExists) {
+                    defaultDoctor = parseInt(defaultDoctorId);
+                } else if (doctors && doctors.length > 0) {
+                    defaultDoctor = doctors[0].DrID;
+                }
+            } else if (doctors && doctors.length > 0) {
+                // Otherwise use the first doctor
+                defaultDoctor = doctors[0].DrID;
+            }
+
+            console.log('SetFormDrawer initialized:', {
+                nextSequence,
+                defaultDoctor,
+                defaultDoctorId,
+                doctorsCount: doctors?.length
+            });
+
             setFormData({
-                SetSequence: '',
+                SetSequence: nextSequence,
                 Type: '',
                 UpperAlignersCount: '',
                 LowerAlignersCount: '',
                 Days: '',
-                AlignerDrID: doctors && doctors.length > 0 ? doctors[0].DrID : '',
+                AlignerDrID: defaultDoctor,
                 SetUrl: '',
                 SetPdfUrl: '',
                 SetCost: '',
@@ -79,7 +108,7 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
             });
         }
         setErrors({});
-    }, [isOpen, set, doctors]);
+    }, [isOpen, set, doctors, allSets, defaultDoctorId]);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -100,7 +129,7 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
             newErrors.SetSequence = 'Set sequence is required';
         }
 
-        if (!formData.AlignerDrID) {
+        if (!formData.AlignerDrID || formData.AlignerDrID === '' || isNaN(parseInt(formData.AlignerDrID))) {
             newErrors.AlignerDrID = 'Doctor is required';
         }
 
@@ -123,6 +152,8 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                 WorkID: workId
             };
 
+            console.log('Submitting aligner set data:', dataToSend);
+
             const url = set
                 ? `/api/aligner/sets/${set.AlignerSetID}`
                 : '/api/aligner/sets';
@@ -136,6 +167,7 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
             });
 
             const result = await response.json();
+            console.log('Server response:', result);
 
             if (result.success) {
                 onSave();
@@ -153,6 +185,9 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
 
     if (!isOpen) return null;
 
+    // Check if doctors are loaded
+    const doctorsLoaded = doctors && doctors.length > 0;
+
     return (
         <div className="drawer-overlay" onClick={onClose}>
             <div className="drawer-container" onClick={(e) => e.stopPropagation()}>
@@ -164,7 +199,13 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                 </div>
 
                 <div className="drawer-body">
-                    <form onSubmit={handleSubmit} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    {!doctorsLoaded && !set ? (
+                        <div style={{ padding: '2rem', textAlign: 'center' }}>
+                            <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
+                            <p>Loading doctors list...</p>
+                        </div>
+                    ) : (
+                        <form onSubmit={handleSubmit} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                         {/* Basic Info Section */}
                         <div className="form-section">
                             <h3>Basic Information</h3>
@@ -391,6 +432,7 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                             </button>
                         </div>
                     </form>
+                    )}
                 </div>
             </div>
         </div>

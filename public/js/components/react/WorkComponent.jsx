@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import WorkCard from './WorkCard.jsx';
+import PaymentModal from './PaymentModal.jsx';
+import '../../../css/components/work-card.css';
 
 const WorkComponent = ({ patientId }) => {
     const [works, setWorks] = useState([]);
@@ -19,6 +22,16 @@ const WorkComponent = ({ patientId }) => {
     const [successMessage, setSuccessMessage] = useState(null);
     const [newAlignerWorkId, setNewAlignerWorkId] = useState(null);
 
+    // Payment-related state
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
+    const [selectedWorkForPayment, setSelectedWorkForPayment] = useState(null);
+    const [paymentHistory, setPaymentHistory] = useState([]);
+    const [loadingPayments, setLoadingPayments] = useState(false);
+
+    // Patient info state
+    const [patientInfo, setPatientInfo] = useState(null);
+
     // Work detail form state
     const [detailFormData, setDetailFormData] = useState({
         WorkID: null,
@@ -27,6 +40,16 @@ const WorkComponent = ({ patientId }) => {
         FillingDepth: '',
         CanalsNo: '',
         Note: ''
+    });
+
+    // Payment form state
+    const [paymentFormData, setPaymentFormData] = useState({
+        workid: null,
+        Amountpaid: '',
+        Dateofpayment: new Date().toISOString().split('T')[0],
+        ActualAmount: '',
+        ActualCur: 'USD',
+        Change: 0
     });
 
     // Form state
@@ -55,8 +78,20 @@ const WorkComponent = ({ patientId }) => {
         if (patientId) {
             loadWorks();
             loadDropdownData();
+            loadPatientInfo();
         }
     }, [patientId]);
+
+    const loadPatientInfo = async () => {
+        try {
+            const response = await fetch(`/api/getinfos?code=${patientId}`);
+            if (!response.ok) throw new Error('Failed to fetch patient info');
+            const data = await response.json();
+            setPatientInfo(data);
+        } catch (err) {
+            console.error('Error loading patient info:', err);
+        }
+    };
 
     const loadWorks = async () => {
         try {
@@ -347,7 +382,11 @@ const WorkComponent = ({ patientId }) => {
             return matchesSearch && matchesFilter;
         })
         .sort((a, b) => {
-            // Sort by AdditionDate ascending (oldest first)
+            // First, sort by Finished status (active works first)
+            if (!a.Finished && b.Finished) return -1;
+            if (a.Finished && !b.Finished) return 1;
+
+            // Within each group (active or completed), sort by AdditionDate ascending (oldest first)
             const dateA = new Date(a.AdditionDate || 0);
             const dateB = new Date(b.AdditionDate || 0);
             return dateA - dateB;
@@ -374,34 +413,158 @@ const WorkComponent = ({ patientId }) => {
         window.location.href = `/aligner?workId=${work.workid}`;
     };
 
+    // Payment-related handlers
+    const handleAddPayment = (work) => {
+        setSelectedWorkForPayment(work);
+        setPaymentFormData({
+            workid: work.workid,
+            Amountpaid: '',
+            Dateofpayment: new Date().toISOString().split('T')[0],
+            ActualAmount: '',
+            ActualCur: work.Currency || 'USD',
+            Change: 0
+        });
+        setShowPaymentModal(true);
+    };
+
+    const handleViewPaymentHistory = async (work) => {
+        setSelectedWorkForPayment(work);
+        setShowPaymentHistoryModal(true);
+        await loadPaymentHistory(work.workid);
+    };
+
+    const loadPaymentHistory = async (workId) => {
+        try {
+            setLoadingPayments(true);
+            const response = await fetch(`/api/getpaymenthistory?workId=${workId}`);
+            if (!response.ok) throw new Error('Failed to fetch payment history');
+            const data = await response.json();
+            setPaymentHistory(data);
+        } catch (err) {
+            setError(err.message);
+            setPaymentHistory([]);
+        } finally {
+            setLoadingPayments(false);
+        }
+    };
+
+    const handlePaymentFormSubmit = async (e) => {
+        e.preventDefault();
+
+        try {
+            // Convert form data to match API expectations
+            const payload = {
+                workid: paymentFormData.workid,
+                amountPaid: parseFloat(paymentFormData.Amountpaid),
+                paymentDate: paymentFormData.Dateofpayment,
+                actualAmount: paymentFormData.ActualAmount ? parseFloat(paymentFormData.ActualAmount) : null,
+                actualCurrency: paymentFormData.ActualCur,
+                change: paymentFormData.Change ? parseFloat(paymentFormData.Change) : 0
+            };
+
+            const response = await fetch('/api/addInvoice', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to add payment');
+            }
+
+            await loadWorks(); // Refresh works to update paid amounts
+            setShowPaymentModal(false);
+            setShowPaymentHistoryModal(false); // Close history modal if open
+            setSuccessMessage('Payment added successfully!');
+            setTimeout(() => setSuccessMessage(null), 5000);
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
     if (loading) return <div className="work-loading">Loading works...</div>;
 
     return (
         <div className="work-component">
-            <div className="work-header">
-                <h2>Work Management</h2>
-                <div className="work-controls">
-                    <input
-                        type="text"
-                        placeholder="Search works..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="search-input"
-                    />
-                    <select
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                        className="filter-select"
-                    >
-                        <option value="all">All Works</option>
-                        <option value="active">Active</option>
-                        <option value="completed">Completed</option>
-                    </select>
-                    <button onClick={handleAddWork} className="btn btn-primary">
-                        Add New Work
-                    </button>
+            {/* Patient Info Card with Controls */}
+            {patientInfo && (
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1.5rem',
+                    padding: '1.5rem',
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '12px',
+                    marginBottom: '1.5rem',
+                    border: '1px solid #e5e7eb',
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                }}>
+                    <div style={{
+                        width: '120px',
+                        height: '150px',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        flexShrink: 0,
+                        backgroundColor: '#e5e7eb',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                    }}>
+                        <img
+                            src={`/DolImgs/${patientId}00.i13`}
+                            alt={`${patientInfo.PatientName} - Smile`}
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover'
+                            }}
+                            onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.parentElement.innerHTML = '<i class="fas fa-user" style="font-size: 48px; color: #9ca3af;"></i>';
+                            }}
+                        />
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '600', color: '#111827' }}>
+                                {patientInfo.PatientName}
+                            </h3>
+                            <div style={{ display: 'flex', gap: '2rem', marginTop: '0.5rem', fontSize: '0.95rem', color: '#6b7280' }}>
+                                <span><i className="fas fa-id-card" style={{ marginRight: '0.5rem' }}></i>{patientInfo.PersonID}</span>
+                                {patientInfo.Phone && (
+                                    <span><i className="fas fa-phone" style={{ marginRight: '0.5rem' }}></i>{patientInfo.Phone}</span>
+                                )}
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <input
+                                type="text"
+                                placeholder="Search works..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="search-input"
+                                style={{ flex: '1 1 250px', minWidth: '200px' }}
+                            />
+                            <select
+                                value={filterStatus}
+                                onChange={(e) => setFilterStatus(e.target.value)}
+                                className="filter-select"
+                                style={{ flex: '0 1 auto' }}
+                            >
+                                <option value="all">All Works</option>
+                                <option value="active">Active</option>
+                                <option value="completed">Completed</option>
+                            </select>
+                            <button onClick={handleAddWork} className="btn btn-primary" style={{ flex: '0 1 auto', whiteSpace: 'nowrap' }}>
+                                <i className="fas fa-plus" style={{ marginRight: '0.5rem' }}></i>
+                                Add New Work
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {error && (
                 <div className="work-error">
@@ -474,116 +637,36 @@ const WorkComponent = ({ patientId }) => {
                 </div>
             </div>
 
-            <div className="work-table-container">
-                <table className="work-table">
-                    <thead>
-                        <tr>
-                            <th>Addition Date</th>
-                            <th>Type</th>
-                            <th>Doctor</th>
-                            <th>Status</th>
-                            <th>Progress</th>
-                            <th>Start Date</th>
-                            <th>Total</th>
-                            <th>Paid</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredWorks.map((work) => (
-                            <tr
-                                key={work.workid}
-                                className={work.Finished ? 'completed-row' : 'active-row'}
-                                style={!work.Finished ? {
-                                    background: '#f0fdf4',
-                                    backgroundColor: '#f0fdf4',
-                                    borderLeft: '4px solid #059669'
-                                } : undefined}
-                            >
-                                <td>{formatDate(work.AdditionDate)}</td>
-                                <td>
-                                    <strong>{work.TypeName || 'Other'}</strong>
-                                </td>
-                                <td>{work.DoctorName || 'Not assigned'}</td>
-                                <td>{getStatusBadge(work)}</td>
-                                <td>
-                                    <div className="progress-container">
-                                        <div
-                                            className="progress-bar"
-                                            style={{ width: `${getProgressPercentage(work)}%` }}
-                                        ></div>
-                                        <span className="progress-text">{getProgressPercentage(work)}%</span>
-                                    </div>
-                                </td>
-                                <td>{formatDate(work.StartDate)}</td>
-                                <td>{formatCurrency(work.TotalRequired, work.Currency)}</td>
-                                <td>{formatCurrency(work.TotalPaid, work.Currency)}</td>
-                                <td>
-                                    <div className="action-buttons">
-                                        <button
-                                            onClick={() => window.location.href = `/views/visits.html?workId=${work.workid}&patient=${patientId}`}
-                                            className="btn btn-sm"
-                                            style={{
-                                                backgroundColor: '#059669',
-                                                color: 'white',
-                                                border: 'none'
-                                            }}
-                                            title="View visits for this work"
-                                        >
-                                            <i className="fas fa-calendar-check"></i> Visits
-                                        </button>
-                                        <button
-                                            onClick={() => handleViewDetails(work)}
-                                            className="btn btn-sm btn-info"
-                                            title="View work details"
-                                        >
-                                            Details
-                                        </button>
-                                        <button
-                                            onClick={() => handleEditWork(work)}
-                                            className="btn btn-sm btn-secondary"
-                                            title="Edit work"
-                                        >
-                                            Edit
-                                        </button>
-                                        {isAlignerWork(work) && (
-                                            <button
-                                                onClick={() => handleAddAlignerSet(work)}
-                                                className="btn btn-sm"
-                                                style={{
-                                                    backgroundColor: '#8b5cf6',
-                                                    color: 'white',
-                                                    border: 'none'
-                                                }}
-                                                title="Add or manage aligner sets"
-                                            >
-                                                <i className="fas fa-tooth"></i> Add Set
-                                            </button>
-                                        )}
-                                        {!work.Finished && (
-                                            <button
-                                                onClick={() => handleCompleteWork(work.workid)}
-                                                className="btn btn-sm btn-success"
-                                                title="Mark work as completed"
-                                            >
-                                                Complete
-                                            </button>
-                                        )}
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                        {filteredWorks.length === 0 && (
-                            <tr>
-                                <td colSpan="9" className="no-data">
-                                    {searchTerm || filterStatus !== 'all' 
-                                        ? 'No works match your criteria' 
-                                        : 'No works found for this patient'}
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+            {/* Works Card Container */}
+            <div className="works-card-container">
+                {filteredWorks.map((work) => (
+                    <WorkCard
+                        key={work.workid}
+                        work={work}
+                        patientId={patientId}
+                        isAlignerWork={isAlignerWork}
+                        onViewDetails={handleViewDetails}
+                        onEdit={handleEditWork}
+                        onAddPayment={handleAddPayment}
+                        onViewPaymentHistory={handleViewPaymentHistory}
+                        onAddAlignerSet={handleAddAlignerSet}
+                        onComplete={handleCompleteWork}
+                        onViewVisits={(work) => window.location.href = `/views/visits.html?workId=${work.workid}&patient=${patientId}`}
+                        formatDate={formatDate}
+                        formatCurrency={formatCurrency}
+                        getProgressPercentage={getProgressPercentage}
+                    />
+                ))}
+                {filteredWorks.length === 0 && (
+                    <div className="no-works-message">
+                        <i className="fas fa-tooth" style={{ fontSize: '3rem', color: '#d1d5db', marginBottom: '1rem' }}></i>
+                        <p style={{ color: '#6b7280', fontSize: '1rem' }}>
+                            {searchTerm || filterStatus !== 'all'
+                                ? 'No works match your criteria'
+                                : 'No works found for this patient'}
+                        </p>
+                    </div>
+                )}
             </div>
 
             {/* Work Details Modal */}
@@ -601,10 +684,11 @@ const WorkComponent = ({ patientId }) => {
                         </div>
 
                         <div className="work-details-content">
-                            {/* Comprehensive Work Information */}
+                            {/* Only show information NOT visible on the card */}
                             <div className="work-summary-info">
+                                {/* Reference Information */}
                                 <h4 style={{ marginBottom: '1rem', color: '#4f46e5', borderBottom: '2px solid #e0e7ff', paddingBottom: '0.5rem' }}>
-                                    <i className="fas fa-info-circle"></i> General Information
+                                    <i className="fas fa-info-circle"></i> Reference Information
                                 </h4>
                                 <div className="info-grid" style={{
                                     display: 'grid',
@@ -614,107 +698,49 @@ const WorkComponent = ({ patientId }) => {
                                 }}>
                                     <div className="info-item">
                                         <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Work ID:</label>
-                                        <span style={{ fontSize: '1rem' }}>{selectedWork.workid}</span>
-                                    </div>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Work Type:</label>
-                                        <span style={{ fontSize: '1rem' }}>{selectedWork.TypeName || 'Other'}</span>
-                                    </div>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Doctor:</label>
-                                        <span style={{ fontSize: '1rem' }}>{selectedWork.DoctorName || 'Not assigned'}</span>
-                                    </div>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Status:</label>
-                                        <span>{getStatusBadge(selectedWork)}</span>
-                                    </div>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Progress:</label>
-                                        <span style={{ fontSize: '1rem', fontWeight: '600', color: '#4f46e5' }}>{getProgressPercentage(selectedWork)}%</span>
-                                    </div>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Finished:</label>
-                                        <span style={{ fontSize: '1rem' }}>{selectedWork.Finished ? '✓ Yes' : '✗ No'}</span>
+                                        <span style={{ fontSize: '1rem', fontFamily: 'monospace', fontWeight: '600' }}>{selectedWork.workid}</span>
                                     </div>
                                 </div>
 
-                                <h4 style={{ marginBottom: '1rem', color: '#059669', borderBottom: '2px solid #d1fae5', paddingBottom: '0.5rem' }}>
-                                    <i className="fas fa-dollar-sign"></i> Financial Information
-                                </h4>
-                                <div className="info-grid" style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                                    gap: '1rem',
-                                    marginBottom: '1.5rem'
-                                }}>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Total Required:</label>
-                                        <span style={{ fontWeight: '600', color: '#059669', fontSize: '1.1rem' }}>
-                                            {formatCurrency(selectedWork.TotalRequired, selectedWork.Currency)}
-                                        </span>
-                                    </div>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Total Paid:</label>
-                                        <span style={{ fontWeight: '600', color: '#0891b2', fontSize: '1.1rem' }}>
-                                            {formatCurrency(selectedWork.TotalPaid, selectedWork.Currency)}
-                                        </span>
-                                    </div>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Balance:</label>
-                                        <span style={{ fontWeight: '600', color: '#dc2626', fontSize: '1.1rem' }}>
-                                            {formatCurrency((selectedWork.TotalRequired || 0) - (selectedWork.TotalPaid || 0), selectedWork.Currency)}
-                                        </span>
-                                    </div>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Currency:</label>
-                                        <span style={{ fontSize: '1rem' }}>{selectedWork.Currency || 'USD'}</span>
-                                    </div>
-                                </div>
-
-                                <h4 style={{ marginBottom: '1rem', color: '#7c3aed', borderBottom: '2px solid #ede9fe', paddingBottom: '0.5rem' }}>
-                                    <i className="fas fa-calendar-alt"></i> Timeline & Dates
-                                </h4>
-                                <div className="info-grid" style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                                    gap: '1rem',
-                                    marginBottom: '1.5rem'
-                                }}>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Addition Date:</label>
-                                        <span style={{ fontSize: '1rem' }}>{formatDate(selectedWork.AdditionDate)}</span>
-                                    </div>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Start Date:</label>
-                                        <span style={{ fontSize: '1rem' }}>{formatDate(selectedWork.StartDate)}</span>
-                                    </div>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Initial Photo Date:</label>
-                                        <span style={{ fontSize: '1rem' }}>{formatDate(selectedWork.IPhotoDate)}</span>
-                                    </div>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Debond Date:</label>
-                                        <span style={{ fontSize: '1rem' }}>{formatDate(selectedWork.DebondDate)}</span>
-                                    </div>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Final Photo Date:</label>
-                                        <span style={{ fontSize: '1rem' }}>{formatDate(selectedWork.FPhotoDate)}</span>
-                                    </div>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Notes Date:</label>
-                                        <span style={{ fontSize: '1rem' }}>{formatDate(selectedWork.NotesDate)}</span>
-                                    </div>
-                                    <div className="info-item">
-                                        <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Estimated Duration:</label>
-                                        <span style={{ fontSize: '1rem' }}>{selectedWork.EstimatedDuration ? `${selectedWork.EstimatedDuration} months` : 'Not set'}</span>
-                                    </div>
-                                </div>
+                                {/* Photo Dates (not on card) */}
+                                {(selectedWork.IPhotoDate || selectedWork.FPhotoDate) && (
+                                    <>
+                                        <h4 style={{ marginBottom: '1rem', color: '#7c3aed', borderBottom: '2px solid #ede9fe', paddingBottom: '0.5rem' }}>
+                                            <i className="fas fa-camera"></i> Photo Dates
+                                        </h4>
+                                        <div className="info-grid" style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                                            gap: '1rem',
+                                            marginBottom: '1.5rem'
+                                        }}>
+                                            {selectedWork.IPhotoDate && (
+                                                <div className="info-item">
+                                                    <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Initial Photo Date:</label>
+                                                    <span style={{ fontSize: '1rem' }}>{formatDate(selectedWork.IPhotoDate)}</span>
+                                                </div>
+                                            )}
+                                            {selectedWork.FPhotoDate && (
+                                                <div className="info-item">
+                                                    <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Final Photo Date:</label>
+                                                    <span style={{ fontSize: '1rem' }}>{formatDate(selectedWork.FPhotoDate)}</span>
+                                                </div>
+                                            )}
+                                            {selectedWork.NotesDate && (
+                                                <div className="info-item">
+                                                    <label style={{ fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Notes Date:</label>
+                                                    <span style={{ fontSize: '1rem' }}>{formatDate(selectedWork.NotesDate)}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
 
                                 {/* Keywords Section */}
                                 {(selectedWork.Keyword1 || selectedWork.Keyword2 || selectedWork.Keyword3 || selectedWork.Keyword4 || selectedWork.Keyword5) && (
                                     <>
                                         <h4 style={{ marginBottom: '1rem', color: '#ea580c', borderBottom: '2px solid #fed7aa', paddingBottom: '0.5rem' }}>
-                                            <i className="fas fa-tags"></i> Keywords
+                                            <i className="fas fa-tags"></i> Keywords & Tags
                                         </h4>
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem' }}>
                                             {selectedWork.Keyword1 && (
@@ -780,53 +806,6 @@ const WorkComponent = ({ patientId }) => {
                                         </div>
                                     </>
                                 )}
-
-                                {/* Notes Section */}
-                                {selectedWork.Notes && (
-                                    <>
-                                        <h4 style={{ marginBottom: '0.5rem', color: '#0891b2', borderBottom: '2px solid #cffafe', paddingBottom: '0.5rem' }}>
-                                            <i className="fas fa-sticky-note"></i> Notes
-                                        </h4>
-                                        <div style={{
-                                            backgroundColor: '#f0fdfa',
-                                            padding: '1rem',
-                                            borderRadius: '8px',
-                                            borderLeft: '4px solid #0891b2',
-                                            marginBottom: '1.5rem'
-                                        }}>
-                                            <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{selectedWork.Notes}</p>
-                                        </div>
-                                    </>
-                                )}
-
-                                {/* View Visits Button */}
-                                <div style={{
-                                    marginTop: '2rem',
-                                    paddingTop: '1.5rem',
-                                    borderTop: '2px solid #e5e7eb',
-                                    display: 'flex',
-                                    gap: '1rem'
-                                }}>
-                                    <button
-                                        onClick={() => window.location.href = `/views/visits.html?workId=${selectedWork.workid}&patient=${patientId}`}
-                                        className="btn btn-primary"
-                                        style={{
-                                            backgroundColor: '#059669',
-                                            padding: '0.75rem 1.5rem',
-                                            fontSize: '1rem',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '0.5rem',
-                                            border: 'none',
-                                            borderRadius: '6px',
-                                            cursor: 'pointer',
-                                            color: 'white',
-                                            fontWeight: '600'
-                                        }}
-                                    >
-                                        <i className="fas fa-calendar-check"></i> View All Visits
-                                    </button>
-                                </div>
                             </div>
 
                             {/* Work Details Table */}
@@ -1001,7 +980,8 @@ const WorkComponent = ({ patientId }) => {
                     <div className="work-modal">
                         <div className="modal-header">
                             <h3>{editingWork ? 'Edit Work' : 'Add New Work'}</h3>
-                            <button 
+                            <button
+                                type="button"
                                 onClick={() => setShowModal(false)}
                                 className="modal-close"
                             >
@@ -1180,6 +1160,136 @@ const WorkComponent = ({ patientId }) => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Payment Modal */}
+            {showPaymentModal && selectedWorkForPayment && (
+                <PaymentModal
+                    workData={selectedWorkForPayment}
+                    onClose={() => setShowPaymentModal(false)}
+                    onSuccess={(result) => {
+                        setSuccessMessage('Payment added successfully!');
+                        loadWorks(); // Reload works to show updated balance
+                    }}
+                />
+            )}
+
+            {/* Payment History Modal */}
+            {showPaymentHistoryModal && selectedWorkForPayment && (
+                <div className="modal-overlay">
+                    <div className="work-modal details-modal" style={{ maxWidth: '900px' }}>
+                        <div className="modal-header">
+                            <h3>Payment History - {selectedWorkForPayment.TypeName || 'Work #' + selectedWorkForPayment.workid}</h3>
+                            <button
+                                onClick={() => setShowPaymentHistoryModal(false)}
+                                className="modal-close"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div style={{
+                            padding: '1rem',
+                            backgroundColor: '#f0fdf4',
+                            borderRadius: '8px',
+                            marginBottom: '1rem',
+                            border: '1px solid #86efac'
+                        }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', fontSize: '1rem' }}>
+                                <div>
+                                    <strong>Total Required:</strong><br/>
+                                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#059669' }}>
+                                        {formatCurrency(selectedWorkForPayment.TotalRequired, selectedWorkForPayment.Currency)}
+                                    </span>
+                                </div>
+                                <div>
+                                    <strong>Total Paid:</strong><br/>
+                                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#0891b2' }}>
+                                        {formatCurrency(selectedWorkForPayment.TotalPaid, selectedWorkForPayment.Currency)}
+                                    </span>
+                                </div>
+                                <div>
+                                    <strong>Balance Remaining:</strong><br/>
+                                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#dc2626' }}>
+                                        {formatCurrency((selectedWorkForPayment.TotalRequired || 0) - (selectedWorkForPayment.TotalPaid || 0), selectedWorkForPayment.Currency)}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {loadingPayments ? (
+                            <div className="work-loading" style={{ padding: '2rem', textAlign: 'center' }}>
+                                Loading payment history...
+                            </div>
+                        ) : (
+                            <div className="details-table-container">
+                                <table className="details-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Amount Paid ({selectedWorkForPayment.Currency})</th>
+                                            <th>Actual Amount</th>
+                                            <th>Actual Currency</th>
+                                            <th>Change</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {paymentHistory.map((payment, index) => (
+                                            <tr key={payment.InvoiceID || index}>
+                                                <td>{formatDate(payment.Dateofpayment)}</td>
+                                                <td style={{ fontWeight: '600', color: '#059669' }}>
+                                                    {formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}
+                                                </td>
+                                                <td>{payment.ActualAmount ? formatCurrency(payment.ActualAmount, payment.ActualCur) : '-'}</td>
+                                                <td>{payment.ActualCur || '-'}</td>
+                                                <td>{payment.Change ? formatCurrency(payment.Change, payment.ActualCur) : '-'}</td>
+                                            </tr>
+                                        ))}
+                                        {paymentHistory.length === 0 && (
+                                            <tr>
+                                                <td colSpan="5" className="no-data">
+                                                    No payments recorded yet for this work
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '2px solid #e5e7eb' }}>
+                            {((selectedWorkForPayment.TotalRequired || 0) - (selectedWorkForPayment.TotalPaid || 0)) > 0 ? (
+                                <button
+                                    onClick={() => {
+                                        setShowPaymentHistoryModal(false);
+                                        handleAddPayment(selectedWorkForPayment);
+                                    }}
+                                    className="btn btn-primary"
+                                    style={{
+                                        backgroundColor: '#10b981',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem'
+                                    }}
+                                >
+                                    <i className="fas fa-plus"></i> Add New Payment
+                                </button>
+                            ) : (
+                                <div style={{
+                                    padding: '1rem',
+                                    backgroundColor: '#f0fdf4',
+                                    borderRadius: '8px',
+                                    border: '1px solid #86efac',
+                                    textAlign: 'center',
+                                    color: '#059669',
+                                    fontWeight: '600'
+                                }}>
+                                    <i className="fas fa-check-circle"></i> This work is fully paid
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

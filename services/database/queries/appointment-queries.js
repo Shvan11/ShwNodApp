@@ -77,21 +77,30 @@ export function getPresentTodayApps(AppsDate) {
         'PresentTodayApps',
         [['AppsDate', TYPES.Date, AppsDate]],
         null,
-        (columns) => ({
-            appointmentID: columns[0].value,
-            PersonID: columns[1].value,
-            AppDetail: columns[2].value,
-            Present: columns[3].value,
-            Seated: columns[4].value,
-            Dismissed: columns[5].value,
-            AppDate: columns[6].value,
-            AppCost: columns[7].value,
-            apptime: columns[8].value,
-            PatientType: columns[9].value,
-            PatientName: columns[10].value,
-            Alerts: columns[11].value,
-            HasVisit: columns[12].value
-        }),
+        (columns) => {
+            const presentTime = columns[3].value;
+            const seatedTime = columns[4].value;
+            const dismissedTime = columns[5].value;
+
+            return {
+                appointmentID: columns[0].value,
+                PersonID: columns[1].value,
+                AppDetail: columns[2].value,
+                Present: presentTime ? true : false,
+                Seated: seatedTime ? true : false,
+                Dismissed: dismissedTime ? true : false,
+                PresentTime: presentTime,
+                SeatedTime: seatedTime,
+                DismissedTime: dismissedTime,
+                AppDate: columns[6].value,
+                AppCost: columns[7].value,
+                apptime: columns[8].value,
+                PatientType: columns[9].value,
+                PatientName: columns[10].value,
+                Alerts: columns[11].value,
+                HasVisit: columns[12].value
+            };
+        },
         (result) => result
     );
 }
@@ -114,5 +123,29 @@ export function updatePresent(Aid, state, Tim) {
         null,
         (columns) => columns,
         (result) => ({ success: true, appointmentID: Aid, state: state, time: Tim })
+    );
+}
+
+/**
+ * Undo appointment state by setting field to NULL (dedicated procedure for undo operations).
+ * This uses a separate procedure to avoid affecting other applications using UpdatePresent.
+ * @param {number} appointmentID - The appointment ID.
+ * @param {string} stateField - The state field to clear (Present, Seated, Dismissed).
+ * @returns {Promise<Object>} - A promise that resolves with the undo result.
+ */
+export function undoAppointmentState(appointmentID, stateField) {
+    return executeStoredProcedure(
+        'UndoAppointmentState',
+        [
+            ['AppointmentID', TYPES.Int, appointmentID],
+            ['StateField', TYPES.VarChar, stateField]
+        ],
+        null,
+        (columns) => ({
+            appointmentID: columns[0].value,
+            stateCleared: columns[1].value,
+            success: columns[2].value
+        }),
+        (result) => result[0] || { success: true, appointmentID, stateCleared: stateField }
     );
 }

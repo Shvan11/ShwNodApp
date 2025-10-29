@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 const GridComponent = ({ patientId, tpCode = '0' }) => {
+    const navigate = useNavigate();
     const [images, setImages] = useState([]);
+    const [timepoints, setTimepoints] = useState([]);
+    const [loadingTimepoints, setLoadingTimepoints] = useState(true);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [lightbox, setLightbox] = useState(null);
@@ -21,15 +25,33 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
         { id: 'lf', index: 8, alt: 'Left' }
     ];
     
+    const loadTimepoints = async () => {
+        try {
+            setLoadingTimepoints(true);
+            const response = await fetch(`/api/gettimepoints?code=${patientId}`);
+
+            if (!response.ok) {
+                throw new Error('Failed to load timepoints');
+            }
+
+            const data = await response.json();
+            setTimepoints(data);
+        } catch (err) {
+            console.error('Error loading timepoints:', err);
+        } finally {
+            setLoadingTimepoints(false);
+        }
+    };
+
     const loadGalleryImages = async () => {
         try {
             setLoading(true);
-            
+
             const response = await fetch(`/api/getgal?code=${patientId}&tp=${tpCode}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            
+
             const galleryImages = await response.json();
             setImages(galleryImages);
         } catch (err) {
@@ -256,6 +278,13 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
         return () => window.removeEventListener('resize', checkScreenSize);
     }, []);
 
+    // Load timepoints when component mounts
+    useEffect(() => {
+        if (patientId) {
+            loadTimepoints();
+        }
+    }, [patientId]);
+
     // Load images when component mounts or dependencies change
     useEffect(() => {
         if (patientId) {
@@ -366,20 +395,53 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
         );
     }
     
+    const formatDate = (dateTime) => {
+        if (!dateTime) return '';
+        return dateTime.substring(0, 10).split("-").reverse().join("-");
+    };
+
+    const handleTimepointClick = (tp) => {
+        navigate(`/patient/${patientId}/grid?tp=${tp}`);
+    };
+
     return (
-        <div 
+        <div
             ref={componentRef}
-            style={{ 
-                padding: '20px',
+            style={{
+                padding: '0',
                 height: '100%',
                 overflowY: 'auto',
                 overflowX: 'hidden'
             }}
         >
+            {/* Timepoints Selector */}
+            {!loadingTimepoints && timepoints.length > 0 && (
+                <div className="timepoints-selector">
+                    {timepoints.map((timepoint, index) => (
+                        <button
+                            key={`tp-${timepoint.tpCode}-${index}`}
+                            className={`timepoint-tab ${tpCode === timepoint.tpCode ? 'active' : ''}`}
+                            onClick={() => handleTimepointClick(timepoint.tpCode)}
+                        >
+                            <div className="timepoint-tab-icon">
+                                <i className="fas fa-camera"></i>
+                            </div>
+                            <div className="timepoint-tab-content">
+                                <div className="timepoint-tab-desc">{timepoint.tpDescription}</div>
+                                <div className="timepoint-tab-date">{formatDate(timepoint.tpDateTime)}</div>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            )}
+
             <div
-                id="dolph_gallery" 
+                id="dolph_gallery"
                 className="pswp-gallery"
-                style={calculateGridStyle()}
+                style={{
+                    ...calculateGridStyle(),
+                    padding: '0 20px 20px 20px'
+                }}
             >
                 {imageElements.map(element => {
                     const imageSrc = getImageSrc(element);

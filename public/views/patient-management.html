@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Management - Shwan Orthodontics</title>
+
+    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/pages/work-management.css">
+    <link rel="stylesheet" href="../css/pages/grid.css">
+    <link rel="stylesheet" href="../css/components/universal-header.css">
+    <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f9fafb;
+        }
+
+        #universal-header-root {
+            margin: 0;
+            padding: 0;
+        }
+
+        #react-root {
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .patient-management {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        }
+
+        @media (max-width: 768px) {
+            #react-root {
+                padding: 1rem;
+            }
+
+            .patient-management {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Universal header mount point -->
+    <div id="universal-header-root"></div>
+
+    <!-- React will mount here -->
+    <div id="react-root"></div>
+
+    <!-- TomSelect Library -->
+    <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+
+    <!-- React entry point -->
+    <script type="module">
+        import React from 'react';
+        import ReactDOM from 'react-dom/client';
+        import UniversalHeader from '/js/components/react/UniversalHeader.jsx';
+        import PatientManagement from '/js/components/react/PatientManagement.jsx';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Initializing Patient Management...');
+
+            // Mount Universal Header
+            const headerRoot = document.getElementById('universal-header-root');
+            if (headerRoot) {
+                const root = ReactDOM.createRoot(headerRoot);
+                root.render(React.createElement(UniversalHeader));
+            }
+
+            // Mount Patient Management
+            const appRoot = document.getElementById('react-root');
+            if (appRoot) {
+                const root = ReactDOM.createRoot(appRoot);
+                root.render(React.createElement(PatientManagement));
+            }
+
+            console.log('✅ Patient Management initialized');
+        });
+    </script>
+</body>
+
+</html>

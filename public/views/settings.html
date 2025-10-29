@@ -13,29 +13,35 @@
 </head>
 <body>
     <div id="universal-header-root"></div>
-    <div id="settings-component-root"></div>
-    
-    <!-- Load navigation components -->
+    <div id="settings-root"></div>
+
+    <!-- Load settings app with React Router -->
     <script type="module">
         import React from 'react';
         import ReactDOM from 'react-dom/client';
         import UniversalHeader from '../js/components/react/UniversalHeader.jsx';
-        import SettingsComponent from '../js/components/react/SettingsComponent.jsx';
-        
+        import SettingsApp from '../js/apps/SettingsApp.jsx';
+
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Initializing Settings with React Router...');
+
+            // Mount Universal Header
             const headerRoot = document.getElementById('universal-header-root');
             if (headerRoot) {
                 const root = ReactDOM.createRoot(headerRoot);
                 root.render(React.createElement(UniversalHeader));
+                console.log('✅ Universal Header initialized');
             }
-            
-            const settingsRoot = document.getElementById('settings-component-root');
+
+            // Mount Settings App with React Router
+            const settingsRoot = document.getElementById('settings-root');
             if (settingsRoot) {
                 const root = ReactDOM.createRoot(settingsRoot);
-                root.render(React.createElement(SettingsComponent));
+                root.render(React.createElement(SettingsApp));
+                console.log('✅ Settings with React Router initialized');
             }
         });
     </script>
-    
+
 </body>
 </html>

@@ -5,75 +5,94 @@
   <meta charset="UTF-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Appointments</title> 
+  <title>Daily Appointments - Shwan Orthodontics</title>
   <link rel="stylesheet" href="../../css/main.css" />
   <link rel="stylesheet" href="../../css/pages/appointments.css" />
   <link rel="stylesheet" href="../../css/components/universal-header.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
   <!-- React handled by Vite -->
 </head>
- 
+
 <body class="daily-appointments-view">
+  <!-- Universal Header -->
   <div id="universal-header-root"></div>
+
+  <!-- Page Header with Date Picker -->
   <div class="header-section">
-    <p id="title">Appointments for Saturday 3-22-2022</p>
+    <h1 id="title">Appointments for Today</h1>
     <div class="date-picker-container">
       <div class="date-picker-left">
         <label for="date-picker">Select Date:</label>
         <input type="date" id="date-picker" />
-        <button id="load-date-btn" class="btn-primary">Load</button>
-      </div>
-      <div class="date-picker-right">
-        <div id="mini-calendar-container">
-          <!-- Mini calendar will be rendered here -->
-        </div>
       </div>
     </div>
   </div>
+
+  <!-- Statistics Cards -->
+  <div class="stats-container">
+    <div class="stat-card stat-total">
+      <div class="stat-icon">
+        <i class="fas fa-calendar-check"></i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-label">Total Appointments</div>
+        <div class="stat-value" id="all">0</div>
+      </div>
+    </div>
+
+    <div class="stat-card stat-present">
+      <div class="stat-icon">
+        <i class="fas fa-user-check"></i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-label">Checked In</div>
+        <div class="stat-value" id="present">0</div>
+      </div>
+    </div>
+
+    <div class="stat-card stat-waiting">
+      <div class="stat-icon">
+        <i class="fas fa-clock"></i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-label">Waiting</div>
+        <div class="stat-value" id="waiting">0</div>
+      </div>
+    </div>
+
+    <div class="stat-card stat-completed">
+      <div class="stat-icon">
+        <i class="fas fa-check-circle"></i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-label">Completed</div>
+        <div class="stat-value" id="completed">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content - Appointments Lists -->
   <div class="container full-width">
     <div class="appointments-section">
       <h3>All Appointments</h3>
       <div id="all-appointments-container">
-        <!-- All appointments table will be rendered here -->
+        <!-- All appointments cards will be rendered here -->
       </div>
     </div>
+
     <div class="appointments-section">
       <h3>Checked-In Patients</h3>
       <div id="checked-in-container">
-        <!-- Checked-in appointments table will be rendered here -->
+        <!-- Checked-in appointments cards will be rendered here -->
       </div>
     </div>
-    <div id="subcont">
-      <ul>
-        <li>
-          Total appointments
-          <p class="nums" id="all">0</p>
-        </li>
-        <li>
-          Present Patients
-          <p class="nums" id="present">0</p>
-        </li>
-        <li id="waitingli">
-          Waiting Patients
-          <p class="nums" id="waiting">0</p>
-        </li>
-        <li>
-          Completed Patients
-          <p class="nums" id="completed">0</p>
-        </li>
-      </ul>
-      <canvas id="canvas" width="330" height="330">
-        <!-- Clock will be rendered here -->
-      </canvas>
-    </div>
   </div>
-  <footer>Shwan Orthodontics</footer>
-  
-  <!-- Load navigation components -->
-  <!-- Components loaded via modern entry point -->
-  
-  <!-- Components and appointment loading handled by daily-appointments.jsx module -->
-  
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2025 Shwan Orthodontics. All rights reserved.</p>
+  </footer>
+
   <!-- Load modular JavaScript -->
   <script type="module" src="../../js/pages/daily-appointments.jsx"></script>
 </body>

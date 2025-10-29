@@ -1,23 +1,26 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import UniversalHeader from '../components/react/UniversalHeader.jsx'
-import PatientShell from '../components/react/PatientShell.jsx'
-import '../../css/main.css'
-import '../../css/pages/grid.css'
-import '../../css/pages/payments.css'
-import '../../css/pages/xrays.css'
-import '../../css/pages/visits-summary.css'
-import '../../css/pages/canvas.css'
-import '../../photoswipe/dist/photoswipe.css'
-import '../../css/components/universal-header.css'
-import '../../css/components/sidebar-navigation.css'
-import '../../css/components/appointment-form.css'
-import '../../css/components/calendar-picker-modal.css'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import UniversalHeader from '../components/react/UniversalHeader.jsx';
+import PatientApp from '../apps/PatientApp.jsx';
+import '../../css/main.css';
+import '../../css/pages/grid.css';
+import '../../css/pages/payments.css';
+import '../../css/pages/xrays.css';
+import '../../css/pages/visits-summary.css';
+import '../../css/pages/canvas.css';
+import '../../photoswipe/dist/photoswipe.css';
+import '../../css/components/universal-header.css';
+import '../../css/components/sidebar-navigation.css';
+import '../../css/pages/patient-shell.css';
+import '../../css/pages/edit-patient.css';
+import '../../css/components/timepoints-selector.css';
+import '../../css/components/appointment-form.css';
+import '../../css/components/calendar-picker-modal.css';
 
-// Initialize the patient shell page
+// Initialize the patient portal with React Router
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Initializing React Patient Shell...');
-    
+    console.log('🚀 Initializing React Patient Portal with Router...');
+
     // Mount Universal Header
     const headerRoot = document.getElementById('universal-header-root');
     if (headerRoot) {
@@ -25,12 +28,12 @@ document.addEventListener('DOMContentLoaded', function() {
         headerReactRoot.render(React.createElement(UniversalHeader));
         console.log('✅ Universal Header initialized');
     }
-    
-    // Mount React App
+
+    // Mount Patient App with React Router
     const reactRoot = document.getElementById('react-root');
     if (reactRoot) {
         const root = ReactDOM.createRoot(reactRoot);
-        root.render(React.createElement(PatientShell));
-        console.log('✅ Patient shell initialized');
+        root.render(React.createElement(PatientApp));
+        console.log('✅ Patient portal with React Router initialized');
     }
 });

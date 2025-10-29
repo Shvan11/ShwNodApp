@@ -27,7 +27,7 @@ async function loadWorkInfo() {
         // Update breadcrumb
         if (patientId) {
             document.getElementById('breadcrumb-patient').innerHTML =
-                `<a href="/views/patient/react-shell.html?patient=${patientId}&page=works">Patient ${patientId}</a>`;
+                `<a href="/patient/${patientId}/works">Patient ${patientId}</a>`;
         }
 
         // Update work info card

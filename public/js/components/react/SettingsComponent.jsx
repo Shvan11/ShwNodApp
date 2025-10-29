@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import SettingsTabNavigation from './SettingsTabNavigation.jsx';
 import GeneralSettings from './GeneralSettings.jsx';
 import DatabaseSettings from './DatabaseSettings.jsx';
 import AlignerDoctorsSettings from './AlignerDoctorsSettings.jsx';
 
 const SettingsComponent = () => {
-    const [activeTab, setActiveTab] = useState('general');
+    const { tab } = useParams();
+    const navigate = useNavigate();
+    const [activeTab, setActiveTab] = useState(tab || 'general');
     const [tabData, setTabData] = useState({
         general: { hasChanges: false },
         database: { hasChanges: false },
@@ -64,32 +67,17 @@ const SettingsComponent = () => {
         }
     ];
 
-    // Load active tab from URL query parameter or localStorage
+    // Sync activeTab with URL parameter
     useEffect(() => {
-        // Check for tab query parameter in URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const tabParam = urlParams.get('tab');
-
-        if (tabParam && tabs.find(tab => tab.id === tabParam && !tab.disabled)) {
-            setActiveTab(tabParam);
-        } else {
-            // Fall back to saved tab from localStorage
-            const savedTab = localStorage.getItem('settings-active-tab');
-            if (savedTab && tabs.find(tab => tab.id === savedTab && !tab.disabled)) {
-                setActiveTab(savedTab);
-            }
+        if (tab && tabs.find(t => t.id === tab && !t.disabled)) {
+            setActiveTab(tab);
         }
-    }, []);
-
-    // Save active tab to localStorage
-    useEffect(() => {
-        localStorage.setItem('settings-active-tab', activeTab);
-    }, [activeTab]);
+    }, [tab]);
 
     const handleTabChange = (tabId) => {
-        const tab = tabs.find(t => t.id === tabId);
-        if (tab && !tab.disabled) {
-            setActiveTab(tabId);
+        const selectedTab = tabs.find(t => t.id === tabId);
+        if (selectedTab && !selectedTab.disabled) {
+            navigate(`/settings/${tabId}`);
         }
     };
 
@@ -103,34 +91,9 @@ const SettingsComponent = () => {
         }));
     }, []);
 
-    const renderTabContent = () => {
-        const currentTab = tabs.find(tab => tab.id === activeTab);
-        
-        if (!currentTab) return null;
-
-        if (currentTab.disabled || !currentTab.component) {
-            return (
-                <div className="coming-soon-content">
-                    <div className="coming-soon-icon">
-                        <i className={currentTab.icon}></i>
-                    </div>
-                    <h3>{currentTab.label} Settings</h3>
-                    <p>{currentTab.description}</p>
-                    <div className="coming-soon-message">
-                        <i className="fas fa-clock"></i>
-                        <span>This feature is coming soon!</span>
-                    </div>
-                </div>
-            );
-        }
-
-        const TabComponent = currentTab.component;
-        return (
-            <TabComponent 
-                onChangesUpdate={(hasChanges) => handleTabChangesUpdate(activeTab, hasChanges)}
-            />
-        );
-    };
+    // Get the active tab component
+    const activeTabConfig = tabs.find(t => t.id === activeTab);
+    const ActiveTabComponent = activeTabConfig?.component;
 
     return (
         <div className="settings-container">
@@ -140,9 +103,24 @@ const SettingsComponent = () => {
                 onTabChange={handleTabChange}
                 tabData={tabData}
             />
-            
-            <div className="tab-content">
-                {renderTabContent()}
+
+            <div className="settings-content">
+                {ActiveTabComponent ? (
+                    <ActiveTabComponent
+                        onChangesUpdate={(hasChanges) => handleTabChangesUpdate(activeTab, hasChanges)}
+                    />
+                ) : (
+                    <div className="settings-placeholder">
+                        <div className="placeholder-icon">
+                            <i className={activeTabConfig?.icon || 'fas fa-cog'}></i>
+                        </div>
+                        <h3>{activeTabConfig?.label || 'Settings'}</h3>
+                        <p>This section is coming soon.</p>
+                        <p className="placeholder-description">
+                            {activeTabConfig?.description || 'Configure your system settings'}
+                        </p>
+                    </div>
+                )}
             </div>
         </div>
     );

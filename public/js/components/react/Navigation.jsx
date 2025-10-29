@@ -1,22 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 
-const Navigation = ({ patientId, currentPath, onNavigate }) => {
+const Navigation = ({ patientId, currentPage }) => {
     const [timepoints, setTimepoints] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [isCollapsed, setIsCollapsed] = useState(true);
-    const [isMobile, setIsMobile] = useState(false);
-    
+    const [photosExpanded, setPhotosExpanded] = useState(false);
+    const [searchParams] = useSearchParams();
+    const photosButtonRef = useRef(null);
+    const [flyoutPosition, setFlyoutPosition] = useState({ top: 0 });
+
     // Cache for timepoints
     const [cache, setCache] = useState(new Map());
     const cacheTimeout = 5 * 60 * 1000; // 5 minutes
-    
+
     const loadTimepoints = useCallback(async (patientId) => {
         if (!patientId) return;
-        
+
         const cacheKey = `patient_${patientId}`;
         const cached = cache.get(cacheKey);
-        
+
         // Check cache first
         if (cached && (Date.now() - cached.timestamp) < cacheTimeout) {
             console.log('Using cached timepoints for patient', patientId);
@@ -24,18 +27,18 @@ const Navigation = ({ patientId, currentPath, onNavigate }) => {
             setLoading(false);
             return;
         }
-        
+
         try {
             setLoading(true);
             console.log('Fetching timepoints for patient', patientId);
-            
+
             const response = await fetch(`/api/gettimepoints?code=${patientId}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            
+
             const data = await response.json();
-            
+
             // Update cache
             const newCache = new Map(cache);
             newCache.set(cacheKey, {
@@ -43,7 +46,7 @@ const Navigation = ({ patientId, currentPath, onNavigate }) => {
                 timestamp: Date.now()
             });
             setCache(newCache);
-            
+
             setTimepoints(data);
             setError(null);
         } catch (err) {
@@ -54,211 +57,191 @@ const Navigation = ({ patientId, currentPath, onNavigate }) => {
             setLoading(false);
         }
     }, [cache, cacheTimeout]);
-    
+
     useEffect(() => {
         loadTimepoints(patientId);
     }, [patientId, loadTimepoints]);
 
-    // Check for mobile screen size
-    useEffect(() => {
-        const checkMobile = () => {
-            const mobile = window.innerWidth <= 768;
-            setIsMobile(mobile);
-            if (mobile) {
-                setIsCollapsed(true);
-            }
-        };
-        
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, []);
-
-    const toggleSidebar = () => {
-        setIsCollapsed(!isCollapsed);
-    };
-    
     const formatDate = (dateTime) => {
         return dateTime.substring(0, 10).split("-").reverse().join("-");
     };
-    
-    const isCurrentPath = (path) => {
-        return currentPath.includes(path);
-    };
-    
-    const handleNavigation = (page) => {
-        onNavigate(page);
-    };
-    
-    // Define static navigation items - using page names instead of paths
+
+    // Define static navigation items (Photos removed - will be its own expandable section)
     const staticNavItems = [
-        { key: 'grid', page: 'grid', label: 'Photos', icon: 'fas fa-images' },
-        { key: 'compare', page: 'compare', label: 'Compare', icon: 'fas fa-exchange-alt' },
-        { key: 'xrays', page: 'xrays', label: 'X-rays', icon: 'fas fa-x-ray' },
-        { key: 'visits', page: 'visits', label: 'Visit Summary', icon: 'fas fa-clipboard-list' },
         { key: 'works', page: 'works', label: 'Works', icon: 'fas fa-tooth' },
-        { key: 'payments', page: 'payments', label: 'Payments', icon: 'fas fa-credit-card' },
-        { key: 'new-appointment', page: 'new-appointment', label: 'New Appointment', icon: 'fas fa-plus-circle' }
+        { key: 'new-appointment', page: 'new-appointment', label: 'New Appointment', icon: 'fas fa-plus-circle' },
+        { key: 'edit-patient', page: 'edit-patient', label: 'Edit Patient', icon: 'fas fa-user-edit' }
     ];
 
     const renderNavItem = (item, isActive = false) => {
+        const className = `sidebar-nav-item ${isActive ? 'active' : ''} ${item.highlight ? 'highlighted' : ''}`;
+
         return (
-            <div
+            <Link
                 key={item.key}
-                className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
-                onClick={(e) => {
-                    e.preventDefault();
-                    handleNavigation(item.page);
-                    if (isMobile) setIsCollapsed(true);
-                }}
-                title={isCollapsed ? item.label : undefined}
-                data-tooltip={isCollapsed ? item.label : undefined}
+                to={`/patient/${patientId}/${item.page}`}
+                className={className}
+                title={item.label}
             >
                 <div className="nav-item-icon">
                     <i className={item.icon} />
                 </div>
-                {!isCollapsed && (
-                    <span className="nav-item-label">{item.label}</span>
-                )}
-            </div>
+                <span className="nav-item-label">{item.label}</span>
+            </Link>
         );
     };
 
     const renderTimepointItem = (timepoint) => {
         // Check if this timepoint is currently active
-        const urlParams = new URLSearchParams(window.location.search);
-        const currentTp = urlParams.get('tp') || '0';
+        const currentTp = searchParams.get('tp') || '0';
         const isActive = currentTp === timepoint.tpCode;
-        const tooltipText = isCollapsed ? `${timepoint.tpDescription} (${formatDate(timepoint.tpDateTime)})` : undefined;
-        
+
         return (
-            <div
+            <Link
                 key={timepoint.tpCode}
-                className={`sidebar-nav-item timepoint-item ${isActive ? 'active' : ''}`}
-                onClick={(e) => {
-                    e.preventDefault();
-                    // Navigate to grid page with specific timepoint
-                    const newUrl = `${window.location.pathname}?code=${patientId}&page=grid&tp=${timepoint.tpCode}`;
-                    window.history.pushState({}, '', newUrl);
-                    // Force PatientShell to update by dispatching a custom event
-                    window.dispatchEvent(new CustomEvent('urlChanged'));
-                    if (isMobile) setIsCollapsed(true);
-                }}
-                title={tooltipText}
-                data-tooltip={tooltipText}
+                to={`/patient/${patientId}/grid?tp=${timepoint.tpCode}`}
+                className={`sidebar-nav-item timepoint-subitem ${isActive ? 'active' : ''}`}
             >
                 <div className="nav-item-icon">
-                    <i className="fas fa-camera" />
+                    <i className="fas fa-circle" style={{ fontSize: '0.5rem' }} />
                 </div>
-                {!isCollapsed && (
-                    <div className="timepoint-content">
-                        <span className="timepoint-description">{timepoint.tpDescription}</span>
-                        <span className="timepoint-date">{formatDate(timepoint.tpDateTime)}</span>
-                    </div>
-                )}
-            </div>
+                <div className="timepoint-content">
+                    <span className="timepoint-description">{timepoint.tpDescription}</span>
+                    <span className="timepoint-date">{formatDate(timepoint.tpDateTime)}</span>
+                </div>
+            </Link>
         );
     };
 
-    return (
-        <div className={`patient-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobile ? 'mobile' : ''}`}>
-            {/* Sidebar header with toggle */}
-            <div className="sidebar-header">
-                <button
-                    className="sidebar-toggle"
-                    onClick={toggleSidebar}
-                    aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                >
-                    <i className={`fas ${isCollapsed ? 'fa-chevron-right' : 'fa-chevron-left'}`} />
-                </button>
-                {!isCollapsed && (
-                    <h3 className="sidebar-title">Patient Navigation</h3>
-                )}
-            </div>
+    const isPhotosPageActive = currentPage === 'grid';
 
+    return (
+        <div className="patient-sidebar narrow-bar">
             {/* Main navigation content */}
             <div className="sidebar-content">
                 {/* Static navigation items section */}
                 <div className="nav-section">
-                    {!isCollapsed && (
-                        <div className="section-title">Patient Records</div>
-                    )}
-                    
                     {staticNavItems.map(item => {
-                        // Check if this page is currently active based on URL params
-                        const urlParams = new URLSearchParams(window.location.search);
-                        const currentPage = urlParams.get('page') || 'grid';
                         const isActive = currentPage === item.page;
-                        
                         return renderNavItem(item, isActive);
                     })}
                 </div>
 
-                {/* Timepoints section */}
-                {loading ? (
-                    <div className="nav-section loading">
-                        <div className="nav-item-icon">
-                            <i className="fas fa-spinner fa-spin" />
-                        </div>
-                        {!isCollapsed && (
-                            <span className="nav-item-label">Loading timepoints...</span>
+                {/* Photos section with flyout menu for timepoints */}
+                <div className="nav-section photos-section">
+                    <div
+                        ref={photosButtonRef}
+                        className="photos-wrapper"
+                        onMouseEnter={() => {
+                            if (photosButtonRef.current) {
+                                const rect = photosButtonRef.current.getBoundingClientRect();
+                                setFlyoutPosition({ top: rect.top });
+                            }
+                            setPhotosExpanded(true);
+                        }}
+                        onMouseLeave={() => {
+                            setPhotosExpanded(false);
+                        }}
+                    >
+                        <Link
+                            to={`/patient/${patientId}/grid?tp=0`}
+                            className={`sidebar-nav-item photos-main-btn ${isPhotosPageActive ? 'active' : ''}`}
+                            title="Photos"
+                        >
+                            <div className="nav-item-icon">
+                                <i className="fas fa-images" />
+                            </div>
+                            <span className="nav-item-label">Photos</span>
+                        </Link>
+
+                        {/* Flyout menu for timepoints */}
+                        {photosExpanded && (
+                            <div
+                                className="photos-flyout-menu"
+                                style={{ top: `${flyoutPosition.top}px` }}
+                                onMouseEnter={() => setPhotosExpanded(true)}
+                                onMouseLeave={() => setPhotosExpanded(false)}
+                            >
+                                <div className="flyout-header">
+                                    <i className="fas fa-images" />
+                                    Photo Sessions
+                                </div>
+                                <div className="flyout-content">
+                                    {loading ? (
+                                        <div className="flyout-loading">
+                                            <i className="fas fa-spinner fa-spin" />
+                                            <span>Loading timepoints...</span>
+                                        </div>
+                                    ) : error ? (
+                                        <div className="flyout-error">
+                                            <i className="fas fa-exclamation-triangle" />
+                                            <span>Error loading timepoints</span>
+                                        </div>
+                                    ) : timepoints.length > 0 ? (
+                                        timepoints.map(timepoint => renderTimepointItem(timepoint))
+                                    ) : (
+                                        <div className="flyout-empty">
+                                            <i className="fas fa-info-circle" />
+                                            <span>No photo sessions yet</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         )}
                     </div>
-                ) : error ? (
-                    <div className="nav-section error">
-                        <div className="nav-item-icon">
-                            <i className="fas fa-exclamation-triangle" />
-                        </div>
-                        {!isCollapsed && (
-                            <span className="nav-item-label">Error loading timepoints</span>
-                        )}
-                    </div>
-                ) : timepoints.length > 0 && (
-                    <div className="nav-section timepoints-section">
-                        {!isCollapsed && (
-                            <div className="section-title">Photo Sessions</div>
-                        )}
-                        
-                        {timepoints.map(timepoint => renderTimepointItem(timepoint))}
-                    </div>
-                )}
+                </div>
             </div>
 
             {/* Sidebar footer */}
             <div className="sidebar-footer">
+                <Link
+                    to={`/patient/${patientId}/compare`}
+                    className={`sidebar-nav-item compare-item ${currentPage === 'compare' ? 'active' : ''}`}
+                    title="Compare"
+                >
+                    <div className="nav-item-icon">
+                        <i className="fas fa-exchange-alt" />
+                    </div>
+                    <span className="nav-item-label">Compare</span>
+                </Link>
+
+                <Link
+                    to={`/patient/${patientId}/xrays`}
+                    className={`sidebar-nav-item xrays-item ${currentPage === 'xrays' ? 'active' : ''}`}
+                    title="X-rays"
+                >
+                    <div className="nav-item-icon">
+                        <i className="fas fa-x-ray" />
+                    </div>
+                    <span className="nav-item-label">X-rays</span>
+                </Link>
+
                 <div
                     className="sidebar-nav-item appointments-item"
                     onClick={(e) => {
                         e.preventDefault();
                         window.location.href = '/daily-appointments';
                     }}
-                    title={isCollapsed ? "Today's Appointments" : undefined}
-                    data-tooltip={isCollapsed ? "Today's Appointments" : undefined}
+                    title="Today's Appointments"
                 >
                     <div className="nav-item-icon">
                         <i className="fas fa-calendar-day" />
                     </div>
-                    {!isCollapsed && (
-                        <span className="nav-item-label">Today's Appointments</span>
-                    )}
+                    <span className="nav-item-label">Today's Appointments</span>
                 </div>
 
-                {/* Calendar item */}
                 <div
                     className="sidebar-nav-item calendar-item"
                     onClick={(e) => {
                         e.preventDefault();
                         window.location.href = '/calendar';
                     }}
-                    title={isCollapsed ? "Full Calendar View" : undefined}
-                    data-tooltip={isCollapsed ? "Full Calendar View" : undefined}
+                    title="Calendar"
                 >
                     <div className="nav-item-icon">
                         <i className="fas fa-calendar-alt" />
                     </div>
-                    {!isCollapsed && (
-                        <span className="nav-item-label">Calendar</span>
-                    )}
+                    <span className="nav-item-label">Calendar</span>
                 </div>
             </div>
         </div>

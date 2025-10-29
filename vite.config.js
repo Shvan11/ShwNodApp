@@ -17,8 +17,8 @@ export default defineConfig({
         'daily-appointments': resolve(__dirname, 'public/views/appointments/daily-appointments.html'),
         'react-shell': resolve(__dirname, 'public/views/patient/react-shell.html'),
         calendar: resolve(__dirname, 'public/views/appointments/calendar.html'),
-        search: resolve(__dirname, 'public/views/patient/search.html'),
         'add-patient': resolve(__dirname, 'public/views/patient/add-patient.html'),
+        'patient-management': resolve(__dirname, 'public/views/patient-management.html'),
         'grid': resolve(__dirname, 'public/views/patient/grid_.html'),
         'send-message': resolve(__dirname, 'public/views/messaging/send-message.html'),
         'send': resolve(__dirname, 'public/views/messaging/send.html'),
@@ -64,11 +64,6 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => '/views/appointments/daily-appointments.html'
       },
-      '/search': {
-        target: 'http://localhost:5173',
-        changeOrigin: true,
-        rewrite: (path) => '/views/patient/search.html'
-      },
       '/settings': {
         target: 'http://localhost:5173',
         changeOrigin: true,
@@ -99,10 +94,16 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => '/views/alignerportal.html'
       },
-      // Patient routes need Express for dynamic handling
+      '/patient-management': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        rewrite: (path) => '/views/patient-management.html'
+      },
+      // Patient routes - serve HTML from Vite dev server, proxy API calls to Express
       '/patient': {
-        target: 'http://localhost:3000',
-        changeOrigin: true
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        rewrite: () => '/views/patient/react-shell.html'
       }
     }
   },

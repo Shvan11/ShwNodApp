@@ -231,7 +231,7 @@ const VisitsComponent = ({ workId, patientId }) => {
                 <div className="work-controls">
                     {patientId && (
                         <button
-                            onClick={() => window.location.href = `/views/patient/react-shell.html?patient=${patientId}&page=works`}
+                            onClick={() => window.location.href = `/patient/${patientId}/works`}
                             className="btn btn-secondary"
                         >
                             <i className="fas fa-arrow-left"></i> Back to Work

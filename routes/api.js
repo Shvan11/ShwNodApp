@@ -4,11 +4,11 @@
 import express from 'express';
 
 import * as database from '../services/database/index.js';
-import { getPresentAps, getAllTodayApps, getPresentTodayApps, updatePresent } from '../services/database/queries/appointment-queries.js';
+import { getPresentAps, getAllTodayApps, getPresentTodayApps, updatePresent, undoAppointmentState } from '../services/database/queries/appointment-queries.js';
 import {getTimePoints, getTimePointImgs } from '../services/database/queries/timepoint-queries.js';
 import { getWhatsAppMessages } from '../services/database/queries/messaging-queries.js';
-import { getPatientsPhones, getInfos, createPatient, getReferralSources, getPatientTypes, getAddresses, getGenders } from '../services/database/queries/patient-queries.js';
-import { getPayments, getActiveWorkForInvoice, getCurrentExchangeRate, addInvoice, updateExchangeRate } from '../services/database/queries/payment-queries.js';
+import { getPatientsPhones, getInfos, createPatient, getReferralSources, getPatientTypes, getAddresses, getGenders, getAllPatients, getPatientById, updatePatient, deletePatient } from '../services/database/queries/patient-queries.js';
+import { getPayments, getActiveWorkForInvoice, getCurrentExchangeRate, addInvoice, updateExchangeRate, getPaymentHistoryByWorkId, getExchangeRateForDate, updateExchangeRateForDate } from '../services/database/queries/payment-queries.js';
 import { getWires, getVisitsSummary, addVisit, updateVisit, deleteVisit, getVisitDetailsByID, getLatestWire, getVisitsByWorkId, getVisitById, addVisitByWorkId, updateVisitByWorkId, deleteVisitByWorkId } from '../services/database/queries/visit-queries.js';
 import { getWorksByPatient, getWorkDetails, addWork, updateWork, finishWork, getActiveWork, getWorkTypes, getWorkKeywords, getWorkDetailsList, addWorkDetail, updateWorkDetail, deleteWorkDetail } from '../services/database/queries/work-queries.js';
 import whatsapp from '../services/messaging/whatsapp.js';
@@ -119,6 +119,21 @@ router.get("/getpayments", async (req, res) => {
     const { code: pid } = req.query;
     const payments = await getPayments(pid);
     res.json(payments);
+});
+
+// Get payment history for a specific work
+router.get("/getpaymenthistory", async (req, res) => {
+    try {
+        const { workId } = req.query;
+        if (!workId) {
+            return res.status(400).json({ error: 'workId is required' });
+        }
+        const payments = await getPaymentHistoryByWorkId(parseInt(workId));
+        res.json(payments);
+    } catch (error) {
+        console.error('Error fetching payment history:', error);
+        res.status(500).json({ error: 'Failed to fetch payment history' });
+    }
 });
 
 // Generate and get QR code
@@ -796,19 +811,40 @@ router.post("/updateAppointmentState", async (req, res) => {
         if (!appointmentID || !state) {
             return res.status(400).json({ error: "Missing required parameters: appointmentID, state" });
         }
-        
+
         // Format time as string for the modified stored procedure
         const now = new Date();
         const currentTime = time || `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
         console.log(`Updating appointment ${appointmentID} with state: ${state}, time: ${currentTime}`);
         const result = await updatePresent(appointmentID, state, currentTime);
-        
+
         wsEmitter.emit(WebSocketEvents.DATA_UPDATED, new Date().toISOString().split('T')[0]);
-        
+
         res.json(result);
     } catch (error) {
         console.error("Error updating appointment state:", error);
         res.status(500).json({ error: "Failed to update appointment state" });
+    }
+});
+
+// Undo appointment state by setting field to NULL (uses dedicated UndoAppointmentState procedure)
+router.post("/undoAppointmentState", async (req, res) => {
+    try {
+        const { appointmentID, state } = req.body;
+        if (!appointmentID || !state) {
+            return res.status(400).json({ error: "Missing required parameters: appointmentID, state" });
+        }
+
+        // Use dedicated undo procedure that doesn't affect other applications
+        console.log(`Undoing appointment ${appointmentID} state: ${state}`);
+        const result = await undoAppointmentState(appointmentID, state);
+
+        wsEmitter.emit(WebSocketEvents.DATA_UPDATED, new Date().toISOString().split('T')[0]);
+
+        res.json(result);
+    } catch (error) {
+        console.error("Error undoing appointment state:", error);
+        res.status(500).json({ error: "Failed to undo appointment state" });
     }
 });
 
@@ -954,12 +990,23 @@ router.get("/getCurrentExchangeRate", async (req, res) => {
 
 router.post("/addInvoice", async (req, res) => {
     try {
-        const { workid, amountPaid, paymentDate, actualAmount, actualCurrency, change } = req.body;
-        
+        const { workid, amountPaid, paymentDate, usdReceived, iqdReceived, change } = req.body;
+
         if (!workid || !amountPaid || !paymentDate) {
-            return res.status(400).json({ 
-                status: 'error', 
-                message: 'Missing required parameters: workid, amountPaid, paymentDate' 
+            return res.status(400).json({
+                status: 'error',
+                message: 'Missing required parameters: workid, amountPaid, paymentDate'
+            });
+        }
+
+        // Validate that at least one currency amount is provided
+        const usd = parseInt(usdReceived) || 0;
+        const iqd = parseInt(iqdReceived) || 0;
+
+        if (usd === 0 && iqd === 0) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'At least one currency amount (USD or IQD) must be provided'
             });
         }
 
@@ -967,11 +1014,11 @@ router.post("/addInvoice", async (req, res) => {
             workid,
             amountPaid,
             paymentDate,
-            actualAmount,
-            actualCurrency,
-            change
+            usdReceived: usd,
+            iqdReceived: iqd,
+            change: parseInt(change) || 0
         });
-        
+
         res.json({ status: 'success', data: result });
     } catch (error) {
         console.error("Error adding invoice:", error);
@@ -982,11 +1029,11 @@ router.post("/addInvoice", async (req, res) => {
 router.post("/updateExchangeRate", async (req, res) => {
     try {
         const { exchangeRate } = req.body;
-        
+
         if (!exchangeRate || exchangeRate <= 0) {
-            return res.status(400).json({ 
-                status: 'error', 
-                message: 'Valid exchange rate is required' 
+            return res.status(400).json({
+                status: 'error',
+                message: 'Valid exchange rate is required'
             });
         }
 
@@ -994,6 +1041,55 @@ router.post("/updateExchangeRate", async (req, res) => {
         res.json({ status: 'success', data: result });
     } catch (error) {
         console.error("Error updating exchange rate:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+// Get exchange rate for a specific date
+router.get("/getExchangeRateForDate", async (req, res) => {
+    try {
+        const { date } = req.query;
+
+        if (!date) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Date parameter is required'
+            });
+        }
+
+        const exchangeRate = await getExchangeRateForDate(date);
+
+        if (exchangeRate === null || exchangeRate === undefined) {
+            return res.status(404).json({
+                status: 'error',
+                message: `No exchange rate set for ${date}`,
+                date: date
+            });
+        }
+
+        res.json({ status: 'success', exchangeRate, date });
+    } catch (error) {
+        console.error("Error getting exchange rate for date:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+// Update exchange rate for a specific date
+router.post("/updateExchangeRateForDate", async (req, res) => {
+    try {
+        const { date, exchangeRate } = req.body;
+
+        if (!date || !exchangeRate || exchangeRate <= 0) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Valid date and exchange rate are required'
+            });
+        }
+
+        const result = await updateExchangeRateForDate(date, exchangeRate);
+        res.json({ status: 'success', data: result, date, exchangeRate });
+    } catch (error) {
+        console.error("Error updating exchange rate for date:", error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 });
@@ -1913,6 +2009,134 @@ router.get('/genders', async (req, res) => {
     }
 });
 
+// Search patients
+router.get('/patients/search', async (req, res) => {
+    try {
+        const searchQuery = req.query.q || '';
+        const patientName = req.query.patientName || '';
+        const firstName = req.query.firstName || '';
+        const lastName = req.query.lastName || '';
+
+        // Build WHERE clause for search
+        let whereConditions = [];
+        const parameters = [];
+
+        // Search by individual name fields
+        if (patientName.trim()) {
+            whereConditions.push('p.PatientName LIKE @patientName');
+            parameters.push(['patientName', database.TYPES.NVarChar, `%${patientName.trim()}%`]);
+        }
+
+        if (firstName.trim()) {
+            whereConditions.push('p.FirstName LIKE @firstName');
+            parameters.push(['firstName', database.TYPES.NVarChar, `%${firstName.trim()}%`]);
+        }
+
+        if (lastName.trim()) {
+            whereConditions.push('p.LastName LIKE @lastName');
+            parameters.push(['lastName', database.TYPES.NVarChar, `%${lastName.trim()}%`]);
+        }
+
+        // General search (phone or ID)
+        if (searchQuery.trim()) {
+            whereConditions.push('(p.Phone LIKE @search OR p.Phone2 LIKE @search OR p.patientID LIKE @search)');
+            parameters.push(['search', database.TYPES.NVarChar, `%${searchQuery.trim()}%`]);
+        }
+
+        const whereClause = whereConditions.length > 0
+            ? 'WHERE ' + whereConditions.join(' AND ')
+            : '';
+
+        const query = `
+            SELECT TOP 100 p.PersonID, p.patientID, p.PatientName, p.FirstName, p.LastName,
+                    p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
+                    p.AddressID, p.ReferralSourceID, p.PatientTypeID,
+                    p.Notes, p.Alerts, p.Language, p.CountryCode,
+                    g.Gender as GenderName, a.Zone as AddressName,
+                    r.Referral as ReferralSource, pt.PatientType as PatientTypeName
+            FROM dbo.tblpatients p
+            LEFT JOIN dbo.tblGender g ON p.Gender = g.Gender_ID
+            LEFT JOIN dbo.tblAddress a ON p.AddressID = a.ID
+            LEFT JOIN dbo.tblReferrals r ON p.ReferralSourceID = r.ID
+            LEFT JOIN dbo.tblPatientType pt ON p.PatientTypeID = pt.ID
+            ${whereClause}
+            ORDER BY p.PatientName
+        `;
+
+        const patients = await database.executeQuery(
+            query,
+            parameters,
+            (columns) => ({
+                PersonID: columns[0].value,
+                patientID: columns[1].value,
+                PatientName: columns[2].value,
+                FirstName: columns[3].value,
+                LastName: columns[4].value,
+                Phone: columns[5].value,
+                Phone2: columns[6].value,
+                Email: columns[7].value,
+                DateofBirth: columns[8].value,
+                Gender: columns[9].value,
+                AddressID: columns[10].value,
+                ReferralSourceID: columns[11].value,
+                PatientTypeID: columns[12].value,
+                Notes: columns[13].value,
+                Alerts: columns[14].value,
+                Language: columns[15].value,
+                CountryCode: columns[16].value,
+                GenderName: columns[17].value,
+                AddressName: columns[18].value,
+                ReferralSource: columns[19].value,
+                PatientTypeName: columns[20].value
+            })
+        );
+
+        res.json(patients);
+    } catch (error) {
+        console.error('Error searching patients:', error);
+        res.status(500).json({
+            error: error.message || "Failed to search patients"
+        });
+    }
+});
+
+// Update patient
+router.put('/patients/:personId', async (req, res) => {
+    try {
+        const personId = parseInt(req.params.personId);
+        const patientData = req.body;
+
+        // Basic validation
+        if (!patientData.PatientName || !patientData.PatientName.trim()) {
+            return res.status(400).json({
+                error: "Patient name is required"
+            });
+        }
+
+        const result = await updatePatient(personId, patientData);
+        res.json({ success: true, message: 'Patient updated successfully' });
+    } catch (error) {
+        console.error('Error updating patient:', error);
+        res.status(500).json({
+            error: error.message || "Failed to update patient"
+        });
+    }
+});
+
+// Delete patient
+router.delete('/patients/:personId', async (req, res) => {
+    try {
+        const personId = parseInt(req.params.personId);
+        const result = await deletePatient(personId);
+        res.json({ success: true, message: 'Patient deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting patient:', error);
+        res.status(500).json({
+            error: error.message || "Failed to delete patient"
+        });
+    }
+});
+
 // Create new patient
 router.post('/patients', async (req, res) => {
     try {
@@ -2034,31 +2258,7 @@ router.get('/getpatient/:personId', async (req, res) => {
             return res.status(400).json({ error: "Missing required parameter: personId" });
         }
 
-        const query = `
-            SELECT
-                p.PersonID,
-                p.FirstName,
-                p.LastName,
-                p.PatientName,
-                p.Phone,
-                p.patientID
-            FROM tblpatients p
-            WHERE p.PersonID = @PersonID
-        `;
-
-        const patient = await database.executeQuery(
-            query,
-            [['PersonID', database.TYPES.Int, parseInt(personId)]],
-            (columns) => ({
-                PersonID: columns[0].value,
-                FirstName: columns[1].value,
-                LastName: columns[2].value,
-                PatientName: columns[3].value,
-                Phone: columns[4].value,
-                patientID: columns[5].value
-            }),
-            (results) => results.length > 0 ? results[0] : null
-        );
+        const patient = await getPatientById(parseInt(personId));
 
         if (!patient) {
             return res.status(404).json({ error: "Patient not found" });
@@ -3283,17 +3483,29 @@ router.post('/aligner/sets', async (req, res) => {
         console.log('Creating new aligner set:', req.body);
 
         const query = `
+            DECLARE @OutputTable TABLE (AlignerSetID INT);
+
+            -- If creating a new active set, deactivate all other sets for this work
+            IF @IsActive = 1
+            BEGIN
+                UPDATE tblAlignerSets
+                SET IsActive = 0
+                WHERE WorkID = @WorkID AND IsActive = 1;
+            END
+
             INSERT INTO tblAlignerSets (
                 WorkID, SetSequence, Type, UpperAlignersCount, LowerAlignersCount,
                 RemainingUpperAligners, RemainingLowerAligners, Days, AlignerDrID,
                 SetUrl, SetPdfUrl, SetCost, Currency, Notes, IsActive, CreationDate
             )
-            OUTPUT INSERTED.AlignerSetID
+            OUTPUT INSERTED.AlignerSetID INTO @OutputTable
             VALUES (
                 @WorkID, @SetSequence, @Type, @UpperAlignersCount, @LowerAlignersCount,
                 @UpperAlignersCount, @LowerAlignersCount, @Days, @AlignerDrID,
                 @SetUrl, @SetPdfUrl, @SetCost, @Currency, @Notes, @IsActive, GETDATE()
-            )
+            );
+
+            SELECT AlignerSetID FROM @OutputTable;
         `;
 
         const result = await database.executeQuery(
@@ -4016,6 +4228,8 @@ router.post('/aligner/batches', async (req, res) => {
         console.log('Creating new aligner batch:', req.body);
 
         const query = `
+            DECLARE @OutputTable TABLE (AlignerBatchID INT);
+
             INSERT INTO tblAlignerBatches (
                 AlignerSetID, BatchSequence, UpperAlignerCount, LowerAlignerCount,
                 UpperAlignerStartSequence, UpperAlignerEndSequence,
@@ -4023,14 +4237,16 @@ router.post('/aligner/batches', async (req, res) => {
                 ManufactureDate, ValidityPeriod, NextBatchReadyDate,
                 Notes, IsActive
             )
-            OUTPUT INSERTED.AlignerBatchID
+            OUTPUT INSERTED.AlignerBatchID INTO @OutputTable
             VALUES (
                 @AlignerSetID, @BatchSequence, @UpperAlignerCount, @LowerAlignerCount,
                 @UpperAlignerStartSequence, @UpperAlignerEndSequence,
                 @LowerAlignerStartSequence, @LowerAlignerEndSequence,
                 @ManufactureDate, @ValidityPeriod, @NextBatchReadyDate,
                 @Notes, @IsActive
-            )
+            );
+
+            SELECT AlignerBatchID FROM @OutputTable;
         `;
 
         const result = await database.executeQuery(
@@ -4499,9 +4715,13 @@ router.post('/aligner-doctors', async (req, res) => {
 
         // Insert without specifying DrID - it will be auto-generated by IDENTITY column
         const insertQuery = `
+            DECLARE @OutputTable TABLE (DrID INT);
+
             INSERT INTO AlignerDoctors (DoctorName, DoctorEmail, LogoPath)
-            OUTPUT INSERTED.DrID
-            VALUES (@name, @email, @logo)
+            OUTPUT INSERTED.DrID INTO @OutputTable
+            VALUES (@name, @email, @logo);
+
+            SELECT DrID FROM @OutputTable;
         `;
 
         const result = await database.executeQuery(

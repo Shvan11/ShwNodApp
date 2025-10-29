@@ -276,3 +276,149 @@ export function getGenders() {
         })
     );
 }
+
+/**
+ * Retrieves a single patient's full details by PersonID.
+ * @param {number} personId - The person ID.
+ * @returns {Promise<Object>} - A promise that resolves with the patient details.
+ */
+export async function getPatientById(personId) {
+    const result = await executeQuery(
+        `SELECT p.PersonID, p.patientID, p.PatientName, p.FirstName, p.LastName,
+                p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
+                p.AddressID, p.ReferralSourceID, p.PatientTypeID,
+                p.Notes, p.Alerts, p.Language, p.CountryCode
+         FROM dbo.tblpatients p
+         WHERE p.PersonID = @personId`,
+        [['personId', TYPES.Int, personId]],
+        (columns) => ({
+            PersonID: columns[0].value,
+            patientID: columns[1].value,
+            PatientName: columns[2].value,
+            FirstName: columns[3].value,
+            LastName: columns[4].value,
+            Phone: columns[5].value,
+            Phone2: columns[6].value,
+            Email: columns[7].value,
+            DateofBirth: columns[8].value,
+            Gender: columns[9].value,
+            AddressID: columns[10].value,
+            ReferralSourceID: columns[11].value,
+            PatientTypeID: columns[12].value,
+            Notes: columns[13].value,
+            Alerts: columns[14].value,
+            Language: columns[15].value,
+            CountryCode: columns[16].value
+        })
+    );
+    return result[0] || null;
+}
+
+/**
+ * Retrieves all patients with full details.
+ * @returns {Promise<Array>} - A promise that resolves with an array of all patients.
+ */
+export function getAllPatients() {
+    return executeQuery(
+        `SELECT p.PersonID, p.patientID, p.PatientName, p.FirstName, p.LastName,
+                p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
+                p.AddressID, p.ReferralSourceID, p.PatientTypeID,
+                p.Notes, p.Alerts, p.Language, p.CountryCode,
+                g.Gender as GenderName, a.Zone as AddressName,
+                r.Referral as ReferralSource, pt.PatientType as PatientTypeName
+         FROM dbo.tblpatients p
+         LEFT JOIN dbo.tblGender g ON p.Gender = g.Gender_ID
+         LEFT JOIN dbo.tblAddress a ON p.AddressID = a.ID
+         LEFT JOIN dbo.tblReferrals r ON p.ReferralSourceID = r.ID
+         LEFT JOIN dbo.tblPatientType pt ON p.PatientTypeID = pt.ID
+         ORDER BY p.PatientName`,
+        [],
+        (columns) => ({
+            PersonID: columns[0].value,
+            patientID: columns[1].value,
+            PatientName: columns[2].value,
+            FirstName: columns[3].value,
+            LastName: columns[4].value,
+            Phone: columns[5].value,
+            Phone2: columns[6].value,
+            Email: columns[7].value,
+            DateofBirth: columns[8].value,
+            Gender: columns[9].value,
+            AddressID: columns[10].value,
+            ReferralSourceID: columns[11].value,
+            PatientTypeID: columns[12].value,
+            Notes: columns[13].value,
+            Alerts: columns[14].value,
+            Language: columns[15].value,
+            CountryCode: columns[16].value,
+            GenderName: columns[17].value,
+            AddressName: columns[18].value,
+            ReferralSource: columns[19].value,
+            PatientTypeName: columns[20].value
+        })
+    );
+}
+
+/**
+ * Updates an existing patient record.
+ * @param {number} personId - The person ID.
+ * @param {Object} patientData - The patient data to update.
+ * @returns {Promise<Object>} - A promise that resolves with the update result.
+ */
+export async function updatePatient(personId, patientData) {
+    const query = `
+        UPDATE dbo.tblpatients
+        SET patientID = @patientID,
+            PatientName = @patientName,
+            FirstName = @firstName,
+            LastName = @lastName,
+            Phone = @phone,
+            Phone2 = @phone2,
+            Email = @email,
+            DateofBirth = @dateOfBirth,
+            Gender = @gender,
+            AddressID = @addressID,
+            ReferralSourceID = @referralSourceID,
+            PatientTypeID = @patientTypeID,
+            Notes = @notes,
+            Alerts = @alerts,
+            Language = @language,
+            CountryCode = @countryCode
+        WHERE PersonID = @personId
+    `;
+
+    const parameters = [
+        ['personId', TYPES.Int, personId],
+        ['patientID', TYPES.NVarChar, patientData.patientID || null],
+        ['patientName', TYPES.NVarChar, patientData.PatientName],
+        ['firstName', TYPES.NVarChar, patientData.FirstName || null],
+        ['lastName', TYPES.NVarChar, patientData.LastName || null],
+        ['phone', TYPES.NVarChar, patientData.Phone || null],
+        ['phone2', TYPES.NVarChar, patientData.Phone2 || null],
+        ['email', TYPES.NChar, patientData.Email || null],
+        ['dateOfBirth', TYPES.Date, patientData.DateofBirth || null],
+        ['gender', TYPES.Int, patientData.Gender ? parseInt(patientData.Gender) : null],
+        ['addressID', TYPES.Int, patientData.AddressID ? parseInt(patientData.AddressID) : null],
+        ['referralSourceID', TYPES.Int, patientData.ReferralSourceID ? parseInt(patientData.ReferralSourceID) : null],
+        ['patientTypeID', TYPES.Int, patientData.PatientTypeID ? parseInt(patientData.PatientTypeID) : null],
+        ['notes', TYPES.NVarChar, patientData.Notes || null],
+        ['alerts', TYPES.NVarChar, patientData.Alerts || null],
+        ['language', TYPES.TinyInt, patientData.Language ? parseInt(patientData.Language) : 0],
+        ['countryCode', TYPES.NVarChar, patientData.CountryCode || null]
+    ];
+
+    await executeQuery(query, parameters);
+    return { success: true };
+}
+
+/**
+ * Deletes a patient record.
+ * @param {number} personId - The person ID.
+ * @returns {Promise<Object>} - A promise that resolves with the delete result.
+ */
+export async function deletePatient(personId) {
+    // Note: This is a hard delete. In production, you might want to implement soft delete.
+    const query = 'DELETE FROM dbo.tblpatients WHERE PersonID = @personId';
+    await executeQuery(query, [['personId', TYPES.Int, personId]]);
+    return { success: true };
+}

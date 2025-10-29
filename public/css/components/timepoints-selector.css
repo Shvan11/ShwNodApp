@@ -1,0 +1,131 @@
+/* ===== TIMEPOINTS SELECTOR ===== */
+
+.timepoints-selector {
+    display: flex;
+    gap: 0.75rem;
+    margin: 0 0 1rem 0;
+    padding: 0.75rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f1f5f9;
+}
+
+.timepoints-selector::-webkit-scrollbar {
+    height: 6px;
+}
+
+.timepoints-selector::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.timepoints-selector::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 3px;
+}
+
+.timepoints-selector::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+}
+
+.timepoint-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 200px;
+    flex-shrink: 0;
+}
+
+.timepoint-tab:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e0;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.timepoint-tab.active {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    border-color: #4f46e5;
+    color: white;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.timepoint-tab-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 8px;
+    color: #6366f1;
+    font-size: 1.125rem;
+    flex-shrink: 0;
+}
+
+.timepoint-tab.active .timepoint-tab-icon {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fbbf24;
+}
+
+.timepoint-tab-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    text-align: left;
+}
+
+.timepoint-tab-desc {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: #1e293b;
+}
+
+.timepoint-tab.active .timepoint-tab-desc {
+    color: white;
+}
+
+.timepoint-tab-date {
+    font-size: 0.8125rem;
+    color: #64748b;
+}
+
+.timepoint-tab.active .timepoint-tab-date {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .timepoints-selector {
+        gap: 0.5rem;
+        padding: 0.5rem;
+    }
+
+    .timepoint-tab {
+        min-width: 160px;
+        padding: 0.625rem 0.875rem;
+    }
+
+    .timepoint-tab-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+
+    .timepoint-tab-desc {
+        font-size: 0.875rem;
+    }
+
+    .timepoint-tab-date {
+        font-size: 0.75rem;
+    }
+}

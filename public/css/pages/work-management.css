@@ -102,14 +102,14 @@
 /* ===== SUMMARY CARDS ===== */
 .work-summary {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-xl);
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
 }
 
 .summary-card {
     background: var(--surface-elevated);
-    padding: var(--spacing-lg);
+    padding: var(--spacing-sm) var(--spacing-md);
     border-radius: var(--border-radius-md);
     box-shadow: var(--shadow-soft);
     text-align: center;
@@ -123,16 +123,16 @@
 }
 
 .summary-card h3 {
-    margin: 0 0 var(--spacing-sm) 0;
+    margin: 0 0 0.25rem 0;
     color: var(--text-secondary);
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .summary-value {
-    font-size: 2rem;
+    font-size: 1.5rem;
     font-weight: 700;
     color: var(--primary);
     display: block;

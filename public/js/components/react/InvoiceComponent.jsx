@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import '../../../css/components/invoice-form.css'
 
 const InvoiceComponent = ({ patientId }) => {
     const [loading, setLoading] = useState(false);
@@ -6,12 +7,13 @@ const InvoiceComponent = ({ patientId }) => {
     const [showRateModal, setShowRateModal] = useState(false);
     const [newExchangeRate, setNewExchangeRate] = useState('');
     const [workData, setWorkData] = useState(null);
-    const [exchangeRate, setExchangeRate] = useState(1500);
+    const [exchangeRate, setExchangeRate] = useState(1406);
+    const [useBalance, setUseBalance] = useState(true);
     const [formData, setFormData] = useState({
         paymentDate: new Date().toISOString().substring(0, 10),
+        requiredPayment: '', // Amount to register in account currency
         paymentCurrency: 'IQD', // Currency patient is paying in
-        amountPaid: '',
-        actualAmount: '', // Amount in patient's payment currency
+        actualAmount: '', // Actual amount received in payment currency
         change: 0
     });
     const [calculations, setCalculations] = useState({
@@ -19,7 +21,8 @@ const InvoiceComponent = ({ patientId }) => {
         accountCurrency: 'IQD',
         totalPaid: 0,
         remainingBalance: 0,
-        convertedAmount: 0
+        suggestedPayment: 0, // Amount patient should pay in selected currency
+        amountToRegister: 0 // Amount to register in account currency
     });
 
     useEffect(() => {
@@ -28,16 +31,24 @@ const InvoiceComponent = ({ patientId }) => {
         }
     }, [showModal, patientId]);
 
+    // Calculate suggested payment when required payment or currency changes
+    useEffect(() => {
+        if (workData && exchangeRate && formData.requiredPayment) {
+            calculateSuggestedPayment();
+        }
+    }, [formData.requiredPayment, formData.paymentCurrency, exchangeRate, workData]);
+
+    // Calculate amount to register when actual payment changes
     useEffect(() => {
         if (workData && exchangeRate && formData.actualAmount) {
-            calculateAmounts();
+            calculateAmountToRegister();
         }
     }, [formData.actualAmount, formData.paymentCurrency, exchangeRate, workData]);
 
     const loadInvoiceData = async () => {
         try {
             setLoading(true);
-            
+
             // Load work data and exchange rate in parallel
             const [workResponse, rateResponse] = await Promise.all([
                 fetch(`/api/getActiveWorkForInvoice?PID=${patientId}`),
@@ -54,15 +65,25 @@ const InvoiceComponent = ({ patientId }) => {
             if (workResult.status === 'success' && workResult.data.length > 0) {
                 const work = workResult.data[0];
                 setWorkData(work);
-                
+
+                const remainingBalance = (work.TotalRequired || 0) - (work.TotalPaid || 0);
+
                 // Set up calculations
                 setCalculations(prev => ({
                     ...prev,
                     totalRequired: work.TotalRequired || 0,
                     accountCurrency: work.Currency || 'IQD',
                     totalPaid: work.TotalPaid || 0,
-                    remainingBalance: (work.TotalRequired || 0) - (work.TotalPaid || 0)
+                    remainingBalance: remainingBalance
                 }));
+
+                // Auto-set required payment to remaining balance
+                setFormData(prev => ({
+                    ...prev,
+                    requiredPayment: remainingBalance.toString(),
+                    paymentCurrency: work.Currency || 'IQD' // Default to account currency
+                }));
+                setUseBalance(true);
             } else {
                 throw new Error('No active work found for this patient');
             }
@@ -82,34 +103,70 @@ const InvoiceComponent = ({ patientId }) => {
         }
     };
 
-    const calculateAmounts = () => {
-        const actualAmount = parseFloat(formData.actualAmount) || 0;
+    const calculateSuggestedPayment = () => {
+        const requiredPayment = parseFloat(formData.requiredPayment) || 0;
         const accountCurrency = calculations.accountCurrency;
         const paymentCurrency = formData.paymentCurrency;
-        
-        let convertedAmount = actualAmount;
-        
-        // Convert payment currency to account currency if different
+
+        let suggestedPayment = requiredPayment;
+
+        // Convert account currency to payment currency if different
         if (accountCurrency !== paymentCurrency) {
             if (accountCurrency === 'USD' && paymentCurrency === 'IQD') {
-                // Converting IQD to USD
-                convertedAmount = actualAmount / exchangeRate;
+                // Account in USD, paying in IQD
+                suggestedPayment = requiredPayment * exchangeRate;
             } else if (accountCurrency === 'IQD' && paymentCurrency === 'USD') {
-                // Converting USD to IQD
-                convertedAmount = actualAmount * exchangeRate;
+                // Account in IQD, paying in USD
+                suggestedPayment = requiredPayment / exchangeRate;
             }
         }
 
         setCalculations(prev => ({
             ...prev,
-            convertedAmount: Math.round(convertedAmount)
+            suggestedPayment: Math.round(suggestedPayment)
         }));
 
-        // Update form data with converted amount
-        setFormData(prev => ({
+        // Auto-fill actual amount with suggested payment
+        if (!formData.actualAmount) {
+            setFormData(prev => ({
+                ...prev,
+                actualAmount: Math.round(suggestedPayment).toString()
+            }));
+        }
+    };
+
+    const calculateAmountToRegister = () => {
+        const actualAmount = parseFloat(formData.actualAmount) || 0;
+        const accountCurrency = calculations.accountCurrency;
+        const paymentCurrency = formData.paymentCurrency;
+
+        let amountToRegister = actualAmount;
+
+        // Convert payment currency to account currency if different
+        if (accountCurrency !== paymentCurrency) {
+            if (accountCurrency === 'USD' && paymentCurrency === 'IQD') {
+                // Account in USD, receiving IQD
+                amountToRegister = actualAmount / exchangeRate;
+            } else if (accountCurrency === 'IQD' && paymentCurrency === 'USD') {
+                // Account in IQD, receiving USD
+                amountToRegister = actualAmount * exchangeRate;
+            }
+        }
+
+        setCalculations(prev => ({
             ...prev,
-            amountPaid: Math.round(convertedAmount).toString()
+            amountToRegister: Math.round(amountToRegister)
         }));
+    };
+
+    const handleUseBalanceToggle = (checked) => {
+        setUseBalance(checked);
+        if (checked) {
+            setFormData(prev => ({
+                ...prev,
+                requiredPayment: calculations.remainingBalance.toString()
+            }));
+        }
     };
 
     const handleInputChange = (e) => {
@@ -118,12 +175,17 @@ const InvoiceComponent = ({ patientId }) => {
             ...prev,
             [name]: value
         }));
+
+        // If user manually changes required payment, uncheck "Use Balance"
+        if (name === 'requiredPayment') {
+            setUseBalance(false);
+        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
-        if (!workData || !formData.actualAmount) {
+
+        if (!workData || !formData.actualAmount || !formData.requiredPayment) {
             alert('Please fill in all required fields');
             return;
         }
@@ -133,10 +195,10 @@ const InvoiceComponent = ({ patientId }) => {
 
             const invoiceData = {
                 workid: workData.workid,
-                amountPaid: parseInt(formData.amountPaid),
+                amountPaid: calculations.amountToRegister, // Amount in account currency
                 paymentDate: formData.paymentDate,
-                actualAmount: parseInt(formData.actualAmount),
-                actualCurrency: formData.paymentCurrency,
+                actualAmount: parseInt(formData.actualAmount), // Actual cash received
+                actualCurrency: formData.paymentCurrency, // Currency received
                 change: parseInt(formData.change) || 0
             };
 
@@ -169,11 +231,12 @@ const InvoiceComponent = ({ patientId }) => {
     const openInvoiceModal = () => {
         setFormData({
             paymentDate: new Date().toISOString().substring(0, 10),
+            requiredPayment: '',
             paymentCurrency: 'IQD',
-            amountPaid: '',
             actualAmount: '',
             change: 0
         });
+        setUseBalance(true);
         setShowModal(true);
     };
 
@@ -184,7 +247,7 @@ const InvoiceComponent = ({ patientId }) => {
 
     const handleUpdateExchangeRate = async (e) => {
         e.preventDefault();
-        
+
         const rate = parseFloat(newExchangeRate);
         if (!rate || rate <= 0) {
             alert('Please enter a valid exchange rate');
@@ -220,7 +283,10 @@ const InvoiceComponent = ({ patientId }) => {
     };
 
     const formatCurrency = (amount, currency) => {
-        return `${amount.toLocaleString()} ${currency}`;
+        if (isNaN(amount) || amount === null || amount === undefined) {
+            return `0 ${currency}`;
+        }
+        return `${Math.round(amount).toLocaleString()} ${currency}`;
     };
 
     console.log('🎯 Invoice Component Rendering:', { patientId });
@@ -232,7 +298,7 @@ const InvoiceComponent = ({ patientId }) => {
                     <i className="fas fa-plus"></i>
                     Add Invoice
                 </button>
-                
+
                 <button className="btn btn-success" onClick={openRateModal}>
                     <i className="fas fa-exchange-alt"></i>
                     Update Exchange Rate
@@ -242,8 +308,8 @@ const InvoiceComponent = ({ patientId }) => {
             {/* Add Invoice Modal */}
             {showModal && (
                 <div className="modal-overlay">
-                    <div className="modal-content large">
-                        <button 
+                    <div className="modal-content invoice-modal">
+                        <button
                             className="modal-close"
                             onClick={() => setShowModal(false)}
                         >
@@ -259,19 +325,23 @@ const InvoiceComponent = ({ patientId }) => {
                                 <div className="summary-grid">
                                     <div className="summary-item">
                                         <label>Patient:</label>
-                                        <span>{workData.PatientName}</span>
+                                        <span className="value">{workData.PatientName}</span>
+                                    </div>
+                                    <div className="summary-item">
+                                        <label>Account Currency:</label>
+                                        <span className="value currency-badge">{calculations.accountCurrency}</span>
                                     </div>
                                     <div className="summary-item">
                                         <label>Total Required:</label>
-                                        <span>{formatCurrency(calculations.totalRequired, calculations.accountCurrency)}</span>
+                                        <span className="value">{formatCurrency(calculations.totalRequired, calculations.accountCurrency)}</span>
                                     </div>
                                     <div className="summary-item">
                                         <label>Total Paid:</label>
-                                        <span>{formatCurrency(calculations.totalPaid, calculations.accountCurrency)}</span>
+                                        <span className="value">{formatCurrency(calculations.totalPaid, calculations.accountCurrency)}</span>
                                     </div>
-                                    <div className="summary-item balance">
+                                    <div className="summary-item highlight">
                                         <label>Remaining Balance:</label>
-                                        <span className={calculations.remainingBalance > 0 ? 'negative' : 'positive'}>
+                                        <span className={`value ${calculations.remainingBalance > 0 ? 'negative' : 'positive'}`}>
                                             {formatCurrency(calculations.remainingBalance, calculations.accountCurrency)}
                                         </span>
                                     </div>
@@ -282,7 +352,7 @@ const InvoiceComponent = ({ patientId }) => {
                         {/* Exchange Rate Info */}
                         <div className="exchange-rate-info">
                             <i className="fas fa-info-circle"></i>
-                            <strong>Current Exchange Rate:</strong> 1 USD = {exchangeRate} IQD
+                            <strong>Today's Exchange Rate:</strong> 1 USD = {exchangeRate.toLocaleString()} IQD
                         </div>
 
                         {loading ? (
@@ -292,89 +362,174 @@ const InvoiceComponent = ({ patientId }) => {
                             </div>
                         ) : (
                             <form onSubmit={handleSubmit} className="invoice-form">
-                                <div className="form-group">
-                                    <label htmlFor="paymentDate">Payment Date:</label>
-                                    <input
-                                        id="paymentDate"
-                                        type="date"
-                                        name="paymentDate"
-                                        value={formData.paymentDate}
-                                        onChange={handleInputChange}
-                                        required
-                                    />
-                                </div>
+                                {/* STEP 1: Amount to Register */}
+                                <div className="form-section">
+                                    <h4 className="section-title">
+                                        <span className="step-number">1</span>
+                                        Amount to Register in Patient File
+                                    </h4>
 
-                                <div className="form-group">
-                                    <label htmlFor="paymentCurrency">Payment Currency:</label>
-                                    <select
-                                        id="paymentCurrency"
-                                        name="paymentCurrency"
-                                        value={formData.paymentCurrency}
-                                        onChange={handleInputChange}
-                                    >
-                                        <option value="IQD">Iraqi Dinar (IQD)</option>
-                                        <option value="USD">US Dollar (USD)</option>
-                                    </select>
-                                </div>
-
-                                <div className="form-group">
-                                    <label htmlFor="actualAmount">
-                                        Amount Paid ({formData.paymentCurrency}):
-                                    </label>
-                                    <input
-                                        id="actualAmount"
-                                        type="number"
-                                        name="actualAmount"
-                                        value={formData.actualAmount}
-                                        onChange={handleInputChange}
-                                        required
-                                        min="0"
-                                        placeholder={`Enter amount in ${formData.paymentCurrency}`}
-                                    />
-                                </div>
-
-                                {/* Currency conversion display */}
-                                {formData.actualAmount && calculations.accountCurrency !== formData.paymentCurrency && (
-                                    <div className="conversion-display">
-                                        <i className="fas fa-calculator"></i>
-                                        <strong>Conversion:</strong>
-                                        <span>
-                                            {formatCurrency(parseFloat(formData.actualAmount) || 0, formData.paymentCurrency)} = {formatCurrency(calculations.convertedAmount, calculations.accountCurrency)}
-                                        </span>
+                                    <div className="form-group checkbox-group">
+                                        <label className="checkbox-label">
+                                            <input
+                                                type="checkbox"
+                                                checked={useBalance}
+                                                onChange={(e) => handleUseBalanceToggle(e.target.checked)}
+                                            />
+                                            <span>Use Remaining Balance ({formatCurrency(calculations.remainingBalance, calculations.accountCurrency)})</span>
+                                        </label>
                                     </div>
-                                )}
 
-                                <div className="form-group">
-                                    <label htmlFor="change">
-                                        Change Given ({formData.paymentCurrency}):
-                                    </label>
-                                    <input
-                                        id="change"
-                                        type="number"
-                                        name="change"
-                                        value={formData.change}
-                                        onChange={handleInputChange}
-                                        min="0"
-                                    />
+                                    <div className="form-group">
+                                        <label htmlFor="requiredPayment">
+                                            Payment Amount ({calculations.accountCurrency}):
+                                        </label>
+                                        <input
+                                            id="requiredPayment"
+                                            type="number"
+                                            name="requiredPayment"
+                                            value={formData.requiredPayment}
+                                            onChange={handleInputChange}
+                                            required
+                                            min="0"
+                                            placeholder={`Enter amount in ${calculations.accountCurrency}`}
+                                            className="large-input"
+                                        />
+                                    </div>
                                 </div>
 
-                                <button
-                                    type="submit"
-                                    className="btn btn-primary btn-lg"
-                                    disabled={loading}
-                                >
-                                    {loading ? (
-                                        <>
-                                            <i className="fas fa-spinner fa-spin"></i>
-                                            Adding Invoice...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <i className="fas fa-save"></i>
-                                            Add Invoice
-                                        </>
+                                {/* STEP 2: Payment Currency & Suggestion */}
+                                <div className="form-section">
+                                    <h4 className="section-title">
+                                        <span className="step-number">2</span>
+                                        How Will Patient Pay?
+                                    </h4>
+
+                                    <div className="form-group">
+                                        <label htmlFor="paymentCurrency">Payment Currency:</label>
+                                        <select
+                                            id="paymentCurrency"
+                                            name="paymentCurrency"
+                                            value={formData.paymentCurrency}
+                                            onChange={handleInputChange}
+                                            className="currency-select"
+                                        >
+                                            <option value="IQD">Iraqi Dinar (IQD)</option>
+                                            <option value="USD">US Dollar (USD)</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Suggested Payment Display */}
+                                    {formData.requiredPayment && (
+                                        <div className="suggested-payment-box">
+                                            <div className="suggestion-icon">
+                                                <i className="fas fa-lightbulb"></i>
+                                            </div>
+                                            <div className="suggestion-content">
+                                                <p className="suggestion-label">Patient Should Pay:</p>
+                                                <p className="suggestion-amount">
+                                                    {formatCurrency(calculations.suggestedPayment, formData.paymentCurrency)}
+                                                </p>
+                                                {calculations.accountCurrency !== formData.paymentCurrency && (
+                                                    <p className="conversion-detail">
+                                                        ({formatCurrency(parseFloat(formData.requiredPayment), calculations.accountCurrency)}
+                                                        {' '}× {exchangeRate.toLocaleString()} = {formatCurrency(calculations.suggestedPayment, formData.paymentCurrency)})
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
                                     )}
-                                </button>
+                                </div>
+
+                                {/* STEP 3: Actual Payment Received */}
+                                <div className="form-section">
+                                    <h4 className="section-title">
+                                        <span className="step-number">3</span>
+                                        Actual Payment Received
+                                    </h4>
+
+                                    <div className="form-group">
+                                        <label htmlFor="actualAmount">
+                                            Amount Received ({formData.paymentCurrency}):
+                                        </label>
+                                        <input
+                                            id="actualAmount"
+                                            type="number"
+                                            name="actualAmount"
+                                            value={formData.actualAmount}
+                                            onChange={handleInputChange}
+                                            required
+                                            min="0"
+                                            placeholder={`Enter amount in ${formData.paymentCurrency}`}
+                                            className="large-input"
+                                        />
+                                    </div>
+
+                                    {/* Show conversion if currencies differ */}
+                                    {formData.actualAmount && calculations.accountCurrency !== formData.paymentCurrency && (
+                                        <div className="conversion-info">
+                                            <i className="fas fa-calculator"></i>
+                                            <span>
+                                                Will register: <strong>{formatCurrency(calculations.amountToRegister, calculations.accountCurrency)}</strong> to patient file
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    <div className="form-group">
+                                        <label htmlFor="change">
+                                            Change Given ({formData.paymentCurrency}):
+                                        </label>
+                                        <input
+                                            id="change"
+                                            type="number"
+                                            name="change"
+                                            value={formData.change}
+                                            onChange={handleInputChange}
+                                            min="0"
+                                            placeholder="0"
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label htmlFor="paymentDate">Payment Date:</label>
+                                        <input
+                                            id="paymentDate"
+                                            type="date"
+                                            name="paymentDate"
+                                            value={formData.paymentDate}
+                                            onChange={handleInputChange}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Submit Button */}
+                                <div className="form-actions">
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={() => setShowModal(false)}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="btn btn-primary btn-lg"
+                                        disabled={loading}
+                                    >
+                                        {loading ? (
+                                            <>
+                                                <i className="fas fa-spinner fa-spin"></i>
+                                                Saving...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <i className="fas fa-save"></i>
+                                                Save Invoice
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                             </form>
                         )}
                     </div>
@@ -385,7 +540,7 @@ const InvoiceComponent = ({ patientId }) => {
             {showRateModal && (
                 <div className="modal-overlay">
                     <div className="modal-content">
-                        <button 
+                        <button
                             className="modal-close"
                             onClick={() => setShowRateModal(false)}
                         >
@@ -410,26 +565,36 @@ const InvoiceComponent = ({ patientId }) => {
                                     min="1"
                                     step="1"
                                     placeholder="Enter exchange rate (e.g., 1450)"
+                                    className="large-input"
                                 />
                             </div>
 
-                            <button
-                                type="submit"
-                                className="btn btn-success btn-lg"
-                                disabled={loading}
-                            >
-                                {loading ? (
-                                    <>
-                                        <i className="fas fa-spinner fa-spin"></i>
-                                        Updating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <i className="fas fa-check"></i>
-                                        Update Rate
-                                    </>
-                                )}
-                            </button>
+                            <div className="form-actions">
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => setShowRateModal(false)}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="btn btn-success btn-lg"
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <>
+                                            <i className="fas fa-spinner fa-spin"></i>
+                                            Updating...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="fas fa-check"></i>
+                                            Update Rate
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>

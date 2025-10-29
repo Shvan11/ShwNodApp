@@ -107,7 +107,7 @@ const XraysComponent = ({ patientId }) => {
                             >
                                 {xray.previewImagePartialPath ? (
                                     <img
-                                        src={`/assets/${patientId}${xray.previewImagePartialPath}`}
+                                        src={`/clinic-assets/${patientId}${xray.previewImagePartialPath}`}
                                         className="xray-thumbnail"
                                         alt={`X-ray ${xray.name}`}
                                         onError={(e) => {

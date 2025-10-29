@@ -17,6 +17,7 @@ const PatientSets = () => {
 
     const [patient, setPatient] = useState(null);
     const [alignerSets, setAlignerSets] = useState([]);
+    const [doctors, setDoctors] = useState([]);
     const [expandedSets, setExpandedSets] = useState({});
     const [batchesData, setBatchesData] = useState({});
     const [notesData, setNotesData] = useState({});
@@ -53,7 +54,21 @@ const PatientSets = () => {
     // Load patient and sets on mount
     useEffect(() => {
         loadPatientAndSets();
+        loadDoctors();
     }, [workId]);
+
+    const loadDoctors = async () => {
+        try {
+            const response = await fetch('/api/aligner/doctors');
+            const data = await response.json();
+
+            if (data.success) {
+                setDoctors(data.doctors || []);
+            }
+        } catch (error) {
+            console.error('Error loading doctors:', error);
+        }
+    };
 
     const loadPatientAndSets = async () => {
         try {
@@ -1457,6 +1472,9 @@ const PatientSets = () => {
                     onSave={handleSetSaved}
                     set={editingSet}
                     workId={patient.workid}
+                    doctors={doctors}
+                    allSets={alignerSets}
+                    defaultDoctorId={doctorId}
                 />
             )}
 

@@ -78,7 +78,7 @@ async function initializeApplication() {
     // Use path resolver for cross-platform compatibility
     const pathResolver = createPathResolver(config.fileSystem.machinePath);
     app.use('/DolImgs', express.static(pathResolver('working')));
-    app.use('/assets', express.static(pathResolver('clinic1')));
+    app.use('/clinic-assets', express.static(pathResolver('clinic1'))); // Changed from /assets to avoid conflict with Vite built assets
     app.use('/photoswipe', express.static('./public/photoswipe/'));
 
     // Setup WebSocket

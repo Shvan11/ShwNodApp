@@ -1,0 +1,453 @@
+/* ===== WORK CARD STYLES ===== */
+
+.works-card-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem 0;
+}
+
+.work-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    border-left: 4px solid transparent;
+}
+
+.work-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+}
+
+.work-card-active {
+    border-left-color: #059669;
+    background: linear-gradient(to right, #f0fdf4 0%, #ffffff 10%);
+}
+
+.work-card-completed {
+    border-left-color: #6b7280;
+    opacity: 0.9;
+}
+
+/* Header Section */
+.work-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    position: relative;
+}
+
+.work-card-title-section {
+    flex: 1;
+}
+
+.work-card-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.work-card-title i {
+    color: #059669;
+    font-size: 1.25rem;
+}
+
+.work-card-title h3 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.work-status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.work-status-badge.active {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.work-status-badge.completed {
+    background: #e5e7eb;
+    color: #4b5563;
+}
+
+.work-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.work-card-meta span {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.work-card-meta i {
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+
+/* Actions Menu */
+.work-card-actions-menu {
+    position: relative;
+}
+
+.btn-icon {
+    background: transparent;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.btn-icon:hover {
+    background: #f3f4f6;
+    color: #1f2937;
+}
+
+.work-card-dropdown {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 180px;
+    z-index: 100;
+    overflow: hidden;
+    margin-top: 0.25rem;
+}
+
+.work-card-dropdown button {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: none;
+    background: white;
+    color: #374151;
+    cursor: pointer;
+    font-size: 0.875rem;
+    text-align: left;
+    transition: background 0.2s;
+}
+
+.work-card-dropdown button:hover {
+    background: #f3f4f6;
+}
+
+.work-card-dropdown button i {
+    width: 16px;
+    color: #6b7280;
+}
+
+/* Progress Section */
+.work-card-progress {
+    margin-bottom: 1rem;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.progress-label {
+    font-size: 0.875rem;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.progress-percentage {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #059669;
+}
+
+.progress-bar-container {
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #059669 0%, #10b981 100%);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+/* Financial Summary */
+.work-card-financial {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.financial-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.financial-label {
+    font-size: 0.75rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.financial-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.financial-value.paid {
+    color: #059669;
+}
+
+.financial-value.remaining {
+    color: #dc2626;
+}
+
+.financial-value.paid-full {
+    color: #059669;
+}
+
+/* Primary Actions */
+.work-card-primary-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.btn-card-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.875rem;
+    border: 2px solid #e5e7eb;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.btn-card-action:hover {
+    border-color: #d1d5db;
+    background: #f9fafb;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+.btn-card-action i {
+    font-size: 1.25rem;
+}
+
+.btn-card-action.btn-visits i {
+    color: #059669;
+}
+
+.btn-card-action.btn-payments i {
+    color: #0891b2;
+}
+
+.btn-card-action.btn-details i {
+    color: #3b82f6;
+}
+
+/* Secondary Actions */
+.work-card-secondary-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.btn-card-secondary {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: all 0.2s;
+    color: white;
+}
+
+.btn-card-secondary.btn-add-payment {
+    background: #10b981;
+}
+
+.btn-card-secondary.btn-add-payment:hover:not(.disabled) {
+    background: #059669;
+}
+
+.btn-card-secondary.btn-add-payment.disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.btn-card-secondary.btn-add-set {
+    background: #8b5cf6;
+}
+
+.btn-card-secondary.btn-add-set:hover {
+    background: #7c3aed;
+}
+
+/* Expanded Details */
+.work-card-expanded {
+    border-top: 1px solid #e5e7eb;
+    padding-top: 1rem;
+    margin-top: 1rem;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.work-card-detail-section h4 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 1rem 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.work-card-detail-section h4 i {
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.detail-item {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+}
+
+.detail-label {
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.detail-value {
+    color: #1f2937;
+}
+
+/* Expand/Collapse Toggle */
+.work-card-expand-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.75rem;
+    background: transparent;
+    border: 1px dashed #d1d5db;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6b7280;
+    transition: all 0.2s;
+}
+
+.work-card-expand-toggle:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+    color: #374151;
+}
+
+/* No Works Message */
+.no-works-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .work-card {
+        padding: 1rem;
+    }
+
+    .work-card-financial {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    .work-card-primary-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .work-card-secondary-actions {
+        flex-direction: column;
+    }
+
+    .work-card-meta {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .work-card-title h3 {
+        font-size: 1rem;
+    }
+
+    .btn-card-action span {
+        font-size: 0.75rem;
+    }
+}

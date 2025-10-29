@@ -1,7 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import UniversalHeader from '../components/react/UniversalHeader.jsx'
-import MiniCalendar from '../components/react/MiniCalendar.jsx'
 import '../../css/pages/appointments.css'
 import '../../css/components/universal-header.css'
 
@@ -13,28 +12,10 @@ function initializePage() {
         const headerReactRoot = ReactDOM.createRoot(headerRoot);
         headerReactRoot.render(React.createElement(UniversalHeader));
     }
-    
-    // Mount Mini Calendar
-    const miniCalendarContainer = document.getElementById('mini-calendar-container');
-    if (miniCalendarContainer) {
-        const miniCalendarRoot = ReactDOM.createRoot(miniCalendarContainer);
-        miniCalendarRoot.render(React.createElement(MiniCalendar, {
-            onDateSelect: (dateString) => {
-                const datePicker = document.getElementById('date-picker');
-                if (datePicker) {
-                    datePicker.value = dateString;
-                    loadAppointments(dateString);
-                }
-            },
-            className: 'daily-appointments-mini-calendar',
-            showHeader: true,
-            highlightToday: true
-        }));
-    }
-    
+
     // Initialize date picker
     initializeDatePicker();
-    
+
     // Load appointments for today by default
     const today = new Date().toISOString().split('T')[0];
     const datePicker = document.getElementById('date-picker');
@@ -42,7 +23,7 @@ function initializePage() {
         datePicker.value = today;
     }
     loadAppointments(today);
-    
+
     console.log('✅ Daily appointments page initialized');
 }
 
@@ -56,18 +37,10 @@ if (document.readyState === 'loading') {
 // Initialize date picker functionality
 function initializeDatePicker() {
     const datePicker = document.getElementById('date-picker');
-    const loadBtn = document.getElementById('load-date-btn');
-    
+
     if (datePicker) {
         datePicker.addEventListener('change', function() {
             loadAppointments(this.value);
-        });
-    }
-    
-    if (loadBtn) {
-        loadBtn.addEventListener('click', function() {
-            const date = datePicker ? datePicker.value : new Date().toISOString().split('T')[0];
-            loadAppointments(date);
         });
     }
 }
@@ -75,38 +48,74 @@ function initializeDatePicker() {
 // Load appointments for a specific date
 async function loadAppointments(date) {
     if (!date) return;
-    
+
+    console.log('🔄 Loading appointments for date:', date);
+
     try {
         // Update title
         const titleElement = document.getElementById('title');
         if (titleElement) {
-            const dateObj = new Date(date);
-            const formattedDate = dateObj.toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+            const dateObj = new Date(date + 'T12:00:00'); // Add time to avoid timezone issues
+            const formattedDate = dateObj.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
             });
             titleElement.textContent = `Appointments for ${formattedDate}`;
         }
-        
+
+        // Show loading skeletons
+        showLoadingState();
+
         // Fetch all appointments for the date
         const [allAppointments, checkedInAppointments] = await Promise.all([
             fetchAllAppointments(date),
             fetchCheckedInAppointments(date)
         ]);
-        
+
+        console.log('✅ Fetched appointments:', {
+            all: allAppointments?.length || 0,
+            checkedIn: checkedInAppointments?.length || 0
+        });
+
         // Render appointments
         renderAllAppointments(allAppointments);
         renderCheckedInAppointments(checkedInAppointments);
-        
+
         // Update statistics
         updateStatistics(allAppointments, checkedInAppointments);
-        
+
     } catch (error) {
         console.error('Error loading appointments:', error);
         showError('Failed to load appointments for ' + date);
     }
+}
+
+// Show loading state with skeleton loaders
+function showLoadingState() {
+    const containers = ['all-appointments-container', 'checked-in-container'];
+    containers.forEach(containerId => {
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.innerHTML = createSkeletonCards(3);
+        }
+    });
+}
+
+// Create skeleton loader cards
+function createSkeletonCards(count = 3) {
+    let html = '<div class="appointments-grid">';
+    for (let i = 0; i < count; i++) {
+        html += `
+            <div class="skeleton-card">
+                <div class="skeleton skeleton-line"></div>
+                <div class="skeleton skeleton-line"></div>
+            </div>
+        `;
+    }
+    html += '</div>';
+    return html;
 }
 
 // Fetch all appointments for a date
@@ -127,181 +136,273 @@ async function fetchCheckedInAppointments(date) {
     return await response.json();
 }
 
-// Render all appointments table
+// Render all appointments in card format
 function renderAllAppointments(appointments) {
     const container = document.getElementById('all-appointments-container');
     if (!container) return;
-    
+
     if (!appointments || appointments.length === 0) {
         container.innerHTML = '<p class="no-appointments">No appointments scheduled for this date.</p>';
         return;
     }
-    
-    const table = createAppointmentsTable(appointments, false);
-    container.innerHTML = '';
-    container.appendChild(table);
+
+    container.innerHTML = createAppointmentsCards(appointments, false);
 }
 
-// Render checked-in appointments table
+// Render checked-in appointments in card format
 function renderCheckedInAppointments(appointments) {
     const container = document.getElementById('checked-in-container');
     if (!container) return;
-    
+
     if (!appointments || appointments.length === 0) {
         container.innerHTML = '<p class="no-appointments">No patients checked in yet.</p>';
         return;
     }
-    
-    const table = createAppointmentsTable(appointments, true);
-    container.innerHTML = '';
-    container.appendChild(table);
+
+    container.innerHTML = createAppointmentsCards(appointments, true);
 }
 
-// Create appointments table
-function createAppointmentsTable(appointments, showActions = false) {
-    const table = document.createElement('table');
-    table.className = 'appointments-table';
-    
-    // Create header
-    const header = table.createTHead();
-    const headerRow = header.insertRow();
-    
-    let headers = ['Time', 'Patient Name'];
-    if (showActions) headers.push('Status'); // Only show status for checked-in patients
-    headers.push('Actions');
-    
-    headers.forEach(headerText => {
-        const th = document.createElement('th');
-        th.textContent = headerText;
-        headerRow.appendChild(th);
-    });
-    
-    // Create body
-    const tbody = table.createTBody();
-    
-    appointments.forEach(appointment => {
-        const row = tbody.insertRow();
-        
-        // Time
-        const timeCell = row.insertCell();
-        timeCell.textContent = appointment.apptime || 'N/A'; // Backend returns apptime
-        timeCell.className = 'time-cell';
-        
-        // Patient Name (clickable to photos)
-        const nameCell = row.insertCell();
-        const patientId = appointment.PersonID; // Backend returns PersonID
-        nameCell.innerHTML = `<a href="javascript:void(0)" class="patient-link" onclick="viewPatientPhotos(${patientId})">${appointment.PatientName || 'Unknown'}</a>`;
-        nameCell.className = 'name-cell';
-        
-        // Status (only for checked-in patients)
+// Format SQL Server TIME value (HH:MM:SS) to 12-hour format
+function formatTime(timeString) {
+    if (!timeString) return '';
+
+    // Handle SQL Server TIME format (HH:MM:SS or HH:MM:SS.000)
+    const timeParts = timeString.split(':');
+    if (timeParts.length < 2) return timeString;
+
+    let hours = parseInt(timeParts[0]);
+    const minutes = timeParts[1];
+    const period = hours >= 12 ? 'PM' : 'AM';
+
+    // Convert to 12-hour format
+    hours = hours % 12;
+    hours = hours ? hours : 12; // 0 should be 12
+
+    return `${hours}:${minutes} ${period}`;
+}
+
+// Create appointments cards HTML
+function createAppointmentsCards(appointments, showStatus = false) {
+    let html = '<div class="appointments-grid">';
+
+    appointments.forEach((appointment) => {
+        const time = appointment.apptime || 'N/A';
+        const patientName = appointment.PatientName || 'Unknown';
+        const patientId = appointment.PersonID;
+        const appointmentId = appointment.appointmentID;
+
+        // Determine current status
         let status = 'Scheduled';
-        if (showActions) {
-            // For checked-in patients, determine status from backend fields
-            if (appointment.Present) status = 'Present';
-            else if (appointment.Seated) status = 'Seated';
-            else if (appointment.Dismissed) status = 'Dismissed';
-            
-            const statusCell = row.insertCell();
-            let statusText = status;
-            let statusClass = status.toLowerCase();
-            
-            statusCell.innerHTML = `<span class="status-badge status-${statusClass}">${statusText}</span>`;
-            statusCell.className = 'status-cell';
-        }
-        
-        // Actions
-        const actionsCell = row.insertCell();
-        actionsCell.className = 'actions-cell';
-        
-        if (!showActions) {
-            // All appointments table - show check-in button
-            const appointmentId = appointment.appointmentID; // Backend returns appointmentID
-            const isCheckedIn = status.toLowerCase() !== 'scheduled';
-            
-            if (isCheckedIn) {
-                actionsCell.innerHTML = `<span class="checked-in-indicator">✓ Checked In</span>`;
-            } else {
-                actionsCell.innerHTML = `
-                    <button class="btn-small btn-success check-in-btn" onclick="checkInPatient(${appointmentId})">
-                        <i class="fas fa-sign-in-alt"></i> Check In
-                    </button>
-                `;
+
+        if (showStatus) {
+            if (appointment.Dismissed) {
+                status = 'Dismissed';
+            } else if (appointment.Seated) {
+                status = 'Seated';
+            } else if (appointment.Present) {
+                status = 'Present';
             }
+        }
+
+        // Get all state times
+        const presentTime = appointment.PresentTime ? formatTime(appointment.PresentTime) : null;
+        const seatedTime = appointment.SeatedTime ? formatTime(appointment.SeatedTime) : null;
+        const dismissedTime = appointment.DismissedTime ? formatTime(appointment.DismissedTime) : null;
+
+        const statusClass = status.toLowerCase();
+
+        html += `
+            <div class="appointment-card fade-in-up"
+                 data-appointment-id="${appointmentId}"
+                 data-status="${status.toLowerCase()}"
+                 oncontextmenu="showContextMenu(event, ${appointmentId}, '${status}', ${showStatus})"
+                 ontouchstart="handleTouchStart(event, ${appointmentId}, '${status}', ${showStatus})"
+                 ontouchend="handleTouchEnd(event)"
+                 ontouchmove="handleTouchMove(event)">
+                <div class="appointment-time">
+                    <i class="fas fa-clock" style="font-size: 0.875rem; opacity: 0.6; display: block; margin-bottom: 0.25rem;"></i>
+                    ${time}
+                </div>
+
+                <div class="appointment-info">
+                    <div class="patient-name">
+                        <a href="javascript:void(0)" class="patient-link" onclick="viewPatientPhotos(${patientId})">
+                            <i class="fas fa-user-circle" style="opacity: 0.7; margin-right: 0.5rem;"></i>
+                            ${patientName}
+                        </a>
+                    </div>
+
+                    <div class="appointment-meta">
+                        ${showStatus ? `
+                            <span class="status-badge status-${statusClass}">
+                                <i class="fas fa-${getStatusIcon(status)}"></i>
+                                ${status}
+                            </span>
+                            <div class="state-times">
+                                ${presentTime ? `
+                                    <span class="status-time status-time-present" title="Checked in">
+                                        <i class="fas fa-user-check"></i>
+                                        ${presentTime}
+                                    </span>
+                                ` : ''}
+                                ${seatedTime ? `
+                                    <span class="status-time status-time-seated" title="Seated">
+                                        <i class="fas fa-chair"></i>
+                                        ${seatedTime}
+                                    </span>
+                                ` : ''}
+                                ${dismissedTime ? `
+                                    <span class="status-time status-time-dismissed" title="Dismissed">
+                                        <i class="fas fa-check-circle"></i>
+                                        ${dismissedTime}
+                                    </span>
+                                ` : ''}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <div class="appointment-actions">
+                    ${createActionButtons(appointmentId, patientId, status, showStatus)}
+                </div>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    return html;
+}
+
+// Get status icon
+function getStatusIcon(status) {
+    const icons = {
+        'Scheduled': 'calendar',
+        'Present': 'user-check',
+        'Seated': 'chair',
+        'Dismissed': 'check-circle'
+    };
+    return icons[status] || 'circle';
+}
+
+// Create action buttons based on status - Sequential workflow implementation
+function createActionButtons(appointmentId, patientId, status, showStatus) {
+    if (!showStatus) {
+        // All appointments table - show check-in button
+        const isCheckedIn = status.toLowerCase() !== 'scheduled';
+
+        if (isCheckedIn) {
+            return `
+                <span class="checked-in-indicator">
+                    <i class="fas fa-check-circle"></i>
+                    Checked In
+                </span>
+            `;
         } else {
-            // Checked-in patients table - show patient management actions
-            const appointmentId = appointment.appointmentID; // Backend returns appointmentID
-            const currentStatus = status.toLowerCase();
-            
-            let actionButtons = `
-                <button class="btn-small btn-primary" onclick="viewPatient(${patientId})" title="View Patient Details">
-                    <i class="fas fa-eye"></i>
+            return `
+                <button class="btn-action btn-success" onclick="checkInPatient(${appointmentId})">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>Check In</span>
                 </button>
             `;
-            
-            if (currentStatus === 'present') {
-                actionButtons += `
-                    <button class="btn-small btn-info" onclick="markSeated(${appointmentId})" title="Mark Seated">
-                        <i class="fas fa-chair"></i>
-                    </button>
-                    <button class="btn-small btn-success" onclick="markDismissed(${appointmentId})" title="Dismiss">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </button>
-                `;
-            } else if (currentStatus === 'seated') {
-                actionButtons += `
-                    <button class="btn-small btn-success" onclick="markDismissed(${appointmentId})" title="Dismiss">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </button>
-                    <button class="btn-small btn-warning" onclick="markPresent(${appointmentId})" title="Mark Present">
-                        <i class="fas fa-user"></i>
-                    </button>
-                `;
-            } else if (currentStatus === 'dismissed') {
-                actionButtons += `
-                    <button class="btn-small btn-secondary" onclick="markPresent(${appointmentId})" title="Mark Present">
-                        <i class="fas fa-undo"></i>
-                    </button>
-                `;
-            }
-            
-            actionsCell.innerHTML = actionButtons;
         }
-    });
-    
-    return table;
+    } else {
+        // Checked-in patients - Sequential workflow: Present → Seat → Dismiss
+        const currentStatus = status.toLowerCase();
+
+        let buttons = '';
+
+        if (currentStatus === 'present') {
+            // Present: Show "Seat" button + Undo button
+            buttons = `
+                <button class="btn-action btn-info" onclick="markSeated(${appointmentId})">
+                    <i class="fas fa-chair"></i>
+                    <span>Seat Patient</span>
+                </button>
+                <button class="btn-action btn-undo" onclick="undoState(${appointmentId}, 'Present')" title="Undo Check-in">
+                    <i class="fas fa-undo"></i>
+                </button>
+            `;
+        } else if (currentStatus === 'seated') {
+            // Seated: Show "Complete Visit" button + Undo button
+            buttons = `
+                <button class="btn-action btn-success" onclick="markDismissed(${appointmentId})">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Complete Visit</span>
+                </button>
+                <button class="btn-action btn-undo" onclick="undoState(${appointmentId}, 'Seated')" title="Undo Seating">
+                    <i class="fas fa-undo"></i>
+                </button>
+            `;
+        } else if (currentStatus === 'dismissed') {
+            // Dismissed: Only show Undo button
+            buttons = `
+                <button class="btn-action btn-undo btn-undo-only" onclick="undoState(${appointmentId}, 'Dismissed')" title="Undo Dismiss">
+                    <i class="fas fa-undo"></i>
+                    <span>Undo Dismiss</span>
+                </button>
+            `;
+        }
+
+        return buttons;
+    }
 }
 
 // Update statistics
 function updateStatistics(allAppointments, checkedInAppointments) {
     const allCount = allAppointments ? allAppointments.length : 0;
-    const presentCount = checkedInAppointments ? checkedInAppointments.length : 0;
-    
-    // Count waiting patients (Present + Seated)
+
+    // Total checked in today (includes Present, Seated, and Dismissed)
+    const checkedInCount = checkedInAppointments ? checkedInAppointments.length : 0;
+
+    // Waiting patients = Present but NOT Seated (in the waiting room)
     const waitingCount = checkedInAppointments ? checkedInAppointments.filter(a => {
-        const status = (a.Status || a.status || '').toLowerCase();
-        return status === 'present' || status === 'seated';
+        return a.Present && !a.Seated && !a.Dismissed;
     }).length : 0;
-    
-    // Count dismissed patients  
+
+    // Completed patients (dismissed)
     const completedCount = checkedInAppointments ? checkedInAppointments.filter(a => {
-        const status = (a.Status || a.status || '').toLowerCase();
-        return status === 'dismissed';
+        return a.Dismissed;
     }).length : 0;
-    
+
+    console.log('📊 Updating statistics:', {
+        all: allCount,
+        checkedIn: checkedInCount,
+        waiting: waitingCount,
+        completed: completedCount
+    });
+
     // Update DOM elements
     const elements = {
         'all': allCount,
-        'present': presentCount,
-        'waiting': waitingCount,
-        'completed': completedCount
+        'present': checkedInCount,   // Total checked in today
+        'waiting': waitingCount,      // In waiting room (checked in but not seated)
+        'completed': completedCount   // Dismissed
     };
-    
+
     Object.entries(elements).forEach(([id, count]) => {
         const element = document.getElementById(id);
         if (element) {
-            element.textContent = count;
+            // Animate count change
+            animateValue(element, parseInt(element.textContent) || 0, count, 300);
         }
     });
+}
+
+// Animate value change with count-up effect
+function animateValue(element, start, end, duration) {
+    const range = end - start;
+    const increment = range / (duration / 16);
+    let current = start;
+
+    const timer = setInterval(() => {
+        current += increment;
+        if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+            element.textContent = end;
+            clearInterval(timer);
+        } else {
+            element.textContent = Math.round(current);
+        }
+    }, 16);
 }
 
 // Show error message
@@ -310,15 +411,18 @@ function showError(message) {
     containers.forEach(containerId => {
         const container = document.getElementById(containerId);
         if (container) {
-            container.innerHTML = `<p class="error-message">❌ ${message}</p>`;
+            container.innerHTML = `<p class="error-message"><i class="fas fa-exclamation-circle"></i> ${message}</p>`;
         }
     });
 }
 
+// Store last action for undo functionality
+let lastAction = null;
+
 // Action functions
 window.viewPatient = function(patientId) {
     if (patientId) {
-        window.location.href = `/views/patient/react-shell.html?patient=${patientId}`;
+        window.location.href = `/patient/${patientId}/works`;
     }
 };
 
@@ -326,7 +430,7 @@ window.viewPatient = function(patientId) {
 window.viewPatientPhotos = function(patientId) {
     console.log('Clicking patient ID:', patientId);
     if (patientId && patientId !== 'undefined' && patientId !== 'null') {
-        const url = `/views/patient/react-shell.html?patient=${patientId}`;
+        const url = `/patient/${patientId}/works`;
         console.log('Navigating to patient app:', url);
         window.location.href = url;
     } else {
@@ -336,7 +440,7 @@ window.viewPatientPhotos = function(patientId) {
 };
 
 // Check in a patient
-window.checkInPatient = async function(appointmentId) {
+window.checkInPatient = async function(appointmentId, patientId) {
     try {
         const response = await fetch('/api/updateAppointmentState', {
             method: 'POST',
@@ -349,11 +453,18 @@ window.checkInPatient = async function(appointmentId) {
                 time: new Date().toLocaleTimeString('en-US', { hour12: false })
             })
         });
-        
+
         if (response.ok) {
-            // Reload appointments to reflect changes
-            refreshAppointments();
-            showNotification('Patient checked in successfully', 'success');
+            // Store action for undo
+            lastAction = {
+                appointmentId,
+                patientId,
+                previousState: 'Scheduled',
+                currentState: 'Present'
+            };
+
+            await refreshAppointments();
+            showNotificationWithUndo('Patient checked in', 'success', appointmentId, 'Scheduled');
         } else {
             showNotification('Failed to check in patient', 'error');
         }
@@ -363,35 +474,8 @@ window.checkInPatient = async function(appointmentId) {
     }
 };
 
-// Mark patient as present (from dismissed back to present)
-window.markPresent = async function(appointmentId) {
-    try {
-        const response = await fetch('/api/updateAppointmentState', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                appointmentID: appointmentId,
-                state: 'Present',
-                time: new Date().toLocaleTimeString('en-US', { hour12: false })
-            })
-        });
-        
-        if (response.ok) {
-            refreshAppointments();
-            showNotification('Patient marked as present', 'success');
-        } else {
-            showNotification('Failed to update patient status', 'error');
-        }
-    } catch (error) {
-        console.error('Error updating patient status:', error);
-        showNotification('Error updating patient status', 'error');
-    }
-};
-
 // Mark patient as seated
-window.markSeated = async function(appointmentId) {
+window.markSeated = async function(appointmentId, patientId) {
     try {
         const response = await fetch('/api/updateAppointmentState', {
             method: 'POST',
@@ -404,21 +488,29 @@ window.markSeated = async function(appointmentId) {
                 time: new Date().toLocaleTimeString('en-US', { hour12: false })
             })
         });
-        
+
         if (response.ok) {
-            refreshAppointments();
-            showNotification('Patient marked as seated', 'success');
+            // Store action for undo
+            lastAction = {
+                appointmentId,
+                patientId,
+                previousState: 'Present',
+                currentState: 'Seated'
+            };
+
+            await refreshAppointments();
+            showNotificationWithUndo('Patient seated', 'success', appointmentId, 'Present');
         } else {
-            showNotification('Failed to update patient status', 'error');
+            showNotification('Failed to seat patient', 'error');
         }
     } catch (error) {
-        console.error('Error updating patient status:', error);
-        showNotification('Error updating patient status', 'error');
+        console.error('Error seating patient:', error);
+        showNotification('Error seating patient', 'error');
     }
 };
 
-// Mark patient as dismissed
-window.markDismissed = async function(appointmentId) {
+// Mark patient as dismissed (complete visit)
+window.markDismissed = async function(appointmentId, patientId) {
     try {
         const response = await fetch('/api/updateAppointmentState', {
             method: 'POST',
@@ -431,28 +523,165 @@ window.markDismissed = async function(appointmentId) {
                 time: new Date().toLocaleTimeString('en-US', { hour12: false })
             })
         });
-        
+
         if (response.ok) {
-            refreshAppointments();
-            showNotification('Patient dismissed', 'success');
+            // Store action for undo
+            lastAction = {
+                appointmentId,
+                patientId,
+                previousState: 'Seated',
+                currentState: 'Dismissed'
+            };
+
+            await refreshAppointments();
+            showNotificationWithUndo('Visit completed', 'success', appointmentId, 'Seated');
         } else {
-            showNotification('Failed to dismiss patient', 'error');
+            showNotification('Failed to complete visit', 'error');
         }
     } catch (error) {
-        console.error('Error dismissing patient:', error);
-        showNotification('Error dismissing patient', 'error');
+        console.error('Error completing visit:', error);
+        showNotification('Error completing visit', 'error');
+    }
+};
+
+// Undo dismiss - restore to Present state
+window.undoDismiss = async function(appointmentId, patientId) {
+    try {
+        const response = await fetch('/api/updateAppointmentState', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                appointmentID: appointmentId,
+                state: 'Present',
+                time: new Date().toLocaleTimeString('en-US', { hour12: false })
+            })
+        });
+
+        if (response.ok) {
+            await refreshAppointments();
+            showNotification('Visit restored', 'info');
+        } else {
+            showNotification('Failed to restore visit', 'error');
+        }
+    } catch (error) {
+        console.error('Error restoring visit:', error);
+        showNotification('Error restoring visit', 'error');
+    }
+};
+
+// Generic undo function called from notification
+window.undoAction = async function(appointmentId, previousState) {
+    try {
+        const response = await fetch('/api/updateAppointmentState', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                appointmentID: appointmentId,
+                state: previousState,
+                time: new Date().toLocaleTimeString('en-US', { hour12: false })
+            })
+        });
+
+        if (response.ok) {
+            // Clear last action
+            lastAction = null;
+            await refreshAppointments();
+            showNotification('Action undone', 'info');
+        } else {
+            showNotification('Failed to undo action', 'error');
+        }
+    } catch (error) {
+        console.error('Error undoing action:', error);
+        showNotification('Error undoing action', 'error');
+    }
+};
+
+// Undo state by setting field to NULL (enforces sequential workflow)
+window.undoState = async function(appointmentId, stateToUndo) {
+    try {
+        const response = await fetch('/api/undoAppointmentState', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                appointmentID: appointmentId,
+                state: stateToUndo
+            })
+        });
+
+        if (response.ok) {
+            // Wait for refresh to complete before showing notification
+            await refreshAppointments();
+            showNotification(`${stateToUndo} status cleared`, 'info');
+        } else {
+            showNotification(`Failed to undo ${stateToUndo}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error undoing state:', error);
+        showNotification('Error undoing state', 'error');
     }
 };
 
 // Refresh appointments with current date
-function refreshAppointments() {
+async function refreshAppointments() {
     const datePicker = document.getElementById('date-picker');
     const date = datePicker ? datePicker.value : new Date().toISOString().split('T')[0];
-    loadAppointments(date);
+    await loadAppointments(date);
 }
 
-// Show notification
+// Show notification with undo button
+function showNotificationWithUndo(message, type, appointmentId, previousState) {
+    // Remove any existing notifications
+    document.querySelectorAll('.notification').forEach(n => n.remove());
+
+    // Create notification element with undo button
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+        <span>${message}</span>
+        <button class="notification-undo" onclick="undoAction(${appointmentId}, '${previousState}'); this.parentElement.remove();">
+            <i class="fas fa-undo"></i>
+            Undo
+        </button>
+        <button class="notification-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+
+    // Add to page
+    document.body.appendChild(notification);
+
+    // Trigger animation
+    requestAnimationFrame(() => {
+        notification.style.opacity = '1';
+        notification.style.transform = 'translateY(0)';
+    });
+
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateY(-20px)';
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 200);
+        }
+    }, 5000);
+}
+
+// Show notification (standard without undo)
 function showNotification(message, type = 'info') {
+    // Remove any existing notifications
+    document.querySelectorAll('.notification').forEach(n => n.remove());
+
     // Create notification element
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
@@ -463,20 +692,146 @@ function showNotification(message, type = 'info') {
             <i class="fas fa-times"></i>
         </button>
     `;
-    
+
     // Add to page
     document.body.appendChild(notification);
-    
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-        if (notification.parentElement) {
-            notification.remove();
-        }
-    }, 5000);
-    
-    // Add animation
-    setTimeout(() => {
+
+    // Trigger animation
+    requestAnimationFrame(() => {
         notification.style.opacity = '1';
         notification.style.transform = 'translateY(0)';
-    }, 10);
+    });
+
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateY(-20px)';
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 200);
+        }
+    }, 3000);
 }
+
+// Context menu for power users
+window.showContextMenu = function(event, appointmentId, status, showStatus) {
+    event.preventDefault();
+
+    // Remove any existing context menu
+    const existingMenu = document.getElementById('context-menu');
+    if (existingMenu) {
+        existingMenu.remove();
+    }
+
+    // Only show context menu for checked-in patients
+    if (!showStatus) return;
+
+    const statusLower = status.toLowerCase();
+
+    // Create context menu
+    const menu = document.createElement('div');
+    menu.id = 'context-menu';
+    menu.className = 'context-menu';
+
+    let menuItems = '';
+
+    // Add appropriate menu items based on status
+    if (statusLower === 'present') {
+        menuItems = `
+            <div class="context-menu-item" onclick="markSeated(${appointmentId}); closeContextMenu();">
+                <i class="fas fa-chair"></i>
+                <span>Seat Patient</span>
+            </div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item context-menu-item-danger" onclick="undoState(${appointmentId}, 'Present'); closeContextMenu();">
+                <i class="fas fa-undo"></i>
+                <span>Undo Check-in</span>
+            </div>
+        `;
+    } else if (statusLower === 'seated') {
+        menuItems = `
+            <div class="context-menu-item" onclick="markDismissed(${appointmentId}); closeContextMenu();">
+                <i class="fas fa-check-circle"></i>
+                <span>Complete Visit</span>
+            </div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item context-menu-item-danger" onclick="undoState(${appointmentId}, 'Seated'); closeContextMenu();">
+                <i class="fas fa-undo"></i>
+                <span>Undo Seating</span>
+            </div>
+        `;
+    } else if (statusLower === 'dismissed') {
+        menuItems = `
+            <div class="context-menu-item context-menu-item-danger" onclick="undoState(${appointmentId}, 'Dismissed'); closeContextMenu();">
+                <i class="fas fa-undo"></i>
+                <span>Undo Dismiss</span>
+            </div>
+        `;
+    }
+
+    menu.innerHTML = menuItems;
+
+    // Position menu at cursor
+    menu.style.left = `${event.pageX}px`;
+    menu.style.top = `${event.pageY}px`;
+
+    // Add to page
+    document.body.appendChild(menu);
+
+    // Close on click outside
+    setTimeout(() => {
+        document.addEventListener('click', closeContextMenu, { once: true });
+    }, 0);
+};
+
+window.closeContextMenu = function() {
+    const menu = document.getElementById('context-menu');
+    if (menu) {
+        menu.remove();
+    }
+};
+
+// Touch event handlers for long-press on mobile
+let touchTimer = null;
+let touchMoved = false;
+
+window.handleTouchStart = function(event, appointmentId, status, showStatus) {
+    touchMoved = false;
+
+    // Start long-press timer (500ms)
+    touchTimer = setTimeout(() => {
+        if (!touchMoved && showStatus) {
+            // Trigger context menu on long press
+            const touch = event.touches[0];
+            const syntheticEvent = {
+                preventDefault: () => event.preventDefault(),
+                pageX: touch.pageX,
+                pageY: touch.pageY
+            };
+            showContextMenu(syntheticEvent, appointmentId, status, showStatus);
+
+            // Vibrate for haptic feedback if available
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+        }
+    }, 500);
+};
+
+window.handleTouchMove = function(event) {
+    touchMoved = true;
+    if (touchTimer) {
+        clearTimeout(touchTimer);
+        touchTimer = null;
+    }
+};
+
+window.handleTouchEnd = function(event) {
+    if (touchTimer) {
+        clearTimeout(touchTimer);
+        touchTimer = null;
+    }
+};

@@ -1,4 +1,5 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import GridComponent from './GridComponent.jsx'
 import PaymentsComponent from './PaymentsComponent.jsx'
 import XraysComponent from './XraysComponent.jsx'
@@ -6,8 +7,10 @@ import VisitsComponent from './VisitsComponent.jsx'
 import CompareComponent from './CompareComponent.jsx'
 import AppointmentForm from './AppointmentForm.jsx'
 import WorkComponent from './WorkComponent.jsx'
+import EditPatientComponent from './EditPatientComponent.jsx'
 
 const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
+    const navigate = useNavigate();
     const renderContent = () => {
         switch (page) {
             case 'grid':
@@ -93,18 +96,24 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
                     <AppointmentForm
                         patientId={patientId}
                         onClose={() => {
-                            // Navigate back to grid page
-                            const newUrl = `${window.location.pathname}?code=${patientId}&page=grid`;
-                            window.history.pushState({}, '', newUrl);
-                            window.dispatchEvent(new CustomEvent('urlChanged'));
+                            // Navigate back to previous page
+                            navigate(-1);
                         }}
                         onSuccess={(result) => {
                             console.log('Appointment created successfully:', result);
-                            // Could show success message here
+                            // Navigate back to previous page after success
+                            navigate(-1);
                         }}
                     />
                 );
-            
+
+            case 'edit-patient':
+                return (
+                    <EditPatientComponent
+                        patientId={patientId}
+                    />
+                );
+
             default:
                 return (
                     <div className="unknown-page">

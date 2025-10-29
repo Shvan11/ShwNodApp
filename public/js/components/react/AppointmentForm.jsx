@@ -166,9 +166,14 @@ const AppointmentForm = ({ patientId, onClose, onSuccess }) => {
             <div className="appointment-form-modal">
                 <div className="appointment-form-header">
                     <h2>New Appointment</h2>
-                    <button 
+                    <button
+                        type="button"
                         className="close-btn"
-                        onClick={onClose}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onClose();
+                        }}
                         aria-label="Close form"
                     >
                         <i className="fas fa-times"></i>
@@ -270,7 +275,11 @@ const AppointmentForm = ({ patientId, onClose, onSuccess }) => {
                         <button
                             type="button"
                             className="btn btn-secondary"
-                            onClick={onClose}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onClose();
+                            }}
                             disabled={loading}
                         >
                             Cancel
