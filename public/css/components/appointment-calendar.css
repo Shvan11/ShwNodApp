@@ -24,6 +24,8 @@
     --slot-available-hover: #d4edda;
     --slot-booked: #e3f2fd;
     --slot-booked-hover: #bbdefb;
+    --slot-full: #fff3cd;
+    --slot-full-border: #ffc107;
     --slot-past: #f5f5f5;
     --slot-selected: #fff3cd;
     --slot-weekend: #f8f9fa;
@@ -170,6 +172,59 @@
     background: var(--hover-bg);
 }
 
+/* Doctor Filter */
+.doctor-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: white;
+    border: 1px solid var(--calendar-border);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.doctor-filter:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.doctor-filter-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-medium);
+    white-space: nowrap;
+    margin: 0;
+}
+
+.doctor-filter-select {
+    padding: 6px 12px;
+    border: 1px solid var(--calendar-border);
+    border-radius: 4px;
+    background: white;
+    color: var(--text-dark);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 150px;
+    outline: none;
+}
+
+.doctor-filter-select:hover:not(:disabled) {
+    border-color: var(--primary-color);
+}
+
+.doctor-filter-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb, 33, 150, 243), 0.1);
+}
+
+.doctor-filter-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: var(--calendar-header-bg);
+}
+
 /* Calendar Statistics */
 .calendar-stats {
     display: flex;
@@ -222,7 +277,7 @@
     color: var(--text-dark);
 }
 
-/* Calendar Grid - Expanded Layout */
+/* Calendar Grid - Expanded Layout (6 days: Sat-Thu, excluding Friday) */
 .calendar-grid {
     display: grid;
     grid-template-columns: var(--calendar-time-width) repeat(6, var(--calendar-day-width));
@@ -232,7 +287,7 @@
     overflow-y: auto;
     overflow-x: auto;
     padding: var(--calendar-gap);
-    min-width: 1400px;  /* Ensure minimum width for larger layout */
+    min-width: 1280px;  /* Updated for 6 columns instead of 7 */
 }
 
 .calendar-grid.view-day {
@@ -367,6 +422,20 @@
 .time-slot.booked:hover {
     background: var(--slot-booked-hover);
     box-shadow: var(--hover-shadow);
+}
+
+/* Full slots - Maximum capacity reached */
+.time-slot.full {
+    background: var(--slot-full);
+    border: 2px solid var(--slot-full-border);
+    cursor: not-allowed;
+    opacity: 0.85;
+}
+
+.time-slot.full:hover {
+    transform: none;
+    box-shadow: none;
+    background: var(--slot-full);
 }
 
 .time-slot.past {

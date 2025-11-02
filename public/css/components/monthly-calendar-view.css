@@ -1,0 +1,399 @@
+/**
+ * Monthly Calendar View Styles
+ *
+ * Clean, modern monthly calendar layout with creative appointment indicators
+ * Week starts from Saturday, excludes Friday (6-day work week)
+ */
+
+/* Monthly Calendar Grid Container */
+.monthly-calendar-grid {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--calendar-background, #ffffff);
+    overflow: auto;
+    padding: 16px;
+}
+
+/* Month Grid Header - Day Names */
+.month-grid-header {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr); /* 6 days: Sat-Thu */
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 12px 0;
+    border-bottom: 2px solid var(--calendar-border, #e0e0e0);
+}
+
+.month-day-header {
+    text-align: center;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-dark, #333);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px;
+}
+
+/* Month Grid Body - Calendar Days */
+.month-grid-body {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr); /* 6 days: Sat-Thu */
+    gap: 8px;
+    flex: 1;
+    align-content: start;
+}
+
+/* Individual Day Cell */
+.month-day-cell {
+    position: relative;
+    min-height: 100px;
+    border: 1px solid var(--calendar-border, #e0e0e0);
+    border-radius: 8px;
+    padding: 8px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+}
+
+.month-day-cell:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+    z-index: 10;
+}
+
+/* Today Highlight with Pulsing Animation */
+.month-day-cell.today {
+    background: linear-gradient(135deg, #fff8e1 0%, #ffffff 100%);
+    border: 2px solid var(--primary-color, #2196f3);
+    box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.1);
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.1);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(33, 150, 243, 0.2);
+    }
+}
+
+.month-day-cell.today {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+/* Weekend Styling */
+.month-day-cell.weekend {
+    background: linear-gradient(135deg, #fafafa 0%, #ffffff 100%);
+}
+
+/* Other Month Days (Dimmed) */
+.month-day-cell.other-month {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.month-day-cell.other-month:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* Day Number */
+.month-day-number {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-dark, #333);
+    margin-bottom: 6px;
+    min-height: 24px;
+}
+
+.month-day-cell.today .month-day-number {
+    color: var(--primary-color, #2196f3);
+    font-size: 20px;
+}
+
+/* Appointment Badge - Creative Circular Design */
+.appointment-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    border: 2px solid;
+    transition: all 0.3s ease;
+    animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.appointment-badge:hover {
+    transform: scale(1.15);
+}
+
+/* Utilization Bar at Bottom */
+.utilization-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: rgba(0, 0, 0, 0.05);
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    overflow: hidden;
+}
+
+.utilization-fill {
+    height: 100%;
+    transition: width 0.5s ease-out;
+    background: linear-gradient(90deg, #4caf50 0%, #ff9800 50%, #f44336 100%);
+}
+
+/* Hover Tooltip */
+.day-tooltip {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 8px;
+    background: white;
+    border: 1px solid var(--calendar-border, #e0e0e0);
+    border-radius: 8px;
+    padding: 12px;
+    min-width: 250px;
+    max-width: 300px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    animation: tooltipSlideIn 0.2s ease-out;
+}
+
+@keyframes tooltipSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* Tooltip Arrow */
+.day-tooltip::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid white;
+}
+
+.tooltip-header {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-dark, #333);
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--calendar-border, #e0e0e0);
+}
+
+.tooltip-stats {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.tooltip-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.tooltip-stat .stat-label {
+    font-size: 11px;
+    color: var(--text-medium, #666);
+    text-transform: uppercase;
+}
+
+.tooltip-stat .stat-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--primary-color, #2196f3);
+}
+
+.tooltip-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-medium, #666);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+}
+
+.tooltip-appointments {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 8px;
+}
+
+.tooltip-appointment {
+    display: flex;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    font-size: 13px;
+}
+
+.tooltip-appointment:last-child {
+    border-bottom: none;
+}
+
+.apt-time {
+    font-weight: 600;
+    color: var(--text-dark, #333);
+    min-width: 45px;
+}
+
+.apt-name {
+    color: var(--text-medium, #666);
+}
+
+.tooltip-more {
+    font-size: 12px;
+    color: var(--text-medium, #666);
+    font-style: italic;
+    text-align: center;
+    padding: 4px 0;
+}
+
+.tooltip-action {
+    font-size: 11px;
+    color: var(--primary-color, #2196f3);
+    text-align: center;
+    padding-top: 8px;
+    border-top: 1px solid var(--calendar-border, #e0e0e0);
+    font-weight: 600;
+}
+
+/* Loading State */
+.monthly-calendar-grid.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    font-size: 16px;
+    color: var(--text-medium, #666);
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .month-day-cell {
+        min-height: 80px;
+    }
+
+    .month-day-number {
+        font-size: 16px;
+    }
+
+    .appointment-badge {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    .monthly-calendar-grid {
+        padding: 8px;
+    }
+
+    .month-grid-header {
+        gap: 4px;
+    }
+
+    .month-grid-body {
+        gap: 4px;
+    }
+
+    .month-day-header {
+        font-size: 12px;
+        padding: 6px;
+    }
+
+    .month-day-cell {
+        min-height: 60px;
+        padding: 6px;
+    }
+
+    .month-day-number {
+        font-size: 14px;
+    }
+
+    .appointment-badge {
+        width: 24px;
+        height: 24px;
+        font-size: 11px;
+        top: 6px;
+        right: 6px;
+    }
+
+    .day-tooltip {
+        min-width: 200px;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .monthly-calendar-grid {
+        padding: 0;
+    }
+
+    .month-day-cell:hover {
+        box-shadow: none;
+        transform: none;
+    }
+
+    .day-tooltip {
+        display: none;
+    }
+
+    .appointment-badge:hover {
+        transform: none;
+    }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    .month-day-cell,
+    .appointment-badge,
+    .utilization-fill,
+    .day-tooltip {
+        transition: none;
+        animation: none;
+    }
+
+    .month-day-cell.today {
+        animation: none;
+    }
+}

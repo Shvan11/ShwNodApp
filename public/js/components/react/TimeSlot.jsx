@@ -55,15 +55,16 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view',
     
     // Click handler
     const handleClick = useCallback(() => {
-        if (slotStatus === 'past') return; // Don't allow clicks on past slots
-        
+        // Don't allow clicks on past or full slots
+        if (slotStatus === 'past' || slotStatus === 'full') return;
+
         // In selection mode, only allow clicking on available slots
-        if (mode === 'selection' && showOnlyAvailable && slotStatus !== 'available') {
+        if (mode === 'selection' && slotStatus !== 'available') {
             return;
         }
-        
+
         onClick(slotData);
-    }, [onClick, slotData, slotStatus, mode, showOnlyAvailable]);
+    }, [onClick, slotData, slotStatus, mode]);
     
     // Render appointment content - SUPPORTS MULTIPLE APPOINTMENTS
     const renderAppointmentContent = () => {
@@ -127,28 +128,8 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view',
     
     // Render empty slot content for available slots
     const renderEmptySlotContent = () => {
-        if (slotStatus === 'past') {
-            return null;
-        }
-        
-        // Different content based on mode
-        if (mode === 'selection') {
-            return (
-                <div className="empty-slot-content selection">
-                    <div className="selection-icon">
-                        <i className="fas fa-mouse-pointer"></i>
-                    </div>
-                    <div className="selection-text">Click to Select</div>
-                </div>
-            );
-        }
-        
-        return (
-            <div className="empty-slot-content">
-                <div className="add-appointment-icon">+</div>
-                <div className="add-appointment-text">Available</div>
-            </div>
-        );
+        // Just return null - let color coding and click behavior handle everything
+        return null;
     };
     
     // Generate tooltip text - SUPPORTS MULTIPLE APPOINTMENTS

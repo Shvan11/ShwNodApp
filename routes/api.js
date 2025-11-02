@@ -11,6 +11,7 @@ import { getPatientsPhones, getInfos, createPatient, getReferralSources, getPati
 import { getPayments, getActiveWorkForInvoice, getCurrentExchangeRate, addInvoice, updateExchangeRate, getPaymentHistoryByWorkId, getExchangeRateForDate, updateExchangeRateForDate } from '../services/database/queries/payment-queries.js';
 import { getWires, getVisitsSummary, addVisit, updateVisit, deleteVisit, getVisitDetailsByID, getLatestWire, getVisitsByWorkId, getVisitById, addVisitByWorkId, updateVisitByWorkId, deleteVisitByWorkId } from '../services/database/queries/visit-queries.js';
 import { getWorksByPatient, getWorkDetails, addWork, updateWork, finishWork, getActiveWork, getWorkTypes, getWorkKeywords, getWorkDetailsList, addWorkDetail, updateWorkDetail, deleteWorkDetail } from '../services/database/queries/work-queries.js';
+import { getAllExpenses, getExpenseById, getExpenseCategories, getExpenseSubcategories, addExpense, updateExpense, deleteExpense, getExpenseSummary, getExpenseTotalsByCurrency } from '../services/database/queries/expense-queries.js';
 import whatsapp from '../services/messaging/whatsapp.js';
 import { sendImg_, sendXray_ } from '../services/messaging/whatsapp-api.js';
 // WebSocket emitter will be injected to avoid circular imports
@@ -4873,5 +4874,239 @@ router.delete('/aligner-doctors/:drID', async (req, res) => {
 //   - aligner-photo-upload-url
 //   - aligner-photo-save-metadata
 //   - aligner-photo-delete
+
+// ==============================
+// EXPENSE MANAGEMENT ROUTES
+// ==============================
+
+/**
+ * Get all expenses with optional filtering
+ * Query params: startDate, endDate, categoryId, subcategoryId, currency
+ */
+router.get('/expenses', async (req, res) => {
+    try {
+        const filters = {
+            startDate: req.query.startDate,
+            endDate: req.query.endDate,
+            categoryId: req.query.categoryId ? parseInt(req.query.categoryId) : null,
+            subcategoryId: req.query.subcategoryId ? parseInt(req.query.subcategoryId) : null,
+            currency: req.query.currency
+        };
+
+        // Remove null/undefined filters
+        Object.keys(filters).forEach(key => {
+            if (filters[key] === null || filters[key] === undefined) {
+                delete filters[key];
+            }
+        });
+
+        const expenses = await getAllExpenses(filters);
+        res.json(expenses);
+    } catch (error) {
+        console.error('Error fetching expenses:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch expenses',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Get a single expense by ID
+ */
+router.get('/expenses/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const expense = await getExpenseById(parseInt(id));
+
+        if (!expense) {
+            return res.status(404).json({
+                success: false,
+                error: 'Expense not found'
+            });
+        }
+
+        res.json(expense);
+    } catch (error) {
+        console.error('Error fetching expense:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch expense',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Get all expense categories
+ */
+router.get('/expenses-categories', async (req, res) => {
+    try {
+        const categories = await getExpenseCategories();
+        res.json(categories);
+    } catch (error) {
+        console.error('Error fetching expense categories:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch expense categories',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Get expense subcategories (optionally filtered by category)
+ * Query params: categoryId (optional)
+ */
+router.get('/expenses-subcategories', async (req, res) => {
+    try {
+        const categoryId = req.query.categoryId ? parseInt(req.query.categoryId) : null;
+        const subcategories = await getExpenseSubcategories(categoryId);
+        res.json(subcategories);
+    } catch (error) {
+        console.error('Error fetching expense subcategories:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch expense subcategories',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Create a new expense
+ */
+router.post('/expenses', async (req, res) => {
+    try {
+        const { expenseDate, amount, currency, note, categoryId, subcategoryId } = req.body;
+
+        // Validation
+        if (!expenseDate || !amount) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required fields: expenseDate, amount'
+            });
+        }
+
+        const expenseData = {
+            expenseDate,
+            amount: parseInt(amount),
+            currency: currency || 'IQD',
+            note,
+            categoryId: categoryId ? parseInt(categoryId) : null,
+            subcategoryId: subcategoryId ? parseInt(subcategoryId) : null
+        };
+
+        const result = await addExpense(expenseData);
+        res.status(201).json({
+            success: true,
+            message: 'Expense created successfully',
+            data: result
+        });
+    } catch (error) {
+        console.error('Error creating expense:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to create expense',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Update an existing expense
+ */
+router.put('/expenses/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { expenseDate, amount, currency, note, categoryId, subcategoryId } = req.body;
+
+        // Validation
+        if (!expenseDate || !amount) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required fields: expenseDate, amount'
+            });
+        }
+
+        const expenseData = {
+            expenseDate,
+            amount: parseInt(amount),
+            currency: currency || 'IQD',
+            note,
+            categoryId: categoryId ? parseInt(categoryId) : null,
+            subcategoryId: subcategoryId ? parseInt(subcategoryId) : null
+        };
+
+        const result = await updateExpense(parseInt(id), expenseData);
+        res.json({
+            success: true,
+            message: 'Expense updated successfully',
+            data: result
+        });
+    } catch (error) {
+        console.error('Error updating expense:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update expense',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Delete an expense
+ */
+router.delete('/expenses/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await deleteExpense(parseInt(id));
+        res.json({
+            success: true,
+            message: 'Expense deleted successfully',
+            data: result
+        });
+    } catch (error) {
+        console.error('Error deleting expense:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete expense',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Get expense summary by category and currency
+ * Query params: startDate, endDate (required)
+ */
+router.get('/expenses-summary', async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+
+        if (!startDate || !endDate) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required parameters: startDate, endDate'
+            });
+        }
+
+        const summary = await getExpenseSummary(startDate, endDate);
+        const totals = await getExpenseTotalsByCurrency(startDate, endDate);
+
+        res.json({
+            summary,
+            totals
+        });
+    } catch (error) {
+        console.error('Error fetching expense summary:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch expense summary',
+            message: error.message
+        });
+    }
+});
 
 export default router;

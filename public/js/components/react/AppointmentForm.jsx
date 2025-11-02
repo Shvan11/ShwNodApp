@@ -1,5 +1,15 @@
-import React, { useState, useEffect } from 'react'
-import CalendarPickerModal from './CalendarPickerModal.jsx'
+import { useState, useEffect } from 'react'
+import SimplifiedCalendarPicker from './SimplifiedCalendarPicker.jsx'
+import '../../../css/components/simplified-calendar-picker.css'
+
+/**
+ * AppointmentForm Component - CLEAN REWRITE
+ *
+ * Full-page layout with 3 columns:
+ * LEFT: Monthly calendar (from SimplifiedCalendarPicker)
+ * MIDDLE: Day schedule (from SimplifiedCalendarPicker)
+ * RIGHT: Appointment details form
+ */
 
 const AppointmentForm = ({ patientId, onClose, onSuccess }) => {
     const [formData, setFormData] = useState({
@@ -13,10 +23,8 @@ const AppointmentForm = ({ patientId, onClose, onSuccess }) => {
     const [details, setDetails] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [showCalendar, setShowCalendar] = useState(false);
     const [validation, setValidation] = useState({});
 
-    // Load doctors and details on component mount
     useEffect(() => {
         loadDoctors();
         loadDetails();
@@ -24,50 +32,33 @@ const AppointmentForm = ({ patientId, onClose, onSuccess }) => {
 
     const loadDoctors = async () => {
         try {
-            console.log('Loading doctors...');
             const response = await fetch('/api/doctors');
-            console.log('Doctors response status:', response.status);
-            if (!response.ok) {
-                throw new Error(`Failed to load doctors: ${response.status} ${response.statusText}`);
-            }
+            if (!response.ok) throw new Error('Failed to load doctors');
             const data = await response.json();
-            console.log('Doctors data received:', data);
             setDoctors(data || []);
         } catch (err) {
             console.error('Error loading doctors:', err);
-            setError(`Failed to load doctors: ${err.message}`);
+            setError(err.message);
         }
     };
 
     const loadDetails = async () => {
         try {
-            console.log('Loading appointment details...');
             const response = await fetch('/api/appointment-details');
-            console.log('Details response status:', response.status);
-            if (!response.ok) {
-                throw new Error(`Failed to load appointment details: ${response.status} ${response.statusText}`);
-            }
+            if (!response.ok) throw new Error('Failed to load appointment details');
             const data = await response.json();
-            console.log('Details data received:', data);
             setDetails(data || []);
         } catch (err) {
             console.error('Error loading appointment details:', err);
-            setError(`Failed to load appointment details: ${err.message}`);
+            setError(err.message);
         }
     };
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-        // Clear validation error when user starts typing
+        setFormData(prev => ({ ...prev, [name]: value }));
         if (validation[name]) {
-            setValidation(prev => ({
-                ...prev,
-                [name]: null
-            }));
+            setValidation(prev => ({ ...prev, [name]: null }));
         }
     };
 
@@ -78,51 +69,31 @@ const AppointmentForm = ({ patientId, onClose, onSuccess }) => {
             AppDate: date.toISOString().split('T')[0],
             AppTime: date.toTimeString().split(' ')[0].slice(0, 5)
         }));
-        setShowCalendar(false);
+        setValidation(prev => ({ ...prev, AppDate: null, AppTime: null }));
     };
 
     const validateForm = () => {
-        const newValidation = {};
-        
-        if (!formData.AppDate) {
-            newValidation.AppDate = 'Please select a date';
-        }
-        
-        if (!formData.AppTime) {
-            newValidation.AppTime = 'Please select a time';
-        }
-        
-        if (!formData.DrID) {
-            newValidation.DrID = 'Please select a doctor';
-        }
-        
-        if (!formData.AppDetail) {
-            newValidation.AppDetail = 'Please select appointment details';
-        }
-
-        setValidation(newValidation);
-        return Object.keys(newValidation).length === 0;
+        const errors = {};
+        if (!formData.AppDate) errors.AppDate = 'Select a date';
+        if (!formData.AppTime) errors.AppTime = 'Select a time';
+        if (!formData.DrID) errors.DrID = 'Select a doctor';
+        if (!formData.AppDetail) errors.AppDetail = 'Select appointment type';
+        setValidation(errors);
+        return Object.keys(errors).length === 0;
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
-        if (!validateForm()) {
-            return;
-        }
+        if (!validateForm()) return;
 
         setLoading(true);
         setError(null);
 
         try {
-            // Combine date and time for the API
             const appointmentDateTime = `${formData.AppDate}T${formData.AppTime}:00`;
-            
             const response = await fetch('/api/appointments', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     PersonID: parseInt(formData.PersonID),
                     AppDate: appointmentDateTime,
@@ -137,14 +108,12 @@ const AppointmentForm = ({ patientId, onClose, onSuccess }) => {
             }
 
             const result = await response.json();
-            
             if (result.success) {
                 onSuccess && onSuccess(result);
                 onClose && onClose();
             } else {
                 throw new Error(result.error || 'Failed to create appointment');
             }
-
         } catch (err) {
             console.error('Error creating appointment:', err);
             setError(err.message);
@@ -153,168 +122,136 @@ const AppointmentForm = ({ patientId, onClose, onSuccess }) => {
         }
     };
 
-    const getDateTime = () => {
+    const getDateTimeDisplay = () => {
         if (formData.AppDate && formData.AppTime) {
             const date = new Date(`${formData.AppDate}T${formData.AppTime}`);
-            return date.toLocaleString();
+            return date.toLocaleString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
         }
-        return 'Select date and time';
+        return 'No time selected';
     };
 
     return (
-        <div className="appointment-form-overlay">
-            <div className="appointment-form-modal">
-                <div className="appointment-form-header">
-                    <h2>New Appointment</h2>
-                    <button
-                        type="button"
-                        className="close-btn"
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onClose();
-                        }}
-                        aria-label="Close form"
-                    >
-                        <i className="fas fa-times"></i>
-                    </button>
+        <div className="appointment-form-page">
+            {/* Page Header */}
+            <header className="page-header">
+                <div>
+                    <h1><i className="fas fa-calendar-plus"></i> New Appointment</h1>
+                    <p>Patient #{patientId}</p>
                 </div>
+                <button className="close-button" onClick={onClose} title="Close">
+                    <i className="fas fa-times"></i>
+                </button>
+            </header>
 
-                <form onSubmit={handleSubmit} className="appointment-form">
-                    {error && (
-                        <div className="error-message">
-                            <i className="fas fa-exclamation-triangle"></i>
-                            {error}
-                        </div>
-                    )}
+            {/* Main Content: 3 Columns */}
+            <div className="page-content">
+                {/* Calendar Picker (LEFT + MIDDLE columns) */}
+                <SimplifiedCalendarPicker
+                    onSelectDateTime={handleDateTimeSelection}
+                    initialDate={formData.AppDate ? new Date(formData.AppDate) : new Date()}
+                />
 
-                    <div className="form-group">
-                        <label htmlFor="patient-id">Patient ID</label>
-                        <input
-                            type="text"
-                            id="patient-id"
-                            value={`Patient ${patientId}`}
-                            disabled
-                            className="form-input disabled"
-                        />
+                {/* RIGHT COLUMN: Form */}
+                <div className="form-column">
+                    <div className="form-header">
+                        <h2><i className="fas fa-clipboard-list"></i> Appointment Details</h2>
                     </div>
 
-                    <div className="form-group">
-                        <label htmlFor="datetime">Date & Time</label>
-                        <div className="datetime-selector">
-                            <input
-                                type="text"
-                                id="datetime"
-                                value={getDateTime()}
-                                readOnly
-                                className={`form-input ${validation.AppDate || validation.AppTime ? 'error' : ''}`}
-                                onClick={() => setShowCalendar(true)}
-                            />
+                    <form onSubmit={handleSubmit} className="appointment-form">
+                        {error && (
+                            <div className="alert alert-error">
+                                <i className="fas fa-exclamation-circle"></i>
+                                <span>{error}</span>
+                            </div>
+                        )}
+
+                        <div className="form-field">
+                            <label><i className="fas fa-calendar-check"></i> Selected Time</label>
+                            <div className={`selected-time ${formData.AppDate && formData.AppTime ? 'has-value' : ''}`}>
+                                {getDateTimeDisplay()}
+                            </div>
+                            {(validation.AppDate || validation.AppTime) && (
+                                <span className="field-error">{validation.AppDate || validation.AppTime}</span>
+                            )}
+                        </div>
+
+                        <div className="form-field">
+                            <label htmlFor="doctor"><i className="fas fa-user-md"></i> Doctor</label>
+                            <select
+                                id="doctor"
+                                name="DrID"
+                                value={formData.DrID}
+                                onChange={handleInputChange}
+                                className={validation.DrID ? 'error' : ''}
+                            >
+                                <option value="">Select doctor...</option>
+                                {doctors.filter(d => d.ID).map((doctor) => (
+                                    <option key={doctor.ID} value={doctor.ID}>
+                                        {doctor.employeeName}
+                                    </option>
+                                ))}
+                            </select>
+                            {validation.DrID && <span className="field-error">{validation.DrID}</span>}
+                        </div>
+
+                        <div className="form-field">
+                            <label htmlFor="details"><i className="fas fa-notes-medical"></i> Appointment Type</label>
+                            <select
+                                id="details"
+                                name="AppDetail"
+                                value={formData.AppDetail}
+                                onChange={handleInputChange}
+                                className={validation.AppDetail ? 'error' : ''}
+                            >
+                                <option value="">Select type...</option>
+                                {details.filter(d => d.ID).map((detail) => (
+                                    <option key={detail.ID} value={detail.Detail}>
+                                        {detail.Detail}
+                                    </option>
+                                ))}
+                            </select>
+                            {validation.AppDetail && <span className="field-error">{validation.AppDetail}</span>}
+                        </div>
+
+                        <div className="form-actions">
                             <button
                                 type="button"
-                                className="calendar-btn"
-                                onClick={() => setShowCalendar(true)}
+                                className="btn btn-cancel"
+                                onClick={onClose}
+                                disabled={loading}
                             >
-                                <i className="fas fa-calendar-alt"></i>
+                                <i className="fas fa-times"></i>
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="btn btn-create"
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <>
+                                        <i className="fas fa-spinner fa-spin"></i>
+                                        Creating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-check"></i>
+                                        Create Appointment
+                                    </>
+                                )}
                             </button>
                         </div>
-                        {(validation.AppDate || validation.AppTime) && (
-                            <span className="validation-error">
-                                {validation.AppDate || validation.AppTime}
-                            </span>
-                        )}
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="doctor">Doctor</label>
-                        <select
-                            id="doctor"
-                            name="DrID"
-                            value={formData.DrID}
-                            onChange={handleInputChange}
-                            className={`form-input ${validation.DrID ? 'error' : ''}`}
-                        >
-                            <option key="doctor-default" value="">Select a doctor</option>
-                            {doctors
-                                .filter(doctor => doctor.ID != null) // Filter out null/undefined IDs
-                                .map((doctor, index) => (
-                                <option key={`doctor-${doctor.ID || index}`} value={doctor.ID}>
-                                    {doctor.employeeName}
-                                </option>
-                            ))}
-                        </select>
-                        {validation.DrID && (
-                            <span className="validation-error">{validation.DrID}</span>
-                        )}
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="details">Appointment Details</label>
-                        <select
-                            id="details"
-                            name="AppDetail"
-                            value={formData.AppDetail}
-                            onChange={handleInputChange}
-                            className={`form-input ${validation.AppDetail ? 'error' : ''}`}
-                        >
-                            <option key="detail-default" value="">Select appointment details</option>
-                            {details
-                                .filter(detail => detail.ID != null) // Filter out null/undefined IDs
-                                .map((detail, index) => (
-                                <option key={`detail-${detail.ID || index}`} value={detail.Detail}>
-                                    {detail.Detail}
-                                </option>
-                            ))}
-                        </select>
-                        {validation.AppDetail && (
-                            <span className="validation-error">{validation.AppDetail}</span>
-                        )}
-                    </div>
-
-                    <div className="form-actions">
-                        <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onClose();
-                            }}
-                            disabled={loading}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="btn btn-primary"
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <>
-                                    <i className="fas fa-spinner fa-spin"></i>
-                                    Creating...
-                                </>
-                            ) : (
-                                <>
-                                    <i className="fas fa-plus"></i>
-                                    Create Appointment
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </form>
-
-                {showCalendar && (
-                    <CalendarPickerModal
-                        onSelectDateTime={handleDateTimeSelection}
-                        onClose={() => setShowCalendar(false)}
-                        initialDate={formData.AppDate ? new Date(formData.AppDate) : new Date()}
-                    />
-                )}
+                    </form>
+                </div>
             </div>
         </div>
     );
 };
-
 
 export default AppointmentForm;

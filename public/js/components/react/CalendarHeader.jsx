@@ -1,11 +1,12 @@
 /**
  * CalendarHeader Component for Appointment Calendar
- * 
+ *
  * Renders the calendar header with navigation, view controls, and statistics
  * Handles week navigation and view mode switching
  */
 
 import React from 'react'
+import DoctorFilter from './DoctorFilter.jsx'
 
 const CalendarHeader = ({
     weekDisplayText,
@@ -15,7 +16,9 @@ const CalendarHeader = ({
     viewMode,
     onViewModeChange,
     calendarStats,
-    loading
+    loading,
+    selectedDoctorId,
+    onDoctorChange
 }) => {
     
     return (
@@ -58,14 +61,14 @@ const CalendarHeader = ({
             
             {/* View mode toggle section */}
             <div className="view-controls">
-                <div 
+                <div
                     className="view-mode-toggle"
                     role="tablist"
                     aria-label="Calendar view mode"
                 >
                     {[
-                        ['week', 'Week View'],
-                        ['day', 'Day View']
+                        ['month', 'Month View'],
+                        ['week', 'Week View']
                     ].map(([mode, label]) => (
                         <button
                             key={mode}
@@ -81,8 +84,15 @@ const CalendarHeader = ({
                         </button>
                     ))}
                 </div>
+
+                {/* Doctor filter */}
+                <DoctorFilter
+                    selectedDoctorId={selectedDoctorId}
+                    onDoctorChange={onDoctorChange}
+                    className="header-doctor-filter"
+                />
             </div>
-            
+
             {/* Calendar statistics section */}
             {calendarStats && (
                 <div 

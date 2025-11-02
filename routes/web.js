@@ -97,6 +97,11 @@ router.get('/settings', (_, res) => {
   serveWithFallback(res, '/views/settings.html', 'Settings not found');
 });
 
+// Expenses
+router.get('/expenses', (_, res) => {
+  serveWithFallback(res, '/views/expenses.html', 'Expenses not found');
+});
+
 // ==============================
 // ROUTE SUMMARY
 // ==============================
@@ -117,6 +122,7 @@ router.get('/settings', (_, res) => {
 //   - /send-message                 → WhatsApp messaging
 //   - /send                         → Send page
 //   - /auth                         → Authentication
+//   - /expenses                     → Expense management
 //
 // All routes serve from dist/ directory (production builds)
 // Use Vite dev server on port 5173 for development with HMR

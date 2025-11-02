@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import CalendarGrid from './CalendarGrid.jsx'
+import CalendarHeader from './CalendarHeader.jsx'
+import MonthlyCalendarGrid from './MonthlyCalendarGrid.jsx'
 
 /**
  * AppointmentCalendar Main Component
- * 
+ *
  * The primary calendar component that orchestrates all calendar functionality
  * Integrates with existing tblcalender system via optimized API endpoints
  */
 
-const AppointmentCalendar = ({ 
-    initialDate, 
+const AppointmentCalendar = ({
+    initialDate,
     initialViewMode = 'week',
     mode = 'view', // 'view' or 'selection'
     onSlotSelect,
@@ -24,23 +26,28 @@ const AppointmentCalendar = ({
     const [error, setError] = useState(null);
     const [internalSelectedSlot, setInternalSelectedSlot] = useState(null);
     const [viewMode, setViewMode] = useState(initialViewMode);
+    const [selectedDoctorId, setSelectedDoctorId] = useState(null);
     
     // Use external selected slot if provided (for controlled mode)
     const selectedSlot = externalSelectedSlot || internalSelectedSlot;
     
     // Utility functions
+    // Week starts on Saturday (day 6)
     const getWeekStart = (date) => {
         const start = new Date(date);
         const day = start.getDay();
-        const diff = start.getDate() - day + (day === 0 ? -6 : 1);
-        start.setDate(diff);
+        // Calculate days to subtract to get to Saturday
+        // Saturday = 6, Sunday = 0, Monday = 1, etc.
+        const diff = day === 6 ? 0 : (day + 1);
+        start.setDate(start.getDate() - diff);
         start.setHours(0, 0, 0, 0);
         return start;
     };
     
     const getWeekEnd = (weekStart) => {
         const end = new Date(weekStart);
-        end.setDate(end.getDate() + 6);
+        // Week: Sat, Sun, Mon, Tue, Wed, Thu (6 days, excluding Friday)
+        end.setDate(end.getDate() + 5); // Thursday (5 days after Saturday)
         end.setHours(23, 59, 59, 999);
         return end;
     };
@@ -68,65 +75,83 @@ const AppointmentCalendar = ({
     const weekDisplayText = useMemo(() => {
         const start = new Date(weekStart);
         const end = new Date(weekEnd);
-        
+
         if (viewMode === 'day') {
-            return currentDate.toLocaleDateString('en-US', { 
+            return currentDate.toLocaleDateString('en-US', {
                 weekday: 'long',
-                month: 'long', 
-                day: 'numeric', 
-                year: 'numeric' 
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
             });
         }
-        
-        return `Week of ${start.toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric' 
-        })} - ${end.toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            year: 'numeric' 
+
+        if (viewMode === 'month') {
+            return currentDate.toLocaleDateString('en-US', {
+                month: 'long',
+                year: 'numeric'
+            });
+        }
+
+        return `Week of ${start.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric'
+        })} - ${end.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
         })}`;
     }, [weekStart, weekEnd, currentDate, viewMode]);
     
     // API functions
-    const fetchCalendarData = useCallback(async (date) => {
+    const fetchCalendarData = useCallback(async (date, doctorId = null, viewModeParam = viewMode) => {
         setLoading(true);
         setError(null);
-        
+
         try {
             const targetDate = date.toISOString().split('T')[0];
-            
+
+            // Build query parameters
+            const calendarParams = new URLSearchParams({ date: targetDate });
+            if (doctorId) {
+                calendarParams.append('doctorId', doctorId);
+            }
+
+            // Determine API endpoint based on view mode
+            const endpoint = viewModeParam === 'month'
+                ? `/api/calendar/month?${calendarParams}`
+                : `/api/calendar/week?${calendarParams}`;
+
             // Fetch both calendar data and stats in parallel
             const [calendarResponse, statsResponse] = await Promise.all([
-                fetch(`/api/calendar/week?date=${targetDate}`),
+                fetch(endpoint),
                 fetch(`/api/calendar/stats?date=${targetDate}`)
             ]);
-            
+
             if (!calendarResponse.ok) {
                 throw new Error(`Calendar API error: ${calendarResponse.status}`);
             }
-            
+
             if (!statsResponse.ok) {
                 throw new Error(`Stats API error: ${statsResponse.status}`);
             }
-            
+
             const calendarResult = await calendarResponse.json();
             const statsResult = await statsResponse.json();
-            
+
             if (!calendarResult.success) {
                 throw new Error(calendarResult.error || 'Failed to fetch calendar data');
             }
-            
+
             if (!statsResult.success) {
                 throw new Error(statsResult.error || 'Failed to fetch calendar stats');
             }
-            
+
             // Validate and set calendar data
             const validatedCalendarData = validateCalendarData(calendarResult);
             setCalendarData(validatedCalendarData);
             setCalendarStats(statsResult.stats);
-            
-            
+
+
         } catch (err) {
             console.error('❌ Calendar fetch error:', err);
             setError(err.message);
@@ -135,14 +160,22 @@ const AppointmentCalendar = ({
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [viewMode]);
     
     // Navigation handlers
     const navigateWeek = useCallback((direction) => {
         const newDate = new Date(currentDate);
-        newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
+
+        if (viewMode === 'month') {
+            // Navigate by month
+            newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
+        } else {
+            // Navigate by week
+            newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
+        }
+
         setCurrentDate(newDate);
-    }, [currentDate]);
+    }, [currentDate, viewMode]);
     
     const goToToday = useCallback(() => {
         setCurrentDate(new Date());
@@ -151,20 +184,26 @@ const AppointmentCalendar = ({
     // Event handlers
     const handleViewModeChange = useCallback((newViewMode) => {
         setViewMode(newViewMode);
+        // Fetch new data for the new view mode
+        fetchCalendarData(currentDate, selectedDoctorId, newViewMode);
+    }, [currentDate, selectedDoctorId, fetchCalendarData]);
+
+    const handleDoctorChange = useCallback((doctorId) => {
+        setSelectedDoctorId(doctorId);
     }, []);
-    
+
     const handleSlotClick = useCallback((slot) => {
         if (mode === 'selection') {
-            // In selection mode, filter available slots and call external handler
-            if (showOnlyAvailable && slot.slotStatus !== 'available') {
+            // In selection mode, only allow selecting available slots (not past, full, or booked)
+            if (slot.slotStatus !== 'available') {
                 return; // Don't allow selection of non-available slots
             }
-            
+
             // Update internal state if no external control
             if (!externalSelectedSlot) {
                 setInternalSelectedSlot(slot);
             }
-            
+
             // Call external selection handler
             if (onSlotSelect) {
                 onSlotSelect(slot);
@@ -173,12 +212,19 @@ const AppointmentCalendar = ({
             // Normal view mode behavior
             setInternalSelectedSlot(slot);
         }
-    }, [mode, showOnlyAvailable, externalSelectedSlot, onSlotSelect]);
+    }, [mode, externalSelectedSlot, onSlotSelect]);
+
+    // Handler for clicking on a day in monthly view
+    const handleDayClick = useCallback((day) => {
+        // Switch to day view for the selected day
+        setCurrentDate(new Date(day.date));
+        setViewMode('day');
+    }, []);
     
     // Effects
     useEffect(() => {
-        fetchCalendarData(currentDate);
-    }, [currentDate, fetchCalendarData]);
+        fetchCalendarData(currentDate, selectedDoctorId);
+    }, [currentDate, selectedDoctorId, fetchCalendarData]);
     
     // WebSocket integration for real-time updates
     useEffect(() => {
@@ -252,51 +298,37 @@ const AppointmentCalendar = ({
         <div className="appointment-calendar">
             {/* Calendar Header */}
             <CalendarHeader
-                viewMode={viewMode}
                 weekDisplayText={weekDisplayText}
-                calendarStats={calendarStats}
-                onNavigateWeek={navigateWeek}
-                onGoToToday={goToToday}
+                onPreviousWeek={() => navigateWeek('prev')}
+                onNextWeek={() => navigateWeek('next')}
+                onTodayClick={goToToday}
+                viewMode={viewMode}
                 onViewModeChange={handleViewModeChange}
+                calendarStats={calendarStats}
+                loading={loading}
+                selectedDoctorId={selectedDoctorId}
+                onDoctorChange={handleDoctorChange}
             />
-            
-            {/* Calendar Grid */}
-            <CalendarGrid
-                calendarData={calendarData}
-                selectedSlot={selectedSlot}
-                onSlotClick={handleSlotClick}
-                mode={mode}
-                showOnlyAvailable={showOnlyAvailable}
-            />
+
+            {/* Calendar Grid - Show different grid based on view mode */}
+            {viewMode === 'month' ? (
+                <MonthlyCalendarGrid
+                    calendarData={calendarData}
+                    onDayClick={handleDayClick}
+                    currentDate={currentDate}
+                    mode={mode}
+                />
+            ) : (
+                <CalendarGrid
+                    calendarData={calendarData}
+                    selectedSlot={selectedSlot}
+                    onSlotClick={handleSlotClick}
+                    mode={mode}
+                    showOnlyAvailable={showOnlyAvailable}
+                />
+            )}
         </div>
     );
 };
-
-// Placeholder components that should be imported when converted
-const CalendarHeader = ({ viewMode, weekDisplayText, calendarStats, onNavigateWeek, onGoToToday, onViewModeChange }) => (
-    <div className="calendar-header">
-        <div className="calendar-navigation">
-            <button onClick={() => onNavigateWeek('prev')}>
-                <i className="fas fa-chevron-left"></i>
-            </button>
-            <h2>{weekDisplayText}</h2>
-            <button onClick={() => onNavigateWeek('next')}>
-                <i className="fas fa-chevron-right"></i>
-            </button>
-        </div>
-        <div className="calendar-controls">
-            <button onClick={onGoToToday}>Today</button>
-            <select value={viewMode} onChange={(e) => onViewModeChange(e.target.value)}>
-                <option value="week">Week</option>
-                <option value="day">Day</option>
-            </select>
-        </div>
-        {calendarStats && (
-            <div className="calendar-stats">
-                <span>Utilization: {calendarStats.utilizationPercent}%</span>
-            </div>
-        )}
-    </div>
-);
 
 export default AppointmentCalendar;

@@ -1,0 +1,21 @@
+Windows Registry Editor Version 5.00
+
+; Registry file to register "explorer:" custom protocol handler
+; This allows clicking explorer:\\path\to\folder links to open Windows Explorer
+;
+; Installation: Double-click this file and click "Yes" to add to registry
+; Uninstallation: Delete HKEY_CLASSES_ROOT\explorer key from registry
+
+[HKEY_CLASSES_ROOT\explorer]
+@="URL:Explorer Folder Protocol"
+"URL Protocol"=""
+
+[HKEY_CLASSES_ROOT\explorer\DefaultIcon]
+@="C:\\Windows\\explorer.exe,0"
+
+[HKEY_CLASSES_ROOT\explorer\shell]
+
+[HKEY_CLASSES_ROOT\explorer\shell\open]
+
+[HKEY_CLASSES_ROOT\explorer\shell\open\command]
+@="\"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"C:\\Windows\\open-folder-handler.ps1\" -url \"%1\""

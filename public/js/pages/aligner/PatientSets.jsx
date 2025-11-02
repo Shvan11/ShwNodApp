@@ -846,24 +846,19 @@ const PatientSets = () => {
                                                 </span>
                                                 {set.Type && <span className="set-type">{set.Type}</span>}
                                             </h4>
-                                            <div className="set-title-actions">
-                                                <button
-                                                    className="action-icon-btn edit"
-                                                    onClick={(e) => openEditSetDrawer(set, e)}
-                                                    title="Edit Set"
-                                                >
-                                                    <i className="fas fa-edit"></i>
-                                                </button>
-                                                <button
-                                                    className="action-icon-btn delete"
-                                                    onClick={(e) => handleDeleteSet(set, e)}
-                                                    title="Delete Set"
-                                                >
-                                                    <i className="fas fa-trash"></i>
-                                                </button>
-                                            </div>
                                         </div>
                                         <div className="set-header-actions">
+                                            <button
+                                                className="edit-set-btn"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    openEditSetDrawer(set);
+                                                }}
+                                                title="Edit Set Details"
+                                            >
+                                                <i className="fas fa-edit"></i>
+                                                <span>Edit Set</span>
+                                            </button>
                                             <button
                                                 className="folder-btn"
                                                 onClick={(e) => {
@@ -875,81 +870,18 @@ const PatientSets = () => {
                                                 <i className="fas fa-folder-open"></i>
                                                 <span>Open Folder</span>
                                             </button>
-                                            {set.SetPdfUrl ? (
-                                                <>
-                                                    <button
-                                                        className="pdf-btn"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            window.open(set.SetPdfUrl, '_blank');
-                                                        }}
-                                                        title={set.SetPdfUrl}
-                                                    >
-                                                        <i className="fas fa-file-pdf"></i>
-                                                        <span>View PDF</span>
-                                                    </button>
-                                                    <label
-                                                        className="replace-pdf-btn"
-                                                        style={{ cursor: 'pointer' }}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        <i className="fas fa-upload"></i>
-                                                        <span>Replace PDF</span>
-                                                        <input
-                                                            type="file"
-                                                            accept=".pdf,application/pdf"
-                                                            style={{ display: 'none' }}
-                                                            onChange={(e) => {
-                                                                if (e.target.files && e.target.files[0]) {
-                                                                    handlePdfUpload(set.AlignerSetID, e.target.files[0]);
-                                                                    e.target.value = '';
-                                                                }
-                                                            }}
-                                                            disabled={uploadingPdf[set.AlignerSetID]}
-                                                        />
-                                                    </label>
-                                                    <button
-                                                        className="delete-pdf-btn"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handlePdfDelete(set.AlignerSetID);
-                                                        }}
-                                                        title="Delete PDF"
-                                                    >
-                                                        <i className="fas fa-trash"></i>
-                                                        <span>Delete PDF</span>
-                                                    </button>
-                                                </>
-                                            ) : (
-                                                <label
-                                                    className="upload-pdf-btn"
-                                                    style={{ cursor: 'pointer' }}
-                                                    onClick={(e) => e.stopPropagation()}
+                                            {set.SetPdfUrl && (
+                                                <button
+                                                    className="pdf-btn"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        window.open(set.SetPdfUrl, '_blank');
+                                                    }}
+                                                    title={set.SetPdfUrl}
                                                 >
-                                                    {uploadingPdf[set.AlignerSetID] ? (
-                                                        <>
-                                                            <i className="fas fa-spinner fa-spin"></i>
-                                                            <span>Uploading...</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <i className="fas fa-upload"></i>
-                                                            <span>Upload PDF</span>
-                                                        </>
-                                                    )}
-                                                    <input
-                                                        type="file"
-                                                        accept=".pdf,application/pdf"
-                                                        style={{ display: 'none' }}
-                                                        onChange={(e) => {
-                                                            if (e.target.files && e.target.files[0]) {
-                                                                handlePdfUpload(set.AlignerSetID, e.target.files[0]);
-                                                                e.target.value = '';
-                                                            }
-                                                        }}
-                                                        disabled={uploadingPdf[set.AlignerSetID]}
-                                                    />
-                                                </label>
+                                                    <i className="fas fa-file-pdf"></i>
+                                                    <span>View PDF</span>
+                                                </button>
                                             )}
                                             {set.SetCost && set.Balance > 0 && (
                                                 <button
@@ -964,6 +896,17 @@ const PatientSets = () => {
                                                     <span>Add Payment</span>
                                                 </button>
                                             )}
+                                            <button
+                                                className="delete-set-btn"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteSet(set, e);
+                                                }}
+                                                title="Delete Set"
+                                            >
+                                                <i className="fas fa-trash"></i>
+                                                <span>Delete</span>
+                                            </button>
                                             <button className={`toggle-batches-btn ${expandedSets[set.AlignerSetID] ? 'expanded' : ''}`}>
                                                 <span>View Batches ({set.TotalBatches})</span>
                                                 <i className="fas fa-chevron-down"></i>
@@ -1475,6 +1418,7 @@ const PatientSets = () => {
                     doctors={doctors}
                     allSets={alignerSets}
                     defaultDoctorId={doctorId}
+                    folderPath={editingSet ? generateFolderPath(editingSet) : null}
                 />
             )}
 

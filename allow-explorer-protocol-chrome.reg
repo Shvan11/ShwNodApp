@@ -1,0 +1,12 @@
+Windows Registry Editor Version 5.00
+
+; Allow the explorer: protocol in Chrome/Edge without prompting
+; This tells browsers to allow the custom protocol without asking the user
+
+; For Google Chrome - Allow custom protocol URLs
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome\URLAllowlist]
+"1"="explorer:*"
+
+; For Microsoft Edge - Allow custom protocol URLs
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge\URLAllowlist]
+"1"="explorer:*"

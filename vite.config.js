@@ -25,7 +25,8 @@ export default defineConfig({
         'auth': resolve(__dirname, 'public/views/messaging/auth.html'),
         aligner: resolve(__dirname, 'public/views/aligner.html'),
         alignerportal: resolve(__dirname, 'public/views/alignerportal.html'),
-        visits: resolve(__dirname, 'public/views/visits.html')
+        visits: resolve(__dirname, 'public/views/visits.html'),
+        expenses: resolve(__dirname, 'public/views/expenses.html')
       }
     }
   },
@@ -98,6 +99,11 @@ export default defineConfig({
         target: 'http://localhost:5173',
         changeOrigin: true,
         rewrite: (path) => '/views/patient-management.html'
+      },
+      '/expenses': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        rewrite: (path) => '/views/expenses.html'
       },
       // Patient routes - serve HTML from Vite dev server, proxy API calls to Express
       '/patient': {

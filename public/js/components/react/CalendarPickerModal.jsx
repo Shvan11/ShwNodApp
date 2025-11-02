@@ -14,14 +14,14 @@ const CalendarPickerModal = ({ onSelectDateTime, onClose, initialDate = new Date
 
     // Handle slot selection from the calendar
     const handleSlotSelect = useCallback((slotData) => {
-        // Only allow selection of available slots (not booked or past)
+        // Only allow selection of available slots (not booked, past, or full)
         if (slotData.slotStatus !== 'available') {
             return;
         }
 
         // Create datetime from slot data
         const selectedDateTime = new Date(`${slotData.date}T${slotData.time}:00`);
-        
+
         setSelectedSlot({
             ...slotData,
             dateTime: selectedDateTime
@@ -133,7 +133,7 @@ const CalendarPickerModal = ({ onSelectDateTime, onClose, initialDate = new Date
                         mode="selection"
                         onSlotSelect={handleSlotSelect}
                         selectedSlot={selectedSlot}
-                        showOnlyAvailable={true}
+                        showOnlyAvailable={false}
                     />
                 </div>
 
@@ -174,6 +174,10 @@ const CalendarPickerModal = ({ onSelectDateTime, onClose, initialDate = new Date
                         <div className="legend-item">
                             <span className="legend-color booked"></span>
                             <span>Booked</span>
+                        </div>
+                        <div className="legend-item">
+                            <span className="legend-color full"></span>
+                            <span>Full (Max Reached)</span>
                         </div>
                         <div className="legend-item">
                             <span className="legend-color past"></span>

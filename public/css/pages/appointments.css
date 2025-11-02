@@ -375,11 +375,44 @@ body.daily-appointments-view {
   transform: translateX(2px);
 }
 
+.appointment-type {
+  font-size: var(--font-size-sm);
+  color: #6b7280;
+  margin-bottom: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 500;
+}
+
 .appointment-meta {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
   flex-wrap: wrap;
+}
+
+.patient-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  background-color: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  transition: all var(--transition-fast);
+}
+
+.patient-type-badge:hover {
+  background-color: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.patient-type-badge i {
+  font-size: 0.7rem;
 }
 
 /* ===== STATUS BADGES ===== */

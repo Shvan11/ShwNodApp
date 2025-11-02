@@ -186,6 +186,11 @@ function createAppointmentsCards(appointments, showStatus = false) {
     let html = '<div class="appointments-grid">';
 
     appointments.forEach((appointment) => {
+        // Debug: Log appointment data
+        console.log('Appointment data:', appointment);
+        console.log('AppDetail:', appointment.AppDetail);
+        console.log('PatientType:', appointment.PatientType);
+
         const time = appointment.apptime || 'N/A';
         const patientName = appointment.PatientName || 'Unknown';
         const patientId = appointment.PersonID;
@@ -232,7 +237,20 @@ function createAppointmentsCards(appointments, showStatus = false) {
                         </a>
                     </div>
 
+                    ${appointment.AppDetail ? `
+                        <div class="appointment-type">
+                            <i class="fas fa-stethoscope" style="opacity: 0.6; margin-right: 0.25rem;"></i>
+                            ${appointment.AppDetail}
+                        </div>
+                    ` : ''}
+
                     <div class="appointment-meta">
+                        ${appointment.PatientType ? `
+                            <span class="patient-type-badge">
+                                <i class="fas fa-tag"></i>
+                                ${appointment.PatientType}
+                            </span>
+                        ` : ''}
                         ${showStatus ? `
                             <span class="status-badge status-${statusClass}">
                                 <i class="fas fa-${getStatusIcon(status)}"></i>

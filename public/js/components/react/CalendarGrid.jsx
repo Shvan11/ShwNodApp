@@ -23,9 +23,12 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
     const getMaxValidAppointmentsForTimeSlot = (timeSlot) => {
         let maxValidAppointments = 0;
         days.forEach(day => {
-            const appointments = day.appointments[timeSlot] || [];
+            const slotData = day.appointments[timeSlot] || { appointments: [], appointmentCount: 0 };
+            const appointments = slotData.appointments || slotData; // Handle both old and new format
+            const appointmentArray = Array.isArray(appointments) ? appointments : [];
+
             // Filter valid appointments using the same logic as TimeSlot component
-            const validAppointments = appointments.filter(appointment => 
+            const validAppointments = appointmentArray.filter(appointment =>
                 appointment && (appointment.patientName || appointment.appointmentID)
             );
             if (validAppointments.length > maxValidAppointments) {
@@ -128,47 +131,31 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
                         </div>
                         
                         {timeSlots.map(timeSlot => {
-                            const appointments = day.appointments[timeSlot] || [];
+                            const slotInfo = day.appointments[timeSlot] || { appointments: [], appointmentCount: 0, slotStatus: 'available' };
+
+                            // Handle both old array format and new object format
+                            const appointments = Array.isArray(slotInfo) ? slotInfo : (slotInfo.appointments || []);
+                            const slotStatus = slotInfo.slotStatus || (appointments.length > 0 ? 'booked' : getSlotStatus(day.date, timeSlot));
+
                             const uniformHeight = getTimeSlotHeight(timeSlot); // Use uniform height for all slots at this time
                             const slotData = {
                                 date: day.date,
                                 time: timeSlot,
                                 dayName: day.dayName,
                                 appointments: appointments,
-                                slotStatus: appointments.length > 0 ? 'booked' : getSlotStatus(day.date, timeSlot),
+                                slotStatus: slotStatus,
                                 appointmentID: appointments.length > 0 ? appointments[0].appointmentID : null,
                                 appDetail: appointments.length > 0 ? appointments[0].appDetail : null,
                                 patientName: appointments.length > 0 ? appointments[0].patientName : null
                             };
-
-                            // In selection mode with showOnlyAvailable, hide non-available slots
-                            const shouldHideSlot = mode === 'selection' && showOnlyAvailable && 
-                                                 slotData.slotStatus !== 'available';
-                            
-                            if (shouldHideSlot) {
-                                return (
-                                    <div 
-                                        key={`${day.date}-${timeSlot}`}
-                                        className="time-slot unavailable-hidden"
-                                        style={{
-                                            minHeight: `${uniformHeight}px`,
-                                            height: `${uniformHeight}px`
-                                        }}
-                                    >
-                                        <div className="unavailable-content">
-                                            <span className="unavailable-text">Not Available</span>
-                                        </div>
-                                    </div>
-                                );
-                            }
 
                             return (
                                 <TimeSlot
                                     key={`${day.date}-${timeSlot}`}
                                     slotData={slotData}
                                     onClick={onSlotClick}
-                                    isSelected={selectedSlot && 
-                                               selectedSlot.date === day.date && 
+                                    isSelected={selectedSlot &&
+                                               selectedSlot.date === day.date &&
                                                selectedSlot.time === timeSlot}
                                     uniformHeight={uniformHeight}
                                     mode={mode}

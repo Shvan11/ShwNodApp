@@ -377,6 +377,11 @@
 }
 
 .legend-color.booked {
+    background: #e3f2fd;
+    border-color: #2196f3;
+}
+
+.legend-color.full {
     background: #fff3cd;
     border-color: #ffc107;
 }
