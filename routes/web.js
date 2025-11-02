@@ -34,6 +34,10 @@ router.get('/patient/*', (_, res) => {
 });
 
 // Aligner Management - React Router handles all /aligner/* routes
+router.get('/aligner', (_, res) => {
+  serveWithFallback(res, '/views/aligner.html', 'Aligner management not found');
+});
+
 router.get('/aligner/*', (_, res) => {
   serveWithFallback(res, '/views/aligner.html', 'Aligner management not found');
 });

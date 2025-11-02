@@ -33,7 +33,6 @@ const PatientSets = () => {
     const [showPaymentDrawer, setShowPaymentDrawer] = useState(false);
     const [currentSetForPayment, setCurrentSetForPayment] = useState(null);
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
-    const [uploadingPdf, setUploadingPdf] = useState({});
 
     // Note states for lab communication
     const [showAddLabNote, setShowAddLabNote] = useState({});
@@ -260,17 +259,25 @@ const PatientSets = () => {
             return;
         }
 
-        // Use the utility function to copy to clipboard
-        const success = await copyToClipboard(folderPath);
+        // Try to open using explorer: protocol
+        try {
+            const explorerUrl = `explorer:${folderPath}`;
 
-        if (success) {
+            // Create a temporary link and click it to trigger the protocol handler
+            const link = document.createElement('a');
+            link.href = explorerUrl;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
             // Show success notification
             const notification = document.createElement('div');
             notification.style.cssText = `
                 position: fixed;
                 top: 20px;
                 right: 20px;
-                background: linear-gradient(135deg, #4caf50, #45a049);
+                background: linear-gradient(135deg, #2563eb, #1d4ed8);
                 color: white;
                 padding: 1rem 1.5rem;
                 border-radius: 8px;
@@ -282,9 +289,9 @@ const PatientSets = () => {
             `;
             notification.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    <i class="fas fa-check-circle" style="font-size: 1.2rem;"></i>
+                    <i class="fas fa-folder-open" style="font-size: 1.2rem;"></i>
                     <div>
-                        <div style="font-weight: 600; margin-bottom: 0.25rem;">Folder path copied!</div>
+                        <div style="font-weight: 600; margin-bottom: 0.25rem;">Opening folder in Explorer...</div>
                         <div style="font-size: 0.85rem; opacity: 0.9;">${folderPath}</div>
                     </div>
                 </div>
@@ -292,14 +299,26 @@ const PatientSets = () => {
 
             document.body.appendChild(notification);
 
-            // Remove notification after 4 seconds
+            // Remove notification after 3 seconds
             setTimeout(() => {
                 notification.style.animation = 'slideOut 0.3s ease-out';
                 setTimeout(() => notification.remove(), 300);
-            }, 4000);
-        } else {
-            // Fallback - show path in alert
-            alert(`Folder path:\n${folderPath}\n\nCould not copy to clipboard automatically.`);
+            }, 3000);
+
+            // Also copy to clipboard as a fallback
+            await copyToClipboard(folderPath);
+
+        } catch (error) {
+            console.error('Error opening folder:', error);
+
+            // Fallback - copy to clipboard and show alert
+            const success = await copyToClipboard(folderPath);
+
+            if (success) {
+                alert(`Folder path copied to clipboard:\n${folderPath}\n\nNote: Please ensure the explorer: protocol handler is installed.`);
+            } else {
+                alert(`Folder path:\n${folderPath}\n\nNote: Please ensure the explorer: protocol handler is installed.`);
+            }
         }
     };
 
@@ -436,72 +455,6 @@ const PatientSets = () => {
                 setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
             }
         });
-    };
-
-    // PDF Upload
-    const handlePdfUpload = async (setId, file) => {
-        if (!file) return;
-
-        if (file.type !== 'application/pdf') {
-            alert('Please select a PDF file');
-            return;
-        }
-
-        if (file.size > 100 * 1024 * 1024) {
-            alert('File is too large. Maximum size is 100MB.');
-            return;
-        }
-
-        try {
-            setUploadingPdf(prev => ({ ...prev, [setId]: true }));
-
-            const formData = new FormData();
-            formData.append('pdf', file);
-
-            const response = await fetch(`/api/aligner/sets/${setId}/upload-pdf`, {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to upload PDF');
-            }
-
-            alert('PDF uploaded successfully');
-            await loadAlignerSets(patient.workid);
-
-        } catch (error) {
-            console.error('Error uploading PDF:', error);
-            alert('Failed to upload PDF: ' + error.message);
-        } finally {
-            setUploadingPdf(prev => ({ ...prev, [setId]: false }));
-        }
-    };
-
-    const handlePdfDelete = async (setId) => {
-        if (!confirm('Are you sure you want to delete this PDF?')) {
-            return;
-        }
-
-        try {
-            const response = await fetch(`/api/aligner/sets/${setId}/pdf`, {
-                method: 'DELETE'
-            });
-
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to delete PDF');
-            }
-
-            alert('PDF deleted successfully');
-            await loadAlignerSets(patient.workid);
-        } catch (error) {
-            console.error('Error deleting PDF:', error);
-            alert('Failed to delete PDF: ' + error.message);
-        }
     };
 
     // Quick URL handlers

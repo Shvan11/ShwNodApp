@@ -68,7 +68,12 @@ export default defineConfig({
       '/settings': {
         target: 'http://localhost:5173',
         changeOrigin: true,
-        rewrite: (path) => '/views/settings.html'
+        bypass: (req) => {
+          // For React Router apps, serve the HTML file for all subroutes
+          if (req.url.startsWith('/settings')) {
+            return '/views/settings.html'
+          }
+        }
       },
       '/send-message': {
         target: 'http://localhost:5173',
@@ -85,15 +90,26 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => '/views/messaging/auth.html'
       },
+      // React Router apps - handle all subroutes
       '/aligner': {
         target: 'http://localhost:5173',
         changeOrigin: true,
-        rewrite: (path) => '/views/aligner.html'
+        bypass: (req) => {
+          // For React Router apps, serve the HTML file for all subroutes
+          if (req.url.startsWith('/aligner')) {
+            return '/views/aligner.html'
+          }
+        }
       },
       '/portal': {
         target: 'http://localhost:5173',
         changeOrigin: true,
-        rewrite: (path) => '/views/alignerportal.html'
+        bypass: (req) => {
+          // For React Router apps, serve the HTML file for all subroutes
+          if (req.url.startsWith('/portal')) {
+            return '/views/alignerportal.html'
+          }
+        }
       },
       '/patient-management': {
         target: 'http://localhost:5173',
@@ -105,11 +121,16 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => '/views/expenses.html'
       },
-      // Patient routes - serve HTML from Vite dev server, proxy API calls to Express
+      // Patient routes - React Router app, serve HTML for all subroutes
       '/patient': {
         target: 'http://localhost:5173',
         changeOrigin: true,
-        rewrite: () => '/views/patient/react-shell.html'
+        bypass: (req) => {
+          // For React Router apps, serve the HTML file for all subroutes
+          if (req.url.startsWith('/patient')) {
+            return '/views/patient/react-shell.html'
+          }
+        }
       }
     }
   },
