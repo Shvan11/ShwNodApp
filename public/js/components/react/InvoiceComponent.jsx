@@ -215,7 +215,7 @@ const InvoiceComponent = ({ patientId }) => {
             if (result.status === 'success') {
                 alert('Invoice added successfully!');
                 setShowModal(false);
-                // Trigger refresh of payments if PaymentsComponent is present
+                // Refresh the page to show updated data
                 window.location.reload();
             } else {
                 alert('Error adding invoice: ' + result.message);

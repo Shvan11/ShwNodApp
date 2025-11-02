@@ -4,7 +4,7 @@ import UniversalHeader from '../components/react/UniversalHeader.jsx';
 import PatientApp from '../apps/PatientApp.jsx';
 import '../../css/main.css';
 import '../../css/pages/grid.css';
-import '../../css/pages/payments.css';
+import '../../css/pages/work-payments.css';
 import '../../css/pages/xrays.css';
 import '../../css/pages/visits-summary.css';
 import '../../css/pages/canvas.css';

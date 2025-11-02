@@ -1,12 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }) => {
     const [formData, setFormData] = useState({
         Amountpaid: '',
-        Dateofpayment: new Date().toISOString().split('T')[0],
-        ActualAmount: '',
-        ActualCur: 'USD',
-        Change: ''
+        Dateofpayment: new Date().toISOString().split('T')[0]
     });
 
     const [errors, setErrors] = useState({});
@@ -17,10 +14,7 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }) => {
             // Reset form when drawer opens
             setFormData({
                 Amountpaid: set.Balance || set.SetCost || '',
-                Dateofpayment: new Date().toISOString().split('T')[0],
-                ActualAmount: '',
-                ActualCur: set.Currency || 'USD',
-                Change: ''
+                Dateofpayment: new Date().toISOString().split('T')[0]
             });
             setErrors({});
         }
@@ -32,18 +26,6 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }) => {
             ...prev,
             [name]: value
         }));
-
-        // Auto-calculate change
-        if (name === 'ActualAmount' || name === 'Amountpaid') {
-            const actualAmount = name === 'ActualAmount' ? parseFloat(value) || 0 : parseFloat(formData.ActualAmount) || 0;
-            const amountPaid = name === 'Amountpaid' ? parseFloat(value) || 0 : parseFloat(formData.Amountpaid) || 0;
-            const change = actualAmount - amountPaid;
-
-            setFormData(prev => ({
-                ...prev,
-                Change: change > 0 ? change.toFixed(2) : ''
-            }));
-        }
 
         // Clear error for this field
         if (errors[name]) {
@@ -83,8 +65,9 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }) => {
             await onSave({
                 ...formData,
                 Amountpaid: parseFloat(formData.Amountpaid),
-                ActualAmount: formData.ActualAmount ? parseFloat(formData.ActualAmount) : null,
-                Change: formData.Change ? parseFloat(formData.Change) : null
+                ActualAmount: null,
+                ActualCur: set?.Currency || 'USD',
+                Change: null
             });
             onClose();
         } catch (error) {
@@ -99,12 +82,14 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }) => {
 
     const remainingBalance = set?.Balance || set?.SetCost || 0;
     const totalPaid = set?.TotalPaid || 0;
+    const newBalance = remainingBalance - (parseFloat(formData.Amountpaid) || 0);
+    const currency = set?.Currency || 'USD';
 
     return (
         <div className="drawer-overlay" onClick={onClose}>
-            <div className="drawer-container" onClick={(e) => e.stopPropagation()}>
+            <div className="drawer-container aligner-payment-drawer" onClick={(e) => e.stopPropagation()}>
                 <div className="drawer-header">
-                    <h2>Add Payment for Set #{set?.SetSequence}</h2>
+                    <h2>Add Payment</h2>
                     <button className="drawer-close-btn" onClick={onClose}>
                         <i className="fas fa-times"></i>
                     </button>
@@ -112,28 +97,34 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }) => {
 
                 <div className="drawer-body">
                     {/* Payment Summary */}
-                    <div className="payment-summary">
-                        <div className="summary-row">
-                            <span>Set Cost:</span>
-                            <strong>{set?.SetCost || 0} {set?.Currency || 'USD'}</strong>
+                    <div className="aligner-payment-summary">
+                        <div className="summary-header">
+                            <h3>Set #{set?.SetSequence}</h3>
+                            <span className="set-currency">{currency}</span>
                         </div>
-                        <div className="summary-row">
-                            <span>Total Paid:</span>
-                            <strong>{totalPaid} {set?.Currency || 'USD'}</strong>
-                        </div>
-                        <div className="summary-row balance">
-                            <span>Remaining Balance:</span>
-                            <strong>{remainingBalance} {set?.Currency || 'USD'}</strong>
+                        <div className="summary-grid">
+                            <div className="summary-item">
+                                <span className="label">Set Cost</span>
+                                <span className="value">{set?.SetCost || 0}</span>
+                            </div>
+                            <div className="summary-item">
+                                <span className="label">Total Paid</span>
+                                <span className="value">{totalPaid}</span>
+                            </div>
+                            <div className="summary-item highlight">
+                                <span className="label">Balance Due</span>
+                                <span className="value">{remainingBalance}</span>
+                            </div>
                         </div>
                     </div>
 
-                    <form onSubmit={handleSubmit}>
+                    <form onSubmit={handleSubmit} className="aligner-payment-form">
                         {/* Amount Paid */}
-                        <div className="form-group">
+                        <div className="form-field">
                             <label htmlFor="Amountpaid">
-                                Amount Paid <span className="required">*</span>
+                                Amount to Pay <span className="required">*</span>
                             </label>
-                            <div className="input-with-currency">
+                            <div className="input-group">
                                 <input
                                     type="number"
                                     id="Amountpaid"
@@ -144,14 +135,15 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }) => {
                                     min="0.01"
                                     className={errors.Amountpaid ? 'error' : ''}
                                     autoFocus
+                                    placeholder="Enter amount"
                                 />
-                                <span className="currency-label">{set?.Currency || 'USD'}</span>
+                                <span className="currency-badge">{currency}</span>
                             </div>
-                            {errors.Amountpaid && <span className="error-text">{errors.Amountpaid}</span>}
+                            {errors.Amountpaid && <span className="error-message">{errors.Amountpaid}</span>}
                         </div>
 
                         {/* Payment Date */}
-                        <div className="form-group">
+                        <div className="form-field">
                             <label htmlFor="Dateofpayment">
                                 Payment Date <span className="required">*</span>
                             </label>
@@ -163,46 +155,17 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }) => {
                                 onChange={handleChange}
                                 className={errors.Dateofpayment ? 'error' : ''}
                             />
-                            {errors.Dateofpayment && <span className="error-text">{errors.Dateofpayment}</span>}
+                            {errors.Dateofpayment && <span className="error-message">{errors.Dateofpayment}</span>}
                         </div>
 
-                        {/* Actual Amount (Optional - for change calculation) */}
-                        <div className="form-group">
-                            <label htmlFor="ActualAmount">
-                                Actual Amount Received (Optional)
-                            </label>
-                            <div className="input-with-currency">
-                                <input
-                                    type="number"
-                                    id="ActualAmount"
-                                    name="ActualAmount"
-                                    value={formData.ActualAmount}
-                                    onChange={handleChange}
-                                    step="0.01"
-                                    min="0"
-                                    placeholder="If customer paid more"
-                                />
-                                <select
-                                    name="ActualCur"
-                                    value={formData.ActualCur}
-                                    onChange={handleChange}
-                                    className="currency-select"
-                                >
-                                    <option value="USD">USD</option>
-                                    <option value="IQD">IQD</option>
-                                    <option value="EUR">EUR</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* Change (Auto-calculated) */}
-                        {formData.Change && parseFloat(formData.Change) > 0 && (
-                            <div className="form-group">
-                                <label>Change to Return</label>
-                                <div className="change-display">
-                                    <i className="fas fa-coins"></i>
-                                    <strong>{formData.Change} {formData.ActualCur}</strong>
-                                </div>
+                        {/* New Balance Preview */}
+                        {formData.Amountpaid && (
+                            <div className="balance-preview">
+                                <span className="preview-label">New Balance:</span>
+                                <span className={`preview-value ${newBalance <= 0 ? 'paid-full' : ''}`}>
+                                    {newBalance.toFixed(2)} {currency}
+                                </span>
+                                {newBalance <= 0 && <span className="badge-success">Fully Paid</span>}
                             </div>
                         )}
 
@@ -232,8 +195,8 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }) => {
                             </>
                         ) : (
                             <>
-                                <i className="fas fa-save"></i>
-                                Add Payment
+                                <i className="fas fa-check"></i>
+                                Save Payment
                             </>
                         )}
                     </button>

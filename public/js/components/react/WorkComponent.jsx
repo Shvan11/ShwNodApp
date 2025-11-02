@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import WorkCard from './WorkCard.jsx';
 import PaymentModal from './PaymentModal.jsx';
+import { printReceipt } from '../../utils/receiptGenerator.js';
 import '../../../css/components/work-card.css';
 
 const WorkComponent = ({ patientId }) => {
@@ -348,16 +349,6 @@ const WorkComponent = ({ patientId }) => {
         }
     };
 
-    const getStatusBadge = (work) => {
-        if (work.Finished) {
-            return <span className="status-badge completed">Completed</span>;
-        } else if (work.StartDate) {
-            return <span className="status-badge in-progress">In Progress</span>;
-        } else {
-            return <span className="status-badge planned">Planned</span>;
-        }
-    };
-
     const getProgressPercentage = (work) => {
         if (work.Finished) return 100;
         if (!work.StartDate) return 0;
@@ -448,38 +439,27 @@ const WorkComponent = ({ patientId }) => {
         }
     };
 
-    const handlePaymentFormSubmit = async (e) => {
-        e.preventDefault();
-
+    const handlePrintReceipt = async (work) => {
         try {
-            // Convert form data to match API expectations
-            const payload = {
-                workid: paymentFormData.workid,
-                amountPaid: parseFloat(paymentFormData.Amountpaid),
-                paymentDate: paymentFormData.Dateofpayment,
-                actualAmount: paymentFormData.ActualAmount ? parseFloat(paymentFormData.ActualAmount) : null,
-                actualCurrency: paymentFormData.ActualCur,
-                change: paymentFormData.Change ? parseFloat(paymentFormData.Change) : 0
+            // Fetch work data from API
+            const response = await fetch(`/api/getworkforreceipt/${work.workid}`);
+            if (!response.ok) throw new Error('Failed to fetch work data');
+            const data = await response.json();
+
+            // Prepare receipt data
+            const receiptData = {
+                ...data,
+                amountPaidToday: 0, // No new payment, just reprinting
+                paymentDateTime: new Date().toISOString(),
+                newBalance: (data.TotalRequired || 0) - (data.TotalPaid || 0)
             };
 
-            const response = await fetch('/api/addInvoice', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            // Use shared print utility
+            printReceipt(receiptData);
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to add payment');
-            }
-
-            await loadWorks(); // Refresh works to update paid amounts
-            setShowPaymentModal(false);
-            setShowPaymentHistoryModal(false); // Close history modal if open
-            setSuccessMessage('Payment added successfully!');
-            setTimeout(() => setSuccessMessage(null), 5000);
         } catch (err) {
-            setError(err.message);
+            console.error('Error printing receipt:', err);
+            alert('Failed to print receipt');
         }
     };
 
@@ -652,6 +632,7 @@ const WorkComponent = ({ patientId }) => {
                         onAddAlignerSet={handleAddAlignerSet}
                         onComplete={handleCompleteWork}
                         onViewVisits={(work) => window.location.href = `/views/visits.html?workId=${work.workid}&patient=${patientId}`}
+                        onPrintReceipt={handlePrintReceipt}
                         formatDate={formatDate}
                         formatCurrency={formatCurrency}
                         getProgressPercentage={getProgressPercentage}
@@ -1168,10 +1149,16 @@ const WorkComponent = ({ patientId }) => {
             {showPaymentModal && selectedWorkForPayment && (
                 <PaymentModal
                     workData={selectedWorkForPayment}
-                    onClose={() => setShowPaymentModal(false)}
+                    onClose={() => {
+                        setShowPaymentModal(false);
+                        setSelectedWorkForPayment(null);
+                        // Reload works when modal is closed to show updated balance
+                        loadWorks();
+                    }}
                     onSuccess={(result) => {
+                        // Don't reload works here - let PaymentModal show success state first
+                        // Works will be reloaded when modal is closed via onClose
                         setSuccessMessage('Payment added successfully!');
-                        loadWorks(); // Reload works to show updated balance
                     }}
                 />
             )}
@@ -1179,16 +1166,37 @@ const WorkComponent = ({ patientId }) => {
             {/* Payment History Modal */}
             {showPaymentHistoryModal && selectedWorkForPayment && (
                 <div className="modal-overlay">
-                    <div className="work-modal details-modal" style={{ maxWidth: '900px' }}>
-                        <div className="modal-header">
+                    <div className="work-modal details-modal" style={{ maxWidth: '900px', position: 'relative', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+                        <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100, backgroundColor: 'white' }}>
                             <h3>Payment History - {selectedWorkForPayment.TypeName || 'Work #' + selectedWorkForPayment.workid}</h3>
                             <button
-                                onClick={() => setShowPaymentHistoryModal(false)}
+                                onClick={() => {
+                                    console.log('CLOSE BUTTON CLICKED!');
+                                    setShowPaymentHistoryModal(false);
+                                }}
                                 className="modal-close"
+                                style={{
+                                    background: '#ef4444',
+                                    border: 'none',
+                                    fontSize: '2rem',
+                                    color: 'white',
+                                    cursor: 'pointer',
+                                    padding: '0',
+                                    width: '50px',
+                                    height: '50px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: '8px',
+                                    fontWeight: '700',
+                                    lineHeight: '1',
+                                    flexShrink: '0'
+                                }}
                             >
                                 ×
                             </button>
                         </div>
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
 
                         <div style={{
                             padding: '1rem',
@@ -1233,6 +1241,7 @@ const WorkComponent = ({ patientId }) => {
                                             <th>Actual Amount</th>
                                             <th>Actual Currency</th>
                                             <th>Change</th>
+                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1245,11 +1254,82 @@ const WorkComponent = ({ patientId }) => {
                                                 <td>{payment.ActualAmount ? formatCurrency(payment.ActualAmount, payment.ActualCur) : '-'}</td>
                                                 <td>{payment.ActualCur || '-'}</td>
                                                 <td>{payment.Change ? formatCurrency(payment.Change, payment.ActualCur) : '-'}</td>
+                                                <td>
+                                                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                        <button
+                                                            onClick={() => {
+                                                                alert(`Edit payment functionality coming soon!\n\nPayment ID: ${payment.InvoiceID}\nAmount: ${formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}`);
+                                                            }}
+                                                            style={{
+                                                                background: '#eff6ff',
+                                                                border: 'none',
+                                                                padding: '0.5rem',
+                                                                borderRadius: '6px',
+                                                                cursor: 'pointer',
+                                                                color: '#3b82f6',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                            onMouseOver={(e) => {
+                                                                e.currentTarget.style.background = '#3b82f6';
+                                                                e.currentTarget.style.color = 'white';
+                                                            }}
+                                                            onMouseOut={(e) => {
+                                                                e.currentTarget.style.background = '#eff6ff';
+                                                                e.currentTarget.style.color = '#3b82f6';
+                                                            }}
+                                                            title="Edit Payment"
+                                                        >
+                                                            <i className="fas fa-edit"></i>
+                                                        </button>
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (window.confirm(`Are you sure you want to delete this payment?\n\nAmount: ${formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}\nDate: ${formatDate(payment.Dateofpayment)}\n\nThis action cannot be undone.`)) {
+                                                                    try {
+                                                                        const response = await fetch(`/api/deleteInvoice/${payment.InvoiceID}`, {
+                                                                            method: 'DELETE'
+                                                                        });
+                                                                        const result = await response.json();
+                                                                        if (result.status === 'success') {
+                                                                            alert('Payment deleted successfully!');
+                                                                            loadPaymentHistory(selectedWorkForPayment.workid);
+                                                                            loadWorks();
+                                                                        } else {
+                                                                            throw new Error(result.message || 'Failed to delete payment');
+                                                                        }
+                                                                    } catch (error) {
+                                                                        console.error('Error deleting payment:', error);
+                                                                        alert(`Error deleting payment: ${error.message}`);
+                                                                    }
+                                                                }
+                                                            }}
+                                                            style={{
+                                                                background: '#fef2f2',
+                                                                border: 'none',
+                                                                padding: '0.5rem',
+                                                                borderRadius: '6px',
+                                                                cursor: 'pointer',
+                                                                color: '#ef4444',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                            onMouseOver={(e) => {
+                                                                e.currentTarget.style.background = '#ef4444';
+                                                                e.currentTarget.style.color = 'white';
+                                                            }}
+                                                            onMouseOut={(e) => {
+                                                                e.currentTarget.style.background = '#fef2f2';
+                                                                e.currentTarget.style.color = '#ef4444';
+                                                            }}
+                                                            title="Delete Payment"
+                                                        >
+                                                            <i className="fas fa-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
                                             </tr>
                                         ))}
                                         {paymentHistory.length === 0 && (
                                             <tr>
-                                                <td colSpan="5" className="no-data">
+                                                <td colSpan="6" className="no-data">
                                                     No payments recorded yet for this work
                                                 </td>
                                             </tr>
@@ -1289,6 +1369,7 @@ const WorkComponent = ({ patientId }) => {
                                     <i className="fas fa-check-circle"></i> This work is fully paid
                                 </div>
                             )}
+                        </div>
                         </div>
                     </div>
                 </div>

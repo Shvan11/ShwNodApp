@@ -1,7 +1,6 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import GridComponent from './GridComponent.jsx'
-import PaymentsComponent from './PaymentsComponent.jsx'
 import XraysComponent from './XraysComponent.jsx'
 import VisitsComponent from './VisitsComponent.jsx'
 import CompareComponent from './CompareComponent.jsx'
@@ -21,14 +20,7 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
                         tpCode={params.tp || '0'}
                     />
                 );
-            
-            case 'payments':
-                return (
-                    <PaymentsComponent
-                        patientId={patientId}
-                    />
-                );
-            
+
             case 'xrays':
                 return (
                     <XraysComponent

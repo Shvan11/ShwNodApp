@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import '../../../css/components/invoice-form.css'
+import { generateReceiptHTML } from '../../utils/receiptGenerator.js'
 
 const PaymentModal = ({ workData, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
@@ -7,6 +8,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
     const [exchangeRateError, setExchangeRateError] = useState(false);
     const [showRateInput, setShowRateInput] = useState(false);
     const [newRateValue, setNewRateValue] = useState('');
+    const [paymentSuccess, setPaymentSuccess] = useState(false);
+    const [receiptData, setReceiptData] = useState(null);
+    const [completeWorkData, setCompleteWorkData] = useState(null);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -33,10 +37,30 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
     });
 
     useEffect(() => {
-        if (workData) {
+        // Fetch complete work data from V_Report view
+        const fetchCompleteWorkData = async () => {
+            if (workData && workData.workid) {
+                try {
+                    const response = await fetch(`/api/getworkforreceipt/${workData.workid}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        setCompleteWorkData(data);
+                    }
+                } catch (error) {
+                    console.error('Error fetching complete work data:', error);
+                }
+            }
+        };
+
+        fetchCompleteWorkData();
+    }, [workData]);
+
+    useEffect(() => {
+        // Only initialize form data if not in payment success mode
+        if (workData && !paymentSuccess) {
             initializeFormData();
         }
-    }, [workData]);
+    }, [workData, paymentSuccess]);
 
     useEffect(() => {
         if (formData.paymentDate) {
@@ -340,10 +364,24 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
             const result = await response.json();
 
             if (result.status === 'success') {
+                // Set success state and prepare receipt data with complete work data
+                setPaymentSuccess(true);
+                setReceiptData({
+                    ...workData,
+                    // Override with complete data from V_Report if available
+                    ...(completeWorkData || {}),
+                    amountPaidToday: amountPaid,
+                    paymentDate: formData.paymentDate,
+                    paymentDateTime: new Date().toISOString(),
+                    usdReceived: actualUSD,
+                    iqdReceived: actualIQD,
+                    change: parseInt(formData.change) || 0,
+                    newBalance: (workData.TotalRequired - workData.TotalPaid - amountPaid)
+                });
+
                 if (onSuccess) {
                     onSuccess(result);
                 }
-                onClose();
             } else {
                 alert('Error adding payment: ' + result.message);
             }
@@ -353,6 +391,16 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handlePrint = () => {
+        window.print();
+    };
+
+    const handleCloseAfterSuccess = () => {
+        setPaymentSuccess(false);
+        setReceiptData(null);
+        onClose();
     };
 
     const formatCurrency = (amount, currency) => {
@@ -370,16 +418,37 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         return Math.round(num).toLocaleString('en-US');
     };
 
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    };
+
+    const formatDateTime = (dateString) => {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
     if (!workData) return null;
 
     return (
-        <div className="modal-overlay">
-            <div className="modal-content invoice-modal">
-                <button className="modal-close" onClick={onClose}>×</button>
+        <>
+            <div className="modal-overlay">
+                <div className="modal-content invoice-modal">
+                <button className="modal-close" onClick={paymentSuccess ? handleCloseAfterSuccess : onClose}>×</button>
 
-                <h2 className="modal-title">
-                    Add Payment - {workData.TypeName || `Work #${workData.workid}`}
-                </h2>
+                {!paymentSuccess ? (
+                    <>
+                        <h2 className="modal-title">
+                            Add Payment - {workData.TypeName || `Work #${workData.workid}`}
+                        </h2>
 
                 <div className="modal-description" style={{
                     padding: '0 24px 20px',
@@ -488,31 +557,33 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                 ) : null}
 
                 <form onSubmit={handleSubmit} className="invoice-form">
-                    {/* STEP 1: Payment Currency */}
-                    <div className="form-section">
-                        <h4 className="section-title">
-                            <span className="step-number">1</span>
-                            Payment Currency
-                        </h4>
+                    {/* Two Column Grid for Steps 1-2 */}
+                    <div className="invoice-form-grid">
+                        {/* STEP 1: Payment Currency */}
+                        <div className="form-section">
+                            <h4 className="section-title">
+                                <span className="step-number">1</span>
+                                Payment Currency
+                            </h4>
 
-                        <div className="form-group">
-                            <label htmlFor="paymentCurrency">How is patient paying?</label>
-                            <select
-                                id="paymentCurrency"
-                                name="paymentCurrency"
-                                value={formData.paymentCurrency}
-                                onChange={handleInputChange}
-                                className="currency-select"
-                            >
-                                <option value="USD">US Dollars (USD) Only</option>
-                                <option value="IQD">Iraqi Dinar (IQD) Only</option>
-                                <option value="MIXED">Mixed (USD + IQD)</option>
-                            </select>
+                            <div className="form-group">
+                                <label htmlFor="paymentCurrency">How is patient paying?</label>
+                                <select
+                                    id="paymentCurrency"
+                                    name="paymentCurrency"
+                                    value={formData.paymentCurrency}
+                                    onChange={handleInputChange}
+                                    className="currency-select"
+                                >
+                                    <option value="USD">US Dollars (USD) Only</option>
+                                    <option value="IQD">Iraqi Dinar (IQD) Only</option>
+                                    <option value="MIXED">Mixed (USD + IQD)</option>
+                                </select>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* STEP 2: Amount to Register */}
-                    <div className="form-section">
+                        {/* STEP 2: Amount to Register */}
+                        <div className="form-section">
                         <h4 className="section-title">
                             <span className="step-number">2</span>
                             Amount to Register
@@ -550,9 +621,12 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                             />
                         </div>
                     </div>
+                    </div>
 
-                    {/* STEP 3: Cash Collection */}
-                    <div className="form-section">
+                    {/* Two Column Grid for Steps 3-4 */}
+                    <div className="invoice-form-grid">
+                        {/* STEP 3: Cash Collection */}
+                        <div className="form-section">
                         <h4 className="section-title">
                             <span className="step-number">3</span>
                             Cash Collection
@@ -718,8 +792,8 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                         )}
                     </div>
 
-                    {/* STEP 4: Change */}
-                    <div className="form-section">
+                        {/* STEP 4: Change */}
+                        <div className="form-section">
                         <h4 className="section-title">
                             <span className="step-number">4</span>
                             Change to Give
@@ -750,8 +824,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                             )}
                         </div>
                     </div>
+                    </div>
 
-                    {/* Final Summary */}
+                    {/* Final Summary - Full Width */}
                     {(formData.actualUSD || formData.actualIQD) && (
                         <div style={{
                             background: '#f9fafb',
@@ -818,8 +893,46 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                         </button>
                     </div>
                 </form>
+                    </>
+                ) : (
+                    /* Payment Success State with Print Button */
+                    <div style={{ padding: '40px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '64px', color: '#16a34a', marginBottom: '20px' }}>
+                            <i className="fas fa-check-circle"></i>
+                        </div>
+                        <h2 style={{ margin: '0 0 10px 0', fontSize: '24px', color: '#111827' }}>
+                            Payment Recorded Successfully!
+                        </h2>
+                        <p style={{ fontSize: '16px', color: '#6b7280', marginBottom: '30px' }}>
+                            Amount: <strong style={{ color: '#16a34a', fontSize: '20px' }}>
+                                {formatCurrency(receiptData?.amountPaidToday || 0, receiptData?.Currency || 'IQD')}
+                            </strong>
+                        </p>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                            <button
+                                onClick={handlePrint}
+                                className="btn btn-primary btn-lg"
+                            >
+                                <i className="fas fa-print"></i>
+                                Print Receipt
+                            </button>
+                            <button
+                                onClick={handleCloseAfterSuccess}
+                                className="btn btn-secondary"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
+
+        {/* Hidden Print Receipt - Using shared generator */}
+        {paymentSuccess && receiptData && (
+            <div dangerouslySetInnerHTML={{ __html: generateReceiptHTML(receiptData) }} />
+        )}
+        </>
     );
 };
 

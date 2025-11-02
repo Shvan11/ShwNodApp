@@ -1027,6 +1027,40 @@ router.post("/addInvoice", async (req, res) => {
     }
 });
 
+router.delete("/deleteInvoice/:invoiceId", async (req, res) => {
+    try {
+        const { invoiceId } = req.params;
+
+        if (!invoiceId) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Invoice ID is required'
+            });
+        }
+
+        const result = await database.executeQuery(
+            'DELETE FROM dbo.tblInvoice WHERE InvoiceID = @InvoiceID',
+            [['InvoiceID', database.TYPES.Int, parseInt(invoiceId)]]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Invoice not found'
+            });
+        }
+
+        res.json({
+            status: 'success',
+            message: 'Invoice deleted successfully',
+            rowsAffected: result.rowCount
+        });
+    } catch (error) {
+        console.error("Error deleting invoice:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
 router.post("/updateExchangeRate", async (req, res) => {
     try {
         const { exchangeRate } = req.body;
@@ -5106,6 +5140,37 @@ router.get('/expenses-summary', async (req, res) => {
             error: 'Failed to fetch expense summary',
             message: error.message
         });
+    }
+});
+
+// Get work data for receipt from V_Report view (includes patient info, appointment, etc.)
+router.get('/getworkforreceipt/:workId', async (req, res) => {
+    try {
+        const { workId } = req.params;
+        if (!workId) {
+            return res.status(400).json({ error: "Missing required parameter: workId" });
+        }
+
+        const result = await database.executeQuery(
+            'SELECT PersonID, PatientName, Phone, TotalPaid, AppDate, workid, TotalRequired, Currency FROM dbo.V_Report WHERE workid = @WorkID',
+            [['WorkID', database.TYPES.Int, parseInt(workId)]],
+            (columns) => {
+                const row = {};
+                columns.forEach(column => {
+                    row[column.metadata.colName] = column.value;
+                });
+                return row;
+            }
+        );
+
+        if (!result || result.length === 0) {
+            return res.status(404).json({ error: "Work not found" });
+        }
+
+        res.json(result[0]);
+    } catch (error) {
+        console.error("Error fetching work for receipt:", error);
+        res.status(500).json({ error: "Failed to fetch work data" });
     }
 });
 

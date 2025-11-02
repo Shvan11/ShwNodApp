@@ -11,6 +11,7 @@ const WorkCard = ({
     onAddAlignerSet,
     onComplete,
     onViewVisits,
+    onPrintReceipt,
     formatDate,
     formatCurrency,
     getProgressPercentage
@@ -147,6 +148,15 @@ const WorkCard = ({
                 >
                     <i className="fas fa-dollar-sign"></i>
                     <span>Add Payment</span>
+                </button>
+                <button
+                    type="button"
+                    className="btn-card-secondary btn-print-receipt"
+                    onClick={() => onPrintReceipt(work)}
+                    title="Print today's receipt"
+                >
+                    <i className="fas fa-print"></i>
+                    <span>Print Receipt</span>
                 </button>
                 {isAlignerWork(work) && (
                     <button

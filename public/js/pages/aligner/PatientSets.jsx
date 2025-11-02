@@ -747,10 +747,20 @@ const PatientSets = () => {
                             <span><i className="fas fa-tooth"></i> {patient.WorkType}</span>
                         </div>
                     </div>
-                    <button className="btn-add-set" onClick={openAddSetDrawer}>
-                        <i className="fas fa-plus"></i>
-                        Add New Set
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <button
+                            className="btn-add-set"
+                            onClick={() => window.location.href = `/patient/${patient.PersonID}/edit-patient`}
+                            style={{ background: '#059669' }}
+                        >
+                            <i className="fas fa-edit"></i>
+                            Edit Patient
+                        </button>
+                        <button className="btn-add-set" onClick={openAddSetDrawer}>
+                            <i className="fas fa-plus"></i>
+                            Add New Set
+                        </button>
+                    </div>
                 </div>
             </div>
 

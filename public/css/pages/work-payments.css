@@ -1,0 +1,80 @@
+/* work-payments.css - Styles for work management payment tables ONLY */
+/* Scoped to avoid affecting other pages */
+
+/* Table styling - scoped to work component tables */
+.work-component table,
+.invoice-list table {
+  width: 100%;
+  border-collapse: collapse;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background-color: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 1rem;
+}
+
+.work-component th,
+.work-component td,
+.invoice-list th,
+.invoice-list td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.work-component th,
+.invoice-list th {
+  background: #f8f9fa;
+  color: #374151;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: none;
+}
+
+.work-component td,
+.invoice-list td {
+  background-color: #ffffff;
+  color: #374151;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+
+/* Hover effect */
+.work-component tbody tr:hover td,
+.invoice-list tbody tr:hover td {
+  background-color: #f9fafb;
+}
+
+/* Number column styling */
+.work-component td:first-child,
+.invoice-list td:first-child {
+  font-weight: 600;
+  color: #6b7280;
+  text-align: center;
+  width: 60px;
+}
+
+/* Empty state */
+.work-component .empty-state,
+.invoice-list .empty-state {
+  background-color: #f9fafb;
+  padding: 2rem;
+  border-radius: 8px;
+  color: #6b7280;
+  text-align: center;
+  margin-top: 1rem;
+}
+
+/* Error message */
+.work-component .error-message,
+.invoice-list .error-message {
+  background-color: #fef2f2;
+  color: #dc2626;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-top: 1rem;
+  text-align: center;
+  border: 1px solid #fecaca;
+}

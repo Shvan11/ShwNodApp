@@ -2020,3 +2020,291 @@
     font-size: 0.9rem;
     padding: 0.55rem 0.7rem;
 }
+
+
+/* ==================== ALIGNER PAYMENT DRAWER (CLEAN & SIMPLE) ==================== */
+.aligner-payment-drawer.drawer-container {
+    max-width: 450px;
+}
+
+.aligner-payment-summary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1.5rem;
+    color: white;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.aligner-payment-summary .summary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.aligner-payment-summary .summary-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.aligner-payment-summary .set-currency {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.aligner-payment-summary .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.aligner-payment-summary .summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.aligner-payment-summary .summary-item .label {
+    font-size: 0.75rem;
+    opacity: 0.85;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.aligner-payment-summary .summary-item .value {
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.aligner-payment-summary .summary-item.highlight {
+    grid-column: span 3;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    margin-top: 0.5rem;
+}
+
+.aligner-payment-summary .summary-item.highlight .label {
+    font-size: 0.85rem;
+}
+
+.aligner-payment-summary .summary-item.highlight .value {
+    font-size: 1.75rem;
+    color: #fbbf24;
+}
+
+.aligner-payment-form {
+    padding: 1.5rem;
+}
+
+.aligner-payment-form .form-field {
+    margin-bottom: 1.5rem;
+}
+
+.aligner-payment-form .form-field:last-of-type {
+    margin-bottom: 1rem;
+}
+
+.aligner-payment-form label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+.aligner-payment-form .required {
+    color: #ef4444;
+}
+
+.aligner-payment-form .input-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.aligner-payment-form .input-group input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #111827;
+    transition: all 0.2s;
+}
+
+.aligner-payment-form .input-group input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.aligner-payment-form .input-group input.error {
+    border-color: #ef4444;
+}
+
+.aligner-payment-form .currency-badge {
+    background: #f3f4f6;
+    color: #6b7280;
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 1rem;
+    min-width: 60px;
+    text-align: center;
+}
+
+.aligner-payment-form input[type="date"] {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: #111827;
+    transition: all 0.2s;
+}
+
+.aligner-payment-form input[type="date"]:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.aligner-payment-form input[type="date"].error {
+    border-color: #ef4444;
+}
+
+.aligner-payment-form .error-message {
+    display: block;
+    color: #ef4444;
+    font-size: 0.75rem;
+    margin-top: 0.4rem;
+    font-weight: 500;
+}
+
+.balance-preview {
+    background: #f0fdf4;
+    border: 2px solid #86efac;
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.balance-preview .preview-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #166534;
+}
+
+.balance-preview .preview-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #15803d;
+}
+
+.balance-preview .preview-value.paid-full {
+    color: #16a34a;
+}
+
+.balance-preview .badge-success {
+    background: #16a34a;
+    color: white;
+    padding: 0.35rem 0.875rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.aligner-payment-form .error-alert {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    padding: 1rem;
+    color: #991b1b;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.aligner-payment-form .error-alert i {
+    font-size: 1.25rem;
+}
+
+.aligner-payment-drawer .drawer-footer .btn-cancel {
+    background: white;
+    color: #6b7280;
+    border: 2px solid #e5e7eb;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.aligner-payment-drawer .drawer-footer .btn-cancel:hover {
+    border-color: #d1d5db;
+    background: #f9fafb;
+}
+
+.aligner-payment-drawer .drawer-footer .btn-submit {
+    background: linear-gradient(135deg, #16a34a, #15803d);
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s;
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+}
+
+.aligner-payment-drawer .drawer-footer .btn-submit:hover {
+    background: linear-gradient(135deg, #15803d, #166534);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(22, 163, 74, 0.4);
+}
+
+.aligner-payment-drawer .drawer-footer .btn-submit:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.aligner-payment-drawer .drawer-footer .btn-submit i {
+    font-size: 1rem;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .aligner-payment-drawer.drawer-container {
+        max-width: 100%;
+    }
+
+    .aligner-payment-summary .summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .aligner-payment-summary .summary-item.highlight {
+        grid-column: span 1;
+    }
+}
