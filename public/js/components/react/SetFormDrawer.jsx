@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { copyToClipboard } from '../../core/utils.js';
 
 const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets = [], defaultDoctorId, folderPath }) => {
     const [formData, setFormData] = useState({
@@ -270,6 +271,48 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
         window.location.href = `explorer:${folderPath}`;
     };
 
+    const copyFolderPathToClipboard = async () => {
+        if (!folderPath) return;
+
+        const success = await copyToClipboard(folderPath);
+
+        if (success) {
+            // Show success notification
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, #10b981, #059669);
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                z-index: 10000;
+                animation: slideIn 0.3s ease-out;
+                font-size: 0.95rem;
+                max-width: 400px;
+            `;
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i class="fas fa-check-circle" style="font-size: 1.2rem;"></i>
+                    <div>
+                        <div style="font-weight: 600; margin-bottom: 0.25rem;">Folder path copied!</div>
+                        <div style="font-size: 0.85rem; opacity: 0.9;">Paste it in the file dialog address bar</div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(notification);
+
+            // Remove notification after 4 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-out';
+                setTimeout(() => notification.remove(), 300);
+            }, 4000);
+        }
+    };
+
     if (!isOpen) return null;
 
     // Check if doctors are loaded
@@ -504,6 +547,10 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                                             <input
                                                 type="file"
                                                 accept=".pdf,application/pdf"
+                                                onClick={() => {
+                                                    // Automatically copy folder path to clipboard when file input is clicked
+                                                    copyFolderPathToClipboard();
+                                                }}
                                                 onChange={(e) => {
                                                     const file = e.target.files?.[0];
                                                     if (file) {
@@ -525,7 +572,8 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                                                     padding: '0.55rem 0.7rem',
                                                     border: '1px solid #d1d5db',
                                                     borderRadius: '4px',
-                                                    fontSize: '0.9rem'
+                                                    fontSize: '0.9rem',
+                                                    cursor: 'pointer'
                                                 }}
                                             />
                                             {pdfFile && (
@@ -546,7 +594,7 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                                                 fontSize: '0.8rem',
                                                 color: '#666'
                                             }}>
-                                                PDF will be uploaded when you save the set
+                                                <i className="fas fa-info-circle"></i> The folder path is automatically copied to your clipboard when you click "Choose File". Paste it in the file dialog address bar to navigate to the set folder.
                                             </div>
                                         </div>
                                     )}
