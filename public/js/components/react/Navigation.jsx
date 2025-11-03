@@ -9,6 +9,7 @@ const Navigation = ({ patientId, currentPage }) => {
     const [searchParams] = useSearchParams();
     const photosButtonRef = useRef(null);
     const [flyoutPosition, setFlyoutPosition] = useState({ top: 0 });
+    const [patientInfo, setPatientInfo] = useState(null);
 
     // Cache for timepoints
     const [cache, setCache] = useState(new Map());
@@ -60,7 +61,41 @@ const Navigation = ({ patientId, currentPage }) => {
 
     useEffect(() => {
         loadTimepoints(patientId);
+        loadPatientInfo(patientId);
     }, [patientId, loadTimepoints]);
+
+    const loadPatientInfo = async (patientId) => {
+        if (!patientId) return;
+
+        try {
+            const response = await fetch(`/api/getinfos?code=${patientId}`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch patient info');
+            }
+            const data = await response.json();
+            setPatientInfo(data);
+        } catch (err) {
+            console.error('Error loading patient info:', err);
+        }
+    };
+
+    const handleOpenCSImaging = () => {
+        try {
+            // Format patient name (replace spaces with underscores for URL)
+            const patientName = patientInfo?.PatientName?.replace(/ /g, '_') || 'Unknown';
+
+            // Construct csimaging: URL
+            const csimagingUrl = `csimaging:${patientId}?name=${encodeURIComponent(patientName)}`;
+
+            // Trigger the protocol handler
+            window.location.href = csimagingUrl;
+
+            console.log('Opening CS Imaging for patient:', patientId, patientName);
+        } catch (err) {
+            console.error('Error opening CS Imaging:', err);
+            alert('Failed to open CS Imaging: ' + err.message);
+        }
+    };
 
     const formatDate = (dateTime) => {
         return dateTime.substring(0, 10).split("-").reverse().join("-");
@@ -215,6 +250,20 @@ const Navigation = ({ patientId, currentPage }) => {
                     </div>
                     <span className="nav-item-label">X-rays</span>
                 </Link>
+
+                <div
+                    className="sidebar-nav-item csimaging-item"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        handleOpenCSImaging();
+                    }}
+                    title="Open CS Imaging Trophy"
+                >
+                    <div className="nav-item-icon">
+                        <i className="fas fa-radiation" />
+                    </div>
+                    <span className="nav-item-label">CS Imaging</span>
+                </div>
 
                 <div
                     className="sidebar-nav-item appointments-item"

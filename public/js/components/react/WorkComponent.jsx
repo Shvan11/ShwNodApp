@@ -43,16 +43,6 @@ const WorkComponent = ({ patientId }) => {
         Note: ''
     });
 
-    // Payment form state
-    const [paymentFormData, setPaymentFormData] = useState({
-        workid: null,
-        Amountpaid: '',
-        Dateofpayment: new Date().toISOString().split('T')[0],
-        ActualAmount: '',
-        ActualCur: 'USD',
-        Change: 0
-    });
-
     // Form state
     const [formData, setFormData] = useState({
         PersonID: patientId,
@@ -407,14 +397,6 @@ const WorkComponent = ({ patientId }) => {
     // Payment-related handlers
     const handleAddPayment = (work) => {
         setSelectedWorkForPayment(work);
-        setPaymentFormData({
-            workid: work.workid,
-            Amountpaid: '',
-            Dateofpayment: new Date().toISOString().split('T')[0],
-            ActualAmount: '',
-            ActualCur: work.Currency || 'USD',
-            Change: 0
-        });
         setShowPaymentModal(true);
     };
 

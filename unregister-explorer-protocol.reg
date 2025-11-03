@@ -1,8 +1,0 @@
-Windows Registry Editor Version 5.00
-
-; Uninstall registry file for "explorer:" protocol handler
-; This removes the custom protocol from Windows
-;
-; Usage: Double-click this file and click "Yes" to remove from registry
-
-[-HKEY_CLASSES_ROOT\explorer]

@@ -50,6 +50,17 @@ const PatientSets = () => {
     const [quickPdfUrlValue, setQuickPdfUrlValue] = useState('');
     const [savingPdfUrl, setSavingPdfUrl] = useState(false);
 
+    // PDF file upload
+    const [pdfFile, setPdfFile] = useState(null);
+    const [uploadingPdf, setUploadingPdf] = useState(false);
+    const fileInputRef = React.useRef(null);
+    const [hasBaseDirectoryAccess, setHasBaseDirectoryAccess] = useState(false);
+
+    // Check if we have base directory access on mount
+    useEffect(() => {
+        checkBaseDirectoryAccess();
+    }, []);
+
     // Load patient and sets on mount
     useEffect(() => {
         loadPatientAndSets();
@@ -247,8 +258,7 @@ const PatientSets = () => {
 
     const generateFolderPath = (set) => {
         if (!patient || !set) return null;
-        const patientName = formatPatientName(patient).replace(/ /g, '_');
-        const folderPath = `\\\\WORK_PC\\Aligner_Sets\\${set.AlignerDrID}\\${patientName}\\${set.SetSequence}`;
+        const folderPath = `\\\\WORK_PC\\Aligner_Sets\\${set.AlignerDrID}\\${patient.PersonID}\\${set.SetSequence}`;
         return folderPath;
     };
 
@@ -507,11 +517,267 @@ const PatientSets = () => {
         }
     };
 
+    // File System Access API helpers
+    const checkBaseDirectoryAccess = async () => {
+        if (!('showDirectoryPicker' in window)) {
+            setHasBaseDirectoryAccess(false);
+            return;
+        }
+
+        try {
+            const baseHandle = await getBaseDirectoryHandle();
+            if (baseHandle) {
+                const permission = await baseHandle.queryPermission({ mode: 'read' });
+                setHasBaseDirectoryAccess(permission === 'granted');
+            } else {
+                setHasBaseDirectoryAccess(false);
+            }
+        } catch (error) {
+            setHasBaseDirectoryAccess(false);
+        }
+    };
+
+    const requestBaseDirectoryAccess = async () => {
+        if (!('showDirectoryPicker' in window)) {
+            alert('Your browser does not support the File System Access API. Please use Chrome or Edge.');
+            return false;
+        }
+
+        try {
+            const dirHandle = await window.showDirectoryPicker({
+                mode: 'read',
+                startIn: 'desktop'
+            });
+
+            // Verify the folder name is correct
+            if (dirHandle.name !== 'Aligner_Sets') {
+                const confirm = window.confirm(
+                    `You selected folder "${dirHandle.name}". Are you sure this is your Aligner_Sets folder?`
+                );
+                if (!confirm) {
+                    return false;
+                }
+            }
+
+            // Save to IndexedDB
+            await saveBaseDirectoryHandle(dirHandle);
+            setHasBaseDirectoryAccess(true);
+
+            alert('Base folder access granted! You can now open PDFs directly in the correct folders.');
+            return true;
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error('Error requesting directory access:', error);
+                alert('Failed to get directory access: ' + error.message);
+            }
+            return false;
+        }
+    };
+
+    const getBaseDirectoryHandle = async () => {
+        const db = await openDirectoryDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(['directories'], 'readonly');
+            const store = transaction.objectStore('directories');
+            const request = store.get('base_aligner_sets');
+
+            request.onsuccess = () => resolve(request.result?.handle);
+            request.onerror = () => reject(request.error);
+        });
+    };
+
+    const saveBaseDirectoryHandle = async (handle) => {
+        const db = await openDirectoryDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(['directories'], 'readwrite');
+            const store = transaction.objectStore('directories');
+            const request = store.put({ key: 'base_aligner_sets', handle, timestamp: Date.now() });
+
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    };
+
+    const openDirectoryDB = () => {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open('AlignerDirectoryHandles', 1);
+
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result);
+
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains('directories')) {
+                    db.createObjectStore('directories', { keyPath: 'key' });
+                }
+            };
+        });
+    };
+
+    const navigateToSetFolder = async (baseHandle, doctorId, personId, setSequence) => {
+        try {
+            // Navigate: Aligner_Sets/{DoctorID}/{PersonID}/{SetSequence}
+            const doctorHandle = await baseHandle.getDirectoryHandle(doctorId.toString(), { create: false });
+            const personHandle = await doctorHandle.getDirectoryHandle(personId.toString(), { create: false });
+            const setHandle = await personHandle.getDirectoryHandle(setSequence.toString(), { create: false });
+            return setHandle;
+        } catch (error) {
+            console.error('Error navigating to folder:', error);
+            return null;
+        }
+    };
+
     // Quick PDF URL handlers
-    const handleStartEditPdfUrl = (set, e) => {
+    const handleStartEditPdfUrl = async (set, e) => {
         e.stopPropagation();
-        setEditingPdfUrlForSet(set.AlignerSetID);
-        setQuickPdfUrlValue(set.SetPdfUrl || '');
+
+        // Check if File System Access API is supported
+        if (!('showOpenFilePicker' in window)) {
+            fallbackToFileInput(set);
+            return;
+        }
+
+        // Check if we have base directory access
+        if (!hasBaseDirectoryAccess) {
+            const granted = await requestBaseDirectoryAccess();
+            if (!granted) {
+                fallbackToFileInput(set);
+                return;
+            }
+        }
+
+        try {
+            // Get base directory handle
+            const baseHandle = await getBaseDirectoryHandle();
+            if (!baseHandle) {
+                fallbackToFileInput(set);
+                return;
+            }
+
+            // Verify we still have permission
+            let permission = await baseHandle.queryPermission({ mode: 'read' });
+            if (permission !== 'granted') {
+                permission = await baseHandle.requestPermission({ mode: 'read' });
+                if (permission !== 'granted') {
+                    setHasBaseDirectoryAccess(false);
+                    fallbackToFileInput(set);
+                    return;
+                }
+            }
+
+            // Navigate to the specific set folder
+            const setFolderHandle = await navigateToSetFolder(
+                baseHandle,
+                set.AlignerDrID,
+                patient.PersonID,
+                set.SetSequence
+            );
+
+            // Open file picker starting in the set folder
+            const pickerOpts = {
+                types: [{
+                    description: 'PDF Files',
+                    accept: { 'application/pdf': ['.pdf'] }
+                }],
+                multiple: false
+            };
+
+            if (setFolderHandle) {
+                pickerOpts.startIn = setFolderHandle;
+            }
+
+            const [fileHandle] = await window.showOpenFilePicker(pickerOpts);
+            const file = await fileHandle.getFile();
+
+            // Validate and upload
+            if (file.type !== 'application/pdf') {
+                alert('Please select a PDF file');
+                return;
+            }
+
+            if (file.size > 100 * 1024 * 1024) {
+                alert('File is too large. Maximum size is 100MB.');
+                return;
+            }
+
+            await handlePdfUpload(set.AlignerSetID, file);
+
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error('File picker error:', error);
+                fallbackToFileInput(set);
+            }
+        }
+    };
+
+    const fallbackToFileInput = async (set) => {
+        // Copy folder path to clipboard as fallback
+        const folderPath = generateFolderPath(set);
+        if (folderPath) {
+            await copyToClipboard(folderPath);
+        }
+
+        // Trigger hidden file input
+        if (fileInputRef.current) {
+            fileInputRef.current.dataset.setId = set.AlignerSetID;
+            fileInputRef.current.click();
+        }
+    };
+
+    const handlePdfFileChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.type !== 'application/pdf') {
+            alert('Please select a PDF file');
+            e.target.value = '';
+            return;
+        }
+
+        if (file.size > 100 * 1024 * 1024) {
+            alert('File is too large. Maximum size is 100MB.');
+            e.target.value = '';
+            return;
+        }
+
+        const setId = e.target.dataset.setId;
+        if (!setId) return;
+
+        // Upload the PDF
+        await handlePdfUpload(parseInt(setId), file);
+        e.target.value = ''; // Reset file input
+    };
+
+    const handlePdfUpload = async (setId, file) => {
+        try {
+            setUploadingPdf(true);
+
+            const formData = new FormData();
+            formData.append('pdf', file);
+
+            const response = await fetch(`/api/aligner/sets/${setId}/upload-pdf`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to upload PDF');
+            }
+
+            // Show success message
+            alert('PDF uploaded successfully!');
+
+            // Reload aligner sets to show updated PDF
+            await loadAlignerSets(patient.workid);
+
+        } catch (error) {
+            console.error('Error uploading PDF:', error);
+            alert('Failed to upload PDF: ' + error.message);
+        } finally {
+            setUploadingPdf(false);
+        }
     };
 
     const handleCancelEditPdfUrl = () => {
@@ -703,6 +969,65 @@ const PatientSets = () => {
 
     return (
         <div className="aligner-container">
+            {/* Hidden file input for PDF upload */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={handlePdfFileChange}
+                style={{ display: 'none' }}
+            />
+
+            {/* Upload Progress Overlay */}
+            {uploadingPdf && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 9999,
+                    backdropFilter: 'blur(4px)'
+                }}>
+                    <div style={{
+                        background: 'white',
+                        padding: '2rem 3rem',
+                        borderRadius: '12px',
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '1.5rem'
+                    }}>
+                        <div style={{
+                            width: '60px',
+                            height: '60px',
+                            border: '4px solid #e5e7eb',
+                            borderTop: '4px solid #2563eb',
+                            borderRadius: '50%',
+                            animation: 'spin 1s linear infinite'
+                        }}></div>
+                        <div style={{
+                            fontSize: '1.25rem',
+                            fontWeight: '600',
+                            color: '#1f2937'
+                        }}>
+                            Uploading PDF...
+                        </div>
+                        <div style={{
+                            fontSize: '0.875rem',
+                            color: '#6b7280'
+                        }}>
+                            Please wait while your file is being uploaded
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Mode Toggle */}
             <div className="mode-toggle">
                 <button
@@ -747,7 +1072,43 @@ const PatientSets = () => {
                             <span><i className="fas fa-tooth"></i> {patient.WorkType}</span>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                        {/* File System Access Status */}
+                        {'showDirectoryPicker' in window && (
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                padding: '0.5rem 1rem',
+                                background: hasBaseDirectoryAccess ? '#d1fae5' : '#fee2e2',
+                                borderRadius: '6px',
+                                fontSize: '0.875rem'
+                            }}>
+                                <i className={`fas ${hasBaseDirectoryAccess ? 'fa-check-circle' : 'fa-exclamation-circle'}`}
+                                   style={{ color: hasBaseDirectoryAccess ? '#059669' : '#dc2626' }}></i>
+                                <span style={{ color: hasBaseDirectoryAccess ? '#065f46' : '#991b1b' }}>
+                                    {hasBaseDirectoryAccess ? 'Folder Access: Active' : 'Folder Access: Not Set'}
+                                </span>
+                                {!hasBaseDirectoryAccess && (
+                                    <button
+                                        onClick={requestBaseDirectoryAccess}
+                                        style={{
+                                            background: '#dc2626',
+                                            color: 'white',
+                                            border: 'none',
+                                            padding: '0.25rem 0.75rem',
+                                            borderRadius: '4px',
+                                            fontSize: '0.75rem',
+                                            cursor: 'pointer',
+                                            fontWeight: '500'
+                                        }}
+                                    >
+                                        Grant Access
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
                         <button
                             className="btn-add-set"
                             onClick={() => window.location.href = `/patient/${patient.PersonID}/edit-patient`}
@@ -1058,8 +1419,13 @@ const PatientSets = () => {
                                                     onClick={(e) => handleStartEditPdfUrl(set, e)}
                                                     title={set.SetPdfUrl ? "Edit PDF URL" : "Add PDF URL"}
                                                     style={{ padding: '0.5rem 1rem', fontSize: '1.1rem' }}
+                                                    disabled={uploadingPdf}
                                                 >
-                                                    <i className={set.SetPdfUrl ? "fas fa-edit" : "fas fa-plus"}></i>
+                                                    {uploadingPdf ? (
+                                                        <i className="fas fa-spinner fa-spin"></i>
+                                                    ) : (
+                                                        <i className={set.SetPdfUrl ? "fas fa-edit" : "fas fa-plus"}></i>
+                                                    )}
                                                 </button>
                                             )}
                                         </div>

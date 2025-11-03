@@ -225,12 +225,13 @@ const EditPatientComponent = ({ patientId }) => {
                         />
                     </div>
                     <div className="form-group">
-                        <label>Patient Name <span style={{ color: '#dc2626' }}>*</span></label>
+                        <label>Patient Name (Arabic) <span style={{ color: '#dc2626' }}>*</span></label>
                         <input
                             type="text"
                             value={formData.PatientName}
                             onChange={(e) => setFormData({...formData, PatientName: e.target.value})}
                             required
+                            style={{ height: '42px', lineHeight: '1.5' }}
                         />
                     </div>
                 </div>
