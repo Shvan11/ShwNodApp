@@ -5,12 +5,14 @@ import DoctorsList from '../pages/aligner/DoctorsList.jsx';
 import PatientsList from '../pages/aligner/PatientsList.jsx';
 import PatientSets from '../pages/aligner/PatientSets.jsx';
 import SearchPatient from '../pages/aligner/SearchPatient.jsx';
+import AllSetsList from '../pages/aligner/AllSetsList.jsx';
 
 /**
  * Aligner Management Application with React Router
  *
  * Routes:
  * - /aligner → Doctors list
+ * - /aligner/all-sets → All sets overview with v_allsets data
  * - /aligner/doctor/:doctorId → Doctor's patients list
  * - /aligner/doctor/:doctorId/patient/:workId → Patient's aligner sets
  * - /aligner/search → Search interface
@@ -22,6 +24,9 @@ const AlignerApp = () => {
             <Routes>
                 {/* Doctors List */}
                 <Route path="/aligner" element={<DoctorsList />} />
+
+                {/* All Sets Overview */}
+                <Route path="/aligner/all-sets" element={<AllSetsList />} />
 
                 {/* Doctor's Patients List */}
                 <Route path="/aligner/doctor/:doctorId" element={<PatientsList />} />

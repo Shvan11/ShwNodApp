@@ -12,6 +12,7 @@ echo ============================================
 echo   Installing:
 echo   - Explorer Protocol (folder opening)
 echo   - CS Imaging Protocol (Trophy integration)
+echo   - Universal Protocol (launch any application)
 echo ============================================
 echo.
 
@@ -42,6 +43,13 @@ if not exist "%~dp0CSImagingProtocolHandler.exe" (
     exit /b 1
 )
 
+if not exist "%~dp0UniversalProtocolHandler.exe" (
+    echo.
+    echo ERROR: UniversalProtocolHandler.exe not found after compilation!
+    pause
+    exit /b 1
+)
+
 echo.
 echo [Step 2/4] Creating/updating configuration file...
 echo.
@@ -68,11 +76,13 @@ echo.
 REM Kill any running protocol handler processes (they may be cached by Windows)
 taskkill /F /IM ExplorerProtocolHandler.exe >nul 2>&1
 taskkill /F /IM CSImagingProtocolHandler.exe >nul 2>&1
+taskkill /F /IM UniversalProtocolHandler.exe >nul 2>&1
 echo   - Stopped any running protocol handlers
 
 REM Check if files already exist and compare
 set NEEDS_COPY_EXPLORER=1
 set NEEDS_COPY_CSIMAGING=1
+set NEEDS_COPY_UNIVERSAL=1
 
 if exist "C:\Windows\ExplorerProtocolHandler.exe" (
     fc /b "%~dp0ExplorerProtocolHandler.exe" "C:\Windows\ExplorerProtocolHandler.exe" >nul 2>&1
@@ -148,6 +158,43 @@ if %NEEDS_COPY_CSIMAGING% equ 1 (
     )
 )
 
+if exist "C:\Windows\UniversalProtocolHandler.exe" (
+    fc /b "%~dp0UniversalProtocolHandler.exe" "C:\Windows\UniversalProtocolHandler.exe" >nul 2>&1
+    if %errorLevel% equ 0 (
+        echo   - UniversalProtocolHandler.exe is up to date
+        set NEEDS_COPY_UNIVERSAL=0
+    ) else (
+        echo   - Updating UniversalProtocolHandler.exe
+    )
+) else (
+    echo   - Installing UniversalProtocolHandler.exe
+)
+
+if %NEEDS_COPY_UNIVERSAL% equ 1 (
+    REM Try to copy with retries (file may be locked temporarily)
+    set COPY_SUCCESS=0
+    for /L %%i in (1,1,3) do (
+        copy /Y "%~dp0UniversalProtocolHandler.exe" "C:\Windows\" >nul 2>&1
+        if !errorLevel! equ 0 (
+            set COPY_SUCCESS=1
+            goto :universal_copied
+        )
+        if %%i lss 3 (
+            timeout /t 2 /nobreak >nul
+        )
+    )
+    :universal_copied
+    if !COPY_SUCCESS! equ 0 (
+        echo ERROR: Failed to copy UniversalProtocolHandler.exe after 3 attempts
+        echo The file may be locked by Windows. Try:
+        echo 1. Close all File Explorer windows
+        echo 2. Wait a few seconds
+        echo 3. Run the installer again
+        pause
+        exit /b 1
+    )
+)
+
 echo.
 echo [Step 4/5] Registering protocols in Windows registry...
 echo.
@@ -161,6 +208,10 @@ reg add "HKCR\csimaging" /ve /t REG_SZ /d "URL:CS Imaging Protocol" /f >nul 2>&1
 reg add "HKCR\csimaging" /v "URL Protocol" /t REG_SZ /d "" /f >nul 2>&1
 reg add "HKCR\csimaging\shell\open\command" /ve /t REG_SZ /d "\"C:\\Windows\\CSImagingProtocolHandler.exe\" \"%%1\"" /f >nul 2>&1
 
+reg add "HKCR\launch" /ve /t REG_SZ /d "URL:Universal Application Launcher" /f >nul 2>&1
+reg add "HKCR\launch" /v "URL Protocol" /t REG_SZ /d "" /f >nul 2>&1
+reg add "HKCR\launch\shell\open\command" /ve /t REG_SZ /d "\"C:\\Windows\\UniversalProtocolHandler.exe\" \"%%1\"" /f >nul 2>&1
+
 REM Smart browser policy handling
 echo   - Configuring browser auto-launch policies...
 
@@ -172,7 +223,7 @@ if %errorLevel% equ 0 (
 ) else (
     echo   - Chrome policy not found, creating...
 )
-reg add %CHROME_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\"]}]" /f >nul 2>&1
+reg add %CHROME_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\"]}, {\"protocol\": \"launch\", \"allowed_origins\": [\"http://clinic:3000\"]}]" /f >nul 2>&1
 
 REM For Edge
 set EDGE_POLICY="HKLM\SOFTWARE\Policies\Microsoft\Edge"
@@ -182,7 +233,7 @@ if %errorLevel% equ 0 (
 ) else (
     echo   - Edge policy not found, creating...
 )
-reg add %EDGE_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\"]}]" /f >nul 2>&1
+reg add %EDGE_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\"]}, {\"protocol\": \"launch\", \"allowed_origins\": [\"http://clinic:3000\"]}]" /f >nul 2>&1
 
 echo   - Protocols registered successfully
 
@@ -214,6 +265,13 @@ if not exist "C:\Windows\CSImagingProtocolHandler.exe" (
     echo   + CSImagingProtocolHandler.exe OK
 )
 
+if not exist "C:\Windows\UniversalProtocolHandler.exe" (
+    echo   X UniversalProtocolHandler.exe NOT FOUND
+    set ALL_OK=0
+) else (
+    echo   + UniversalProtocolHandler.exe OK
+)
+
 REM Verify registry keys exist
 reg query "HKCR\explorer\shell\open\command" >nul 2>&1
 if !errorLevel! equ 0 (
@@ -228,6 +286,14 @@ if !errorLevel! equ 0 (
     echo   + csimaging: protocol registered
 ) else (
     echo   X csimaging: protocol NOT registered
+    set ALL_OK=0
+)
+
+reg query "HKCR\launch\shell\open\command" >nul 2>&1
+if !errorLevel! equ 0 (
+    echo   + launch: protocol registered
+) else (
+    echo   X launch: protocol NOT registered
     set ALL_OK=0
 )
 
@@ -246,6 +312,7 @@ if !ALL_OK! equ 1 (
     echo 3. Test protocols:
     echo    - Click "Open Folder" on aligner sets
     echo    - Click "CS Imaging" in patient sidebar
+    echo    - Click "Print Labels" on aligner batch cards
     echo.
     echo The handlers are now active and ready to use!
 ) else (

@@ -7,6 +7,7 @@ import SetFormDrawer from '../../components/react/SetFormDrawer.jsx';
 import BatchFormDrawer from '../../components/react/BatchFormDrawer.jsx';
 import PaymentFormDrawer from '../../components/react/PaymentFormDrawer.jsx';
 import { copyToClipboard } from '../../core/utils.js';
+import UniversalLauncher from '../../services/UniversalLauncher.js';
 
 const PatientSets = () => {
     const { doctorId, workId } = useParams();
@@ -465,6 +466,24 @@ const PatientSets = () => {
                 setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
             }
         });
+    };
+
+    // Print labels for aligner batch using MS Access
+    const handlePrintLabels = (batch, set, e) => {
+        e.stopPropagation();
+
+        if (!patient || !batch.AlignerBatchID) {
+            alert('Missing required information for printing labels');
+            return;
+        }
+
+        // Get the doctor ID from the set's DoctorID field
+        const drId = set.DoctorID || 1; // Fallback to 1 if not available
+        const patientName = patient.patientname || 'Unknown Patient';
+        const batchId = batch.AlignerBatchID;
+
+        // Launch MS Access with label printing parameters
+        UniversalLauncher.printAlignerLabels(batchId, patientName, drId);
     };
 
     // Quick URL handlers
@@ -1489,6 +1508,17 @@ const PatientSets = () => {
                                                                             <i className="fas fa-check-circle"></i>
                                                                         </button>
                                                                     )}
+                                                                    <button
+                                                                        className="action-icon-btn print-labels"
+                                                                        onClick={(e) => handlePrintLabels(batch, set, e)}
+                                                                        title="Print Labels in MS Access"
+                                                                        style={{
+                                                                            backgroundColor: '#8b5cf6',
+                                                                            color: 'white'
+                                                                        }}
+                                                                    >
+                                                                        <i className="fas fa-print"></i>
+                                                                    </button>
                                                                     <button
                                                                         className="action-icon-btn edit"
                                                                         onClick={(e) => openEditBatchDrawer(batch, set, e)}

@@ -11,6 +11,7 @@ echo ============================================
 echo   This will remove:
 echo   - Explorer Protocol (folder opening)
 echo   - CS Imaging Protocol (Trophy integration)
+echo   - Universal Protocol (application launcher)
 echo   - All registry entries
 echo   - Handler executables
 echo ============================================
@@ -57,6 +58,14 @@ if %errorLevel% equ 0 (
     echo   - csimaging: protocol not found (already removed)
 )
 
+reg query "HKCR\launch" >nul 2>&1
+if %errorLevel% equ 0 (
+    reg delete "HKCR\launch" /f >nul 2>&1
+    echo   - launch: protocol removed
+) else (
+    echo   - launch: protocol not found (already removed)
+)
+
 REM Remove browser policies
 set CHROME_POLICY="HKLM\SOFTWARE\Policies\Google\Chrome"
 reg query %CHROME_POLICY% /v AutoLaunchProtocolsFromOrigins >nul 2>&1
@@ -100,6 +109,17 @@ if exist "C:\Windows\CSImagingProtocolHandler.exe" (
     )
 ) else (
     echo   - CSImagingProtocolHandler.exe not found (already removed)
+)
+
+if exist "C:\Windows\UniversalProtocolHandler.exe" (
+    del /f "C:\Windows\UniversalProtocolHandler.exe" >nul 2>&1
+    if %errorLevel% equ 0 (
+        echo   - UniversalProtocolHandler.exe deleted
+    ) else (
+        echo   - Warning: Could not delete UniversalProtocolHandler.exe
+    )
+) else (
+    echo   - UniversalProtocolHandler.exe not found (already removed)
 )
 
 REM Also clean up CS Imaging cache if it exists
@@ -151,6 +171,13 @@ if exist "C:\Windows\CSImagingProtocolHandler.exe" (
     echo   + CSImagingProtocolHandler.exe removed
 )
 
+if exist "C:\Windows\UniversalProtocolHandler.exe" (
+    echo   X UniversalProtocolHandler.exe still exists
+    set ALL_REMOVED=0
+) else (
+    echo   + UniversalProtocolHandler.exe removed
+)
+
 REM Check if registry keys still exist
 reg query "HKCR\explorer" >nul 2>&1
 if %errorLevel% equ 0 (
@@ -166,6 +193,14 @@ if %errorLevel% equ 0 (
     set ALL_REMOVED=0
 ) else (
     echo   + csimaging: protocol removed
+)
+
+reg query "HKCR\launch" >nul 2>&1
+if %errorLevel% equ 0 (
+    echo   X launch: protocol still registered
+    set ALL_REMOVED=0
+) else (
+    echo   + launch: protocol removed
 )
 
 echo.

@@ -2988,6 +2988,81 @@ router.get('/aligner/doctors', async (req, res) => {
 });
 
 /**
+ * Get all patients from v_allsets view
+ * Shows all aligner sets with visual indicators for those without next batch
+ */
+router.get('/aligner/all-sets', async (req, res) => {
+    try {
+        console.log('Fetching all aligner sets from v_allsets');
+
+        const query = `
+            SELECT
+                v.PersonID,
+                v.PatientName,
+                v.WorkID,
+                v.AlignerDrID,
+                v.AlignerSetID,
+                v.SetSequence,
+                v.BatchSequence,
+                v.CreationDate,
+                v.ManufactureDate,
+                v.DeliveredToPatientDate,
+                v.NextBatchReadyDate,
+                v.Notes,
+                v.NextBatchPresent,
+                ad.DoctorName,
+                p.patientID,
+                p.Phone
+            FROM dbo.v_allsets v
+            INNER JOIN AlignerDoctors ad ON v.AlignerDrID = ad.DrID
+            LEFT JOIN tblpatients p ON v.PersonID = p.PersonID
+            ORDER BY
+                CASE WHEN v.NextBatchPresent = 'False' THEN 0 ELSE 1 END,
+                v.NextBatchReadyDate ASC,
+                v.PatientName
+        `;
+
+        const sets = await database.executeQuery(
+            query,
+            [],
+            (columns) => ({
+                PersonID: columns[0].value,
+                PatientName: columns[1].value,
+                WorkID: columns[2].value,
+                AlignerDrID: columns[3].value,
+                AlignerSetID: columns[4].value,
+                SetSequence: columns[5].value,
+                BatchSequence: columns[6].value,
+                CreationDate: columns[7].value,
+                ManufactureDate: columns[8].value,
+                DeliveredToPatientDate: columns[9].value,
+                NextBatchReadyDate: columns[10].value,
+                Notes: columns[11].value,
+                NextBatchPresent: columns[12].value,
+                DoctorName: columns[13].value,
+                patientID: columns[14].value,
+                Phone: columns[15].value
+            })
+        );
+
+        res.json({
+            success: true,
+            sets: sets || [],
+            count: sets ? sets.length : 0,
+            noNextBatchCount: sets ? sets.filter(s => s.NextBatchPresent === 'False').length : 0
+        });
+
+    } catch (error) {
+        console.error('Error fetching all aligner sets:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch aligner sets',
+            message: error.message
+        });
+    }
+});
+
+/**
  * Get all aligner patients (all doctors)
  * Returns all patients with aligner sets
  */
