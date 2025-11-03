@@ -480,8 +480,11 @@ const PatientSets = () => {
         // Get the doctor ID from the set's DoctorID field
         const drId = set.DoctorID || 1; // Fallback to 1 if not available
 
-        // Use the formatPatientName function to get the correct name
-        const patientName = formatPatientName(patient);
+        // Get patient name with fallback options
+        const patientName = patient.PatientName ||
+                           (patient.FirstName && patient.LastName ? `${patient.FirstName} ${patient.LastName}` : null) ||
+                           'Unknown Patient';
+
         const batchId = batch.AlignerBatchID;
 
         // Launch MS Access with label printing parameters
