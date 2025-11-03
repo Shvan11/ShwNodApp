@@ -77,14 +77,24 @@ export class UniversalLauncher {
    * @example
    * UniversalLauncher.printAlignerLabels(193, 'Sibar Fathil', 1);
    */
+  // UniversalLauncher.js (The required code block)
+
   static printAlignerLabels(alignerBatchId, patientName, drId) {
+    // This single string is the crucial part that VBA's Command() function will read.
+    const vbaCommandString =
+      `frmLabels` +
+      `|` +
+      `AlignerBatchID = ${alignerBatchId}` +
+      `|` +
+      patientName +
+      `|` +
+      drId.toString();
+
+    // Pass the three mandatory command line components to the C# handler.
     return this.launch('msaccess', [
       '{AccessDatabase}',
       '/cmd',
-      'frmLabels',
-      `AlignerBatchID = ${alignerBatchId}`,
-      patientName,
-      drId.toString()
+      vbaCommandString
     ]);
   }
 

@@ -108,26 +108,68 @@ namespace UniversalProtocolHandler
                         // Split by pipe character and rebuild as space-separated
                         string[] argParts = argsParam.Split('|');
 
-                        // Build the argument string
-                        // Quote arguments that contain spaces
+                        // Special handling for /cmd switch (used by MS Access and other apps)
+                        // If we have: database.accdb|/cmd|FormName|Arg1|Arg2
+                        // We need: "database.accdb" /cmd "FormName|Arg1|Arg2"
+                        bool hasCmdSwitch = false;
+                        int cmdIndex = -1;
+
                         for (int i = 0; i < argParts.Length; i++)
                         {
-                            string arg = argParts[i];
-
-                            // Add quotes around arguments with spaces (unless already quoted)
-                            if (arg.Contains(" ") && !arg.StartsWith("\""))
+                            if (argParts[i].Trim().Equals("/cmd", StringComparison.OrdinalIgnoreCase))
                             {
-                                arguments += "\"" + arg + "\"";
+                                hasCmdSwitch = true;
+                                cmdIndex = i;
+                                break;
                             }
-                            else
-                            {
-                                arguments += arg;
-                            }
+                        }
 
-                            // Add space between arguments (except last one)
-                            if (i < argParts.Length - 1)
+                        if (hasCmdSwitch && cmdIndex >= 0 && cmdIndex < argParts.Length - 1)
+                        {
+                            // Process arguments before /cmd normally
+                            for (int i = 0; i < cmdIndex; i++)
                             {
+                                string arg = argParts[i];
+                                if (arg.Contains(" ") && !arg.StartsWith("\""))
+                                {
+                                    arguments += "\"" + arg + "\"";
+                                }
+                                else
+                                {
+                                    arguments += arg;
+                                }
                                 arguments += " ";
+                            }
+
+                            // Add /cmd switch
+                            arguments += "/cmd ";
+
+                            // Combine all remaining arguments into a single quoted string with pipes
+                            string cmdArgument = string.Join("|", argParts, cmdIndex + 1, argParts.Length - cmdIndex - 1);
+                            arguments += "\"" + cmdArgument + "\"";
+                        }
+                        else
+                        {
+                            // Normal processing for non-/cmd commands
+                            for (int i = 0; i < argParts.Length; i++)
+                            {
+                                string arg = argParts[i];
+
+                                // Add quotes around arguments with spaces (unless already quoted)
+                                if (arg.Contains(" ") && !arg.StartsWith("\""))
+                                {
+                                    arguments += "\"" + arg + "\"";
+                                }
+                                else
+                                {
+                                    arguments += arg;
+                                }
+
+                                // Add space between arguments (except last one)
+                                if (i < argParts.Length - 1)
+                                {
+                                    arguments += " ";
+                                }
                             }
                         }
                     }
