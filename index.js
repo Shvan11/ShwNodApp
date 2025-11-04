@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import config from './config/config.js';
 import { setupWebSocketServer } from './utils/websocket.js';
-import { setupMiddleware } from './middlewares/index.js';
+import { setupMiddleware } from './middleware/index.js';
 import apiRoutes from './routes/api.js';
 import webRoutes from './routes/web.js';
 import calendarRoutes from './routes/calendar.js';
