@@ -951,8 +951,22 @@ const WorkComponent = ({ patientId }) => {
                                 ×
                             </button>
                         </div>
-                        
+
                         <form onSubmit={handleFormSubmit} className="work-form">
+                            {/* Action Buttons - Top */}
+                            <div className="form-actions" style={{ marginTop: 0, paddingTop: 0, borderTop: 'none', borderBottom: '1px solid var(--border-light)', paddingBottom: 'var(--spacing-lg)' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowModal(false)}
+                                    className="btn btn-secondary"
+                                >
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary">
+                                    {editingWork ? 'Update Work' : 'Add Work'}
+                                </button>
+                            </div>
+
                             <div className="form-row">
                                 <div className="form-group">
                                     <label>Work Type <span style={{ color: '#dc2626' }}>*</span></label>
@@ -1110,9 +1124,10 @@ const WorkComponent = ({ patientId }) => {
                                 </div>
                             </div>
 
+                            {/* Action Buttons - Bottom */}
                             <div className="form-actions">
-                                <button 
-                                    type="button" 
+                                <button
+                                    type="button"
                                     onClick={() => setShowModal(false)}
                                     className="btn btn-secondary"
                                 >

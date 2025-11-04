@@ -195,181 +195,201 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
 
                 <div className="drawer-body">
                     <form onSubmit={handleSubmit} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                        {/* Basic Info Section */}
-                        <div className="form-section">
-                            <h3>Basic Information</h3>
-
-                            <div className="form-field">
-                                <label htmlFor="BatchSequence">
-                                    Batch Sequence <span className="required">*</span>
-                                </label>
-                                <input
-                                    type="number"
-                                    id="BatchSequence"
-                                    name="BatchSequence"
-                                    value={formData.BatchSequence}
-                                    onChange={handleChange}
-                                    className={errors.BatchSequence ? 'error' : ''}
-                                    min="1"
-                                />
-                                {errors.BatchSequence && (
-                                    <span className="error-message">{errors.BatchSequence}</span>
+                        {/* Action Buttons - Top */}
+                        <div className="drawer-footer" style={{ borderTop: 'none', borderBottom: '1px solid #e0e0e0', marginTop: 0 }}>
+                            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+                                Cancel
+                            </button>
+                            <button type="submit" className="btn btn-primary" disabled={saving}>
+                                {saving ? (
+                                    <>
+                                        <i className="fas fa-spinner fa-spin"></i> Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-save"></i> {batch ? 'Update Batch' : 'Create Batch'}
+                                    </>
                                 )}
+                            </button>
+                        </div>
+
+                        {/* Two-Column Layout Container */}
+                        <div className="form-two-column-container">
+                            {/* Left Column */}
+                            <div className="form-column">
+                                {/* Basic Info Section */}
+                                <div className="form-section">
+                                    <h3>Basic Information</h3>
+                                    <div className="form-field">
+                                        <label htmlFor="BatchSequence">
+                                            Batch Sequence <span className="required">*</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            id="BatchSequence"
+                                            name="BatchSequence"
+                                            value={formData.BatchSequence}
+                                            onChange={handleChange}
+                                            className={errors.BatchSequence ? 'error' : ''}
+                                            min="1"
+                                        />
+                                        {errors.BatchSequence && (
+                                            <span className="error-message">{errors.BatchSequence}</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Upper Aligners Section */}
+                                <div className="form-section">
+                                    <h3>Upper Aligners
+                                        {set && (
+                                            <span style={{ marginLeft: '1rem', fontSize: '0.9rem', fontWeight: 'normal', color: '#6b7280' }}>
+                                                (Remaining: <strong style={{ color: set.RemainingUpperAligners > 0 ? '#059669' : '#dc2626' }}>{set.RemainingUpperAligners}</strong>)
+                                            </span>
+                                        )}
+                                    </h3>
+
+                                    <div className="form-field">
+                                        <label htmlFor="UpperAlignerStartSequence">Start Sequence (Auto)</label>
+                                        <input
+                                            type="number"
+                                            id="UpperAlignerStartSequence"
+                                            value={computedFields.UpperAlignerStartSequence}
+                                            readOnly
+                                            className="readonly"
+                                        />
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label htmlFor="UpperAlignerCount">Count</label>
+                                        <input
+                                            type="number"
+                                            id="UpperAlignerCount"
+                                            name="UpperAlignerCount"
+                                            value={formData.UpperAlignerCount}
+                                            onChange={handleChange}
+                                            className={errors.UpperAlignerCount ? 'error' : ''}
+                                            min="0"
+                                            max={set?.RemainingUpperAligners}
+                                            placeholder="Number of aligners"
+                                        />
+                                        {errors.UpperAlignerCount && (
+                                            <span className="error-message">{errors.UpperAlignerCount}</span>
+                                        )}
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label htmlFor="UpperAlignerEndSequence">End Sequence (Auto)</label>
+                                        <input
+                                            type="number"
+                                            id="UpperAlignerEndSequence"
+                                            value={computedFields.UpperAlignerEndSequence || ''}
+                                            readOnly
+                                            className="readonly"
+                                            placeholder="Auto-calculated"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Column */}
+                            <div className="form-column">
+                                {/* Lower Aligners Section */}
+                                <div className="form-section">
+                                    <h3>Lower Aligners
+                                        {set && (
+                                            <span style={{ marginLeft: '1rem', fontSize: '0.9rem', fontWeight: 'normal', color: '#6b7280' }}>
+                                                (Remaining: <strong style={{ color: set.RemainingLowerAligners > 0 ? '#059669' : '#dc2626' }}>{set.RemainingLowerAligners}</strong>)
+                                            </span>
+                                        )}
+                                    </h3>
+
+                                    <div className="form-field">
+                                        <label htmlFor="LowerAlignerStartSequence">Start Sequence (Auto)</label>
+                                        <input
+                                            type="number"
+                                            id="LowerAlignerStartSequence"
+                                            value={computedFields.LowerAlignerStartSequence}
+                                            readOnly
+                                            className="readonly"
+                                        />
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label htmlFor="LowerAlignerCount">Count</label>
+                                        <input
+                                            type="number"
+                                            id="LowerAlignerCount"
+                                            name="LowerAlignerCount"
+                                            value={formData.LowerAlignerCount}
+                                            onChange={handleChange}
+                                            className={errors.LowerAlignerCount ? 'error' : ''}
+                                            min="0"
+                                            max={set?.RemainingLowerAligners}
+                                            placeholder="Number of aligners"
+                                        />
+                                        {errors.LowerAlignerCount && (
+                                            <span className="error-message">{errors.LowerAlignerCount}</span>
+                                        )}
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label htmlFor="LowerAlignerEndSequence">End Sequence (Auto)</label>
+                                        <input
+                                            type="number"
+                                            id="LowerAlignerEndSequence"
+                                            value={computedFields.LowerAlignerEndSequence || ''}
+                                            readOnly
+                                            className="readonly"
+                                            placeholder="Auto-calculated"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Dates Section */}
+                                <div className="form-section">
+                                    <h3>Dates & Timing</h3>
+
+                                    <div className="form-field">
+                                        <label htmlFor="ManufactureDate">Manufacture Date</label>
+                                        <input
+                                            type="date"
+                                            id="ManufactureDate"
+                                            name="ManufactureDate"
+                                            value={formData.ManufactureDate}
+                                            onChange={handleChange}
+                                        />
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label htmlFor="DeliveredToPatientDate">Delivered Date</label>
+                                        <input
+                                            type="date"
+                                            id="DeliveredToPatientDate"
+                                            name="DeliveredToPatientDate"
+                                            value={formData.DeliveredToPatientDate}
+                                            onChange={handleChange}
+                                        />
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label htmlFor="Days">Days per Aligner</label>
+                                        <input
+                                            type="number"
+                                            id="Days"
+                                            name="Days"
+                                            value={formData.Days}
+                                            onChange={handleChange}
+                                            min="1"
+                                            placeholder="Days to wear each aligner"
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Upper Aligners Section */}
-                        <div className="form-section">
-                            <h3>Upper Aligners
-                                {set && (
-                                    <span style={{ marginLeft: '1rem', fontSize: '0.9rem', fontWeight: 'normal', color: '#6b7280' }}>
-                                        (Remaining: <strong style={{ color: set.RemainingUpperAligners > 0 ? '#059669' : '#dc2626' }}>{set.RemainingUpperAligners}</strong>)
-                                    </span>
-                                )}
-                            </h3>
-
-                            <div className="form-row">
-                                <div className="form-field">
-                                    <label htmlFor="UpperAlignerStartSequence">Start Sequence (Auto)</label>
-                                    <input
-                                        type="number"
-                                        id="UpperAlignerStartSequence"
-                                        value={computedFields.UpperAlignerStartSequence}
-                                        readOnly
-                                        className="readonly"
-                                    />
-                                </div>
-
-                                <div className="form-field">
-                                    <label htmlFor="UpperAlignerCount">Count</label>
-                                    <input
-                                        type="number"
-                                        id="UpperAlignerCount"
-                                        name="UpperAlignerCount"
-                                        value={formData.UpperAlignerCount}
-                                        onChange={handleChange}
-                                        className={errors.UpperAlignerCount ? 'error' : ''}
-                                        min="0"
-                                        max={set?.RemainingUpperAligners}
-                                        placeholder="Number of aligners"
-                                    />
-                                    {errors.UpperAlignerCount && (
-                                        <span className="error-message">{errors.UpperAlignerCount}</span>
-                                    )}
-                                </div>
-
-                                <div className="form-field">
-                                    <label htmlFor="UpperAlignerEndSequence">End Sequence (Auto)</label>
-                                    <input
-                                        type="number"
-                                        id="UpperAlignerEndSequence"
-                                        value={computedFields.UpperAlignerEndSequence || ''}
-                                        readOnly
-                                        className="readonly"
-                                        placeholder="Auto-calculated"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Lower Aligners Section */}
-                        <div className="form-section">
-                            <h3>Lower Aligners
-                                {set && (
-                                    <span style={{ marginLeft: '1rem', fontSize: '0.9rem', fontWeight: 'normal', color: '#6b7280' }}>
-                                        (Remaining: <strong style={{ color: set.RemainingLowerAligners > 0 ? '#059669' : '#dc2626' }}>{set.RemainingLowerAligners}</strong>)
-                                    </span>
-                                )}
-                            </h3>
-
-                            <div className="form-row">
-                                <div className="form-field">
-                                    <label htmlFor="LowerAlignerStartSequence">Start Sequence (Auto)</label>
-                                    <input
-                                        type="number"
-                                        id="LowerAlignerStartSequence"
-                                        value={computedFields.LowerAlignerStartSequence}
-                                        readOnly
-                                        className="readonly"
-                                    />
-                                </div>
-
-                                <div className="form-field">
-                                    <label htmlFor="LowerAlignerCount">Count</label>
-                                    <input
-                                        type="number"
-                                        id="LowerAlignerCount"
-                                        name="LowerAlignerCount"
-                                        value={formData.LowerAlignerCount}
-                                        onChange={handleChange}
-                                        className={errors.LowerAlignerCount ? 'error' : ''}
-                                        min="0"
-                                        max={set?.RemainingLowerAligners}
-                                        placeholder="Number of aligners"
-                                    />
-                                    {errors.LowerAlignerCount && (
-                                        <span className="error-message">{errors.LowerAlignerCount}</span>
-                                    )}
-                                </div>
-
-                                <div className="form-field">
-                                    <label htmlFor="LowerAlignerEndSequence">End Sequence (Auto)</label>
-                                    <input
-                                        type="number"
-                                        id="LowerAlignerEndSequence"
-                                        value={computedFields.LowerAlignerEndSequence || ''}
-                                        readOnly
-                                        className="readonly"
-                                        placeholder="Auto-calculated"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Dates Section */}
-                        <div className="form-section">
-                            <h3>Dates & Timing</h3>
-
-                            <div className="form-row">
-                                <div className="form-field">
-                                    <label htmlFor="ManufactureDate">Manufacture Date</label>
-                                    <input
-                                        type="date"
-                                        id="ManufactureDate"
-                                        name="ManufactureDate"
-                                        value={formData.ManufactureDate}
-                                        onChange={handleChange}
-                                    />
-                                </div>
-
-                                <div className="form-field">
-                                    <label htmlFor="DeliveredToPatientDate">Delivered Date</label>
-                                    <input
-                                        type="date"
-                                        id="DeliveredToPatientDate"
-                                        name="DeliveredToPatientDate"
-                                        value={formData.DeliveredToPatientDate}
-                                        onChange={handleChange}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-field">
-                                <label htmlFor="Days">Days per Aligner</label>
-                                <input
-                                    type="number"
-                                    id="Days"
-                                    name="Days"
-                                    value={formData.Days}
-                                    onChange={handleChange}
-                                    min="1"
-                                    placeholder="Days to wear each aligner"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Notes Section */}
-                        <div className="form-section">
+                        {/* Notes Section - Full Width */}
+                        <div className="form-section" style={{ padding: '0 1.5rem' }}>
                             <div className="form-field">
                                 <label htmlFor="Notes">Notes</label>
                                 <textarea
