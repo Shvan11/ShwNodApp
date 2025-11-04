@@ -8,7 +8,7 @@ import '../../css/pages/work-payments.css';
 import '../../css/pages/xrays.css';
 import '../../css/pages/visits-summary.css';
 import '../../css/pages/canvas.css';
-import '../../photoswipe/dist/photoswipe.css';
+import 'photoswipe/dist/photoswipe.css';
 import '../../css/components/universal-header.css';
 import '../../css/components/sidebar-navigation.css';
 import '../../css/pages/patient-shell.css';

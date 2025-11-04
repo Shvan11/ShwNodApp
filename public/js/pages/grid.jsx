@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import GridComponent from '../components/react/GridComponent.jsx'
 import '../../css/pages/grid.css'
-import '../../photoswipe/dist/photoswipe.css'
+import 'photoswipe/dist/photoswipe.css'
 
 // Initialize the grid page
 document.addEventListener('DOMContentLoaded', async function() {

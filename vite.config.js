@@ -19,7 +19,7 @@ export default defineConfig({
         calendar: resolve(__dirname, 'public/views/appointments/calendar.html'),
         'add-patient': resolve(__dirname, 'public/views/patient/add-patient.html'),
         'patient-management': resolve(__dirname, 'public/views/patient-management.html'),
-        'grid': resolve(__dirname, 'public/views/patient/grid_.html'),
+        'grid': resolve(__dirname, 'public/views/patient/grid.html'),
         'send-message': resolve(__dirname, 'public/views/messaging/send-message.html'),
         'send': resolve(__dirname, 'public/views/messaging/send.html'),
         'auth': resolve(__dirname, 'public/views/messaging/auth.html'),

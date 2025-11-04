@@ -250,7 +250,6 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                         onChange={handleChange}
                                         className={errors.UpperAlignerCount ? 'error' : ''}
                                         min="0"
-                                        max={set?.RemainingUpperAligners}
                                         placeholder="Number of aligners"
                                     />
                                     {errors.UpperAlignerCount && (
@@ -304,7 +303,6 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                         onChange={handleChange}
                                         className={errors.LowerAlignerCount ? 'error' : ''}
                                         min="0"
-                                        max={set?.RemainingLowerAligners}
                                         placeholder="Number of aligners"
                                     />
                                     {errors.LowerAlignerCount && (
