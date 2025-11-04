@@ -1481,7 +1481,37 @@
     }
 }
 
+/* Two-Column Layout for Forms */
+.form-two-column-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    padding: 0 1.5rem;
+}
+
+.form-column {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-column .form-section {
+    padding: 0;
+}
+
+/* Ensure tab content with two-column layout has proper padding */
+.tab-content .form-two-column-container {
+    padding-top: 1.25rem;
+}
+
 /* Responsive Design */
+@media (max-width: 991px) {
+    /* Switch two-column layout to single column on tablets and mobile */
+    .form-two-column-container {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+}
+
 @media (max-width: 768px) {
     .view-mode-toggle,
     .mode-toggle {

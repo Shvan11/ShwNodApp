@@ -364,268 +364,293 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                                 </button>
                             </div>
 
+                            {/* Action Buttons - Top */}
+                            <div className="drawer-footer" style={{ borderTop: 'none', borderBottom: '1px solid #e0e0e0', marginTop: 0 }}>
+                                <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary" disabled={saving}>
+                                    {saving ? (
+                                        <>
+                                            <i className="fas fa-spinner fa-spin"></i> Saving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="fas fa-save"></i> {set ? 'Update Set' : 'Create Set'}
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+
                             {/* Tab 1: Aligner Details */}
                             <div className={`tab-content ${activeTab === 'details' ? 'active' : ''}`}>
-                                <div className="form-row">
-                                    <div className="form-field">
-                                        <label htmlFor="SetSequence">
-                                            Set Sequence <span className="required">*</span>
-                                        </label>
-                                        <input
-                                            type="number"
-                                            id="SetSequence"
-                                            name="SetSequence"
-                                            value={formData.SetSequence}
-                                            onChange={handleChange}
-                                            className={errors.SetSequence ? 'error' : ''}
-                                            min="1"
-                                        />
-                                        {errors.SetSequence && (
-                                            <span className="error-message">{errors.SetSequence}</span>
-                                        )}
+                                <div className="form-two-column-container">
+                                    <div className="form-column">
+                                        <div className="form-field">
+                                            <label htmlFor="SetSequence">
+                                                Set Sequence <span className="required">*</span>
+                                            </label>
+                                            <input
+                                                type="number"
+                                                id="SetSequence"
+                                                name="SetSequence"
+                                                value={formData.SetSequence}
+                                                onChange={handleChange}
+                                                className={errors.SetSequence ? 'error' : ''}
+                                                min="1"
+                                            />
+                                            {errors.SetSequence && (
+                                                <span className="error-message">{errors.SetSequence}</span>
+                                            )}
+                                        </div>
+
+                                        <div className="form-field">
+                                            <label htmlFor="UpperAlignersCount">Upper Aligners</label>
+                                            <input
+                                                type="number"
+                                                id="UpperAlignersCount"
+                                                name="UpperAlignersCount"
+                                                value={formData.UpperAlignersCount}
+                                                onChange={handleChange}
+                                                min="0"
+                                            />
+                                        </div>
+
+                                        <div className="form-field">
+                                            <label htmlFor="Days">Treatment Days</label>
+                                            <input
+                                                type="number"
+                                                id="Days"
+                                                name="Days"
+                                                value={formData.Days}
+                                                onChange={handleChange}
+                                                min="0"
+                                            />
+                                        </div>
                                     </div>
 
-                                    <div className="form-field">
-                                        <label htmlFor="Type">Type</label>
-                                        <select
-                                            id="Type"
-                                            name="Type"
-                                            value={formData.Type}
-                                            onChange={handleChange}
-                                        >
-                                            <option value="">Select Type</option>
-                                            <option value="Initial">Initial</option>
-                                            <option value="Refinement">Refinement</option>
-                                            <option value="Revision">Revision</option>
-                                        </select>
+                                    <div className="form-column">
+                                        <div className="form-field">
+                                            <label htmlFor="Type">Type</label>
+                                            <select
+                                                id="Type"
+                                                name="Type"
+                                                value={formData.Type}
+                                                onChange={handleChange}
+                                            >
+                                                <option value="">Select Type</option>
+                                                <option value="Initial">Initial</option>
+                                                <option value="Refinement">Refinement</option>
+                                                <option value="Revision">Revision</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="form-field">
+                                            <label htmlFor="LowerAlignersCount">Lower Aligners</label>
+                                            <input
+                                                type="number"
+                                                id="LowerAlignersCount"
+                                                name="LowerAlignersCount"
+                                                value={formData.LowerAlignersCount}
+                                                onChange={handleChange}
+                                                min="0"
+                                            />
+                                        </div>
+
+                                        <div className="form-field">
+                                            <label htmlFor="AlignerDrID">
+                                                Aligner Doctor <span className="required">*</span>
+                                            </label>
+                                            <select
+                                                id="AlignerDrID"
+                                                name="AlignerDrID"
+                                                value={formData.AlignerDrID}
+                                                onChange={handleChange}
+                                                className={errors.AlignerDrID ? 'error' : ''}
+                                            >
+                                                <option value="">Select Doctor</option>
+                                                {doctors && doctors.map(doctor => (
+                                                    <option key={doctor.DrID} value={doctor.DrID}>
+                                                        {doctor.DoctorName}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {errors.AlignerDrID && (
+                                                <span className="error-message">{errors.AlignerDrID}</span>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-
-                                <div className="form-field">
-                                    <label htmlFor="AlignerDrID">
-                                        Aligner Doctor <span className="required">*</span>
-                                    </label>
-                                    <select
-                                        id="AlignerDrID"
-                                        name="AlignerDrID"
-                                        value={formData.AlignerDrID}
-                                        onChange={handleChange}
-                                        className={errors.AlignerDrID ? 'error' : ''}
-                                    >
-                                        <option value="">Select Doctor</option>
-                                        {doctors && doctors.map(doctor => (
-                                            <option key={doctor.DrID} value={doctor.DrID}>
-                                                {doctor.DoctorName}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {errors.AlignerDrID && (
-                                        <span className="error-message">{errors.AlignerDrID}</span>
-                                    )}
-                                </div>
-
-                                <div className="form-row">
-                                    <div className="form-field">
-                                        <label htmlFor="UpperAlignersCount">Upper Aligners</label>
-                                        <input
-                                            type="number"
-                                            id="UpperAlignersCount"
-                                            name="UpperAlignersCount"
-                                            value={formData.UpperAlignersCount}
-                                            onChange={handleChange}
-                                            min="0"
-                                        />
-                                    </div>
-
-                                    <div className="form-field">
-                                        <label htmlFor="LowerAlignersCount">Lower Aligners</label>
-                                        <input
-                                            type="number"
-                                            id="LowerAlignersCount"
-                                            name="LowerAlignersCount"
-                                            value={formData.LowerAlignersCount}
-                                            onChange={handleChange}
-                                            min="0"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="form-field">
-                                    <label htmlFor="Days">Treatment Days</label>
-                                    <input
-                                        type="number"
-                                        id="Days"
-                                        name="Days"
-                                        value={formData.Days}
-                                        onChange={handleChange}
-                                        min="0"
-                                    />
                                 </div>
                             </div>
 
                             {/* Tab 2: Resources & Payment */}
                             <div className={`tab-content ${activeTab === 'resources' ? 'active' : ''}`}>
-                                <div className="form-field">
-                                    <label htmlFor="SetUrl">Set URL</label>
-                                    <input
-                                        type="url"
-                                        id="SetUrl"
-                                        name="SetUrl"
-                                        value={formData.SetUrl}
-                                        onChange={handleChange}
-                                        placeholder="https://..."
-                                    />
-                                </div>
-
-                                <div className="form-field">
-                                    <label htmlFor="SetPdfUrl">PDF URL (Google Drive)</label>
-                                    <input
-                                        type="url"
-                                        id="SetPdfUrl"
-                                        name="SetPdfUrl"
-                                        value={formData.SetPdfUrl}
-                                        onChange={handleChange}
-                                        placeholder="https://drive.google.com/..."
-                                    />
-                                </div>
-
-                                {/* PDF Upload Section */}
-                                <div className="form-field">
-                                    <label>PDF File</label>
-                                    {formData.SetPdfUrl ? (
-                                        <div style={{
-                                            background: '#f0f9ff',
-                                            border: '1px solid #bae6fd',
-                                            borderRadius: '6px',
-                                            padding: '0.75rem',
-                                            marginBottom: '0.5rem'
-                                        }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                                                <i className="fas fa-file-pdf" style={{ color: '#0284c7' }}></i>
-                                                <span style={{ color: '#0c4a6e', fontWeight: '500' }}>PDF Uploaded</span>
-                                            </div>
-                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-secondary"
-                                                    style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
-                                                    onClick={() => window.open(formData.SetPdfUrl, '_blank')}
-                                                >
-                                                    <i className="fas fa-external-link-alt"></i> View PDF
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-danger"
-                                                    style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
-                                                    onClick={handlePdfDelete}
-                                                    disabled={deletingPdf}
-                                                >
-                                                    {deletingPdf ? (
-                                                        <>
-                                                            <i className="fas fa-spinner fa-spin"></i> Deleting...
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <i className="fas fa-trash"></i> Delete PDF
-                                                        </>
-                                                    )}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            {folderPath && (
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-secondary"
-                                                    style={{ fontSize: '0.9rem', padding: '0.6rem 1rem', width: '100%', marginBottom: '0.75rem' }}
-                                                    onClick={openFolder}
-                                                >
-                                                    <i className="fas fa-folder-open"></i> Open Patient Folder
-                                                </button>
-                                            )}
+                                <div className="form-two-column-container">
+                                    <div className="form-column">
+                                        <div className="form-field">
+                                            <label htmlFor="SetUrl">Set URL</label>
                                             <input
-                                                type="file"
-                                                accept=".pdf,application/pdf"
-                                                onClick={() => {
-                                                    // Automatically copy folder path to clipboard when file input is clicked
-                                                    copyFolderPathToClipboard();
-                                                }}
-                                                onChange={(e) => {
-                                                    const file = e.target.files?.[0];
-                                                    if (file) {
-                                                        if (file.type !== 'application/pdf') {
-                                                            alert('Please select a PDF file');
-                                                            e.target.value = '';
-                                                            return;
-                                                        }
-                                                        if (file.size > 100 * 1024 * 1024) {
-                                                            alert('File is too large. Maximum size is 100MB.');
-                                                            e.target.value = '';
-                                                            return;
-                                                        }
-                                                        setPdfFile(file);
-                                                    }
-                                                }}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '0.55rem 0.7rem',
-                                                    border: '1px solid #d1d5db',
-                                                    borderRadius: '4px',
-                                                    fontSize: '0.9rem',
-                                                    cursor: 'pointer'
-                                                }}
+                                                type="url"
+                                                id="SetUrl"
+                                                name="SetUrl"
+                                                value={formData.SetUrl}
+                                                onChange={handleChange}
+                                                placeholder="https://..."
                                             />
-                                            {pdfFile && (
+                                        </div>
+
+                                        <div className="form-field">
+                                            <label htmlFor="SetPdfUrl">PDF URL (Google Drive)</label>
+                                            <input
+                                                type="url"
+                                                id="SetPdfUrl"
+                                                name="SetPdfUrl"
+                                                value={formData.SetPdfUrl}
+                                                onChange={handleChange}
+                                                placeholder="https://drive.google.com/..."
+                                            />
+                                        </div>
+
+                                        {/* PDF Upload Section */}
+                                        <div className="form-field">
+                                            <label>PDF File</label>
+                                            {formData.SetPdfUrl ? (
                                                 <div style={{
-                                                    marginTop: '0.5rem',
-                                                    padding: '0.5rem',
-                                                    background: '#f0fdf4',
-                                                    border: '1px solid #bbf7d0',
-                                                    borderRadius: '4px',
-                                                    fontSize: '0.85rem',
-                                                    color: '#166534'
+                                                    background: '#f0f9ff',
+                                                    border: '1px solid #bae6fd',
+                                                    borderRadius: '6px',
+                                                    padding: '0.75rem',
+                                                    marginBottom: '0.5rem'
                                                 }}>
-                                                    <i className="fas fa-check-circle"></i> {pdfFile.name} selected
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                                        <i className="fas fa-file-pdf" style={{ color: '#0284c7' }}></i>
+                                                        <span style={{ color: '#0c4a6e', fontWeight: '500' }}>PDF Uploaded</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-secondary"
+                                                            style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
+                                                            onClick={() => window.open(formData.SetPdfUrl, '_blank')}
+                                                        >
+                                                            <i className="fas fa-external-link-alt"></i> View PDF
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-danger"
+                                                            style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
+                                                            onClick={handlePdfDelete}
+                                                            disabled={deletingPdf}
+                                                        >
+                                                            {deletingPdf ? (
+                                                                <>
+                                                                    <i className="fas fa-spinner fa-spin"></i> Deleting...
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <i className="fas fa-trash"></i> Delete PDF
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    {folderPath && (
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-secondary"
+                                                            style={{ fontSize: '0.9rem', padding: '0.6rem 1rem', width: '100%', marginBottom: '0.75rem' }}
+                                                            onClick={openFolder}
+                                                        >
+                                                            <i className="fas fa-folder-open"></i> Open Patient Folder
+                                                        </button>
+                                                    )}
+                                                    <input
+                                                        type="file"
+                                                        accept=".pdf,application/pdf"
+                                                        onClick={() => {
+                                                            // Automatically copy folder path to clipboard when file input is clicked
+                                                            copyFolderPathToClipboard();
+                                                        }}
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (file) {
+                                                                if (file.type !== 'application/pdf') {
+                                                                    alert('Please select a PDF file');
+                                                                    e.target.value = '';
+                                                                    return;
+                                                                }
+                                                                if (file.size > 100 * 1024 * 1024) {
+                                                                    alert('File is too large. Maximum size is 100MB.');
+                                                                    e.target.value = '';
+                                                                    return;
+                                                                }
+                                                                setPdfFile(file);
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            width: '100%',
+                                                            padding: '0.55rem 0.7rem',
+                                                            border: '1px solid #d1d5db',
+                                                            borderRadius: '4px',
+                                                            fontSize: '0.9rem',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    />
+                                                    {pdfFile && (
+                                                        <div style={{
+                                                            marginTop: '0.5rem',
+                                                            padding: '0.5rem',
+                                                            background: '#f0fdf4',
+                                                            border: '1px solid #bbf7d0',
+                                                            borderRadius: '4px',
+                                                            fontSize: '0.85rem',
+                                                            color: '#166534'
+                                                        }}>
+                                                            <i className="fas fa-check-circle"></i> {pdfFile.name} selected
+                                                        </div>
+                                                    )}
+                                                    <div style={{
+                                                        marginTop: '0.5rem',
+                                                        fontSize: '0.8rem',
+                                                        color: '#666'
+                                                    }}>
+                                                        <i className="fas fa-info-circle"></i> The folder path is automatically copied to your clipboard when you click "Choose File". Paste it in the file dialog address bar to navigate to the set folder.
+                                                    </div>
                                                 </div>
                                             )}
-                                            <div style={{
-                                                marginTop: '0.5rem',
-                                                fontSize: '0.8rem',
-                                                color: '#666'
-                                            }}>
-                                                <i className="fas fa-info-circle"></i> The folder path is automatically copied to your clipboard when you click "Choose File". Paste it in the file dialog address bar to navigate to the set folder.
-                                            </div>
                                         </div>
-                                    )}
-                                </div>
-
-                                <div className="form-row">
-                                    <div className="form-field">
-                                        <label htmlFor="SetCost">Set Cost</label>
-                                        <input
-                                            type="number"
-                                            id="SetCost"
-                                            name="SetCost"
-                                            value={formData.SetCost}
-                                            onChange={handleChange}
-                                            step="0.01"
-                                            min="0"
-                                            placeholder="0.00"
-                                        />
                                     </div>
-                                    <div className="form-field">
-                                        <label htmlFor="Currency">Currency</label>
-                                        <select
-                                            id="Currency"
-                                            name="Currency"
-                                            value={formData.Currency}
-                                            onChange={handleChange}
-                                        >
-                                            <option value="USD">USD</option>
-                                            <option value="IQD">IQD</option>
-                                            <option value="EUR">EUR</option>
-                                        </select>
+
+                                    <div className="form-column">
+                                        <div className="form-field">
+                                            <label htmlFor="SetCost">Set Cost</label>
+                                            <input
+                                                type="number"
+                                                id="SetCost"
+                                                name="SetCost"
+                                                value={formData.SetCost}
+                                                onChange={handleChange}
+                                                step="0.01"
+                                                min="0"
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+
+                                        <div className="form-field">
+                                            <label htmlFor="Currency">Currency</label>
+                                            <select
+                                                id="Currency"
+                                                name="Currency"
+                                                value={formData.Currency}
+                                                onChange={handleChange}
+                                            >
+                                                <option value="USD">USD</option>
+                                                <option value="IQD">IQD</option>
+                                                <option value="EUR">EUR</option>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
