@@ -1949,15 +1949,18 @@ router.get('/convert-path', async (req, res) => {
     }
 });
 
-// Photo server status and management
+// ⚠️ DISABLED: Photo server routes - photo-server.js file is missing
+// These routes were referencing middlewares/photo-server.js which doesn't exist
+// TODO: Either implement photo-server.js or remove these routes entirely
+/*
 router.get('/photo-server/status', async (req, res) => {
     try {
-        const { default: photoServer } = await import('../middlewares/photo-server.js');
+        const { default: photoServer } = await import('../middleware/photo-server.js');
         const { default: photoPathDetector } = await import('../services/imaging/path-detector.js');
-        
+
         const status = photoServer.getStatus();
         const allPaths = photoPathDetector.getAllDetectedPaths();
-        
+
         res.json({
             status,
             detectedPaths: allPaths,
@@ -1973,11 +1976,11 @@ router.get('/photo-server/status', async (req, res) => {
 
 router.post('/photo-server/re-detect', async (req, res) => {
     try {
-        const { default: photoServer } = await import('../middlewares/photo-server.js');
-        
+        const { default: photoServer } = await import('../middleware/photo-server.js');
+
         console.log('🔍 Manual photo path re-detection requested');
         await photoServer.initialize();
-        
+
         const status = photoServer.getStatus();
         res.json({
             success: true,
@@ -1991,6 +1994,7 @@ router.post('/photo-server/re-detect', async (req, res) => {
         });
     }
 });
+*/
 
 // Get referral sources for dropdowns
 router.get('/referral-sources', async (req, res) => {

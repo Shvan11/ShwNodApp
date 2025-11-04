@@ -211,6 +211,49 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                     </>
                                 )}
                             </button>
+                            </h3>
+
+                            <div className="form-row">
+                                <div className="form-field">
+                                    <label htmlFor="UpperAlignerStartSequence">Start Sequence (Auto)</label>
+                                    <input
+                                        type="number"
+                                        id="UpperAlignerStartSequence"
+                                        value={computedFields.UpperAlignerStartSequence}
+                                        readOnly
+                                        className="readonly"
+                                    />
+                                </div>
+
+                                <div className="form-field">
+                                    <label htmlFor="UpperAlignerCount">Count</label>
+                                    <input
+                                        type="number"
+                                        id="UpperAlignerCount"
+                                        name="UpperAlignerCount"
+                                        value={formData.UpperAlignerCount}
+                                        onChange={handleChange}
+                                        className={errors.UpperAlignerCount ? 'error' : ''}
+                                        min="0"
+                                        placeholder="Number of aligners"
+                                    />
+                                    {errors.UpperAlignerCount && (
+                                        <span className="error-message">{errors.UpperAlignerCount}</span>
+                                    )}
+                                </div>
+
+                                <div className="form-field">
+                                    <label htmlFor="UpperAlignerEndSequence">End Sequence (Auto)</label>
+                                    <input
+                                        type="number"
+                                        id="UpperAlignerEndSequence"
+                                        value={computedFields.UpperAlignerEndSequence || ''}
+                                        readOnly
+                                        className="readonly"
+                                        placeholder="Auto-calculated"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
                         {/* Two-Column Layout Container */}
@@ -289,6 +332,33 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                             placeholder="Auto-calculated"
                                         />
                                     </div>
+                                <div className="form-field">
+                                    <label htmlFor="LowerAlignerCount">Count</label>
+                                    <input
+                                        type="number"
+                                        id="LowerAlignerCount"
+                                        name="LowerAlignerCount"
+                                        value={formData.LowerAlignerCount}
+                                        onChange={handleChange}
+                                        className={errors.LowerAlignerCount ? 'error' : ''}
+                                        min="0"
+                                        placeholder="Number of aligners"
+                                    />
+                                    {errors.LowerAlignerCount && (
+                                        <span className="error-message">{errors.LowerAlignerCount}</span>
+                                    )}
+                                </div>
+
+                                <div className="form-field">
+                                    <label htmlFor="LowerAlignerEndSequence">End Sequence (Auto)</label>
+                                    <input
+                                        type="number"
+                                        id="LowerAlignerEndSequence"
+                                        value={computedFields.LowerAlignerEndSequence || ''}
+                                        readOnly
+                                        className="readonly"
+                                        placeholder="Auto-calculated"
+                                    />
                                 </div>
                             </div>
 
