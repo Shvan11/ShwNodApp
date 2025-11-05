@@ -112,6 +112,36 @@ class TemplateDesigner {
                         <input type="text" value="${this.template.background_color || '#FFFFFF'}" readonly>
                     </div>
                 </div>
+            </div>
+
+            <div class="property-group">
+                <h3>Page Margins (mm)</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Top</label>
+                        <input type="number" id="template_margin_top" value="${this.template.paper_margin_top || 10}" min="0" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label>Right</label>
+                        <input type="number" id="template_margin_right" value="${this.template.paper_margin_right || 10}" min="0" max="100">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Bottom</label>
+                        <input type="number" id="template_margin_bottom" value="${this.template.paper_margin_bottom || 10}" min="0" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label>Left</label>
+                        <input type="number" id="template_margin_left" value="${this.template.paper_margin_left || 10}" min="0" max="100">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="template_show_margins" checked>
+                        Show margin guides
+                    </label>
+                </div>
                 <button class="btn btn-success" style="width: 100%; margin-top: 10px;" id="saveTemplateSettingsBtn">
                     💾 Save Template Settings
                 </button>
@@ -128,13 +158,19 @@ class TemplateDesigner {
         });
 
         // Update canvas when dimensions change
-        ['template_width', 'template_height', 'template_bg_color'].forEach(id => {
+        ['template_width', 'template_height', 'template_bg_color',
+         'template_margin_top', 'template_margin_right', 'template_margin_bottom', 'template_margin_left'].forEach(id => {
             const input = document.getElementById(id);
             if (input) {
                 input.addEventListener('input', () => {
                     this.applyTemplateSettings();
                 });
             }
+        });
+
+        // Toggle margin guides
+        document.getElementById('template_show_margins').addEventListener('change', (e) => {
+            this.showMarginGuides(e.target.checked);
         });
     }
 
@@ -159,6 +195,10 @@ class TemplateDesigner {
         this.template.paper_width = parseFloat(document.getElementById('template_width').value) || 80;
         this.template.paper_height = parseFloat(document.getElementById('template_height').value) || 297;
         this.template.background_color = document.getElementById('template_bg_color').value;
+        this.template.paper_margin_top = parseFloat(document.getElementById('template_margin_top').value) || 0;
+        this.template.paper_margin_right = parseFloat(document.getElementById('template_margin_right').value) || 0;
+        this.template.paper_margin_bottom = parseFloat(document.getElementById('template_margin_bottom').value) || 0;
+        this.template.paper_margin_left = parseFloat(document.getElementById('template_margin_left').value) || 0;
 
         // Re-render canvas with new dimensions
         this.renderCanvas();
@@ -172,7 +212,11 @@ class TemplateDesigner {
                 template_name: this.template.template_name,
                 paper_width: parseFloat(document.getElementById('template_width').value),
                 paper_height: parseFloat(document.getElementById('template_height').value),
-                background_color: document.getElementById('template_bg_color').value
+                background_color: document.getElementById('template_bg_color').value,
+                paper_margin_top: parseFloat(document.getElementById('template_margin_top').value),
+                paper_margin_right: parseFloat(document.getElementById('template_margin_right').value),
+                paper_margin_bottom: parseFloat(document.getElementById('template_margin_bottom').value),
+                paper_margin_left: parseFloat(document.getElementById('template_margin_left').value)
             };
 
             const response = await fetch(`/api/templates/${this.template.template_id}`, {
@@ -247,7 +291,98 @@ class TemplateDesigner {
             canvas.appendChild(elementDiv);
         });
 
+        // Render margin guides
+        this.renderMarginGuides();
+
         this.updateCanvasZoom();
+    }
+
+    renderMarginGuides() {
+        const canvas = document.getElementById('templateCanvas');
+
+        // Remove existing margin guides
+        const existingGuides = canvas.querySelectorAll('.margin-guide');
+        existingGuides.forEach(guide => guide.remove());
+
+        // Check if we should show margin guides
+        const showMarginsCheckbox = document.getElementById('template_show_margins');
+        if (!showMarginsCheckbox || !showMarginsCheckbox.checked) {
+            return;
+        }
+
+        const marginTop = this.mmToPx(this.template.paper_margin_top || 0);
+        const marginRight = this.mmToPx(this.template.paper_margin_right || 0);
+        const marginBottom = this.mmToPx(this.template.paper_margin_bottom || 0);
+        const marginLeft = this.mmToPx(this.template.paper_margin_left || 0);
+
+        const canvasWidth = this.mmToPx(this.template.paper_width);
+        const canvasHeight = this.mmToPx(this.template.paper_height);
+
+        // Create margin guide overlay
+        const marginGuide = document.createElement('div');
+        marginGuide.className = 'margin-guide';
+        marginGuide.style.position = 'absolute';
+        marginGuide.style.top = '0';
+        marginGuide.style.left = '0';
+        marginGuide.style.width = '100%';
+        marginGuide.style.height = '100%';
+        marginGuide.style.pointerEvents = 'none';
+        marginGuide.style.zIndex = '1000';
+
+        // Draw margin lines
+        const createLine = (x1, y1, x2, y2) => {
+            const line = document.createElement('div');
+            line.style.position = 'absolute';
+            line.style.background = 'rgba(255, 0, 0, 0.3)';
+            line.style.pointerEvents = 'none';
+
+            if (x1 === x2) { // Vertical line
+                line.style.left = x1 + 'px';
+                line.style.top = y1 + 'px';
+                line.style.width = '1px';
+                line.style.height = (y2 - y1) + 'px';
+            } else { // Horizontal line
+                line.style.left = x1 + 'px';
+                line.style.top = y1 + 'px';
+                line.style.width = (x2 - x1) + 'px';
+                line.style.height = '1px';
+            }
+
+            return line;
+        };
+
+        // Top margin line
+        if (marginTop > 0) {
+            marginGuide.appendChild(createLine(0, marginTop, canvasWidth, marginTop));
+        }
+
+        // Right margin line
+        if (marginRight > 0) {
+            marginGuide.appendChild(createLine(canvasWidth - marginRight, 0, canvasWidth - marginRight, canvasHeight));
+        }
+
+        // Bottom margin line
+        if (marginBottom > 0) {
+            marginGuide.appendChild(createLine(0, canvasHeight - marginBottom, canvasWidth, canvasHeight - marginBottom));
+        }
+
+        // Left margin line
+        if (marginLeft > 0) {
+            marginGuide.appendChild(createLine(marginLeft, 0, marginLeft, canvasHeight));
+        }
+
+        canvas.appendChild(marginGuide);
+    }
+
+    showMarginGuides(show) {
+        const guides = document.querySelectorAll('.margin-guide');
+        guides.forEach(guide => {
+            guide.style.display = show ? 'block' : 'none';
+        });
+
+        if (show) {
+            this.renderMarginGuides();
+        }
     }
 
     createElementDiv(element) {
