@@ -628,9 +628,14 @@ class TemplateDesigner {
 
         // Content - create a content wrapper to avoid text node issues
         const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'element-content';
         contentWrapper.style.width = '100%';
         contentWrapper.style.height = '100%';
         contentWrapper.style.pointerEvents = 'none'; // Let clicks pass through to parent
+        contentWrapper.style.position = 'absolute';
+        contentWrapper.style.top = '0';
+        contentWrapper.style.left = '0';
+        contentWrapper.style.userSelect = 'none';
 
         const content = this.getElementContent(element);
         if (element.element_type === 'line') {
@@ -733,7 +738,12 @@ class TemplateDesigner {
     }
 
     onDrag(e) {
-        if (!this.isDragging) return;
+        if (!this.isDragging) {
+            console.log('onDrag called but isDragging is false');
+            return;
+        }
+
+        console.log('onDrag called - mouse at', e.clientX, e.clientY);
 
         const canvas = document.getElementById('templateCanvas');
         const canvasRect = canvas.getBoundingClientRect();
@@ -742,9 +752,13 @@ class TemplateDesigner {
         const mouseXInCanvas = (e.clientX - canvasRect.left) / this.zoom;
         const mouseYInCanvas = (e.clientY - canvasRect.top) / this.zoom;
 
+        console.log('Canvas coords:', mouseXInCanvas, mouseYInCanvas, 'zoom:', this.zoom);
+
         // Calculate new position (subtract the offset to keep mouse at same point in element)
         let newX = mouseXInCanvas - this.dragStart.offsetX;
         let newY = mouseYInCanvas - this.dragStart.offsetY;
+
+        console.log('New position before snap:', newX, newY);
 
         // Apply grid snapping
         newX = this.snap(newX);
@@ -757,11 +771,16 @@ class TemplateDesigner {
         this.draggedElement.pos_x = Math.max(0, Math.min(Math.round(newX), maxX));
         this.draggedElement.pos_y = Math.max(0, Math.min(Math.round(newY), maxY));
 
+        console.log('Updated position:', this.draggedElement.pos_x, this.draggedElement.pos_y);
+
         // Update visual position
         const elementDiv = document.querySelector(`[data-element-id="${this.draggedElement.element_id}"]`);
         if (elementDiv) {
             elementDiv.style.left = this.draggedElement.pos_x + 'px';
             elementDiv.style.top = this.draggedElement.pos_y + 'px';
+            console.log('Updated element style:', elementDiv.style.left, elementDiv.style.top);
+        } else {
+            console.error('Could not find element div!');
         }
 
         // Update properties panel if this element is selected
