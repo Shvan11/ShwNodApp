@@ -57,6 +57,22 @@ class TemplateDesigner {
         if (result.status === 'success') {
             this.template = result.data;
             this.elements = result.data.elements || [];
+
+            console.log('Template loaded:', this.template.template_name);
+            console.log('Elements count:', this.elements.length);
+
+            // Debug: Log first few elements
+            if (this.elements.length > 0) {
+                console.log('First element:', this.elements[0]);
+                console.log('Sample positions:', this.elements.slice(0, 3).map(e => ({
+                    name: e.element_name,
+                    x: e.pos_x,
+                    y: e.pos_y,
+                    w: e.width,
+                    h: e.height
+                })));
+            }
+
             this.hasUnsavedChanges = false;
             this.history = [];
             this.historyIndex = -1;
@@ -473,6 +489,8 @@ class TemplateDesigner {
         const widthPx = this.mmToPx(this.template.paper_width);
         const heightPx = this.mmToPx(this.template.paper_height);
 
+        console.log(`Rendering canvas: ${widthPx}px × ${heightPx}px (${this.template.paper_width}mm × ${this.template.paper_height}mm)`);
+
         canvas.style.width = widthPx + 'px';
         canvas.style.height = heightPx + 'px';
         canvas.style.backgroundColor = this.template.background_color || '#FFFFFF';
@@ -481,6 +499,7 @@ class TemplateDesigner {
         canvas.innerHTML = '';
 
         // Render elements
+        console.log(`Rendering ${this.elements.length} elements`);
         this.elements.forEach(element => {
             const elementDiv = this.createElementDiv(element);
             canvas.appendChild(elementDiv);
@@ -601,13 +620,27 @@ class TemplateDesigner {
             div.style.backgroundColor = element.background_color;
         }
 
-        // Content - use textContent to prevent XSS
+        // Essential display properties
+        div.style.overflow = 'hidden';
+        div.style.wordWrap = 'break-word';
+        div.style.display = 'block';
+        div.style.boxSizing = 'border-box';
+
+        // Content - create a content wrapper to avoid text node issues
+        const contentWrapper = document.createElement('div');
+        contentWrapper.style.width = '100%';
+        contentWrapper.style.height = '100%';
+        contentWrapper.style.pointerEvents = 'none'; // Let clicks pass through to parent
+
         const content = this.getElementContent(element);
         if (element.element_type === 'line') {
-            div.innerHTML = content; // Safe for lines
+            contentWrapper.innerHTML = content; // Safe for lines (just borders)
         } else {
-            div.textContent = content;
+            // Sanitize and set as text
+            contentWrapper.textContent = content;
         }
+
+        div.appendChild(contentWrapper);
 
         // Add label
         const label = document.createElement('div');
@@ -658,6 +691,8 @@ class TemplateDesigner {
 
         e.preventDefault();
         e.stopPropagation();
+
+        console.log('Start drag:', element.element_name, 'at', element.pos_x, element.pos_y);
 
         this.isDragging = true;
         this.draggedElement = element;
