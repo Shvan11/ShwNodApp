@@ -1,43 +1,53 @@
-/* ===== WORK CARD STYLES ===== */
+/* ===== WORK CARD STYLES - CLEAN COLLAPSIBLE DESIGN ===== */
 
 .works-card-container {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.5rem;
     padding: 1rem 0;
 }
 
 .work-card {
     background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    padding: 1.5rem;
-    transition: all 0.3s ease;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    transition: all 0.2s ease;
     border-left: 4px solid transparent;
+    overflow: hidden;
+}
+
+.work-card.collapsed {
+    padding: 0.75rem 1rem;
+}
+
+.work-card.expanded {
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .work-card:hover {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .work-card-active {
     border-left-color: #059669;
-    background: linear-gradient(to right, #f0fdf4 0%, #ffffff 10%);
 }
 
 .work-card-completed {
     border-left-color: #6b7280;
-    opacity: 0.9;
+    opacity: 0.85;
 }
 
-/* Header Section */
-.work-card-header {
+/* Collapsed Header - Always Visible */
+.work-card-collapsed-header {
     display: flex;
+    align-items: center;
     justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 1rem;
-    position: relative;
+    transition: all 0.2s;
+}
+
+.work-card-collapsed-header:hover {
+    opacity: 0.8;
 }
 
 .work-card-title-section {
@@ -47,26 +57,26 @@
 .work-card-title {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.5rem;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
 }
 
-.work-card-title i {
+.work-card-title i.fa-tooth {
     color: #059669;
-    font-size: 1.25rem;
+    font-size: 1rem;
 }
 
 .work-card-title h3 {
     margin: 0;
-    font-size: 1.125rem;
+    font-size: 1rem;
     font-weight: 600;
     color: #1f2937;
 }
 
 .work-status-badge {
-    padding: 0.25rem 0.75rem;
+    padding: 0.125rem 0.5rem;
     border-radius: 12px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -82,28 +92,50 @@
     color: #4b5563;
 }
 
-.work-card-meta {
+.work-card-meta-minimal {
     display: flex;
     flex-wrap: wrap;
     gap: 1rem;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     color: #6b7280;
+    margin-left: 1.375rem;
 }
 
-.work-card-meta span {
+.work-card-meta-minimal span {
     display: flex;
     align-items: center;
-    gap: 0.375rem;
+    gap: 0.25rem;
 }
 
-.work-card-meta i {
-    font-size: 0.75rem;
+.work-card-meta-minimal i {
+    font-size: 0.7rem;
     color: #9ca3af;
+}
+
+/* Full Content - Only When Expanded */
+.work-card-full-content {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Actions Menu */
 .work-card-actions-menu {
-    position: relative;
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
 }
 
 .btn-icon {
@@ -239,6 +271,34 @@
     color: #059669;
 }
 
+/* Additional Info Section */
+.work-card-additional-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: #f9fafb;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}
+
+.work-card-additional-info .info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #374151;
+}
+
+.work-card-additional-info .info-item.full-width {
+    flex-basis: 100%;
+}
+
+.work-card-additional-info .info-item i {
+    color: #6b7280;
+    font-size: 0.75rem;
+}
+
 /* Primary Actions */
 .work-card-primary-actions {
     display: grid;
@@ -290,7 +350,6 @@
 .work-card-secondary-actions {
     display: flex;
     gap: 0.75rem;
-    margin-bottom: 0.75rem;
 }
 
 .btn-card-secondary {
@@ -310,101 +369,33 @@
 }
 
 .btn-card-secondary.btn-add-payment {
-    background: #10b981;
+    background: #10b981 !important;
 }
 
 .btn-card-secondary.btn-add-payment:hover:not(.disabled) {
-    background: #059669;
+    background: #059669 !important;
 }
 
 .btn-card-secondary.btn-add-payment.disabled {
-    background: #9ca3af;
+    background: #9ca3af !important;
     cursor: not-allowed;
     opacity: 0.6;
 }
 
+.btn-card-secondary.btn-print-receipt {
+    background: #3b82f6 !important;
+}
+
+.btn-card-secondary.btn-print-receipt:hover {
+    background: #2563eb !important;
+}
+
 .btn-card-secondary.btn-add-set {
-    background: #8b5cf6;
+    background: #8b5cf6 !important;
 }
 
 .btn-card-secondary.btn-add-set:hover {
-    background: #7c3aed;
-}
-
-/* Expanded Details */
-.work-card-expanded {
-    border-top: 1px solid #e5e7eb;
-    padding-top: 1rem;
-    margin-top: 1rem;
-    animation: slideDown 0.3s ease;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.work-card-detail-section h4 {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 0 0 1rem 0;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #374151;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.work-card-detail-section h4 i {
-    color: #6b7280;
-    font-size: 0.875rem;
-}
-
-.detail-item {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-    font-size: 0.875rem;
-}
-
-.detail-label {
-    font-weight: 600;
-    color: #6b7280;
-}
-
-.detail-value {
-    color: #1f2937;
-}
-
-/* Expand/Collapse Toggle */
-.work-card-expand-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.75rem;
-    background: transparent;
-    border: 1px dashed #d1d5db;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #6b7280;
-    transition: all 0.2s;
-}
-
-.work-card-expand-toggle:hover {
-    background: #f9fafb;
-    border-color: #9ca3af;
-    color: #374151;
+    background: #7c3aed !important;
 }
 
 /* No Works Message */
@@ -419,7 +410,7 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
-    .work-card {
+    .work-card.expanded {
         padding: 1rem;
     }
 
@@ -436,15 +427,15 @@
         flex-direction: column;
     }
 
-    .work-card-meta {
+    .work-card-meta-minimal {
         flex-direction: column;
-        gap: 0.5rem;
+        gap: 0.25rem;
     }
 }
 
 @media (max-width: 480px) {
     .work-card-title h3 {
-        font-size: 1rem;
+        font-size: 0.9rem;
     }
 
     .btn-card-action span {

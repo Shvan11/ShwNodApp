@@ -73,11 +73,11 @@ const PatientShell = () => {
                             {' '}
                             {patientData.loading ? `Patient ${patientId}` : patientData.name}
                         </span>
-                        {page !== 'grid' && (
+                        {page && page !== 'grid' && (
                             <>
                                 <span className="breadcrumb-separator">/</span>
                                 <span className="breadcrumb-item active">
-                                    {page.charAt(0).toUpperCase() + page.slice(1)}
+                                    {page.charAt(0).toUpperCase() + page.slice(1).replace(/-/g, ' ')}
                                 </span>
                             </>
                         )}

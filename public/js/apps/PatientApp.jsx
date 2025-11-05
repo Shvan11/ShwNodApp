@@ -14,14 +14,15 @@ import PatientShell from '../components/react/PatientShell.jsx';
  * - /patient/:patientId/visits → Visit summary
  * - /patient/:patientId/payments → Payment records
  * - /patient/:patientId/new-appointment → New appointment form
+ * - /patient/:patientId/edit-appointment/:appointmentId → Edit appointment
  * - /patient/:patientId/edit → Edit patient information
  */
 const PatientApp = () => {
     return (
         <BrowserRouter>
             <Routes>
-                {/* Patient routes with page parameter */}
-                <Route path="/patient/:patientId/:page" element={<PatientShell />} />
+                {/* Patient routes with page parameter - handles both simple and nested pages */}
+                <Route path="/patient/:patientId/:page/*" element={<PatientShell />} />
 
                 {/* Default patient route - redirect to works page */}
                 <Route path="/patient/:patientId" element={<Navigate to="works" replace />} />

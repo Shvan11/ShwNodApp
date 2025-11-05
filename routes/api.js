@@ -43,9 +43,13 @@ import { getContacts } from '../services/authentication/google.js';
 import { createPathResolver } from '../utils/path-resolver.js';
 import { getAllOptions, getOption, updateOption, getOptionsByPattern, bulkUpdateOptions } from '../services/database/queries/options-queries.js';
 import DatabaseConfigService from '../services/config/DatabaseConfigService.js';
+import templateRouter from './template-api.js';
 
 const router = express.Router();
 const upload = multer();
+
+// Mount template routes
+router.use('/templates', templateRouter);
 
 
 
@@ -1192,6 +1196,7 @@ router.post("/appointments", async (req, res) => {
         }
         
         // Insert new appointment (defaults will be applied automatically)
+        // Use CAST to convert string to datetime2 on SQL Server side to avoid timezone conversion
         const insertQuery = `
             INSERT INTO tblappointments (
                 PersonID,
@@ -1199,12 +1204,12 @@ router.post("/appointments", async (req, res) => {
                 AppDetail,
                 DrID,
                 LastUpdated
-            ) VALUES (@personID, @appDate, @appDetail, @drID, GETDATE())
+            ) VALUES (@personID, CAST(@appDate AS datetime2), @appDetail, @drID, GETDATE())
         `;
 
         const result = await database.executeQuery(insertQuery, [
             ['personID', database.TYPES.Int, parseInt(PersonID)],
-            ['appDate', database.TYPES.DateTime, AppDate],
+            ['appDate', database.TYPES.NVarChar, AppDate], // Pass as string, SQL Server will cast
             ['appDetail', database.TYPES.NVarChar, AppDetail],
             ['drID', database.TYPES.Int, parseInt(DrID)]
         ]);
@@ -1261,7 +1266,7 @@ router.get("/patient-appointments/:patientId", async (req, res) => {
             SELECT
                 a.appointmentID,
                 a.PersonID,
-                a.AppDate,
+                FORMAT(a.AppDate, 'yyyy-MM-ddTHH:mm:ss') as AppDate,
                 a.AppDetail,
                 a.DrID,
                 e.employeeName as DrName
@@ -1277,7 +1282,7 @@ router.get("/patient-appointments/:patientId", async (req, res) => {
             (columns) => ({
                 appointmentID: columns[0].value,
                 PersonID: columns[1].value,
-                AppDate: columns[2].value,
+                AppDate: columns[2].value, // Already formatted as string without timezone
                 AppDetail: columns[3].value,
                 DrID: columns[4].value,
                 DrName: columns[5].value
@@ -1294,6 +1299,111 @@ router.get("/patient-appointments/:patientId", async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to fetch appointments',
+            details: error.message
+        });
+    }
+});
+
+// Get single appointment by ID
+router.get("/appointments/:appointmentId", async (req, res) => {
+    try {
+        const { appointmentId } = req.params;
+
+        if (!appointmentId || isNaN(parseInt(appointmentId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid appointment ID'
+            });
+        }
+
+        const query = `
+            SELECT
+                a.appointmentID,
+                a.PersonID,
+                FORMAT(a.AppDate, 'yyyy-MM-ddTHH:mm:ss') as AppDate,
+                a.AppDetail,
+                a.DrID,
+                e.employeeName as DrName
+            FROM tblappointments a
+            LEFT JOIN tblemployees e ON a.DrID = e.ID
+            WHERE a.appointmentID = @appointmentId
+        `;
+
+        const result = await database.executeQuery(query, [
+            ['appointmentId', database.TYPES.Int, parseInt(appointmentId)]
+        ]);
+
+        if (!result || result.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Appointment not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            appointment: result[0]
+        });
+
+    } catch (error) {
+        console.error('Error fetching appointment:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch appointment',
+            details: error.message
+        });
+    }
+});
+
+// Update appointment
+router.put("/appointments/:appointmentId", async (req, res) => {
+    try {
+        const { appointmentId } = req.params;
+        const { PersonID, AppDate, AppDetail, DrID } = req.body;
+
+        if (!appointmentId || isNaN(parseInt(appointmentId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid appointment ID'
+            });
+        }
+
+        // Validate required fields
+        if (!PersonID || !AppDate || !AppDetail || !DrID) {
+            return res.status(400).json({
+                success: false,
+                error: 'PersonID, AppDate, AppDetail, and DrID are required'
+            });
+        }
+
+        // Use CAST to convert string to datetime2 on SQL Server side to avoid timezone conversion
+        const query = `
+            UPDATE tblappointments
+            SET PersonID = @PersonID,
+                AppDate = CAST(@AppDate AS datetime2),
+                AppDetail = @AppDetail,
+                DrID = @DrID
+            WHERE appointmentID = @appointmentId
+        `;
+
+        await database.executeQuery(query, [
+            ['appointmentId', database.TYPES.Int, parseInt(appointmentId)],
+            ['PersonID', database.TYPES.Int, parseInt(PersonID)],
+            ['AppDate', database.TYPES.NVarChar, AppDate], // Pass as string, SQL Server will cast
+            ['AppDetail', database.TYPES.NVarChar, AppDetail],
+            ['DrID', database.TYPES.Int, parseInt(DrID)]
+        ]);
+
+        res.json({
+            success: true,
+            message: 'Appointment updated successfully'
+        });
+
+    } catch (error) {
+        console.error('Error updating appointment:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update appointment',
             details: error.message
         });
     }
@@ -1357,9 +1467,18 @@ router.post("/appointments/quick-checkin", async (req, res) => {
         const detail = AppDetail || 'Walk-in';
         const doctorId = DrID ? parseInt(DrID) : null;
 
-        // Get today's date at midnight for consistency
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // Get today's date at current time for the appointment
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+
+        // Format as string to avoid timezone conversion
+        const todayDateTime = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+        const todayDateOnly = `${year}-${month}-${day}`;
 
         // Get current time for Present field - tedious TYPES.Time expects a Date object
         const currentTime = new Date();
@@ -1369,10 +1488,10 @@ router.post("/appointments/quick-checkin", async (req, res) => {
             SELECT appointmentID, Present, Seated, Dismissed
             FROM tblappointments
             WHERE PersonID = @personID
-              AND CAST(AppDate AS DATE) = CAST(@today AS DATE)
+              AND CAST(AppDate AS DATE) = @today
         `, [
             ['personID', database.TYPES.Int, parseInt(PersonID)],
-            ['today', database.TYPES.DateTime, today]
+            ['today', database.TYPES.NVarChar, todayDateOnly]
         ]);
 
         // If appointment exists, just update the Present time if not already set
@@ -1389,7 +1508,7 @@ router.post("/appointments/quick-checkin", async (req, res) => {
                     appointment: {
                         appointmentID: apt.appointmentID,
                         PersonID: parseInt(PersonID),
-                        AppDate: today,
+                        AppDate: todayDateTime,
                         Present: apt.Present
                     }
                 });
@@ -1409,7 +1528,7 @@ router.post("/appointments/quick-checkin", async (req, res) => {
 
                 // Emit WebSocket event for real-time updates
                 if (wsEmitter) {
-                    wsEmitter.emit('appointments_updated', today.toISOString().split('T')[0]);
+                    wsEmitter.emit('appointments_updated', todayDateOnly);
                 }
 
                 return res.json({
@@ -1420,7 +1539,7 @@ router.post("/appointments/quick-checkin", async (req, res) => {
                     appointment: {
                         appointmentID: apt.appointmentID,
                         PersonID: parseInt(PersonID),
-                        AppDate: today,
+                        AppDate: todayDateTime,
                         Present: currentTime
                     }
                 });
@@ -1457,7 +1576,7 @@ router.post("/appointments/quick-checkin", async (req, res) => {
             )
             VALUES (
                 @personID,
-                @appDate,
+                CAST(@appDate AS datetime2),
                 @appDetail,
                 @drID,
                 @presentTime,
@@ -1468,7 +1587,7 @@ router.post("/appointments/quick-checkin", async (req, res) => {
 
         const result = await database.executeQuery(insertQuery, [
             ['personID', database.TYPES.Int, parseInt(PersonID)],
-            ['appDate', database.TYPES.DateTime, today],
+            ['appDate', database.TYPES.NVarChar, todayDateTime],
             ['appDetail', database.TYPES.NVarChar, detail],
             ['drID', database.TYPES.Int, doctorId || null],
             ['presentTime', database.TYPES.Time, currentTime]
@@ -1482,7 +1601,7 @@ router.post("/appointments/quick-checkin", async (req, res) => {
 
         // Emit WebSocket event for real-time updates
         if (wsEmitter) {
-            wsEmitter.emit('appointments_updated', today.toISOString().split('T')[0]);
+            wsEmitter.emit('appointments_updated', todayDateOnly);
         }
 
         res.json({
@@ -1494,7 +1613,7 @@ router.post("/appointments/quick-checkin", async (req, res) => {
             appointment: {
                 appointmentID: newAppointmentId,
                 PersonID: parseInt(PersonID),
-                AppDate: today,
+                AppDate: todayDateTime,
                 AppDetail: detail,
                 DrID: doctorId,
                 Present: currentTime

@@ -36,6 +36,13 @@ const PatientAppointments = ({ patientId }) => {
         }
     }
 
+    const handleEdit = (appointment) => {
+        // Navigate to edit page with appointment data as state
+        navigate(`/patient/${patientId}/edit-appointment/${appointment.appointmentID}`, {
+            state: { appointment }
+        })
+    }
+
     const handleDelete = async (appointmentId) => {
         try {
             const response = await fetch(`/api/appointments/${appointmentId}`, {
@@ -152,13 +159,22 @@ const PatientAppointments = ({ patientId }) => {
                                 </div>
                                 <div className="appointment-actions">
                                     {!isPast && (
-                                        <button
-                                            className="btn-delete"
-                                            onClick={() => setDeleteConfirm(appointment.appointmentID)}
-                                            title="Delete appointment"
-                                        >
-                                            <i className="fas fa-trash"></i>
-                                        </button>
+                                        <>
+                                            <button
+                                                className="btn-edit"
+                                                onClick={() => handleEdit(appointment)}
+                                                title="Edit appointment"
+                                            >
+                                                <i className="fas fa-edit"></i>
+                                            </button>
+                                            <button
+                                                className="btn-delete"
+                                                onClick={() => setDeleteConfirm(appointment.appointmentID)}
+                                                title="Delete appointment"
+                                            >
+                                                <i className="fas fa-trash"></i>
+                                            </button>
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -205,12 +221,16 @@ const PatientAppointments = ({ patientId }) => {
                     justify-content: space-between;
                     align-items: center;
                     margin-bottom: 2rem;
+                    gap: 1rem;
+                    flex-wrap: wrap;
                 }
 
                 .appointments-header h2 {
                     margin: 0;
                     font-size: 1.75rem;
                     color: #1f2937;
+                    flex: 1;
+                    min-width: 200px;
                 }
 
                 .appointments-header h2 i {
@@ -229,11 +249,16 @@ const PatientAppointments = ({ patientId }) => {
                     display: flex;
                     align-items: center;
                     gap: 0.5rem;
-                    transition: background 0.2s;
+                    transition: all 0.2s;
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                    white-space: nowrap;
+                    flex-shrink: 0;
                 }
 
                 .btn-new-appointment:hover {
                     background: #2563eb;
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
                 }
 
                 .appointments-list {
@@ -305,6 +330,25 @@ const PatientAppointments = ({ patientId }) => {
                 .appointment-actions {
                     display: flex;
                     gap: 0.5rem;
+                    flex-shrink: 0;
+                }
+
+                .btn-edit {
+                    background: #10b981;
+                    color: white;
+                    border: none;
+                    padding: 0.5rem 1rem;
+                    border-radius: 0.375rem;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.25rem;
+                }
+
+                .btn-edit:hover {
+                    background: #059669;
+                    transform: translateY(-1px);
                 }
 
                 .btn-delete {
@@ -314,11 +358,15 @@ const PatientAppointments = ({ patientId }) => {
                     padding: 0.5rem 1rem;
                     border-radius: 0.375rem;
                     cursor: pointer;
-                    transition: background 0.2s;
+                    transition: all 0.2s;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.25rem;
                 }
 
                 .btn-delete:hover {
                     background: #dc2626;
+                    transform: translateY(-1px);
                 }
 
                 .empty-state, .loading-state, .error-state {

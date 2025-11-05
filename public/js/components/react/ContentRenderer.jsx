@@ -1,16 +1,21 @@
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import GridComponent from './GridComponent.jsx'
 import XraysComponent from './XraysComponent.jsx'
 import VisitsComponent from './VisitsComponent.jsx'
 import CompareComponent from './CompareComponent.jsx'
 import AppointmentForm from './AppointmentForm.jsx'
+import EditAppointmentForm from './EditAppointmentForm.jsx'
 import WorkComponent from './WorkComponent.jsx'
 import EditPatientComponent from './EditPatientComponent.jsx'
 import PatientAppointments from './PatientAppointments.jsx'
 
 const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
     const navigate = useNavigate();
+    const wildcardParams = useParams();
+
+    // Extract appointmentId from wildcard route (for edit-appointment/:appointmentId)
+    const appointmentId = wildcardParams['*'];
     const renderContent = () => {
         switch (page) {
             case 'grid':
@@ -96,13 +101,31 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
                     <AppointmentForm
                         patientId={patientId}
                         onClose={() => {
-                            // Navigate back to previous page
-                            navigate(-1);
+                            // Navigate back to appointments page
+                            navigate(`/patient/${patientId}/appointments`);
                         }}
                         onSuccess={(result) => {
                             console.log('Appointment created successfully:', result);
-                            // Navigate back to previous page after success
-                            navigate(-1);
+                            // Navigate back to appointments page after success
+                            navigate(`/patient/${patientId}/appointments`);
+                        }}
+                    />
+                );
+
+            case 'edit-appointment':
+                // Handle edit-appointment/:appointmentId pattern
+                return (
+                    <EditAppointmentForm
+                        patientId={patientId}
+                        appointmentId={appointmentId}
+                        onClose={() => {
+                            // Navigate back to appointments page
+                            navigate(`/patient/${patientId}/appointments`);
+                        }}
+                        onSuccess={(result) => {
+                            console.log('Appointment updated successfully:', result);
+                            // Navigate back to appointments page after success
+                            navigate(`/patient/${patientId}/appointments`);
                         }}
                     />
                 );

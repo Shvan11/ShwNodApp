@@ -33,6 +33,9 @@ const WorkComponent = ({ patientId }) => {
     // Patient info state
     const [patientInfo, setPatientInfo] = useState(null);
 
+    // Expanded works state - track which work IDs are expanded
+    const [expandedWorks, setExpandedWorks] = useState(new Set());
+
     // Work detail form state
     const [detailFormData, setDetailFormData] = useState({
         WorkID: null,
@@ -72,6 +75,16 @@ const WorkComponent = ({ patientId }) => {
             loadPatientInfo();
         }
     }, [patientId]);
+
+    // Auto-expand the first active work when works are loaded
+    useEffect(() => {
+        if (works.length > 0) {
+            const firstActiveWork = works.find(work => !work.Finished);
+            if (firstActiveWork) {
+                setExpandedWorks(new Set([firstActiveWork.workid]));
+            }
+        }
+    }, [works]);
 
     const loadPatientInfo = async () => {
         try {
@@ -445,6 +458,18 @@ const WorkComponent = ({ patientId }) => {
         }
     };
 
+    const toggleWorkExpanded = (workId) => {
+        setExpandedWorks(prevExpanded => {
+            const newExpanded = new Set(prevExpanded);
+            if (newExpanded.has(workId)) {
+                newExpanded.delete(workId);
+            } else {
+                newExpanded.add(workId);
+            }
+            return newExpanded;
+        });
+    };
+
     if (loading) return <div className="work-loading">Loading works...</div>;
 
     return (
@@ -607,6 +632,8 @@ const WorkComponent = ({ patientId }) => {
                         work={work}
                         patientId={patientId}
                         isAlignerWork={isAlignerWork}
+                        isExpanded={expandedWorks.has(work.workid)}
+                        onToggleExpanded={() => toggleWorkExpanded(work.workid)}
                         onViewDetails={handleViewDetails}
                         onEdit={handleEditWork}
                         onAddPayment={handleAddPayment}
