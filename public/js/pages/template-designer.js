@@ -26,6 +26,7 @@ class TemplateDesigner {
             this.setupEventListeners();
 
             // Render initial state
+            this.renderTemplateSettings();
             this.renderElementList();
             this.renderCanvas();
 
@@ -69,6 +70,134 @@ class TemplateDesigner {
                 label.style.display = e.target.checked ? 'block' : 'none';
             });
         });
+    }
+
+    renderTemplateSettings() {
+        const panel = document.getElementById('templateSettings');
+
+        if (!this.template) {
+            panel.innerHTML = '<div class="empty-state"><p>No template loaded</p></div>';
+            return;
+        }
+
+        const currentOrientation = this.template.paper_width > this.template.paper_height ? 'landscape' : 'portrait';
+
+        panel.innerHTML = `
+            <div class="property-group">
+                <div class="form-group">
+                    <label>Template Name</label>
+                    <input type="text" id="template_name" value="${this.template.template_name || ''}" disabled>
+                </div>
+                <div class="form-group">
+                    <label>Orientation</label>
+                    <select id="template_orientation">
+                        <option value="portrait" ${currentOrientation === 'portrait' ? 'selected' : ''}>Portrait</option>
+                        <option value="landscape" ${currentOrientation === 'landscape' ? 'selected' : ''}>Landscape</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Width (mm)</label>
+                        <input type="number" id="template_width" value="${this.template.paper_width || 80}" min="10" max="400">
+                    </div>
+                    <div class="form-group">
+                        <label>Height (mm)</label>
+                        <input type="number" id="template_height" value="${this.template.paper_height || 297}" min="10" max="600">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Background Color</label>
+                    <div class="color-input">
+                        <input type="color" id="template_bg_color" value="${this.template.background_color || '#FFFFFF'}">
+                        <input type="text" value="${this.template.background_color || '#FFFFFF'}" readonly>
+                    </div>
+                </div>
+                <button class="btn btn-success" style="width: 100%; margin-top: 10px;" id="saveTemplateSettingsBtn">
+                    💾 Save Template Settings
+                </button>
+            </div>
+        `;
+
+        // Add event listeners
+        document.getElementById('saveTemplateSettingsBtn').addEventListener('click', () => {
+            this.saveTemplateSettings();
+        });
+
+        document.getElementById('template_orientation').addEventListener('change', (e) => {
+            this.handleOrientationChange(e.target.value);
+        });
+
+        // Update canvas when dimensions change
+        ['template_width', 'template_height', 'template_bg_color'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.addEventListener('input', () => {
+                    this.applyTemplateSettings();
+                });
+            }
+        });
+    }
+
+    handleOrientationChange(newOrientation) {
+        const widthInput = document.getElementById('template_width');
+        const heightInput = document.getElementById('template_height');
+
+        const currentWidth = parseFloat(widthInput.value);
+        const currentHeight = parseFloat(heightInput.value);
+        const currentOrientation = currentWidth > currentHeight ? 'landscape' : 'portrait';
+
+        // Only swap if orientation actually changes
+        if (newOrientation !== currentOrientation) {
+            widthInput.value = currentHeight;
+            heightInput.value = currentWidth;
+            this.applyTemplateSettings();
+        }
+    }
+
+    applyTemplateSettings() {
+        // Update template object with new values
+        this.template.paper_width = parseFloat(document.getElementById('template_width').value) || 80;
+        this.template.paper_height = parseFloat(document.getElementById('template_height').value) || 297;
+        this.template.background_color = document.getElementById('template_bg_color').value;
+
+        // Re-render canvas with new dimensions
+        this.renderCanvas();
+    }
+
+    async saveTemplateSettings() {
+        this.showLoading(true);
+
+        try {
+            const templateData = {
+                template_name: this.template.template_name,
+                paper_width: parseFloat(document.getElementById('template_width').value),
+                paper_height: parseFloat(document.getElementById('template_height').value),
+                background_color: document.getElementById('template_bg_color').value
+            };
+
+            const response = await fetch(`/api/templates/${this.template.template_id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(templateData)
+            });
+
+            const result = await response.json();
+            if (result.status === 'success') {
+                this.showToast('Template settings saved successfully!', 'success');
+
+                // Update local template object
+                Object.assign(this.template, templateData);
+            } else {
+                throw new Error(result.message);
+            }
+        } catch (error) {
+            console.error('Failed to save template settings:', error);
+            this.showToast('Failed to save template settings', 'error');
+        } finally {
+            this.showLoading(false);
+        }
     }
 
     renderElementList() {
@@ -493,6 +622,7 @@ class TemplateDesigner {
         this.showLoading(true);
         try {
             await this.loadTemplate(this.template.template_id);
+            this.renderTemplateSettings();
             this.renderElementList();
             this.renderCanvas();
             this.selectedElement = null;
