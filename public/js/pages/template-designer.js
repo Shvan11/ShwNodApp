@@ -317,21 +317,26 @@ class TemplateDesigner {
         if (e.button !== 0) return; // Only left mouse button
 
         e.preventDefault();
+        e.stopPropagation();
+
         this.isDragging = true;
         this.draggedElement = element;
 
-        const rect = e.currentTarget.getBoundingClientRect();
         const canvas = document.getElementById('templateCanvas');
         const canvasRect = canvas.getBoundingClientRect();
 
+        // Calculate offset of mouse within the element (in unscaled coordinates)
+        const mouseXInCanvas = (e.clientX - canvasRect.left) / this.zoom;
+        const mouseYInCanvas = (e.clientY - canvasRect.top) / this.zoom;
+
         this.dragStart = {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
+            offsetX: mouseXInCanvas - element.pos_x,
+            offsetY: mouseYInCanvas - element.pos_y,
             elementX: element.pos_x,
             elementY: element.pos_y
         };
 
-        const mouseMoveHandler = (e) => this.onDrag(e, canvasRect);
+        const mouseMoveHandler = (e) => this.onDrag(e);
         const mouseUpHandler = () => {
             this.isDragging = false;
             document.removeEventListener('mousemove', mouseMoveHandler);
@@ -340,17 +345,31 @@ class TemplateDesigner {
 
         document.addEventListener('mousemove', mouseMoveHandler);
         document.addEventListener('mouseup', mouseUpHandler);
+
+        // Select the element being dragged
+        this.selectElement(element.element_id);
     }
 
-    onDrag(e, canvasRect) {
+    onDrag(e) {
         if (!this.isDragging) return;
 
-        const newX = (e.clientX - canvasRect.left - this.dragStart.x) / this.zoom;
-        const newY = (e.clientY - canvasRect.top - this.dragStart.y) / this.zoom;
+        const canvas = document.getElementById('templateCanvas');
+        const canvasRect = canvas.getBoundingClientRect();
 
-        // Update element position
-        this.draggedElement.pos_x = Math.max(0, Math.round(newX));
-        this.draggedElement.pos_y = Math.max(0, Math.round(newY));
+        // Calculate mouse position in canvas coordinates (accounting for zoom)
+        const mouseXInCanvas = (e.clientX - canvasRect.left) / this.zoom;
+        const mouseYInCanvas = (e.clientY - canvasRect.top) / this.zoom;
+
+        // Calculate new position (subtract the offset to keep mouse at same point in element)
+        const newX = mouseXInCanvas - this.dragStart.offsetX;
+        const newY = mouseYInCanvas - this.dragStart.offsetY;
+
+        // Update element position (constrain to canvas bounds)
+        const maxX = this.template.paper_width ? this.mmToPx(this.template.paper_width) - this.draggedElement.width : 1000;
+        const maxY = this.template.paper_height ? this.mmToPx(this.template.paper_height) - this.draggedElement.height : 1000;
+
+        this.draggedElement.pos_x = Math.max(0, Math.min(Math.round(newX), maxX));
+        this.draggedElement.pos_y = Math.max(0, Math.min(Math.round(newY), maxY));
 
         // Update visual position
         const elementDiv = document.querySelector(`[data-element-id="${this.draggedElement.element_id}"]`);
