@@ -55,7 +55,11 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
     const fetchAvailableSlots = useCallback(async (date) => {
         try {
             setLoading(true);
-            const dateStr = date.toISOString().split('T')[0];
+            // Format date without timezone conversion
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
             const response = await fetch(`/api/calendar/available-slots?date=${dateStr}`);
 
             if (!response.ok) throw new Error('Failed to fetch slots');

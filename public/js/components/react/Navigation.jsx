@@ -104,6 +104,7 @@ const Navigation = ({ patientId, currentPage }) => {
     // Define static navigation items (Photos removed - will be its own expandable section)
     const staticNavItems = [
         { key: 'works', page: 'works', label: 'Works', icon: 'fas fa-tooth' },
+        { key: 'appointments', page: 'appointments', label: 'Appointments', icon: 'fas fa-calendar-check' },
         { key: 'new-appointment', page: 'new-appointment', label: 'New Appointment', icon: 'fas fa-plus-circle' },
         { key: 'edit-patient', page: 'edit-patient', label: 'Edit Patient', icon: 'fas fa-user-edit' }
     ];

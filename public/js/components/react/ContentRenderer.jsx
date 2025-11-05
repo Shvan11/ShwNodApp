@@ -7,6 +7,7 @@ import CompareComponent from './CompareComponent.jsx'
 import AppointmentForm from './AppointmentForm.jsx'
 import WorkComponent from './WorkComponent.jsx'
 import EditPatientComponent from './EditPatientComponent.jsx'
+import PatientAppointments from './PatientAppointments.jsx'
 
 const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
     const navigate = useNavigate();
@@ -83,6 +84,13 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
                     </div>
                 );
             
+            case 'appointments':
+                return (
+                    <PatientAppointments
+                        patientId={patientId}
+                    />
+                );
+
             case 'new-appointment':
                 return (
                     <AppointmentForm

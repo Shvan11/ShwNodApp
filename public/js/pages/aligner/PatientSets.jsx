@@ -1791,8 +1791,9 @@ const PatientSets = () => {
                     isOpen={showBatchDrawer}
                     onClose={() => setShowBatchDrawer(false)}
                     onSave={handleBatchSaved}
-                    editingBatch={editingBatch}
+                    batch={editingBatch}
                     set={currentSetForBatch}
+                    existingBatches={currentSetForBatch ? (batchesData[currentSetForBatch.AlignerSetID] || []) : []}
                 />
             )}
 

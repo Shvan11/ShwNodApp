@@ -300,6 +300,41 @@ const PatientManagement = () => {
         setShowDeleteConfirm(true);
     };
 
+    const handleQuickCheckin = async (patient) => {
+        try {
+            setLoading(true);
+            const response = await fetch('/api/appointments/quick-checkin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    PersonID: patient.PersonID
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to check in patient');
+            }
+
+            const result = await response.json();
+
+            if (result.alreadyCheckedIn) {
+                setSuccessMessage(`${patient.PatientName} is already checked in today!`);
+            } else if (result.created) {
+                setSuccessMessage(`${patient.PatientName} added to today's appointments and checked in!`);
+            } else {
+                setSuccessMessage(`${patient.PatientName} checked in successfully!`);
+            }
+
+            setTimeout(() => setSuccessMessage(null), 5000);
+        } catch (err) {
+            setError(err.message);
+            setTimeout(() => setError(null), 5000);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleEditSubmit = async (e) => {
         e.preventDefault();
 
@@ -469,7 +504,9 @@ const PatientManagement = () => {
                         value={searchPatientName}
                         onChange={(e) => setSearchPatientName(e.target.value)}
                         className="search-input"
-                        style={{ width: '100%' }}
+                        style={{ width: '100%', direction: 'rtl', textAlign: 'right' }}
+                        lang="ar"
+                        dir="rtl"
                     />
                 </div>
                 <div>
@@ -636,7 +673,20 @@ const PatientManagement = () => {
                                 <td>{formatDate(patient.DateofBirth)}</td>
                                 <td>{patient.GenderName || 'N/A'}</td>
                                 <td>
-                                    <div className="action-buttons" style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <div className="action-buttons" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                        <button
+                                            onClick={() => handleQuickCheckin(patient)}
+                                            className="btn btn-sm"
+                                            style={{
+                                                backgroundColor: '#10b981',
+                                                color: 'white',
+                                                border: 'none'
+                                            }}
+                                            title="Add to today's appointments and check in"
+                                            disabled={loading}
+                                        >
+                                            <i className="fas fa-check-circle"></i> Check In
+                                        </button>
                                         <button
                                             onClick={() => window.location.href = `/patient/${patient.PersonID}/works`}
                                             className="btn btn-sm"

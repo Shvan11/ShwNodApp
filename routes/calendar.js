@@ -470,7 +470,12 @@ function transformToCalendarStructure(flatData, maxAppointmentsPerSlot = 3) {
     const timeSlots = new Set();
 
     flatData.forEach(item => {
-        const dateKey = item.calendarDate.toISOString().split('T')[0];
+        // Format date without timezone conversion to avoid -1 day offset
+        const date = new Date(item.calendarDate);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const dateKey = `${year}-${month}-${day}`;
 
         if (!days[dateKey]) {
             days[dateKey] = {
@@ -481,8 +486,11 @@ function transformToCalendarStructure(flatData, maxAppointmentsPerSlot = 3) {
             };
         }
 
-        // Extract time from slotDateTime for time slot key
-        const timeKey = item.slotDateTime.toISOString().split('T')[1].substring(0, 5); // HH:MM format
+        // Extract time from slotDateTime for time slot key (without timezone conversion)
+        const slotDate = new Date(item.slotDateTime);
+        const hours = String(slotDate.getHours()).padStart(2, '0');
+        const minutes = String(slotDate.getMinutes()).padStart(2, '0');
+        const timeKey = `${hours}:${minutes}`; // HH:MM format
         timeSlots.add(timeKey);
 
         // MULTIPLE APPOINTMENTS SUPPORT: Group appointments by time slot

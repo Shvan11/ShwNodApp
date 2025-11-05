@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches = [] }) => {
     const [formData, setFormData] = useState({
@@ -21,64 +21,73 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
 
     const [errors, setErrors] = useState({});
     const [saving, setSaving] = useState(false);
+    const previousIsOpenRef = useRef(false);
 
     useEffect(() => {
-        if (isOpen && batch) {
-            // Edit mode - populate form
-            setFormData({
-                BatchSequence: batch.BatchSequence || '',
-                UpperAlignerCount: batch.UpperAlignerCount || '',
-                LowerAlignerCount: batch.LowerAlignerCount || '',
-                Days: batch.Days || '',
-                ManufactureDate: batch.ManufactureDate ? batch.ManufactureDate.split('T')[0] : '',
-                DeliveredToPatientDate: batch.DeliveredToPatientDate ? batch.DeliveredToPatientDate.split('T')[0] : '',
-                Notes: batch.Notes || '',
-                IsActive: batch.IsActive !== undefined ? batch.IsActive : true
-            });
-            setComputedFields({
-                UpperAlignerStartSequence: batch.UpperAlignerStartSequence || 1,
-                LowerAlignerStartSequence: batch.LowerAlignerStartSequence || 1,
-                UpperAlignerEndSequence: batch.UpperAlignerEndSequence,
-                LowerAlignerEndSequence: batch.LowerAlignerEndSequence
-            });
-        } else if (isOpen) {
-            // Add mode - calculate next batch sequence and start sequences
-            const nextBatchSequence = existingBatches.length > 0
-                ? Math.max(...existingBatches.map(b => b.BatchSequence || 0)) + 1
-                : 1;
+        // Only run when drawer opens (isOpen transitions from false to true)
+        if (isOpen && !previousIsOpenRef.current) {
+            if (batch) {
+                // Edit mode - populate form
+                setFormData({
+                    BatchSequence: batch.BatchSequence || '',
+                    UpperAlignerCount: batch.UpperAlignerCount || '',
+                    LowerAlignerCount: batch.LowerAlignerCount || '',
+                    Days: batch.Days || '',
+                    ManufactureDate: batch.ManufactureDate ? batch.ManufactureDate.split('T')[0] : '',
+                    DeliveredToPatientDate: batch.DeliveredToPatientDate ? batch.DeliveredToPatientDate.split('T')[0] : '',
+                    Notes: batch.Notes || '',
+                    IsActive: batch.IsActive !== undefined ? batch.IsActive : true
+                });
+                setComputedFields({
+                    UpperAlignerStartSequence: batch.UpperAlignerStartSequence || 1,
+                    LowerAlignerStartSequence: batch.LowerAlignerStartSequence || 1,
+                    UpperAlignerEndSequence: batch.UpperAlignerEndSequence,
+                    LowerAlignerEndSequence: batch.LowerAlignerEndSequence
+                });
+            } else {
+                // Add mode - calculate next batch sequence and start sequences
+                const nextBatchSequence = existingBatches.length > 0
+                    ? Math.max(...existingBatches.map(b => b.BatchSequence || 0)) + 1
+                    : 1;
 
-            // Calculate start sequences based on last batch's end sequences
-            let upperStart = 1;
-            let lowerStart = 1;
+                // Calculate start sequences based on last batch's end sequences
+                let upperStart = 1;
+                let lowerStart = 1;
 
-            if (existingBatches.length > 0) {
-                const lastBatch = existingBatches.reduce((latest, batch) =>
-                    (batch.BatchSequence > latest.BatchSequence) ? batch : latest
-                );
+                if (existingBatches.length > 0) {
+                    const lastBatch = existingBatches.reduce((latest, batch) =>
+                        (batch.BatchSequence > latest.BatchSequence) ? batch : latest
+                    );
 
-                upperStart = (lastBatch.UpperAlignerEndSequence || 0) + 1;
-                lowerStart = (lastBatch.LowerAlignerEndSequence || 0) + 1;
+                    upperStart = (lastBatch.UpperAlignerEndSequence || 0) + 1;
+                    lowerStart = (lastBatch.LowerAlignerEndSequence || 0) + 1;
+                }
+
+                // Get today's date in YYYY-MM-DD format
+                const today = new Date().toISOString().split('T')[0];
+
+                setFormData({
+                    BatchSequence: nextBatchSequence,
+                    UpperAlignerCount: '',
+                    LowerAlignerCount: '',
+                    Days: '',
+                    ManufactureDate: today,
+                    DeliveredToPatientDate: '',
+                    Notes: '',
+                    IsActive: true
+                });
+
+                setComputedFields({
+                    UpperAlignerStartSequence: upperStart,
+                    LowerAlignerStartSequence: lowerStart,
+                    UpperAlignerEndSequence: null,
+                    LowerAlignerEndSequence: null
+                });
             }
-
-            setFormData({
-                BatchSequence: nextBatchSequence,
-                UpperAlignerCount: '',
-                LowerAlignerCount: '',
-                Days: '',
-                ManufactureDate: '',
-                DeliveredToPatientDate: '',
-                Notes: '',
-                IsActive: true
-            });
-
-            setComputedFields({
-                UpperAlignerStartSequence: upperStart,
-                LowerAlignerStartSequence: lowerStart,
-                UpperAlignerEndSequence: null,
-                LowerAlignerEndSequence: null
-            });
+            setErrors({});
         }
-        setErrors({});
+
+        previousIsOpenRef.current = isOpen;
     }, [isOpen, batch, existingBatches]);
 
     // Auto-calculate end sequences when counts change
@@ -211,80 +220,36 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                     </>
                                 )}
                             </button>
-                            </h3>
+                        </div>
 
-                            <div className="form-row">
-                                <div className="form-field">
-                                    <label htmlFor="UpperAlignerStartSequence">Start Sequence (Auto)</label>
-                                    <input
-                                        type="number"
-                                        id="UpperAlignerStartSequence"
-                                        value={computedFields.UpperAlignerStartSequence}
-                                        readOnly
-                                        className="readonly"
-                                    />
-                                </div>
-
-                                <div className="form-field">
-                                    <label htmlFor="UpperAlignerCount">Count</label>
-                                    <input
-                                        type="number"
-                                        id="UpperAlignerCount"
-                                        name="UpperAlignerCount"
-                                        value={formData.UpperAlignerCount}
-                                        onChange={handleChange}
-                                        className={errors.UpperAlignerCount ? 'error' : ''}
-                                        min="0"
-                                        placeholder="Number of aligners"
-                                    />
-                                    {errors.UpperAlignerCount && (
-                                        <span className="error-message">{errors.UpperAlignerCount}</span>
-                                    )}
-                                </div>
-
-                                <div className="form-field">
-                                    <label htmlFor="UpperAlignerEndSequence">End Sequence (Auto)</label>
-                                    <input
-                                        type="number"
-                                        id="UpperAlignerEndSequence"
-                                        value={computedFields.UpperAlignerEndSequence || ''}
-                                        readOnly
-                                        className="readonly"
-                                        placeholder="Auto-calculated"
-                                    />
-                                </div>
+                        {/* Basic Info Section - Full Width */}
+                        <div className="form-section" style={{ padding: '0 1.5rem', paddingBottom: '0.5rem' }}>
+                            <h3 style={{ marginTop: '0.5rem', marginBottom: '0.75rem' }}>Basic Information</h3>
+                            <div className="form-field">
+                                <label htmlFor="BatchSequence">
+                                    Batch Sequence <span className="required">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    id="BatchSequence"
+                                    name="BatchSequence"
+                                    value={formData.BatchSequence}
+                                    onChange={handleChange}
+                                    className={errors.BatchSequence ? 'error' : ''}
+                                    min="1"
+                                />
+                                {errors.BatchSequence && (
+                                    <span className="error-message">{errors.BatchSequence}</span>
+                                )}
                             </div>
                         </div>
 
-                        {/* Two-Column Layout Container */}
-                        <div className="form-two-column-container">
-                            {/* Left Column */}
+                        {/* Two-Column Layout Container - Upper and Lower Aligners */}
+                        <div className="form-two-column-container" style={{ marginTop: '0' }}>
+                            {/* Left Column - Upper Aligners */}
                             <div className="form-column">
-                                {/* Basic Info Section */}
-                                <div className="form-section">
-                                    <h3>Basic Information</h3>
-                                    <div className="form-field">
-                                        <label htmlFor="BatchSequence">
-                                            Batch Sequence <span className="required">*</span>
-                                        </label>
-                                        <input
-                                            type="number"
-                                            id="BatchSequence"
-                                            name="BatchSequence"
-                                            value={formData.BatchSequence}
-                                            onChange={handleChange}
-                                            className={errors.BatchSequence ? 'error' : ''}
-                                            min="1"
-                                        />
-                                        {errors.BatchSequence && (
-                                            <span className="error-message">{errors.BatchSequence}</span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Upper Aligners Section */}
-                                <div className="form-section">
-                                    <h3>Upper Aligners
+                                <div className="form-section" style={{ paddingTop: '0.75rem' }}>
+                                    <h3 style={{ marginTop: '0', marginBottom: '0.75rem' }}>Upper Aligners
                                         {set && (
                                             <span style={{ marginLeft: '1rem', fontSize: '0.9rem', fontWeight: 'normal', color: '#6b7280' }}>
                                                 (Remaining: <strong style={{ color: set.RemainingUpperAligners > 0 ? '#059669' : '#dc2626' }}>{set.RemainingUpperAligners}</strong>)
@@ -313,7 +278,6 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                             onChange={handleChange}
                                             className={errors.UpperAlignerCount ? 'error' : ''}
                                             min="0"
-                                            max={set?.RemainingUpperAligners}
                                             placeholder="Number of aligners"
                                         />
                                         {errors.UpperAlignerCount && (
@@ -332,41 +296,13 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                             placeholder="Auto-calculated"
                                         />
                                     </div>
-                                <div className="form-field">
-                                    <label htmlFor="LowerAlignerCount">Count</label>
-                                    <input
-                                        type="number"
-                                        id="LowerAlignerCount"
-                                        name="LowerAlignerCount"
-                                        value={formData.LowerAlignerCount}
-                                        onChange={handleChange}
-                                        className={errors.LowerAlignerCount ? 'error' : ''}
-                                        min="0"
-                                        placeholder="Number of aligners"
-                                    />
-                                    {errors.LowerAlignerCount && (
-                                        <span className="error-message">{errors.LowerAlignerCount}</span>
-                                    )}
-                                </div>
-
-                                <div className="form-field">
-                                    <label htmlFor="LowerAlignerEndSequence">End Sequence (Auto)</label>
-                                    <input
-                                        type="number"
-                                        id="LowerAlignerEndSequence"
-                                        value={computedFields.LowerAlignerEndSequence || ''}
-                                        readOnly
-                                        className="readonly"
-                                        placeholder="Auto-calculated"
-                                    />
                                 </div>
                             </div>
 
-                            {/* Right Column */}
+                            {/* Right Column - Lower Aligners */}
                             <div className="form-column">
-                                {/* Lower Aligners Section */}
-                                <div className="form-section">
-                                    <h3>Lower Aligners
+                                <div className="form-section" style={{ paddingTop: '0.75rem' }}>
+                                    <h3 style={{ marginTop: '0', marginBottom: '0.75rem' }}>Lower Aligners
                                         {set && (
                                             <span style={{ marginLeft: '1rem', fontSize: '0.9rem', fontWeight: 'normal', color: '#6b7280' }}>
                                                 (Remaining: <strong style={{ color: set.RemainingLowerAligners > 0 ? '#059669' : '#dc2626' }}>{set.RemainingLowerAligners}</strong>)
@@ -395,7 +331,6 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                             onChange={handleChange}
                                             className={errors.LowerAlignerCount ? 'error' : ''}
                                             min="0"
-                                            max={set?.RemainingLowerAligners}
                                             placeholder="Number of aligners"
                                         />
                                         {errors.LowerAlignerCount && (
@@ -415,51 +350,52 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                         />
                                     </div>
                                 </div>
+                            </div>
+                        </div>
 
-                                {/* Dates Section */}
-                                <div className="form-section">
-                                    <h3>Dates & Timing</h3>
+                        {/* Dates Section - Full Width */}
+                        <div className="form-section" style={{ padding: '0 1.5rem', paddingTop: '0.5rem' }}>
+                            <h3 style={{ marginTop: '0', marginBottom: '0.75rem' }}>Dates & Timing</h3>
+                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                                <div className="form-field">
+                                    <label htmlFor="ManufactureDate">Manufacture Date</label>
+                                    <input
+                                        type="date"
+                                        id="ManufactureDate"
+                                        name="ManufactureDate"
+                                        value={formData.ManufactureDate}
+                                        onChange={handleChange}
+                                    />
+                                </div>
 
-                                    <div className="form-field">
-                                        <label htmlFor="ManufactureDate">Manufacture Date</label>
-                                        <input
-                                            type="date"
-                                            id="ManufactureDate"
-                                            name="ManufactureDate"
-                                            value={formData.ManufactureDate}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
+                                <div className="form-field">
+                                    <label htmlFor="DeliveredToPatientDate">Delivered Date</label>
+                                    <input
+                                        type="date"
+                                        id="DeliveredToPatientDate"
+                                        name="DeliveredToPatientDate"
+                                        value={formData.DeliveredToPatientDate}
+                                        onChange={handleChange}
+                                    />
+                                </div>
 
-                                    <div className="form-field">
-                                        <label htmlFor="DeliveredToPatientDate">Delivered Date</label>
-                                        <input
-                                            type="date"
-                                            id="DeliveredToPatientDate"
-                                            name="DeliveredToPatientDate"
-                                            value={formData.DeliveredToPatientDate}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-
-                                    <div className="form-field">
-                                        <label htmlFor="Days">Days per Aligner</label>
-                                        <input
-                                            type="number"
-                                            id="Days"
-                                            name="Days"
-                                            value={formData.Days}
-                                            onChange={handleChange}
-                                            min="1"
-                                            placeholder="Days to wear each aligner"
-                                        />
-                                    </div>
+                                <div className="form-field">
+                                    <label htmlFor="Days">Days per Aligner</label>
+                                    <input
+                                        type="number"
+                                        id="Days"
+                                        name="Days"
+                                        value={formData.Days}
+                                        onChange={handleChange}
+                                        min="1"
+                                        placeholder="Days to wear each aligner"
+                                    />
                                 </div>
                             </div>
                         </div>
 
                         {/* Notes Section - Full Width */}
-                        <div className="form-section" style={{ padding: '0 1.5rem' }}>
+                        <div className="form-section" style={{ padding: '0 1.5rem', paddingTop: '0.5rem' }}>
                             <div className="form-field">
                                 <label htmlFor="Notes">Notes</label>
                                 <textarea

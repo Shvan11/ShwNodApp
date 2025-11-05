@@ -1194,14 +1194,14 @@ router.post("/appointments", async (req, res) => {
         // Insert new appointment (defaults will be applied automatically)
         const insertQuery = `
             INSERT INTO tblappointments (
-                PersonID, 
-                AppDate, 
-                AppDetail, 
+                PersonID,
+                AppDate,
+                AppDetail,
                 DrID,
                 LastUpdated
             ) VALUES (@personID, @appDate, @appDetail, @drID, GETDATE())
         `;
-        
+
         const result = await database.executeQuery(insertQuery, [
             ['personID', database.TYPES.Int, parseInt(PersonID)],
             ['appDate', database.TYPES.DateTime, AppDate],
@@ -1240,6 +1240,272 @@ router.post("/appointments", async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to create appointment',
+            details: error.message
+        });
+    }
+});
+
+// Get all appointments for a specific patient
+router.get("/patient-appointments/:patientId", async (req, res) => {
+    try {
+        const { patientId } = req.params;
+
+        if (!patientId || isNaN(parseInt(patientId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid patient ID'
+            });
+        }
+
+        const query = `
+            SELECT
+                a.appointmentID,
+                a.PersonID,
+                a.AppDate,
+                a.AppDetail,
+                a.DrID,
+                e.employeeName as DrName
+            FROM tblappointments a
+            LEFT JOIN tblEmployees e ON a.DrID = e.ID
+            WHERE a.PersonID = @personID
+            ORDER BY a.AppDate DESC
+        `;
+
+        const appointments = await database.executeQuery(
+            query,
+            [['personID', database.TYPES.Int, parseInt(patientId)]],
+            (columns) => ({
+                appointmentID: columns[0].value,
+                PersonID: columns[1].value,
+                AppDate: columns[2].value,
+                AppDetail: columns[3].value,
+                DrID: columns[4].value,
+                DrName: columns[5].value
+            })
+        );
+
+        res.json({
+            success: true,
+            appointments: appointments || []
+        });
+
+    } catch (error) {
+        console.error('Error fetching patient appointments:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch appointments',
+            details: error.message
+        });
+    }
+});
+
+// Delete appointment
+router.delete("/appointments/:appointmentId", async (req, res) => {
+    try {
+        const { appointmentId } = req.params;
+
+        if (!appointmentId || isNaN(parseInt(appointmentId))) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid appointment ID'
+            });
+        }
+
+        const query = `DELETE FROM tblappointments WHERE appointmentID = @appointmentId`;
+
+        await database.executeQuery(query, [
+            ['appointmentId', database.TYPES.Int, parseInt(appointmentId)]
+        ]);
+
+        res.json({
+            success: true,
+            message: 'Appointment deleted successfully'
+        });
+
+    } catch (error) {
+        console.error('Error deleting appointment:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete appointment',
+            details: error.message
+        });
+    }
+});
+
+// Quick check-in: Add patient to today's appointments and mark as present
+router.post("/appointments/quick-checkin", async (req, res) => {
+    try {
+        const { PersonID, AppDetail, DrID } = req.body;
+
+        // Validate required fields
+        if (!PersonID) {
+            return res.status(400).json({
+                success: false,
+                error: 'PersonID is required'
+            });
+        }
+
+        // Validate PersonID is a number
+        if (isNaN(parseInt(PersonID))) {
+            return res.status(400).json({
+                success: false,
+                error: 'PersonID must be a valid number'
+            });
+        }
+
+        // Set defaults for optional fields
+        const detail = AppDetail || 'Walk-in';
+        const doctorId = DrID ? parseInt(DrID) : null;
+
+        // Get today's date at midnight for consistency
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Get current time for Present field - tedious TYPES.Time expects a Date object
+        const currentTime = new Date();
+
+        // Check if patient already has an appointment today
+        const existingAppointment = await database.executeQuery(`
+            SELECT appointmentID, Present, Seated, Dismissed
+            FROM tblappointments
+            WHERE PersonID = @personID
+              AND CAST(AppDate AS DATE) = CAST(@today AS DATE)
+        `, [
+            ['personID', database.TYPES.Int, parseInt(PersonID)],
+            ['today', database.TYPES.DateTime, today]
+        ]);
+
+        // If appointment exists, just update the Present time if not already set
+        if (existingAppointment && existingAppointment.length > 0) {
+            const apt = existingAppointment[0];
+
+            if (apt.Present) {
+                return res.json({
+                    success: true,
+                    alreadyCheckedIn: true,
+                    appointmentID: apt.appointmentID,
+                    message: 'Patient already checked in today',
+                    presentTime: apt.Present,
+                    appointment: {
+                        appointmentID: apt.appointmentID,
+                        PersonID: parseInt(PersonID),
+                        AppDate: today,
+                        Present: apt.Present
+                    }
+                });
+            } else {
+                // Update existing appointment with check-in time
+                await database.executeQuery(`
+                    UPDATE tblappointments
+                    SET Present = @presentTime,
+                        LastUpdated = GETDATE()
+                    WHERE appointmentID = @appointmentID
+                `, [
+                    ['presentTime', database.TYPES.Time, currentTime],
+                    ['appointmentID', database.TYPES.Int, apt.appointmentID]
+                ]);
+
+                console.log(`Patient ${PersonID} checked in to existing appointment ${apt.appointmentID} at ${currentTime}`);
+
+                // Emit WebSocket event for real-time updates
+                if (wsEmitter) {
+                    wsEmitter.emit('appointments_updated', today.toISOString().split('T')[0]);
+                }
+
+                return res.json({
+                    success: true,
+                    checkedIn: true,
+                    appointmentID: apt.appointmentID,
+                    message: 'Patient checked in successfully',
+                    appointment: {
+                        appointmentID: apt.appointmentID,
+                        PersonID: parseInt(PersonID),
+                        AppDate: today,
+                        Present: currentTime
+                    }
+                });
+            }
+        }
+
+        // If doctor ID provided, verify it's valid
+        if (doctorId) {
+            const doctorCheck = await database.executeQuery(`
+                SELECT e.ID, e.employeeName, p.PositionName
+                FROM tblEmployees e
+                INNER JOIN tblPositions p ON e.Position = p.ID
+                WHERE e.ID = @drID AND p.PositionName = 'Doctor'
+            `, [['drID', database.TYPES.Int, doctorId]]);
+
+            if (!doctorCheck || doctorCheck.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid doctor ID or employee is not a doctor'
+                });
+            }
+        }
+
+        // Create new appointment with Present time already set
+        // Note: Can't use OUTPUT clause due to triggers, use SCOPE_IDENTITY() instead
+        const insertQuery = `
+            INSERT INTO tblappointments (
+                PersonID,
+                AppDate,
+                AppDetail,
+                DrID,
+                Present,
+                LastUpdated
+            )
+            VALUES (
+                @personID,
+                @appDate,
+                @appDetail,
+                @drID,
+                @presentTime,
+                GETDATE()
+            );
+            SELECT SCOPE_IDENTITY() AS appointmentID;
+        `;
+
+        const result = await database.executeQuery(insertQuery, [
+            ['personID', database.TYPES.Int, parseInt(PersonID)],
+            ['appDate', database.TYPES.DateTime, today],
+            ['appDetail', database.TYPES.NVarChar, detail],
+            ['drID', database.TYPES.Int, doctorId || null],
+            ['presentTime', database.TYPES.Time, currentTime]
+        ], (columns) => ({
+            appointmentID: columns[0].value
+        }));
+
+        const newAppointmentId = result?.[0]?.appointmentID;
+
+        console.log(`Quick check-in: Created appointment ${newAppointmentId} for patient ${PersonID} and marked present at ${currentTime}`);
+
+        // Emit WebSocket event for real-time updates
+        if (wsEmitter) {
+            wsEmitter.emit('appointments_updated', today.toISOString().split('T')[0]);
+        }
+
+        res.json({
+            success: true,
+            created: true,
+            checkedIn: true,
+            appointmentID: newAppointmentId,
+            message: 'Appointment created and patient checked in successfully',
+            appointment: {
+                appointmentID: newAppointmentId,
+                PersonID: parseInt(PersonID),
+                AppDate: today,
+                AppDetail: detail,
+                DrID: doctorId,
+                Present: currentTime
+            }
+        });
+
+    } catch (error) {
+        console.error('Error in quick check-in:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to check in patient',
             details: error.message
         });
     }

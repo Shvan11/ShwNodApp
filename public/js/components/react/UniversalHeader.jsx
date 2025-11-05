@@ -122,7 +122,7 @@ const UniversalHeader = () => {
 
 
     const navigateToSearch = () => {
-        window.location.href = '/views/patient/search.html';
+        window.location.href = '/patient-management';
     };
 
     const navigateBack = () => {

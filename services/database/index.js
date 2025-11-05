@@ -48,7 +48,10 @@ function executeQuery(query, params, rowMapper, resultMapper = (result) => resul
           if (!Array.isArray(param) || param.length < 3) {
             throw new Error(`Invalid parameter at index ${index}: expected [name, type, value]`);
           }
-          request.addParameter(param[0], param[1], param[2]);
+          const [name, type, value] = param;
+          // If value is null, pass options to mark it as nullable
+          const options = value === null ? { nullable: true } : undefined;
+          request.addParameter(name, type, value, options);
         });
       } catch (paramError) {
         reject(paramError);
@@ -148,13 +151,16 @@ function executeStoredProcedure(procedureName, params, beforeExec, rowMapper, re
         }
       });
 
-      // Add parameters with validation 
+      // Add parameters with validation
       try {
         (params || []).forEach((param, index) => {
           if (!Array.isArray(param) || param.length < 3) {
             throw new Error(`Invalid parameter at index ${index}: expected [name, type, value]`);
           }
-          request.addParameter(param[0], param[1], param[2]);
+          const [name, type, value] = param;
+          // If value is null, pass options to mark it as nullable
+          const options = value === null ? { nullable: true } : undefined;
+          request.addParameter(name, type, value, options);
         });
       } catch (paramError) {
         reject(paramError);

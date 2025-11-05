@@ -64,10 +64,17 @@ const AppointmentForm = ({ patientId, onClose, onSuccess }) => {
 
     const handleDateTimeSelection = (dateTime) => {
         const date = new Date(dateTime);
+        // Extract date components without timezone conversion to avoid -1 day offset
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+
         setFormData(prev => ({
             ...prev,
-            AppDate: date.toISOString().split('T')[0],
-            AppTime: date.toTimeString().split(' ')[0].slice(0, 5)
+            AppDate: `${year}-${month}-${day}`,
+            AppTime: `${hours}:${minutes}`
         }));
         setValidation(prev => ({ ...prev, AppDate: null, AppTime: null }));
     };
