@@ -681,13 +681,35 @@ class TemplateDesigner {
             this.applyProperties();
         });
 
-        // Live update for position
-        ['pos_x', 'pos_y', 'width', 'height'].forEach(prop => {
+        // Live update for position, size, and typography
+        ['pos_x', 'pos_y', 'width', 'height', 'font_size'].forEach(prop => {
             const input = document.getElementById(`prop_${prop}`);
             if (input) {
                 input.addEventListener('input', () => this.applyProperties());
             }
         });
+
+        // Live update for selects (font family, font weight, text align)
+        ['font_family', 'font_weight', 'text_align'].forEach(prop => {
+            const input = document.getElementById(`prop_${prop}`);
+            if (input) {
+                input.addEventListener('change', () => this.applyProperties());
+            }
+        });
+
+        // Live update for colors
+        ['text_color', 'background_color'].forEach(prop => {
+            const input = document.getElementById(`prop_${prop}`);
+            if (input && input.type === 'color') {
+                input.addEventListener('input', () => this.applyProperties());
+            }
+        });
+
+        // Live update for content
+        const staticContentInput = document.getElementById('prop_static_content');
+        if (staticContentInput) {
+            staticContentInput.addEventListener('input', () => this.applyProperties());
+        }
     }
 
     updatePropertiesForm() {
