@@ -2,10 +2,28 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 
+// Custom plugin to skip React processing for .js and .mjs files
+function skipReactForPlainJS() {
+  return {
+    name: 'skip-react-for-plain-js',
+    enforce: 'pre', // Run before other plugins
+    transform(code, id) {
+      // Skip React transformation for .js and .mjs files (not .jsx/.tsx)
+      if (/\.(js|mjs)$/.test(id) && !/node_modules/.test(id)) {
+        return {
+          code,
+          map: null
+        }
+      }
+    }
+  }
+}
+
 export default defineConfig({
   plugins: [
+    skipReactForPlainJS(),
     react({
-      // Use filter function to explicitly only process JSX/TSX files
+      // Only include .jsx and .tsx files
       include: /\.(jsx|tsx)$/,
     })
   ],
