@@ -1,1448 +1,515 @@
 /**
- * Template Designer - Enhanced Version
- * Visual editor for receipt templates with bug fixes and enhancements
+ * GrapesJS Template Designer
+ * Visual designer for receipt/invoice/prescription templates
  */
 
-class TemplateDesigner {
-    constructor() {
-        this.template = null;
-        this.elements = [];
-        this.selectedElement = null;
-        this.zoom = 1.0;
-        this.isDragging = false;
-        this.isResizing = false;
-        this.resizeHandle = null;
-        this.dragStart = { x: 0, y: 0 };
-        this.hasUnsavedChanges = false;
-        this.history = [];
-        this.historyIndex = -1;
-        this.maxHistory = 50;
-        this.gridSize = 5; // pixels
-        this.snapToGrid = false;
+import grapesjs from 'grapesjs';
+import 'grapesjs/dist/css/grapes.min.css';
+import gjsNewsletter from 'grapesjs-preset-newsletter';
 
-        this.init();
-    }
+let editor;
+let currentTemplateId = null;
+let currentDocumentType = null;
 
-    async init() {
-        this.showLoading(true);
+// Make functions globally available for onclick handlers
+window.goBack = goBack;
+window.previewTemplate = previewTemplate;
+window.saveTemplate = saveTemplate;
 
-        try {
-            // Load default receipt template
-            await this.loadTemplate(2); // Template ID 2 = default receipt
+// Initialize designer on page load
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOMContentLoaded - Initializing template designer');
 
-            // Setup event listeners
-            this.setupEventListeners();
+    try {
+        // Get template ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        currentTemplateId = urlParams.get('templateId');
 
-            // Render initial state
-            this.renderTemplateSettings();
-            this.renderElementList();
-            this.renderCanvas();
+        console.log('Template ID from URL:', currentTemplateId);
 
-            // Setup keyboard shortcuts
-            this.setupKeyboardShortcuts();
-
-            // Setup unsaved changes warning
-            this.setupUnsavedChangesWarning();
-
-        } catch (error) {
-            console.error('Failed to initialize designer:', error);
-            this.showToast('Failed to load template', 'error');
-        } finally {
-            this.showLoading(false);
+        if (currentTemplateId) {
+            loadTemplate(currentTemplateId);
+        } else {
+            initializeEditor();
         }
+    } catch (error) {
+        console.error('Error during initialization:', error);
+        alert('Error initializing designer: ' + error.message);
+    }
+});
+
+/**
+ * Initialize GrapesJS editor
+ */
+function initializeEditor(templateHtml = null) {
+    console.log('Initializing GrapesJS editor...');
+
+    try {
+        editor = grapesjs.init({
+            container: '#gjs',
+            height: '100%',
+            width: 'auto',
+            storageManager: false, // Disable local storage - we save to files
+
+            plugins: [gjsNewsletter],
+            pluginsOpts: {
+                'gjs-preset-newsletter': {
+                    modalTitleImport: 'Import template',
+                    modalLabelImport: 'Paste HTML template',
+                    modalTitleExport: 'Export template',
+                    modalLabelExport: 'Copy HTML',
+                    codeViewerTheme: 'material',
+                    importPlaceholder: '<table class="main-body">...</table>',
+                    cellStyle: {
+                        'font-size': '12px',
+                        'font-weight': 300,
+                        'vertical-align': 'top',
+                        color: 'rgb(111, 119, 125)',
+                        margin: 0,
+                        padding: 0,
+                    }
+                }
+            },
+
+        canvas: {
+            styles: [
+                'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'
+            ]
+        },
+
+        deviceManager: {
+            devices: [
+                {
+                    id: 'desktop',
+                    name: 'Desktop',
+                    width: '800px',
+                },
+                {
+                    id: 'tablet',
+                    name: 'Tablet',
+                    width: '600px',
+                    widthMedia: '768px',
+                },
+                {
+                    id: 'mobile',
+                    name: 'Mobile',
+                    width: '320px',
+                    widthMedia: '480px',
+                }
+            ]
+        },
+
+        panels: {
+            defaults: [
+                {
+                    id: 'layers',
+                    el: '.panel__right',
+                    resizable: {
+                        maxDim: 350,
+                        minDim: 200,
+                        tc: 0,
+                        cl: 1,
+                        cr: 0,
+                        bc: 0,
+                        keyWidth: 'flex-basis',
+                    },
+                },
+                {
+                    id: 'panel-switcher',
+                    el: '.panel__switcher',
+                    buttons: [
+                        {
+                            id: 'show-layers',
+                            active: true,
+                            label: 'Layers',
+                            command: 'show-layers',
+                            togglable: false,
+                        },
+                        {
+                            id: 'show-style',
+                            active: true,
+                            label: 'Styles',
+                            command: 'show-styles',
+                            togglable: false,
+                        },
+                        {
+                            id: 'show-traits',
+                            active: true,
+                            label: 'Settings',
+                            command: 'show-traits',
+                            togglable: false,
+                        }
+                    ],
+                },
+                {
+                    id: 'panel-devices',
+                    el: '.panel__devices',
+                    buttons: [
+                        {
+                            id: 'device-desktop',
+                            label: '<i class="fa fa-desktop"></i>',
+                            command: 'set-device-desktop',
+                            active: true,
+                            togglable: false,
+                        },
+                        {
+                            id: 'device-tablet',
+                            label: '<i class="fa fa-tablet"></i>',
+                            command: 'set-device-tablet',
+                            togglable: false,
+                        },
+                        {
+                            id: 'device-mobile',
+                            label: '<i class="fa fa-mobile"></i>',
+                            command: 'set-device-mobile',
+                            togglable: false,
+                        }
+                    ],
+                }
+            ]
+        }
+    });
+
+    // Add custom receipt blocks
+    addReceiptBlocks();
+
+    // Load template HTML if provided
+    if (templateHtml) {
+        editor.setComponents(templateHtml);
+    } else {
+        // Set default receipt structure
+        editor.setComponents(getDefaultReceiptTemplate());
     }
 
-    async loadTemplate(templateId) {
-        const response = await fetch(`/api/templates/${templateId}/full`);
+    // Add custom CSS for print
+    editor.setStyle(getDefaultReceiptStyles());
+}
+
+/**
+ * Add custom receipt-specific blocks
+ */
+function addReceiptBlocks() {
+    const blockManager = editor.BlockManager;
+
+    // Clinic Header Block
+    blockManager.add('clinic-header', {
+        label: 'Clinic Header',
+        category: 'Receipt Elements',
+        content: `
+            <div class="clinic-header" style="text-align: center; padding: 20px; border-bottom: 2px solid #333;">
+                <h1 style="margin: 0; font-size: 24px; color: #333;">{{clinic.Name}}</h1>
+                <p style="margin: 5px 0; font-size: 14px; color: #666;">{{clinic.Location}}</p>
+                <p style="margin: 5px 0; font-size: 14px; color: #666;">{{clinic.Phone1}} | {{clinic.Phone2}}</p>
+            </div>
+        `,
+        attributes: { class: 'fa fa-building' }
+    });
+
+    // Patient Info Block
+    blockManager.add('patient-info', {
+        label: 'Patient Info',
+        category: 'Receipt Elements',
+        content: `
+            <div class="patient-info" style="padding: 15px; background: #f9f9f9; margin: 10px 0;">
+                <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #333;">Patient Information</h3>
+                <p style="margin: 5px 0;"><strong>Name:</strong> {{patient.PatientName}}</p>
+                <p style="margin: 5px 0;"><strong>Phone:</strong> {{patient.Phone}}</p>
+                <p style="margin: 5px 0;"><strong>Patient ID:</strong> {{patient.PersonID}}</p>
+            </div>
+        `,
+        attributes: { class: 'fa fa-user' }
+    });
+
+    // Payment Details Block
+    blockManager.add('payment-details', {
+        label: 'Payment Details',
+        category: 'Receipt Elements',
+        content: `
+            <div class="payment-details" style="padding: 15px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #333;">Payment Details</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #ddd;">
+                        <td style="padding: 8px;">Total Treatment Cost:</td>
+                        <td style="padding: 8px; text-align: right;"><strong>{{work.TotalRequired|currency}} {{work.Currency}}</strong></td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #ddd;">
+                        <td style="padding: 8px;">Previously Paid:</td>
+                        <td style="padding: 8px; text-align: right;">{{payment.PreviouslyPaid|currency}} {{payment.Currency}}</td>
+                    </tr>
+                    <tr style="border-bottom: 2px solid #333; background: #f0f0f0;">
+                        <td style="padding: 8px;"><strong>Paid Today:</strong></td>
+                        <td style="padding: 8px; text-align: right;"><strong>{{payment.AmountPaidToday|currency}} {{payment.Currency}}</strong></td>
+                    </tr>
+                    <tr style="font-size: 18px;">
+                        <td style="padding: 12px 8px;"><strong>Total Paid:</strong></td>
+                        <td style="padding: 12px 8px; text-align: right;"><strong>{{payment.TotalPaid|currency}} {{payment.Currency}}</strong></td>
+                    </tr>
+                    <tr style="font-size: 18px; color: #d32f2f;">
+                        <td style="padding: 8px;"><strong>Remaining Balance:</strong></td>
+                        <td style="padding: 8px; text-align: right;"><strong>{{payment.RemainingBalance|currency}} {{payment.Currency}}</strong></td>
+                    </tr>
+                </table>
+            </div>
+        `,
+        attributes: { class: 'fa fa-money-bill' }
+    });
+
+    // Receipt Footer Block
+    blockManager.add('receipt-footer', {
+        label: 'Receipt Footer',
+        category: 'Receipt Elements',
+        content: `
+            <div class="receipt-footer" style="text-align: center; padding: 20px; border-top: 2px solid #333; margin-top: 20px;">
+                <p style="margin: 5px 0; font-size: 14px; font-weight: bold;">Thank you for your payment!</p>
+                <p style="margin: 5px 0; font-size: 12px; color: #666;">Keep this receipt for your records</p>
+                <p style="margin: 10px 0; font-size: 11px; color: #999;">Receipt #{{work.WorkID}} | {{payment.PaymentDateTime|date:MMM DD, YYYY}}</p>
+            </div>
+        `,
+        attributes: { class: 'fa fa-receipt' }
+    });
+
+    // Placeholder Block
+    blockManager.add('placeholder', {
+        label: 'Data Placeholder',
+        category: 'Receipt Elements',
+        content: '<span style="background: #fffacd; padding: 2px 5px; border: 1px dashed #ffa500;">{{field.name}}</span>',
+        attributes: { class: 'fa fa-code' }
+    });
+
+    // Divider Block
+    blockManager.add('divider-line', {
+        label: 'Divider Line',
+        category: 'Receipt Elements',
+        content: '<hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">',
+        attributes: { class: 'fa fa-minus' }
+    });
+}
+
+/**
+ * Get default receipt template structure
+ */
+function getDefaultReceiptTemplate() {
+    return `
+        <div style="max-width: 800px; margin: 0 auto; background: white; padding: 20px; font-family: Arial, sans-serif;">
+            <div class="clinic-header" style="text-align: center; padding: 20px; border-bottom: 2px solid #333;">
+                <h1 style="margin: 0; font-size: 24px; color: #333;">SHWAN ORTHODONTICS</h1>
+                <p style="margin: 5px 0; font-size: 14px; color: #666;">Sulaymaniyah, Kurdistan - Iraq</p>
+                <p style="margin: 5px 0; font-size: 14px; color: #666;">+964 750 123 4567 | +964 770 987 6543</p>
+            </div>
+
+            <h2 style="text-align: center; margin: 20px 0; color: #333;">PAYMENT RECEIPT</h2>
+
+            <div class="patient-info" style="padding: 15px; background: #f9f9f9; margin: 10px 0;">
+                <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #333;">Patient Information</h3>
+                <p style="margin: 5px 0;"><strong>Name:</strong> {{patient.PatientName}}</p>
+                <p style="margin: 5px 0;"><strong>Phone:</strong> {{patient.Phone}}</p>
+                <p style="margin: 5px 0;"><strong>Patient ID:</strong> {{patient.PersonID}}</p>
+            </div>
+
+            <div class="payment-details" style="padding: 15px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #333;">Payment Details</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #ddd;">
+                        <td style="padding: 8px;">Total Treatment Cost:</td>
+                        <td style="padding: 8px; text-align: right;"><strong>{{work.TotalRequired|currency}} {{work.Currency}}</strong></td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #ddd;">
+                        <td style="padding: 8px;">Previously Paid:</td>
+                        <td style="padding: 8px; text-align: right;">{{payment.PreviouslyPaid|currency}} {{payment.Currency}}</td>
+                    </tr>
+                    <tr style="border-bottom: 2px solid #333; background: #f0f0f0;">
+                        <td style="padding: 8px;"><strong>Paid Today:</strong></td>
+                        <td style="padding: 8px; text-align: right;"><strong>{{payment.AmountPaidToday|currency}} {{payment.Currency}}</strong></td>
+                    </tr>
+                    <tr style="font-size: 18px;">
+                        <td style="padding: 12px 8px;"><strong>Total Paid:</strong></td>
+                        <td style="padding: 12px 8px; text-align: right;"><strong>{{payment.TotalPaid|currency}} {{payment.Currency}}</strong></td>
+                    </tr>
+                    <tr style="font-size: 18px; color: #d32f2f;">
+                        <td style="padding: 8px;"><strong>Remaining Balance:</strong></td>
+                        <td style="padding: 8px; text-align: right;"><strong>{{payment.RemainingBalance|currency}} {{payment.Currency}}</strong></td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="receipt-footer" style="text-align: center; padding: 20px; border-top: 2px solid #333; margin-top: 20px;">
+                <p style="margin: 5px 0; font-size: 14px; font-weight: bold;">Thank you for your payment!</p>
+                <p style="margin: 5px 0; font-size: 12px; color: #666;">Keep this receipt for your records</p>
+                <p style="margin: 10px 0; font-size: 11px; color: #999;">Receipt #{{work.WorkID}} | {{payment.PaymentDateTime|date:MMM DD, YYYY}}</p>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Get default receipt styles (for print)
+ */
+function getDefaultReceiptStyles() {
+    return `
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+            }
+            .gjs-dashed * {
+                outline: none !important;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+    `;
+}
+
+/**
+ * Load existing template
+ */
+async function loadTemplate(templateId) {
+    try {
+        const response = await fetch(`/api/templates/${templateId}`);
         const result = await response.json();
 
         if (result.status === 'success') {
-            this.template = result.data;
-            this.elements = result.data.elements || [];
+            const template = result.data;
+            document.getElementById('templateName').textContent = template.template_name;
+            currentDocumentType = template.document_type_id;
 
-            // Store original saved state for reset functionality
-            this.savedElementStates = {};
-            this.elements.forEach(element => {
-                this.savedElementStates[element.element_id] = JSON.parse(JSON.stringify(element));
-            });
+            // Load template HTML from file
+            if (template.template_file_path) {
+                const htmlResponse = await fetch(`/${template.template_file_path}`);
+                const templateHtml = await htmlResponse.text();
 
-            console.log('Template loaded:', this.template.template_name);
-            console.log('Elements count:', this.elements.length);
+                // Extract body content from HTML
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(templateHtml, 'text/html');
+                const bodyContent = doc.body.innerHTML;
 
-            // Debug: Log first few elements
-            if (this.elements.length > 0) {
-                console.log('First element:', this.elements[0]);
-                console.log('Sample positions:', this.elements.slice(0, 3).map(e => ({
-                    name: e.element_name,
-                    x: e.pos_x,
-                    y: e.pos_y,
-                    w: e.width,
-                    h: e.height
-                })));
-            }
-
-            this.hasUnsavedChanges = false;
-            this.history = [];
-            this.historyIndex = -1;
-        } else {
-            throw new Error(result.message);
-        }
-    }
-
-    setupEventListeners() {
-        // Header buttons
-        document.getElementById('saveBtn').addEventListener('click', () => this.saveTemplate());
-        document.getElementById('reloadBtn').addEventListener('click', () => this.reloadTemplate());
-        document.getElementById('previewBtn').addEventListener('click', () => this.previewTemplate());
-
-        // Zoom slider
-        const zoomSlider = document.getElementById('zoomSlider');
-        zoomSlider.addEventListener('input', (e) => {
-            this.zoom = e.target.value / 100;
-            document.getElementById('zoomValue').textContent = e.target.value + '%';
-            this.updateCanvasZoom();
-        });
-
-        // Show labels toggle
-        document.getElementById('showLabels').addEventListener('change', (e) => {
-            document.querySelectorAll('.element-label').forEach(label => {
-                label.style.display = e.target.checked ? 'block' : 'none';
-            });
-        });
-    }
-
-    setupKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
-            // Ctrl/Cmd + S = Save
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                e.preventDefault();
-                this.saveTemplate();
-            }
-
-            // Ctrl/Cmd + Z = Undo
-            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-                e.preventDefault();
-                this.undo();
-            }
-
-            // Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z = Redo
-            if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
-                e.preventDefault();
-                this.redo();
-            }
-
-            // Delete key = Delete selected element
-            if (e.key === 'Delete' && this.selectedElement) {
-                e.preventDefault();
-                this.deleteSelectedElement();
-            }
-
-            // Escape = Deselect
-            if (e.key === 'Escape') {
-                this.deselectElement();
-            }
-
-            // Arrow keys = Nudge element
-            if (this.selectedElement && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-                e.preventDefault();
-                this.nudgeElement(e.key, e.shiftKey ? 10 : 1);
-            }
-        });
-    }
-
-    setupUnsavedChangesWarning() {
-        window.addEventListener('beforeunload', (e) => {
-            if (this.hasUnsavedChanges) {
-                e.preventDefault();
-                e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-                return e.returnValue;
-            }
-        });
-    }
-
-    pushHistory(action, data) {
-        // Remove any future states if we're in the middle of history
-        this.history = this.history.slice(0, this.historyIndex + 1);
-
-        this.history.push({
-            action,
-            data: JSON.parse(JSON.stringify(data)), // Deep clone
-            timestamp: Date.now()
-        });
-
-        this.historyIndex++;
-
-        // Limit history size
-        if (this.history.length > this.maxHistory) {
-            this.history.shift();
-            this.historyIndex--;
-        }
-
-        this.hasUnsavedChanges = true;
-    }
-
-    undo() {
-        if (this.historyIndex > 0) {
-            this.historyIndex--;
-            const state = this.history[this.historyIndex];
-            this.applyHistoryState(state);
-            this.showToast('Undo', 'success');
-        } else {
-            this.showToast('Nothing to undo', 'error');
-        }
-    }
-
-    redo() {
-        if (this.historyIndex < this.history.length - 1) {
-            this.historyIndex++;
-            const state = this.history[this.historyIndex];
-            this.applyHistoryState(state);
-            this.showToast('Redo', 'success');
-        } else {
-            this.showToast('Nothing to redo', 'error');
-        }
-    }
-
-    applyHistoryState(state) {
-        if (state.action === 'modify_element') {
-            const element = this.elements.find(e => e.element_id === state.data.element_id);
-            if (element) {
-                Object.assign(element, state.data);
-                this.renderCanvas();
-                if (this.selectedElement && this.selectedElement.element_id === element.element_id) {
-                    this.renderPropertiesPanel();
-                }
-            }
-        }
-    }
-
-    nudgeElement(key, amount) {
-        const previousState = { ...this.selectedElement };
-
-        switch (key) {
-            case 'ArrowUp':
-                this.selectedElement.pos_y = Math.max(0, this.selectedElement.pos_y - amount);
-                break;
-            case 'ArrowDown':
-                this.selectedElement.pos_y += amount;
-                break;
-            case 'ArrowLeft':
-                this.selectedElement.pos_x = Math.max(0, this.selectedElement.pos_x - amount);
-                break;
-            case 'ArrowRight':
-                this.selectedElement.pos_x += amount;
-                break;
-        }
-
-        this.pushHistory('modify_element', previousState);
-        this.renderCanvas();
-        this.updatePropertiesForm();
-        this.selectElement(this.selectedElement.element_id);
-    }
-
-    deleteSelectedElement() {
-        if (!this.selectedElement) return;
-
-        if (confirm(`Delete element "${this.selectedElement.element_name}"?`)) {
-            const index = this.elements.findIndex(e => e.element_id === this.selectedElement.element_id);
-            if (index > -1) {
-                this.pushHistory('delete_element', this.selectedElement);
-                this.elements.splice(index, 1);
-                this.selectedElement = null;
-                this.hasUnsavedChanges = true;
-                this.renderElementList();
-                this.renderCanvas();
-                this.renderPropertiesPanel();
-                this.showToast('Element deleted', 'success');
-            }
-        }
-    }
-
-    resetElementToSaved() {
-        if (!this.selectedElement) return;
-
-        const elementId = this.selectedElement.element_id;
-        const savedState = this.savedElementStates[elementId];
-
-        if (!savedState) {
-            this.showToast('No saved state found', 'error');
-            return;
-        }
-
-        if (confirm(`Reset "${this.selectedElement.element_name}" to last saved state?`)) {
-            const previousState = { ...this.selectedElement };
-
-            // Restore all properties from saved state
-            Object.assign(this.selectedElement, JSON.parse(JSON.stringify(savedState)));
-
-            this.pushHistory('modify_element', previousState);
-            this.hasUnsavedChanges = true;
-
-            // Re-render canvas and properties
-            this.renderCanvas();
-            this.selectElement(elementId);
-            this.showToast('Element reset to saved state', 'success');
-        }
-    }
-
-    deselectElement() {
-        this.selectedElement = null;
-        document.querySelectorAll('.element-item.selected, .canvas-element.selected').forEach(el => {
-            el.classList.remove('selected');
-        });
-        this.renderPropertiesPanel();
-    }
-
-    sanitizeHTML(html) {
-        const div = document.createElement('div');
-        div.textContent = html;
-        return div.innerHTML;
-    }
-
-    renderTemplateSettings() {
-        const panel = document.getElementById('templateSettings');
-
-        if (!this.template) {
-            panel.innerHTML = '<div class="empty-state"><p>No template loaded</p></div>';
-            return;
-        }
-
-        const currentOrientation = this.template.paper_width > this.template.paper_height ? 'landscape' : 'portrait';
-
-        panel.innerHTML = `
-            <div class="property-group">
-                <div class="form-group">
-                    <label>Template Name</label>
-                    <input type="text" id="template_name" value="${this.sanitizeHTML(this.template.template_name || '')}" disabled>
-                </div>
-                <div class="form-group">
-                    <label>Orientation</label>
-                    <select id="template_orientation">
-                        <option value="portrait" ${currentOrientation === 'portrait' ? 'selected' : ''}>Portrait</option>
-                        <option value="landscape" ${currentOrientation === 'landscape' ? 'selected' : ''}>Landscape</option>
-                    </select>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Width (mm)</label>
-                        <input type="number" id="template_width" value="${this.template.paper_width || 80}" min="10" max="400" step="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Height (mm)</label>
-                        <input type="number" id="template_height" value="${this.template.paper_height || 297}" min="10" max="600" step="1">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Background Color</label>
-                    <div class="color-input">
-                        <input type="color" id="template_bg_color" value="${this.template.background_color || '#FFFFFF'}">
-                        <input type="text" id="template_bg_color_text" value="${this.template.background_color || '#FFFFFF'}" readonly>
-                    </div>
-                </div>
-            </div>
-
-            <div class="property-group">
-                <h3>Page Margins (mm)</h3>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Top</label>
-                        <input type="number" id="template_margin_top" value="${this.template.paper_margin_top || 10}" min="0" max="100" step="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Right</label>
-                        <input type="number" id="template_margin_right" value="${this.template.paper_margin_right || 10}" min="0" max="100" step="1">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Bottom</label>
-                        <input type="number" id="template_margin_bottom" value="${this.template.paper_margin_bottom || 10}" min="0" max="100" step="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Left</label>
-                        <input type="number" id="template_margin_left" value="${this.template.paper_margin_left || 10}" min="0" max="100" step="1">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="template_show_margins" checked>
-                        Show margin guides
-                    </label>
-                </div>
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="template_snap_to_grid" ${this.snapToGrid ? 'checked' : ''}>
-                        Snap to grid (${this.gridSize}px)
-                    </label>
-                </div>
-                <button class="btn btn-success" style="width: 100%; margin-top: 10px;" id="saveTemplateSettingsBtn">
-                    💾 Save Template Settings
-                </button>
-            </div>
-        `;
-
-        // Add event listeners
-        document.getElementById('saveTemplateSettingsBtn').addEventListener('click', () => {
-            this.saveTemplateSettings();
-        });
-
-        document.getElementById('template_orientation').addEventListener('change', (e) => {
-            this.handleOrientationChange(e.target.value);
-        });
-
-        // Update color text field when color picker changes
-        const bgColorPicker = document.getElementById('template_bg_color');
-        const bgColorText = document.getElementById('template_bg_color_text');
-        bgColorPicker.addEventListener('input', (e) => {
-            bgColorText.value = e.target.value.toUpperCase();
-            this.applyTemplateSettings();
-        });
-
-        // Update canvas when dimensions change
-        ['template_width', 'template_height',
-         'template_margin_top', 'template_margin_right', 'template_margin_bottom', 'template_margin_left'].forEach(id => {
-            const input = document.getElementById(id);
-            if (input) {
-                input.addEventListener('input', () => {
-                    this.applyTemplateSettings();
-                });
-            }
-        });
-
-        // Toggle margin guides
-        document.getElementById('template_show_margins').addEventListener('change', (e) => {
-            this.showMarginGuides(e.target.checked);
-        });
-
-        // Toggle grid snapping
-        document.getElementById('template_snap_to_grid').addEventListener('change', (e) => {
-            this.snapToGrid = e.target.checked;
-        });
-    }
-
-    handleOrientationChange(newOrientation) {
-        const widthInput = document.getElementById('template_width');
-        const heightInput = document.getElementById('template_height');
-
-        const currentWidth = parseFloat(widthInput.value);
-        const currentHeight = parseFloat(heightInput.value);
-        const currentOrientation = currentWidth > currentHeight ? 'landscape' : 'portrait';
-
-        // Only swap if orientation actually changes
-        if (newOrientation !== currentOrientation) {
-            widthInput.value = currentHeight;
-            heightInput.value = currentWidth;
-            this.applyTemplateSettings();
-        }
-    }
-
-    applyTemplateSettings() {
-        // Update template object with new values
-        this.template.paper_width = parseFloat(document.getElementById('template_width').value) || 80;
-        this.template.paper_height = parseFloat(document.getElementById('template_height').value) || 297;
-        this.template.background_color = document.getElementById('template_bg_color').value;
-        this.template.paper_margin_top = parseFloat(document.getElementById('template_margin_top').value) || 0;
-        this.template.paper_margin_right = parseFloat(document.getElementById('template_margin_right').value) || 0;
-        this.template.paper_margin_bottom = parseFloat(document.getElementById('template_margin_bottom').value) || 0;
-        this.template.paper_margin_left = parseFloat(document.getElementById('template_margin_left').value) || 0;
-
-        this.hasUnsavedChanges = true;
-
-        // Re-render canvas with new dimensions
-        this.renderCanvas();
-    }
-
-    async saveTemplateSettings() {
-        this.showLoading(true);
-
-        try {
-            const templateData = {
-                template_name: this.template.template_name,
-                paper_width: parseFloat(document.getElementById('template_width').value),
-                paper_height: parseFloat(document.getElementById('template_height').value),
-                background_color: document.getElementById('template_bg_color').value,
-                paper_margin_top: parseFloat(document.getElementById('template_margin_top').value),
-                paper_margin_right: parseFloat(document.getElementById('template_margin_right').value),
-                paper_margin_bottom: parseFloat(document.getElementById('template_margin_bottom').value),
-                paper_margin_left: parseFloat(document.getElementById('template_margin_left').value)
-            };
-
-            const response = await fetch(`/api/templates/${this.template.template_id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(templateData)
-            });
-
-            const result = await response.json();
-            if (result.status === 'success') {
-                this.showToast('Template settings saved successfully!', 'success');
-                Object.assign(this.template, templateData);
+                initializeEditor(bodyContent);
             } else {
-                throw new Error(result.message);
-            }
-        } catch (error) {
-            console.error('Failed to save template settings:', error);
-            this.showToast('Failed to save template settings', 'error');
-        } finally {
-            this.showLoading(false);
-        }
-    }
-
-    renderElementList() {
-        const listContainer = document.getElementById('elementList');
-
-        if (this.elements.length === 0) {
-            listContainer.innerHTML = '<div class="empty-state"><p>No elements found</p></div>';
-            return;
-        }
-
-        listContainer.innerHTML = this.elements
-            .sort((a, b) => a.element_order - b.element_order)
-            .map(element => `
-                <div class="element-item" data-element-id="${element.element_id}">
-                    <span class="element-name">${this.sanitizeHTML(element.element_name)}</span>
-                    <span class="element-type">${this.sanitizeHTML(element.element_type)}</span>
-                </div>
-            `)
-            .join('');
-
-        // Add click listeners
-        listContainer.querySelectorAll('.element-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const elementId = parseInt(item.dataset.elementId);
-                this.selectElement(elementId);
-            });
-        });
-    }
-
-    renderCanvas() {
-        const canvas = document.getElementById('templateCanvas');
-
-        // Set canvas size based on template
-        const widthPx = this.mmToPx(this.template.paper_width);
-        const heightPx = this.mmToPx(this.template.paper_height);
-
-        console.log(`Rendering canvas: ${widthPx}px × ${heightPx}px (${this.template.paper_width}mm × ${this.template.paper_height}mm)`);
-
-        canvas.style.width = widthPx + 'px';
-        canvas.style.height = heightPx + 'px';
-        canvas.style.backgroundColor = this.template.background_color || '#FFFFFF';
-
-        // Clear canvas
-        canvas.innerHTML = '';
-
-        // Render elements
-        console.log(`Rendering ${this.elements.length} elements`);
-        this.elements.forEach(element => {
-            const elementDiv = this.createElementDiv(element);
-            canvas.appendChild(elementDiv);
-        });
-
-        // Render margin guides
-        this.renderMarginGuides();
-
-        this.updateCanvasZoom();
-    }
-
-    renderMarginGuides() {
-        const canvas = document.getElementById('templateCanvas');
-
-        // Remove existing margin guides
-        const existingGuides = canvas.querySelectorAll('.margin-guide');
-        existingGuides.forEach(guide => guide.remove());
-
-        // Check if we should show margin guides
-        const showMarginsCheckbox = document.getElementById('template_show_margins');
-        if (!showMarginsCheckbox || !showMarginsCheckbox.checked) {
-            return;
-        }
-
-        const marginTop = this.mmToPx(this.template.paper_margin_top || 0);
-        const marginRight = this.mmToPx(this.template.paper_margin_right || 0);
-        const marginBottom = this.mmToPx(this.template.paper_margin_bottom || 0);
-        const marginLeft = this.mmToPx(this.template.paper_margin_left || 0);
-
-        const canvasWidth = this.mmToPx(this.template.paper_width);
-        const canvasHeight = this.mmToPx(this.template.paper_height);
-
-        // Create margin guide overlay
-        const marginGuide = document.createElement('div');
-        marginGuide.className = 'margin-guide';
-        marginGuide.style.position = 'absolute';
-        marginGuide.style.top = '0';
-        marginGuide.style.left = '0';
-        marginGuide.style.width = '100%';
-        marginGuide.style.height = '100%';
-        marginGuide.style.pointerEvents = 'none';
-        marginGuide.style.zIndex = '1000';
-
-        // Draw margin lines
-        const createLine = (x1, y1, x2, y2) => {
-            const line = document.createElement('div');
-            line.style.position = 'absolute';
-            line.style.background = 'rgba(255, 0, 0, 0.3)';
-            line.style.pointerEvents = 'none';
-
-            if (x1 === x2) { // Vertical line
-                line.style.left = x1 + 'px';
-                line.style.top = y1 + 'px';
-                line.style.width = '1px';
-                line.style.height = (y2 - y1) + 'px';
-            } else { // Horizontal line
-                line.style.left = x1 + 'px';
-                line.style.top = y1 + 'px';
-                line.style.width = (x2 - x1) + 'px';
-                line.style.height = '1px';
-            }
-
-            return line;
-        };
-
-        // Top margin line
-        if (marginTop > 0) {
-            marginGuide.appendChild(createLine(0, marginTop, canvasWidth, marginTop));
-        }
-
-        // Right margin line
-        if (marginRight > 0) {
-            marginGuide.appendChild(createLine(canvasWidth - marginRight, 0, canvasWidth - marginRight, canvasHeight));
-        }
-
-        // Bottom margin line
-        if (marginBottom > 0) {
-            marginGuide.appendChild(createLine(0, canvasHeight - marginBottom, canvasWidth, canvasHeight - marginBottom));
-        }
-
-        // Left margin line
-        if (marginLeft > 0) {
-            marginGuide.appendChild(createLine(marginLeft, 0, marginLeft, canvasHeight));
-        }
-
-        canvas.appendChild(marginGuide);
-    }
-
-    showMarginGuides(show) {
-        const guides = document.querySelectorAll('.margin-guide');
-        guides.forEach(guide => {
-            guide.style.display = show ? 'block' : 'none';
-        });
-
-        if (show) {
-            this.renderMarginGuides();
-        }
-    }
-
-    createElementDiv(element) {
-        const div = document.createElement('div');
-        div.className = 'canvas-element';
-        div.dataset.elementId = element.element_id;
-
-        // Position and size
-        div.style.left = element.pos_x + 'px';
-        div.style.top = element.pos_y + 'px';
-        div.style.width = element.width + 'px';
-        div.style.height = element.height + 'px';
-
-        // Typography
-        if (element.font_family) div.style.fontFamily = element.font_family;
-        if (element.font_size) div.style.fontSize = element.font_size + 'px';
-        if (element.font_weight) div.style.fontWeight = element.font_weight;
-        if (element.text_align) div.style.textAlign = element.text_align;
-        if (element.text_color) div.style.color = element.text_color;
-        if (element.background_color && element.background_color !== 'transparent') {
-            div.style.backgroundColor = element.background_color;
-        }
-
-        // Essential display properties
-        div.style.overflow = 'hidden';
-        div.style.wordWrap = 'break-word';
-        div.style.display = 'block';
-        div.style.boxSizing = 'border-box';
-
-        // Content - create a content wrapper to avoid text node issues
-        const contentWrapper = document.createElement('div');
-        contentWrapper.className = 'element-content';
-        contentWrapper.style.width = '100%';
-        contentWrapper.style.height = '100%';
-        contentWrapper.style.pointerEvents = 'none'; // Let clicks pass through to parent
-        contentWrapper.style.userSelect = 'none';
-        // DO NOT set position absolute - let it flow normally!
-
-        const content = this.getElementContent(element);
-        if (element.element_type === 'line') {
-            contentWrapper.innerHTML = content; // Safe for lines (just borders)
-        } else {
-            // Sanitize and set as text
-            contentWrapper.textContent = content;
-        }
-
-        div.appendChild(contentWrapper);
-
-        // Add label
-        const label = document.createElement('div');
-        label.className = 'element-label';
-        label.textContent = element.element_name;
-        label.style.pointerEvents = 'none'; // Ensure label doesn't interfere
-        div.appendChild(label);
-
-        // Add resize handles
-        this.addResizeHandles(div, element);
-
-        // Track if this was a drag operation to prevent click from firing
-        let wasDragged = false;
-        let dragStartTime = 0;
-
-        // Make draggable
-        div.addEventListener('mousedown', (e) => {
-            // Don't start drag if clicking on a resize handle
-            if (e.target.classList.contains('resize-handle')) {
-                return;
-            }
-
-            wasDragged = false;
-            dragStartTime = Date.now();
-            this.startDrag(e, element, () => {
-                wasDragged = true;
-            });
-        });
-
-        // Only select on click if it wasn't a drag
-        div.addEventListener('click', (e) => {
-            e.stopPropagation();
-            // If the mouse was held for > 100ms or moved, it was a drag, not a click
-            const timeSinceMouseDown = Date.now() - dragStartTime;
-            if (!wasDragged && timeSinceMouseDown < 200) {
-                this.selectElement(element.element_id);
-            }
-        });
-
-        return div;
-    }
-
-    addResizeHandles(elementDiv, element) {
-        const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
-
-        handles.forEach(position => {
-            const handle = document.createElement('div');
-            handle.className = `resize-handle ${position}`;
-            handle.dataset.position = position;
-
-            handle.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.startResize(e, element, position);
-            });
-
-            elementDiv.appendChild(handle);
-        });
-    }
-
-    getElementContent(element) {
-        switch (element.element_type) {
-            case 'text':
-            case 'static_text':
-                return element.static_content || '';
-
-            case 'data_field':
-                const label = element.static_content || '';
-                const placeholder = `{${element.data_binding || 'data'}}`;
-                return label + placeholder;
-
-            case 'line':
-                const isHorizontal = element.line_orientation === 'horizontal';
-                const style = isHorizontal
-                    ? `border-top: ${element.line_thickness || 1}px ${element.line_style || 'solid'} ${element.border_color || '#000'}; width: 100%;`
-                    : `border-left: ${element.line_thickness || 1}px ${element.line_style || 'solid'} ${element.border_color || '#000'}; height: 100%;`;
-                return `<div style="${style}"></div>`;
-
-            default:
-                return element.static_content || `[${element.element_type}]`;
-        }
-    }
-
-    snap(value) {
-        if (!this.snapToGrid) return value;
-        return Math.round(value / this.gridSize) * this.gridSize;
-    }
-
-    startDrag(e, element, onDragStartCallback) {
-        if (e.button !== 0) return; // Only left mouse button
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        console.log('Start drag:', element.element_name, 'at', element.pos_x, element.pos_y);
-
-        this.isDragging = true;
-        this.draggedElement = element;
-        this.dragStartState = { ...element }; // Store original state for undo
-        this.hasMoved = false; // Track if mouse has actually moved
-
-        const canvas = document.getElementById('templateCanvas');
-        const canvasRect = canvas.getBoundingClientRect();
-
-        // Calculate offset of mouse within the element (in unscaled coordinates)
-        const mouseXInCanvas = (e.clientX - canvasRect.left) / this.zoom;
-        const mouseYInCanvas = (e.clientY - canvasRect.top) / this.zoom;
-
-        this.dragStart = {
-            offsetX: mouseXInCanvas - element.pos_x,
-            offsetY: mouseYInCanvas - element.pos_y,
-            elementX: element.pos_x,
-            elementY: element.pos_y,
-            clientX: e.clientX,
-            clientY: e.clientY
-        };
-
-        const mouseMoveHandler = (e) => {
-            // If mouse moved more than 3px, consider it a drag
-            const deltaX = Math.abs(e.clientX - this.dragStart.clientX);
-            const deltaY = Math.abs(e.clientY - this.dragStart.clientY);
-            if (deltaX > 3 || deltaY > 3) {
-                if (!this.hasMoved) {
-                    // First move - add visual indicators
-                    document.body.classList.add('dragging-active');
-                    const elementDiv = document.querySelector(`[data-element-id="${element.element_id}"]`);
-                    if (elementDiv) {
-                        elementDiv.classList.add('dragging');
-                    }
-                }
-                this.hasMoved = true;
-                if (onDragStartCallback) onDragStartCallback();
-            }
-            this.onDrag(e);
-        };
-
-        const mouseUpHandler = () => {
-            this.isDragging = false;
-            document.body.classList.remove('dragging-active');
-            const elementDiv = document.querySelector(`[data-element-id="${element.element_id}"]`);
-            if (elementDiv) {
-                elementDiv.classList.remove('dragging');
-            }
-
-            document.removeEventListener('mousemove', mouseMoveHandler);
-            document.removeEventListener('mouseup', mouseUpHandler);
-
-            // Push to history on drag end only if actually moved
-            if (this.hasMoved &&
-                (this.dragStartState.pos_x !== this.draggedElement.pos_x ||
-                 this.dragStartState.pos_y !== this.draggedElement.pos_y)) {
-                this.pushHistory('modify_element', this.dragStartState);
-            }
-        };
-
-        document.addEventListener('mousemove', mouseMoveHandler);
-        document.addEventListener('mouseup', mouseUpHandler);
-
-        // Select the element being dragged
-        this.selectElement(element.element_id);
-    }
-
-    onDrag(e) {
-        if (!this.isDragging || !this.draggedElement) return;
-
-        e.preventDefault(); // Prevent text selection during drag
-
-        const canvas = document.getElementById('templateCanvas');
-        const canvasRect = canvas.getBoundingClientRect();
-
-        // Calculate mouse position in canvas coordinates (accounting for zoom)
-        const mouseXInCanvas = (e.clientX - canvasRect.left) / this.zoom;
-        const mouseYInCanvas = (e.clientY - canvasRect.top) / this.zoom;
-
-        // Calculate new position (subtract the offset to keep mouse at same point in element)
-        let newX = mouseXInCanvas - this.dragStart.offsetX;
-        let newY = mouseYInCanvas - this.dragStart.offsetY;
-
-        // Apply grid snapping
-        newX = this.snap(newX);
-        newY = this.snap(newY);
-
-        // Update element position (constrain to canvas bounds)
-        const maxX = this.template.paper_width ? this.mmToPx(this.template.paper_width) - this.draggedElement.width : 1000;
-        const maxY = this.template.paper_height ? this.mmToPx(this.template.paper_height) - this.draggedElement.height : 1000;
-
-        this.draggedElement.pos_x = Math.max(0, Math.min(Math.round(newX), maxX));
-        this.draggedElement.pos_y = Math.max(0, Math.min(Math.round(newY), maxY));
-
-        // Update visual position DIRECTLY without re-rendering entire canvas
-        const elementDiv = document.querySelector(`.canvas-element[data-element-id="${this.draggedElement.element_id}"]`);
-        if (elementDiv) {
-            elementDiv.style.left = this.draggedElement.pos_x + 'px';
-            elementDiv.style.top = this.draggedElement.pos_y + 'px';
-        }
-
-        // Update properties panel if this element is selected (but don't re-render canvas!)
-        if (this.selectedElement && this.selectedElement.element_id === this.draggedElement.element_id) {
-            this.updatePropertiesForm();
-        }
-    }
-
-    startResize(e, element, handlePosition) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        console.log('Start resize:', element.element_name, 'handle:', handlePosition);
-
-        this.isResizing = true;
-        this.resizedElement = element;
-        this.resizeHandle = handlePosition;
-        this.resizeStartState = { ...element }; // Store original state for undo
-        this.hasMoved = false;
-
-        const canvas = document.getElementById('templateCanvas');
-        const canvasRect = canvas.getBoundingClientRect();
-
-        // Store initial mouse and element state
-        this.resizeStart = {
-            mouseX: (e.clientX - canvasRect.left) / this.zoom,
-            mouseY: (e.clientY - canvasRect.top) / this.zoom,
-            elementX: element.pos_x,
-            elementY: element.pos_y,
-            elementWidth: element.width,
-            elementHeight: element.height,
-            clientX: e.clientX,
-            clientY: e.clientY
-        };
-
-        const mouseMoveHandler = (e) => {
-            const deltaX = Math.abs(e.clientX - this.resizeStart.clientX);
-            const deltaY = Math.abs(e.clientY - this.resizeStart.clientY);
-            if (deltaX > 3 || deltaY > 3) {
-                this.hasMoved = true;
-            }
-            this.onResize(e);
-        };
-
-        const mouseUpHandler = () => {
-            this.isResizing = false;
-            this.resizeHandle = null;
-            document.removeEventListener('mousemove', mouseMoveHandler);
-            document.removeEventListener('mouseup', mouseUpHandler);
-
-            // Push to history on resize end only if actually moved
-            if (this.hasMoved &&
-                (this.resizeStartState.pos_x !== this.resizedElement.pos_x ||
-                 this.resizeStartState.pos_y !== this.resizedElement.pos_y ||
-                 this.resizeStartState.width !== this.resizedElement.width ||
-                 this.resizeStartState.height !== this.resizedElement.height)) {
-                this.pushHistory('modify_element', this.resizeStartState);
-            }
-        };
-
-        document.addEventListener('mousemove', mouseMoveHandler);
-        document.addEventListener('mouseup', mouseUpHandler);
-
-        // Select the element being resized
-        this.selectElement(element.element_id);
-    }
-
-    onResize(e) {
-        if (!this.isResizing || !this.resizedElement) return;
-
-        e.preventDefault();
-
-        const canvas = document.getElementById('templateCanvas');
-        const canvasRect = canvas.getBoundingClientRect();
-
-        // Calculate mouse position in canvas coordinates
-        const mouseX = (e.clientX - canvasRect.left) / this.zoom;
-        const mouseY = (e.clientY - canvasRect.top) / this.zoom;
-
-        // Calculate delta from start
-        const deltaX = mouseX - this.resizeStart.mouseX;
-        const deltaY = mouseY - this.resizeStart.mouseY;
-
-        // Apply snapping to deltas
-        const snappedDeltaX = this.snap(deltaX);
-        const snappedDeltaY = this.snap(deltaY);
-
-        let newX = this.resizeStart.elementX;
-        let newY = this.resizeStart.elementY;
-        let newWidth = this.resizeStart.elementWidth;
-        let newHeight = this.resizeStart.elementHeight;
-
-        // Adjust based on handle position
-        const handle = this.resizeHandle;
-
-        // Horizontal resize
-        if (handle.includes('w')) {
-            // West: move left edge
-            newX = this.resizeStart.elementX + snappedDeltaX;
-            newWidth = this.resizeStart.elementWidth - snappedDeltaX;
-        } else if (handle.includes('e')) {
-            // East: move right edge
-            newWidth = this.resizeStart.elementWidth + snappedDeltaX;
-        }
-
-        // Vertical resize
-        if (handle.includes('n')) {
-            // North: move top edge
-            newY = this.resizeStart.elementY + snappedDeltaY;
-            newHeight = this.resizeStart.elementHeight - snappedDeltaY;
-        } else if (handle.includes('s')) {
-            // South: move bottom edge
-            newHeight = this.resizeStart.elementHeight + snappedDeltaY;
-        }
-
-        // Enforce minimum size
-        const minWidth = 20;
-        const minHeight = 10;
-
-        if (newWidth < minWidth) {
-            if (handle.includes('w')) {
-                newX = this.resizeStart.elementX + this.resizeStart.elementWidth - minWidth;
-            }
-            newWidth = minWidth;
-        }
-
-        if (newHeight < minHeight) {
-            if (handle.includes('n')) {
-                newY = this.resizeStart.elementY + this.resizeStart.elementHeight - minHeight;
-            }
-            newHeight = minHeight;
-        }
-
-        // Constrain to canvas bounds
-        const canvasWidth = this.mmToPx(this.template.paper_width);
-        const canvasHeight = this.mmToPx(this.template.paper_height);
-
-        newX = Math.max(0, Math.min(newX, canvasWidth - newWidth));
-        newY = Math.max(0, Math.min(newY, canvasHeight - newHeight));
-
-        if (newX + newWidth > canvasWidth) {
-            newWidth = canvasWidth - newX;
-        }
-        if (newY + newHeight > canvasHeight) {
-            newHeight = canvasHeight - newY;
-        }
-
-        // Update element
-        this.resizedElement.pos_x = Math.round(newX);
-        this.resizedElement.pos_y = Math.round(newY);
-        this.resizedElement.width = Math.round(newWidth);
-        this.resizedElement.height = Math.round(newHeight);
-
-        // Update visual appearance DIRECTLY
-        const elementDiv = document.querySelector(`.canvas-element[data-element-id="${this.resizedElement.element_id}"]`);
-        if (elementDiv) {
-            elementDiv.style.left = this.resizedElement.pos_x + 'px';
-            elementDiv.style.top = this.resizedElement.pos_y + 'px';
-            elementDiv.style.width = this.resizedElement.width + 'px';
-            elementDiv.style.height = this.resizedElement.height + 'px';
-        }
-
-        // Update properties panel
-        if (this.selectedElement && this.selectedElement.element_id === this.resizedElement.element_id) {
-            this.updatePropertiesForm();
-        }
-    }
-
-    selectElement(elementId) {
-        // Remove previous selection
-        document.querySelectorAll('.element-item.selected, .canvas-element.selected').forEach(el => {
-            el.classList.remove('selected');
-        });
-
-        // Find and select element
-        this.selectedElement = this.elements.find(e => e.element_id === elementId);
-
-        if (this.selectedElement) {
-            // Highlight in list
-            const listItem = document.querySelector(`.element-item[data-element-id="${elementId}"]`);
-            if (listItem) {
-                listItem.classList.add('selected');
-                listItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-
-            // Highlight on canvas
-            const canvasItem = document.querySelector(`.canvas-element[data-element-id="${elementId}"]`);
-            if (canvasItem) canvasItem.classList.add('selected');
-
-            // Show properties
-            this.renderPropertiesPanel();
-        }
-    }
-
-    renderPropertiesPanel() {
-        const panel = document.getElementById('propertiesForm');
-
-        if (!this.selectedElement) {
-            panel.innerHTML = '<div class="empty-state"><p>Select an element to edit</p></div>';
-            return;
-        }
-
-        const el = this.selectedElement;
-
-        panel.innerHTML = `
-            <div class="property-group">
-                <h3>Basic Info</h3>
-                <div class="form-group">
-                    <label>Element Name</label>
-                    <input type="text" id="prop_element_name" value="${this.sanitizeHTML(el.element_name || '')}">
-                </div>
-                <div class="form-group">
-                    <label>Element Type</label>
-                    <input type="text" value="${this.sanitizeHTML(el.element_type)}" disabled>
-                </div>
-            </div>
-
-            <div class="property-group">
-                <h3>Position & Size</h3>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>X (px)</label>
-                        <input type="number" id="prop_pos_x" value="${el.pos_x || 0}" min="0" step="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Y (px)</label>
-                        <input type="number" id="prop_pos_y" value="${el.pos_y || 0}" min="0" step="1">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Width (px)</label>
-                        <input type="number" id="prop_width" value="${el.width || 0}" min="0" step="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Height (px)</label>
-                        <input type="number" id="prop_height" value="${el.height || 0}" min="0" step="1">
-                    </div>
-                </div>
-            </div>
-
-            <div class="property-group">
-                <h3>Typography</h3>
-                <div class="form-group">
-                    <label>Font Family</label>
-                    <select id="prop_font_family">
-                        <option value="Arial" ${el.font_family === 'Arial' ? 'selected' : ''}>Arial</option>
-                        <option value="Helvetica" ${el.font_family === 'Helvetica' ? 'selected' : ''}>Helvetica</option>
-                        <option value="Times New Roman" ${el.font_family === 'Times New Roman' ? 'selected' : ''}>Times New Roman</option>
-                        <option value="Courier New" ${el.font_family === 'Courier New' ? 'selected' : ''}>Courier New</option>
-                    </select>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Font Size (px)</label>
-                        <input type="number" id="prop_font_size" value="${el.font_size || 14}" min="6" max="72" step="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Font Weight</label>
-                        <select id="prop_font_weight">
-                            <option value="normal" ${el.font_weight === 'normal' ? 'selected' : ''}>Normal</option>
-                            <option value="bold" ${el.font_weight === 'bold' ? 'selected' : ''}>Bold</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Text Align</label>
-                    <select id="prop_text_align">
-                        <option value="left" ${el.text_align === 'left' ? 'selected' : ''}>Left</option>
-                        <option value="center" ${el.text_align === 'center' ? 'selected' : ''}>Center</option>
-                        <option value="right" ${el.text_align === 'right' ? 'selected' : ''}>Right</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="property-group">
-                <h3>Colors</h3>
-                <div class="form-group">
-                    <label>Text Color</label>
-                    <div class="color-input">
-                        <input type="color" id="prop_text_color" value="${el.text_color || '#000000'}">
-                        <input type="text" id="prop_text_color_text" value="${el.text_color || '#000000'}" readonly>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Background Color</label>
-                    <div class="color-input">
-                        <input type="color" id="prop_background_color" value="${el.background_color === 'transparent' ? '#FFFFFF' : (el.background_color || '#FFFFFF')}">
-                        <input type="text" id="prop_background_color_text" value="${el.background_color || 'transparent'}" readonly>
-                    </div>
-                </div>
-            </div>
-
-            ${el.element_type === 'static_text' || el.element_type === 'text' ? `
-                <div class="property-group">
-                    <h3>Content</h3>
-                    <div class="form-group">
-                        <label>Static Content</label>
-                        <textarea id="prop_static_content" rows="3">${this.sanitizeHTML(el.static_content || '')}</textarea>
-                    </div>
-                </div>
-            ` : ''}
-
-            ${el.element_type === 'data_field' ? `
-                <div class="property-group">
-                    <h3>Data Binding</h3>
-                    <div class="form-group">
-                        <label>Label/Prefix</label>
-                        <input type="text" id="prop_static_content" value="${this.sanitizeHTML(el.static_content || '')}">
-                    </div>
-                    <div class="form-group">
-                        <label>Data Binding</label>
-                        <input type="text" id="prop_data_binding" value="${this.sanitizeHTML(el.data_binding || '')}" placeholder="patient.PatientName">
-                    </div>
-                    <div class="form-group">
-                        <label>Format Pattern</label>
-                        <input type="text" id="prop_format_pattern" value="${this.sanitizeHTML(el.format_pattern || '')}" placeholder="currency, date:MMM DD, YYYY">
-                    </div>
-                </div>
-            ` : ''}
-
-            <div style="margin-top: 20px;">
-                <button class="btn btn-success" style="width: 100%;" id="applyPropertiesBtn">
-                    Apply Changes
-                </button>
-            </div>
-            <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <button class="btn btn-secondary" style="width: 100%;" id="resetElementBtn">
-                    🔄 Reset
-                </button>
-                <button class="btn btn-secondary" style="width: 100%;" id="deleteElementBtn">
-                    🗑️ Delete
-                </button>
-            </div>
-        `;
-
-        // Add event listeners
-        document.getElementById('applyPropertiesBtn').addEventListener('click', () => {
-            this.applyProperties();
-        });
-
-        document.getElementById('resetElementBtn').addEventListener('click', () => {
-            this.resetElementToSaved();
-        });
-
-        document.getElementById('deleteElementBtn').addEventListener('click', () => {
-            this.deleteSelectedElement();
-        });
-
-        // Live update for position, size, and typography
-        ['pos_x', 'pos_y', 'width', 'height', 'font_size'].forEach(prop => {
-            const input = document.getElementById(`prop_${prop}`);
-            if (input) {
-                input.addEventListener('input', () => {
-                    this.applyProperties();
-                });
-            }
-        });
-
-        // Live update for selects (font family, font weight, text align)
-        ['font_family', 'font_weight', 'text_align'].forEach(prop => {
-            const input = document.getElementById(`prop_${prop}`);
-            if (input) {
-                input.addEventListener('change', () => this.applyProperties());
-            }
-        });
-
-        // Live update for colors
-        ['text_color', 'background_color'].forEach(prop => {
-            const colorPicker = document.getElementById(`prop_${prop}`);
-            const colorText = document.getElementById(`prop_${prop}_text`);
-            if (colorPicker && colorText) {
-                colorPicker.addEventListener('input', (e) => {
-                    colorText.value = e.target.value.toUpperCase();
-                    this.applyProperties();
-                });
-            }
-        });
-
-        // Live update for content
-        const staticContentInput = document.getElementById('prop_static_content');
-        if (staticContentInput) {
-            staticContentInput.addEventListener('input', () => this.applyProperties());
-        }
-    }
-
-    updatePropertiesForm() {
-        if (!this.selectedElement) return;
-
-        const el = this.selectedElement;
-        const setValue = (id, value) => {
-            const input = document.getElementById(id);
-            if (input) input.value = value;
-        };
-
-        setValue('prop_pos_x', el.pos_x);
-        setValue('prop_pos_y', el.pos_y);
-        setValue('prop_width', el.width);
-        setValue('prop_height', el.height);
-    }
-
-    applyProperties() {
-        if (!this.selectedElement) return;
-
-        const previousState = { ...this.selectedElement };
-
-        const getValue = (id) => {
-            const input = document.getElementById(id);
-            return input ? input.value : null;
-        };
-
-        // Update element properties
-        this.selectedElement.element_name = getValue('prop_element_name');
-        this.selectedElement.pos_x = parseFloat(getValue('prop_pos_x')) || 0;
-        this.selectedElement.pos_y = parseFloat(getValue('prop_pos_y')) || 0;
-        this.selectedElement.width = parseFloat(getValue('prop_width')) || 0;
-        this.selectedElement.height = parseFloat(getValue('prop_height')) || 0;
-        this.selectedElement.font_family = getValue('prop_font_family');
-        this.selectedElement.font_size = parseInt(getValue('prop_font_size')) || 14;
-        this.selectedElement.font_weight = getValue('prop_font_weight');
-        this.selectedElement.text_align = getValue('prop_text_align');
-        this.selectedElement.text_color = getValue('prop_text_color');
-        this.selectedElement.background_color = getValue('prop_background_color');
-
-        if (getValue('prop_static_content') !== null) {
-            this.selectedElement.static_content = getValue('prop_static_content');
-        }
-        if (getValue('prop_data_binding') !== null) {
-            this.selectedElement.data_binding = getValue('prop_data_binding');
-        }
-        if (getValue('prop_format_pattern') !== null) {
-            this.selectedElement.format_pattern = getValue('prop_format_pattern');
-        }
-
-        // Check if anything actually changed
-        if (JSON.stringify(previousState) !== JSON.stringify(this.selectedElement)) {
-            this.pushHistory('modify_element', previousState);
-        }
-
-        // Re-render canvas to show changes (but NOT while dragging or resizing!)
-        if (!this.isDragging && !this.isResizing) {
-            this.renderCanvas();
-            this.selectElement(this.selectedElement.element_id);
-        } else {
-            // During drag/resize, just update the element visually without full re-render
-            const elementDiv = document.querySelector(`.canvas-element[data-element-id="${this.selectedElement.element_id}"]`);
-            if (elementDiv) {
-                elementDiv.style.left = this.selectedElement.pos_x + 'px';
-                elementDiv.style.top = this.selectedElement.pos_y + 'px';
-                elementDiv.style.width = this.selectedElement.width + 'px';
-                elementDiv.style.height = this.selectedElement.height + 'px';
+                initializeEditor();
             }
         }
-    }
-
-    async saveTemplate() {
-        if (!this.hasUnsavedChanges) {
-            this.showToast('No changes to save', 'success');
-            return;
-        }
-
-        this.showLoading(true);
-
-        try {
-            // Update each element
-            for (const element of this.elements) {
-                await this.updateElement(element);
-            }
-
-            // Update saved states after successful save
-            this.elements.forEach(element => {
-                this.savedElementStates[element.element_id] = JSON.parse(JSON.stringify(element));
-            });
-
-            this.hasUnsavedChanges = false;
-            this.showToast('Template saved successfully!', 'success');
-        } catch (error) {
-            console.error('Failed to save template:', error);
-            this.showToast('Failed to save template: ' + error.message, 'error');
-        } finally {
-            this.showLoading(false);
-        }
-    }
-
-    async updateElement(element) {
-        const response = await fetch(`/api/templates/elements/${element.element_id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(element)
-        });
-
-        const result = await response.json();
-        if (result.status !== 'success') {
-            throw new Error(result.message);
-        }
-    }
-
-    async reloadTemplate() {
-        if (this.hasUnsavedChanges) {
-            if (!confirm('You have unsaved changes. Are you sure you want to reload?')) {
-                return;
-            }
-        }
-
-        this.showLoading(true);
-        try {
-            await this.loadTemplate(this.template.template_id);
-            this.renderTemplateSettings();
-            this.renderElementList();
-            this.renderCanvas();
-            this.selectedElement = null;
-            this.renderPropertiesPanel();
-            this.showToast('Template reloaded', 'success');
-        } catch (error) {
-            this.showToast('Failed to reload', 'error');
-        } finally {
-            this.showLoading(false);
-        }
-    }
-
-    async previewTemplate() {
-        try {
-            const response = await fetch(`/api/templates/${this.template.template_id}/preview`);
-            const result = await response.json();
-
-            if (result.status === 'success' && result.data && result.data.html) {
-                // Open preview in new window with the HTML content
-                const previewWindow = window.open('', '_blank', 'width=400,height=600');
-                previewWindow.document.write(result.data.html);
-                previewWindow.document.close();
-            } else {
-                throw new Error('Invalid preview response');
-            }
-        } catch (error) {
-            console.error('Preview error:', error);
-            this.showToast('Failed to generate preview', 'error');
-        }
-    }
-
-    updateCanvasZoom() {
-        const canvas = document.getElementById('templateCanvas');
-        canvas.style.transform = `scale(${this.zoom})`;
-    }
-
-    mmToPx(mm) {
-        return Math.round((mm * 96) / 25.4);
-    }
-
-    showLoading(show) {
-        document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
-    }
-
-    showToast(message, type = 'success') {
-        // Remove existing toasts
-        document.querySelectorAll('.toast').forEach(t => t.remove());
-
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.textContent = message;
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-            toast.remove();
-        }, 3000);
+    } catch (error) {
+        console.error('Error loading template:', error);
+        alert('Failed to load template');
+        initializeEditor();
     }
 }
 
-// Initialize designer when page loads
-document.addEventListener('DOMContentLoaded', () => {
-    new TemplateDesigner();
-});
+/**
+ * Save template to file
+ */
+async function saveTemplate() {
+    if (!currentTemplateId) {
+        alert('No template ID found. Please create a template first.');
+        return;
+    }
+
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    loadingOverlay.classList.add('active');
+
+    try {
+        // Get HTML and CSS from editor
+        const html = editor.getHtml();
+        const css = editor.getCss();
+
+        // Create complete HTML document
+        const completeHtml = generateCompleteHTML(html, css);
+
+        // Send to backend to save as file
+        const response = await fetch(`/api/templates/${currentTemplateId}/save-html`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ html: completeHtml })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            alert('Template saved successfully!');
+        } else {
+            throw new Error(result.message || 'Failed to save template');
+        }
+    } catch (error) {
+        console.error('Error saving template:', error);
+        alert('Failed to save template: ' + error.message);
+    } finally {
+        loadingOverlay.classList.remove('active');
+    }
+}
+
+/**
+ * Generate complete HTML document
+ */
+function generateCompleteHTML(bodyHtml, css) {
+    return `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Receipt</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background: white;
+            font-family: Arial, sans-serif;
+        }
+
+        ${css}
+
+        @media print {
+            body {
+                margin: 0;
+                padding: 20px;
+            }
+
+            * {
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+            }
+        }
+
+        @media screen {
+            body {
+                background: #f0f0f0;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    ${bodyHtml}
+</body>
+</html>`;
+}
+
+/**
+ * Preview template
+ */
+function previewTemplate() {
+    const html = generateCompleteHTML(editor.getHtml(), editor.getCss());
+    const previewWindow = window.open('', '_blank', 'width=800,height=600');
+    previewWindow.document.write(html);
+    previewWindow.document.close();
+}
+
+/**
+ * Go back to template management
+ */
+function goBack() {
+    if (confirm('Are you sure you want to leave? Unsaved changes will be lost.')) {
+        window.location.href = '/views/template-management.html';
+    }
+}

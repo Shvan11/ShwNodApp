@@ -441,22 +441,22 @@ const WorkComponent = ({ patientId }) => {
 
             const html = await response.text();
 
-            // Create print window with template-rendered HTML
-            const printWindow = window.open('', '', 'width=302,height=1122'); // 80mm x 297mm at 96 DPI
+            // Create print window
+            const printWindow = window.open('', '_blank', 'width=800,height=600');
             if (!printWindow) {
                 throw new Error('Pop-up blocked. Please allow pop-ups for this site.');
             }
 
+            // Write content
+            printWindow.document.open();
             printWindow.document.write(html);
             printWindow.document.close();
 
-            // Trigger print dialog
-            printWindow.focus();
-            setTimeout(() => {
+            // Wait for load then print
+            printWindow.onload = function() {
+                printWindow.focus();
                 printWindow.print();
-                // Close window after printing
-                printWindow.onafterprint = () => printWindow.close();
-            }, 250); // Small delay to ensure content is fully loaded
+            };
 
         } catch (err) {
             console.error('Error printing receipt:', err);

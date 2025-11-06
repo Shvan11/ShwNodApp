@@ -1,15 +1,13 @@
 /**
  * Document Template System - API Routes
- * Handles all API endpoints for template management, elements, and rendering
+ * Handles API endpoints for file-based template management and receipt generation
  */
 
 import express from 'express';
 import * as templateQueries from '../services/database/queries/template-queries.js';
-import TemplateRenderer from '../services/templates/TemplateRenderer.js';
-import {
-    generateReceiptHTML,
-    generateReceiptDataForFrontend
-} from '../services/templates/receipt-service.js';
+import { generateReceiptHTML } from '../services/templates/receipt-service.js';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 const router = express.Router();
 
@@ -69,56 +67,6 @@ router.get('/document-types/:typeId', async (req, res) => {
 });
 
 // ============================================================================
-// DATA FIELDS
-// ============================================================================
-
-/**
- * GET /api/templates/data-fields/:documentTypeId
- * Get all available data fields for a document type
- */
-router.get('/data-fields/:documentTypeId', async (req, res) => {
-    try {
-        const { documentTypeId } = req.params;
-        const dataFields = await templateQueries.getDataFieldsByDocumentType(parseInt(documentTypeId));
-
-        res.json({
-            status: 'success',
-            data: dataFields
-        });
-    } catch (error) {
-        console.error('Error fetching data fields:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to fetch data fields',
-            error: error.message
-        });
-    }
-});
-
-/**
- * GET /api/templates/data-fields/:documentTypeId/grouped
- * Get data fields grouped by category
- */
-router.get('/data-fields/:documentTypeId/grouped', async (req, res) => {
-    try {
-        const { documentTypeId } = req.params;
-        const groupedFields = await templateQueries.getDataFieldsGrouped(parseInt(documentTypeId));
-
-        res.json({
-            status: 'success',
-            data: groupedFields
-        });
-    } catch (error) {
-        console.error('Error fetching grouped data fields:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to fetch grouped data fields',
-            error: error.message
-        });
-    }
-});
-
-// ============================================================================
 // TEMPLATES - CRUD OPERATIONS
 // ============================================================================
 
@@ -159,7 +107,7 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/templates/:templateId
- * Get a specific template by ID (without elements)
+ * Get a specific template by ID
  */
 router.get('/:templateId', async (req, res) => {
     try {
@@ -182,36 +130,6 @@ router.get('/:templateId', async (req, res) => {
         res.status(500).json({
             status: 'error',
             message: 'Failed to fetch template',
-            error: error.message
-        });
-    }
-});
-
-/**
- * GET /api/templates/:templateId/full
- * Get a template with all its elements
- */
-router.get('/:templateId/full', async (req, res) => {
-    try {
-        const { templateId } = req.params;
-        const template = await templateQueries.getTemplateWithElements(parseInt(templateId));
-
-        if (!template) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'Template not found'
-            });
-        }
-
-        res.json({
-            status: 'success',
-            data: template
-        });
-    } catch (error) {
-        console.error('Error fetching template with elements:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to fetch template with elements',
             error: error.message
         });
     }
@@ -261,15 +179,6 @@ router.post('/', async (req, res) => {
                 status: 'error',
                 message: 'Missing required fields: template_name, document_type_id'
             });
-        }
-
-        // Set defaults for paper dimensions if not provided
-        if (!templateData.paper_width || !templateData.paper_height) {
-            const documentType = await templateQueries.getDocumentTypeById(templateData.document_type_id);
-            if (documentType) {
-                templateData.paper_width = templateData.paper_width || documentType.default_paper_width;
-                templateData.paper_height = templateData.paper_height || documentType.default_paper_height;
-            }
         }
 
         const templateId = await templateQueries.createTemplate(templateData);
@@ -363,233 +272,28 @@ router.delete('/:templateId', async (req, res) => {
     }
 });
 
-/**
- * POST /api/templates/:templateId/clone
- * Clone an existing template
- */
-router.post('/:templateId/clone', async (req, res) => {
-    try {
-        const { templateId } = req.params;
-        const { newName, createdBy } = req.body;
-
-        const newTemplateId = await templateQueries.cloneTemplate(
-            parseInt(templateId),
-            newName,
-            createdBy || 'system'
-        );
-
-        res.status(201).json({
-            status: 'success',
-            message: 'Template cloned successfully',
-            data: { template_id: newTemplateId }
-        });
-    } catch (error) {
-        console.error('Error cloning template:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to clone template',
-            error: error.message
-        });
-    }
-});
-
 // ============================================================================
-// TEMPLATE ELEMENTS - CRUD OPERATIONS
+// TEMPLATE DESIGNER - SAVE HTML TO FILE
 // ============================================================================
 
 /**
- * GET /api/templates/:templateId/elements
- * Get all elements for a template
+ * POST /api/templates/:templateId/save-html
+ * Save template HTML to file system
  */
-router.get('/:templateId/elements', async (req, res) => {
+router.post('/:templateId/save-html', async (req, res) => {
     try {
         const { templateId } = req.params;
-        const elements = await templateQueries.getTemplateElements(parseInt(templateId));
+        const { html } = req.body;
 
-        res.json({
-            status: 'success',
-            data: elements
-        });
-    } catch (error) {
-        console.error('Error fetching template elements:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to fetch template elements',
-            error: error.message
-        });
-    }
-});
-
-/**
- * GET /api/templates/elements/:elementId
- * Get a specific element by ID
- */
-router.get('/elements/:elementId', async (req, res) => {
-    try {
-        const { elementId } = req.params;
-        const element = await templateQueries.getTemplateElementById(parseInt(elementId));
-
-        if (!element) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'Element not found'
-            });
-        }
-
-        res.json({
-            status: 'success',
-            data: element
-        });
-    } catch (error) {
-        console.error('Error fetching element:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to fetch element',
-            error: error.message
-        });
-    }
-});
-
-/**
- * POST /api/templates/:templateId/elements
- * Create a new element in a template
- */
-router.post('/:templateId/elements', async (req, res) => {
-    try {
-        const { templateId } = req.params;
-        const elementData = req.body;
-
-        // Validate required fields
-        if (!elementData.element_type || !elementData.element_name) {
+        if (!html) {
             return res.status(400).json({
                 status: 'error',
-                message: 'Missing required fields: element_type, element_name'
+                message: 'Missing HTML content'
             });
         }
 
-        const elementId = await templateQueries.createTemplateElement(parseInt(templateId), elementData);
-
-        res.status(201).json({
-            status: 'success',
-            message: 'Element created successfully',
-            data: { element_id: elementId }
-        });
-    } catch (error) {
-        console.error('Error creating element:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to create element',
-            error: error.message
-        });
-    }
-});
-
-/**
- * PUT /api/templates/elements/:elementId
- * Update an existing element
- */
-router.put('/elements/:elementId', async (req, res) => {
-    try {
-        const { elementId } = req.params;
-        const elementData = req.body;
-
-        // Check if element exists
-        const existingElement = await templateQueries.getTemplateElementById(parseInt(elementId));
-        if (!existingElement) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'Element not found'
-            });
-        }
-
-        // Check if element is locked
-        if (existingElement.is_locked) {
-            return res.status(403).json({
-                status: 'error',
-                message: 'Cannot modify locked element'
-            });
-        }
-
-        await templateQueries.updateTemplateElement(parseInt(elementId), elementData);
-
-        res.json({
-            status: 'success',
-            message: 'Element updated successfully'
-        });
-    } catch (error) {
-        console.error('Error updating element:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to update element',
-            error: error.message
-        });
-    }
-});
-
-/**
- * DELETE /api/templates/elements/:elementId
- * Delete an element
- */
-router.delete('/elements/:elementId', async (req, res) => {
-    try {
-        const { elementId } = req.params;
-
-        // Check if element exists and is not locked
-        const element = await templateQueries.getTemplateElementById(parseInt(elementId));
-        if (!element) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'Element not found'
-            });
-        }
-
-        if (element.is_locked) {
-            return res.status(403).json({
-                status: 'error',
-                message: 'Cannot delete locked element'
-            });
-        }
-
-        await templateQueries.deleteTemplateElement(parseInt(elementId));
-
-        res.json({
-            status: 'success',
-            message: 'Element deleted successfully'
-        });
-    } catch (error) {
-        console.error('Error deleting element:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to delete element',
-            error: error.message
-        });
-    }
-});
-
-// ============================================================================
-// TEMPLATE RENDERING & PREVIEW
-// ============================================================================
-
-/**
- * POST /api/templates/:templateId/render
- * Render a template with real data
- * Body: { data: { patient: {}, payment: {}, ... }, printReady: boolean }
- */
-router.post('/:templateId/render', async (req, res) => {
-    try {
-        const { templateId } = req.params;
-        const { data, printReady } = req.body;
-
-        if (!data) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Missing required field: data'
-            });
-        }
-
-        // Get template with elements
-        const template = await templateQueries.getTemplateWithElements(parseInt(templateId));
-
+        // Get template metadata
+        const template = await templateQueries.getTemplateById(parseInt(templateId));
         if (!template) {
             return res.status(404).json({
                 status: 'error',
@@ -597,123 +301,49 @@ router.post('/:templateId/render', async (req, res) => {
             });
         }
 
-        // Render template
-        const html = printReady
-            ? TemplateRenderer.renderTemplateToPrint(template, data)
-            : TemplateRenderer.renderTemplate(template, data);
+        // Generate file path if not exists
+        let filePath = template.template_file_path;
+        if (!filePath) {
+            // Create filename from template name
+            const fileName = template.template_name
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+            filePath = `data/templates/${fileName}.html`;
 
-        // Log usage if context provided
-        if (data.contextType && data.contextId) {
-            await templateQueries.logTemplateUsage(
-                parseInt(templateId),
-                data.contextType,
-                data.contextId,
-                data.usedBy || 'system'
-            );
-        }
-
-        res.json({
-            status: 'success',
-            data: {
-                template_id: templateId,
-                template_name: template.template_name,
-                html: html
-            }
-        });
-    } catch (error) {
-        console.error('Error rendering template:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to render template',
-            error: error.message
-        });
-    }
-});
-
-/**
- * GET /api/templates/:templateId/preview
- * Generate a preview with sample data
- */
-router.get('/:templateId/preview', async (req, res) => {
-    try {
-        const { templateId } = req.params;
-
-        // Get template with elements
-        const template = await templateQueries.getTemplateWithElements(parseInt(templateId));
-
-        if (!template) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'Template not found'
+            // Update database with file path
+            await templateQueries.updateTemplate(parseInt(templateId), {
+                template_file_path: filePath,
+                modified_by: 'designer'
             });
         }
 
-        // Generate sample data based on document type
-        const sampleData = TemplateRenderer.generateSampleData(template.document_type_code);
-
-        // Render template with sample data
-        const html = TemplateRenderer.renderTemplate(template, sampleData);
+        // Save HTML to file
+        const fullPath = path.join(process.cwd(), filePath);
+        await fs.writeFile(fullPath, html, 'utf-8');
 
         res.json({
             status: 'success',
-            data: {
-                template_id: templateId,
-                template_name: template.template_name,
-                html: html,
-                sample_data: sampleData
-            }
+            message: 'Template saved successfully',
+            data: { file_path: filePath }
         });
     } catch (error) {
-        console.error('Error generating preview:', error);
+        console.error('Error saving template HTML:', error);
         res.status(500).json({
             status: 'error',
-            message: 'Failed to generate preview',
+            message: 'Failed to save template',
             error: error.message
         });
     }
 });
 
 // ============================================================================
-// TEMPLATE USAGE LOGGING
-// ============================================================================
-
-/**
- * POST /api/templates/:templateId/log-usage
- * Log template usage
- */
-router.post('/:templateId/log-usage', async (req, res) => {
-    try {
-        const { templateId } = req.params;
-        const { contextType, contextId, usedBy } = req.body;
-
-        await templateQueries.logTemplateUsage(
-            parseInt(templateId),
-            contextType,
-            contextId,
-            usedBy || 'system'
-        );
-
-        res.json({
-            status: 'success',
-            message: 'Usage logged successfully'
-        });
-    } catch (error) {
-        console.error('Error logging template usage:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to log template usage',
-            error: error.message
-        });
-    }
-});
-
-// ============================================================================
-// RECEIPT GENERATION (Specialized Endpoints)
+// RECEIPT GENERATION
 // ============================================================================
 
 /**
  * GET /api/templates/receipt/work/:workId
- * Generate receipt HTML for a work (all payments)
+ * Generate receipt HTML for a work using file-based template
  */
 router.get('/receipt/work/:workId', async (req, res) => {
     try {
@@ -726,63 +356,6 @@ router.get('/receipt/work/:workId', async (req, res) => {
         res.status(500).json({
             status: 'error',
             message: 'Failed to generate receipt',
-            error: error.message
-        });
-    }
-});
-
-/**
- * GET /api/templates/receipt/invoice/:invoiceId
- * Generate receipt HTML for a specific invoice/payment
- */
-router.get('/receipt/invoice/:invoiceId', async (req, res) => {
-    try {
-        const { invoiceId } = req.params;
-        const { workId } = req.query;
-
-        if (!workId) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'workId query parameter is required'
-            });
-        }
-
-        const html = await generateReceiptHTML(parseInt(workId), parseInt(invoiceId));
-
-        res.send(html);
-    } catch (error) {
-        console.error('Error generating receipt:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to generate receipt',
-            error: error.message
-        });
-    }
-});
-
-/**
- * GET /api/templates/receipt/data/:workId
- * Get receipt data (for frontend compatibility)
- */
-router.get('/receipt/data/:workId', async (req, res) => {
-    try {
-        const { workId } = req.params;
-        const { invoiceId } = req.query;
-
-        const data = await generateReceiptDataForFrontend(
-            parseInt(workId),
-            invoiceId ? parseInt(invoiceId) : null
-        );
-
-        res.json({
-            status: 'success',
-            data
-        });
-    } catch (error) {
-        console.error('Error getting receipt data:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to get receipt data',
             error: error.message
         });
     }

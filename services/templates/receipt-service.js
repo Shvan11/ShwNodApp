@@ -1,59 +1,37 @@
 /**
  * Receipt Service
- * Handles receipt generation using the template system
+ * Handles receipt generation using file-based HTML templates
  */
 
-import { getDefaultTemplate, logTemplateUsage } from '../database/queries/template-queries.js';
-import { renderTemplateToPrint } from './TemplateRenderer.js';
 import { executeQuery, TYPES } from '../database/index.js';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 /**
- * Get receipt data for a specific payment/work
+ * Get receipt data for a specific payment/work using V_Report view
  * @param {number} workId - Work ID
- * @param {number} invoiceId - Optional invoice ID for specific payment
  * @returns {Promise<Object>} Receipt data
  */
-export async function getReceiptData(workId, invoiceId = null) {
+export async function getReceiptData(workId) {
     const query = `
         SELECT
-            -- Patient Info
-            p.PersonID,
-            p.PatientName,
-            p.Phone,
-            p.AppDate,
-
-            -- Work Info
-            w.workid,
-            w.TotalRequired,
-            w.Currency,
-            w.Typeofwork,
-            w.StartDate,
-
-            -- Payment Info
-            ${invoiceId ? 'i.Amountpaid as AmountPaidToday,' : 'NULL as AmountPaidToday,'}
-            ${invoiceId ? 'i.Dateofpayment as PaymentDateTime,' : 'GETDATE() as PaymentDateTime,'}
-            COALESCE(SUM(i2.Amountpaid), 0) as PreviouslyPaid
-
-        FROM dbo.tblwork w
-        INNER JOIN dbo.tblpatients p ON w.PersonID = p.PersonID
-        ${invoiceId ? 'LEFT JOIN dbo.tblInvoice i ON i.InvoiceID = @invoiceId' : ''}
-        LEFT JOIN dbo.tblInvoice i2 ON w.workid = i2.workid ${invoiceId ? 'AND i2.InvoiceID != @invoiceId' : ''}
-
-        WHERE w.workid = @workId
-        GROUP BY p.PersonID, p.PatientName, p.Phone, p.AppDate,
-                 w.workid, w.TotalRequired, w.Currency, w.Typeofwork, w.StartDate
-                 ${invoiceId ? ', i.Amountpaid, i.Dateofpayment' : ''}
+            PersonID,
+            PatientName,
+            Phone,
+            TotalPaid,
+            AppDate,
+            Dateofpayment,
+            Amountpaid,
+            workid,
+            TotalRequired,
+            Currency
+        FROM dbo.V_Report WITH (NOLOCK)
+        WHERE workid = @workId
     `;
 
-    const params = [
+    const results = await executeQuery(query, [
         ['workId', TYPES.Int, workId]
-    ];
-
-    if (invoiceId) {
-        params.push(['invoiceId', TYPES.Int, invoiceId]);
-    }
-
-    const results = await executeQuery(query, params, (columns) => {
+    ], (columns) => {
         const row = {};
         columns.forEach(col => {
             row[col.metadata.colName] = col.value;
@@ -67,10 +45,10 @@ export async function getReceiptData(workId, invoiceId = null) {
 
     const data = results[0];
 
-    // Calculate totals
-    const previouslyPaid = data.PreviouslyPaid || 0;
-    const amountPaidToday = data.AmountPaidToday || 0;
-    const totalPaid = previouslyPaid + amountPaidToday;
+    // Calculate balances
+    const totalPaid = data.TotalPaid || 0;
+    const amountPaidToday = data.Amountpaid || 0;
+    const previouslyPaid = totalPaid - amountPaidToday;
     const remainingBalance = data.TotalRequired - totalPaid;
 
     // Structure data for template
@@ -84,93 +62,186 @@ export async function getReceiptData(workId, invoiceId = null) {
         work: {
             WorkID: data.workid,
             TotalRequired: data.TotalRequired,
-            Currency: data.Currency,
-            Typeofwork: data.Typeofwork,
-            StartDate: data.StartDate
+            Currency: data.Currency
         },
         payment: {
-            PaymentDateTime: data.PaymentDateTime || new Date(),
+            PaymentDateTime: data.Dateofpayment || new Date(),
             AmountPaidToday: amountPaidToday,
             PreviouslyPaid: previouslyPaid,
             TotalPaid: totalPaid,
             RemainingBalance: remainingBalance,
             Currency: data.Currency
-        },
-        clinic: {
-            Name: 'Shwan Orthodontics',
-            Location: 'Sulaymaniyah, Kurdistan - Iraq',
-            Phone1: '+964 750 123 4567',
-            Phone2: '+964 770 987 6543'
-        },
-        system: {
-            CurrentDateTime: new Date(),
-            ReceiptNumber: `${data.workid}-${Date.now().toString().slice(-6)}`
         }
     };
 }
 
 /**
- * Generate receipt HTML for a payment
- * @param {number} workId - Work ID
- * @param {number} invoiceId - Optional invoice ID
- * @returns {Promise<string>} Receipt HTML
+ * Get default template file path from database
+ * @returns {Promise<string>} Template file path
  */
-export async function generateReceiptHTML(workId, invoiceId = null) {
-    // Get default receipt template
-    const template = await getDefaultTemplate(1); // 1 = receipt type
+async function getDefaultTemplatePath() {
+    const query = `
+        SELECT template_file_path
+        FROM DocumentTemplates WITH (NOLOCK)
+        WHERE document_type_id = 1
+        AND is_default = 1
+        AND is_active = 1
+    `;
 
-    if (!template) {
+    const results = await executeQuery(query, [], (columns) => {
+        return columns[0].value;
+    });
+
+    if (results.length === 0 || !results[0]) {
         throw new Error('Default receipt template not found');
     }
 
-    // Get receipt data
-    const data = await getReceiptData(workId, invoiceId);
+    return results[0];
+}
 
-    // Render template
-    const html = renderTemplateToPrint(template, data);
+/**
+ * Render template with data
+ * @param {string} templateHTML - HTML template with placeholders
+ * @param {Object} data - Data to fill into template
+ * @returns {string} - Rendered HTML
+ */
+function renderTemplate(templateHTML, data) {
+    let rendered = templateHTML;
 
-    // Log template usage
-    if (invoiceId) {
-        await logTemplateUsage(template.template_id, 'invoice', invoiceId, 'system');
+    // Replace all {{placeholder}} occurrences
+    rendered = rendered.replace(/\{\{([^}]+)\}\}/g, (_, placeholder) => {
+        const parts = placeholder.split('|');
+        const path = parts[0].trim();
+        const filters = parts.slice(1).map(f => f.trim());
+
+        // Resolve data path (e.g., 'patient.PatientName')
+        let value = resolveDataPath(path, data);
+
+        // Apply filters
+        for (const filter of filters) {
+            value = applyFilter(value, filter);
+        }
+
+        return value !== null && value !== undefined ? value : '';
+    });
+
+    return rendered;
+}
+
+/**
+ * Resolve data path (e.g., 'patient.PatientName')
+ * @param {string} path - Dot-notation path
+ * @param {Object} data - Data object
+ * @returns {any} - Resolved value
+ */
+function resolveDataPath(path, data) {
+    const keys = path.split('.');
+    let value = data;
+
+    for (const key of keys) {
+        if (value === null || value === undefined) {
+            return null;
+        }
+        value = value[key];
     }
+
+    return value;
+}
+
+/**
+ * Apply filter to value
+ * @param {any} value - Value to filter
+ * @param {string} filter - Filter expression (e.g., 'currency', 'date:MMM DD, YYYY')
+ * @returns {string} - Filtered value
+ */
+function applyFilter(value, filter) {
+    if (value === null || value === undefined || value === '') {
+        // Check for default filter
+        if (filter.startsWith('default:')) {
+            return filter.substring(8);
+        }
+        return '';
+    }
+
+    // Currency filter
+    if (filter === 'currency') {
+        const num = parseFloat(value);
+        if (isNaN(num)) return '0';
+        return Math.round(num).toLocaleString('en-US');
+    }
+
+    // Date filter
+    if (filter.startsWith('date:')) {
+        const format = filter.substring(5);
+        return formatDate(value, format);
+    }
+
+    // Default filter
+    if (filter.startsWith('default:')) {
+        return String(value);
+    }
+
+    return String(value);
+}
+
+/**
+ * Format date based on pattern
+ * @param {any} dateValue - Date value
+ * @param {string} pattern - Format pattern
+ * @returns {string} - Formatted date
+ */
+function formatDate(dateValue, pattern) {
+    if (!dateValue) return '';
+
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) return String(dateValue);
+
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthsFull = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    const replacements = {
+        'YYYY': date.getFullYear(),
+        'YY': String(date.getFullYear()).slice(-2),
+        'MMMM': monthsFull[date.getMonth()],
+        'MMM': months[date.getMonth()],
+        'MM': String(date.getMonth() + 1).padStart(2, '0'),
+        'DD': String(date.getDate()).padStart(2, '0'),
+        'HH': String(date.getHours()).padStart(2, '0'),
+        'mm': String(date.getMinutes()).padStart(2, '0'),
+        'ss': String(date.getSeconds()).padStart(2, '0')
+    };
+
+    let formatted = pattern;
+    for (const [key, value] of Object.entries(replacements)) {
+        formatted = formatted.replace(new RegExp(key, 'g'), value);
+    }
+
+    return formatted;
+}
+
+/**
+ * Generate receipt HTML for a payment
+ * @param {number} workId - Work ID
+ * @returns {Promise<string>} Receipt HTML
+ */
+export async function generateReceiptHTML(workId) {
+    // Get template file path from database
+    const templatePath = await getDefaultTemplatePath();
+    const fullPath = path.join(process.cwd(), templatePath);
+
+    // Read template file
+    const templateHTML = await fs.readFile(fullPath, 'utf-8');
+
+    // Get receipt data from V_Report view
+    const data = await getReceiptData(workId);
+
+    // Render template with data
+    const html = renderTemplate(templateHTML, data);
 
     return html;
 }
 
-/**
- * Generate receipt data for frontend (for the existing receiptGenerator.js)
- * This maintains backwards compatibility with the existing system
- * @param {number} workId - Work ID
- * @param {number} invoiceId - Optional invoice ID
- * @returns {Promise<Object>} Receipt data formatted for frontend
- */
-export async function generateReceiptDataForFrontend(workId, invoiceId = null) {
-    const data = await getReceiptData(workId, invoiceId);
-
-    // Format for existing frontend receiptGenerator.js
-    return {
-        // Patient Info
-        PersonID: data.patient.PersonID,
-        PatientName: data.patient.PatientName,
-        Phone: data.patient.Phone,
-        AppDate: data.patient.AppDate,
-
-        // Work Info
-        workid: data.work.WorkID,
-        TotalRequired: data.work.TotalRequired,
-        Currency: data.work.Currency,
-        Typeofwork: data.work.Typeofwork,
-
-        // Payment Info
-        paymentDateTime: data.payment.PaymentDateTime,
-        amountPaidToday: data.payment.AmountPaidToday,
-        TotalPaid: data.payment.PreviouslyPaid, // Previous total (before today)
-        newBalance: data.payment.RemainingBalance
-    };
-}
-
 export default {
     getReceiptData,
-    generateReceiptHTML,
-    generateReceiptDataForFrontend
+    generateReceiptHTML
 };

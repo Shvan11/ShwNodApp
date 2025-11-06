@@ -69,51 +69,22 @@ export async function getDocumentTypeById(typeId) {
 }
 
 // ============================================================================
-// DATA FIELD DEFINITIONS
+// DATA FIELD DEFINITIONS (DEPRECATED - file-based templates)
 // ============================================================================
 
 /**
- * Get all data fields for a specific document type
+ * Get all data fields for a specific document type (deprecated)
  */
 export async function getDataFieldsByDocumentType(documentTypeId) {
-    const query = `
-        SELECT
-            field_id,
-            document_type_id,
-            field_category,
-            field_name,
-            field_path,
-            field_label,
-            field_description,
-            data_type,
-            default_format,
-            is_required,
-            sort_order
-        FROM DataFieldDefinitions
-        WHERE document_type_id = @documentTypeId
-        ORDER BY field_category, sort_order, field_name
-    `;
-    return await executeQuery(query, [
-        ['documentTypeId', TYPES.Int, documentTypeId]
-    ], mapRowToObject);
+    // File-based templates don't use DataFieldDefinitions
+    return [];
 }
 
 /**
- * Get data fields grouped by category
+ * Get data fields grouped by category (deprecated)
  */
 export async function getDataFieldsGrouped(documentTypeId) {
-    const fields = await getDataFieldsByDocumentType(documentTypeId);
-
-    // Group by category
-    const grouped = {};
-    fields.forEach(field => {
-        if (!grouped[field.field_category]) {
-            grouped[field.field_category] = [];
-        }
-        grouped[field.field_category].push(field);
-    });
-
-    return grouped;
+    return {};
 }
 
 // ============================================================================
@@ -153,7 +124,7 @@ export async function getDocumentTemplates(filters = {}) {
             t.modified_by,
             t.modified_date,
             t.last_used_date,
-            (SELECT COUNT(*) FROM TemplateElements WHERE template_id = t.template_id) as element_count
+            t.template_file_path
         FROM DocumentTemplates t
         INNER JOIN DocumentTypes dt ON t.document_type_id = dt.type_id
         WHERE 1=1
@@ -226,21 +197,11 @@ export async function getTemplateById(templateId) {
 }
 
 /**
- * Get template with all elements
+ * Get template with all elements (deprecated - now file-based)
  */
 export async function getTemplateWithElements(templateId) {
-    const template = await getTemplateById(templateId);
-
-    if (!template) {
-        return null;
-    }
-
-    // Get all elements for this template
-    const elements = await getTemplateElements(templateId);
-
-    template.elements = elements;
-
-    return template;
+    // File-based templates don't have elements in database
+    return await getTemplateById(templateId);
 }
 
 /**
@@ -278,13 +239,7 @@ export async function getDefaultTemplate(documentTypeId) {
         ['documentTypeId', TYPES.Int, documentTypeId]
     ], mapRowToObject);
 
-    if (results.length > 0) {
-        const template = results[0];
-        template.elements = await getTemplateElements(template.template_id);
-        return template;
-    }
-
-    return null;
+    return results[0] || null;
 }
 
 /**
@@ -470,264 +425,22 @@ export async function cloneTemplate(templateId, newName, createdBy) {
 // ============================================================================
 
 /**
- * Get all elements for a template
+ * Get all elements for a template (deprecated - file-based templates)
  */
 export async function getTemplateElements(templateId) {
-    const query = `
-        SELECT *
-        FROM TemplateElements
-        WHERE template_id = @templateId
-        ORDER BY element_order, element_id
-    `;
-
-    return await executeQuery(query, [
-        ['templateId', TYPES.Int, templateId]
-    ], mapRowToObject);
+    // File-based templates don't store elements in database
+    return [];
 }
 
 /**
- * Get a single element by ID
+ * Get a single element by ID (deprecated - file-based templates)
  */
 export async function getTemplateElementById(elementId) {
-    const query = `SELECT * FROM TemplateElements WHERE element_id = @elementId`;
-    const results = await executeQuery(query, [['elementId', TYPES.Int, elementId]], mapRowToObject);
-    return results[0] || null;
+    return null;
 }
 
-/**
- * Create a new template element
- */
-export async function createTemplateElement(templateId, elementData) {
-    const query = `
-        INSERT INTO TemplateElements (
-            template_id, element_type, element_name, element_label, element_order,
-            is_locked, pos_x, pos_y, width, height,
-            display_type, position_type,
-            font_family, font_size, font_weight, font_style,
-            text_align, text_decoration, text_transform, vertical_align,
-            letter_spacing, line_height, word_spacing, white_space,
-            text_color, background_color,
-            margin_top, margin_right, margin_bottom, margin_left,
-            padding_top, padding_right, padding_bottom, padding_left,
-            border_style, border_width, border_color, border_radius,
-            static_content, data_binding, data_category, format_pattern, default_value,
-            image_url, image_data_binding, image_fit,
-            line_orientation, line_thickness, line_style,
-            signature_type, show_signature_line, signature_label,
-            show_condition, hide_if_empty,
-            is_repeating, repeat_data_source, repeat_direction, repeat_spacing,
-            is_visible, is_printable
-        ) VALUES (
-            @template_id, @element_type, @element_name, @element_label, @element_order,
-            @is_locked, @pos_x, @pos_y, @width, @height,
-            @display_type, @position_type,
-            @font_family, @font_size, @font_weight, @font_style,
-            @text_align, @text_decoration, @text_transform, @vertical_align,
-            @letter_spacing, @line_height, @word_spacing, @white_space,
-            @text_color, @background_color,
-            @margin_top, @margin_right, @margin_bottom, @margin_left,
-            @padding_top, @padding_right, @padding_bottom, @padding_left,
-            @border_style, @border_width, @border_color, @border_radius,
-            @static_content, @data_binding, @data_category, @format_pattern, @default_value,
-            @image_url, @image_data_binding, @image_fit,
-            @line_orientation, @line_thickness, @line_style,
-            @signature_type, @show_signature_line, @signature_label,
-            @show_condition, @hide_if_empty,
-            @is_repeating, @repeat_data_source, @repeat_direction, @repeat_spacing,
-            @is_visible, @is_printable
-        );
-        SELECT SCOPE_IDENTITY() as element_id;
-    `;
-
-    const params = [
-        ['template_id', TYPES.Int, templateId],
-        ['element_type', TYPES.NVarChar, elementData.element_type],
-        ['element_name', TYPES.NVarChar, elementData.element_name],
-        ['element_label', TYPES.NVarChar, elementData.element_label || null],
-        ['element_order', TYPES.Int, elementData.element_order || 0],
-        ['is_locked', TYPES.Bit, elementData.is_locked ? 1 : 0],
-        ['pos_x', TYPES.Decimal, elementData.pos_x || 0],
-        ['pos_y', TYPES.Decimal, elementData.pos_y || 0],
-        ['width', TYPES.Decimal, elementData.width || 100],
-        ['height', TYPES.Decimal, elementData.height || 20],
-        ['display_type', TYPES.NVarChar, elementData.display_type || 'block'],
-        ['position_type', TYPES.NVarChar, elementData.position_type || 'absolute'],
-        ['font_family', TYPES.NVarChar, elementData.font_family || 'Arial'],
-        ['font_size', TYPES.Int, elementData.font_size || 14],
-        ['font_weight', TYPES.NVarChar, elementData.font_weight || 'normal'],
-        ['font_style', TYPES.NVarChar, elementData.font_style || 'normal'],
-        ['text_align', TYPES.NVarChar, elementData.text_align || 'left'],
-        ['text_decoration', TYPES.NVarChar, elementData.text_decoration || 'none'],
-        ['text_transform', TYPES.NVarChar, elementData.text_transform || 'none'],
-        ['vertical_align', TYPES.NVarChar, elementData.vertical_align || 'top'],
-        ['letter_spacing', TYPES.Decimal, elementData.letter_spacing || 0],
-        ['line_height', TYPES.Decimal, elementData.line_height || 1.5],
-        ['word_spacing', TYPES.Decimal, elementData.word_spacing || 0],
-        ['white_space', TYPES.NVarChar, elementData.white_space || 'normal'],
-        ['text_color', TYPES.NVarChar, elementData.text_color || '#000000'],
-        ['background_color', TYPES.NVarChar, elementData.background_color || 'transparent'],
-        ['margin_top', TYPES.Decimal, elementData.margin_top || 0],
-        ['margin_right', TYPES.Decimal, elementData.margin_right || 0],
-        ['margin_bottom', TYPES.Decimal, elementData.margin_bottom || 0],
-        ['margin_left', TYPES.Decimal, elementData.margin_left || 0],
-        ['padding_top', TYPES.Decimal, elementData.padding_top || 0],
-        ['padding_right', TYPES.Decimal, elementData.padding_right || 0],
-        ['padding_bottom', TYPES.Decimal, elementData.padding_bottom || 0],
-        ['padding_left', TYPES.Decimal, elementData.padding_left || 0],
-        ['border_style', TYPES.NVarChar, elementData.border_style || 'none'],
-        ['border_width', TYPES.Int, elementData.border_width || 0],
-        ['border_color', TYPES.NVarChar, elementData.border_color || '#000000'],
-        ['border_radius', TYPES.Int, elementData.border_radius || 0],
-        ['static_content', TYPES.NVarChar, elementData.static_content || null],
-        ['data_binding', TYPES.NVarChar, elementData.data_binding || null],
-        ['data_category', TYPES.NVarChar, elementData.data_category || null],
-        ['format_pattern', TYPES.NVarChar, elementData.format_pattern || null],
-        ['default_value', TYPES.NVarChar, elementData.default_value || null],
-        ['image_url', TYPES.NVarChar, elementData.image_url || null],
-        ['image_data_binding', TYPES.NVarChar, elementData.image_data_binding || null],
-        ['image_fit', TYPES.NVarChar, elementData.image_fit || 'contain'],
-        ['line_orientation', TYPES.NVarChar, elementData.line_orientation || null],
-        ['line_thickness', TYPES.Int, elementData.line_thickness || 1],
-        ['line_style', TYPES.NVarChar, elementData.line_style || null],
-        ['signature_type', TYPES.NVarChar, elementData.signature_type || null],
-        ['show_signature_line', TYPES.Bit, elementData.show_signature_line !== false ? 1 : 0],
-        ['signature_label', TYPES.NVarChar, elementData.signature_label || null],
-        ['show_condition', TYPES.NVarChar, elementData.show_condition || null],
-        ['hide_if_empty', TYPES.Bit, elementData.hide_if_empty ? 1 : 0],
-        ['is_repeating', TYPES.Bit, elementData.is_repeating ? 1 : 0],
-        ['repeat_data_source', TYPES.NVarChar, elementData.repeat_data_source || null],
-        ['repeat_direction', TYPES.NVarChar, elementData.repeat_direction || 'vertical'],
-        ['repeat_spacing', TYPES.Decimal, elementData.repeat_spacing || 0],
-        ['is_visible', TYPES.Bit, elementData.is_visible !== false ? 1 : 0],
-        ['is_printable', TYPES.Bit, elementData.is_printable !== false ? 1 : 0]
-    ];
-
-    const result = await executeQuery(query, params, mapRowToObject);
-    return result[0].element_id;
-}
-
-/**
- * Update an existing template element
- */
-export async function updateTemplateElement(elementId, elementData) {
-    const query = `
-        UPDATE TemplateElements
-        SET
-            element_type = @element_type,
-            element_name = @element_name,
-            element_label = @element_label,
-            element_order = @element_order,
-            is_locked = @is_locked,
-            pos_x = @pos_x,
-            pos_y = @pos_y,
-            width = @width,
-            height = @height,
-            font_family = @font_family,
-            font_size = @font_size,
-            font_weight = @font_weight,
-            font_style = @font_style,
-            text_align = @text_align,
-            text_decoration = @text_decoration,
-            text_transform = @text_transform,
-            text_color = @text_color,
-            background_color = @background_color,
-            margin_top = @margin_top,
-            margin_right = @margin_right,
-            margin_bottom = @margin_bottom,
-            margin_left = @margin_left,
-            padding_top = @padding_top,
-            padding_right = @padding_right,
-            padding_bottom = @padding_bottom,
-            padding_left = @padding_left,
-            border_style = @border_style,
-            border_width = @border_width,
-            border_color = @border_color,
-            border_radius = @border_radius,
-            static_content = @static_content,
-            data_binding = @data_binding,
-            data_category = @data_category,
-            format_pattern = @format_pattern,
-            default_value = @default_value,
-            is_visible = @is_visible,
-            is_printable = @is_printable
-        WHERE element_id = @element_id
-    `;
-
-    const params = [
-        ['element_id', TYPES.Int, elementId],
-        ['element_type', TYPES.NVarChar, elementData.element_type],
-        ['element_name', TYPES.NVarChar, elementData.element_name],
-        ['element_label', TYPES.NVarChar, elementData.element_label || null],
-        ['element_order', TYPES.Int, elementData.element_order],
-        ['is_locked', TYPES.Bit, elementData.is_locked ? 1 : 0],
-        ['pos_x', TYPES.Decimal, elementData.pos_x],
-        ['pos_y', TYPES.Decimal, elementData.pos_y],
-        ['width', TYPES.Decimal, elementData.width],
-        ['height', TYPES.Decimal, elementData.height],
-        ['font_family', TYPES.NVarChar, elementData.font_family],
-        ['font_size', TYPES.Int, elementData.font_size],
-        ['font_weight', TYPES.NVarChar, elementData.font_weight],
-        ['font_style', TYPES.NVarChar, elementData.font_style],
-        ['text_align', TYPES.NVarChar, elementData.text_align],
-        ['text_decoration', TYPES.NVarChar, elementData.text_decoration],
-        ['text_transform', TYPES.NVarChar, elementData.text_transform],
-        ['text_color', TYPES.NVarChar, elementData.text_color],
-        ['background_color', TYPES.NVarChar, elementData.background_color],
-        ['margin_top', TYPES.Decimal, elementData.margin_top],
-        ['margin_right', TYPES.Decimal, elementData.margin_right],
-        ['margin_bottom', TYPES.Decimal, elementData.margin_bottom],
-        ['margin_left', TYPES.Decimal, elementData.margin_left],
-        ['padding_top', TYPES.Decimal, elementData.padding_top],
-        ['padding_right', TYPES.Decimal, elementData.padding_right],
-        ['padding_bottom', TYPES.Decimal, elementData.padding_bottom],
-        ['padding_left', TYPES.Decimal, elementData.padding_left],
-        ['border_style', TYPES.NVarChar, elementData.border_style],
-        ['border_width', TYPES.Int, elementData.border_width],
-        ['border_color', TYPES.NVarChar, elementData.border_color],
-        ['border_radius', TYPES.Int, elementData.border_radius],
-        ['static_content', TYPES.NVarChar, elementData.static_content || null],
-        ['data_binding', TYPES.NVarChar, elementData.data_binding || null],
-        ['data_category', TYPES.NVarChar, elementData.data_category || null],
-        ['format_pattern', TYPES.NVarChar, elementData.format_pattern || null],
-        ['default_value', TYPES.NVarChar, elementData.default_value || null],
-        ['is_visible', TYPES.Bit, elementData.is_visible ? 1 : 0],
-        ['is_printable', TYPES.Bit, elementData.is_printable ? 1 : 0]
-    ];
-
-    await executeQuery(query, params, mapRowToObject);
-    return true;
-}
-
-/**
- * Delete a template element
- */
-export async function deleteTemplateElement(elementId) {
-    const query = `DELETE FROM TemplateElements WHERE element_id = @element_id`;
-    await executeQuery(query, [['element_id', TYPES.Int, elementId]], mapRowToObject);
-    return true;
-}
-
-// ============================================================================
-// TEMPLATE USAGE LOGGING
-// ============================================================================
-
-/**
- * Log template usage
- */
-export async function logTemplateUsage(templateId, contextType, contextId, usedBy = 'system') {
-    const query = `
-        INSERT INTO TemplateUsageLog (template_id, document_type_id, used_by, context_type, context_id)
-        SELECT @template_id, document_type_id, @used_by, @context_type, @context_id
-        FROM DocumentTemplates
-        WHERE template_id = @template_id;
-
-        UPDATE DocumentTemplates SET last_used_date = GETDATE() WHERE template_id = @template_id;
-    `;
-
-    await executeQuery(query, [
-        ['template_id', TYPES.Int, templateId],
-        ['used_by', TYPES.NVarChar, usedBy],
-        ['context_type', TYPES.NVarChar, contextType],
-        ['context_id', TYPES.Int, contextId]
-    ], mapRowToObject);
-}
+// Element functions deprecated - use GrapesJS file-based templates
+export async function createTemplateElement() { throw new Error('Deprecated'); }
+export async function updateTemplateElement() { throw new Error('Deprecated'); }
+export async function deleteTemplateElement() { throw new Error('Deprecated'); }
+export async function logTemplateUsage() { /* No-op */ }

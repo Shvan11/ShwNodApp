@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>PAYMENT RECEIPT</title>
+    <style>
+        @page {
+            size: 210mm 80mm;
+            margin: 0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 10px;
+            background: white;
+            font-family: Arial, sans-serif;
+        }
+
+        .receipt-container {
+            width: 790px;
+            min-height: 300px;
+            background-color: #FFFFFF;
+            position: relative;
+        }
+
+        .clinic-name {
+            position: absolute;
+            left: 5px;
+            top: 5px;
+            width: 350px;
+            height: 20px;
+            font-family: Arial;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: left;
+            color: #000000;
+            margin: 0 5px 0 5px;
+        }
+
+        .clinic-location {
+            position: absolute;
+            left: 5px;
+            top: 28px;
+            width: 350px;
+            height: 14px;
+            font-family: Arial;
+            font-size: 8px;
+            text-align: center;
+            color: #000000;
+            margin: 0 5px 0 5px;
+        }
+
+        .clinic-contact {
+            position: absolute;
+            left: 5px;
+            top: 45px;
+            width: 350px;
+            height: 14px;
+            font-family: Arial;
+            font-size: 8px;
+            text-align: center;
+            color: #000000;
+            margin: 0 5px 0 5px;
+        }
+
+        .divider-1 {
+            position: absolute;
+            left: 5px;
+            top: 65px;
+            width: 780px;
+            border-top: 1px solid #000000;
+        }
+
+        .invoice-title {
+            position: absolute;
+            left: 500px;
+            top: 8px;
+            width: 280px;
+            height: 22px;
+            font-family: Arial;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            color: #000000;
+            margin: 0 5px 0 5px;
+        }
+
+        .invoice-date {
+            position: absolute;
+            left: 5px;
+            top: 72px;
+            width: 280px;
+            height: 14px;
+            font-family: Arial;
+            font-size: 8px;
+            text-align: center;
+            color: #000000;
+        }
+
+        .receipt-number {
+            position: absolute;
+            left: 5px;
+            top: 89px;
+            width: 280px;
+            height: 14px;
+            font-family: Arial;
+            font-size: 8px;
+            text-align: center;
+            color: #000000;
+        }
+
+        .divider-2 {
+            position: absolute;
+            left: 5px;
+            top: 108px;
+            width: 780px;
+            border-top: 1px solid #000000;
+        }
+
+        .patient-info-label {
+            position: absolute;
+            left: 295px;
+            top: 72px;
+            width: 230px;
+            height: 14px;
+            font-family: Arial;
+            font-size: 9px;
+            font-weight: bold;
+            text-align: left;
+            color: #000000;
+        }
+
+        .patient-name {
+            position: absolute;
+            left: 295px;
+            top: 89px;
+            width: 230px;
+            height: 14px;
+            font-family: Arial;
+            font-size: 8px;
+            text-align: left;
+            color: #000000;
+        }
+
+        .patient-phone {
+            position: absolute;
+            left: 535px;
+            top: 72px;
+            width: 250px;
+            height: 14px;
+            font-family: Arial;
+            font-size: 8px;
+            text-align: left;
+            color: #000000;
+        }
+
+        .patient-id {
+            position: absolute;
+            left: 535px;
+            top: 89px;
+            width: 250px;
+            height: 14px;
+            font-family: Arial;
+            font-size: 8px;
+            text-align: left;
+            color: #000000;
+        }
+
+        .next-appointment-label {
+            position: absolute;
+            left: 7px;
+            top: 115px;
+            width: 285px;
+            height: 14px;
+            font-family: Arial;
+            font-size: 9px;
+            font-weight: bold;
+            text-align: left;
+            color: #000000;
+        }
+
+        .appointment-date {
+            position: absolute;
+            left: 5px;
+            top: 132px;
+            width: 385px;
+            height: 14px;
+            font-family: Arial;
+            font-size: 8px;
+            text-align: left;
+            color: #000000;
+        }
+
+        .payment-details-label {
+            position: absolute;
+            left: 400px;
+            top: 115px;
+            width: 385px;
+            height: 14px;
+            font-family: Arial;
+            font-size: 9px;
+            font-weight: bold;
+            text-align: left;
+            color: #000000;
+        }
+
+        .total-treatment-cost {
+            position: absolute;
+            left: 5px;
+            top: 152px;
+            width: 255px;
+            height: 16px;
+            font-family: Arial;
+            font-size: 8px;
+            text-align: left;
+            color: #000000;
+        }
+
+        .previously-paid {
+            position: absolute;
+            left: 270px;
+            top: 152px;
+            width: 255px;
+            height: 16px;
+            font-family: Arial;
+            font-size: 8px;
+            text-align: left;
+            color: #000000;
+        }
+
+        .payment-divider-1 {
+            position: absolute;
+            left: 5px;
+            top: 173px;
+            width: 780px;
+            border-top: 1px solid #000000;
+        }
+
+        .paid-today {
+            position: absolute;
+            left: 535px;
+            top: 152px;
+            width: 250px;
+            height: 16px;
+            font-family: Arial;
+            font-size: 8px;
+            font-weight: bold;
+            text-align: left;
+            color: #000000;
+            background-color: #F0F0F0;
+            padding: 2px 0;
+        }
+
+        .payment-divider-2 {
+            position: absolute;
+            left: 5px;
+            top: 180px;
+            width: 780px;
+            border-top: 2px solid #000000;
+        }
+
+        .total-paid {
+            position: absolute;
+            left: 5px;
+            top: 188px;
+            width: 385px;
+            height: 30px;
+            font-family: Arial;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: left;
+            color: #000000;
+        }
+
+        .remaining-balance {
+            position: absolute;
+            left: 400px;
+            top: 188px;
+            width: 385px;
+            height: 30px;
+            font-family: Arial;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: left;
+            color: #000000;
+        }
+
+        .thank-you {
+            position: absolute;
+            left: 5px;
+            top: 230px;
+            width: 780px;
+            height: 28px;
+            font-family: Arial;
+            font-size: 9px;
+            font-weight: bold;
+            text-align: center;
+            color: #000000;
+            margin: 0 5px 0 5px;
+        }
+
+        .footer-note {
+            position: absolute;
+            left: 5px;
+            top: 262px;
+            width: 780px;
+            height: 28px;
+            font-family: Arial;
+            font-size: 7px;
+            text-align: center;
+            color: #000000;
+            margin: 0 5px 0 5px;
+        }
+
+        @media print {
+            body {
+                margin: 0;
+                padding: 10px;
+            }
+
+            .receipt-container {
+                page-break-after: always;
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+            }
+        }
+
+        @media screen {
+            body {
+                background: #f0f0f0;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-container">
+        <div class="clinic-name">SHWAN ORTHODONTICS</div>
+        <div class="clinic-location">📍 Sulaymaniyah, Kurdistan - Iraq</div>
+        <div class="clinic-contact">📞 +964 750 123 4567 | +964 770 987 6543</div>
+        <div class="divider-1"></div>
+
+        <div class="invoice-title">PAYMENT RECEIPT</div>
+        <div class="invoice-date">{{payment.PaymentDateTime|date:MMM DD, YYYY HH:mm}}</div>
+        <div class="receipt-number">Receipt #: {{work.WorkID}}</div>
+        <div class="divider-2"></div>
+
+        <div class="patient-info-label">PATIENT INFORMATION</div>
+        <div class="patient-name">Name: {{patient.PatientName}}</div>
+        <div class="patient-phone">Phone: {{patient.Phone}}</div>
+        <div class="patient-id">Patient ID: {{patient.PersonID}}</div>
+
+        <div class="next-appointment-label">NEXT APPOINTMENT</div>
+        <div class="appointment-date">{{patient.AppDate|date:MMM DD, YYYY HH:mm|default:Not Scheduled}}</div>
+
+        <div class="payment-details-label">PAYMENT DETAILS</div>
+        <div class="total-treatment-cost">Total Treatment Cost: {{work.TotalRequired|currency}} {{work.Currency}}</div>
+        <div class="previously-paid">Previously Paid: {{payment.PreviouslyPaid|currency}} {{payment.Currency}}</div>
+        <div class="payment-divider-1"></div>
+
+        <div class="paid-today">Paid Today: {{payment.AmountPaidToday|currency}} {{payment.Currency}}</div>
+        <div class="payment-divider-2"></div>
+
+        <div class="total-paid">Total Paid: {{payment.TotalPaid|currency}} {{payment.Currency}}</div>
+        <div class="remaining-balance">Remaining Balance: {{payment.RemainingBalance|currency}} {{payment.Currency}}</div>
+
+        <div class="thank-you">Thank you for your payment!</div>
+        <div class="footer-note">Keep this receipt for your records</div>
+    </div>
+</body>
+</html>

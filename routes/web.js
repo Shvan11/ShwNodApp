@@ -106,6 +106,16 @@ router.get('/expenses', (_, res) => {
   serveWithFallback(res, '/views/expenses.html', 'Expenses not found');
 });
 
+// Template Management
+router.get('/template-management', (_, res) => {
+  serveWithFallback(res, '/views/template-management.html', 'Template management not found');
+});
+
+// Template Designer
+router.get('/template-designer', (_, res) => {
+  serveWithFallback(res, '/template-designer.html', 'Template designer not found');
+});
+
 // ==============================
 // ROUTE SUMMARY
 // ==============================
@@ -127,6 +137,8 @@ router.get('/expenses', (_, res) => {
 //   - /send                         → Send page
 //   - /auth                         → Authentication
 //   - /expenses                     → Expense management
+//   - /template-management          → Document template management
+//   - /template-designer            → Template designer (visual editor)
 //
 // All routes serve from dist/ directory (production builds)
 // Use Vite dev server on port 5173 for development with HMR
