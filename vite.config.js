@@ -2,17 +2,24 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 
-// Custom plugin to skip React processing for .js and .mjs files
+// Custom plugin to handle plain JS/MJS files without JSX transformation
 function skipReactForPlainJS() {
   return {
     name: 'skip-react-for-plain-js',
     enforce: 'pre', // Run before other plugins
-    transform(code, id) {
-      // Skip React transformation for .js and .mjs files (not .jsx/.tsx)
-      if (/\.(js|mjs)$/.test(id) && !/node_modules/.test(id)) {
+
+    async transform(code, id) {
+      // Only process our own .js and .mjs files (not node_modules, not .jsx/.tsx)
+      if (/\.(js|mjs)$/.test(id) && !/node_modules/.test(id) && !id.includes('.jsx') && !id.includes('.tsx')) {
+        // Return code with explicit marker that this is NOT JSX
+        // This prevents import-analysis from trying to parse as JSX
         return {
-          code,
-          map: null
+          code: code,
+          map: null,
+          // Mark as already transformed to skip further JSX processing
+          meta: {
+            'skip-jsx': true
+          }
         }
       }
     }
@@ -21,11 +28,12 @@ function skipReactForPlainJS() {
 
 export default defineConfig({
   plugins: [
-    skipReactForPlainJS(),
-    react({
-      // Only include .jsx and .tsx files
-      include: /\.(jsx|tsx)$/,
-    })
+    // Temporarily disable React plugin to test
+    // skipReactForPlainJS(),
+    // react({
+    //   // Only include .jsx and .tsx files
+    //   include: /\.(jsx|tsx)$/,
+    // })
   ],
   root: 'public',
   publicDir: 'assets',
@@ -169,11 +177,6 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['react', 'react-dom'],
-    exclude: ['grapesjs', 'grapesjs-preset-newsletter'],
-    esbuildOptions: {
-      loader: {
-        '.js': 'jsx', // Only for dependencies that need JSX
-      }
-    }
+    exclude: ['grapesjs', 'grapesjs-preset-newsletter']
   }
 })
