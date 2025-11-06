@@ -41,9 +41,10 @@ document.addEventListener('DOMContentLoaded', () => {
  * Initialize GrapesJS editor
  */
 function initializeEditor(templateHtml = null) {
-    console.log('Initializing GrapesJS editor...');
+    console.log('Initializing GrapesJS editor...', { templateHtml: templateHtml ? 'provided' : 'null' });
 
     try {
+        console.log('Creating GrapesJS instance...');
         editor = grapesjs.init({
             container: '#gjs',
             height: '100%',
@@ -82,19 +83,27 @@ function initializeEditor(templateHtml = null) {
         }
     });
 
+    console.log('GrapesJS instance created successfully');
+
     // Add custom receipt blocks
+    console.log('Adding custom receipt blocks...');
     addReceiptBlocks();
 
     // Load template HTML if provided
     if (templateHtml) {
+        console.log('Setting template HTML components...');
         editor.setComponents(templateHtml);
     } else {
+        console.log('Setting default receipt template...');
         // Set default receipt structure
         editor.setComponents(getDefaultReceiptTemplate());
     }
 
     // Add custom CSS for print
+    console.log('Setting default styles...');
     editor.setStyle(getDefaultReceiptStyles());
+
+    console.log('GrapesJS editor initialized successfully!');
     } catch (error) {
         console.error('Error initializing GrapesJS editor:', error);
         alert('Failed to initialize template designer: ' + error.message);
@@ -282,33 +291,44 @@ function getDefaultReceiptStyles() {
  * Load existing template
  */
 async function loadTemplate(templateId) {
+    console.log('loadTemplate called with ID:', templateId);
     try {
         const response = await fetch(`/api/templates/${templateId}`);
+        console.log('Template API response status:', response.status);
         const result = await response.json();
+        console.log('Template API result:', result);
 
         if (result.status === 'success') {
             const template = result.data;
+            console.log('Template loaded:', template);
             document.getElementById('templateName').textContent = template.template_name;
             currentDocumentType = template.document_type_id;
 
             // Load template HTML from file
             if (template.template_file_path) {
+                console.log('Loading template HTML from:', template.template_file_path);
                 const htmlResponse = await fetch(`/${template.template_file_path}`);
                 const templateHtml = await htmlResponse.text();
+                console.log('Template HTML loaded, length:', templateHtml.length);
 
                 // Extract body content from HTML
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(templateHtml, 'text/html');
                 const bodyContent = doc.body.innerHTML;
 
+                console.log('Calling initializeEditor with body content');
                 initializeEditor(bodyContent);
             } else {
+                console.log('No template file path, calling initializeEditor without content');
                 initializeEditor();
             }
+        } else {
+            console.error('Template API returned error status:', result);
+            initializeEditor();
         }
     } catch (error) {
         console.error('Error loading template:', error);
-        alert('Failed to load template');
+        alert('Failed to load template: ' + error.message);
         initializeEditor();
     }
 }
