@@ -10,6 +10,8 @@ class TemplateDesigner {
         this.selectedElement = null;
         this.zoom = 1.0;
         this.isDragging = false;
+        this.isResizing = false;
+        this.resizeHandle = null;
         this.dragStart = { x: 0, y: 0 };
         this.hasUnsavedChanges = false;
         this.history = [];
@@ -57,6 +59,12 @@ class TemplateDesigner {
         if (result.status === 'success') {
             this.template = result.data;
             this.elements = result.data.elements || [];
+
+            // Store original saved state for reset functionality
+            this.savedElementStates = {};
+            this.elements.forEach(element => {
+                this.savedElementStates[element.element_id] = JSON.parse(JSON.stringify(element));
+            });
 
             console.log('Template loaded:', this.template.template_name);
             console.log('Elements count:', this.elements.length);
@@ -247,6 +255,33 @@ class TemplateDesigner {
                 this.renderPropertiesPanel();
                 this.showToast('Element deleted', 'success');
             }
+        }
+    }
+
+    resetElementToSaved() {
+        if (!this.selectedElement) return;
+
+        const elementId = this.selectedElement.element_id;
+        const savedState = this.savedElementStates[elementId];
+
+        if (!savedState) {
+            this.showToast('No saved state found', 'error');
+            return;
+        }
+
+        if (confirm(`Reset "${this.selectedElement.element_name}" to last saved state?`)) {
+            const previousState = { ...this.selectedElement };
+
+            // Restore all properties from saved state
+            Object.assign(this.selectedElement, JSON.parse(JSON.stringify(savedState)));
+
+            this.pushHistory('modify_element', previousState);
+            this.hasUnsavedChanges = true;
+
+            // Re-render canvas and properties
+            this.renderCanvas();
+            this.selectElement(elementId);
+            this.showToast('Element reset to saved state', 'success');
         }
     }
 
@@ -649,16 +684,59 @@ class TemplateDesigner {
         const label = document.createElement('div');
         label.className = 'element-label';
         label.textContent = element.element_name;
+        label.style.pointerEvents = 'none'; // Ensure label doesn't interfere
         div.appendChild(label);
 
+        // Add resize handles
+        this.addResizeHandles(div, element);
+
+        // Track if this was a drag operation to prevent click from firing
+        let wasDragged = false;
+        let dragStartTime = 0;
+
         // Make draggable
-        div.addEventListener('mousedown', (e) => this.startDrag(e, element));
+        div.addEventListener('mousedown', (e) => {
+            // Don't start drag if clicking on a resize handle
+            if (e.target.classList.contains('resize-handle')) {
+                return;
+            }
+
+            wasDragged = false;
+            dragStartTime = Date.now();
+            this.startDrag(e, element, () => {
+                wasDragged = true;
+            });
+        });
+
+        // Only select on click if it wasn't a drag
         div.addEventListener('click', (e) => {
             e.stopPropagation();
-            this.selectElement(element.element_id);
+            // If the mouse was held for > 100ms or moved, it was a drag, not a click
+            const timeSinceMouseDown = Date.now() - dragStartTime;
+            if (!wasDragged && timeSinceMouseDown < 200) {
+                this.selectElement(element.element_id);
+            }
         });
 
         return div;
+    }
+
+    addResizeHandles(elementDiv, element) {
+        const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+
+        handles.forEach(position => {
+            const handle = document.createElement('div');
+            handle.className = `resize-handle ${position}`;
+            handle.dataset.position = position;
+
+            handle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.startResize(e, element, position);
+            });
+
+            elementDiv.appendChild(handle);
+        });
     }
 
     getElementContent(element) {
@@ -689,7 +767,7 @@ class TemplateDesigner {
         return Math.round(value / this.gridSize) * this.gridSize;
     }
 
-    startDrag(e, element) {
+    startDrag(e, element, onDragStartCallback) {
         if (e.button !== 0) return; // Only left mouse button
 
         e.preventDefault();
@@ -700,6 +778,7 @@ class TemplateDesigner {
         this.isDragging = true;
         this.draggedElement = element;
         this.dragStartState = { ...element }; // Store original state for undo
+        this.hasMoved = false; // Track if mouse has actually moved
 
         const canvas = document.getElementById('templateCanvas');
         const canvasRect = canvas.getBoundingClientRect();
@@ -712,18 +791,45 @@ class TemplateDesigner {
             offsetX: mouseXInCanvas - element.pos_x,
             offsetY: mouseYInCanvas - element.pos_y,
             elementX: element.pos_x,
-            elementY: element.pos_y
+            elementY: element.pos_y,
+            clientX: e.clientX,
+            clientY: e.clientY
         };
 
-        const mouseMoveHandler = (e) => this.onDrag(e);
+        const mouseMoveHandler = (e) => {
+            // If mouse moved more than 3px, consider it a drag
+            const deltaX = Math.abs(e.clientX - this.dragStart.clientX);
+            const deltaY = Math.abs(e.clientY - this.dragStart.clientY);
+            if (deltaX > 3 || deltaY > 3) {
+                if (!this.hasMoved) {
+                    // First move - add visual indicators
+                    document.body.classList.add('dragging-active');
+                    const elementDiv = document.querySelector(`[data-element-id="${element.element_id}"]`);
+                    if (elementDiv) {
+                        elementDiv.classList.add('dragging');
+                    }
+                }
+                this.hasMoved = true;
+                if (onDragStartCallback) onDragStartCallback();
+            }
+            this.onDrag(e);
+        };
+
         const mouseUpHandler = () => {
             this.isDragging = false;
+            document.body.classList.remove('dragging-active');
+            const elementDiv = document.querySelector(`[data-element-id="${element.element_id}"]`);
+            if (elementDiv) {
+                elementDiv.classList.remove('dragging');
+            }
+
             document.removeEventListener('mousemove', mouseMoveHandler);
             document.removeEventListener('mouseup', mouseUpHandler);
 
-            // Push to history on drag end
-            if (this.dragStartState.pos_x !== this.draggedElement.pos_x ||
-                this.dragStartState.pos_y !== this.draggedElement.pos_y) {
+            // Push to history on drag end only if actually moved
+            if (this.hasMoved &&
+                (this.dragStartState.pos_x !== this.draggedElement.pos_x ||
+                 this.dragStartState.pos_y !== this.draggedElement.pos_y)) {
                 this.pushHistory('modify_element', this.dragStartState);
             }
         };
@@ -736,7 +842,9 @@ class TemplateDesigner {
     }
 
     onDrag(e) {
-        if (!this.isDragging) return;
+        if (!this.isDragging || !this.draggedElement) return;
+
+        e.preventDefault(); // Prevent text selection during drag
 
         const canvas = document.getElementById('templateCanvas');
         const canvasRect = canvas.getBoundingClientRect();
@@ -760,18 +868,175 @@ class TemplateDesigner {
         this.draggedElement.pos_x = Math.max(0, Math.min(Math.round(newX), maxX));
         this.draggedElement.pos_y = Math.max(0, Math.min(Math.round(newY), maxY));
 
-        // Update visual position
-        const elementDiv = document.querySelector(`[data-element-id="${this.draggedElement.element_id}"]`);
+        // Update visual position DIRECTLY without re-rendering entire canvas
+        const elementDiv = document.querySelector(`.canvas-element[data-element-id="${this.draggedElement.element_id}"]`);
         if (elementDiv) {
             elementDiv.style.left = this.draggedElement.pos_x + 'px';
             elementDiv.style.top = this.draggedElement.pos_y + 'px';
-
-            // Force browser repaint
-            void elementDiv.offsetHeight;
         }
 
-        // Update properties panel if this element is selected
+        // Update properties panel if this element is selected (but don't re-render canvas!)
         if (this.selectedElement && this.selectedElement.element_id === this.draggedElement.element_id) {
+            this.updatePropertiesForm();
+        }
+    }
+
+    startResize(e, element, handlePosition) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        console.log('Start resize:', element.element_name, 'handle:', handlePosition);
+
+        this.isResizing = true;
+        this.resizedElement = element;
+        this.resizeHandle = handlePosition;
+        this.resizeStartState = { ...element }; // Store original state for undo
+        this.hasMoved = false;
+
+        const canvas = document.getElementById('templateCanvas');
+        const canvasRect = canvas.getBoundingClientRect();
+
+        // Store initial mouse and element state
+        this.resizeStart = {
+            mouseX: (e.clientX - canvasRect.left) / this.zoom,
+            mouseY: (e.clientY - canvasRect.top) / this.zoom,
+            elementX: element.pos_x,
+            elementY: element.pos_y,
+            elementWidth: element.width,
+            elementHeight: element.height,
+            clientX: e.clientX,
+            clientY: e.clientY
+        };
+
+        const mouseMoveHandler = (e) => {
+            const deltaX = Math.abs(e.clientX - this.resizeStart.clientX);
+            const deltaY = Math.abs(e.clientY - this.resizeStart.clientY);
+            if (deltaX > 3 || deltaY > 3) {
+                this.hasMoved = true;
+            }
+            this.onResize(e);
+        };
+
+        const mouseUpHandler = () => {
+            this.isResizing = false;
+            this.resizeHandle = null;
+            document.removeEventListener('mousemove', mouseMoveHandler);
+            document.removeEventListener('mouseup', mouseUpHandler);
+
+            // Push to history on resize end only if actually moved
+            if (this.hasMoved &&
+                (this.resizeStartState.pos_x !== this.resizedElement.pos_x ||
+                 this.resizeStartState.pos_y !== this.resizedElement.pos_y ||
+                 this.resizeStartState.width !== this.resizedElement.width ||
+                 this.resizeStartState.height !== this.resizedElement.height)) {
+                this.pushHistory('modify_element', this.resizeStartState);
+            }
+        };
+
+        document.addEventListener('mousemove', mouseMoveHandler);
+        document.addEventListener('mouseup', mouseUpHandler);
+
+        // Select the element being resized
+        this.selectElement(element.element_id);
+    }
+
+    onResize(e) {
+        if (!this.isResizing || !this.resizedElement) return;
+
+        e.preventDefault();
+
+        const canvas = document.getElementById('templateCanvas');
+        const canvasRect = canvas.getBoundingClientRect();
+
+        // Calculate mouse position in canvas coordinates
+        const mouseX = (e.clientX - canvasRect.left) / this.zoom;
+        const mouseY = (e.clientY - canvasRect.top) / this.zoom;
+
+        // Calculate delta from start
+        const deltaX = mouseX - this.resizeStart.mouseX;
+        const deltaY = mouseY - this.resizeStart.mouseY;
+
+        // Apply snapping to deltas
+        const snappedDeltaX = this.snap(deltaX);
+        const snappedDeltaY = this.snap(deltaY);
+
+        let newX = this.resizeStart.elementX;
+        let newY = this.resizeStart.elementY;
+        let newWidth = this.resizeStart.elementWidth;
+        let newHeight = this.resizeStart.elementHeight;
+
+        // Adjust based on handle position
+        const handle = this.resizeHandle;
+
+        // Horizontal resize
+        if (handle.includes('w')) {
+            // West: move left edge
+            newX = this.resizeStart.elementX + snappedDeltaX;
+            newWidth = this.resizeStart.elementWidth - snappedDeltaX;
+        } else if (handle.includes('e')) {
+            // East: move right edge
+            newWidth = this.resizeStart.elementWidth + snappedDeltaX;
+        }
+
+        // Vertical resize
+        if (handle.includes('n')) {
+            // North: move top edge
+            newY = this.resizeStart.elementY + snappedDeltaY;
+            newHeight = this.resizeStart.elementHeight - snappedDeltaY;
+        } else if (handle.includes('s')) {
+            // South: move bottom edge
+            newHeight = this.resizeStart.elementHeight + snappedDeltaY;
+        }
+
+        // Enforce minimum size
+        const minWidth = 20;
+        const minHeight = 10;
+
+        if (newWidth < minWidth) {
+            if (handle.includes('w')) {
+                newX = this.resizeStart.elementX + this.resizeStart.elementWidth - minWidth;
+            }
+            newWidth = minWidth;
+        }
+
+        if (newHeight < minHeight) {
+            if (handle.includes('n')) {
+                newY = this.resizeStart.elementY + this.resizeStart.elementHeight - minHeight;
+            }
+            newHeight = minHeight;
+        }
+
+        // Constrain to canvas bounds
+        const canvasWidth = this.mmToPx(this.template.paper_width);
+        const canvasHeight = this.mmToPx(this.template.paper_height);
+
+        newX = Math.max(0, Math.min(newX, canvasWidth - newWidth));
+        newY = Math.max(0, Math.min(newY, canvasHeight - newHeight));
+
+        if (newX + newWidth > canvasWidth) {
+            newWidth = canvasWidth - newX;
+        }
+        if (newY + newHeight > canvasHeight) {
+            newHeight = canvasHeight - newY;
+        }
+
+        // Update element
+        this.resizedElement.pos_x = Math.round(newX);
+        this.resizedElement.pos_y = Math.round(newY);
+        this.resizedElement.width = Math.round(newWidth);
+        this.resizedElement.height = Math.round(newHeight);
+
+        // Update visual appearance DIRECTLY
+        const elementDiv = document.querySelector(`.canvas-element[data-element-id="${this.resizedElement.element_id}"]`);
+        if (elementDiv) {
+            elementDiv.style.left = this.resizedElement.pos_x + 'px';
+            elementDiv.style.top = this.resizedElement.pos_y + 'px';
+            elementDiv.style.width = this.resizedElement.width + 'px';
+            elementDiv.style.height = this.resizedElement.height + 'px';
+        }
+
+        // Update properties panel
+        if (this.selectedElement && this.selectedElement.element_id === this.resizedElement.element_id) {
             this.updatePropertiesForm();
         }
     }
@@ -934,9 +1199,12 @@ class TemplateDesigner {
                     Apply Changes
                 </button>
             </div>
-            <div style="margin-top: 10px;">
+            <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button class="btn btn-secondary" style="width: 100%;" id="resetElementBtn">
+                    🔄 Reset
+                </button>
                 <button class="btn btn-secondary" style="width: 100%;" id="deleteElementBtn">
-                    🗑️ Delete Element
+                    🗑️ Delete
                 </button>
             </div>
         `;
@@ -944,6 +1212,10 @@ class TemplateDesigner {
         // Add event listeners
         document.getElementById('applyPropertiesBtn').addEventListener('click', () => {
             this.applyProperties();
+        });
+
+        document.getElementById('resetElementBtn').addEventListener('click', () => {
+            this.resetElementToSaved();
         });
 
         document.getElementById('deleteElementBtn').addEventListener('click', () => {
@@ -954,7 +1226,6 @@ class TemplateDesigner {
         ['pos_x', 'pos_y', 'width', 'height', 'font_size'].forEach(prop => {
             const input = document.getElementById(`prop_${prop}`);
             if (input) {
-                const previousState = { ...this.selectedElement };
                 input.addEventListener('input', () => {
                     this.applyProperties();
                 });
@@ -999,6 +1270,8 @@ class TemplateDesigner {
 
         setValue('prop_pos_x', el.pos_x);
         setValue('prop_pos_y', el.pos_y);
+        setValue('prop_width', el.width);
+        setValue('prop_height', el.height);
     }
 
     applyProperties() {
@@ -1039,9 +1312,20 @@ class TemplateDesigner {
             this.pushHistory('modify_element', previousState);
         }
 
-        // Re-render canvas to show changes
-        this.renderCanvas();
-        this.selectElement(this.selectedElement.element_id);
+        // Re-render canvas to show changes (but NOT while dragging or resizing!)
+        if (!this.isDragging && !this.isResizing) {
+            this.renderCanvas();
+            this.selectElement(this.selectedElement.element_id);
+        } else {
+            // During drag/resize, just update the element visually without full re-render
+            const elementDiv = document.querySelector(`.canvas-element[data-element-id="${this.selectedElement.element_id}"]`);
+            if (elementDiv) {
+                elementDiv.style.left = this.selectedElement.pos_x + 'px';
+                elementDiv.style.top = this.selectedElement.pos_y + 'px';
+                elementDiv.style.width = this.selectedElement.width + 'px';
+                elementDiv.style.height = this.selectedElement.height + 'px';
+            }
+        }
     }
 
     async saveTemplate() {
@@ -1057,6 +1341,11 @@ class TemplateDesigner {
             for (const element of this.elements) {
                 await this.updateElement(element);
             }
+
+            // Update saved states after successful save
+            this.elements.forEach(element => {
+                this.savedElementStates[element.element_id] = JSON.parse(JSON.stringify(element));
+            });
 
             this.hasUnsavedChanges = false;
             this.showToast('Template saved successfully!', 'success');

@@ -192,6 +192,21 @@
             user-select: none;
         }
 
+        .canvas-element.dragging {
+            cursor: grabbing !important;
+            opacity: 0.8;
+            z-index: 1000;
+        }
+
+        body.dragging-active {
+            cursor: grabbing !important;
+            user-select: none;
+        }
+
+        body.dragging-active * {
+            cursor: grabbing !important;
+        }
+
         .canvas-element:hover {
             outline-color: #3498db;
             box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.3);
@@ -201,6 +216,58 @@
             outline: 2px solid #e74c3c;
             box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.2);
         }
+
+        /* Resize handles */
+        .resize-handle {
+            position: absolute;
+            background: #e74c3c;
+            border: 1px solid white;
+            box-shadow: 0 0 2px rgba(0,0,0,0.3);
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+
+        .canvas-element.selected .resize-handle {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Corner handles */
+        .resize-handle.nw, .resize-handle.ne,
+        .resize-handle.sw, .resize-handle.se {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .resize-handle.nw { top: -4px; left: -4px; cursor: nw-resize; }
+        .resize-handle.ne { top: -4px; right: -4px; cursor: ne-resize; }
+        .resize-handle.sw { bottom: -4px; left: -4px; cursor: sw-resize; }
+        .resize-handle.se { bottom: -4px; right: -4px; cursor: se-resize; }
+
+        /* Edge handles */
+        .resize-handle.n, .resize-handle.s {
+            left: 50%;
+            transform: translateX(-50%);
+            width: 8px;
+            height: 6px;
+            border-radius: 3px;
+        }
+
+        .resize-handle.e, .resize-handle.w {
+            top: 50%;
+            transform: translateY(-50%);
+            width: 6px;
+            height: 8px;
+            border-radius: 3px;
+        }
+
+        .resize-handle.n { top: -3px; cursor: n-resize; }
+        .resize-handle.s { bottom: -3px; cursor: s-resize; }
+        .resize-handle.e { right: -3px; cursor: e-resize; }
+        .resize-handle.w { left: -3px; cursor: w-resize; }
 
         .element-label {
             position: absolute;
