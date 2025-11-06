@@ -2,21 +2,31 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import { readFileSync } from 'fs'
+import { transformSync } from 'esbuild'
 
-// Custom plugin to bypass import-analysis for template-designer
-function bypassImportAnalysis() {
+// Custom plugin to pre-transform template-designer with esbuild (JSX disabled)
+function preTransformTemplateDesigner() {
   return {
-    name: 'bypass-import-analysis',
-    enforce: 'pre', // Run before all other plugins
+    name: 'pre-transform-template-designer',
+    enforce: 'pre', // Run before import-analysis
 
     async load(id) {
-      // Intercept template-designer file before Vite processes it
+      // Intercept template-designer file
       if (id.includes('template-designer.mjs') || id.includes('template-designer.js')) {
-        // Read and return the file directly
-        // This skips Vite's import-analysis entirely
+        // Read the file
         const code = readFileSync(id, 'utf-8')
+
+        // Transform with esbuild - explicitly set loader to 'js' (not jsx)
+        const result = transformSync(code, {
+          loader: 'js', // Treat as plain JavaScript, NOT JSX
+          format: 'esm',
+          target: 'es2020',
+          sourcemap: false,
+        })
+
+        // Return transformed code - this bypasses import-analysis JSX detection
         return {
-          code,
+          code: result.code,
           map: null
         }
       }
@@ -26,7 +36,7 @@ function bypassImportAnalysis() {
 
 export default defineConfig({
   plugins: [
-    bypassImportAnalysis(), // Load template-designer before Vite tries to parse it
+    preTransformTemplateDesigner(), // Pre-transform with esbuild before Vite's import-analysis
     react({
       // Only include .jsx and .tsx files
       include: /\.(jsx|tsx)$/,
