@@ -382,8 +382,15 @@ async function saveTemplate() {
         const html = editor.getHtml();
         const css = editor.getCss();
 
-        // Create complete HTML document
-        const completeHtml = generateCompleteHTML(html, css);
+        // Get current device dimensions
+        const device = editor.Devices.getSelected();
+        const pageWidth = device.get('width') || '794px';
+        const pageHeight = device.get('height') || null;
+
+        console.log('Saving with dimensions:', { pageWidth, pageHeight });
+
+        // Create complete HTML document with page size
+        const completeHtml = generateCompleteHTML(html, css, pageWidth, pageHeight);
 
         // Send to backend to save as file
         const response = await fetch(`/api/templates/${currentTemplateId}/save-html`, {
@@ -410,15 +417,20 @@ async function saveTemplate() {
 /**
  * Generate complete HTML document
  */
-function generateCompleteHTML(bodyHtml, css) {
+function generateCompleteHTML(bodyHtml, css, pageWidth = '794px', pageHeight = '1123px') {
+    // Convert px to mm for @page size (96dpi: 1px = 0.2646mm)
+    const widthMm = Math.round(parseInt(pageWidth) * 0.2646);
+    const heightMm = pageHeight ? Math.round(parseInt(pageHeight) * 0.2646) : 'auto';
+    const pageSize = pageHeight ? `${widthMm}mm ${heightMm}mm` : `${widthMm}mm auto`;
+
     return `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Receipt</title>
+    <title>Receipt Preview</title>
     <style>
         @page {
-            size: A4;
+            size: ${pageSize};
             margin: 0;
         }
 
@@ -433,6 +445,10 @@ function generateCompleteHTML(bodyHtml, css) {
             padding: 20px;
             background: white;
             font-family: Arial, sans-serif;
+            width: ${pageWidth};
+            ${pageHeight ? `min-height: ${pageHeight};` : ''}
+            max-width: ${pageWidth};
+            margin: 0 auto;
         }
 
         ${css}
@@ -467,8 +483,20 @@ function generateCompleteHTML(bodyHtml, css) {
  * Preview template
  */
 function previewTemplate() {
-    const html = generateCompleteHTML(editor.getHtml(), editor.getCss());
-    const previewWindow = window.open('', '_blank', 'width=800,height=600');
+    // Get current device dimensions
+    const device = editor.Devices.getSelected();
+    const pageWidth = device.get('width') || '794px';
+    const pageHeight = device.get('height') || null;
+
+    console.log('Preview with dimensions:', { pageWidth, pageHeight });
+
+    const html = generateCompleteHTML(editor.getHtml(), editor.getCss(), pageWidth, pageHeight);
+
+    // Open preview window with dimensions matching the page size
+    const widthPx = parseInt(pageWidth) + 100; // Add padding for window chrome
+    const heightPx = pageHeight ? parseInt(pageHeight) + 100 : 800;
+
+    const previewWindow = window.open('', '_blank', `width=${widthPx},height=${heightPx}`);
     previewWindow.document.write(html);
     previewWindow.document.close();
 }
