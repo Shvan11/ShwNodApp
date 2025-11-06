@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import WorkCard from './WorkCard.jsx';
 import PaymentModal from './PaymentModal.jsx';
-import { printReceipt } from '../../utils/receiptGenerator.js';
 import '../../../css/components/work-card.css';
 
 const WorkComponent = ({ patientId }) => {
@@ -436,25 +435,32 @@ const WorkComponent = ({ patientId }) => {
 
     const handlePrintReceipt = async (work) => {
         try {
-            // Fetch work data from API
-            const response = await fetch(`/api/getworkforreceipt/${work.workid}`);
-            if (!response.ok) throw new Error('Failed to fetch work data');
-            const data = await response.json();
+            // Fetch receipt HTML from template-based system
+            const response = await fetch(`/api/templates/receipt/work/${work.workid}`);
+            if (!response.ok) throw new Error('Failed to generate receipt');
 
-            // Prepare receipt data
-            const receiptData = {
-                ...data,
-                amountPaidToday: 0, // No new payment, just reprinting
-                paymentDateTime: new Date().toISOString(),
-                newBalance: (data.TotalRequired || 0) - (data.TotalPaid || 0)
-            };
+            const html = await response.text();
 
-            // Use shared print utility
-            printReceipt(receiptData);
+            // Create print window with template-rendered HTML
+            const printWindow = window.open('', '', 'width=302,height=1122'); // 80mm x 297mm at 96 DPI
+            if (!printWindow) {
+                throw new Error('Pop-up blocked. Please allow pop-ups for this site.');
+            }
+
+            printWindow.document.write(html);
+            printWindow.document.close();
+
+            // Trigger print dialog
+            printWindow.focus();
+            setTimeout(() => {
+                printWindow.print();
+                // Close window after printing
+                printWindow.onafterprint = () => printWindow.close();
+            }, 250); // Small delay to ensure content is fully loaded
 
         } catch (err) {
             console.error('Error printing receipt:', err);
-            alert('Failed to print receipt');
+            alert(`Failed to print receipt: ${err.message}`);
         }
     };
 
