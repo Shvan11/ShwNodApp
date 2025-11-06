@@ -3,7 +3,10 @@ import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react({
+    // Only process .jsx and .tsx files, not .js files
+    include: /\.(jsx|tsx)$/,
+  })],
   root: 'public',
   publicDir: 'assets',
   build: {
