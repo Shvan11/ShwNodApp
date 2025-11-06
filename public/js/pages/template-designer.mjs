@@ -104,6 +104,21 @@ function initializeEditor(templateHtml = null) {
     editor.setStyle(getDefaultReceiptStyles());
 
     console.log('GrapesJS editor initialized successfully!');
+
+    // Debug: Check what GrapesJS rendered
+    setTimeout(() => {
+        const gjsContainer = document.getElementById('gjs');
+        console.log('=== DEBUG INFO ===');
+        console.log('GJS Container element:', gjsContainer);
+        console.log('GJS Container children count:', gjsContainer?.children.length);
+        console.log('GJS Container innerHTML length:', gjsContainer?.innerHTML.length);
+        console.log('GJS Container computed height:', window.getComputedStyle(gjsContainer).height);
+        console.log('GJS Container computed display:', window.getComputedStyle(gjsContainer).display);
+        console.log('Editor instance:', editor);
+        console.log('Editor Canvas:', editor.Canvas);
+        console.log('================');
+    }, 1000);
+
     } catch (error) {
         console.error('Error initializing GrapesJS editor:', error);
         alert('Failed to initialize template designer: ' + error.message);
