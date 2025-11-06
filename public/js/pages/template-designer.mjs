@@ -63,21 +63,29 @@ function initializeEditor(templateHtml = null) {
         deviceManager: {
             devices: [
                 {
-                    id: 'desktop',
-                    name: 'Desktop',
+                    id: 'a4',
+                    name: 'A4 (210mm)',
+                    width: '794px', // A4 width in pixels (210mm at 96dpi)
+                },
+                {
+                    id: 'letter',
+                    name: 'Letter (8.5")',
+                    width: '816px', // US Letter width (8.5 inches at 96dpi)
+                },
+                {
+                    id: 'receipt-80mm',
+                    name: 'Receipt 80mm',
+                    width: '302px', // Standard thermal receipt width
+                },
+                {
+                    id: 'receipt-58mm',
+                    name: 'Receipt 58mm',
+                    width: '219px', // Small thermal receipt width
+                },
+                {
+                    id: 'custom',
+                    name: 'Custom (800px)',
                     width: '800px',
-                },
-                {
-                    id: 'tablet',
-                    name: 'Tablet',
-                    width: '600px',
-                    widthMedia: '768px',
-                },
-                {
-                    id: 'mobile',
-                    name: 'Mobile',
-                    width: '320px',
-                    widthMedia: '480px',
                 }
             ]
         }
