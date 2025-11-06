@@ -4,7 +4,7 @@
  */
 
 import grapesjs from 'grapesjs';
-import 'grapesjs/dist/css/grapes.min.css';
+// CSS loaded via <link> tag in HTML instead of import for better Vite compatibility
 
 let editor;
 let currentTemplateId = null;
