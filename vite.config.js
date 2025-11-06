@@ -1,25 +1,23 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
+import { readFileSync } from 'fs'
 
-// Custom plugin to handle plain JS/MJS files without JSX transformation
-function skipReactForPlainJS() {
+// Custom plugin to bypass import-analysis for template-designer
+function bypassImportAnalysis() {
   return {
-    name: 'skip-react-for-plain-js',
-    enforce: 'pre', // Run before other plugins
+    name: 'bypass-import-analysis',
+    enforce: 'pre', // Run before all other plugins
 
-    async transform(code, id) {
-      // Only process our own .js and .mjs files (not node_modules, not .jsx/.tsx)
-      if (/\.(js|mjs)$/.test(id) && !/node_modules/.test(id) && !id.includes('.jsx') && !id.includes('.tsx')) {
-        // Return code with explicit marker that this is NOT JSX
-        // This prevents import-analysis from trying to parse as JSX
+    async load(id) {
+      // Intercept template-designer file before Vite processes it
+      if (id.includes('template-designer.mjs') || id.includes('template-designer.js')) {
+        // Read and return the file directly
+        // This skips Vite's import-analysis entirely
+        const code = readFileSync(id, 'utf-8')
         return {
-          code: code,
-          map: null,
-          // Mark as already transformed to skip further JSX processing
-          meta: {
-            'skip-jsx': true
-          }
+          code,
+          map: null
         }
       }
     }
@@ -28,15 +26,21 @@ function skipReactForPlainJS() {
 
 export default defineConfig({
   plugins: [
-    // Temporarily disable React plugin to test
-    // skipReactForPlainJS(),
-    // react({
-    //   // Only include .jsx and .tsx files
-    //   include: /\.(jsx|tsx)$/,
-    // })
+    bypassImportAnalysis(), // Load template-designer before Vite tries to parse it
+    react({
+      // Only include .jsx and .tsx files
+      include: /\.(jsx|tsx)$/,
+    })
   ],
   root: 'public',
   publicDir: 'assets',
+  esbuild: {
+    // Disable JSX transform for .js and .mjs files
+    loader: {
+      '.js': 'js',
+      '.mjs': 'js',
+    },
+  },
   build: {
     outDir: '../dist',
     emptyOutDir: true,
