@@ -57,6 +57,9 @@ export default defineConfig({
     port: 5173,
     host: true,
     open: true,
+    fs: {
+      strict: false
+    },
     proxy: {
       // Proxy API and data routes to Express server
       '/api': {
@@ -171,11 +174,6 @@ export default defineConfig({
       loader: {
         '.js': 'jsx', // Only for dependencies that need JSX
       }
-    }
-  },
-  server: {
-    fs: {
-      strict: false
     }
   }
 })
