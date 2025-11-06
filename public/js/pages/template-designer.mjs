@@ -47,7 +47,7 @@ function initializeEditor(templateHtml = null) {
         console.log('Creating GrapesJS instance...');
         editor = grapesjs.init({
             container: '#gjs',
-            height: '100%',
+            height: 'calc(100vh - 71px)', // Match CSS height calculation
             width: 'auto',
             storageManager: false, // Disable local storage - we save to files
 
