@@ -3,11 +3,13 @@ import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 
 export default defineConfig({
-  plugins: [react({
-    // Only process .jsx and .tsx files, not .js files
-    include: /\.(jsx|tsx)$/,
-    exclude: /\.js$/,
-  })],
+  plugins: [
+    react({
+      // Use filter function to explicitly only process JSX/TSX files
+      include: '**/*.{jsx,tsx}',
+      exclude: '**/*.js',
+    })
+  ],
   root: 'public',
   publicDir: 'assets',
   build: {
@@ -146,6 +148,11 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['react', 'react-dom']
+    include: ['react', 'react-dom'],
+    esbuildOptions: {
+      loader: {
+        '.js': 'js', // Treat .js files as plain JavaScript, not JSX
+      }
+    }
   }
 })
