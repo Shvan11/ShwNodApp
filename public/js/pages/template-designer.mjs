@@ -247,52 +247,56 @@ function addReceiptBlocks() {
  */
 function getDefaultReceiptTemplate() {
     return `
-        <div style="max-width: 800px; margin: 0 auto; background: white; padding: 20px; font-family: Arial, sans-serif;">
-            <div class="clinic-header" style="text-align: center; padding: 20px; border-bottom: 2px solid #333;">
-                <h1 style="margin: 0; font-size: 24px; color: #333;">SHWAN ORTHODONTICS</h1>
-                <p style="margin: 5px 0; font-size: 14px; color: #666;">Sulaymaniyah, Kurdistan - Iraq</p>
-                <p style="margin: 5px 0; font-size: 14px; color: #666;">+964 750 123 4567 | +964 770 987 6543</p>
+        <div style="width: 794px; height: 302px; margin: 0; padding: 8px; font-family: Arial, sans-serif; font-size: 10px; line-height: 1.3; background: white;">
+            <!-- Compact Header -->
+            <div style="text-align: center; padding-bottom: 4px; border-bottom: 2px solid #000; margin-bottom: 6px;">
+                <div style="font-size: 16px; font-weight: bold; margin-bottom: 2px;">SHWAN ORTHODONTICS</div>
+                <div style="font-size: 9px;">Sulaymaniyah, Iraq | Tel: +964 750 123 4567 | Receipt: #{{work.WorkID}}</div>
             </div>
 
-            <h2 style="text-align: center; margin: 20px 0; color: #333;">PAYMENT RECEIPT</h2>
+            <!-- Two Column Layout: Patient Info + Payment Summary -->
+            <div style="display: flex; gap: 10px; margin-bottom: 6px;">
 
-            <div class="patient-info" style="padding: 15px; background: #f9f9f9; margin: 10px 0;">
-                <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #333;">Patient Information</h3>
-                <p style="margin: 5px 0;"><strong>Name:</strong> {{patient.PatientName}}</p>
-                <p style="margin: 5px 0;"><strong>Phone:</strong> {{patient.Phone}}</p>
-                <p style="margin: 5px 0;"><strong>Patient ID:</strong> {{patient.PersonID}}</p>
+                <!-- LEFT: Patient Information -->
+                <div style="flex: 1; border: 1px solid #000; padding: 6px;">
+                    <div style="font-size: 11px; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #000; padding-bottom: 2px;">PATIENT</div>
+                    <div style="margin-bottom: 2px;"><strong>Name:</strong> {{patient.PatientName}}</div>
+                    <div style="margin-bottom: 2px;"><strong>ID:</strong> {{patient.PersonID}}</div>
+                    <div style="margin-bottom: 2px;"><strong>Phone:</strong> {{patient.Phone}}</div>
+                    <div style="font-size: 9px; color: #666; margin-top: 3px;">Date: {{payment.PaymentDateTime|date:DD/MM/YYYY}}</div>
+                </div>
+
+                <!-- RIGHT: Payment Summary -->
+                <div style="flex: 1.2; border: 1px solid #000; padding: 6px;">
+                    <div style="font-size: 11px; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #000; padding-bottom: 2px;">PAYMENT DETAILS</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+                        <tr>
+                            <td style="padding: 2px 0;">Total Cost:</td>
+                            <td style="text-align: right; font-weight: bold;">{{work.TotalRequired|currency}} {{work.Currency}}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 2px 0;">Previously Paid:</td>
+                            <td style="text-align: right;">{{payment.PreviouslyPaid|currency}}</td>
+                        </tr>
+                        <tr style="border-top: 1px solid #000; border-bottom: 1px solid #000;">
+                            <td style="padding: 3px 0; font-weight: bold;">PAID TODAY:</td>
+                            <td style="text-align: right; font-weight: bold; font-size: 12px;">{{payment.AmountPaidToday|currency}}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 2px 0;">Total Paid:</td>
+                            <td style="text-align: right; font-weight: bold;">{{payment.TotalPaid|currency}}</td>
+                        </tr>
+                        <tr style="border-top: 2px double #000;">
+                            <td style="padding: 3px 0; font-weight: bold; font-size: 11px;">REMAINING:</td>
+                            <td style="text-align: right; font-weight: bold; font-size: 12px;">{{payment.RemainingBalance|currency}}</td>
+                        </tr>
+                    </table>
+                </div>
             </div>
 
-            <div class="payment-details" style="padding: 15px;">
-                <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #333;">Payment Details</h3>
-                <table style="width: 100%; border-collapse: collapse;">
-                    <tr style="border-bottom: 1px solid #ddd;">
-                        <td style="padding: 8px;">Total Treatment Cost:</td>
-                        <td style="padding: 8px; text-align: right;"><strong>{{work.TotalRequired|currency}} {{work.Currency}}</strong></td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid #ddd;">
-                        <td style="padding: 8px;">Previously Paid:</td>
-                        <td style="padding: 8px; text-align: right;">{{payment.PreviouslyPaid|currency}} {{payment.Currency}}</td>
-                    </tr>
-                    <tr style="border-bottom: 2px solid #333; background: #f0f0f0;">
-                        <td style="padding: 8px;"><strong>Paid Today:</strong></td>
-                        <td style="padding: 8px; text-align: right;"><strong>{{payment.AmountPaidToday|currency}} {{payment.Currency}}</strong></td>
-                    </tr>
-                    <tr style="font-size: 18px;">
-                        <td style="padding: 12px 8px;"><strong>Total Paid:</strong></td>
-                        <td style="padding: 12px 8px; text-align: right;"><strong>{{payment.TotalPaid|currency}} {{payment.Currency}}</strong></td>
-                    </tr>
-                    <tr style="font-size: 18px; color: #d32f2f;">
-                        <td style="padding: 8px;"><strong>Remaining Balance:</strong></td>
-                        <td style="padding: 8px; text-align: right;"><strong>{{payment.RemainingBalance|currency}} {{payment.Currency}}</strong></td>
-                    </tr>
-                </table>
-            </div>
-
-            <div class="receipt-footer" style="text-align: center; padding: 20px; border-top: 2px solid #333; margin-top: 20px;">
-                <p style="margin: 5px 0; font-size: 14px; font-weight: bold;">Thank you for your payment!</p>
-                <p style="margin: 5px 0; font-size: 12px; color: #666;">Keep this receipt for your records</p>
-                <p style="margin: 10px 0; font-size: 11px; color: #999;">Receipt #{{work.WorkID}} | {{payment.PaymentDateTime|date:MMM DD, YYYY}}</p>
+            <!-- Compact Footer -->
+            <div style="text-align: center; border-top: 2px solid #000; padding-top: 4px; font-size: 9px;">
+                <strong>Thank you for your payment!</strong> • Keep this receipt for your records • www.shwanortho.com
             </div>
         </div>
     `;
