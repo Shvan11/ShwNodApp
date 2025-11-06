@@ -6,8 +6,7 @@ export default defineConfig({
   plugins: [
     react({
       // Use filter function to explicitly only process JSX/TSX files
-      include: '**/*.{jsx,tsx}',
-      exclude: '**/*.js',
+      include: /\.(jsx|tsx)$/,
     })
   ],
   root: 'public',
@@ -149,10 +148,16 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['react', 'react-dom'],
+    exclude: ['grapesjs', 'grapesjs-preset-newsletter'],
     esbuildOptions: {
       loader: {
-        '.js': 'js', // Treat .js files as plain JavaScript, not JSX
+        '.js': 'jsx', // Only for dependencies that need JSX
       }
+    }
+  },
+  server: {
+    fs: {
+      strict: false
     }
   }
 })
