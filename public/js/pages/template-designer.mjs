@@ -5,7 +5,6 @@
 
 import grapesjs from 'grapesjs';
 import 'grapesjs/dist/css/grapes.min.css';
-import gjsNewsletter from 'grapesjs-preset-newsletter';
 
 let editor;
 let currentTemplateId = null;
@@ -51,27 +50,10 @@ function initializeEditor(templateHtml = null) {
             width: 'auto',
             storageManager: false, // Disable local storage - we save to files
 
-            plugins: [gjsNewsletter],
-            pluginsOpts: {
-                'gjs-preset-newsletter': {
-                    modalTitleImport: 'Import template',
-                    modalLabelImport: 'Paste HTML template',
-                    modalTitleExport: 'Export template',
-                    modalLabelExport: 'Copy HTML',
-                    codeViewerTheme: 'material',
-                    importPlaceholder: '<table class="main-body">...</table>',
-                    cellStyle: {
-                        'font-size': '12px',
-                        'font-weight': 300,
-                        'vertical-align': 'top',
-                        color: 'rgb(111, 119, 125)',
-                        margin: 0,
-                        padding: 0,
-                    }
-                }
-            },
+            // Removed gjs-preset-newsletter due to ESM import issues
+            // plugins: [gjsNewsletter],
 
-        canvas: {
+            canvas: {
             styles: [
                 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'
             ]
