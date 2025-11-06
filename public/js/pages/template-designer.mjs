@@ -183,6 +183,10 @@ function initializeEditor(templateHtml = null) {
 
     // Add custom CSS for print
     editor.setStyle(getDefaultReceiptStyles());
+    } catch (error) {
+        console.error('Error initializing GrapesJS editor:', error);
+        alert('Failed to initialize template designer: ' + error.message);
+    }
 }
 
 /**
