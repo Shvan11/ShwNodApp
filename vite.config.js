@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react({
     // Only process .jsx and .tsx files, not .js files
     include: /\.(jsx|tsx)$/,
+    exclude: /\.js$/,
   })],
   root: 'public',
   publicDir: 'assets',
