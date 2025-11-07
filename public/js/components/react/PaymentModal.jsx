@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import '../../../css/components/invoice-form.css'
-import { generateReceiptHTML } from '../../utils/receiptGenerator.js'
 
 const PaymentModal = ({ workData, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
@@ -393,8 +392,34 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         }
     };
 
-    const handlePrint = () => {
-        window.print();
+    const handlePrint = async () => {
+        try {
+            // Fetch receipt HTML from template-based system using work ID
+            const response = await fetch(`/api/templates/receipt/work/${workData.workid}`);
+            if (!response.ok) throw new Error('Failed to generate receipt');
+
+            const html = await response.text();
+
+            // Create print window
+            const printWindow = window.open('', '_blank', 'width=800,height=600');
+            if (!printWindow) {
+                throw new Error('Pop-up blocked. Please allow pop-ups for this site.');
+            }
+
+            // Write content
+            printWindow.document.open();
+            printWindow.document.write(html);
+            printWindow.document.close();
+
+            // Wait for load then print
+            printWindow.onload = function() {
+                printWindow.focus();
+                printWindow.print();
+            };
+        } catch (err) {
+            console.error('Error printing receipt:', err);
+            alert(`Failed to print receipt: ${err.message}`);
+        }
     };
 
     const handleCloseAfterSuccess = () => {
@@ -928,10 +953,6 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
             </div>
         </div>
 
-        {/* Hidden Print Receipt - Using shared generator */}
-        {paymentSuccess && receiptData && (
-            <div dangerouslySetInnerHTML={{ __html: generateReceiptHTML(receiptData) }} />
-        )}
         </>
     );
 };

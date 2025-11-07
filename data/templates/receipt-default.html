@@ -17,311 +17,186 @@
 
         body {
             margin: 0;
-            padding: 10px;
+            padding: 12px;
             background: white;
             font-family: Arial, sans-serif;
+            color: #000;
         }
 
         .receipt-container {
-            width: 790px;
-            min-height: 300px;
-            background-color: #FFFFFF;
-            position: relative;
+            width: 100%;
+            max-width: 770px;
+            min-height: 278px;
+            background-color: #fff;
+            padding: 8px;
+        }
+
+        /* Header Row */
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 6px 0;
+            border-bottom: 2px solid #000;
+            margin-bottom: 8px;
+        }
+
+        .clinic-header {
+            flex: 1;
         }
 
         .clinic-name {
-            position: absolute;
-            left: 5px;
-            top: 5px;
-            width: 350px;
-            height: 20px;
-            font-family: Arial;
-            font-size: 14px;
+            font-size: 18px;
             font-weight: bold;
-            text-align: left;
-            color: #000000;
-            margin: 0 5px 0 5px;
+            margin-bottom: 3px;
         }
 
-        .clinic-location {
-            position: absolute;
-            left: 5px;
-            top: 28px;
-            width: 350px;
-            height: 14px;
-            font-family: Arial;
-            font-size: 8px;
-            text-align: center;
-            color: #000000;
-            margin: 0 5px 0 5px;
-        }
-
-        .clinic-contact {
-            position: absolute;
-            left: 5px;
-            top: 45px;
-            width: 350px;
-            height: 14px;
-            font-family: Arial;
-            font-size: 8px;
-            text-align: center;
-            color: #000000;
-            margin: 0 5px 0 5px;
-        }
-
-        .divider-1 {
-            position: absolute;
-            left: 5px;
-            top: 65px;
-            width: 780px;
-            border-top: 1px solid #000000;
-        }
-
-        .invoice-title {
-            position: absolute;
-            left: 500px;
-            top: 8px;
-            width: 280px;
-            height: 22px;
-            font-family: Arial;
-            font-size: 16px;
-            font-weight: bold;
-            text-align: center;
-            color: #000000;
-            margin: 0 5px 0 5px;
-        }
-
-        .invoice-date {
-            position: absolute;
-            left: 5px;
-            top: 72px;
-            width: 280px;
-            height: 14px;
-            font-family: Arial;
-            font-size: 8px;
-            text-align: center;
-            color: #000000;
-        }
-
-        .receipt-number {
-            position: absolute;
-            left: 5px;
-            top: 89px;
-            width: 280px;
-            height: 14px;
-            font-family: Arial;
-            font-size: 8px;
-            text-align: center;
-            color: #000000;
-        }
-
-        .divider-2 {
-            position: absolute;
-            left: 5px;
-            top: 108px;
-            width: 780px;
-            border-top: 1px solid #000000;
-        }
-
-        .patient-info-label {
-            position: absolute;
-            left: 295px;
-            top: 72px;
-            width: 230px;
-            height: 14px;
-            font-family: Arial;
+        .clinic-subtitle {
             font-size: 9px;
+            color: #333;
+        }
+
+        .receipt-ids {
+            font-size: 9px;
+            color: #333;
+            margin-top: 2px;
+        }
+
+        .receipt-timestamp {
+            text-align: right;
+            font-size: 9px;
+        }
+
+        .timestamp-label {
             font-weight: bold;
-            text-align: left;
-            color: #000000;
+            margin-bottom: 3px;
         }
 
-        .patient-name {
-            position: absolute;
-            left: 295px;
-            top: 89px;
-            width: 230px;
-            height: 14px;
-            font-family: Arial;
-            font-size: 8px;
-            text-align: left;
-            color: #000000;
+        .timestamp-value {
+            color: #333;
         }
 
-        .patient-phone {
-            position: absolute;
-            left: 535px;
-            top: 72px;
-            width: 250px;
-            height: 14px;
-            font-family: Arial;
-            font-size: 8px;
-            text-align: left;
-            color: #000000;
+        /* Two Column Main Content */
+        .main-content {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 0;
         }
 
-        .patient-id {
-            position: absolute;
-            left: 535px;
-            top: 89px;
-            width: 250px;
-            height: 14px;
-            font-family: Arial;
-            font-size: 8px;
-            text-align: left;
-            color: #000000;
+        .column-left,
+        .column-right {
+            flex: 1;
+            border: 1px solid #000;
+            padding: 6px;
+        }
+
+        .section-header {
+            font-size: 10px;
+            font-weight: bold;
+            padding: 3px 5px;
+            margin-bottom: 6px;
+            background-color: #000;
+            color: #fff;
+        }
+
+        .info-row {
+            font-size: 10px;
+            margin-bottom: 4px;
+            display: flex;
+        }
+
+        .info-label {
+            font-weight: bold;
+            min-width: 65px;
+        }
+
+        .info-value {
+            flex: 1;
+        }
+
+        .next-appointment {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #000;
         }
 
         .next-appointment-label {
-            position: absolute;
-            left: 7px;
-            top: 115px;
-            width: 285px;
-            height: 14px;
-            font-family: Arial;
-            font-size: 9px;
+            font-size: 11px;
             font-weight: bold;
-            text-align: left;
-            color: #000000;
+            margin-bottom: 4px;
         }
 
-        .appointment-date {
-            position: absolute;
-            left: 5px;
-            top: 132px;
-            width: 385px;
-            height: 14px;
-            font-family: Arial;
-            font-size: 8px;
-            text-align: left;
-            color: #000000;
-        }
-
-        .payment-details-label {
-            position: absolute;
-            left: 400px;
-            top: 115px;
-            width: 385px;
-            height: 14px;
-            font-family: Arial;
-            font-size: 9px;
-            font-weight: bold;
-            text-align: left;
-            color: #000000;
-        }
-
-        .total-treatment-cost {
-            position: absolute;
-            left: 5px;
-            top: 152px;
-            width: 255px;
-            height: 16px;
-            font-family: Arial;
-            font-size: 8px;
-            text-align: left;
-            color: #000000;
-        }
-
-        .previously-paid {
-            position: absolute;
-            left: 270px;
-            top: 152px;
-            width: 255px;
-            height: 16px;
-            font-family: Arial;
-            font-size: 8px;
-            text-align: left;
-            color: #000000;
-        }
-
-        .payment-divider-1 {
-            position: absolute;
-            left: 5px;
-            top: 173px;
-            width: 780px;
-            border-top: 1px solid #000000;
-        }
-
-        .paid-today {
-            position: absolute;
-            left: 535px;
-            top: 152px;
-            width: 250px;
-            height: 16px;
-            font-family: Arial;
-            font-size: 8px;
-            font-weight: bold;
-            text-align: left;
-            color: #000000;
-            background-color: #F0F0F0;
-            padding: 2px 0;
-        }
-
-        .payment-divider-2 {
-            position: absolute;
-            left: 5px;
-            top: 180px;
-            width: 780px;
-            border-top: 2px solid #000000;
-        }
-
-        .total-paid {
-            position: absolute;
-            left: 5px;
-            top: 188px;
-            width: 385px;
-            height: 30px;
-            font-family: Arial;
+        .next-appointment-value {
             font-size: 12px;
             font-weight: bold;
-            text-align: left;
-            color: #000000;
         }
 
-        .remaining-balance {
-            position: absolute;
-            left: 400px;
-            top: 188px;
-            width: 385px;
-            height: 30px;
-            font-family: Arial;
-            font-size: 12px;
-            font-weight: bold;
-            text-align: left;
-            color: #000000;
-        }
-
-        .thank-you {
-            position: absolute;
-            left: 5px;
-            top: 230px;
-            width: 780px;
-            height: 28px;
-            font-family: Arial;
-            font-size: 9px;
-            font-weight: bold;
+        .clinic-footer {
+            margin-top: 8px;
+            padding-top: 6px;
+            border-top: 1px solid #000;
+            font-size: 8px;
             text-align: center;
-            color: #000000;
-            margin: 0 5px 0 5px;
         }
 
-        .footer-note {
-            position: absolute;
-            left: 5px;
-            top: 262px;
-            width: 780px;
-            height: 28px;
-            font-family: Arial;
-            font-size: 7px;
-            text-align: center;
-            color: #000000;
-            margin: 0 5px 0 5px;
+        .clinic-footer-title {
+            font-weight: bold;
+            margin-bottom: 3px;
         }
+
+        .clinic-footer-info {
+            color: #333;
+            margin-bottom: 1px;
+        }
+
+        /* Payment Table */
+        .payment-table {
+            width: 100%;
+            font-size: 11px;
+            border-collapse: collapse;
+        }
+
+        .payment-table td {
+            padding: 4px 2px;
+        }
+
+        .payment-table .label-col {
+            text-align: left;
+        }
+
+        .payment-table .amount-col {
+            text-align: right;
+            font-weight: bold;
+        }
+
+        .payment-row-divider {
+            border-top: 1px solid #000;
+        }
+
+        .payment-row-highlight {
+            background-color: #000;
+            color: #fff;
+        }
+
+        .payment-row-highlight td {
+            padding: 5px 3px;
+            font-size: 13px;
+        }
+
+        .payment-row-total {
+            border-top: 2px solid #000;
+            font-size: 14px;
+        }
+
+        .payment-row-total td {
+            padding: 5px 2px;
+        }
+
 
         @media print {
             body {
                 margin: 0;
-                padding: 10px;
+                padding: 12px;
             }
 
             .receipt-container {
@@ -341,37 +216,80 @@
 </head>
 <body>
     <div class="receipt-container">
-        <div class="clinic-name">SHWAN ORTHODONTICS</div>
-        <div class="clinic-location">📍 Sulaymaniyah, Kurdistan - Iraq</div>
-        <div class="clinic-contact">📞 +964 750 123 4567 | +964 770 987 6543</div>
-        <div class="divider-1"></div>
+        <!-- Header Row -->
+        <div class="header-row">
+            <div class="clinic-header">
+                <div class="clinic-name">SHWAN ORTHODONTICS</div>
+                <div class="receipt-ids">Receipt #{{work.WorkID}} | Patient ID: {{patient.PersonID}}</div>
+            </div>
+            <div class="receipt-timestamp">
+                <div class="timestamp-label">Generated:</div>
+                <div class="timestamp-value">{{payment.PaymentDateTime|date:DD/MM/YYYY HH:mm}}</div>
+            </div>
+        </div>
 
-        <div class="invoice-title">PAYMENT RECEIPT</div>
-        <div class="invoice-date">{{payment.PaymentDateTime|date:MMM DD, YYYY HH:mm}}</div>
-        <div class="receipt-number">Receipt #: {{work.WorkID}}</div>
-        <div class="divider-2"></div>
+        <!-- Two Column Main Content -->
+        <div class="main-content">
+            <!-- Left Column: Patient Information -->
+            <div class="column-left">
+                <div class="section-header">PATIENT INFORMATION</div>
+                <div class="info-row">
+                    <span class="info-label">Name:</span>
+                    <span class="info-value">{{patient.PatientName}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Phone:</span>
+                    <span class="info-value">{{patient.Phone}}</span>
+                </div>
 
-        <div class="patient-info-label">PATIENT INFORMATION</div>
-        <div class="patient-name">Name: {{patient.PatientName}}</div>
-        <div class="patient-phone">Phone: {{patient.Phone}}</div>
-        <div class="patient-id">Patient ID: {{patient.PersonID}}</div>
+                <!-- Next Appointment -->
+                <div class="next-appointment">
+                    <div class="next-appointment-label">NEXT APPOINTMENT</div>
+                    <div class="next-appointment-value">{{patient.AppDate|date:DD/MM/YYYY HH:mm|default:Not Scheduled}}</div>
+                </div>
 
-        <div class="next-appointment-label">NEXT APPOINTMENT</div>
-        <div class="appointment-date">{{patient.AppDate|date:MMM DD, YYYY HH:mm|default:Not Scheduled}}</div>
+                <!-- Clinic Footer in Left Column -->
+                <div class="clinic-footer">
+                    <div class="clinic-footer-title">Thank you for your payment!</div>
+                    <div class="clinic-footer-info">Sulaymaniyah, Kurdistan - Iraq</div>
+                    <div class="clinic-footer-info">Tel: +964 750 123 4567 | +964 770 987 6543</div>
+                    <div class="clinic-footer-info">Keep this receipt for your records</div>
+                </div>
+            </div>
 
-        <div class="payment-details-label">PAYMENT DETAILS</div>
-        <div class="total-treatment-cost">Total Treatment Cost: {{work.TotalRequired|currency}} {{work.Currency}}</div>
-        <div class="previously-paid">Previously Paid: {{payment.PreviouslyPaid|currency}} {{payment.Currency}}</div>
-        <div class="payment-divider-1"></div>
-
-        <div class="paid-today">Paid Today: {{payment.AmountPaidToday|currency}} {{payment.Currency}}</div>
-        <div class="payment-divider-2"></div>
-
-        <div class="total-paid">Total Paid: {{payment.TotalPaid|currency}} {{payment.Currency}}</div>
-        <div class="remaining-balance">Remaining Balance: {{payment.RemainingBalance|currency}} {{payment.Currency}}</div>
-
-        <div class="thank-you">Thank you for your payment!</div>
-        <div class="footer-note">Keep this receipt for your records</div>
+            <!-- Right Column: Payment Details -->
+            <div class="column-right">
+                <div class="section-header">PAYMENT DETAILS</div>
+                <table class="payment-table">
+                    <tr>
+                        <td class="label-col">Total Treatment Cost:</td>
+                        <td class="amount-col">{{work.TotalRequired|currency}} {{work.Currency}}</td>
+                    </tr>
+                    <tr>
+                        <td class="label-col">Previously Paid:</td>
+                        <td class="amount-col">{{payment.PreviouslyPaid|currency}}</td>
+                    </tr>
+                    <tr class="payment-row-divider">
+                        <td colspan="2"></td>
+                    </tr>
+                    <tr class="payment-row-highlight">
+                        <td class="label-col">PAID TODAY:</td>
+                        <td class="amount-col">{{payment.AmountPaidToday|currency}}</td>
+                    </tr>
+                    <tr class="payment-row-divider">
+                        <td colspan="2"></td>
+                    </tr>
+                    <tr>
+                        <td class="label-col">Total Paid:</td>
+                        <td class="amount-col">{{payment.TotalPaid|currency}}</td>
+                    </tr>
+                    <tr class="payment-row-total">
+                        <td class="label-col">REMAINING BALANCE:</td>
+                        <td class="amount-col">{{payment.RemainingBalance|currency}}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
     </div>
 </body>
 </html>

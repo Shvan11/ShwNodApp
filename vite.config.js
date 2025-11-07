@@ -4,53 +4,46 @@ import { resolve } from 'path'
 import { readFileSync } from 'fs'
 import { transformSync } from 'esbuild'
 
-// Custom plugin to pre-transform template-designer with esbuild (JSX disabled)
-function preTransformTemplateDesigner() {
+// Custom plugin to handle template-designer specifically
+function templateDesignerPlugin() {
   return {
-    name: 'pre-transform-template-designer',
-    enforce: 'pre', // Run before import-analysis
+    name: 'template-designer-handler',
+    enforce: 'pre',
 
     async load(id) {
-      // Intercept template-designer file
-      if (id.includes('template-designer.mjs') || id.includes('template-designer.js')) {
-        // Read the file
+      // Only process the specific template-designer file
+      if (id.endsWith('template-designer.mjs') || id.endsWith('pages/template-designer.js')) {
         const code = readFileSync(id, 'utf-8')
 
-        // Transform with esbuild - explicitly set loader to 'js' (not jsx)
+        // Pre-transform to prevent JSX detection
         const result = transformSync(code, {
-          loader: 'js', // Treat as plain JavaScript, NOT JSX
+          loader: 'js',
           format: 'esm',
           target: 'es2020',
-          sourcemap: false,
+          jsx: 'preserve', // Don't transform JSX-like syntax
         })
 
-        // Return transformed code - this bypasses import-analysis JSX detection
         return {
           code: result.code,
           map: null
         }
       }
+      // Return null to let other plugins handle other files normally
+      return null
     }
   }
 }
 
 export default defineConfig({
   plugins: [
-    preTransformTemplateDesigner(), // Pre-transform with esbuild before Vite's import-analysis
+    templateDesignerPlugin(), // Handle template-designer specifically
     react({
-      // Only include .jsx and .tsx files
-      include: /\.(jsx|tsx)$/,
+      // Include all typical React file extensions
+      include: /\.(jsx|tsx|js|ts)$/,
     })
   ],
   root: 'public',
   publicDir: 'assets',
-  esbuild: {
-    // Disable JSX transform for .js and .mjs files
-    loader: {
-      '.js': 'js',
-      '.mjs': 'js',
-    },
-  },
   build: {
     outDir: '../dist',
     emptyOutDir: true,
