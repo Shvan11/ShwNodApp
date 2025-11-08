@@ -157,10 +157,10 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
             }
 
             // Format date in local timezone
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const dateStr = `${year}-${month}-${day}`;
+            const dateYear = date.getFullYear();
+            const dateMonth = String(date.getMonth() + 1).padStart(2, '0');
+            const dateDay = String(date.getDate()).padStart(2, '0');
+            const dateStr = `${dateYear}-${dateMonth}-${dateDay}`;
             const availability = dayAvailability[dateStr] || { availableCount: 0, appointmentCount: 0 };
             const isPast = date < new Date(new Date().setHours(0, 0, 0, 0));
             const isToday = date.toDateString() === new Date().toDateString();
