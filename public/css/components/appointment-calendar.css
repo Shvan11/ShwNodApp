@@ -390,7 +390,7 @@
 }
 
 .day-header {
-    height: 60px;
+    height: 80px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -398,6 +398,7 @@
     background: var(--calendar-header-bg);
     border-bottom: 1px solid var(--calendar-border);
     gap: 2px;
+    padding: 4px;
     position: sticky;
     top: 0;
     z-index: 5;
@@ -417,6 +418,17 @@
     color: var(--text-dark);
 }
 
+.day-appointment-count {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 8px;
+    background: var(--primary-color);
+    color: white;
+    margin-top: 3px;
+    line-height: 1;
+}
+
 .day-column.today .day-header {
     background: var(--primary-color);
     color: white;
@@ -425,6 +437,11 @@
 .day-column.today .day-name,
 .day-column.today .day-date {
     color: white;
+}
+
+.day-column.today .day-appointment-count {
+    background: white;
+    color: var(--primary-color);
 }
 
 /* Time Slots - Dynamic Height */

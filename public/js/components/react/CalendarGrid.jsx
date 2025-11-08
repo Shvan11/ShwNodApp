@@ -129,11 +129,25 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
                     isWeekend(day.dayOfWeek) ? 'weekend' : ''
                 ].filter(Boolean).join(' ');
 
+                // Calculate total appointments for this day
+                const totalAppointments = Object.values(day.appointments).reduce((total, slotInfo) => {
+                    const appointments = Array.isArray(slotInfo) ? slotInfo : (slotInfo.appointments || []);
+                    const validAppointments = appointments.filter(apt =>
+                        apt && (apt.patientName || apt.appointmentID)
+                    );
+                    return total + validAppointments.length;
+                }, 0);
+
                 return (
                     <div key={day.date} className={dayClasses}>
                         <div className="day-header">
                             <div className="day-name">{day.dayName}</div>
                             <div className="day-date">{new Date(day.date).getDate()}</div>
+                            {totalAppointments > 0 && (
+                                <div className="day-appointment-count" title={`${totalAppointments} appointment${totalAppointments !== 1 ? 's' : ''}`}>
+                                    {totalAppointments}
+                                </div>
+                            )}
                         </div>
 
                         {filteredTimeSlots.map(timeSlot => {

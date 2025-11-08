@@ -568,7 +568,8 @@ function transformToMonthlyStructure(flatData, gridStart, gridEnd, maxAppointmen
 
     // Group data by date
     flatData.forEach(item => {
-        const dateKey = item.calendarDate.toISOString().split('T')[0];
+        // CalendarDate is already a string in format 'YYYY-MM-DD' - use directly (avoids UTC issues)
+        const dateKey = item.calendarDate;
 
         if (!dayMap[dateKey]) {
             dayMap[dateKey] = {
