@@ -80,13 +80,13 @@ const AddPatientForm = () => {
         }));
     };
 
-    const showAlert = (message, type = 'danger') => {
+    const showAlert = (message, type = 'danger', redirect = null) => {
         setAlert({ show: true, message, type });
-        
-        if (type === 'success') {
+
+        if (type === 'success' && redirect) {
             setTimeout(() => {
-                window.location.href = '/';
-            }, 2000);
+                window.location.href = redirect;
+            }, 1500);
         }
     };
 
@@ -118,26 +118,13 @@ const AddPatientForm = () => {
             const result = await response.json();
 
             if (response.ok) {
-                showAlert(`Patient "${formData.patientName}" has been successfully added with ID: ${result.personId}`, 'success');
-                // Reset form
-                setFormData({
-                    patientName: '',
-                    patientID: '',
-                    firstName: '',
-                    lastName: '',
-                    phone: '',
-                    phone2: '',
-                    email: '',
-                    countryCode: '',
-                    dateOfBirth: '',
-                    gender: '',
-                    addressID: '',
-                    referralSourceID: '',
-                    patientTypeID: '',
-                    language: '0',
-                    notes: '',
-                    alerts: ''
-                });
+                const personId = result.personId;
+                // Redirect to patient's works page
+                showAlert(
+                    `Patient "${formData.patientName}" has been successfully added. Redirecting to works page...`,
+                    'success',
+                    `/patient/${personId}/works`
+                );
             } else {
                 showAlert(result.error || 'Failed to add patient. Please try again.');
             }

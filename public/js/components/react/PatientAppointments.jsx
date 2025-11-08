@@ -159,23 +159,21 @@ const PatientAppointments = ({ patientId }) => {
                                 </div>
                                 <div className="appointment-actions">
                                     {!isPast && (
-                                        <>
-                                            <button
-                                                className="btn-edit"
-                                                onClick={() => handleEdit(appointment)}
-                                                title="Edit appointment"
-                                            >
-                                                <i className="fas fa-edit"></i>
-                                            </button>
-                                            <button
-                                                className="btn-delete"
-                                                onClick={() => setDeleteConfirm(appointment.appointmentID)}
-                                                title="Delete appointment"
-                                            >
-                                                <i className="fas fa-trash"></i>
-                                            </button>
-                                        </>
+                                        <button
+                                            className="btn-edit"
+                                            onClick={() => handleEdit(appointment)}
+                                            title="Edit appointment"
+                                        >
+                                            <i className="fas fa-edit"></i>
+                                        </button>
                                     )}
+                                    <button
+                                        className="btn-delete"
+                                        onClick={() => setDeleteConfirm(appointment.appointmentID)}
+                                        title="Delete appointment"
+                                    >
+                                        <i className="fas fa-trash"></i>
+                                    </button>
                                 </div>
                             </div>
                         )

@@ -29,6 +29,10 @@ const WorkComponent = ({ patientId }) => {
     // Patient info state
     const [patientInfo, setPatientInfo] = useState(null);
 
+    // Check-in state
+    const [checkingIn, setCheckingIn] = useState(false);
+    const [checkedIn, setCheckedIn] = useState(false);
+
     // Expanded works state - track which work IDs are expanded
     const [expandedWorks, setExpandedWorks] = useState(new Set());
 
@@ -312,6 +316,45 @@ const WorkComponent = ({ patientId }) => {
         });
     };
 
+    // Check-in handler
+    const handleQuickCheckin = async () => {
+        try {
+            setCheckingIn(true);
+            const response = await fetch('/api/appointments/quick-checkin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    PersonID: patientId
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to check in patient');
+            }
+
+            const result = await response.json();
+
+            if (result.alreadyCheckedIn) {
+                setSuccessMessage(`${patientInfo?.name || 'Patient'} is already checked in today!`);
+                setCheckedIn(true);
+            } else if (result.created) {
+                setSuccessMessage(`${patientInfo?.name || 'Patient'} added to today's appointments and checked in!`);
+                setCheckedIn(true);
+            } else {
+                setSuccessMessage(`${patientInfo?.name || 'Patient'} checked in successfully!`);
+                setCheckedIn(true);
+            }
+
+            setTimeout(() => setSuccessMessage(null), 5000);
+        } catch (err) {
+            setError(err.message);
+            setTimeout(() => setError(null), 5000);
+        } finally {
+            setCheckingIn(false);
+        }
+    };
+
     if (loading) return <div className="work-loading">Loading works...</div>;
 
     return (
@@ -359,6 +402,28 @@ const WorkComponent = ({ patientId }) => {
                                 <option value="active">Active</option>
                                 <option value="completed">Completed</option>
                             </select>
+                            <button
+                                onClick={handleQuickCheckin}
+                                className="btn-checkin"
+                                disabled={checkingIn || checkedIn}
+                                style={{
+                                    backgroundColor: checkedIn ? '#10b981' : '#3b82f6',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '0.5rem 1rem',
+                                    borderRadius: '6px',
+                                    cursor: checkingIn || checkedIn ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    fontWeight: '500',
+                                    opacity: checkingIn || checkedIn ? 0.7 : 1
+                                }}
+                                title={checkedIn ? 'Patient already checked in today' : 'Check in patient for today'}
+                            >
+                                <i className={`fas ${checkedIn ? 'fa-check-circle' : 'fa-calendar-check'}`}></i>
+                                {checkingIn ? 'Checking In...' : checkedIn ? 'Checked In' : 'Check In'}
+                            </button>
                             <button onClick={handleAddWork} className="btn-primary">
                                 <i className="fas fa-plus"></i>
                                 Add New Work
