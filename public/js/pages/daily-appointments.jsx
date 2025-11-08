@@ -16,8 +16,13 @@ function initializePage() {
     // Initialize date picker
     initializeDatePicker();
 
-    // Load appointments for today by default
-    const today = new Date().toISOString().split('T')[0];
+    // Load appointments for today by default - use local timezone
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const today = `${year}-${month}-${day}`;
+
     const datePicker = document.getElementById('date-picker');
     if (datePicker) {
         datePicker.value = today;
@@ -648,7 +653,17 @@ window.undoState = async function(appointmentId, stateToUndo) {
 // Refresh appointments with current date
 async function refreshAppointments() {
     const datePicker = document.getElementById('date-picker');
-    const date = datePicker ? datePicker.value : new Date().toISOString().split('T')[0];
+    let date;
+    if (datePicker) {
+        date = datePicker.value;
+    } else {
+        // Use local timezone if no date picker
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        date = `${year}-${month}-${day}`;
+    }
     await loadAppointments(date);
 }
 

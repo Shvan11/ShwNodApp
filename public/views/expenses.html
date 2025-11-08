@@ -7,10 +7,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Expense Management</title>
   <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/components/universal-header.css" />
   <link rel="stylesheet" href="../css/pages/expenses.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 
 <body>
+  <!-- Universal header mount point -->
+  <div id="universal-header-root"></div>
+
   <div class="page-header">
     <h1>Expense Management</h1>
     <button id="add-expense-btn" class="btn btn-primary">Add New Expense</button>
@@ -181,7 +186,21 @@
     </div>
   </div>
 
-  <footer>Shwan Orthodontics - Expense Management</footer>
+  <!-- Mount Universal Header -->
+  <script type="module">
+    import React from 'react';
+    import ReactDOM from 'react-dom/client';
+    import UniversalHeader from '/js/components/react/UniversalHeader.jsx';
+
+    document.addEventListener('DOMContentLoaded', function() {
+      // Mount Universal Header
+      const headerRoot = document.getElementById('universal-header-root');
+      if (headerRoot) {
+        const root = ReactDOM.createRoot(headerRoot);
+        root.render(React.createElement(UniversalHeader));
+      }
+    });
+  </script>
 
   <!-- Load modular JavaScript -->
   <script type="module" src="../js/pages/expenses.js"></script>

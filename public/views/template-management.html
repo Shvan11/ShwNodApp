@@ -5,27 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Template Management - Shwan Orthodontics</title>
     <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/components/universal-header.css">
     <link rel="stylesheet" href="../css/pages/template-management.css">
     <link rel="stylesheet" href="../fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <div id="app">
-        <header class="header">
-            <div class="container">
-                <div class="logo">
-                    <a href="/dashboard" style="display: flex; align-items: center; text-decoration: none; color: inherit;">
-                        <img src="../images/logo.png" alt="Shwan Orthodontics">
-                        <h1>Shwan Orthodontics</h1>
-                    </a>
-                </div>
-                <div class="user-info">
-                    <a href="/dashboard" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Back to Dashboard
-                    </a>
-                </div>
-            </div>
-        </header>
+    <!-- Universal header mount point -->
+    <div id="universal-header-root"></div>
 
+    <div id="app">
         <main class="main-content">
             <div class="container">
                 <!-- Page Header -->
@@ -198,6 +187,22 @@
             </div>
         </div>
     </div>
+
+    <!-- Mount Universal Header -->
+    <script type="module">
+        import React from 'react';
+        import ReactDOM from 'react-dom/client';
+        import UniversalHeader from '/js/components/react/UniversalHeader.jsx';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Mount Universal Header
+            const headerRoot = document.getElementById('universal-header-root');
+            if (headerRoot) {
+                const root = ReactDOM.createRoot(headerRoot);
+                root.render(React.createElement(UniversalHeader));
+            }
+        });
+    </script>
 
     <script src="../js/pages/template-management.js"></script>
 </body>

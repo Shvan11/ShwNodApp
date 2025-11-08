@@ -4,45 +4,21 @@
  * Provides full CRUD operations for visits tied to specific work IDs
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-import DentalChart from './DentalChart.jsx';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import NewVisitComponent from './NewVisitComponent.jsx';
 
-const VisitsComponent = ({ workId, patientId }) => {
+const VisitsComponent = ({ workId, patientId, autoShowForm = false }) => {
+    const navigate = useNavigate();
     const [visits, setVisits] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [showModal, setShowModal] = useState(false);
-    const [editingVisit, setEditingVisit] = useState(null);
-    const [wires, setWires] = useState([]);
-    const [operators, setOperators] = useState([]);
-    const [selectedTeeth, setSelectedTeeth] = useState([]);
-    const othersTextareaRef = useRef(null);
-    const nextVisitTextareaRef = useRef(null);
-    const [lastFocusedField, setLastFocusedField] = useState('Others'); // Track which field has focus
-
-    // Form state
-    const [formData, setFormData] = useState({
-        WorkID: workId,
-        VisitDate: '',
-        UpperWireID: '',
-        LowerWireID: '',
-        BracketChange: '',
-        WireBending: '',
-        Elastics: '',
-        OPG: false,
-        PPhoto: false,
-        IPhoto: false,
-        FPhoto: false,
-        Others: '',
-        NextVisit: '',
-        ApplianceRemoved: false,
-        OperatorID: ''
-    });
+    const [showForm, setShowForm] = useState(autoShowForm);
+    const [editingVisitId, setEditingVisitId] = useState(null);
 
     useEffect(() => {
         if (workId) {
             loadVisits();
-            loadDropdownData();
         }
     }, [workId]);
 
@@ -62,107 +38,14 @@ const VisitsComponent = ({ workId, patientId }) => {
         }
     };
 
-    const loadDropdownData = async () => {
-        try {
-            const [wiresRes, operatorsRes] = await Promise.all([
-                fetch('/api/getWires'),
-                fetch('/api/operators')
-            ]);
-
-            if (wiresRes.ok) {
-                const wiresData = await wiresRes.json();
-                setWires(wiresData);
-            }
-            if (operatorsRes.ok) {
-                const operatorsData = await operatorsRes.json();
-                setOperators(operatorsData);
-            }
-        } catch (err) {
-            console.error('Error loading dropdown data:', err);
-        }
-    };
-
     const handleAddVisit = () => {
-        setEditingVisit(null);
-        setFormData({
-            WorkID: workId,
-            VisitDate: new Date().toISOString().split('T')[0],
-            UpperWireID: '',
-            LowerWireID: '',
-            BracketChange: '',
-            WireBending: '',
-            Elastics: '',
-            OPG: false,
-            PPhoto: false,
-            IPhoto: false,
-            FPhoto: false,
-            Others: '',
-            NextVisit: '',
-            ApplianceRemoved: false,
-            OperatorID: ''
-        });
-        setSelectedTeeth([]);
-        setShowModal(true);
+        setEditingVisitId(null);
+        setShowForm(true);
     };
 
     const handleEditVisit = (visit) => {
-        setEditingVisit(visit);
-        setFormData({
-            WorkID: visit.WorkID,
-            VisitDate: visit.VisitDate ? new Date(visit.VisitDate).toISOString().split('T')[0] : '',
-            UpperWireID: visit.UpperWireID || '',
-            LowerWireID: visit.LowerWireID || '',
-            BracketChange: visit.BracketChange || '',
-            WireBending: visit.WireBending || '',
-            Elastics: visit.Elastics || '',
-            OPG: visit.OPG || false,
-            PPhoto: visit.PPhoto || false,
-            IPhoto: visit.IPhoto || false,
-            FPhoto: visit.FPhoto || false,
-            Others: visit.Others || '',
-            NextVisit: visit.NextVisit || '',
-            ApplianceRemoved: visit.ApplianceRemoved || false,
-            OperatorID: visit.OperatorID || ''
-        });
-        // Extract tooth notations from Others field if present
-        const toothPattern = /(UR|UL|LR|LL)[1-8]/g;
-        const matches = (visit.Others || '').match(toothPattern);
-        setSelectedTeeth(matches || []);
-        setShowModal(true);
-    };
-
-    const handleFormSubmit = async (e) => {
-        e.preventDefault();
-
-        try {
-            let response;
-
-            if (editingVisit) {
-                // Update existing visit
-                response = await fetch('/api/updatevisitbywork', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ visitId: editingVisit.ID, ...formData })
-                });
-            } else {
-                // Add new visit
-                response = await fetch('/api/addvisitbywork', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData)
-                });
-            }
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to save visit');
-            }
-
-            await loadVisits();
-            setShowModal(false);
-        } catch (err) {
-            setError(err.message);
-        }
+        setEditingVisitId(visit.ID);
+        setShowForm(true);
     };
 
     const handleDeleteVisit = async (visitId) => {
@@ -186,40 +69,20 @@ const VisitsComponent = ({ workId, patientId }) => {
         }
     };
 
-    const formatDate = (dateString) => {
-        if (!dateString) return 'Not set';
-        return new Date(dateString).toLocaleDateString();
+    const handleFormSave = async () => {
+        await loadVisits();
+        setShowForm(false);
+        setEditingVisitId(null);
+    };
+
+    const handleFormCancel = () => {
+        setShowForm(false);
+        setEditingVisitId(null);
     };
 
     const formatDateTime = (dateString) => {
         if (!dateString) return 'Not set';
         return new Date(dateString).toLocaleString();
-    };
-
-    // Handle tooth selection from dental chart
-    const handleToothClick = (palmerNotation) => {
-        // Determine which field to append to based on last focused field
-        const targetField = lastFocusedField;
-        const currentValue = formData[targetField] || '';
-        const newValue = currentValue
-            ? `${currentValue} ${palmerNotation}`
-            : palmerNotation;
-
-        // Update the appropriate field
-        setFormData({ ...formData, [targetField]: newValue });
-
-        // Update selected teeth for visual feedback
-        setSelectedTeeth(prev =>
-            prev.includes(palmerNotation)
-                ? prev.filter(t => t !== palmerNotation)
-                : [...prev, palmerNotation]
-        );
-
-        // Keep focus on the textarea that was focused
-        const targetRef = targetField === 'Others' ? othersTextareaRef : nextVisitTextareaRef;
-        if (targetRef.current) {
-            targetRef.current.focus();
-        }
     };
 
     if (loading) return <div className="work-loading">Loading visits...</div>;
@@ -231,15 +94,17 @@ const VisitsComponent = ({ workId, patientId }) => {
                 <div className="work-controls">
                     {patientId && (
                         <button
-                            onClick={() => window.location.href = `/patient/${patientId}/works`}
+                            onClick={() => navigate(`/patient/${patientId}/works`)}
                             className="btn btn-secondary"
                         >
-                            <i className="fas fa-arrow-left"></i> Back to Work
+                            <i className="fas fa-arrow-left"></i> Back
                         </button>
                     )}
-                    <button onClick={handleAddVisit} className="btn btn-primary">
-                        <i className="fas fa-plus"></i> Add New Visit
-                    </button>
+                    {!showForm && (
+                        <button onClick={handleAddVisit} className="btn btn-primary">
+                            <i className="fas fa-plus"></i> Add Visit
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -250,57 +115,55 @@ const VisitsComponent = ({ workId, patientId }) => {
                 </div>
             )}
 
-            <div className="work-summary" style={{ marginBottom: '2rem' }}>
-                <div className="summary-card">
-                    <h3>Total Visits</h3>
-                    <span className="summary-value">{visits.length}</span>
+            {!showForm && (
+                <div className="work-summary">
+                    <div className="summary-card">
+                        <h3>Total Visits</h3>
+                        <span className="summary-value">{visits.length}</span>
+                    </div>
+                    <div className="summary-card">
+                        <h3>OPG Taken</h3>
+                        <span className="summary-value">{visits.filter(v => v.OPG).length}</span>
+                    </div>
+                    <div className="summary-card">
+                        <h3>Photos Taken</h3>
+                        <span className="summary-value">{visits.filter(v => v.IPhoto || v.PPhoto || v.FPhoto).length}</span>
+                    </div>
                 </div>
-                <div className="summary-card">
-                    <h3>OPG Taken</h3>
-                    <span className="summary-value">{visits.filter(v => v.OPG).length}</span>
+            )}
+
+            {/* New Visit Form Component */}
+            {showForm && (
+                <div className="form-container">
+                    <NewVisitComponent
+                        workId={workId}
+                        visitId={editingVisitId}
+                        onSave={handleFormSave}
+                        onCancel={handleFormCancel}
+                    />
                 </div>
-                <div className="summary-card">
-                    <h3>Photos Taken</h3>
-                    <span className="summary-value">{visits.filter(v => v.IPhoto || v.PPhoto || v.FPhoto).length}</span>
-                </div>
-            </div>
+            )}
 
             {/* Visit Cards View - Shows all details including Others and NextVisit */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {!showForm && (
+            <div className="visit-cards-container">
                 {visits.map((visit) => (
-                    <div key={visit.ID} style={{
-                        backgroundColor: 'white',
-                        padding: '1.5rem',
-                        borderRadius: '8px',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                        border: '1px solid #e5e7eb'
-                    }}>
+                    <div key={visit.ID} className="visit-card">
                         {/* Header Row */}
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: '1rem',
-                            paddingBottom: '1rem',
-                            borderBottom: '2px solid #e5e7eb'
-                        }}>
+                        <div className="visit-card-header">
                             <div>
-                                <h3 style={{
-                                    margin: '0 0 0.5rem 0',
-                                    color: '#4f46e5',
-                                    fontSize: '1.25rem'
-                                }}>
+                                <h3 className="visit-card-title">
                                     <i className="fas fa-calendar-check"></i> {formatDateTime(visit.VisitDate)}
                                 </h3>
-                                <div style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                                <div className="visit-card-meta">
                                     {visit.OperatorName && (
                                         <span><i className="fas fa-user-md"></i> {visit.OperatorName}</span>
                                     )}
                                     {visit.OPG && (
-                                        <span style={{ color: '#059669' }}><i className="fas fa-x-ray"></i> OPG Taken</span>
+                                        <span className="meta-success"><i className="fas fa-x-ray"></i> OPG</span>
                                     )}
                                     {visit.ApplianceRemoved && (
-                                        <span style={{ color: '#dc2626' }}><i className="fas fa-times-circle"></i> Appliance Removed</span>
+                                        <span className="meta-danger"><i className="fas fa-times-circle"></i> Removed</span>
                                     )}
                                 </div>
                             </div>
@@ -310,438 +173,93 @@ const VisitsComponent = ({ workId, patientId }) => {
                                     className="btn btn-sm btn-secondary"
                                     title="Edit visit"
                                 >
-                                    <i className="fas fa-edit"></i> Edit
+                                    <i className="fas fa-edit"></i>
                                 </button>
                                 <button
                                     onClick={() => handleDeleteVisit(visit.ID)}
                                     className="btn btn-sm btn-danger"
                                     title="Delete visit"
                                 >
-                                    <i className="fas fa-trash"></i> Delete
+                                    <i className="fas fa-trash"></i>
                                 </button>
                             </div>
                         </div>
 
-                        {/* Wire and Treatment Info */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                            gap: '1rem',
-                            marginBottom: '1rem'
-                        }}>
-                            <div>
-                                <strong style={{ color: '#6b7280', fontSize: '0.875rem' }}>Upper Wire:</strong>
-                                <div style={{ fontSize: '1rem', marginTop: '0.25rem' }}>
-                                    {visit.UpperWireName || '-'}
-                                </div>
-                            </div>
-                            <div>
-                                <strong style={{ color: '#6b7280', fontSize: '0.875rem' }}>Lower Wire:</strong>
-                                <div style={{ fontSize: '1rem', marginTop: '0.25rem' }}>
-                                    {visit.LowerWireName || '-'}
-                                </div>
-                            </div>
-                            {visit.BracketChange && (
-                                <div style={{ gridColumn: '1 / -1' }}>
-                                    <strong style={{ color: '#6b7280', fontSize: '0.875rem' }}>Bracket Change:</strong>
-                                    <div style={{ fontSize: '1rem', marginTop: '0.25rem' }}>
-                                        {visit.BracketChange}
+                        {/* Wire Info */}
+                        {(visit.UpperWireName || visit.LowerWireName) && (
+                            <div className="wire-info">
+                                {visit.UpperWireName && (
+                                    <div className="wire-info-item">
+                                        <div className="wire-info-label">Upper Wire:</div>
+                                        <div className="wire-info-value">{visit.UpperWireName}</div>
                                     </div>
-                                </div>
-                            )}
-                            {visit.WireBending && (
-                                <div style={{ gridColumn: '1 / -1' }}>
-                                    <strong style={{ color: '#6b7280', fontSize: '0.875rem' }}>Wire Bending:</strong>
-                                    <div style={{ fontSize: '1rem', marginTop: '0.25rem' }}>
-                                        {visit.WireBending}
+                                )}
+                                {visit.LowerWireName && (
+                                    <div className="wire-info-item">
+                                        <div className="wire-info-label">Lower Wire:</div>
+                                        <div className="wire-info-value">{visit.LowerWireName}</div>
                                     </div>
-                                </div>
-                            )}
-                            {visit.Elastics && (
-                                <div style={{ gridColumn: '1 / -1' }}>
-                                    <strong style={{ color: '#6b7280', fontSize: '0.875rem' }}>Elastics:</strong>
-                                    <div style={{ fontSize: '1rem', marginTop: '0.25rem' }}>
-                                        {visit.Elastics}
-                                    </div>
-                                </div>
-                            )}
-                            <div>
-                                <strong style={{ color: '#6b7280', fontSize: '0.875rem' }}>Photos Taken:</strong>
-                                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
-                                    {visit.IPhoto && (
-                                        <span style={{
-                                            backgroundColor: '#d1fae5',
-                                            color: '#065f46',
-                                            padding: '0.25rem 0.75rem',
-                                            borderRadius: '9999px',
-                                            fontSize: '0.875rem',
-                                            fontWeight: '500'
-                                        }}>
-                                            Initial
-                                        </span>
-                                    )}
-                                    {visit.PPhoto && (
-                                        <span style={{
-                                            backgroundColor: '#dbeafe',
-                                            color: '#1e40af',
-                                            padding: '0.25rem 0.75rem',
-                                            borderRadius: '9999px',
-                                            fontSize: '0.875rem',
-                                            fontWeight: '500'
-                                        }}>
-                                            Progress
-                                        </span>
-                                    )}
-                                    {visit.FPhoto && (
-                                        <span style={{
-                                            backgroundColor: '#ede9fe',
-                                            color: '#6b21a8',
-                                            padding: '0.25rem 0.75rem',
-                                            borderRadius: '9999px',
-                                            fontSize: '0.875rem',
-                                            fontWeight: '500'
-                                        }}>
-                                            Final
-                                        </span>
-                                    )}
-                                    {!visit.IPhoto && !visit.PPhoto && !visit.FPhoto && (
-                                        <span style={{ color: '#9ca3af' }}>None</span>
-                                    )}
-                                </div>
+                                )}
                             </div>
-                        </div>
+                        )}
+
+                        {/* Treatment Info */}
+                        {(visit.BracketChange || visit.WireBending || visit.Elastics) && (
+                            <div className="treatment-info">
+                                {visit.BracketChange && (
+                                    <div className="treatment-info-item">
+                                        <span className="treatment-info-label">Bracket: </span>
+                                        <span className="treatment-info-value">{visit.BracketChange}</span>
+                                    </div>
+                                )}
+                                {visit.WireBending && (
+                                    <div className="treatment-info-item">
+                                        <span className="treatment-info-label">Bending: </span>
+                                        <span className="treatment-info-value">{visit.WireBending}</span>
+                                    </div>
+                                )}
+                                {visit.Elastics && (
+                                    <div className="treatment-info-item">
+                                        <span className="treatment-info-label">Elastics: </span>
+                                        <span className="treatment-info-value">{visit.Elastics}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Photos */}
+                        {(visit.IPhoto || visit.PPhoto || visit.FPhoto) && (
+                            <div className="photo-badges">
+                                {visit.IPhoto && <span className="photo-badge"><i className="fas fa-camera"></i> Initial</span>}
+                                {visit.PPhoto && <span className="photo-badge"><i className="fas fa-camera"></i> Progress</span>}
+                                {visit.FPhoto && <span className="photo-badge"><i className="fas fa-camera"></i> Final</span>}
+                            </div>
+                        )}
 
                         {/* IMPORTANT: Others (Notes) Section */}
                         {visit.Others && (
-                            <div style={{
-                                backgroundColor: '#fff7ed',
-                                padding: '1rem',
-                                borderRadius: '8px',
-                                borderLeft: '4px solid #f59e0b',
-                                marginBottom: '1rem'
-                            }}>
-                                <strong style={{
-                                    color: '#92400e',
-                                    fontSize: '0.875rem',
-                                    display: 'block',
-                                    marginBottom: '0.5rem'
-                                }}>
-                                    <i className="fas fa-sticky-note"></i> Visit Notes:
-                                </strong>
-                                <div style={{
-                                    color: '#78350f',
-                                    whiteSpace: 'pre-wrap',
-                                    lineHeight: '1.6'
-                                }}>
-                                    {visit.Others}
-                                </div>
+                            <div className="notes-section">
+                                <strong><i className="fas fa-sticky-note"></i> Notes</strong>
+                                <p>{visit.Others}</p>
                             </div>
                         )}
 
                         {/* IMPORTANT: Next Visit Instructions Section */}
                         {visit.NextVisit && (
-                            <div style={{
-                                backgroundColor: '#f0fdf4',
-                                padding: '1rem',
-                                borderRadius: '8px',
-                                borderLeft: '4px solid #059669'
-                            }}>
-                                <strong style={{
-                                    color: '#065f46',
-                                    fontSize: '0.875rem',
-                                    display: 'block',
-                                    marginBottom: '0.5rem'
-                                }}>
-                                    <i className="fas fa-arrow-circle-right"></i> Next Visit Instructions:
-                                </strong>
-                                <div style={{
-                                    color: '#064e3b',
-                                    whiteSpace: 'pre-wrap',
-                                    lineHeight: '1.6'
-                                }}>
-                                    {visit.NextVisit}
-                                </div>
+                            <div className="next-visit-section">
+                                <strong><i className="fas fa-arrow-circle-right"></i> Next Visit</strong>
+                                <p>{visit.NextVisit}</p>
                             </div>
                         )}
                     </div>
                 ))}
                 {visits.length === 0 && (
-                    <div style={{
-                        textAlign: 'center',
-                        padding: '3rem',
-                        backgroundColor: '#f9fafb',
-                        borderRadius: '8px',
-                        border: '2px dashed #d1d5db'
-                    }}>
-                        <i className="fas fa-calendar-times" style={{ fontSize: '3rem', color: '#9ca3af', marginBottom: '1rem' }}></i>
-                        <p style={{ color: '#6b7280', fontSize: '1.1rem', margin: 0 }}>
-                            No visits recorded yet. Click "Add New Visit" to create one.
-                        </p>
+                    <div className="empty-state">
+                        <i className="fas fa-calendar-times"></i>
+                        <p>No visits recorded yet.</p>
                     </div>
                 )}
-            </div>
-
-            {/* Visit Form Modal */}
-            {showModal && (
-                <div className="modal-overlay">
-                    <div className="work-modal" style={{ maxWidth: '95%', width: '1400px', maxHeight: '90vh', overflow: 'auto' }}>
-                        <div className="modal-header">
-                            <h3>{editingVisit ? 'Edit Visit' : 'Add New Visit'}</h3>
-                            <button
-                                onClick={() => setShowModal(false)}
-                                className="modal-close"
-                            >
-                                ×
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleFormSubmit} className="work-form">
-                            {/* Basic Information */}
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Visit Date <span style={{ color: '#dc2626' }}>*</span></label>
-                                    <input
-                                        type="date"
-                                        value={formData.VisitDate}
-                                        onChange={(e) => setFormData({...formData, VisitDate: e.target.value})}
-                                        required
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Operator</label>
-                                    <select
-                                        value={formData.OperatorID}
-                                        onChange={(e) => setFormData({...formData, OperatorID: e.target.value})}
-                                    >
-                                        <option value="">Select Operator</option>
-                                        {operators.map(op => (
-                                            <option key={op.ID} value={op.ID}>
-                                                {op.employeeName}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Wire Information */}
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Upper Wire</label>
-                                    <select
-                                        value={formData.UpperWireID}
-                                        onChange={(e) => setFormData({...formData, UpperWireID: e.target.value})}
-                                    >
-                                        <option value="">Select Wire</option>
-                                        {wires.map(wire => (
-                                            <option key={wire.id} value={wire.id}>
-                                                {wire.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>Lower Wire</label>
-                                    <select
-                                        value={formData.LowerWireID}
-                                        onChange={(e) => setFormData({...formData, LowerWireID: e.target.value})}
-                                    >
-                                        <option value="">Select Wire</option>
-                                        {wires.map(wire => (
-                                            <option key={wire.id} value={wire.id}>
-                                                {wire.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Treatment Details */}
-                            <div className="form-group full-width">
-                                <label>Bracket Change</label>
-                                <input
-                                    type="text"
-                                    value={formData.BracketChange}
-                                    onChange={(e) => setFormData({...formData, BracketChange: e.target.value})}
-                                    placeholder="e.g., Replaced upper left bracket"
-                                />
-                            </div>
-
-                            <div className="form-group full-width">
-                                <label>Wire Bending</label>
-                                <input
-                                    type="text"
-                                    value={formData.WireBending}
-                                    onChange={(e) => setFormData({...formData, WireBending: e.target.value})}
-                                    placeholder="e.g., Omega loop on upper wire"
-                                />
-                            </div>
-
-                            <div className="form-group full-width">
-                                <label>Elastics</label>
-                                <input
-                                    type="text"
-                                    value={formData.Elastics}
-                                    onChange={(e) => setFormData({...formData, Elastics: e.target.value})}
-                                    placeholder="e.g., Class II elastics"
-                                />
-                            </div>
-
-                            {/* Checkboxes */}
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                                gap: '1rem',
-                                padding: '1rem',
-                                backgroundColor: '#f9fafb',
-                                borderRadius: '8px',
-                                marginBottom: '1rem'
-                            }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.OPG}
-                                        onChange={(e) => setFormData({...formData, OPG: e.target.checked})}
-                                    />
-                                    <span>OPG Taken</span>
-                                </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.IPhoto}
-                                        onChange={(e) => setFormData({...formData, IPhoto: e.target.checked})}
-                                    />
-                                    <span>Initial Photo</span>
-                                </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.PPhoto}
-                                        onChange={(e) => setFormData({...formData, PPhoto: e.target.checked})}
-                                    />
-                                    <span>Progress Photo</span>
-                                </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.FPhoto}
-                                        onChange={(e) => setFormData({...formData, FPhoto: e.target.checked})}
-                                    />
-                                    <span>Final Photo</span>
-                                </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.ApplianceRemoved}
-                                        onChange={(e) => setFormData({...formData, ApplianceRemoved: e.target.checked})}
-                                    />
-                                    <span>Appliance Removed</span>
-                                </label>
-                            </div>
-
-                            {/* Dental Chart for tooth selection */}
-                            <div style={{ marginBottom: '1rem' }}>
-                                <label style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    marginBottom: '0.5rem',
-                                    fontWeight: '600',
-                                    color: '#4a5568'
-                                }}>
-                                    <span>
-                                        <i className="fas fa-tooth"></i> Select Teeth (Palmer Notation)
-                                    </span>
-                                    <span style={{
-                                        fontSize: '0.875rem',
-                                        fontWeight: '500',
-                                        color: '#4f46e5',
-                                        backgroundColor: '#eef2ff',
-                                        padding: '0.25rem 0.75rem',
-                                        borderRadius: '4px'
-                                    }}>
-                                        <i className="fas fa-arrow-down"></i> Will append to: <strong>{lastFocusedField === 'Others' ? 'Other Notes' : 'Next Visit Instructions'}</strong>
-                                    </span>
-                                </label>
-                                <DentalChart
-                                    onToothClick={handleToothClick}
-                                    selectedTeeth={selectedTeeth}
-                                />
-                            </div>
-
-                            {/* Notes */}
-                            <div className="form-group full-width">
-                                <label>
-                                    Other Notes
-                                    {lastFocusedField === 'Others' && (
-                                        <span style={{
-                                            marginLeft: '0.5rem',
-                                            fontSize: '0.875rem',
-                                            color: '#4f46e5',
-                                            fontWeight: '500'
-                                        }}>
-                                            <i className="fas fa-tooth"></i> Active
-                                        </span>
-                                    )}
-                                </label>
-                                <textarea
-                                    ref={othersTextareaRef}
-                                    value={formData.Others}
-                                    onChange={(e) => setFormData({...formData, Others: e.target.value})}
-                                    onFocus={() => setLastFocusedField('Others')}
-                                    rows="3"
-                                    placeholder="Any additional notes about this visit... (Click here then select teeth from chart above)"
-                                    style={{
-                                        borderColor: lastFocusedField === 'Others' ? '#4f46e5' : undefined,
-                                        borderWidth: lastFocusedField === 'Others' ? '2px' : undefined
-                                    }}
-                                />
-                            </div>
-
-                            {/* Next Visit Instructions */}
-                            <div className="form-group full-width">
-                                <label>
-                                    Next Visit Instructions
-                                    {lastFocusedField === 'NextVisit' && (
-                                        <span style={{
-                                            marginLeft: '0.5rem',
-                                            fontSize: '0.875rem',
-                                            color: '#4f46e5',
-                                            fontWeight: '500'
-                                        }}>
-                                            <i className="fas fa-tooth"></i> Active
-                                        </span>
-                                    )}
-                                </label>
-                                <textarea
-                                    ref={nextVisitTextareaRef}
-                                    value={formData.NextVisit}
-                                    onChange={(e) => setFormData({...formData, NextVisit: e.target.value})}
-                                    onFocus={() => setLastFocusedField('NextVisit')}
-                                    rows="2"
-                                    placeholder="Instructions or notes for the next visit... (Click here then select teeth from chart above)"
-                                    style={{
-                                        borderColor: lastFocusedField === 'NextVisit' ? '#4f46e5' : undefined,
-                                        borderWidth: lastFocusedField === 'NextVisit' ? '2px' : undefined
-                                    }}
-                                />
-                            </div>
-
-                            <div className="form-actions">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                    className="btn btn-secondary"
-                                >
-                                    Cancel
-                                </button>
-                                <button type="submit" className="btn btn-primary">
-                                    {editingVisit ? 'Update Visit' : 'Add Visit'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            </div>)}
         </div>
     );
 };

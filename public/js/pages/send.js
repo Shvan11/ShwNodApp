@@ -426,6 +426,7 @@ class DOMManager {
             dateSelector: document.getElementById('dateSelector'),
             refreshDateBtn: document.getElementById('refreshDateBtn'),
             resetMessagingBtn: document.getElementById('resetMessagingBtn'),
+            sendEmailBtn: document.getElementById('sendEmailBtn'),
             messageCountElement: document.getElementById('messageCount'),
 
 
@@ -1134,7 +1135,8 @@ class WhatsAppMessengerApp extends EventEmitter {
     setupControlButtons() {
         const buttons = [
             { element: 'refreshDateBtn', handler: () => this.handleRefresh() },
-            { element: 'resetMessagingBtn', handler: () => this.handleReset() }
+            { element: 'resetMessagingBtn', handler: () => this.handleReset() },
+            { element: 'sendEmailBtn', handler: () => this.handleSendEmail() }
         ];
 
         buttons.forEach(({ element, handler }) => {
@@ -1735,6 +1737,43 @@ class WhatsAppMessengerApp extends EventEmitter {
         }
     }
 
+    async handleSendEmail() {
+        const currentDate = this.dateManager.getCurrentDate();
+
+        // Handle confirmation state
+        if (!this.buttonStateManager.isButtonInState('sendEmailBtn', BUTTON_STATES.CONFIRMING)) {
+            this.buttonStateManager.setButtonState('sendEmailBtn', BUTTON_STATES.CONFIRMING, {
+                text: 'Click to Confirm',
+                timeout: 3000
+            });
+            return;
+        }
+
+        this.buttonStateManager.setButtonState('sendEmailBtn', BUTTON_STATES.LOADING, {
+            text: 'Sending Email...'
+        });
+
+        try {
+            const result = await this.apiClient.post(
+                `/api/email/send-appointments?date=${currentDate}`,
+                null,
+                { expectedFields: ['success'] }
+            );
+
+            if (result.success) {
+                this.messageDisplay.displayMessage(
+                    `Email sent successfully! ${result.appointmentCount} appointments`,
+                    MESSAGE_TYPES.SUCCESS
+                );
+            } else {
+                throw new Error(result.error || 'Email sending failed');
+            }
+        } catch (error) {
+            this.messageDisplay.displayError(error, 'Failed to send email');
+        } finally {
+            this.buttonStateManager.resetButton('sendEmailBtn');
+        }
+    }
 
     onDateChanged(newDate) {
         console.log(`Date changed to: ${newDate}`);

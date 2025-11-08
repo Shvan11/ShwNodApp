@@ -12,7 +12,7 @@
  * - selectedTeeth: string[] - Array of selected tooth notations (optional, for highlighting)
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 
 const DentalChart = ({ onToothClick, selectedTeeth = [] }) => {
     // Palmer notation prefixes
@@ -63,59 +63,19 @@ const DentalChart = ({ onToothClick, selectedTeeth = [] }) => {
         return (
             <div
                 onClick={() => onToothClick(palmer)}
-                style={{
-                    width: '40px',
-                    height: '50px',
-                    border: `2px solid ${isSelected ? '#667eea' : '#cbd5e0'}`,
-                    borderRadius: '6px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    background: isSelected
-                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                        : 'white',
-                    position: 'relative'
-                }}
-                onMouseEnter={(e) => {
-                    if (!isSelected) {
-                        e.currentTarget.style.borderColor = '#4299e1';
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(66, 153, 225, 0.3)';
-                    }
-                }}
-                onMouseLeave={(e) => {
-                    if (!isSelected) {
-                        e.currentTarget.style.borderColor = '#cbd5e0';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = 'none';
-                    }
-                }}
+                className={`dental-tooth ${isSelected ? 'selected' : ''}`}
             >
-                <div style={{ marginBottom: '0.15rem' }}>
+                <div className="dental-tooth-image">
                     <img
                         src={getToothImage(quadrant, number)}
                         alt={`Tooth ${number}`}
-                        style={{
-                            width: '28px',
-                            height: '32px',
-                            objectFit: 'contain',
-                            filter: isSelected ? 'brightness(0) invert(1)' : 'grayscale(0%)',
-                            transition: 'all 0.3s'
-                        }}
                         onError={(e) => {
                             e.target.style.display = 'none';
-                            e.target.parentElement.innerHTML = '<div style="font-size: 1.5rem;">🦷</div>';
+                            e.target.parentElement.innerHTML = '<div class="tooth-emoji">🦷</div>';
                         }}
                     />
                 </div>
-                <div style={{
-                    fontSize: '0.7rem',
-                    fontWeight: '600',
-                    color: isSelected ? 'white' : '#4a5568'
-                }}>
+                <div className="dental-tooth-number">
                     {number}
                 </div>
             </div>
@@ -152,31 +112,13 @@ const DentalChart = ({ onToothClick, selectedTeeth = [] }) => {
         }
 
         return (
-            <div style={{ marginBottom: '1.5rem' }}>
-                <div style={{
-                    textAlign: 'center',
-                    fontWeight: '600',
-                    color: '#4a5568',
-                    marginBottom: '0.75rem',
-                    fontSize: '1rem'
-                }}>
+            <div className="dental-arch">
+                <div className="dental-arch-label">
                     {label}
                 </div>
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    gap: '0.3rem',
-                    flexWrap: 'nowrap'
-                }}>
+                <div className="dental-arch-teeth">
                     {rightTeeth}
-                    <div style={{
-                        width: '3px',
-                        height: '50px',
-                        backgroundColor: '#e53e3e',
-                        margin: '0 0.4rem',
-                        borderRadius: '1px'
-                    }}></div>
+                    <div className="dental-midline"></div>
                     {leftTeeth}
                 </div>
             </div>
@@ -184,12 +126,7 @@ const DentalChart = ({ onToothClick, selectedTeeth = [] }) => {
     };
 
     return (
-        <div style={{
-            backgroundColor: '#f7fafc',
-            borderRadius: '12px',
-            padding: '2rem',
-            marginBottom: '1rem'
-        }}>
+        <div className="dental-chart-container">
             {/* Upper Arch (UR + UL) */}
             {renderArch(
                 { id: 'ul', prefix: palmerPrefixes.ul },
@@ -203,22 +140,6 @@ const DentalChart = ({ onToothClick, selectedTeeth = [] }) => {
                 { id: 'lr', prefix: palmerPrefixes.lr },
                 'Lower Teeth'
             )}
-
-            {/* Legend */}
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                fontSize: '0.875rem',
-                color: '#6b7280',
-                marginTop: '0.5rem',
-                paddingTop: '1rem',
-                borderTop: '1px solid #e2e8f0'
-            }}>
-                <i className="fas fa-hand-pointer" style={{ color: '#4299e1' }}></i>
-                <span>Click on teeth to select them</span>
-            </div>
         </div>
     );
 };

@@ -122,7 +122,15 @@ const UniversalHeader = () => {
 
 
     const navigateToSearch = () => {
-        window.location.href = '/patient-management';
+        // Open the search dropdown instead of navigating immediately
+        setIsSearchVisible(true);
+    };
+
+    const handleSearchSubmit = (e) => {
+        if (e.key === 'Enter' && searchTerm.trim()) {
+            // Navigate to patient-management with search term
+            window.location.href = `/patient-management?search=${encodeURIComponent(searchTerm.trim())}`;
+        }
     };
 
     const navigateBack = () => {
@@ -164,8 +172,8 @@ const UniversalHeader = () => {
                 key: 'search',
                 label: 'Search',
                 icon: 'fas fa-search',
-                onClick: navigateToSearch,
-                isActive: window.location.pathname.includes('/search')
+                onClick: () => window.location.href = '/patient-management',
+                isActive: window.location.pathname.includes('/patient-management')
             },
         ];
     };
@@ -219,11 +227,15 @@ const UniversalHeader = () => {
                             <div className="quick-search-dropdown">
                                 <input
                                     type="text"
-                                    placeholder="Search patients..."
+                                    placeholder="Search patients (Arabic name)..."
                                     value={searchTerm}
                                     onChange={handleSearchInput}
+                                    onKeyDown={handleSearchSubmit}
                                     className="quick-search-input"
                                     autoFocus
+                                    style={{ direction: 'rtl', textAlign: 'right' }}
+                                    lang="ar"
+                                    dir="rtl"
                                 />
                                 
                                 {searchResults.length > 0 && (

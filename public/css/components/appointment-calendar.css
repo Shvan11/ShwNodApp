@@ -172,6 +172,42 @@
     background: var(--hover-bg);
 }
 
+/* Early Slots Toggle Button */
+.early-slots-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border: 1px solid var(--calendar-border);
+    background: white;
+    color: var(--text-medium);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.early-slots-toggle:hover:not(:disabled) {
+    background: var(--hover-bg);
+    border-color: var(--primary-color);
+}
+
+.early-slots-toggle.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.early-slots-toggle:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.early-slots-toggle i {
+    font-size: 14px;
+}
+
 /* Doctor Filter */
 .doctor-filter {
     display: flex;

@@ -55,6 +55,14 @@ const PatientManagement = () => {
     useEffect(() => {
         loadDropdownData();
         loadAllPatientsForDropdown();
+
+        // Check for search parameter in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchParam = urlParams.get('search');
+        if (searchParam) {
+            setSearchPatientName(searchParam);
+            // The useEffect for searchPatientName will trigger the search automatically
+        }
     }, []);
 
     // Initialize TomSelect when allPatients data is loaded
@@ -504,7 +512,7 @@ const PatientManagement = () => {
                         value={searchPatientName}
                         onChange={(e) => setSearchPatientName(e.target.value)}
                         className="search-input"
-                        style={{ width: '100%', direction: 'rtl', textAlign: 'right' }}
+                        style={{ width: '100%', direction: 'rtl', textAlign: 'right', height: '2.75rem', lineHeight: '1.5', padding: '0.5rem 0.75rem' }}
                         lang="ar"
                         dir="rtl"
                     />
@@ -519,7 +527,7 @@ const PatientManagement = () => {
                         value={searchFirstName}
                         onChange={(e) => setSearchFirstName(e.target.value)}
                         className="search-input"
-                        style={{ width: '100%' }}
+                        style={{ width: '100%', height: '2.75rem', lineHeight: '1.5', padding: '0.5rem 0.75rem' }}
                     />
                 </div>
                 <div>
@@ -532,7 +540,7 @@ const PatientManagement = () => {
                         value={searchLastName}
                         onChange={(e) => setSearchLastName(e.target.value)}
                         className="search-input"
-                        style={{ width: '100%' }}
+                        style={{ width: '100%', height: '2.75rem', lineHeight: '1.5', padding: '0.5rem 0.75rem' }}
                     />
                 </div>
             </div>

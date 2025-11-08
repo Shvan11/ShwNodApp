@@ -10,9 +10,9 @@ import { setupMiddleware } from './middleware/index.js';
 import apiRoutes from './routes/api.js';
 import webRoutes from './routes/web.js';
 import calendarRoutes from './routes/calendar.js';
-import portalRoutes from './routes/portal.js';
 import adminRoutes from './routes/admin.js';
 import syncWebhookRoutes from './routes/sync-webhook.js';
+import emailApiRoutes from './routes/email-api.js';
 import whatsappService from './services/messaging/whatsapp.js';
 import driveClient from './services/google-drive/google-drive-client.js';
 import messageState from './services/state/messageState.js';
@@ -80,6 +80,7 @@ async function initializeApplication() {
     app.use('/DolImgs', express.static(pathResolver('working')));
     app.use('/clinic-assets', express.static(pathResolver('clinic1'))); // Changed from /assets to avoid conflict with Vite built assets
     app.use('/photoswipe', express.static('./public/photoswipe/'));
+    app.use('/data', express.static('./data')); // Serve data directory for template files
 
     // Setup WebSocket
     console.log('🔌 Setting up WebSocket server...');
@@ -93,9 +94,9 @@ async function initializeApplication() {
     console.log('🛣️  Setting up routes...');
     app.use('/api', apiRoutes);
     app.use('/api/calendar', calendarRoutes);
+    app.use('/api/email', emailApiRoutes); // Email API routes
     app.use('/', syncWebhookRoutes); // Sync webhook endpoints (SQL Server ↔ Supabase)
     app.use('/', adminRoutes); // Admin routes
-    app.use('/', portalRoutes); // Portal routes (includes auth middleware)
     app.use('/', webRoutes);
 
     // ===== ADDED: Initialize health monitoring =====

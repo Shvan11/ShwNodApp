@@ -123,9 +123,9 @@ namespace CSImagingProtocolHandler
                 }
 
                 // Launch TW.EXE with parameters
-                // Syntax: TW.EXE -P "opgPath" -N "PatientName" -D PatientID
+                // Syntax: TW.EXE -P<opgPath> -N<PatientName> -D<PatientID> (no spaces after flags)
                 string arguments = string.Format(
-                    "-P \"{0}\" -N \"{1}\" -D {2}",
+                    "-P{0} -N{1} -D{2}",
                     opgPath,
                     patientName,
                     patientId
@@ -135,8 +135,7 @@ namespace CSImagingProtocolHandler
                 {
                     FileName = twExePath,
                     Arguments = arguments,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
+                    UseShellExecute = true  // Use shell execute for proper Unicode/Arabic handling
                 };
 
                 Process.Start(startInfo);

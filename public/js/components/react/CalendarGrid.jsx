@@ -8,7 +8,7 @@
 import React from 'react'
 import TimeSlot from './TimeSlot.jsx'
 
-const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', showOnlyAvailable = false }) => {
+const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', showOnlyAvailable = false, showEarlySlots = false }) => {
     if (!calendarData || !calendarData.days || !calendarData.timeSlots) {
         return (
             <div className="calendar-grid loading">
@@ -18,6 +18,12 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
     }
 
     const { days, timeSlots } = calendarData;
+
+    // Filter out early time slots if showEarlySlots is false
+    const earlySlotTimes = ['12:00', '12:30', '13:00', '13:30'];
+    const filteredTimeSlots = showEarlySlots
+        ? timeSlots
+        : timeSlots.filter(slot => !earlySlotTimes.includes(slot));
 
     // Calculate maximum valid appointments per time slot across all days
     const getMaxValidAppointmentsForTimeSlot = (timeSlot) => {
@@ -97,14 +103,14 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
             {/* Time column */}
             <div className="time-column">
                 <div className="time-header">Time</div>
-                {timeSlots.map(timeSlot => {
+                {filteredTimeSlots.map(timeSlot => {
                     const dynamicHeight = getTimeSlotHeight(timeSlot);
-                    
+
                     return (
-                        <div 
-                            key={timeSlot} 
+                        <div
+                            key={timeSlot}
                             className="time-slot-label"
-                            style={{ 
+                            style={{
                                 minHeight: `${dynamicHeight}px`,
                                 height: `${dynamicHeight}px`
                             }}
@@ -129,8 +135,8 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
                             <div className="day-name">{day.dayName}</div>
                             <div className="day-date">{new Date(day.date).getDate()}</div>
                         </div>
-                        
-                        {timeSlots.map(timeSlot => {
+
+                        {filteredTimeSlots.map(timeSlot => {
                             const slotInfo = day.appointments[timeSlot] || { appointments: [], appointmentCount: 0, slotStatus: 'available' };
 
                             // Handle both old array format and new object format

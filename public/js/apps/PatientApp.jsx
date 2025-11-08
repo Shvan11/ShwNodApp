@@ -11,7 +11,8 @@ import PatientShell from '../components/react/PatientShell.jsx';
  * - /patient/:patientId/grid → Patient photos grid
  * - /patient/:patientId/compare → Photo comparison view
  * - /patient/:patientId/xrays → X-rays view
- * - /patient/:patientId/visits → Visit summary
+ * - /patient/:patientId/visits → Visit summary (with ?workId query param)
+ * - /patient/:patientId/new-visit → New visit form (with ?workId query param)
  * - /patient/:patientId/payments → Payment records
  * - /patient/:patientId/new-appointment → New appointment form
  * - /patient/:patientId/edit-appointment/:appointmentId → Edit appointment

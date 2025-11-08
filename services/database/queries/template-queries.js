@@ -164,6 +164,7 @@ export async function getTemplateById(templateId) {
             t.document_type_id,
             dt.type_name as document_type_name,
             dt.type_code as document_type_code,
+            t.template_file_path,
             t.paper_width,
             t.paper_height,
             t.paper_orientation,
@@ -216,6 +217,7 @@ export async function getDefaultTemplate(documentTypeId) {
             t.document_type_id,
             dt.type_name as document_type_name,
             dt.type_code as document_type_code,
+            t.template_file_path,
             t.paper_width,
             t.paper_height,
             t.paper_orientation,
@@ -312,49 +314,67 @@ export async function createTemplate(templateData) {
 }
 
 /**
- * Update an existing template
+ * Update an existing template (supports partial updates)
  */
 export async function updateTemplate(templateId, templateData) {
+    // Build dynamic SET clause based on provided fields
+    const setFields = [];
+    const params = [['template_id', TYPES.Int, templateId]];
+
+    // Map of field names to their SQL types
+    const fieldTypeMap = {
+        template_name: TYPES.NVarChar,
+        description: TYPES.NVarChar,
+        paper_width: TYPES.Int,
+        paper_height: TYPES.Int,
+        paper_orientation: TYPES.NVarChar,
+        paper_margin_top: TYPES.Int,
+        paper_margin_right: TYPES.Int,
+        paper_margin_bottom: TYPES.Int,
+        paper_margin_left: TYPES.Int,
+        background_color: TYPES.NVarChar,
+        show_grid: TYPES.Bit,
+        grid_size: TYPES.Int,
+        is_default: TYPES.Bit,
+        is_active: TYPES.Bit,
+        template_file_path: TYPES.NVarChar,
+        modified_by: TYPES.NVarChar
+    };
+
+    // Add each provided field to the update
+    for (const [fieldName, sqlType] of Object.entries(fieldTypeMap)) {
+        if (templateData.hasOwnProperty(fieldName)) {
+            setFields.push(`${fieldName} = @${fieldName}`);
+
+            let value = templateData[fieldName];
+
+            // Handle boolean fields for SQL Server bit type
+            if (sqlType === TYPES.Bit && typeof value === 'boolean') {
+                value = value ? 1 : 0;
+            }
+
+            // Handle null values
+            if (value === null || value === undefined) {
+                value = null;
+            }
+
+            params.push([fieldName, sqlType, value]);
+        }
+    }
+
+    // Always update modified_date
+    setFields.push('modified_date = GETDATE()');
+
+    // If no fields to update, return early
+    if (setFields.length === 1) { // Only modified_date
+        return true;
+    }
+
     const query = `
         UPDATE DocumentTemplates
-        SET
-            template_name = @template_name,
-            description = @description,
-            paper_width = @paper_width,
-            paper_height = @paper_height,
-            paper_orientation = @paper_orientation,
-            paper_margin_top = @paper_margin_top,
-            paper_margin_right = @paper_margin_right,
-            paper_margin_bottom = @paper_margin_bottom,
-            paper_margin_left = @paper_margin_left,
-            background_color = @background_color,
-            show_grid = @show_grid,
-            grid_size = @grid_size,
-            is_default = @is_default,
-            is_active = @is_active,
-            modified_by = @modified_by,
-            modified_date = GETDATE()
+        SET ${setFields.join(',\n            ')}
         WHERE template_id = @template_id
     `;
-
-    const params = [
-        ['template_id', TYPES.Int, templateId],
-        ['template_name', TYPES.NVarChar, templateData.template_name],
-        ['description', TYPES.NVarChar, templateData.description || null],
-        ['paper_width', TYPES.Int, templateData.paper_width],
-        ['paper_height', TYPES.Int, templateData.paper_height],
-        ['paper_orientation', TYPES.NVarChar, templateData.paper_orientation],
-        ['paper_margin_top', TYPES.Int, templateData.paper_margin_top],
-        ['paper_margin_right', TYPES.Int, templateData.paper_margin_right],
-        ['paper_margin_bottom', TYPES.Int, templateData.paper_margin_bottom],
-        ['paper_margin_left', TYPES.Int, templateData.paper_margin_left],
-        ['background_color', TYPES.NVarChar, templateData.background_color],
-        ['show_grid', TYPES.Bit, templateData.show_grid ? 1 : 0],
-        ['grid_size', TYPES.Int, templateData.grid_size],
-        ['is_default', TYPES.Bit, templateData.is_default ? 1 : 0],
-        ['is_active', TYPES.Bit, templateData.is_active ? 1 : 0],
-        ['modified_by', TYPES.NVarChar, templateData.modified_by || 'system']
-    ];
 
     await executeQuery(query, params, mapRowToObject);
     return true;

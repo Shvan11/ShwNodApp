@@ -40,11 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
 /**
  * Initialize GrapesJS editor
  */
-function initializeEditor(templateHtml = null) {
-    console.log('Initializing GrapesJS editor...', { templateHtml: templateHtml ? 'provided' : 'null' });
-
+function initializeEditor(templateHtml = null, templateCss = null) {
     try {
-        console.log('Creating GrapesJS instance...');
         editor = grapesjs.init({
             container: '#gjs',
             height: 'calc(100vh - 71px)', // Match CSS height calculation
@@ -63,10 +60,10 @@ function initializeEditor(templateHtml = null) {
         deviceManager: {
             devices: [
                 {
-                    id: 'landscape-80x210',
-                    name: 'Landscape 80×210mm',
-                    width: '794px', // 210mm width (landscape)
-                    height: '302px', // 80mm height
+                    id: 'landscape-80x200',
+                    name: 'Thermal 75×190mm',
+                    width: '718px', // 190mm width - optimal for single-page thermal printing
+                    height: '283px', // 75mm height - optimal for single-page thermal printing
                 },
                 {
                     id: 'a4',
@@ -100,41 +97,26 @@ function initializeEditor(templateHtml = null) {
         }
     });
 
-    console.log('GrapesJS instance created successfully');
-
     // Add custom receipt blocks
-    console.log('Adding custom receipt blocks...');
     addReceiptBlocks();
 
     // Load template HTML if provided
     if (templateHtml) {
-        console.log('Setting template HTML components...');
         editor.setComponents(templateHtml);
     } else {
-        console.log('Setting default receipt template...');
-        // Set default receipt structure
-        editor.setComponents(getDefaultReceiptTemplate());
+        console.warn('No template HTML provided - cannot initialize editor');
+        alert('Error: Template file not found. Please ensure the template has a valid file path.');
+        return;
     }
 
-    // Add custom CSS for print
-    console.log('Setting default styles...');
-    editor.setStyle(getDefaultReceiptStyles());
+    // Load CSS from file
+    if (templateCss) {
+        editor.setStyle(templateCss);
+    } else {
+        console.warn('No template CSS provided - using minimal styles');
+        editor.setStyle('');
+    }
 
-    console.log('GrapesJS editor initialized successfully!');
-
-    // Debug: Check what GrapesJS rendered
-    setTimeout(() => {
-        const gjsContainer = document.getElementById('gjs');
-        console.log('=== DEBUG INFO ===');
-        console.log('GJS Container element:', gjsContainer);
-        console.log('GJS Container children count:', gjsContainer?.children.length);
-        console.log('GJS Container innerHTML length:', gjsContainer?.innerHTML.length);
-        console.log('GJS Container computed height:', window.getComputedStyle(gjsContainer).height);
-        console.log('GJS Container computed display:', window.getComputedStyle(gjsContainer).display);
-        console.log('Editor instance:', editor);
-        console.log('Editor Canvas:', editor.Canvas);
-        console.log('================');
-    }, 1000);
 
     } catch (error) {
         console.error('Error initializing GrapesJS editor:', error);
@@ -243,329 +225,49 @@ function addReceiptBlocks() {
 }
 
 /**
- * Get default receipt template structure
- */
-function getDefaultReceiptTemplate() {
-    return `
-        <div class="receipt-container">
-            <!-- Header Row -->
-            <div class="header-row">
-                <div class="clinic-header">
-                    <div class="clinic-name">SHWAN ORTHODONTICS</div>
-                    <div class="receipt-ids">Receipt #{{work.WorkID}} | Patient ID: {{patient.PersonID}}</div>
-                </div>
-                <div class="receipt-timestamp">
-                    <div class="timestamp-label">Generated:</div>
-                    <div class="timestamp-value">{{payment.PaymentDateTime|date:DD/MM/YYYY HH:mm}}</div>
-                </div>
-            </div>
-
-            <!-- Two Column Main Content -->
-            <div class="main-content">
-                <!-- Left Column: Patient Information -->
-                <div class="column-left">
-                    <div class="section-header">PATIENT INFORMATION</div>
-                    <div class="info-row">
-                        <span class="info-label">Name:</span>
-                        <span class="info-value">{{patient.PatientName}}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Phone:</span>
-                        <span class="info-value">{{patient.Phone}}</span>
-                    </div>
-
-                    <!-- Next Appointment -->
-                    <div class="next-appointment">
-                        <div class="next-appointment-label">NEXT APPOINTMENT</div>
-                        <div class="next-appointment-value">{{patient.AppDate|date:DD/MM/YYYY HH:mm|default:Not Scheduled}}</div>
-                    </div>
-
-                    <!-- Clinic Footer in Left Column -->
-                    <div class="clinic-footer">
-                        <div class="clinic-footer-title">Thank you for your payment!</div>
-                        <div class="clinic-footer-info">Sulaymaniyah, Kurdistan - Iraq</div>
-                        <div class="clinic-footer-info">Tel: +964 750 123 4567 | +964 770 987 6543</div>
-                        <div class="clinic-footer-info">Keep this receipt for your records</div>
-                    </div>
-                </div>
-
-                <!-- Right Column: Payment Details -->
-                <div class="column-right">
-                    <div class="section-header">PAYMENT DETAILS</div>
-                    <table class="payment-table">
-                        <tr>
-                            <td class="label-col">Total Treatment Cost:</td>
-                            <td class="amount-col">{{work.TotalRequired|currency}} {{work.Currency}}</td>
-                        </tr>
-                        <tr>
-                            <td class="label-col">Previously Paid:</td>
-                            <td class="amount-col">{{payment.PreviouslyPaid|currency}}</td>
-                        </tr>
-                        <tr class="payment-row-divider">
-                            <td colspan="2"></td>
-                        </tr>
-                        <tr class="payment-row-highlight">
-                            <td class="label-col">PAID TODAY:</td>
-                            <td class="amount-col">{{payment.AmountPaidToday|currency}}</td>
-                        </tr>
-                        <tr class="payment-row-divider">
-                            <td colspan="2"></td>
-                        </tr>
-                        <tr>
-                            <td class="label-col">Total Paid:</td>
-                            <td class="amount-col">{{payment.TotalPaid|currency}}</td>
-                        </tr>
-                        <tr class="payment-row-total">
-                            <td class="label-col">REMAINING BALANCE:</td>
-                            <td class="amount-col">{{payment.RemainingBalance|currency}}</td>
-                        </tr>
-                    </table>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-/**
- * Get default receipt styles (for print)
- */
-function getDefaultReceiptStyles() {
-    return `
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        .receipt-container {
-            width: 100%;
-            max-width: 770px;
-            min-height: 278px;
-            background-color: #fff;
-            padding: 8px;
-        }
-
-        /* Header Row */
-        .header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            padding: 6px 0;
-            border-bottom: 2px solid #000;
-            margin-bottom: 8px;
-        }
-
-        .clinic-header {
-            flex: 1;
-        }
-
-        .clinic-name {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 3px;
-        }
-
-        .clinic-subtitle {
-            font-size: 9px;
-            color: #333;
-        }
-
-        .receipt-ids {
-            font-size: 9px;
-            color: #333;
-            margin-top: 2px;
-        }
-
-        .receipt-timestamp {
-            text-align: right;
-            font-size: 9px;
-        }
-
-        .timestamp-label {
-            font-weight: bold;
-            margin-bottom: 3px;
-        }
-
-        .timestamp-value {
-            color: #333;
-        }
-
-        /* Two Column Main Content */
-        .main-content {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 0;
-        }
-
-        .column-left,
-        .column-right {
-            flex: 1;
-            border: 1px solid #000;
-            padding: 6px;
-        }
-
-        .section-header {
-            font-size: 10px;
-            font-weight: bold;
-            padding: 3px 5px;
-            margin-bottom: 6px;
-            background-color: #000;
-            color: #fff;
-        }
-
-        .info-row {
-            font-size: 10px;
-            margin-bottom: 4px;
-            display: flex;
-        }
-
-        .info-label {
-            font-weight: bold;
-            min-width: 65px;
-        }
-
-        .info-value {
-            flex: 1;
-        }
-
-        .next-appointment {
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px solid #000;
-        }
-
-        .next-appointment-label {
-            font-size: 11px;
-            font-weight: bold;
-            margin-bottom: 4px;
-        }
-
-        .next-appointment-value {
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .clinic-footer {
-            margin-top: 8px;
-            padding-top: 6px;
-            border-top: 1px solid #000;
-            font-size: 8px;
-            text-align: center;
-        }
-
-        .clinic-footer-title {
-            font-weight: bold;
-            margin-bottom: 3px;
-        }
-
-        .clinic-footer-info {
-            color: #333;
-            margin-bottom: 1px;
-        }
-
-        /* Payment Table */
-        .payment-table {
-            width: 100%;
-            font-size: 11px;
-            border-collapse: collapse;
-        }
-
-        .payment-table td {
-            padding: 4px 2px;
-        }
-
-        .payment-table .label-col {
-            text-align: left;
-        }
-
-        .payment-table .amount-col {
-            text-align: right;
-            font-weight: bold;
-        }
-
-        .payment-row-divider {
-            border-top: 1px solid #000;
-        }
-
-        .payment-row-highlight {
-            background-color: #000;
-            color: #fff;
-        }
-
-        .payment-row-highlight td {
-            padding: 5px 3px;
-            font-size: 13px;
-        }
-
-        .payment-row-total {
-            border-top: 2px solid #000;
-            font-size: 14px;
-        }
-
-        .payment-row-total td {
-            padding: 5px 2px;
-        }
-
-
-        @media print {
-            body {
-                margin: 0;
-                padding: 12px;
-            }
-            .gjs-dashed * {
-                outline: none !important;
-            }
-            * {
-                print-color-adjust: exact;
-                -webkit-print-color-adjust: exact;
-            }
-        }
-    `;
-}
-
-/**
  * Load existing template
  */
 async function loadTemplate(templateId) {
-    console.log('loadTemplate called with ID:', templateId);
     try {
         const response = await fetch(`/api/templates/${templateId}`);
-        console.log('Template API response status:', response.status);
         const result = await response.json();
-        console.log('Template API result:', result);
 
         if (result.status === 'success') {
             const template = result.data;
-            console.log('Template loaded:', template);
             document.getElementById('templateName').textContent = template.template_name;
             currentDocumentType = template.document_type_id;
 
             // Load template HTML from file
             if (template.template_file_path) {
-                console.log('Loading template HTML from:', template.template_file_path);
-                const htmlResponse = await fetch(`/${template.template_file_path}`);
+                // Add cache-busting query parameter to ensure fresh load
+                const cacheBuster = `?t=${Date.now()}`;
+                const htmlResponse = await fetch(`/${template.template_file_path}${cacheBuster}`);
                 const templateHtml = await htmlResponse.text();
-                console.log('Template HTML loaded, length:', templateHtml.length);
 
-                // Extract body content from HTML
+                // Extract body content and CSS from HTML
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(templateHtml, 'text/html');
                 const bodyContent = doc.body.innerHTML;
 
-                console.log('Calling initializeEditor with body content');
-                initializeEditor(bodyContent);
+                // Extract CSS from style tags
+                const styleElements = doc.querySelectorAll('style');
+                let extractedCss = '';
+                styleElements.forEach(style => {
+                    extractedCss += style.textContent + '\n';
+                });
+
+                initializeEditor(bodyContent, extractedCss);
             } else {
-                console.log('No template file path, calling initializeEditor without content');
-                initializeEditor();
+                console.error('Template has no file path');
+                alert('Error: Template file not found. Please contact support.');
             }
         } else {
-            console.error('Template API returned error status:', result);
-            initializeEditor();
+            console.error('Failed to load template:', result.message);
+            alert('Failed to load template: ' + result.message);
         }
     } catch (error) {
         console.error('Error loading template:', error);
         alert('Failed to load template: ' + error.message);
-        initializeEditor();
     }
 }
 
@@ -590,8 +292,6 @@ async function saveTemplate() {
         const device = editor.Devices.getSelected();
         const pageWidth = device.get('width') || '794px';
         const pageHeight = device.get('height') || null;
-
-        console.log('Saving with dimensions:', { pageWidth, pageHeight });
 
         // Create complete HTML document with page size
         const completeHtml = generateCompleteHTML(html, css, pageWidth, pageHeight);
@@ -646,7 +346,7 @@ function generateCompleteHTML(bodyHtml, css, pageWidth = '794px', pageHeight = '
 
         body {
             margin: 0;
-            padding: 20px;
+            padding: 0;
             background: white;
             font-family: Arial, sans-serif;
             width: ${pageWidth};
@@ -660,7 +360,7 @@ function generateCompleteHTML(bodyHtml, css, pageWidth = '794px', pageHeight = '
         @media print {
             body {
                 margin: 0;
-                padding: 20px;
+                padding: 0;
             }
 
             * {
@@ -672,7 +372,7 @@ function generateCompleteHTML(bodyHtml, css, pageWidth = '794px', pageHeight = '
         @media screen {
             body {
                 background: #f0f0f0;
-                padding: 20px;
+                padding: 0;
             }
         }
     </style>

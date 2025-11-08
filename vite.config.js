@@ -62,7 +62,6 @@ export default defineConfig({
         'send': resolve(__dirname, 'public/views/messaging/send.html'),
         'auth': resolve(__dirname, 'public/views/messaging/auth.html'),
         aligner: resolve(__dirname, 'public/views/aligner.html'),
-        alignerportal: resolve(__dirname, 'public/views/alignerportal.html'),
         visits: resolve(__dirname, 'public/views/visits.html'),
         expenses: resolve(__dirname, 'public/views/expenses.html')
       }
@@ -87,6 +86,10 @@ export default defineConfig({
         changeOrigin: true
       },
       '/DolImgs': {
+        target: 'http://localhost:3000',
+        changeOrigin: true
+      },
+      '/data': {
         target: 'http://localhost:3000',
         changeOrigin: true
       },
@@ -139,16 +142,6 @@ export default defineConfig({
           // For React Router apps, serve the HTML file for all subroutes
           if (req.url.startsWith('/aligner')) {
             return '/views/aligner.html'
-          }
-        }
-      },
-      '/portal': {
-        target: 'http://localhost:5173',
-        changeOrigin: true,
-        bypass: (req) => {
-          // For React Router apps, serve the HTML file for all subroutes
-          if (req.url.startsWith('/portal')) {
-            return '/views/alignerportal.html'
           }
         }
       },

@@ -5,7 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/css/main.css" />
+    <link rel="stylesheet" href="/css/components/universal-header.css" />
     <link rel="stylesheet" href="/css/pages/send.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <title>Shwan Orthodontics - WhatsApp Sender</title>
     
     <!-- Preload critical resources -->
@@ -17,14 +19,17 @@
 </head>
 
 <body>
+    <!-- Universal header mount point -->
+    <div id="universal-header-root"></div>
+
     <main class="container main-layout" role="main">
-        <header class="header-area">
-            <h1>Shwan Orthodontics - WhatsApp Messaging</h1>
+        <div class="page-header-area">
+            <h2>WhatsApp Messaging</h2>
             <div class="connection-status" aria-live="polite">
                 <span class="connection-indicator" aria-hidden="true"></span>
                 <span class="connection-text">Initializing...</span>
             </div>
-        </header>
+        </div>
         
         <!-- Date Selection Panel -->
         <section class="controls-area">
@@ -42,10 +47,15 @@
                         <span class="btn-icon" aria-hidden="true">🔄</span>
                         <span>Refresh</span>
                     </button>
-                    <button id="resetMessagingBtn" class="btn btn-danger" 
+                    <button id="resetMessagingBtn" class="btn btn-danger"
                             aria-label="Reset all messages for selected date">
                         <span class="btn-icon" aria-hidden="true">🔄</span>
                         <span>Reset Messages</span>
+                    </button>
+                    <button id="sendEmailBtn" class="btn btn-success"
+                            aria-label="Email appointment list to staff">
+                        <span class="btn-icon" aria-hidden="true">📧</span>
+                        <span>Email to Staff</span>
                     </button>
                 </div>
                 
@@ -134,6 +144,22 @@
     <!-- Screen Reader Announcements -->
     <div id="announcer" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
     <div id="progressAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Mount Universal Header -->
+    <script type="module">
+        import React from 'react';
+        import ReactDOM from 'react-dom/client';
+        import UniversalHeader from '/js/components/react/UniversalHeader.jsx';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Mount Universal Header
+            const headerRoot = document.getElementById('universal-header-root');
+            if (headerRoot) {
+                const root = ReactDOM.createRoot(headerRoot);
+                root.render(React.createElement(UniversalHeader));
+            }
+        });
+    </script>
 
     <!-- Load modular JavaScript -->
     <script type="module" src="/js/pages/send.js"></script>

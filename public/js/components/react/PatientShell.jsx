@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import Navigation from './Navigation.jsx';
 import ContentRenderer from './ContentRenderer.jsx';
 
@@ -9,6 +9,7 @@ const PatientShell = () => {
     const [searchParams] = useSearchParams();
 
     const [patientData, setPatientData] = useState({ name: '', loading: true, error: null });
+    const [workData, setWorkData] = useState({ typeName: '', loading: false, error: null });
 
     // Fetch patient data when patient ID changes
     const fetchPatientData = useCallback(async (id) => {
@@ -39,12 +40,48 @@ const PatientShell = () => {
         }
     }, []);
 
+    // Fetch work data when workId is in query params
+    const fetchWorkData = useCallback(async (workId) => {
+        if (!workId) {
+            setWorkData({ typeName: '', loading: false, error: null });
+            return;
+        }
+
+        try {
+            setWorkData(prev => ({ ...prev, loading: true, error: null }));
+            const response = await fetch(`/api/getworkdetails?workId=${workId}`);
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch work data: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const workTypeName = data.TypeName || `Work ${workId}`;
+
+            setWorkData({ typeName: workTypeName, workId: parseInt(workId), loading: false, error: null });
+        } catch (error) {
+            console.error('Error fetching work data:', error);
+            setWorkData({
+                typeName: `Work ${workId}`,
+                workId: parseInt(workId),
+                loading: false,
+                error: error.message
+            });
+        }
+    }, []);
+
     // Fetch patient data when patient ID changes
     useEffect(() => {
         if (patientId) {
             fetchPatientData(patientId);
         }
     }, [patientId, fetchPatientData]);
+
+    // Fetch work data when workId query param changes
+    const workId = searchParams.get('workId');
+    useEffect(() => {
+        fetchWorkData(workId);
+    }, [workId, fetchWorkData]);
 
     // Extract additional params from URL
     const params = {
@@ -65,18 +102,40 @@ const PatientShell = () => {
 
             {/* Main Content Area */}
             <div className="main-content-area">
-                {/* Breadcrumb */}
+                {/* Enhanced Breadcrumb */}
                 <div className="breadcrumb-container">
                     <nav className="breadcrumb">
-                        <span className="breadcrumb-item">
+                        {/* Home Link - Use regular anchor for external navigation */}
+                        <a href="/patient-management" className="breadcrumb-item breadcrumb-link">
+                            <i className="fas fa-home"></i> Home
+                        </a>
+
+                        <span className="breadcrumb-separator">/</span>
+
+                        {/* Patient Link */}
+                        <Link to={`/patient/${patientId}/works`} className="breadcrumb-item breadcrumb-link">
                             <i className="fas fa-user"></i>
                             {' '}
                             {patientData.loading ? `Patient ${patientId}` : patientData.name}
-                        </span>
-                        {page && page !== 'grid' && (
+                        </Link>
+
+                        {/* Work Level (if workId is present) */}
+                        {workId && workData.typeName && (
+                            <>
+                                <span className="breadcrumb-separator">/</span>
+                                <Link to={`/patient/${patientId}/works`} className="breadcrumb-item breadcrumb-link">
+                                    <i className="fas fa-briefcase-medical"></i> {workData.typeName}
+                                </Link>
+                            </>
+                        )}
+
+                        {/* Current Page */}
+                        {page && page !== 'grid' && page !== 'works' && (
                             <>
                                 <span className="breadcrumb-separator">/</span>
                                 <span className="breadcrumb-item active">
+                                    <i className={`fas fa-${page === 'visits' ? 'calendar-check' : page === 'appointments' ? 'calendar-alt' : page === 'xrays' ? 'x-ray' : 'file'}`}></i>
+                                    {' '}
                                     {page.charAt(0).toUpperCase() + page.slice(1).replace(/-/g, ' ')}
                                 </span>
                             </>

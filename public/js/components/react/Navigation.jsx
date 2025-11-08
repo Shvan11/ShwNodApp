@@ -10,6 +10,7 @@ const Navigation = ({ patientId, currentPage }) => {
     const photosButtonRef = useRef(null);
     const [flyoutPosition, setFlyoutPosition] = useState({ top: 0 });
     const [patientInfo, setPatientInfo] = useState(null);
+    const [patientsFolder, setPatientsFolder] = useState('');
 
     // Cache for timepoints
     const [cache, setCache] = useState(new Map());
@@ -62,7 +63,36 @@ const Navigation = ({ patientId, currentPage }) => {
     useEffect(() => {
         loadTimepoints(patientId);
         loadPatientInfo(patientId);
+        loadPatientsFolder();
     }, [patientId, loadTimepoints]);
+
+    const loadPatientsFolder = async () => {
+        try {
+            // Try to get from localStorage first
+            const cached = localStorage.getItem('patientsFolder');
+            if (cached) {
+                setPatientsFolder(cached);
+                return;
+            }
+
+            // If not in cache, fetch from API
+            const response = await fetch('/api/settings/patients-folder');
+            if (!response.ok) {
+                throw new Error('Failed to fetch patients folder setting');
+            }
+            const data = await response.json();
+            const folderPath = data.patientsFolder || '';
+
+            // Store in localStorage for future use
+            if (folderPath) {
+                localStorage.setItem('patientsFolder', folderPath);
+            }
+
+            setPatientsFolder(folderPath);
+        } catch (err) {
+            console.error('Error loading patients folder setting:', err);
+        }
+    };
 
     const loadPatientInfo = async (patientId) => {
         if (!patientId) return;
@@ -81,16 +111,31 @@ const Navigation = ({ patientId, currentPage }) => {
 
     const handleOpenCSImaging = () => {
         try {
+            // Debug: Log patient info to see what we have
+            console.log('Patient Info:', patientInfo);
+            console.log('Patient Info Keys:', patientInfo ? Object.keys(patientInfo) : 'null');
+
+            // Try different possible field names for patient name
+            const patientName = patientInfo?.PatientName
+                || patientInfo?.patientName
+                || patientInfo?.Name
+                || patientInfo?.name
+                || patientInfo?.FullName
+                || patientInfo?.fullName
+                || 'Unknown';
+
+            console.log('Resolved Patient Name:', patientName);
+
             // Format patient name (replace spaces with underscores for URL)
-            const patientName = patientInfo?.PatientName?.replace(/ /g, '_') || 'Unknown';
+            const formattedName = patientName.replace(/ /g, '_');
 
             // Construct csimaging: URL
-            const csimagingUrl = `csimaging:${patientId}?name=${encodeURIComponent(patientName)}`;
+            const csimagingUrl = `csimaging:${patientId}?name=${encodeURIComponent(formattedName)}`;
 
             // Trigger the protocol handler
             window.location.href = csimagingUrl;
 
-            console.log('Opening CS Imaging for patient:', patientId, patientName);
+            console.log('Opening CS Imaging for patient:', patientId, formattedName);
         } catch (err) {
             console.error('Error opening CS Imaging:', err);
             alert('Failed to open CS Imaging: ' + err.message);
@@ -264,6 +309,26 @@ const Navigation = ({ patientId, currentPage }) => {
                         <i className="fas fa-radiation" />
                     </div>
                     <span className="nav-item-label">CS Imaging</span>
+                </div>
+
+                <div
+                    className="sidebar-nav-item folder-item"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        if (!patientsFolder) {
+                            alert('Patients folder path is not configured. Please check settings.');
+                            return;
+                        }
+                        // Construct full path: PatientsFolder + PatientID
+                        const fullPath = `${patientsFolder}${patientId}`;
+                        window.location.href = `explorer:${fullPath}`;
+                    }}
+                    title="Open Patient Folder"
+                >
+                    <div className="nav-item-icon">
+                        <i className="fas fa-folder-open" />
+                    </div>
+                    <span className="nav-item-label">Open Folder</span>
                 </div>
 
                 <div

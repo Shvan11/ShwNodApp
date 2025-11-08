@@ -1,5 +1,5 @@
 import React from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import GridComponent from './GridComponent.jsx'
 import XraysComponent from './XraysComponent.jsx'
 import VisitsComponent from './VisitsComponent.jsx'
@@ -7,15 +7,21 @@ import CompareComponent from './CompareComponent.jsx'
 import AppointmentForm from './AppointmentForm.jsx'
 import EditAppointmentForm from './EditAppointmentForm.jsx'
 import WorkComponent from './WorkComponent.jsx'
+import NewWorkComponent from './NewWorkComponent.jsx'
 import EditPatientComponent from './EditPatientComponent.jsx'
 import PatientAppointments from './PatientAppointments.jsx'
+import '../../../css/components/new-work-component.css'
 
 const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
     const navigate = useNavigate();
     const wildcardParams = useParams();
+    const [searchParams] = useSearchParams();
 
     // Extract appointmentId from wildcard route (for edit-appointment/:appointmentId)
     const appointmentId = wildcardParams['*'];
+
+    // Extract workId from query params for work-specific pages like visits
+    const workId = searchParams.get('workId');
     const renderContent = () => {
         switch (page) {
             case 'grid':
@@ -35,19 +41,49 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
                 );
             
             case 'visits':
+                // Visits can be shown at work level (with workId) or patient level (all visits)
                 return (
                     <VisitsComponent
-                        patientId={patientId}
+                        workId={workId ? parseInt(workId) : null}
+                        patientId={patientId ? parseInt(patientId) : null}
                     />
                 );
-            
+
+            case 'new-visit':
+                // New visit form for a specific work - reuse VisitsComponent with autoShowForm prop
+                return (
+                    <VisitsComponent
+                        workId={workId ? parseInt(workId) : null}
+                        patientId={patientId ? parseInt(patientId) : null}
+                        autoShowForm={true}
+                    />
+                );
+
             case 'works':
                 return (
                     <WorkComponent
                         patientId={patientId}
                     />
                 );
-            
+
+            case 'new-work':
+                // New work form - uses NewWorkComponent
+                return (
+                    <NewWorkComponent
+                        patientId={patientId}
+                        workId={workId ? parseInt(workId) : null}
+                        onSave={(result) => {
+                            console.log('Work saved successfully:', result);
+                            // Navigate back to works page
+                            navigate(`/patient/${patientId}/works`);
+                        }}
+                        onCancel={() => {
+                            // Go back to works page
+                            navigate(`/patient/${patientId}/works`);
+                        }}
+                    />
+                );
+
             case 'compare':
                 return (
                     <CompareComponent
@@ -101,13 +137,13 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
                     <AppointmentForm
                         patientId={patientId}
                         onClose={() => {
-                            // Navigate back to appointments page
-                            navigate(`/patient/${patientId}/appointments`);
+                            // Go back to previous page
+                            navigate(-1);
                         }}
                         onSuccess={(result) => {
                             console.log('Appointment created successfully:', result);
-                            // Navigate back to appointments page after success
-                            navigate(`/patient/${patientId}/appointments`);
+                            // Go back to previous page after success
+                            navigate(-1);
                         }}
                     />
                 );
@@ -119,13 +155,13 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
                         patientId={patientId}
                         appointmentId={appointmentId}
                         onClose={() => {
-                            // Navigate back to appointments page
-                            navigate(`/patient/${patientId}/appointments`);
+                            // Go back to previous page
+                            navigate(-1);
                         }}
                         onSuccess={(result) => {
                             console.log('Appointment updated successfully:', result);
-                            // Navigate back to appointments page after success
-                            navigate(`/patient/${patientId}/appointments`);
+                            // Go back to previous page after success
+                            navigate(-1);
                         }}
                     />
                 );

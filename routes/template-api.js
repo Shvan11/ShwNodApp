@@ -350,6 +350,11 @@ router.get('/receipt/work/:workId', async (req, res) => {
         const { workId } = req.params;
         const html = await generateReceiptHTML(parseInt(workId));
 
+        // Prevent caching
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+
         res.send(html);
     } catch (error) {
         console.error('Error generating receipt:', error);

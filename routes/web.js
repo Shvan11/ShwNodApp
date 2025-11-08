@@ -42,11 +42,6 @@ router.get('/aligner/*', (_, res) => {
   serveWithFallback(res, '/views/aligner.html', 'Aligner management not found');
 });
 
-// Doctor Portal - React Router handles all /portal/* routes
-router.get('/portal/*', (_, res) => {
-  serveWithFallback(res, '/views/alignerportal.html', 'Portal not found');
-});
-
 // ==============================
 // STANDALONE PAGE ROUTES
 // ==============================
@@ -123,7 +118,6 @@ router.get('/template-designer', (_, res) => {
 // React Router Apps (client-side routing):
 //   - /patient/:patientId/:page     → Patient portal (works, grid, compare, xrays, visits, payments, etc.)
 //   - /aligner/*                    → Aligner management (doctors, patients, sets, search)
-//   - /portal/*                     → Doctor portal
 //   - /settings/:tab                → Settings (general, database, alignerDoctors, messaging, system, security)
 //
 // Standalone Pages:

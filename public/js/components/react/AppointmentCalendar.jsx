@@ -27,6 +27,7 @@ const AppointmentCalendar = ({
     const [internalSelectedSlot, setInternalSelectedSlot] = useState(null);
     const [viewMode, setViewMode] = useState(initialViewMode);
     const [selectedDoctorId, setSelectedDoctorId] = useState(null);
+    const [showEarlySlots, setShowEarlySlots] = useState(false);
     
     // Use external selected slot if provided (for controlled mode)
     const selectedSlot = externalSelectedSlot || internalSelectedSlot;
@@ -108,7 +109,11 @@ const AppointmentCalendar = ({
         setError(null);
 
         try {
-            const targetDate = date.toISOString().split('T')[0];
+            // Format date in local timezone to avoid UTC conversion issues
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const targetDate = `${year}-${month}-${day}`;
 
             // Build query parameters
             const calendarParams = new URLSearchParams({ date: targetDate });
@@ -190,6 +195,10 @@ const AppointmentCalendar = ({
 
     const handleDoctorChange = useCallback((doctorId) => {
         setSelectedDoctorId(doctorId);
+    }, []);
+
+    const handleToggleEarlySlots = useCallback(() => {
+        setShowEarlySlots(prev => !prev);
     }, []);
 
     const handleSlotClick = useCallback((slot) => {
@@ -308,6 +317,8 @@ const AppointmentCalendar = ({
                 loading={loading}
                 selectedDoctorId={selectedDoctorId}
                 onDoctorChange={handleDoctorChange}
+                showEarlySlots={showEarlySlots}
+                onToggleEarlySlots={handleToggleEarlySlots}
             />
 
             {/* Calendar Grid - Show different grid based on view mode */}
@@ -325,6 +336,7 @@ const AppointmentCalendar = ({
                     onSlotClick={handleSlotClick}
                     mode={mode}
                     showOnlyAvailable={showOnlyAvailable}
+                    showEarlySlots={showEarlySlots}
                 />
             )}
         </div>

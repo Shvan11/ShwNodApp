@@ -175,6 +175,32 @@ export async function getLatestWire(PID) {
 }
 
 /**
+ * Retrieves the latest wire details (ID and name) for a given work ID.
+ * @param {number} workId - The work ID.
+ * @returns {Promise<Object>} - A promise that resolves with an object containing the latest upper and lower wire details.
+ */
+export async function getLatestWiresByWorkId(workId) {
+    return executeQuery(
+        `SELECT
+            uw.Wire_ID as UpperWireID,
+            uw.Wire as UpperWireName,
+            lw.Wire_ID as LowerWireID,
+            lw.Wire as LowerWireName
+        FROM dbo.qryLastUWire uw
+        FULL OUTER JOIN dbo.qryLastLWire lw ON uw.WorkID = lw.WorkID
+        WHERE COALESCE(uw.WorkID, lw.WorkID) = @WorkID`,
+        [['WorkID', TYPES.Int, workId]],
+        (columns) => ({
+            UpperWireID: columns[0].value,
+            UpperWireName: columns[1].value,
+            LowerWireID: columns[2].value,
+            LowerWireName: columns[3].value,
+        }),
+        (result) => result && result.length > 0 ? result[0] : { UpperWireID: null, UpperWireName: null, LowerWireID: null, LowerWireName: null }
+    );
+}
+
+/**
  * Retrieves all visits for a specific work ID (not dependent on active work).
  * @param {number} workId - The work ID.
  * @returns {Promise<Array>} - A promise that resolves with an array of visit objects.

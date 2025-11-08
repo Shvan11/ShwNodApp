@@ -13,6 +13,7 @@ const WorkCard = ({
     onAddAlignerSet,
     onComplete,
     onViewVisits,
+    onNewVisit,
     onPrintReceipt,
     formatDate,
     formatCurrency,
@@ -38,10 +39,10 @@ const WorkCard = ({
     return (
         <div className={`work-card ${work.Finished ? 'work-card-completed' : 'work-card-active'} ${isExpanded ? 'expanded' : 'collapsed'}`}>
             {/* Minimal Header - Always Visible */}
-            <div className="work-card-collapsed-header" onClick={onToggleExpanded} style={{ cursor: 'pointer' }}>
+            <div className="work-card-collapsed-header" onClick={onToggleExpanded}>
                 <div className="work-card-title-section">
                     <div className="work-card-title">
-                        <i className={`fas fa-chevron-${isExpanded ? 'down' : 'right'}`} style={{ fontSize: '0.875rem', color: '#6b7280', marginRight: '0.5rem' }}></i>
+                        <i className={`fas fa-chevron-${isExpanded ? 'down' : 'right'} chevron-icon`}></i>
                         <i className="fas fa-tooth"></i>
                         <h3>{work.TypeName || 'Other Treatment'}</h3>
                         {getStatusBadge()}
@@ -50,7 +51,7 @@ const WorkCard = ({
                         <span><i className="fas fa-user-md"></i> {work.DoctorName || 'Not assigned'}</span>
                         <span><i className="fas fa-calendar-plus"></i> {formatDate(work.AdditionDate)}</span>
                         {!isExpanded && getRemainingBalance() > 0 && (
-                            <span className="balance-indicator" style={{ color: '#dc2626', fontWeight: '600' }}>
+                            <span className="balance-indicator">
                                 <i className="fas fa-exclamation-circle"></i> Balance: {formatCurrency(getRemainingBalance(), work.Currency)}
                             </span>
                         )}
@@ -152,6 +153,15 @@ const WorkCard = ({
 
                     {/* Primary Actions */}
                     <div className="work-card-primary-actions">
+                        <button
+                            type="button"
+                            className="btn-card-action btn-new-visit"
+                            onClick={() => onNewVisit(work)}
+                            title="Add new visit for this work"
+                        >
+                            <i className="fas fa-plus-circle"></i>
+                            <span>New Visit</span>
+                        </button>
                         <button
                             type="button"
                             className="btn-card-action btn-visits"

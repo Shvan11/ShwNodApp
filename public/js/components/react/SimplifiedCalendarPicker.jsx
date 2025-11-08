@@ -31,10 +31,18 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
             const firstDay = new Date(year, month, 1);
             const lastDay = new Date(year, month + 1, 0);
 
+            // Format dates in local timezone to avoid UTC conversion issues
+            const formatLocalDate = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+
             const response = await fetch(
                 `/api/calendar/month-availability?` +
-                `startDate=${firstDay.toISOString().split('T')[0]}&` +
-                `endDate=${lastDay.toISOString().split('T')[0]}`
+                `startDate=${formatLocalDate(firstDay)}&` +
+                `endDate=${formatLocalDate(lastDay)}`
             );
 
             if (!response.ok) throw new Error('Failed to fetch availability');
@@ -148,7 +156,11 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                 continue;
             }
 
-            const dateStr = date.toISOString().split('T')[0];
+            // Format date in local timezone
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
             const availability = dayAvailability[dateStr] || { availableCount: 0, appointmentCount: 0 };
             const isPast = date < new Date(new Date().setHours(0, 0, 0, 0));
             const isToday = date.toDateString() === new Date().toDateString();

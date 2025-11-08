@@ -412,21 +412,33 @@ function getWeekStart(date) {
     const diff = day === 6 ? 0 : (day + 1);
     const weekStart = new Date(d);
     weekStart.setDate(weekStart.getDate() - diff);
-    return weekStart.toISOString().split('T')[0];
+    // Format in local timezone to avoid UTC conversion
+    const year = weekStart.getFullYear();
+    const month = String(weekStart.getMonth() + 1).padStart(2, '0');
+    const dayNum = String(weekStart.getDate()).padStart(2, '0');
+    return `${year}-${month}-${dayNum}`;
 }
 
 function getWeekEnd(weekStart) {
     const d = new Date(weekStart);
     // Week: Sat, Sun, Mon, Tue, Wed, Thu (6 days, excluding Friday)
     d.setDate(d.getDate() + 5); // Thursday end (5 days after Saturday)
-    return d.toISOString().split('T')[0];
+    // Format in local timezone to avoid UTC conversion
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const dayNum = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${dayNum}`;
 }
 
 // Get month start (first day of month)
 function getMonthStart(date) {
     const d = new Date(date);
     d.setDate(1);
-    return d.toISOString().split('T')[0];
+    // Format in local timezone to avoid UTC conversion
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 // Get month end (last day of month)
@@ -434,7 +446,11 @@ function getMonthEnd(date) {
     const d = new Date(date);
     d.setMonth(d.getMonth() + 1);
     d.setDate(0);
-    return d.toISOString().split('T')[0];
+    // Format in local timezone to avoid UTC conversion
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 // Get calendar grid start (Saturday before or at month start)
@@ -447,22 +463,26 @@ function getCalendarGridStart(date) {
 function getCalendarGridEnd(date) {
     const monthEnd = new Date(getMonthEnd(date));
     const gridEnd = new Date(monthEnd);
-    const day = gridEnd.getDay();
+    const dayOfWeek = gridEnd.getDay();
     // Add days to get to Thursday (day 4), skip Friday
     let daysToAdd;
-    if (day === 4) {
+    if (dayOfWeek === 4) {
         daysToAdd = 0; // Already Thursday
-    } else if (day === 5) {
+    } else if (dayOfWeek === 5) {
         daysToAdd = 6; // Friday -> next Thursday (skip Friday)
-    } else if (day === 6) {
+    } else if (dayOfWeek === 6) {
         daysToAdd = 5; // Saturday -> Thursday
-    } else if (day === 0) {
+    } else if (dayOfWeek === 0) {
         daysToAdd = 4; // Sunday -> Thursday
     } else {
-        daysToAdd = 4 - day; // Mon-Wed -> Thursday
+        daysToAdd = 4 - dayOfWeek; // Mon-Wed -> Thursday
     }
     gridEnd.setDate(gridEnd.getDate() + daysToAdd);
-    return gridEnd.toISOString().split('T')[0];
+    // Format in local timezone to avoid UTC conversion
+    const year = gridEnd.getFullYear();
+    const month = String(gridEnd.getMonth() + 1).padStart(2, '0');
+    const dayNum = String(gridEnd.getDate()).padStart(2, '0');
+    return `${year}-${month}-${dayNum}`;
 }
 
 function transformToCalendarStructure(flatData, maxAppointmentsPerSlot = 3) {
@@ -470,12 +490,8 @@ function transformToCalendarStructure(flatData, maxAppointmentsPerSlot = 3) {
     const timeSlots = new Set();
 
     flatData.forEach(item => {
-        // Format date without timezone conversion to avoid -1 day offset
-        const date = new Date(item.calendarDate);
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const dateKey = `${year}-${month}-${day}`;
+        // CalendarDate is now a string in format 'YYYY-MM-DD' - use directly
+        const dateKey = item.calendarDate;
 
         if (!days[dateKey]) {
             days[dateKey] = {
@@ -486,11 +502,10 @@ function transformToCalendarStructure(flatData, maxAppointmentsPerSlot = 3) {
             };
         }
 
-        // Extract time from slotDateTime for time slot key (without timezone conversion)
-        const slotDate = new Date(item.slotDateTime);
-        const hours = String(slotDate.getHours()).padStart(2, '0');
-        const minutes = String(slotDate.getMinutes()).padStart(2, '0');
-        const timeKey = `${hours}:${minutes}`; // HH:MM format
+        // SlotDateTime is now a string in format 'YYYY-MM-DD HH:MM:SS' - extract time portion
+        // This avoids timezone conversion issues
+        const timePart = item.slotDateTime.split(' ')[1]; // Get 'HH:MM:SS'
+        const timeKey = timePart.substring(0, 5); // Get 'HH:MM'
         timeSlots.add(timeKey);
 
         // MULTIPLE APPOINTMENTS SUPPORT: Group appointments by time slot
@@ -520,7 +535,8 @@ function transformToCalendarStructure(flatData, maxAppointmentsPerSlot = 3) {
             days[dateKey].appointments[timeKey].appointments.length;
 
         // Determine slot status based on appointment count and time
-        const slotDateTime = new Date(item.slotDateTime);
+        // Parse slotDateTime string properly without timezone conversion
+        const slotDateTime = new Date(item.slotDateTime.replace(' ', 'T'));
         const now = new Date();
         const appointmentCount = days[dateKey].appointments[timeKey].appointmentCount;
 
@@ -577,7 +593,7 @@ function transformToMonthlyStructure(flatData, gridStart, gridEnd, maxAppointmen
                 drID: item.drID,
                 patientName: item.patientName,
                 personID: item.personID,
-                time: item.slotDateTime.toISOString().split('T')[1].substring(0, 5)
+                time: item.slotDateTime.split(' ')[1].substring(0, 5) // Extract time from 'YYYY-MM-DD HH:MM:SS'
             };
 
             dayMap[dateKey].appointments.push(appointment);
@@ -585,7 +601,8 @@ function transformToMonthlyStructure(flatData, gridStart, gridEnd, maxAppointmen
         }
 
         // Count slot status
-        const slotDateTime = new Date(item.slotDateTime);
+        // Parse slotDateTime string properly without timezone conversion
+        const slotDateTime = new Date(item.slotDateTime.replace(' ', 'T'));
         if (slotDateTime >= now) {
             if (item.slotStatus === 'available' || (item.slotStatus === 'booked' && item.appointmentCount < maxAppointmentsPerSlot)) {
                 dayMap[dateKey].availableSlots++;

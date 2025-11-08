@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Receipt Preview</title>
+    <style>
+        @page {
+            size: 190mm 75mm;
+            margin: 0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: white;
+            font-family: Arial, sans-serif;
+            width: 718px;
+            min-height: 283px;
+            max-width: 718px;
+            margin: 0 auto;
+        }
+
+        * { box-sizing: border-box; } body {margin: 0;}*{margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px;box-sizing:border-box;}body{padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px;background-image:initial;background-position-x:initial;background-position-y:initial;background-size:initial;background-repeat:initial;background-attachment:initial;background-origin:initial;background-clip:initial;background-color:white;font-family:Arial, sans-serif;width:710px;min-height:284px;max-width:710px;margin-top:0px;margin-right:auto;margin-bottom:0px;margin-left:auto;}*{box-sizing:border-box;}body{margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;}*{margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px;box-sizing:border-box;}body{margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:12mm;background-image:initial;background-position-x:initial;background-position-y:initial;background-size:initial;background-repeat:initial;background-attachment:initial;background-origin:initial;background-clip:initial;background-color:white;font-family:Arial, sans-serif;width:188mm;}*{box-sizing:border-box;}body{margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;}*{margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px;box-sizing:border-box;}html, body{width:100%;height:100%;margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px;background-image:initial;background-position-x:initial;background-position-y:initial;background-size:initial;background-repeat:initial;background-attachment:initial;background-origin:initial;background-clip:initial;background-color:white;font-family:Arial, sans-serif;color:rgb(0, 0, 0);}.receipt-container{width:100%;height:100%;background-color:rgb(255, 255, 255);padding-top:8px;padding-right:8px;padding-bottom:8px;padding-left:8px;box-sizing:border-box;}.header-row{display:flex;justify-content:space-between;align-items:flex-start;padding-top:6px;padding-right:0px;padding-bottom:6px;padding-left:0px;border-bottom-width:2px;border-bottom-style:solid;border-bottom-color:rgb(0, 0, 0);margin-bottom:8px;}.clinic-header{flex-grow:1;flex-shrink:1;flex-basis:0%;}.clinic-name{font-size:18px;font-weight:bold;margin-bottom:3px;}.receipt-ids{font-size:9px;color:rgb(0, 0, 0);margin-top:2px;}.receipt-timestamp{text-align:right;font-size:9px;}.timestamp-value{color:rgb(0, 0, 0);}.main-content{display:flex;row-gap:10px;column-gap:10px;margin-bottom:0px;}.column-left{flex-grow:1;flex-shrink:1;flex-basis:0%;border-top-width:1px;border-right-width:1px;border-bottom-width:1px;border-left-width:1px;border-top-style:solid;border-right-style:solid;border-bottom-style:solid;border-left-style:solid;border-top-color:rgb(0, 0, 0);border-right-color:rgb(0, 0, 0);border-bottom-color:rgb(0, 0, 0);border-left-color:rgb(0, 0, 0);border-image-source:initial;border-image-slice:initial;border-image-width:initial;border-image-outset:initial;border-image-repeat:initial;padding-top:6px;padding-right:6px;padding-bottom:6px;padding-left:6px;}.column-right{flex-grow:1;flex-shrink:1;flex-basis:0%;border-top-width:1px;border-right-width:1px;border-bottom-width:1px;border-left-width:1px;border-top-style:solid;border-right-style:solid;border-bottom-style:solid;border-left-style:solid;border-top-color:rgb(0, 0, 0);border-right-color:rgb(0, 0, 0);border-bottom-color:rgb(0, 0, 0);border-left-color:rgb(0, 0, 0);border-image-source:initial;border-image-slice:initial;border-image-width:initial;border-image-outset:initial;border-image-repeat:initial;padding-top:6px;padding-right:6px;padding-bottom:6px;padding-left:6px;}.section-header{font-size:10px;font-weight:bold;padding-top:3px;padding-right:5px;padding-bottom:3px;padding-left:5px;margin-bottom:6px;border-top-width:1px;border-right-width:1px;border-bottom-width:1px;border-left-width:1px;border-top-style:solid;border-right-style:solid;border-bottom-style:solid;border-left-style:solid;border-top-color:rgb(0, 0, 0);border-right-color:rgb(0, 0, 0);border-bottom-color:rgb(0, 0, 0);border-left-color:rgb(0, 0, 0);border-image-source:initial;border-image-slice:initial;border-image-width:initial;border-image-outset:initial;border-image-repeat:initial;background-color:rgb(255, 255, 255);color:rgb(0, 0, 0);}.info-row{font-size:10px;margin-bottom:4px;display:flex;}.patient-name-row{font-size:14px;}.info-label{font-weight:bold;min-width:65px;color:rgb(0, 0, 0);}.info-value{flex-grow:1;flex-shrink:1;flex-basis:0%;color:rgb(0, 0, 0);}.patient-name-value{font-size:14px;font-weight:bold;}.next-appointment{margin-top:8px;padding-top:8px;border-top-width:1px;border-top-style:solid;border-top-color:rgb(0, 0, 0);}.next-appointment-label{font-size:11px;font-weight:bold;margin-bottom:4px;color:rgb(0, 0, 0);}.next-appointment-value{font-size:12px;font-weight:bold;color:rgb(0, 0, 0);}.clinic-footer{margin-top:8px;padding-top:6px;border-top-width:1px;border-top-style:solid;border-top-color:rgb(0, 0, 0);font-size:8px;text-align:center;}.clinic-footer-title{font-weight:bold;margin-bottom:3px;color:rgb(0, 0, 0);}.clinic-footer-info{color:rgb(0, 0, 0);margin-bottom:1px;}.payment-table{width:100%;font-size:11px;border-collapse:collapse;}.payment-table td{padding-top:4px;padding-right:2px;padding-bottom:4px;padding-left:2px;color:rgb(0, 0, 0);}.payment-table .label-col{text-align:left;color:rgb(0, 0, 0);}.payment-table .amount-col{text-align:right;font-weight:bold;color:rgb(0, 0, 0);}.payment-row-divider{border-top-width:1px;border-top-style:solid;border-top-color:rgb(0, 0, 0);}.payment-row-highlight{background-color:rgb(224, 224, 224);color:rgb(0, 0, 0);}.payment-row-highlight td{padding-top:5px;padding-right:3px;padding-bottom:5px;padding-left:3px;font-size:13px;color:rgb(0, 0, 0);}.payment-row-total{border-top-width:2px;border-top-style:solid;border-top-color:rgb(0, 0, 0);font-size:14px;}.payment-row-total td{padding-top:5px;padding-right:2px;padding-bottom:5px;padding-left:2px;color:rgb(0, 0, 0);}@page{size:188mm 75mm;margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;}@page{size:200mm 80mm;margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;}@page{size:190mm 75mm;margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;}@media print{body{margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px;width:190mm;height:75mm;overflow-x:hidden;overflow-y:hidden;}.receipt-container{print-color-adjust:exact;break-inside:avoid;break-after:avoid;}*{print-color-adjust:exact;}body{margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px;}*{print-color-adjust:exact;}}@media screen{body{background-image:initial;background-position-x:initial;background-position-y:initial;background-size:initial;background-repeat:initial;background-attachment:initial;background-origin:initial;background-clip:initial;background-color:rgb(240, 240, 240);padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px;}body{background-image:initial;background-position-x:initial;background-position-y:initial;background-size:initial;background-repeat:initial;background-attachment:initial;background-origin:initial;background-clip:initial;background-color:rgb(240, 240, 240);padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px;}body{background-image:initial;background-position-x:initial;background-position-y:initial;background-size:initial;background-repeat:initial;background-attachment:initial;background-origin:initial;background-clip:initial;background-color:rgb(240, 240, 240);padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px;}}@media (max-width: 756px){.receipt-container{margin-top:5px;margin-right:0px;margin-bottom:0px;margin-left:0px;}}@media (max-width: 718px){.receipt-container{padding:8px 8px 8px 8px;margin:0px 0px 0px 0px;}.amount-col{font-size:14px;}.timestamp-value{font-size:12px;}.info-value.patient-name-value{font-size:16px;}.next-appointment-value{font-size:16px;}.label-col{font-size:12px;}.clinic-footer-title{font-size:12px;padding:3px 0px 0px 0px;}.clinic-footer-info{font-size:12px;padding:3px 0px 0px 0px;}.receipt-ids{font-size:10px;}}
+
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+            }
+
+            * {
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+            }
+        }
+
+        @media screen {
+            body {
+                background: #f0f0f0;
+                padding: 0;
+            }
+        }
+    </style>
+    <script>
+        // Auto-print when page loads and auto-close after printing
+        window.onload = function() {
+            window.print();
+
+            // Close window after print dialog is dismissed
+            window.onafterprint = function() {
+                window.close();
+            };
+        };
+    </script>
+</head>
+<body>
+    <body id="irv4"><div class="receipt-container"><!-- Header Row --><div class="header-row"><div class="clinic-header"><div class="clinic-name">SHWAN ORTHODONTICS</div><div class="receipt-ids">Receipt #{{work.WorkID}} | Patient ID: {{patient.PersonID}} | Phone: {{patient.Phone}}</div></div><div class="receipt-timestamp"><div class="timestamp-value">{{payment.PaymentDateTime|date:DD/MM/YYYY HH:mm}}</div></div></div><!-- Two Column Main Content --><div class="main-content"><!-- Left Column: Patient Information --><div class="column-left"><div class="info-row patient-name-row"><span class="info-label">Name:</span><span class="info-value patient-name-value">{{patient.PatientName}}</span></div><!-- Next Appointment --><div class="next-appointment"><div class="next-appointment-label">NEXT APPOINTMENT</div><div class="next-appointment-value">{{patient.AppDate|date:DD/MM/YYYY HH:mm|default:Not Scheduled}}</div></div><!-- Clinic Footer in Left Column --><div class="clinic-footer"><div class="clinic-footer-title">Thank you for your payment!</div><div class="clinic-footer-info">Duhok, Kurdistan - Iraq</div><div class="clinic-footer-info">Tel: +964 750 8108833 |</div><div class="clinic-footer-info">Keep this receipt for your records</div></div></div><!-- Right Column: Payment Details --><div class="column-right"><div class="section-header">PAYMENT DETAILS</div><table class="payment-table"><tbody><tr><td class="label-col">Total Treatment Cost:</td><td class="amount-col">{{work.TotalRequired|currency}} {{work.Currency}}</td></tr><tr><td class="label-col">Previously Paid:</td><td class="amount-col">{{payment.PreviouslyPaid|currency}}</td></tr><tr class="payment-row-divider"><td colspan="2"></td></tr><tr class="payment-row-highlight"><td class="label-col">PAID TODAY:</td><td class="amount-col">{{payment.AmountPaidToday|currency}}</td></tr><tr class="payment-row-divider"><td colspan="2"></td></tr><tr><td class="label-col">Total Paid:</td><td class="amount-col">{{payment.TotalPaid|currency}}</td></tr><tr class="payment-row-total"><td class="label-col">REMAINING BALANCE:</td><td class="amount-col">{{payment.RemainingBalance|currency}}</td></tr></tbody></table></div></div></div></body>
+</body>
+</html>

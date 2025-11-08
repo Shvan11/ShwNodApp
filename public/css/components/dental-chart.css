@@ -1,0 +1,163 @@
+/* ===== DENTAL CHART COMPONENT ===== */
+
+.dental-chart-container {
+    background-color: #f7fafc;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0;
+}
+
+/* Arch Section */
+.dental-arch {
+    margin-bottom: 0.75rem;
+}
+
+.dental-arch:last-of-type {
+    margin-bottom: 0;
+}
+
+.dental-arch-label {
+    text-align: center;
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 0.375rem;
+    font-size: 0.8125rem;
+    line-height: 1;
+}
+
+.dental-arch-teeth {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.1875rem;
+    flex-wrap: nowrap;
+}
+
+/* Midline Divider */
+.dental-midline {
+    width: 3px;
+    height: 42px;
+    background-color: #e53e3e;
+    margin: 0 0.25rem;
+    border-radius: 1px;
+    flex-shrink: 0;
+}
+
+/* Individual Tooth */
+.dental-tooth {
+    width: 34px;
+    height: 42px;
+    border: 1.5px solid #cbd5e0;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: white;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.dental-tooth:hover {
+    border-color: #4299e1;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(66, 153, 225, 0.3);
+}
+
+.dental-tooth.selected {
+    border-color: #667eea;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.dental-tooth.selected:hover {
+    border-color: #667eea;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
+}
+
+/* Tooth Image Container */
+.dental-tooth-image {
+    margin-bottom: 0.0625rem;
+}
+
+.dental-tooth-image img {
+    width: 22px;
+    height: 26px;
+    object-fit: contain;
+    filter: grayscale(0%);
+    transition: all 0.3s;
+}
+
+.dental-tooth.selected .dental-tooth-image img {
+    filter: brightness(0) invert(1);
+}
+
+.dental-tooth-image .tooth-emoji {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+/* Tooth Number Label */
+.dental-tooth-number {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #4a5568;
+    line-height: 1;
+}
+
+.dental-tooth.selected .dental-tooth-number {
+    color: white;
+}
+
+/* Legend - Hidden as per requirements */
+.dental-legend {
+    display: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .dental-chart-container {
+        padding: 0.625rem 0.75rem;
+    }
+
+    .dental-tooth {
+        width: 30px;
+        height: 38px;
+    }
+
+    .dental-tooth-image img {
+        width: 20px;
+        height: 24px;
+    }
+
+    .dental-midline {
+        height: 38px;
+    }
+
+    .dental-arch-teeth {
+        gap: 0.125rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .dental-tooth {
+        width: 26px;
+        height: 34px;
+    }
+
+    .dental-tooth-image img {
+        width: 18px;
+        height: 22px;
+    }
+
+    .dental-tooth-number {
+        font-size: 0.625rem;
+    }
+
+    .dental-midline {
+        height: 34px;
+        margin: 0 0.1875rem;
+    }
+}

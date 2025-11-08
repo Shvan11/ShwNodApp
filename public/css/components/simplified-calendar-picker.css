@@ -6,15 +6,10 @@
 /* ==================== PAGE LAYOUT ==================== */
 
 .appointment-form-page {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
     background: #f5f6fa;
     display: flex;
     flex-direction: column;
-    z-index: 9999;
+    min-height: 100vh;
 }
 
 /* Page Header - SCOPED */

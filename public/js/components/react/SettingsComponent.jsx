@@ -4,6 +4,8 @@ import SettingsTabNavigation from './SettingsTabNavigation.jsx';
 import GeneralSettings from './GeneralSettings.jsx';
 import DatabaseSettings from './DatabaseSettings.jsx';
 import AlignerDoctorsSettings from './AlignerDoctorsSettings.jsx';
+import EmailSettings from './EmailSettings.jsx';
+import EmployeeSettings from './EmployeeSettings.jsx';
 
 const SettingsComponent = () => {
     const { tab } = useParams();
@@ -13,6 +15,8 @@ const SettingsComponent = () => {
         general: { hasChanges: false },
         database: { hasChanges: false },
         alignerDoctors: { hasChanges: false },
+        email: { hasChanges: false },
+        employees: { hasChanges: false },
         messaging: { hasChanges: false },
         system: { hasChanges: false },
         security: { hasChanges: false }
@@ -40,6 +44,20 @@ const SettingsComponent = () => {
             icon: 'fas fa-user-md',
             component: AlignerDoctorsSettings,
             description: 'Manage aligner doctors and portal access'
+        },
+        {
+            id: 'email',
+            label: 'Email',
+            icon: 'fas fa-envelope',
+            component: EmailSettings,
+            description: 'Email notifications and SMTP configuration'
+        },
+        {
+            id: 'employees',
+            label: 'Employees',
+            icon: 'fas fa-users',
+            component: EmployeeSettings,
+            description: 'Manage staff members and email notification settings'
         },
         {
             id: 'messaging',
