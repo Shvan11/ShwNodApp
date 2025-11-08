@@ -173,18 +173,18 @@ export async function getActiveWID(PID) {
 export async function createPatient(patientData) {
     const query = `
         INSERT INTO dbo.tblpatients (
-            patientID, PatientName, Phone, FirstName, LastName, 
+            patientID, PatientName, Phone, FirstName, LastName,
             DateofBirth, Gender, Phone2, Email, AddressID,
-            ReferralSourceID, PatientTypeID, Notes, Alerts, 
+            ReferralSourceID, PatientTypeID, Notes, Alerts,
             Language, CountryCode
-        ) 
-        OUTPUT INSERTED.PersonID
+        )
         VALUES (
             @patientID, @patientName, @phone, @firstName, @lastName,
             @dateOfBirth, @gender, @phone2, @email, @addressID,
-            @referralSourceID, @patientTypeID, @notes, @alerts, 
+            @referralSourceID, @patientTypeID, @notes, @alerts,
             @language, @countryCode
-        )
+        );
+        SELECT SCOPE_IDENTITY() AS PersonID;
     `;
 
     const parameters = [
