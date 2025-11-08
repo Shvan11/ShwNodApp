@@ -40,11 +40,104 @@
 
         @media (max-width: 768px) {
             #react-root {
-                padding: 1rem;
+                padding: 0.5rem;
             }
 
             .patient-management {
-                padding: 1rem;
+                padding: 0.75rem;
+                border-radius: 8px;
+            }
+
+            /* Stack header items vertically */
+            .patient-management > div:first-child {
+                flex-direction: column !important;
+                align-items: stretch !important;
+            }
+
+            .patient-management > div:first-child > div {
+                width: 100% !important;
+            }
+
+            /* Stack buttons vertically on mobile */
+            .patient-management > div:first-child button {
+                width: 100%;
+                justify-content: center;
+            }
+
+            /* Make search inputs stack better */
+            .patient-management input,
+            .patient-management select {
+                font-size: 16px !important; /* Prevents zoom on iOS */
+            }
+
+            /* Improve table scrolling */
+            .work-table-container {
+                margin: 0 -0.75rem;
+                border-radius: 0;
+            }
+
+            /* Make action buttons stack */
+            .action-buttons {
+                flex-direction: column !important;
+                gap: 0.25rem !important;
+            }
+
+            .action-buttons .btn {
+                width: 100% !important;
+                justify-content: center !important;
+                font-size: 0.875rem !important;
+            }
+
+            /* Optimize table for mobile */
+            .work-table th,
+            .work-table td {
+                padding: 0.5rem !important;
+                font-size: 0.8125rem !important;
+            }
+
+            /* Hide less important columns on mobile */
+            .work-table th:nth-child(4),
+            .work-table td:nth-child(4),
+            .work-table th:nth-child(5),
+            .work-table td:nth-child(5) {
+                display: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #react-root {
+                padding: 0.25rem;
+            }
+
+            .patient-management {
+                padding: 0.5rem;
+            }
+
+            .patient-management h2,
+            .patient-management h3 {
+                font-size: 1rem !important;
+            }
+
+            /* Even more aggressive table optimization */
+            .work-table th:nth-child(6),
+            .work-table td:nth-child(6) {
+                display: none;
+            }
+
+            .work-table {
+                font-size: 0.75rem;
+            }
+
+            /* Modal full screen on small devices */
+            .work-modal {
+                max-width: 100% !important;
+                max-height: 100% !important;
+                border-radius: 0 !important;
+                margin: 0;
+            }
+
+            .modal-overlay {
+                padding: 0 !important;
             }
         }
     </style>

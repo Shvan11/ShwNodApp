@@ -71,6 +71,12 @@ export default {
   urls: {
     qrHost: process.env.QR_HOST_URL
   },
+  webceph: {
+    partnerApiKey: process.env.WEBCEPH_PARTNER_API_KEY,
+    userEmail: process.env.WEBCEPH_USER_EMAIL,
+    userApiPassword: process.env.WEBCEPH_USER_API_PASSWORD,
+    baseUrl: process.env.WEBCEPH_API_BASE_URL || 'https://api.webceph.com'
+  },
   cs_export: process.env.CS_EXPORT,
 gram_session: process.env.GRAM_SESSION,
 };

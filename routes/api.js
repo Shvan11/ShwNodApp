@@ -44,6 +44,7 @@ import { createPathResolver } from '../utils/path-resolver.js';
 import { getAllOptions, getOption, updateOption, getOptionsByPattern, bulkUpdateOptions } from '../services/database/queries/options-queries.js';
 import DatabaseConfigService from '../services/config/DatabaseConfigService.js';
 import templateRouter from './template-api.js';
+import webcephService from '../services/webceph/webceph-service.js';
 
 const router = express.Router();
 const upload = multer();
@@ -2717,6 +2718,185 @@ router.get('/getpatient/:personId', async (req, res) => {
     } catch (error) {
         console.error("Error fetching patient:", error);
         res.status(500).json({ error: "Failed to fetch patient" });
+    }
+});
+
+// ==============================
+// WEBCEPH API ENDPOINTS
+// ==============================
+
+// Create patient in WebCeph
+router.post('/webceph/create-patient', async (req, res) => {
+    try {
+        const { personId, patientData } = req.body;
+
+        if (!personId) {
+            return res.status(400).json({ error: 'PersonID is required' });
+        }
+
+        // Validate patient data
+        const validation = webcephService.validatePatientData(patientData);
+        if (!validation.valid) {
+            return res.status(400).json({ error: validation.errors.join(', ') });
+        }
+
+        // Create patient in WebCeph
+        const result = await webcephService.createPatient(patientData);
+
+        // Update local database with WebCeph information
+        const updateQuery = `
+            UPDATE tblPatients
+            SET WebCephPatientID = @webcephPatientId,
+                WebCephLink = @link,
+                WebCephCreatedAt = GETDATE()
+            WHERE PersonID = @personId
+        `;
+
+        await database.executeQuery(updateQuery, [
+            ['webcephPatientId', database.TYPES.NVarChar, result.webcephPatientId],
+            ['link', database.TYPES.NVarChar, result.link],
+            ['personId', database.TYPES.Int, personId]
+        ]);
+
+        console.log(`[WebCeph] Patient created successfully for PersonID: ${personId}`);
+
+        res.json({
+            success: true,
+            message: 'Patient created in WebCeph successfully',
+            data: {
+                webcephPatientId: result.webcephPatientId,
+                link: result.link,
+                linkId: result.linkId
+            }
+        });
+    } catch (error) {
+        console.error('[WebCeph] Error creating patient:', error);
+        res.status(500).json({
+            error: 'Failed to create patient in WebCeph',
+            details: error.message
+        });
+    }
+});
+
+// Upload X-ray image to WebCeph
+router.post('/webceph/upload-image', upload.single('image'), async (req, res) => {
+    try {
+        const { patientID, recordDate, targetClass } = req.body;
+
+        if (!req.file) {
+            return res.status(400).json({ error: 'Image file is required' });
+        }
+
+        // Step 1: Create a new record for this date (if it doesn't exist)
+        let recordResult;
+        try {
+            recordResult = await webcephService.addNewRecord(patientID, recordDate);
+            console.log(`[WebCeph] Record created or already exists`);
+        } catch (error) {
+            // If record already exists, that's fine, continue with upload
+            if (!error.message.includes('already exist')) {
+                throw error;
+            }
+            console.log(`[WebCeph] Using existing record for ${recordDate}`);
+        }
+
+        // Step 2: Upload the image to the record
+        const uploadData = {
+            patientID,
+            recordHash: recordDate,
+            targetClass,
+            image: req.file.buffer,
+            filename: req.file.originalname,
+            contentType: req.file.mimetype,
+            overwrite: true
+        };
+
+        // Validate upload data
+        const validation = webcephService.validateUploadData(uploadData);
+        if (!validation.valid) {
+            return res.status(400).json({ error: validation.errors.join(', ') });
+        }
+
+        // Upload to WebCeph
+        const result = await webcephService.uploadImage(uploadData);
+
+        console.log(`[WebCeph] Image uploaded successfully for patient: ${patientID}`);
+
+        res.json({
+            success: true,
+            message: 'Image uploaded to WebCeph successfully',
+            data: {
+                big: result.big,
+                thumbnail: result.thumbnail,
+                link: result.link
+            }
+        });
+    } catch (error) {
+        console.error('[WebCeph] Error uploading image:', error);
+        res.status(500).json({
+            error: 'Failed to upload image to WebCeph',
+            details: error.message
+        });
+    }
+});
+
+// Get WebCeph patient link for a patient
+router.get('/webceph/patient-link/:personId', async (req, res) => {
+    try {
+        const { personId } = req.params;
+
+        if (!personId) {
+            return res.status(400).json({ error: 'PersonID is required' });
+        }
+
+        const query = `
+            SELECT WebCephPatientID, WebCephLink, WebCephCreatedAt
+            FROM tblPatients
+            WHERE PersonID = @personId
+        `;
+
+        const result = await database.executeQuery(
+            query,
+            [['personId', database.TYPES.Int, parseInt(personId)]],
+            (columns) => ({
+                webcephPatientId: columns[0].value,
+                link: columns[1].value,
+                createdAt: columns[2].value
+            })
+        );
+
+        if (!result || result.length === 0 || !result[0].webcephPatientId) {
+            return res.json({
+                success: false,
+                message: 'Patient not found in WebCeph',
+                data: null
+            });
+        }
+
+        res.json({
+            success: true,
+            data: result[0]
+        });
+    } catch (error) {
+        console.error('[WebCeph] Error fetching patient link:', error);
+        res.status(500).json({
+            error: 'Failed to fetch WebCeph patient link',
+            details: error.message
+        });
+    }
+});
+
+// Get available photo types
+router.get('/webceph/photo-types', async (req, res) => {
+    try {
+        const photoTypes = webcephService.getPhotoTypes();
+        res.json({
+            success: true,
+            data: photoTypes
+        });
+    } catch (error) {
+        console.error('[WebCeph] Error fetching photo types:', error);
+        res.status(500).json({ error: 'Failed to fetch photo types' });
     }
 });
 

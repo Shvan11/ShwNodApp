@@ -15,6 +15,18 @@ const EditPatientComponent = ({ patientId }) => {
     const [referralSources, setReferralSources] = useState([]);
     const [patientTypes, setPatientTypes] = useState([]);
 
+    // WebCeph integration state
+    const [webcephData, setWebcephData] = useState(null);
+    const [webcephLoading, setWebcephLoading] = useState(false);
+    const [webcephError, setWebcephError] = useState(null);
+    const [webcephSuccess, setWebcephSuccess] = useState('');
+    const [photoTypes, setPhotoTypes] = useState([]);
+    const [uploadData, setUploadData] = useState({
+        recordDate: new Date().toISOString().split('T')[0],
+        targetClass: 'ceph_photo',
+        imageFile: null
+    });
+
     // Form data
     const [formData, setFormData] = useState({
         PersonID: '',
@@ -100,7 +112,151 @@ const EditPatientComponent = ({ patientId }) => {
     useEffect(() => {
         loadDropdownData();
         loadPatientData();
+        loadWebcephData();
+        loadPhotoTypes();
     }, [patientId, loadDropdownData, loadPatientData]);
+
+    // Load WebCeph data for patient
+    const loadWebcephData = async () => {
+        if (!patientId) return;
+
+        try {
+            const response = await fetch(`/api/webceph/patient-link/${patientId}`);
+            const data = await response.json();
+
+            if (data.success && data.data) {
+                setWebcephData(data.data);
+            }
+        } catch (err) {
+            console.error('Error loading WebCeph data:', err);
+        }
+    };
+
+    // Load available photo types
+    const loadPhotoTypes = async () => {
+        try {
+            const response = await fetch('/api/webceph/photo-types');
+            const data = await response.json();
+
+            if (data.success) {
+                setPhotoTypes(data.data);
+            }
+        } catch (err) {
+            console.error('Error loading photo types:', err);
+        }
+    };
+
+    // Create patient in WebCeph
+    const handleCreateWebcephPatient = async () => {
+        if (!patientData) return;
+
+        try {
+            setWebcephLoading(true);
+            setWebcephError(null);
+
+            // Map gender ID to gender name
+            let genderName = '';
+            if (formData.Gender) {
+                const gender = genders.find(g => g.id === parseInt(formData.Gender));
+                genderName = gender ? gender.name : '';
+            }
+
+            // Pad patient ID with zeros to meet 6-character minimum
+            let paddedPatientID = formData.patientID || patientData.PersonID.toString();
+            if (paddedPatientID.length < 6) {
+                paddedPatientID = paddedPatientID.padStart(6, '0');
+            }
+
+            const webcephPatientData = {
+                patientID: paddedPatientID,
+                firstName: formData.FirstName || '',
+                lastName: formData.LastName || '',
+                gender: genderName,
+                birthday: formData.DateofBirth || '',
+                race: 'Asian' // Default value
+            };
+
+            const response = await fetch('/api/webceph/create-patient', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    personId: patientData.PersonID,
+                    patientData: webcephPatientData
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || data.details || 'Failed to create patient in WebCeph');
+            }
+
+            setWebcephData({
+                webcephPatientId: data.data.webcephPatientId,
+                link: data.data.link,
+                createdAt: new Date().toISOString()
+            });
+
+            setWebcephSuccess('Patient created in WebCeph successfully!');
+            setTimeout(() => setWebcephSuccess(''), 5000);
+        } catch (err) {
+            console.error('Error creating WebCeph patient:', err);
+            setWebcephError(err.message);
+        } finally {
+            setWebcephLoading(false);
+        }
+    };
+
+    // Upload X-ray image to WebCeph
+    const handleUploadImage = async () => {
+        if (!uploadData.imageFile) {
+            setWebcephError('Please select an image file');
+            return;
+        }
+
+        try {
+            setWebcephLoading(true);
+            setWebcephError(null);
+
+            const formDataObj = new FormData();
+            formDataObj.append('image', uploadData.imageFile);
+            formDataObj.append('patientID', formData.patientID || patientData.PersonID.toString());
+            formDataObj.append('recordDate', uploadData.recordDate);
+            formDataObj.append('targetClass', uploadData.targetClass);
+
+            const response = await fetch('/api/webceph/upload-image', {
+                method: 'POST',
+                body: formDataObj
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || data.details || 'Failed to upload image');
+            }
+
+            setWebcephSuccess(`Image uploaded successfully! View at: ${data.data.link}`);
+            setTimeout(() => setWebcephSuccess(''), 10000);
+
+            // Reset upload form
+            setUploadData({
+                recordDate: new Date().toISOString().split('T')[0],
+                targetClass: 'ceph_photo',
+                imageFile: null
+            });
+
+            // Clear file input
+            const fileInput = document.getElementById('webceph-image-upload');
+            if (fileInput) fileInput.value = '';
+        } catch (err) {
+            console.error('Error uploading image:', err);
+            setWebcephError(err.message);
+        } finally {
+            setWebcephLoading(false);
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -395,6 +551,249 @@ const EditPatientComponent = ({ patientId }) => {
                         rows="2"
                         placeholder="Important alerts about this patient"
                     />
+                </div>
+
+                {/* WebCeph AI X-Ray Analysis Section */}
+                <div style={{
+                    marginTop: '3rem',
+                    padding: '2rem',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '12px',
+                    border: '2px solid #e2e8f0'
+                }}>
+                    <h3 style={{
+                        fontSize: '1.25rem',
+                        fontWeight: 'bold',
+                        color: '#1f2937',
+                        marginBottom: '1.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem'
+                    }}>
+                        <i className="fas fa-brain" style={{ color: '#8b5cf6' }}></i>
+                        WebCeph AI X-Ray Analysis
+                    </h3>
+
+                    {webcephError && (
+                        <div style={{
+                            backgroundColor: '#fee2e2',
+                            color: '#991b1b',
+                            padding: '1rem',
+                            borderRadius: '8px',
+                            marginBottom: '1rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                        }}>
+                            <div>
+                                <i className="fas fa-exclamation-circle" style={{ marginRight: '0.5rem' }}></i>
+                                {webcephError}
+                            </div>
+                            <button onClick={() => setWebcephError(null)} style={{
+                                background: 'transparent',
+                                border: 'none',
+                                fontSize: '1.5rem',
+                                cursor: 'pointer',
+                                color: '#991b1b'
+                            }}>×</button>
+                        </div>
+                    )}
+
+                    {webcephSuccess && (
+                        <div style={{
+                            backgroundColor: '#d1fae5',
+                            color: '#065f46',
+                            padding: '1rem',
+                            borderRadius: '8px',
+                            marginBottom: '1rem'
+                        }}>
+                            <i className="fas fa-check-circle" style={{ marginRight: '0.5rem' }}></i>
+                            {webcephSuccess}
+                        </div>
+                    )}
+
+                    {!webcephData ? (
+                        <div style={{
+                            backgroundColor: 'white',
+                            padding: '2rem',
+                            borderRadius: '8px',
+                            textAlign: 'center'
+                        }}>
+                            <i className="fas fa-user-plus" style={{ fontSize: '3rem', color: '#8b5cf6', marginBottom: '1rem' }}></i>
+                            <h4 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                                Create Patient in WebCeph
+                            </h4>
+                            <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+                                Get AI-powered cephalometric analysis by creating this patient in WebCeph
+                            </p>
+                            <button
+                                type="button"
+                                onClick={handleCreateWebcephPatient}
+                                disabled={webcephLoading}
+                                style={{
+                                    backgroundColor: '#8b5cf6',
+                                    color: 'white',
+                                    padding: '0.75rem 2rem',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    fontSize: '1rem',
+                                    fontWeight: '600',
+                                    cursor: webcephLoading ? 'not-allowed' : 'pointer',
+                                    opacity: webcephLoading ? 0.6 : 1
+                                }}
+                            >
+                                {webcephLoading ? (
+                                    <>
+                                        <i className="fas fa-spinner fa-spin" style={{ marginRight: '0.5rem' }}></i>
+                                        Creating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-plus-circle" style={{ marginRight: '0.5rem' }}></i>
+                                        Create in WebCeph
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            {/* Patient Link Card */}
+                            <div style={{
+                                backgroundColor: 'white',
+                                padding: '1.5rem',
+                                borderRadius: '8px',
+                                border: '1px solid #e2e8f0'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <i className="fas fa-check-circle" style={{ color: '#10b981' }}></i>
+                                        <span style={{ fontWeight: '600', color: '#1f2937' }}>Patient Created in WebCeph</span>
+                                    </div>
+                                    <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                        {webcephData.createdAt ? new Date(webcephData.createdAt).toLocaleDateString() : ''}
+                                    </span>
+                                </div>
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>WebCeph Patient ID</div>
+                                    <div style={{ fontFamily: 'monospace', fontSize: '0.9rem', color: '#1f2937' }}>
+                                        {webcephData.webcephPatientId}
+                                    </div>
+                                </div>
+                                <a
+                                    href={webcephData.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        backgroundColor: '#8b5cf6',
+                                        color: 'white',
+                                        padding: '0.5rem 1.5rem',
+                                        borderRadius: '6px',
+                                        textDecoration: 'none',
+                                        fontSize: '0.9rem',
+                                        fontWeight: '600'
+                                    }}
+                                >
+                                    <i className="fas fa-external-link-alt"></i>
+                                    Open in WebCeph
+                                </a>
+                            </div>
+
+                            {/* Upload X-Ray Card */}
+                            <div style={{
+                                backgroundColor: 'white',
+                                padding: '1.5rem',
+                                borderRadius: '8px',
+                                border: '1px solid #e2e8f0'
+                            }}>
+                                <h4 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937' }}>
+                                    <i className="fas fa-upload" style={{ marginRight: '0.5rem', color: '#8b5cf6' }}></i>
+                                    Upload X-Ray Image
+                                </h4>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
+                                            Record Date
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={uploadData.recordDate}
+                                            onChange={(e) => setUploadData({...uploadData, recordDate: e.target.value})}
+                                            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #d1d5db' }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
+                                            Photo Type
+                                        </label>
+                                        <select
+                                            value={uploadData.targetClass}
+                                            onChange={(e) => setUploadData({...uploadData, targetClass: e.target.value})}
+                                            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #d1d5db' }}
+                                        >
+                                            {photoTypes.map(type => (
+                                                <option key={type.class} value={type.class}>{type.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
+                                        X-Ray Image
+                                    </label>
+                                    <input
+                                        id="webceph-image-upload"
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/jpg"
+                                        onChange={(e) => setUploadData({...uploadData, imageFile: e.target.files[0]})}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.5rem',
+                                            borderRadius: '6px',
+                                            border: '1px solid #d1d5db',
+                                            fontSize: '0.9rem'
+                                        }}
+                                    />
+                                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                        Accepted formats: JPEG, PNG (Max 10MB)
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={handleUploadImage}
+                                    disabled={webcephLoading || !uploadData.imageFile}
+                                    style={{
+                                        backgroundColor: '#059669',
+                                        color: 'white',
+                                        padding: '0.75rem 1.5rem',
+                                        borderRadius: '6px',
+                                        border: 'none',
+                                        fontSize: '0.9rem',
+                                        fontWeight: '600',
+                                        cursor: (webcephLoading || !uploadData.imageFile) ? 'not-allowed' : 'pointer',
+                                        opacity: (webcephLoading || !uploadData.imageFile) ? 0.6 : 1
+                                    }}
+                                >
+                                    {webcephLoading ? (
+                                        <>
+                                            <i className="fas fa-spinner fa-spin" style={{ marginRight: '0.5rem' }}></i>
+                                            Uploading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="fas fa-cloud-upload-alt" style={{ marginRight: '0.5rem' }}></i>
+                                            Upload to WebCeph
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="modal-actions" style={{
