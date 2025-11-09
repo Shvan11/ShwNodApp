@@ -417,8 +417,23 @@ body.daily-appointments-view {
   flex: 1;
   min-width: 0;
   display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Line 1: Patient name, patient type, and appointment type */
+.appointment-info-line-1 {
+  display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Line 2: State times and visit notes icon */
+.appointment-info-line-2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
@@ -428,6 +443,7 @@ body.daily-appointments-view {
   color: #1f2937;
   display: flex;
   align-items: center;
+  gap: 0.375rem;
   line-height: 1;
 }
 
@@ -493,6 +509,32 @@ body.daily-appointments-view {
   border-color: rgba(139, 92, 246, 0.3);
 }
 
+/* Inline patient type badge (beside name) */
+.patient-type-badge-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  background-color: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  transition: all var(--transition-fast);
+  line-height: 1;
+}
+
+/* Inline appointment type (beside patient type) */
+.appointment-type-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: var(--font-size-sm);
+  color: #6b7280;
+  line-height: 1;
+}
+
 .patient-type-badge i {
   font-size: 0.65rem;
 }
@@ -533,6 +575,48 @@ body.daily-appointments-view {
   color: var(--status-dismissed-text);
 }
 
+/* Visit Notes Icon Styles - Compact icon-only design */
+.visit-notes-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  transition: all var(--transition-fast);
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.visit-notes-icon.visit-notes-registered {
+  background-color: #d1fae5;
+  color: #065f46;
+  border: 1.5px solid #86efac;
+}
+
+.visit-notes-icon.visit-notes-registered:hover {
+  background-color: #a7f3d0;
+  border-color: #4ade80;
+  transform: scale(1.05);
+}
+
+.visit-notes-icon.visit-notes-missing {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1.5px solid #fcd34d;
+}
+
+.visit-notes-icon.visit-notes-missing:hover {
+  background-color: #fde68a;
+  border-color: #fbbf24;
+  transform: scale(1.05);
+}
+
+.visit-notes-icon i {
+  font-size: 0.875rem;
+}
+
 @keyframes pulse {
   0%, 100% {
     opacity: 1;
@@ -548,6 +632,52 @@ body.daily-appointments-view {
   align-items: center;
   gap: 0.25rem;
   flex-wrap: wrap;
+}
+
+/* Compact state times container */
+.state-times-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+
+/* Compact status time icons (icon + time only, no labels) */
+.status-time-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background-color: rgba(107, 114, 128, 0.08);
+  color: #4b5563;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid rgba(107, 114, 128, 0.15);
+  transition: all var(--transition-fast);
+  line-height: 1;
+}
+
+.status-time-icon i {
+  font-size: 0.75rem;
+}
+
+.status-time-icon.status-time-present {
+  background-color: var(--status-present-bg);
+  color: var(--status-present-text);
+  border-color: rgba(30, 64, 175, 0.2);
+}
+
+.status-time-icon.status-time-seated {
+  background-color: var(--status-seated-bg);
+  color: var(--status-seated-text);
+  border-color: rgba(180, 83, 9, 0.2);
+}
+
+.status-time-icon.status-time-dismissed {
+  background-color: var(--status-dismissed-bg);
+  color: var(--status-dismissed-text);
+  border-color: rgba(6, 95, 70, 0.2);
 }
 
 .status-time {

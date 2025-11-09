@@ -167,7 +167,28 @@ function renderCheckedInAppointments(appointments) {
         return;
     }
 
-    container.innerHTML = createAppointmentsCards(appointments, true);
+    // Sort by check-in time (earliest first)
+    const sortedAppointments = sortByCheckInTime(appointments);
+    container.innerHTML = createAppointmentsCards(sortedAppointments, true);
+}
+
+// Sort appointments by check-in time (earliest first)
+function sortByCheckInTime(appointments) {
+    if (!appointments || appointments.length === 0) return appointments;
+
+    return [...appointments].sort((a, b) => {
+        const timeA = a.PresentTime || '99:99'; // Put items without time at end
+        const timeB = b.PresentTime || '99:99';
+
+        // Convert HH:MM to comparable number
+        const [hoursA, minutesA] = timeA.split(':').map(Number);
+        const [hoursB, minutesB] = timeB.split(':').map(Number);
+
+        const totalMinutesA = (hoursA || 0) * 60 + (minutesA || 0);
+        const totalMinutesB = (hoursB || 0) * 60 + (minutesB || 0);
+
+        return totalMinutesA - totalMinutesB;
+    });
 }
 
 // Format SQL Server TIME value (HH:MM:SS) to 12-hour format
@@ -238,54 +259,57 @@ function createAppointmentsCards(appointments, showStatus = false) {
                 </div>
 
                 <div class="appointment-info">
-                    <div class="patient-name">
-                        <a href="javascript:void(0)" class="patient-link" onclick="viewPatientPhotos(${patientId})">
-                            <i class="fas fa-user-circle patient-link-icon"></i>
-                            ${patientName}
-                        </a>
+                    <div class="appointment-info-line-1">
+                        <div class="patient-name">
+                            <a href="javascript:void(0)" class="patient-link" onclick="viewPatientPhotos(${patientId})">
+                                <i class="fas fa-user-circle patient-link-icon"></i>
+                                ${patientName}
+                            </a>
+                            ${appointment.PatientType ? `
+                                <span class="patient-type-badge-inline">
+                                    <i class="fas fa-tag"></i>
+                                    ${appointment.PatientType}
+                                </span>
+                            ` : ''}
+                        </div>
+                        ${appointment.AppDetail ? `
+                            <div class="appointment-type-inline">
+                                <i class="fas fa-stethoscope appointment-type-icon"></i>
+                                ${appointment.AppDetail}
+                            </div>
+                        ` : ''}
                     </div>
 
-                    ${appointment.AppDetail ? `
-                        <div class="appointment-type">
-                            <i class="fas fa-stethoscope appointment-type-icon"></i>
-                            ${appointment.AppDetail}
-                        </div>
-                    ` : ''}
-
-                    <div class="appointment-meta">
-                        ${appointment.PatientType ? `
-                            <span class="patient-type-badge">
-                                <i class="fas fa-tag"></i>
-                                ${appointment.PatientType}
-                            </span>
-                        ` : ''}
-                        ${showStatus ? `
-                            <span class="status-badge status-${statusClass}">
-                                <i class="fas fa-${getStatusIcon(status)}"></i>
-                                ${status}
-                            </span>
-                            <div class="state-times">
+                    ${showStatus ? `
+                        <div class="appointment-info-line-2">
+                            <div class="state-times-compact">
                                 ${presentTime ? `
-                                    <span class="status-time status-time-present" title="Checked in">
+                                    <span class="status-time-icon status-time-present" title="Checked in: ${presentTime}">
                                         <i class="fas fa-user-check"></i>
                                         ${presentTime}
                                     </span>
                                 ` : ''}
                                 ${seatedTime ? `
-                                    <span class="status-time status-time-seated" title="Seated">
+                                    <span class="status-time-icon status-time-seated" title="Seated: ${seatedTime}">
                                         <i class="fas fa-chair"></i>
                                         ${seatedTime}
                                     </span>
                                 ` : ''}
                                 ${dismissedTime ? `
-                                    <span class="status-time status-time-dismissed" title="Dismissed">
+                                    <span class="status-time-icon status-time-dismissed" title="Dismissed: ${dismissedTime}">
                                         <i class="fas fa-check-circle"></i>
                                         ${dismissedTime}
                                     </span>
                                 ` : ''}
                             </div>
-                        ` : ''}
-                    </div>
+                            ${appointment.PatientType === 'Active' ? `
+                                <span class="visit-notes-icon ${appointment.HasVisit ? 'visit-notes-registered' : 'visit-notes-missing'}"
+                                      title="${appointment.HasVisit ? 'Visit notes registered ✓' : 'No visit notes yet'}">
+                                    <i class="fas fa-${appointment.HasVisit ? 'clipboard-check' : 'clipboard'}"></i>
+                                </span>
+                            ` : ''}
+                        </div>
+                    ` : ''}
                 </div>
 
                 <div class="appointment-actions">
