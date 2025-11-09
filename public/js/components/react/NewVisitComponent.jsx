@@ -2,9 +2,10 @@
  * NewVisitComponent - Standalone form for adding/editing visits
  *
  * Compact, space-efficient form with dental chart integration
+ * Optimized with React hooks (useCallback, useMemo) for performance
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import DentalChart from './DentalChart.jsx';
 
 const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
@@ -12,7 +13,6 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
     const [error, setError] = useState(null);
     const [wires, setWires] = useState([]);
     const [operators, setOperators] = useState([]);
-    const [selectedTeeth, setSelectedTeeth] = useState([]);
     const [latestWires, setLatestWires] = useState({
         UpperWireID: null,
         UpperWireName: null,
@@ -43,14 +43,17 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
         OperatorID: ''
     });
 
-    useEffect(() => {
-        loadDropdownData();
-        if (visitId) {
-            loadVisitData();
-        }
-    }, [workId, visitId]);
+    // Derive selected teeth from formData using useMemo (prevents unnecessary recalculations)
+    const selectedTeeth = useMemo(() => {
+        const toothPattern = /(UR|UL|LR|LL)[1-8]/g;
+        const othersMatches = (formData.Others || '').match(toothPattern) || [];
+        const nextVisitMatches = (formData.NextVisit || '').match(toothPattern) || [];
+        // Combine and remove duplicates
+        return [...new Set([...othersMatches, ...nextVisitMatches])];
+    }, [formData.Others, formData.NextVisit]);
 
-    const loadDropdownData = async () => {
+    // Memoized function to load dropdown data
+    const loadDropdownData = useCallback(async () => {
         try {
             const [wiresRes, operatorsRes, latestWiresRes] = await Promise.all([
                 fetch('/api/getWires'),
@@ -73,9 +76,10 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
         } catch (err) {
             console.error('Error loading dropdown data:', err);
         }
-    };
+    }, [workId]);
 
-    const loadVisitData = async () => {
+    // Memoized function to load visit data
+    const loadVisitData = useCallback(async () => {
         try {
             setLoading(true);
             const response = await fetch(`/api/getvisitbyid?visitId=${visitId}`);
@@ -99,19 +103,24 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                 ApplianceRemoved: visit.ApplianceRemoved || false,
                 OperatorID: visit.OperatorID || ''
             });
-
-            // Extract tooth notations from Others field if present
-            const toothPattern = /(UR|UL|LR|LL)[1-8]/g;
-            const matches = (visit.Others || '').match(toothPattern);
-            setSelectedTeeth(matches || []);
+            // selectedTeeth is now automatically derived via useMemo
         } catch (err) {
             setError(err.message);
         } finally {
             setLoading(false);
         }
-    };
+    }, [visitId]);
 
-    const handleFormSubmit = async (e) => {
+    // useEffect with proper dependencies
+    useEffect(() => {
+        loadDropdownData();
+        if (visitId) {
+            loadVisitData();
+        }
+    }, [loadDropdownData, loadVisitData, visitId]);
+
+    // Memoized form submit handler
+    const handleFormSubmit = useCallback(async (e) => {
         e.preventDefault();
         setError(null);
 
@@ -149,28 +158,47 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [visitId, formData, onSave]);
 
-    const handleToothClick = (palmerNotation) => {
-        const targetField = lastFocusedField;
-        const currentValue = formData[targetField] || '';
-        const newValue = currentValue
-            ? `${currentValue} ${palmerNotation}`
-            : palmerNotation;
+    // Memoized tooth click handler - prevents DentalChart re-renders
+    const handleToothClick = useCallback((palmerNotation) => {
+        setFormData(prevData => {
+            const targetField = lastFocusedField;
+            const currentValue = prevData[targetField] || '';
+            const newValue = currentValue
+                ? `${currentValue} ${palmerNotation}`
+                : palmerNotation;
 
-        setFormData({ ...formData, [targetField]: newValue });
+            return { ...prevData, [targetField]: newValue };
+        });
 
-        setSelectedTeeth(prev =>
-            prev.includes(palmerNotation)
-                ? prev.filter(t => t !== palmerNotation)
-                : [...prev, palmerNotation]
-        );
+        // selectedTeeth is automatically updated via useMemo when formData changes
 
-        const targetRef = targetField === 'Others' ? othersTextareaRef : nextVisitTextareaRef;
+        const targetRef = lastFocusedField === 'Others' ? othersTextareaRef : nextVisitTextareaRef;
         if (targetRef.current) {
             targetRef.current.focus();
         }
-    };
+    }, [lastFocusedField]);
+
+    // Generic memoized field change handler
+    const handleFieldChange = useCallback((field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    }, []);
+
+    // Memoized tab change handler
+    const handleTabChange = useCallback((tab) => {
+        setActiveTab(tab);
+    }, []);
+
+    // Memoized focus handler
+    const handleFieldFocus = useCallback((field) => {
+        setLastFocusedField(field);
+    }, []);
+
+    // Memoized error clear handler
+    const handleClearError = useCallback(() => {
+        setError(null);
+    }, []);
 
     if (loading && visitId) {
         return (
@@ -193,7 +221,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
             {error && (
                 <div className="new-visit-error">
                     <i className="fas fa-exclamation-circle"></i> {error}
-                    <button onClick={() => setError(null)} className="error-close">×</button>
+                    <button onClick={handleClearError} className="error-close">×</button>
                 </div>
             )}
 
@@ -216,14 +244,14 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                     <button
                         type="button"
                         className={`visit-tab ${activeTab === 'basic' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('basic')}
+                        onClick={() => handleTabChange('basic')}
                     >
                         <i className="fas fa-calendar"></i> Basic Info
                     </button>
                     <button
                         type="button"
                         className={`visit-tab ${activeTab === 'treatment' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('treatment')}
+                        onClick={() => handleTabChange('treatment')}
                     >
                         <i className="fas fa-teeth"></i> Treatment Details
                     </button>
@@ -238,7 +266,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                         <input
                             type="date"
                             value={formData.VisitDate}
-                            onChange={(e) => setFormData({...formData, VisitDate: e.target.value})}
+                            onChange={(e) => handleFieldChange('VisitDate', e.target.value)}
                             required
                         />
                     </div>
@@ -246,7 +274,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                         <label>Operator</label>
                         <select
                             value={formData.OperatorID}
-                            onChange={(e) => setFormData({...formData, OperatorID: e.target.value})}
+                            onChange={(e) => handleFieldChange('OperatorID', e.target.value)}
                         >
                             <option value="">Select Operator</option>
                             {operators.map(op => (
@@ -268,7 +296,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                             {latestWires.UpperWireName && (
                                 <button
                                     type="button"
-                                    onClick={() => setFormData({...formData, UpperWireID: latestWires.UpperWireID})}
+                                    onClick={() => handleFieldChange('UpperWireID', latestWires.UpperWireID)}
                                     className={`wire-btn ${formData.UpperWireID === latestWires.UpperWireID ? 'active upper' : 'upper'}`}
                                 >
                                     <div className="wire-label">Upper:</div>
@@ -278,7 +306,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                             {latestWires.LowerWireName && (
                                 <button
                                     type="button"
-                                    onClick={() => setFormData({...formData, LowerWireID: latestWires.LowerWireID})}
+                                    onClick={() => handleFieldChange('LowerWireID', latestWires.LowerWireID)}
                                     className={`wire-btn ${formData.LowerWireID === latestWires.LowerWireID ? 'active lower' : 'lower'}`}
                                 >
                                     <div className="wire-label">Lower:</div>
@@ -295,7 +323,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                             <label>Upper Wire</label>
                             <select
                                 value={formData.UpperWireID}
-                                onChange={(e) => setFormData({...formData, UpperWireID: e.target.value})}
+                                onChange={(e) => handleFieldChange('UpperWireID', e.target.value)}
                             >
                                 <option value="">Select Wire</option>
                                 {wires.map(wire => (
@@ -309,7 +337,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                             <label>Lower Wire</label>
                             <select
                                 value={formData.LowerWireID}
-                                onChange={(e) => setFormData({...formData, LowerWireID: e.target.value})}
+                                onChange={(e) => handleFieldChange('LowerWireID', e.target.value)}
                             >
                                 <option value="">Select Wire</option>
                                 {wires.map(wire => (
@@ -330,7 +358,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                         <input
                             type="text"
                             value={formData.BracketChange}
-                            onChange={(e) => setFormData({...formData, BracketChange: e.target.value})}
+                            onChange={(e) => handleFieldChange('BracketChange', e.target.value)}
                             placeholder="e.g., Replaced upper left bracket"
                         />
                     </div>
@@ -340,7 +368,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                         <input
                             type="text"
                             value={formData.WireBending}
-                            onChange={(e) => setFormData({...formData, WireBending: e.target.value})}
+                            onChange={(e) => handleFieldChange('WireBending', e.target.value)}
                             placeholder="e.g., Omega loop on upper wire"
                         />
                     </div>
@@ -350,7 +378,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                         <input
                             type="text"
                             value={formData.Elastics}
-                            onChange={(e) => setFormData({...formData, Elastics: e.target.value})}
+                            onChange={(e) => handleFieldChange('Elastics', e.target.value)}
                             placeholder="e.g., Class II elastics"
                         />
                     </div>
@@ -385,8 +413,8 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                     <textarea
                         ref={othersTextareaRef}
                         value={formData.Others}
-                        onChange={(e) => setFormData({...formData, Others: e.target.value})}
-                        onFocus={() => setLastFocusedField('Others')}
+                        onChange={(e) => handleFieldChange('Others', e.target.value)}
+                        onFocus={() => handleFieldFocus('Others')}
                         rows="2"
                         placeholder="Any additional notes about this visit..."
                         className={lastFocusedField === 'Others' ? 'active' : ''}
@@ -406,8 +434,8 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                     <textarea
                         ref={nextVisitTextareaRef}
                         value={formData.NextVisit}
-                        onChange={(e) => setFormData({...formData, NextVisit: e.target.value})}
-                        onFocus={() => setLastFocusedField('NextVisit')}
+                        onChange={(e) => handleFieldChange('NextVisit', e.target.value)}
+                        onFocus={() => handleFieldFocus('NextVisit')}
                         rows="2"
                         placeholder="Instructions or notes for the next visit..."
                         className={lastFocusedField === 'NextVisit' ? 'active' : ''}
@@ -420,7 +448,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                         <input
                             type="checkbox"
                             checked={formData.OPG}
-                            onChange={(e) => setFormData({...formData, OPG: e.target.checked})}
+                            onChange={(e) => handleFieldChange('OPG', e.target.checked)}
                         />
                         <span>OPG Taken</span>
                     </label>
@@ -428,7 +456,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                         <input
                             type="checkbox"
                             checked={formData.IPhoto}
-                            onChange={(e) => setFormData({...formData, IPhoto: e.target.checked})}
+                            onChange={(e) => handleFieldChange('IPhoto', e.target.checked)}
                         />
                         <span>Initial Photo</span>
                     </label>
@@ -436,7 +464,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                         <input
                             type="checkbox"
                             checked={formData.PPhoto}
-                            onChange={(e) => setFormData({...formData, PPhoto: e.target.checked})}
+                            onChange={(e) => handleFieldChange('PPhoto', e.target.checked)}
                         />
                         <span>Progress Photo</span>
                     </label>
@@ -444,7 +472,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                         <input
                             type="checkbox"
                             checked={formData.FPhoto}
-                            onChange={(e) => setFormData({...formData, FPhoto: e.target.checked})}
+                            onChange={(e) => handleFieldChange('FPhoto', e.target.checked)}
                         />
                         <span>Final Photo</span>
                     </label>
@@ -452,7 +480,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                         <input
                             type="checkbox"
                             checked={formData.ApplianceRemoved}
-                            onChange={(e) => setFormData({...formData, ApplianceRemoved: e.target.checked})}
+                            onChange={(e) => handleFieldChange('ApplianceRemoved', e.target.checked)}
                         />
                         <span>Appliance Removed</span>
                     </label>
