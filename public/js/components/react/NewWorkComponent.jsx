@@ -13,11 +13,14 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
     const [keywords, setKeywords] = useState([]);
     const [doctors, setDoctors] = useState([]);
     const [activeTab, setActiveTab] = useState('basic');
+    const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+    const [existingWorkData, setExistingWorkData] = useState(null);
+    const [pendingFormData, setPendingFormData] = useState(null);
 
     // Form state
     const [formData, setFormData] = useState({
         PersonID: patientId,
-        TotalRequired: 0,
+        TotalRequired: '',
         Currency: 'USD',
         Typeofwork: '',
         Notes: '',
@@ -131,7 +134,16 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to save work');
+                // Handle specific error cases with detailed messages
+                if (errorData.code === 'DUPLICATE_ACTIVE_WORK') {
+                    // Show confirmation dialog instead of error
+                    setExistingWorkData(errorData.existingWork);
+                    setPendingFormData(formData);
+                    setShowConfirmDialog(true);
+                    setLoading(false);
+                    return;
+                }
+                throw new Error(errorData.details || errorData.error || 'Failed to save work');
             }
 
             const result = await response.json();
@@ -143,6 +155,54 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleFinishExistingAndAddNew = async () => {
+        try {
+            setLoading(true);
+            setShowConfirmDialog(false);
+
+            // First, finish the existing work
+            const finishResponse = await fetch('/api/finishwork', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ workId: existingWorkData.workId })
+            });
+
+            if (!finishResponse.ok) {
+                throw new Error('Failed to finish existing work');
+            }
+
+            // Now add the new work
+            const addResponse = await fetch('/api/addwork', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(pendingFormData)
+            });
+
+            if (!addResponse.ok) {
+                const errorData = await addResponse.json();
+                throw new Error(errorData.details || errorData.error || 'Failed to add new work');
+            }
+
+            const result = await addResponse.json();
+            if (onSave) {
+                onSave(result);
+            }
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+            setExistingWorkData(null);
+            setPendingFormData(null);
+        }
+    };
+
+    const handleCancelConfirmation = () => {
+        setShowConfirmDialog(false);
+        setExistingWorkData(null);
+        setPendingFormData(null);
+        setLoading(false);
     };
 
     if (loading && workId) {
@@ -167,6 +227,54 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
                 <div className="new-work-error">
                     <i className="fas fa-exclamation-circle"></i> {error}
                     <button onClick={() => setError(null)} className="error-close">×</button>
+                </div>
+            )}
+
+            {/* Confirmation Dialog for Duplicate Active Work */}
+            {showConfirmDialog && existingWorkData && (
+                <div className="confirmation-dialog-overlay">
+                    <div className="confirmation-dialog">
+                        <div className="confirmation-header">
+                            <i className="fas fa-exclamation-triangle"></i>
+                            <h3>Active Work Already Exists</h3>
+                        </div>
+                        <div className="confirmation-body">
+                            <p>This patient already has an active work record:</p>
+                            <div className="existing-work-details">
+                                <div className="detail-row">
+                                    <strong>Work Type:</strong> {existingWorkData.typeName || `Type ${existingWorkData.typeOfWork}`}
+                                </div>
+                                <div className="detail-row">
+                                    <strong>Doctor:</strong> {existingWorkData.doctor || 'N/A'}
+                                </div>
+                                <div className="detail-row">
+                                    <strong>Total Required:</strong> {existingWorkData.totalRequired} {existingWorkData.currency}
+                                </div>
+                                <div className="detail-row">
+                                    <strong>Added:</strong> {existingWorkData.additionDate ? new Date(existingWorkData.additionDate).toLocaleDateString() : 'N/A'}
+                                </div>
+                            </div>
+                            <p className="confirmation-question">
+                                Would you like to finish the existing work and add this new one?
+                            </p>
+                        </div>
+                        <div className="confirmation-actions">
+                            <button
+                                onClick={handleFinishExistingAndAddNew}
+                                className="btn-primary"
+                                disabled={loading}
+                            >
+                                <i className="fas fa-check"></i> Yes, Finish & Add New
+                            </button>
+                            <button
+                                onClick={handleCancelConfirmation}
+                                className="btn-secondary"
+                                disabled={loading}
+                            >
+                                <i className="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -247,14 +355,14 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
 
                     <div className="form-row">
                         <div className="form-group">
-                            <label>Total Required <span className="required">*</span></label>
+                            <label>Total Required</label>
                             <input
                                 type="number"
-                                value={formData.TotalRequired}
+                                value={formData.TotalRequired === 0 ? '' : formData.TotalRequired}
                                 onChange={(e) => setFormData({...formData, TotalRequired: e.target.value})}
                                 min="0"
                                 step="0.01"
-                                required
+                                placeholder="Enter amount (defaults to 0)"
                             />
                         </div>
 

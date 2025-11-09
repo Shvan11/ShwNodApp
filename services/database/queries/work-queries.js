@@ -291,11 +291,13 @@ export const finishWork = async (workId) => {
 
 export const getActiveWork = async (personId) => {
     return executeQuery(
-        `SELECT TOP 1 
+        `SELECT TOP 1
             w.*,
-            e.employeeName as DoctorName
+            e.employeeName as DoctorName,
+            wt.WorkType as TypeName
         FROM tblwork w
         LEFT JOIN tblEmployees e ON w.DrID = e.ID
+        LEFT JOIN tblWorkType wt ON w.Typeofwork = wt.ID
         WHERE w.PersonID = @PersonID AND w.Finished = 0
         ORDER BY w.AdditionDate DESC`,
         [['PersonID', TYPES.Int, personId]],

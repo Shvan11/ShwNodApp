@@ -2922,8 +2922,8 @@ router.get('/getworkdetails', async (req, res) => {
 
 // Add new work
 router.post('/addwork', async (req, res) => {
+    const workData = req.body;  // Moved outside try block so it's accessible in catch
     try {
-        const workData = req.body;
         
         // Validate required fields
         if (!workData.PersonID || !workData.DrID) {
@@ -2932,11 +2932,9 @@ router.post('/addwork', async (req, res) => {
             });
         }
 
-        // Validate and ensure TotalRequired is a valid number (required field)
+        // Default TotalRequired to 0 if empty or not provided
         if (workData.TotalRequired === '' || workData.TotalRequired === null || workData.TotalRequired === undefined) {
-            return res.status(400).json({
-                error: "TotalRequired is required and must be a valid number"
-            });
+            workData.TotalRequired = 0;
         }
 
         // Validate Typeofwork is required
@@ -2967,13 +2965,43 @@ router.post('/addwork', async (req, res) => {
         });
 
         const result = await addWork(workData);
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             workId: result.workid,
-            message: "Work added successfully" 
+            message: "Work added successfully"
         });
     } catch (error) {
         console.error("Error adding work:", error);
+
+        // Handle duplicate active work constraint violation
+        if (error.number === 2601 && error.message.includes('UNQ_tblWork_Active')) {
+            try {
+                // Fetch the existing active work details to show to the user
+                const existingWork = await getActiveWork(workData.PersonID);
+                return res.status(409).json({
+                    error: "Patient already has an active work",
+                    details: "This patient already has an active (unfinished) work record. You can finish the existing work and add the new one.",
+                    code: "DUPLICATE_ACTIVE_WORK",
+                    existingWork: existingWork ? {
+                        workId: existingWork.workid,
+                        typeOfWork: existingWork.Typeofwork,
+                        typeName: existingWork.TypeName,
+                        doctor: existingWork.DoctorName,
+                        additionDate: existingWork.AdditionDate,
+                        totalRequired: existingWork.TotalRequired,
+                        currency: existingWork.Currency
+                    } : null
+                });
+            } catch (fetchError) {
+                // If we can't fetch the existing work, return basic error
+                return res.status(409).json({
+                    error: "Patient already has an active work",
+                    details: "This patient already has an active (unfinished) work record. Please complete or finish the existing work before adding a new one.",
+                    code: "DUPLICATE_ACTIVE_WORK"
+                });
+            }
+        }
+
         res.status(500).json({ error: "Failed to add work", details: error.message });
     }
 });
