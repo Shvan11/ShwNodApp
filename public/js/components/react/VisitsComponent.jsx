@@ -26,8 +26,8 @@ const VisitsComponent = ({ workId, patientId }) => {
             const response = await fetch(`/api/getvisitsbywork?workId=${workId}`);
             if (!response.ok) throw new Error('Failed to fetch visits');
             const data = await response.json();
-            // Sort by visit date ascending (oldest first)
-            const sortedData = data.sort((a, b) => new Date(a.VisitDate) - new Date(b.VisitDate));
+            // Sort by visit date descending (most recent first)
+            const sortedData = data.sort((a, b) => new Date(b.VisitDate) - new Date(a.VisitDate));
             setVisits(sortedData);
         } catch (err) {
             setError(err.message);
