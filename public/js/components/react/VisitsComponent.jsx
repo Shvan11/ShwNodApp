@@ -1,20 +1,18 @@
 /**
- * VisitsComponent - Work-based visit history display and management
+ * VisitsComponent - Work-based visit history display
  *
- * Provides full CRUD operations for visits tied to specific work IDs
+ * Simple list view of visits for a specific work
+ * Form functionality handled by separate NewVisitComponent via routing
  */
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import NewVisitComponent from './NewVisitComponent.jsx';
 
-const VisitsComponent = ({ workId, patientId, autoShowForm = false }) => {
+const VisitsComponent = ({ workId, patientId }) => {
     const navigate = useNavigate();
     const [visits, setVisits] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [showForm, setShowForm] = useState(autoShowForm);
-    const [editingVisitId, setEditingVisitId] = useState(null);
 
     useEffect(() => {
         if (workId) {
@@ -39,13 +37,11 @@ const VisitsComponent = ({ workId, patientId, autoShowForm = false }) => {
     };
 
     const handleAddVisit = () => {
-        setEditingVisitId(null);
-        setShowForm(true);
+        navigate(`/patient/${patientId}/new-visit?workId=${workId}`);
     };
 
-    const handleEditVisit = (visit) => {
-        setEditingVisitId(visit.ID);
-        setShowForm(true);
+    const handleEditVisit = (visitId) => {
+        navigate(`/patient/${patientId}/new-visit?workId=${workId}&visitId=${visitId}`);
     };
 
     const handleDeleteVisit = async (visitId) => {
@@ -69,17 +65,6 @@ const VisitsComponent = ({ workId, patientId, autoShowForm = false }) => {
         }
     };
 
-    const handleFormSave = async () => {
-        await loadVisits();
-        setShowForm(false);
-        setEditingVisitId(null);
-    };
-
-    const handleFormCancel = () => {
-        setShowForm(false);
-        setEditingVisitId(null);
-    };
-
     const formatDateTime = (dateString) => {
         if (!dateString) return 'Not set';
         return new Date(dateString).toLocaleString();
@@ -100,11 +85,9 @@ const VisitsComponent = ({ workId, patientId, autoShowForm = false }) => {
                             <i className="fas fa-arrow-left"></i> Back
                         </button>
                     )}
-                    {!showForm && (
-                        <button onClick={handleAddVisit} className="btn btn-primary">
-                            <i className="fas fa-plus"></i> Add Visit
-                        </button>
-                    )}
+                    <button onClick={handleAddVisit} className="btn btn-primary">
+                        <i className="fas fa-plus"></i> Add Visit
+                    </button>
                 </div>
             </div>
 
@@ -115,37 +98,22 @@ const VisitsComponent = ({ workId, patientId, autoShowForm = false }) => {
                 </div>
             )}
 
-            {!showForm && (
-                <div className="work-summary">
-                    <div className="summary-card">
-                        <h3>Total Visits</h3>
-                        <span className="summary-value">{visits.length}</span>
-                    </div>
-                    <div className="summary-card">
-                        <h3>OPG Taken</h3>
-                        <span className="summary-value">{visits.filter(v => v.OPG).length}</span>
-                    </div>
-                    <div className="summary-card">
-                        <h3>Photos Taken</h3>
-                        <span className="summary-value">{visits.filter(v => v.IPhoto || v.PPhoto || v.FPhoto).length}</span>
-                    </div>
+            <div className="work-summary">
+                <div className="summary-card">
+                    <h3>Total Visits</h3>
+                    <span className="summary-value">{visits.length}</span>
                 </div>
-            )}
-
-            {/* New Visit Form Component */}
-            {showForm && (
-                <div className="form-container">
-                    <NewVisitComponent
-                        workId={workId}
-                        visitId={editingVisitId}
-                        onSave={handleFormSave}
-                        onCancel={handleFormCancel}
-                    />
+                <div className="summary-card">
+                    <h3>OPG Taken</h3>
+                    <span className="summary-value">{visits.filter(v => v.OPG).length}</span>
                 </div>
-            )}
+                <div className="summary-card">
+                    <h3>Photos Taken</h3>
+                    <span className="summary-value">{visits.filter(v => v.IPhoto || v.PPhoto || v.FPhoto).length}</span>
+                </div>
+            </div>
 
-            {/* Visit Cards View - Shows all details including Others and NextVisit */}
-            {!showForm && (
+            {/* Visit Cards View */}
             <div className="visit-cards-container">
                 {visits.map((visit) => (
                     <div key={visit.ID} className="visit-card">
@@ -169,7 +137,7 @@ const VisitsComponent = ({ workId, patientId, autoShowForm = false }) => {
                             </div>
                             <div className="action-buttons">
                                 <button
-                                    onClick={() => handleEditVisit(visit)}
+                                    onClick={() => handleEditVisit(visit.ID)}
                                     className="btn btn-sm btn-secondary"
                                     title="Edit visit"
                                 >
@@ -236,7 +204,7 @@ const VisitsComponent = ({ workId, patientId, autoShowForm = false }) => {
                             </div>
                         )}
 
-                        {/* IMPORTANT: Others (Notes) Section */}
+                        {/* Notes Section */}
                         {visit.Others && (
                             <div className="notes-section">
                                 <strong><i className="fas fa-sticky-note"></i> Notes</strong>
@@ -244,7 +212,7 @@ const VisitsComponent = ({ workId, patientId, autoShowForm = false }) => {
                             </div>
                         )}
 
-                        {/* IMPORTANT: Next Visit Instructions Section */}
+                        {/* Next Visit Instructions */}
                         {visit.NextVisit && (
                             <div className="next-visit-section">
                                 <strong><i className="fas fa-arrow-circle-right"></i> Next Visit</strong>
@@ -259,7 +227,7 @@ const VisitsComponent = ({ workId, patientId, autoShowForm = false }) => {
                         <p>No visits recorded yet.</p>
                     </div>
                 )}
-            </div>)}
+            </div>
         </div>
     );
 };

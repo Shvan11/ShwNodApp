@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import GridComponent from './GridComponent.jsx'
 import XraysComponent from './XraysComponent.jsx'
 import VisitsComponent from './VisitsComponent.jsx'
+import NewVisitComponent from './NewVisitComponent.jsx'
 import CompareComponent from './CompareComponent.jsx'
 import AppointmentForm from './AppointmentForm.jsx'
 import EditAppointmentForm from './EditAppointmentForm.jsx'
@@ -20,8 +21,9 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
     // Extract appointmentId from wildcard route (for edit-appointment/:appointmentId)
     const appointmentId = wildcardParams['*'];
 
-    // Extract workId from query params for work-specific pages like visits
+    // Extract workId and visitId from query params for work-specific pages like visits
     const workId = searchParams.get('workId');
+    const visitId = searchParams.get('visitId');
     const renderContent = () => {
         switch (page) {
             case 'grid':
@@ -50,12 +52,19 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
                 );
 
             case 'new-visit':
-                // New visit form for a specific work - reuse VisitsComponent with autoShowForm prop
+                // New visit form - clean component directly related to parent work
                 return (
-                    <VisitsComponent
+                    <NewVisitComponent
                         workId={workId ? parseInt(workId) : null}
-                        patientId={patientId ? parseInt(patientId) : null}
-                        autoShowForm={true}
+                        visitId={visitId ? parseInt(visitId) : null}
+                        onSave={() => {
+                            // Navigate back to visit history after save
+                            navigate(`/patient/${patientId}/visits?workId=${workId}`);
+                        }}
+                        onCancel={() => {
+                            // Navigate back to visit history on cancel
+                            navigate(`/patient/${patientId}/visits?workId=${workId}`);
+                        }}
                     />
                 );
 
