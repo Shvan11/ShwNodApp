@@ -187,6 +187,50 @@ body.daily-appointments-view {
   transform: translateY(0);
 }
 
+/* ===== MOBILE VIEW TOGGLE ===== */
+.mobile-view-toggle {
+  display: none;
+  padding: 0 var(--spacing-lg);
+  margin-bottom: var(--spacing-sm);
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.toggle-btn {
+  flex: 1;
+  max-width: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--card-bg);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--neutral-gray);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  box-shadow: var(--shadow-sm);
+}
+
+.toggle-btn:hover {
+  border-color: var(--primary-blue-light);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.toggle-btn.active {
+  background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+  border-color: var(--primary-blue);
+  color: white;
+}
+
+.toggle-btn i {
+  font-size: 1rem;
+}
+
 /* ===== STATISTICS CARDS ===== */
 .stats-container {
   display: grid;
@@ -1012,6 +1056,26 @@ footer {
 
   .date-picker-left label {
     display: none;
+  }
+
+  /* Show mobile toggle */
+  .mobile-view-toggle {
+    display: flex;
+  }
+
+  /* Stack sections and hide by default */
+  .container.full-width {
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .appointments-section {
+    display: none;
+  }
+
+  /* Show active section based on data attribute */
+  .appointments-section.active-view {
+    display: block;
   }
 
   .stats-container {

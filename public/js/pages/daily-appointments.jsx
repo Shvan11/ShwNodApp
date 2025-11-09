@@ -16,6 +16,9 @@ function initializePage() {
     // Initialize date picker
     initializeDatePicker();
 
+    // Initialize mobile view toggle
+    initializeMobileViewToggle();
+
     // Load appointments for today by default - use local timezone
     const now = new Date();
     const year = now.getFullYear();
@@ -866,5 +869,42 @@ window.handleTouchEnd = function(event) {
     if (touchTimer) {
         clearTimeout(touchTimer);
         touchTimer = null;
+    }
+};
+
+// Mobile view toggle functionality
+function initializeMobileViewToggle() {
+    // Set initial active view to "all" on mobile
+    const sections = document.querySelectorAll('.appointments-section');
+    if (sections.length >= 2) {
+        sections[0].classList.add('active-view'); // All appointments
+        sections[1].classList.remove('active-view'); // Checked-in
+    }
+}
+
+// Switch between mobile views
+window.switchMobileView = function(view) {
+    console.log('Switching to view:', view);
+
+    // Update toggle buttons
+    const toggleButtons = document.querySelectorAll('.toggle-btn');
+    toggleButtons.forEach(btn => {
+        if (btn.dataset.view === view) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    // Update sections visibility
+    const sections = document.querySelectorAll('.appointments-section');
+    if (view === 'all' && sections.length >= 1) {
+        sections[0].classList.add('active-view');
+        if (sections.length >= 2) {
+            sections[1].classList.remove('active-view');
+        }
+    } else if (view === 'checked-in' && sections.length >= 2) {
+        sections[0].classList.remove('active-view');
+        sections[1].classList.add('active-view');
     }
 };
