@@ -415,7 +415,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                         value={formData.Others}
                         onChange={(e) => handleFieldChange('Others', e.target.value)}
                         onFocus={() => handleFieldFocus('Others')}
-                        rows="2"
+                        rows="4"
                         placeholder="Any additional notes about this visit..."
                         className={lastFocusedField === 'Others' ? 'active' : ''}
                     />
@@ -436,7 +436,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                         value={formData.NextVisit}
                         onChange={(e) => handleFieldChange('NextVisit', e.target.value)}
                         onFocus={() => handleFieldFocus('NextVisit')}
-                        rows="2"
+                        rows="4"
                         placeholder="Instructions or notes for the next visit..."
                         className={lastFocusedField === 'NextVisit' ? 'active' : ''}
                     />
