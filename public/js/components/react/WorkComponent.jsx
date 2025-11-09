@@ -374,15 +374,31 @@ const WorkComponent = ({ patientId }) => {
                         />
                     </div>
                     <div className="patient-info-details">
-                        <div className="patient-info-header">
-                            <h3 className="patient-name">
-                                {patientInfo.PatientName}
-                            </h3>
-                            <div className="patient-meta-info">
-                                <span><i className="fas fa-id-card"></i>{patientInfo.PersonID}</span>
-                                {patientInfo.Phone && (
-                                    <span><i className="fas fa-phone"></i>{patientInfo.Phone}</span>
-                                )}
+                        <div className="patient-info-row">
+                            <div className="patient-info-header">
+                                <h3 className="patient-name">
+                                    {patientInfo.PatientName}
+                                </h3>
+                                <div className="patient-meta-info">
+                                    <span><i className="fas fa-id-card"></i>{patientInfo.PersonID}</span>
+                                    {patientInfo.Phone && (
+                                        <span><i className="fas fa-phone"></i>{patientInfo.Phone}</span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="work-summary-inline">
+                                <div className="summary-card-inline">
+                                    <span className="summary-value-inline">{works.length}</span>
+                                    <span className="summary-label-inline">Total</span>
+                                </div>
+                                <div className="summary-card-inline">
+                                    <span className="summary-value-inline">{works.filter(w => !w.Finished).length}</span>
+                                    <span className="summary-label-inline">Active</span>
+                                </div>
+                                <div className="summary-card-inline">
+                                    <span className="summary-value-inline">{works.filter(w => w.Finished).length}</span>
+                                    <span className="summary-label-inline">Completed</span>
+                                </div>
                             </div>
                         </div>
                         <div className="patient-controls">
@@ -404,21 +420,8 @@ const WorkComponent = ({ patientId }) => {
                             </select>
                             <button
                                 onClick={handleQuickCheckin}
-                                className="btn-checkin"
+                                className={`btn-checkin ${checkedIn ? 'checked-in' : ''} ${checkingIn ? 'checking-in' : ''}`}
                                 disabled={checkingIn || checkedIn}
-                                style={{
-                                    backgroundColor: checkedIn ? '#10b981' : '#3b82f6',
-                                    color: 'white',
-                                    border: 'none',
-                                    padding: '0.5rem 1rem',
-                                    borderRadius: '6px',
-                                    cursor: checkingIn || checkedIn ? 'not-allowed' : 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.5rem',
-                                    fontWeight: '500',
-                                    opacity: checkingIn || checkedIn ? 0.7 : 1
-                                }}
                                 title={checkedIn ? 'Patient already checked in today' : 'Check in patient for today'}
                             >
                                 <i className={`fas ${checkedIn ? 'fa-check-circle' : 'fa-calendar-check'}`}></i>
@@ -467,21 +470,6 @@ const WorkComponent = ({ patientId }) => {
                     </div>
                 </div>
             )}
-
-            <div className="work-summary">
-                <div className="summary-card">
-                    <h3>Total Works</h3>
-                    <span className="summary-value">{works.length}</span>
-                </div>
-                <div className="summary-card">
-                    <h3>Active</h3>
-                    <span className="summary-value">{works.filter(w => !w.Finished).length}</span>
-                </div>
-                <div className="summary-card">
-                    <h3>Completed</h3>
-                    <span className="summary-value">{works.filter(w => w.Finished).length}</span>
-                </div>
-            </div>
 
             {/* Works Card Container */}
             <div className="works-card-container">

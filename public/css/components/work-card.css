@@ -447,6 +447,33 @@
         flex-direction: column;
         gap: 0.25rem;
     }
+
+    .patient-info-row {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .work-summary-inline {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .summary-card-inline {
+        flex: 1;
+        min-width: 60px;
+    }
+
+    .patient-controls {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .search-input,
+    .filter-select,
+    .btn-checkin,
+    .btn-primary {
+        width: 100%;
+    }
 }
 
 @media (max-width: 480px) {
@@ -495,11 +522,18 @@
     flex: 1;
     display: flex;
     flex-direction: column;
+    gap: 0.75rem;
+}
+
+.patient-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
     gap: 1rem;
 }
 
 .patient-info-header {
-    margin-bottom: 0;
+    flex: 1;
 }
 
 .patient-name {
@@ -519,6 +553,42 @@
 
 .patient-meta-info i {
     margin-right: 0.5rem;
+}
+
+/* Inline Work Summary */
+.work-summary-inline {
+    display: flex;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+.summary-card-inline {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e5e7eb;
+    min-width: 70px;
+}
+
+.summary-value-inline {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #111827;
+    line-height: 1;
+}
+
+.summary-label-inline {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 0.25rem;
 }
 
 .patient-controls {
@@ -556,6 +626,43 @@
     outline: none;
     border-color: #4f46e5;
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.btn-checkin {
+    flex: 0 1 auto;
+    white-space: nowrap;
+    padding: 0.5rem 1rem;
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-checkin:hover:not(:disabled) {
+    background-color: #2563eb;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.btn-checkin.checked-in {
+    background-color: #10b981;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.btn-checkin.checking-in {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.btn-checkin:disabled {
+    cursor: not-allowed;
 }
 
 .btn-primary {
