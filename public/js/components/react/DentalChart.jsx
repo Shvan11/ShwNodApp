@@ -6,6 +6,7 @@
  * - Different tooth image placeholders for each tooth type
  * - Click to append tooth number to text field
  * - Reusable across the application
+ * - Optimized with React.memo to prevent unnecessary re-renders
  *
  * Props:
  * - onToothClick: (palmerNotation) => void - Callback when tooth is clicked
@@ -14,14 +15,9 @@
 
 import React from 'react';
 
-const DentalChart = ({ onToothClick, selectedTeeth = [] }) => {
-    // Palmer notation prefixes
-    const palmerPrefixes = {
-        ur: 'UR', // Upper Right
-        ul: 'UL', // Upper Left
-        lr: 'LR', // Lower Right
-        ll: 'LL'  // Lower Left
-    };
+// Memoized Tooth component to prevent unnecessary re-renders
+const Tooth = React.memo(({ quadrant, number, prefix, isSelected, onToothClick }) => {
+    const palmer = `${prefix}${number}`;
 
     // Get tooth image path based on quadrant and tooth number
     const getToothImage = (quadrant, number) => {
@@ -55,31 +51,37 @@ const DentalChart = ({ onToothClick, selectedTeeth = [] }) => {
         }
     };
 
-    // Create tooth element
-    const Tooth = ({ quadrant, number, prefix }) => {
-        const palmer = `${prefix}${number}`;
-        const isSelected = selectedTeeth.includes(palmer);
-
-        return (
-            <div
-                onClick={() => onToothClick(palmer)}
-                className={`dental-tooth ${isSelected ? 'selected' : ''}`}
-            >
-                <div className="dental-tooth-image">
-                    <img
-                        src={getToothImage(quadrant, number)}
-                        alt={`Tooth ${number}`}
-                        onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.parentElement.innerHTML = '<div class="tooth-emoji">🦷</div>';
-                        }}
-                    />
-                </div>
-                <div className="dental-tooth-number">
-                    {number}
-                </div>
+    return (
+        <div
+            onClick={() => onToothClick(palmer)}
+            className={`dental-tooth ${isSelected ? 'selected' : ''}`}
+        >
+            <div className="dental-tooth-image">
+                <img
+                    src={getToothImage(quadrant, number)}
+                    alt={`Tooth ${number}`}
+                    onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.parentElement.innerHTML = '<div class="tooth-emoji">🦷</div>';
+                    }}
+                />
             </div>
-        );
+            <div className="dental-tooth-number">
+                {number}
+            </div>
+        </div>
+    );
+});
+
+Tooth.displayName = 'Tooth';
+
+const DentalChart = React.memo(({ onToothClick, selectedTeeth = [] }) => {
+    // Palmer notation prefixes
+    const palmerPrefixes = {
+        ur: 'UR', // Upper Right
+        ul: 'UL', // Upper Left
+        lr: 'LR', // Lower Right
+        ll: 'LL'  // Lower Left
     };
 
     // Helper to render a full arch (left + right quadrants on one line)
@@ -89,24 +91,30 @@ const DentalChart = ({ onToothClick, selectedTeeth = [] }) => {
 
         // Right quadrant (8 to 1, reversed)
         for (let i = 8; i >= 1; i--) {
+            const palmer = `${rightQuadrant.prefix}${i}`;
             rightTeeth.push(
                 <Tooth
                     key={`${rightQuadrant.id}-${i}`}
                     quadrant={rightQuadrant.id}
                     number={i}
                     prefix={rightQuadrant.prefix}
+                    isSelected={selectedTeeth.includes(palmer)}
+                    onToothClick={onToothClick}
                 />
             );
         }
 
         // Left quadrant (1 to 8)
         for (let i = 1; i <= 8; i++) {
+            const palmer = `${leftQuadrant.prefix}${i}`;
             leftTeeth.push(
                 <Tooth
                     key={`${leftQuadrant.id}-${i}`}
                     quadrant={leftQuadrant.id}
                     number={i}
                     prefix={leftQuadrant.prefix}
+                    isSelected={selectedTeeth.includes(palmer)}
+                    onToothClick={onToothClick}
                 />
             );
         }
@@ -142,6 +150,8 @@ const DentalChart = ({ onToothClick, selectedTeeth = [] }) => {
             )}
         </div>
     );
-};
+});
+
+DentalChart.displayName = 'DentalChart';
 
 export default DentalChart;
