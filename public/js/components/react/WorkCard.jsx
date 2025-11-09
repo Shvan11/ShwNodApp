@@ -48,7 +48,7 @@ const WorkCard = ({
                         {getStatusBadge()}
                     </div>
                     <div className="work-card-meta-minimal">
-                        <span><i className="fas fa-user-md"></i> {work.DoctorName || 'Not assigned'}</span>
+                        <span><i className="fas fa-user-md"></i> {work.DoctorName ? (work.DoctorName === 'Admin' ? work.DoctorName : `Dr. ${work.DoctorName}`) : 'Not assigned'}</span>
                         <span><i className="fas fa-calendar-plus"></i> {formatDate(work.AdditionDate)}</span>
                         {!isExpanded && getRemainingBalance() > 0 && (
                             <span className="balance-indicator">

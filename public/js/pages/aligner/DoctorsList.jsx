@@ -142,7 +142,7 @@ const DoctorsList = () => {
                             </div>
                         )}
                         <i className="fas fa-user-md doctor-icon"></i>
-                        <h3>{doctor.DoctorName}</h3>
+                        <h3>{doctor.DoctorName === 'Admin' ? doctor.DoctorName : `Dr. ${doctor.DoctorName}`}</h3>
                         <i className="fas fa-chevron-right arrow-icon"></i>
                     </div>
                 ))}

@@ -471,7 +471,7 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                                                 <option value="">Select Doctor</option>
                                                 {doctors && doctors.map(doctor => (
                                                     <option key={doctor.DrID} value={doctor.DrID}>
-                                                        {doctor.DoctorName}
+                                                        {doctor.DoctorName === 'Admin' ? doctor.DoctorName : `Dr. ${doctor.DoctorName}`}
                                                     </option>
                                                 ))}
                                             </select>

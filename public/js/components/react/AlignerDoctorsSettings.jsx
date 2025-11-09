@@ -269,7 +269,7 @@ const AlignerDoctorsSettings = ({ onChangesUpdate }) => {
                                         <td>{doctor.DrID}</td>
                                         <td className="doctor-name">
                                             <i className="fas fa-user-md"></i>
-                                            {doctor.DoctorName}
+                                            {doctor.DoctorName === 'Admin' ? doctor.DoctorName : `Dr. ${doctor.DoctorName}`}
                                         </td>
                                         <td>
                                             {doctor.DoctorEmail ? (

@@ -33,7 +33,7 @@ async function loadWorkInfo() {
         // Update work info card
         document.getElementById('work-patient').textContent = work.PatientName || 'N/A';
         document.getElementById('work-type').textContent = work.TypeName || 'N/A';
-        document.getElementById('work-doctor').textContent = work.DoctorName || 'N/A';
+        document.getElementById('work-doctor').textContent = work.DoctorName ? (work.DoctorName === 'Admin' ? work.DoctorName : `Dr. ${work.DoctorName}`) : 'N/A';
         document.getElementById('work-status').textContent = work.Finished ? 'Completed' : 'Active';
         document.getElementById('workInfoCard').style.display = 'block';
     } catch (error) {

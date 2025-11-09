@@ -117,7 +117,7 @@ const PatientsList = () => {
             <div className="section-header">
                 <h2>
                     <i className="fas fa-user-md"></i>
-                    {doctor?.DoctorName}'s Patients
+                    {doctor?.DoctorName === 'Admin' ? doctor.DoctorName : `Dr. ${doctor?.DoctorName}`}'s Patients
                 </h2>
                 <div className="section-info">
                     <span>{patients.length} patient{patients.length !== 1 ? 's' : ''}</span>

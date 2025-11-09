@@ -257,7 +257,7 @@ const AllSetsList = () => {
                                             </div>
                                         )}
                                     </td>
-                                    <td style={cellStyle}>{set.DoctorName}</td>
+                                    <td style={cellStyle}>{set.DoctorName === 'Admin' ? set.DoctorName : `Dr. ${set.DoctorName}`}</td>
                                     <td style={cellStyle}>
                                         <span style={{
                                             backgroundColor: '#e0e7ff',
