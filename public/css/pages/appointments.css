@@ -346,6 +346,13 @@ body.daily-appointments-view {
   font-size: var(--font-size-lg);
 }
 
+.appointment-time-icon {
+  font-size: var(--font-size-sm);
+  opacity: 0.6;
+  display: block;
+  margin-bottom: var(--spacing-xs);
+}
+
 .appointment-info {
   flex: 1;
   min-width: 0;
@@ -375,6 +382,11 @@ body.daily-appointments-view {
   transform: translateX(2px);
 }
 
+.patient-link-icon {
+  opacity: 0.7;
+  margin-right: var(--spacing-sm);
+}
+
 .appointment-type {
   font-size: var(--font-size-sm);
   color: #6b7280;
@@ -383,6 +395,11 @@ body.daily-appointments-view {
   align-items: center;
   gap: 0.25rem;
   font-weight: 500;
+}
+
+.appointment-type-icon {
+  opacity: 0.6;
+  margin-right: var(--spacing-xs);
 }
 
 .appointment-meta {

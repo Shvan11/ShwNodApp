@@ -230,21 +230,21 @@ function createAppointmentsCards(appointments, showStatus = false) {
                  ontouchend="handleTouchEnd(event)"
                  ontouchmove="handleTouchMove(event)">
                 <div class="appointment-time">
-                    <i class="fas fa-clock" style="font-size: 0.875rem; opacity: 0.6; display: block; margin-bottom: 0.25rem;"></i>
+                    <i class="fas fa-clock appointment-time-icon"></i>
                     ${time}
                 </div>
 
                 <div class="appointment-info">
                     <div class="patient-name">
                         <a href="javascript:void(0)" class="patient-link" onclick="viewPatientPhotos(${patientId})">
-                            <i class="fas fa-user-circle" style="opacity: 0.7; margin-right: 0.5rem;"></i>
+                            <i class="fas fa-user-circle patient-link-icon"></i>
                             ${patientName}
                         </a>
                     </div>
 
                     ${appointment.AppDetail ? `
                         <div class="appointment-type">
-                            <i class="fas fa-stethoscope" style="opacity: 0.6; margin-right: 0.25rem;"></i>
+                            <i class="fas fa-stethoscope appointment-type-icon"></i>
                             ${appointment.AppDetail}
                         </div>
                     ` : ''}
