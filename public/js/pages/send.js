@@ -2111,17 +2111,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Show error to user
         const errorElement = document.createElement('div');
-        errorElement.className = 'initialization-error';
+        errorElement.className = 'critical-error-overlay';
         errorElement.innerHTML = `
             <h2>Initialization Failed</h2>
             <p>Failed to initialize WhatsApp Messenger: ${error.message}</p>
             <button onclick="location.reload()">Retry</button>
-        `;
-        errorElement.style.cssText = `
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: white; padding: 20px; border: 2px solid #dc3545;
-            border-radius: 8px; text-align: center; z-index: 1000;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         `;
         document.body.appendChild(errorElement);
     }

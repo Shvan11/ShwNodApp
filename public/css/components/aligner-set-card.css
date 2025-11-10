@@ -1,0 +1,309 @@
+/* Aligner Sets Container */
+.aligner-sets-container {
+    margin-top: 2rem;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.section-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #333;
+}
+
+.section-info {
+    font-size: 0.95rem;
+    color: #666;
+}
+
+/* Aligner Set Card */
+.aligner-set-card {
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    transition: all 0.3s;
+}
+
+.aligner-set-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.aligner-set-card.active {
+    border-color: #4caf50;
+    background: #f9fff9;
+}
+
+.aligner-set-card.inactive {
+    opacity: 0.7;
+    border-color: #ccc;
+}
+
+/* Highlight card when there are unread activities */
+.aligner-set-card.has-activity {
+    border-color: #ff9800;
+    border-width: 3px;
+    background: #fff8f0;
+    box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.1);
+}
+
+.aligner-set-card.has-activity:hover {
+    box-shadow: 0 4px 16px rgba(255, 152, 0, 0.3), 0 0 0 3px rgba(255, 152, 0, 0.1);
+}
+
+/* Activity Banner at top of card */
+.activity-banner {
+    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.95rem;
+    box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.activity-banner i {
+    font-size: 1.2rem;
+    animation: ring 2s ease-in-out infinite;
+}
+
+.activity-banner strong {
+    font-size: 1.1rem;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+    }
+    50% {
+        box-shadow: 0 4px 16px rgba(255, 152, 0, 0.5);
+    }
+}
+
+@keyframes ring {
+    0%, 100% {
+        transform: rotate(0deg);
+    }
+    10%, 30% {
+        transform: rotate(-10deg);
+    }
+    20%, 40% {
+        transform: rotate(10deg);
+    }
+}
+
+.set-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    cursor: pointer;
+}
+
+.set-title {
+    flex: 1;
+}
+
+.set-title h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.3rem;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.set-header-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.folder-btn {
+    background: #ff9800;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.folder-btn:hover {
+    background: #f57c00;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+}
+
+.folder-btn i {
+    font-size: 1rem;
+}
+
+.url-btn {
+    background: #2196F3;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.url-btn:hover {
+    background: #1976D2;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+}
+
+.url-btn i {
+    font-size: 0.95rem;
+}
+
+.pdf-btn {
+    background: #E91E63;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.pdf-btn:hover {
+    background: #C2185B;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(233, 30, 99, 0.3);
+}
+
+.pdf-btn i {
+    font-size: 0.95rem;
+}
+
+.set-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.set-badge.active {
+    background: #4caf50;
+    color: white;
+}
+
+.set-badge.inactive {
+    background: #999;
+    color: white;
+}
+
+.set-type {
+    background: #0073e6;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+}
+
+.set-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.set-info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #666;
+}
+
+.set-info-item i {
+    color: #0073e6;
+    width: 20px;
+}
+
+.set-info-item strong {
+    color: #333;
+    font-weight: 600;
+}
+
+.set-progress {
+    margin-top: 1rem;
+}
+
+.progress-bar-container {
+    background: #f0f0f0;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-bar {
+    background: linear-gradient(90deg, #4caf50 0%, #8bc34a 100%);
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 0.9rem;
+    color: #666;
+    display: flex;
+    justify-content: space-between;
+}
+
+.toggle-batches-btn {
+    background: #0073e6;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    transition: all 0.3s;
+}
+
+.toggle-batches-btn:hover {
+    background: #005bb5;
+}
+
+.toggle-batches-btn i {
+    transition: transform 0.3s;
+}
+
+.toggle-batches-btn.expanded i {
+    transform: rotate(180deg);
+}
+

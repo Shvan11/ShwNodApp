@@ -75,7 +75,7 @@
             </div>
             
             <!-- Progress Display for Message Sending -->
-            <div id="progressContainer" class="sending-progress-container" style="display: none;" role="progressbar" aria-label="Message sending progress">
+            <div id="progressContainer" class="sending-progress-container" class="hidden" role="progressbar" aria-label="Message sending progress">
                 <div class="sending-progress-header">
                     <span class="sending-progress-title">Sending Messages</span>
                     <span id="progressStats" class="sending-progress-stats">0/0</span>
@@ -92,7 +92,7 @@
             <!-- Main Action Button -->
             <div class="action-section">
                 <button id="startButton" class="btn btn-primary primary-action" 
-                        style="display: none;" 
+                        class="hidden" 
                         aria-describedby="send-instructions">
                     <span class="btn-icon" aria-hidden="true">📱</span>
                     <span>Start Sending Messages</span>
@@ -125,7 +125,7 @@
     <div id="toastContainer" class="toast-container" role="alert" aria-live="assertive"></div>
 
     <!-- Error Overlay -->
-    <div id="errorOverlay" class="error-overlay" role="dialog" aria-modal="true" aria-hidden="true" style="display: none;">
+    <div id="errorOverlay" class="error-overlay" role="dialog" aria-modal="true" aria-hidden="true" class="hidden">
         <div class="error-content">
             <h2 id="errorTitle">Application Error</h2>
             <p id="errorMessage">An unexpected error occurred</p>
