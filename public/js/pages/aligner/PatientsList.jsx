@@ -93,7 +93,10 @@ const PatientsList = () => {
         <div className="aligner-container">
             {/* Mode Toggle */}
             <div className="mode-toggle">
-                <button className="mode-btn active">
+                <button
+                    className="mode-btn active"
+                    onClick={() => navigate('/aligner')}
+                >
                     <i className="fas fa-user-md"></i>
                     Browse by Doctor
                 </button>

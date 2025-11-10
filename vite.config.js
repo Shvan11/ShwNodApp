@@ -75,6 +75,8 @@ export default defineConfig({
     fs: {
       strict: false
     },
+    // Custom middleware to handle SPA routing for React Router apps
+    middlewareMode: false,
     proxy: {
       // Proxy API and data routes to Express server
       '/api': {
@@ -135,14 +137,22 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => '/views/messaging/auth.html'
       },
-      // React Router apps - handle all subroutes
+      // React Router apps - serve HTML for all subroutes
       '/aligner': {
         target: 'http://localhost:5173',
         changeOrigin: true,
         bypass: (req) => {
-          // For React Router apps, serve the HTML file for all subroutes
           if (req.url.startsWith('/aligner')) {
             return '/views/aligner.html'
+          }
+        }
+      },
+      '/patient': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        bypass: (req) => {
+          if (req.url.startsWith('/patient')) {
+            return '/views/patient/react-shell.html'
           }
         }
       },
@@ -160,17 +170,6 @@ export default defineConfig({
         target: 'http://localhost:5173',
         changeOrigin: true,
         rewrite: (path) => '/views/statistics.html'
-      },
-      // Patient routes - React Router app, serve HTML for all subroutes
-      '/patient': {
-        target: 'http://localhost:5173',
-        changeOrigin: true,
-        bypass: (req) => {
-          // For React Router apps, serve the HTML file for all subroutes
-          if (req.url.startsWith('/patient')) {
-            return '/views/patient/react-shell.html'
-          }
-        }
       }
     }
   },

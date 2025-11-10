@@ -313,8 +313,8 @@ const WorkComponent = ({ patientId }) => {
 
     // Navigate to aligner page with pre-selected work
     const handleAddAlignerSet = (work) => {
-        // Redirect to aligner page with workId parameter
-        window.location.href = `/aligner?workId=${work.workid}`;
+        // Navigate to patient sets page using direct patient route
+        window.location.href = `/aligner/patient/${work.workid}`;
     };
 
     // Payment-related handlers
