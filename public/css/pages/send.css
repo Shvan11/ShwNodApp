@@ -790,7 +790,7 @@ tr.false {
     text-align: center;
     padding: 24px;
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-radius: var(--border-radius-lg);
+    border-radius: var(--radius-lg);
     border: 1px solid #dee2e6;
     box-shadow: var(--box-shadow);
 }
@@ -1099,7 +1099,7 @@ tr.false {
     margin: 24px 0;
     padding: 24px;
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-radius: var(--border-radius-lg);
+    border-radius: var(--radius-lg);
     border: 1px solid #dee2e6;
     box-shadow: var(--box-shadow);
 }
@@ -1129,7 +1129,7 @@ tr.false {
     margin: 24px 0;
     padding: 24px;
     background: white;
-    border-radius: var(--border-radius-lg);
+    border-radius: var(--radius-lg);
     border: 2px solid var(--primary-color);
     box-shadow: var(--box-shadow);
     position: relative;

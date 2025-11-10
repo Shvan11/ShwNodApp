@@ -33,13 +33,13 @@
             </div>
             
             <!-- QR Code Display -->
-            <div id="qrContainer" class="qr-section" style="display: none;">
+            <div id="qrContainer" class="qr-section" class="hidden">
                 <div class="qr-header">
                     <h2>Scan QR Code</h2>
                     <p>Open WhatsApp on your phone and scan this code</p>
                 </div>
                 <div class="qr-code-container">
-                    <img id="qrImage" class="qr-code" style="display: none;" alt="WhatsApp QR Code for authentication">
+                    <img id="qrImage" class="qr-code" class="hidden" alt="WhatsApp QR Code for authentication">
                     <div class="qr-placeholder" id="qrPlaceholder">
                         <div class="qr-loading">
                             <span class="loading-spinner"></span>
@@ -58,7 +58,7 @@
             </div>
             
             <!-- Success State -->
-            <div id="successContainer" class="success-section" style="display: none;">
+            <div id="successContainer" class="success-section" class="hidden">
                 <div class="success-icon-container">
                     <span class="success-icon" aria-hidden="true">✅</span>
                 </div>
@@ -69,7 +69,7 @@
             </div>
             
             <!-- Error State -->
-            <div id="errorContainer" class="error-section" style="display: none;">
+            <div id="errorContainer" class="error-section" class="hidden">
                 <div class="error-icon-container">
                     <span class="error-icon" aria-hidden="true">❌</span>
                 </div>
@@ -81,23 +81,23 @@
             
             <!-- Control Actions -->
             <div class="auth-actions">
-                <button id="retryBtn" class="btn btn-secondary" style="display: none;">
+                <button id="retryBtn" class="btn btn-secondary" class="hidden">
                     <span class="btn-icon" aria-hidden="true">🔄</span>
                     <span>Retry Connection</span>
                 </button>
-                <button id="refreshBtn" class="btn btn-primary" style="display: none;">
+                <button id="refreshBtn" class="btn btn-primary" class="hidden">
                     <span class="btn-icon" aria-hidden="true">📱</span>
                     <span>Refresh QR Code</span>
                 </button>
-                <button id="restartBtn" class="btn btn-success" style="display: none;">
+                <button id="restartBtn" class="btn btn-success" class="hidden">
                     <span class="btn-icon" aria-hidden="true">🔄</span>
                     <span>Restart Client</span>
                 </button>
-                <button id="destroyBtn" class="btn btn-warning" style="display: none;">
+                <button id="destroyBtn" class="btn btn-warning" class="hidden">
                     <span class="btn-icon" aria-hidden="true">⏹️</span>
                     <span>Close Browser</span>
                 </button>
-                <button id="logoutBtn" class="btn btn-danger" style="display: none;">
+                <button id="logoutBtn" class="btn btn-danger" class="hidden">
                     <span class="btn-icon" aria-hidden="true">🚪</span>
                     <span>Logout WhatsApp</span>
                 </button>

@@ -18,25 +18,25 @@
   
   /* Button variants */
   .btn-primary {
-    color: #fff;
+    color: var(--color-white);
     background-color: var(--primary-color);
     border-color: var(--primary-color);
   }
-  
+
   .btn-primary:hover {
     background-color: var(--primary-hover);
     border-color: var(--primary-hover);
   }
-  
+
   .btn-secondary {
-    color: #fff;
+    color: var(--color-white);
     background-color: var(--secondary-color);
     border-color: var(--secondary-color);
   }
-  
+
   .btn-secondary:hover {
-    background-color: #3c9a3f;
-    border-color: #3c9a3f;
+    background-color: var(--secondary-hover);
+    border-color: var(--secondary-hover);
   }
   
   /* Button sizes */
@@ -62,15 +62,15 @@
   
   /* Specific button styles from your application */
   .PButton {
-    border: 1px solid #000000;
+    border: 1px solid var(--color-black);
     padding: 8px;
     border-radius: 2px;
     font-size: 12px;
     cursor: pointer;
   }
-  
+
   .PButton:hover {
-    background-color: antiquewhite;
+    background-color: var(--color-beige);
   }
   
   .PButton:disabled {
@@ -82,29 +82,29 @@
     margin: 20px;
     border: none;
     border-radius: 5px;
-    background-color: #1c87c9;
-    color: white;
+    background-color: var(--color-blue-action);
+    color: var(--color-white);
     padding: 14px 20px;
     cursor: pointer;
     align-self: flex-end;
   }
-  
+
   /* For your existing "Send" type buttons */
   .submit-btn {
     text-decoration: none;
     width: 100%;
     text-align: center;
     display: block;
-    background-color: #FFBC00;
-    color: #fff;
-    border: 1px solid #FFCB00;
+    background-color: var(--color-yellow);
+    color: var(--color-white);
+    border: 1px solid var(--color-yellow-border);
     padding: 10px 0;
     font-size: 20px;
     cursor: pointer;
     border-radius: 5px;
     margin-top: 20px;
   }
-  
+
   .submit-btn:hover {
-    background-color: #F0B200;
+    background-color: var(--color-yellow-hover);
   }
