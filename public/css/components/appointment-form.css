@@ -181,7 +181,8 @@
     border-top: 1px solid #e0e0e0;
 }
 
-.btn {
+/* Modal Form Buttons - Scoped to Modal Only */
+.appointment-form-modal .btn {
     padding: 12px 24px;
     border: none;
     border-radius: 8px;
@@ -196,61 +197,29 @@
     justify-content: center;
 }
 
-.btn:disabled {
+.appointment-form-modal .btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
 
-.btn-primary {
+.appointment-form-modal .btn-primary {
     background: #007bff;
     color: white;
 }
 
-.btn-primary:hover:not(:disabled) {
+.appointment-form-modal .btn-primary:hover:not(:disabled) {
     background: #0056b3;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
 }
 
-.btn-secondary {
+.appointment-form-modal .btn-secondary {
     background: #6c757d;
     color: white;
 }
 
-.btn-secondary:hover:not(:disabled) {
+.appointment-form-modal .btn-secondary:hover:not(:disabled) {
     background: #545b62;
-}
-
-/* Appointment Form Specific Button Styles */
-.appointment-form-page .form-actions .btn {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    height: auto;
-    line-height: 1.2;
-}
-
-.appointment-form-page .form-actions .btn-cancel {
-    background: white;
-    color: #4a5568;
-    border: 2px solid #e1e4e8;
-}
-
-.appointment-form-page .form-actions .btn-cancel:hover:not(:disabled) {
-    background: #f7fafc;
-    border-color: #cbd5e0;
-}
-
-.appointment-form-page .form-actions .btn-create {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: 3px solid white;
-}
-
-.appointment-form-page .form-actions .btn-create:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-    border: 3px solid white;
 }
 
 /* Calendar Picker Modal */
