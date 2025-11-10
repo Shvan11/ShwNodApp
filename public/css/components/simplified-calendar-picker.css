@@ -62,7 +62,7 @@
 .appointment-form-page .page-content {
     flex: 1;
     display: grid;
-    grid-template-columns: 30% 1fr 25%;
+    grid-template-columns: minmax(280px, 25%) 1fr minmax(300px, 30%);
     gap: 0;
     overflow: hidden;
 }
@@ -518,6 +518,9 @@
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    position: relative;
+    z-index: 1;
+    min-width: 0;
 }
 
 .appointment-form-page .form-header {
@@ -537,11 +540,12 @@
 }
 
 .appointment-form-page .appointment-form {
-    padding: 20px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
     flex: 1;
+    min-width: 0;
 }
 
 .appointment-form-page .alert {
@@ -625,30 +629,31 @@
 }
 
 .appointment-form-page .form-actions {
-    display: grid;
-    grid-template-columns: 1fr 2fr;
+    display: flex;
     gap: 10px;
     margin-top: auto;
-    padding-top: 20px;
+    padding-top: 16px;
     border-top: 2px solid #e1e4e8;
+    flex-wrap: wrap;
 }
 
 /* Form Action Buttons - Clean, Maintainable Styles */
 .appointment-form-page .form-actions .btn {
-    padding: 14px 20px;
-    border-radius: 8px;
-    font-size: 15px;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    min-height: 48px;
+    gap: 6px;
+    min-height: 40px;
     box-sizing: border-box;
     border: none;
     font-family: inherit;
+    white-space: nowrap;
 }
 
 .appointment-form-page .form-actions .btn:disabled {
@@ -661,6 +666,7 @@
     background: white;
     color: #4a5568;
     border: 2px solid #e1e4e8 !important;
+    flex: 0 1 auto;
 }
 
 .appointment-form-page .form-actions .btn-cancel:hover:not(:disabled) {
@@ -675,6 +681,7 @@
     color: white;
     border: none !important;
     box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
+    flex: 1 1 auto;
 }
 
 .appointment-form-page .form-actions .btn-create:hover:not(:disabled) {
@@ -736,8 +743,12 @@
         grid-template-columns: 1fr;
     }
 
-    .form-actions {
-        grid-template-columns: 1fr;
+    .appointment-form-page .form-actions {
+        flex-direction: column;
+    }
+
+    .appointment-form-page .form-actions .btn {
+        width: 100%;
     }
 }
 
