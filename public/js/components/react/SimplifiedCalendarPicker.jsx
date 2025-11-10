@@ -185,7 +185,10 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
     };
 
     const calendarDays = generateCalendarDays();
-    const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const monthNumber = currentMonth.getMonth() + 1;
+    const monthNameOnly = currentMonth.toLocaleDateString('en-US', { month: 'long' });
+    const year = currentMonth.getFullYear();
+    const monthName = `${monthNumber}/${year}`;
 
     return (
         <div className="calendar-picker-container">
@@ -216,7 +219,10 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                     <button className="month-nav-btn" onClick={goToPreviousMonth}>
                         <i className="fas fa-chevron-left"></i>
                     </button>
-                    <h3 className="month-name">{monthName}</h3>
+                    <div className="month-display">
+                        <h3 className="month-name">{monthName}</h3>
+                        <div className="month-name-text">{monthNameOnly}</div>
+                    </div>
                     <button className="month-nav-btn" onClick={goToNextMonth}>
                         <i className="fas fa-chevron-right"></i>
                     </button>

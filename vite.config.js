@@ -63,7 +63,8 @@ export default defineConfig({
         'auth': resolve(__dirname, 'public/views/messaging/auth.html'),
         aligner: resolve(__dirname, 'public/views/aligner.html'),
         visits: resolve(__dirname, 'public/views/visits.html'),
-        expenses: resolve(__dirname, 'public/views/expenses.html')
+        expenses: resolve(__dirname, 'public/views/expenses.html'),
+        statistics: resolve(__dirname, 'public/views/statistics.html')
       }
     }
   },
@@ -154,6 +155,11 @@ export default defineConfig({
         target: 'http://localhost:5173',
         changeOrigin: true,
         rewrite: (path) => '/views/expenses.html'
+      },
+      '/statistics': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        rewrite: (path) => '/views/statistics.html'
       },
       // Patient routes - React Router app, serve HTML for all subroutes
       '/patient': {

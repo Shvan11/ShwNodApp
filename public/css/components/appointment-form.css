@@ -221,6 +221,38 @@
     background: #545b62;
 }
 
+/* Appointment Form Specific Button Styles */
+.appointment-form-page .form-actions .btn {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: auto;
+    line-height: 1.2;
+}
+
+.appointment-form-page .form-actions .btn-cancel {
+    background: white;
+    color: #4a5568;
+    border: 2px solid #e1e4e8;
+}
+
+.appointment-form-page .form-actions .btn-cancel:hover:not(:disabled) {
+    background: #f7fafc;
+    border-color: #cbd5e0;
+}
+
+.appointment-form-page .form-actions .btn-create {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: 3px solid white;
+}
+
+.appointment-form-page .form-actions .btn-create:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    border: 3px solid white;
+}
+
 /* Calendar Picker Modal */
 .calendar-picker-overlay {
     position: fixed;

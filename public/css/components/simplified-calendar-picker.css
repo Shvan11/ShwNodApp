@@ -177,11 +177,24 @@
     color: white;
 }
 
+.appointment-form-page .month-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
 .appointment-form-page .month-name {
     margin: 0;
     font-size: 16px;
     font-weight: 600;
     color: #2d3748;
+}
+
+.appointment-form-page .month-name-text {
+    font-size: 11px;
+    color: #718096;
+    font-weight: 500;
 }
 
 .appointment-form-page .calendar-weekdays {
@@ -620,43 +633,38 @@
     border-top: 2px solid #e1e4e8;
 }
 
-.appointment-form-page .btn {
-    padding: 12px 20px;
-    border: none;
-    border-radius: 8px;
+/* Appointment Form Button Overrides - HIGHEST SPECIFICITY */
+div.appointment-form-page div.form-column form.appointment-form div.form-actions button.btn {
+    padding: 16px 24px;
+    min-height: 50px;
     font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    font-family: inherit;
+    box-sizing: border-box;
 }
 
-.appointment-form-page .btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.appointment-form-page .btn-cancel {
+div.appointment-form-page div.form-column form.appointment-form div.form-actions button.btn.btn-cancel {
     background: white;
     color: #4a5568;
     border: 2px solid #e1e4e8;
 }
 
-.appointment-form-page .btn-cancel:hover:not(:disabled) {
+div.appointment-form-page div.form-column form.appointment-form div.form-actions button.btn.btn-cancel:hover:not(:disabled) {
     background: #f7fafc;
-    border-color: #cbd5e0;
+    border: 2px solid #cbd5e0;
 }
 
-.appointment-form-page .btn-create {
+div.appointment-form-page div.form-column form.appointment-form div.form-actions button.btn.btn-create {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
+    border: 3px solid white;
 }
 
-.appointment-form-page .btn-create:hover:not(:disabled) {
+div.appointment-form-page div.form-column form.appointment-form div.form-actions button.btn.btn-create:hover:not(:disabled) {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 3px solid white;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }

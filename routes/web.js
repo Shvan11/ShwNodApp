@@ -101,6 +101,11 @@ router.get('/expenses', (_, res) => {
   serveWithFallback(res, '/views/expenses.html', 'Expenses not found');
 });
 
+// Statistics
+router.get('/statistics', (_, res) => {
+  serveWithFallback(res, '/views/statistics.html', 'Statistics not found');
+});
+
 // Template Management
 router.get('/template-management', (_, res) => {
   serveWithFallback(res, '/views/template-management.html', 'Template management not found');

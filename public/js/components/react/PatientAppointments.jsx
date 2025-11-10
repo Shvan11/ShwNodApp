@@ -64,14 +64,24 @@ const PatientAppointments = ({ patientId }) => {
 
     const formatDateTime = (dateTime) => {
         const date = new Date(dateTime)
-        return date.toLocaleString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
+
+        // Get day name
+        const dayName = date.toLocaleString('en-US', { weekday: 'short' })
+
+        // Get date components
+        const day = String(date.getDate()).padStart(2, '0')
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const year = date.getFullYear()
+
+        // Get time
+        const time = date.toLocaleString('en-US', {
             hour: 'numeric',
-            minute: '2-digit'
+            minute: '2-digit',
+            hour12: true
         })
+
+        // Format: "Mon 25/12/2024 2:30 PM"
+        return `${dayName} ${day}/${month}/${year} ${time}`
     }
 
     const isPastAppointment = (dateTime) => {

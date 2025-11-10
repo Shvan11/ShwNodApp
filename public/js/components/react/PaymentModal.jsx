@@ -178,15 +178,15 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
             if (accountCurrency === 'USD') {
                 suggestedUSD = amountToRegister;
             } else {
-                // Account is IQD, paying in USD
-                suggestedUSD = Math.round(amountToRegister / exchangeRate);
+                // Account is IQD, paying in USD - Round UP to collect more
+                suggestedUSD = Math.ceil(amountToRegister / exchangeRate);
             }
         } else if (paymentCurrency === 'IQD') {
             if (accountCurrency === 'IQD') {
                 suggestedIQD = amountToRegister;
             } else {
-                // Account is USD, paying in IQD
-                suggestedIQD = Math.round(amountToRegister * exchangeRate);
+                // Account is USD, paying in IQD - Round UP to nearest 1000 to collect more
+                suggestedIQD = Math.ceil(amountToRegister * exchangeRate / 1000) * 1000;
             }
         }
 
@@ -212,24 +212,28 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         const amountToRegister = parseFloat(formData.amountToRegister) || 0;
         const accountCurrency = calculations.accountCurrency;
 
-        // Convert total received to account currency
+        // Convert total received to account currency - Round DOWN what patient gave (you benefit)
         let totalInAccountCurrency;
         if (accountCurrency === 'USD') {
-            totalInAccountCurrency = actualUSD + (actualIQD / exchangeRate);
+            // Patient gave IQD, convert to USD - Round DOWN
+            const iqdValueInUSD = Math.floor(actualIQD / exchangeRate);
+            totalInAccountCurrency = actualUSD + iqdValueInUSD;
         } else {
-            totalInAccountCurrency = (actualUSD * exchangeRate) + actualIQD;
+            // Patient gave USD, convert to IQD - Round DOWN to nearest 1000
+            const usdValueInIQD = Math.floor(actualUSD * exchangeRate / 1000) * 1000;
+            totalInAccountCurrency = usdValueInIQD + actualIQD;
         }
 
         // Calculate overpayment
         const overpayment = totalInAccountCurrency - amountToRegister;
 
-        // Convert overpayment to IQD (change always in IQD)
+        // Convert overpayment to IQD (change always in IQD) - Round DOWN to nearest 1000 (you give less)
         let changeInIQD = 0;
         if (overpayment > 0) {
             if (accountCurrency === 'USD') {
-                changeInIQD = Math.round(overpayment * exchangeRate);
+                changeInIQD = Math.floor(overpayment * exchangeRate / 1000) * 1000;
             } else {
-                changeInIQD = Math.round(overpayment);
+                changeInIQD = Math.floor(overpayment / 1000) * 1000;
             }
         }
 
@@ -261,13 +265,17 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
             const amountToRegister = parseFloat(formData.amountToRegister) || 0;
             const accountCurrency = calculations.accountCurrency;
 
-            let usdValueInAccount = accountCurrency === 'USD' ? usd : usd * exchangeRate;
+            // Round DOWN what patient gave (you benefit)
+            let usdValueInAccount = accountCurrency === 'USD'
+                ? usd
+                : Math.floor(usd * exchangeRate / 1000) * 1000;
             let remainingInAccount = amountToRegister - usdValueInAccount;
 
             if (remainingInAccount > 0) {
+                // Round UP what patient owes (you benefit)
                 let neededIQD = accountCurrency === 'USD'
-                    ? Math.round(remainingInAccount * exchangeRate)
-                    : Math.round(remainingInAccount);
+                    ? Math.ceil(remainingInAccount * exchangeRate / 1000) * 1000
+                    : Math.ceil(remainingInAccount / 1000) * 1000;
 
                 setCalculations(prev => ({
                     ...prev,
@@ -286,13 +294,17 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
             const amountToRegister = parseFloat(formData.amountToRegister) || 0;
             const accountCurrency = calculations.accountCurrency;
 
-            let iqdValueInAccount = accountCurrency === 'IQD' ? iqd : iqd / exchangeRate;
+            // Round DOWN what patient gave (you benefit)
+            let iqdValueInAccount = accountCurrency === 'IQD'
+                ? iqd
+                : Math.floor(iqd / exchangeRate);
             let remainingInAccount = amountToRegister - iqdValueInAccount;
 
             if (remainingInAccount > 0) {
+                // Round UP what patient owes (you benefit)
                 let neededUSD = accountCurrency === 'IQD'
-                    ? Math.round(remainingInAccount / exchangeRate)
-                    : Math.round(remainingInAccount);
+                    ? Math.ceil(remainingInAccount / exchangeRate)
+                    : Math.ceil(remainingInAccount);
 
                 setCalculations(prev => ({
                     ...prev,
