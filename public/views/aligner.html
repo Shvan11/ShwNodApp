@@ -15,28 +15,11 @@
     <div id="aligner-component-root"></div>
 
     <!-- Load React Router App -->
-    <script type="module">
-        import React from 'react';
-        import ReactDOM from 'react-dom/client';
-        import UniversalHeader from '/js/components/react/UniversalHeader.jsx';
-        import AlignerApp from '/js/apps/AlignerApp.jsx';
+    <script type="module" src="../js/pages/aligner-shell.jsx"></script>
 
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 Initializing Aligner App with React Router...');
-
-            const headerRoot = document.getElementById('universal-header-root');
-            if (headerRoot) {
-                const root = ReactDOM.createRoot(headerRoot);
-                root.render(React.createElement(UniversalHeader));
-            }
-
-            const alignerRoot = document.getElementById('aligner-component-root');
-            if (alignerRoot) {
-                const root = ReactDOM.createRoot(alignerRoot);
-                root.render(React.createElement(AlignerApp));
-                console.log('✅ Aligner App initialized with React Router');
-            }
-        });
+    <!-- Modern initialization is handled by aligner-shell.jsx -->
+    <script>
+        console.log('🚀 React Aligner App will be initialized by JSX module...');
     </script>
 
 </body>
