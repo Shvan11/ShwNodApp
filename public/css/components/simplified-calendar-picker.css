@@ -631,7 +631,7 @@
 .appointment-form-page .form-actions {
     display: flex;
     gap: 10px;
-    margin-top: auto;
+    margin-top: 20px;
     padding-top: 16px;
     border-top: 2px solid #e1e4e8;
     flex-wrap: wrap;
