@@ -151,8 +151,8 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
                         }}
                         onSuccess={(result) => {
                             console.log('Appointment created successfully:', result);
-                            // Go back to previous page after success
-                            navigate(-1);
+                            // Navigate to works page after success
+                            navigate(`/patient/${patientId}/works`);
                         }}
                     />
                 );

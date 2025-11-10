@@ -100,7 +100,7 @@ const WorkComponent = ({ patientId }) => {
 
     const handleCompleteWork = async (workId) => {
         if (!confirm('Are you sure you want to mark this work as completed?')) return;
-        
+
         try {
             const response = await fetch('/api/finishwork', {
                 method: 'POST',
@@ -116,6 +116,51 @@ const WorkComponent = ({ patientId }) => {
             await loadWorks();
         } catch (err) {
             setError(err.message);
+        }
+    };
+
+    const handleDeleteWork = async (work) => {
+        const confirmMessage = `Are you sure you want to delete this work?\n\nWork Type: ${work.TypeName || 'N/A'}\nDoctor: ${work.DoctorName || 'N/A'}\nTotal Required: ${formatCurrency(work.TotalRequired, work.Currency)}\n\nThis action cannot be undone!`;
+
+        if (!confirm(confirmMessage)) return;
+
+        try {
+            const response = await fetch('/api/deletework', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ workId: work.workid })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                // Handle dependency error with detailed message
+                if (response.status === 409 && result.dependencies) {
+                    const deps = result.dependencies;
+                    let detailMessage = 'Cannot delete this work because it has:\n\n';
+
+                    if (deps.InvoiceCount > 0) detailMessage += `• ${deps.InvoiceCount} payment(s)\n`;
+                    if (deps.VisitCount > 0) detailMessage += `• ${deps.VisitCount} visit(s)\n`;
+                    if (deps.DetailCount > 0) detailMessage += `• ${deps.DetailCount} treatment detail(s)\n`;
+                    if (deps.DiagnosisCount > 0) detailMessage += `• ${deps.DiagnosisCount} diagnosis(es)\n`;
+                    if (deps.ImplantCount > 0) detailMessage += `• ${deps.ImplantCount} implant(s)\n`;
+                    if (deps.ScrewCount > 0) detailMessage += `• ${deps.ScrewCount} screw(s)\n`;
+
+                    detailMessage += '\nPlease delete these records first before deleting the work.';
+
+                    alert(detailMessage);
+                    return;
+                }
+
+                throw new Error(result.error || 'Failed to delete work');
+            }
+
+            setSuccessMessage('Work deleted successfully!');
+            setTimeout(() => setSuccessMessage(null), 3000);
+            await loadWorks();
+        } catch (err) {
+            setError(err.message);
+            setTimeout(() => setError(null), 5000);
         }
     };
 
@@ -483,6 +528,7 @@ const WorkComponent = ({ patientId }) => {
                         onToggleExpanded={() => toggleWorkExpanded(work.workid)}
                         onViewDetails={handleViewDetails}
                         onEdit={handleEditWork}
+                        onDelete={handleDeleteWork}
                         onAddPayment={handleAddPayment}
                         onViewPaymentHistory={handleViewPaymentHistory}
                         onAddAlignerSet={handleAddAlignerSet}

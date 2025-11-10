@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import tabManager from '../../utils/tab-manager.js'
 
 const UniversalHeader = () => {
     const [currentPatient, setCurrentPatient] = useState(null);
@@ -147,7 +148,9 @@ const UniversalHeader = () => {
     };
 
     const navigateToAppointments = () => {
-        window.location.href = '/appointments';
+        // Use TabManager to focus existing appointments tab or open new one
+        // This ensures only one appointments tab exists (singleton behavior)
+        tabManager.openOrFocus('/appointments', 'appointments');
     };
 
 

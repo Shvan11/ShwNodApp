@@ -282,11 +282,61 @@ export const finishWork = async (workId) => {
         `UPDATE tblwork SET Finished = 1 WHERE workid = @WorkID`,
         [['WorkID', TYPES.Int, workId]],
         null,
-        (results, outputParams) => ({ 
-            success: true, 
+        (results, outputParams) => ({
+            success: true,
             rowCount: results.length || 0
         })
     );
+};
+
+export const deleteWork = async (workId) => {
+    // Check for dependencies before deletion
+    const dependencyCheck = await executeQuery(
+        `SELECT
+            (SELECT COUNT(*) FROM tblInvoice WHERE workid = @WorkID) AS InvoiceCount,
+            (SELECT COUNT(*) FROM tblvisits WHERE WorkID = @WorkID) AS VisitCount,
+            (SELECT COUNT(*) FROM tblWorkDetails WHERE WorkID = @WorkID) AS DetailCount,
+            (SELECT COUNT(*) FROM tblDiagnosis WHERE WorkID = @WorkID) AS DiagnosisCount,
+            (SELECT COUNT(*) FROM tblImplant WHERE WorkID = @WorkID) AS ImplantCount,
+            (SELECT COUNT(*) FROM tblscrews WHERE WorkID = @WorkID) AS ScrewCount`,
+        [['WorkID', TYPES.Int, workId]],
+        (columns) => ({
+            InvoiceCount: columns[0].value,
+            VisitCount: columns[1].value,
+            DetailCount: columns[2].value,
+            DiagnosisCount: columns[3].value,
+            ImplantCount: columns[4].value,
+            ScrewCount: columns[5].value
+        }),
+        (results) => results[0]
+    );
+
+    // Return dependency information if any exist
+    if (dependencyCheck.InvoiceCount > 0 || dependencyCheck.VisitCount > 0 ||
+        dependencyCheck.DetailCount > 0 || dependencyCheck.DiagnosisCount > 0 ||
+        dependencyCheck.ImplantCount > 0 || dependencyCheck.ScrewCount > 0) {
+        return {
+            canDelete: false,
+            dependencies: dependencyCheck
+        };
+    }
+
+    // If no dependencies, proceed with deletion
+    const result = await executeQuery(
+        `DELETE FROM tblwork WHERE workid = @WorkID`,
+        [['WorkID', TYPES.Int, workId]],
+        null,
+        (results, outputParams) => ({
+            success: true,
+            rowCount: results.length || 0
+        })
+    );
+
+    return {
+        canDelete: true,
+        success: result.success,
+        rowCount: result.rowCount
+    };
 };
 
 export const getActiveWork = async (personId) => {

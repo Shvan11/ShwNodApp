@@ -8,6 +8,7 @@ const WorkCard = ({
     onToggleExpanded,
     onViewDetails,
     onEdit,
+    onDelete,
     onAddPayment,
     onViewPaymentHistory,
     onAddAlignerSet,
@@ -20,6 +21,14 @@ const WorkCard = ({
     getProgressPercentage
 }) => {
     const [showActions, setShowActions] = useState(false);
+
+    // Debug: Log if onEdit and onDelete are defined
+    console.log('WorkCard props:', {
+        hasOnEdit: !!onEdit,
+        hasOnDelete: !!onDelete,
+        workId: work.workid,
+        isExpanded
+    });
 
     const getStatusBadge = () => {
         if (work.Finished) {
@@ -59,36 +68,45 @@ const WorkCard = ({
                 </div>
             </div>
 
+            {/* Actions Menu - Show when expanded */}
+            {isExpanded && (
+                <div className="work-card-actions-menu">
+                    <button
+                        type="button"
+                        className="btn-icon"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowActions(!showActions);
+                        }}
+                        title="More actions"
+                    >
+                        <i className="fas fa-ellipsis-v"></i>
+                    </button>
+                    {showActions && (
+                        <div className="work-card-dropdown">
+                            <button type="button" onClick={() => { onEdit(work); setShowActions(false); }}>
+                                <i className="fas fa-edit"></i> Edit Work
+                            </button>
+                            {!work.Finished && (
+                                <button type="button" onClick={() => { onComplete(work.workid); setShowActions(false); }}>
+                                    <i className="fas fa-check-circle"></i> Mark Complete
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                className="dropdown-delete-btn"
+                                onClick={() => { onDelete(work); setShowActions(false); }}
+                            >
+                                <i className="fas fa-trash-alt"></i> Delete Work
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Full Content - Only Visible When Expanded */}
             {isExpanded && (
                 <div className="work-card-full-content">
-                    {/* Actions Menu */}
-                    <div className="work-card-actions-menu">
-                        <button
-                            type="button"
-                            className="btn-icon"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setShowActions(!showActions);
-                            }}
-                            title="More actions"
-                        >
-                            <i className="fas fa-ellipsis-v"></i>
-                        </button>
-                        {showActions && (
-                            <div className="work-card-dropdown">
-                                <button type="button" onClick={() => { onEdit(work); setShowActions(false); }}>
-                                    <i className="fas fa-edit"></i> Edit Work
-                                </button>
-                                {!work.Finished && (
-                                    <button type="button" onClick={() => { onComplete(work.workid); setShowActions(false); }}>
-                                        <i className="fas fa-check-circle"></i> Mark Complete
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
                     {/* Progress Section */}
                     <div className="work-card-progress">
                         <div className="progress-info">

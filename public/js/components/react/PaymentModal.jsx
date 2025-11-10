@@ -352,6 +352,24 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
             if (!confirm) return;
         }
 
+        // Determine if same-currency payment
+        const isSameCurrencyPayment =
+            (calculations.accountCurrency === 'USD' && actualUSD > 0 && actualIQD === 0) ||
+            (calculations.accountCurrency === 'IQD' && actualIQD > 0 && actualUSD === 0);
+
+        // For same-currency: Force change to NULL (not tracked)
+        // For cross-currency: Use the change value (can be 0 or positive)
+        const changeToSubmit = isSameCurrencyPayment ? null : (parseInt(formData.change) || 0);
+
+        // Validate cross-currency change doesn't exceed received amounts
+        if (!isSameCurrencyPayment && changeToSubmit > 0) {
+            // Simple case: IQD only payment
+            if (actualUSD === 0 && changeToSubmit > actualIQD) {
+                alert(`⚠️ Invalid Change\n\nChange (${changeToSubmit} IQD) cannot exceed IQD received (${actualIQD} IQD)`);
+                return;
+            }
+        }
+
         try {
             setLoading(true);
 
@@ -361,7 +379,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                 paymentDate: formData.paymentDate,
                 usdReceived: actualUSD,
                 iqdReceived: actualIQD,
-                change: parseInt(formData.change) || 0
+                change: changeToSubmit  // NULL for same-currency, number for cross-currency
             };
 
             const response = await fetch('/api/addInvoice', {
@@ -836,30 +854,82 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                             Change to Give
                         </h4>
 
-                        <div className="form-group">
-                            <label htmlFor="change">
-                                Change Given (IQD):
-                            </label>
-                            <input
-                                id="change"
-                                type="number"
-                                name="change"
-                                value={formData.change}
-                                onChange={(e) => handleChangeOverride(e.target.value)}
-                                min="0"
-                                placeholder="0"
-                            />
-                            {calculations.calculatedChange > 0 && !formData.changeManualOverride && (
-                                <small style={{ color: '#10b981' }}>
-                                    ✓ Auto-calculated based on overpayment
-                                </small>
-                            )}
-                            {formData.changeManualOverride && (
-                                <small style={{ color: '#f59e0b' }}>
-                                    ✏️ Manually overridden
-                                </small>
-                            )}
-                        </div>
+                        {(() => {
+                            // Detect same-currency payment
+                            const isSameCurrencyPayment =
+                                (calculations.accountCurrency === 'USD' && formData.paymentCurrency === 'USD') ||
+                                (calculations.accountCurrency === 'IQD' && formData.paymentCurrency === 'IQD');
+
+                            if (isSameCurrencyPayment) {
+                                // Same currency - Hide change field, show explanation
+                                return (
+                                    <div style={{
+                                        padding: '16px',
+                                        background: '#f3f4f6',
+                                        borderRadius: '8px',
+                                        border: '2px solid #9ca3af'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                            <i className="fas fa-info-circle" style={{ color: '#6b7280' }}></i>
+                                            <strong style={{ color: '#374151' }}>No Change Tracking Needed</strong>
+                                        </div>
+                                        <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 12px 0', lineHeight: '1.5' }}>
+                                            Patient is paying in <strong>{calculations.accountCurrency}</strong> and account is in <strong>{calculations.accountCurrency}</strong>.
+                                            <br/>
+                                            Any cash change given is standard cash handling and doesn't need to be registered in the system.
+                                        </p>
+                                        <input
+                                            type="text"
+                                            value="Not Applicable"
+                                            disabled
+                                            style={{
+                                                width: '100%',
+                                                padding: '10px',
+                                                background: '#e5e7eb',
+                                                border: '1px solid #d1d5db',
+                                                borderRadius: '6px',
+                                                color: '#9ca3af',
+                                                cursor: 'not-allowed',
+                                                fontSize: '14px',
+                                                fontWeight: '500',
+                                                textAlign: 'center'
+                                            }}
+                                        />
+                                    </div>
+                                );
+                            } else {
+                                // Cross-currency or mixed - Show normal change field
+                                return (
+                                    <div className="form-group">
+                                        <label htmlFor="change">
+                                            Change Given (IQD):
+                                        </label>
+                                        <input
+                                            id="change"
+                                            type="number"
+                                            name="change"
+                                            value={formData.change}
+                                            onChange={(e) => handleChangeOverride(e.target.value)}
+                                            min="0"
+                                            placeholder="0"
+                                        />
+                                        <small style={{ color: '#6b7280', display: 'block', marginTop: '4px' }}>
+                                            Track IQD change given back during currency conversion
+                                        </small>
+                                        {calculations.calculatedChange > 0 && !formData.changeManualOverride && (
+                                            <small style={{ color: '#10b981' }}>
+                                                ✓ Auto-calculated based on overpayment
+                                            </small>
+                                        )}
+                                        {formData.changeManualOverride && (
+                                            <small style={{ color: '#f59e0b' }}>
+                                                ✏️ Manually overridden
+                                            </small>
+                                        )}
+                                    </div>
+                                );
+                            }
+                        })()}
                     </div>
                     </div>
 

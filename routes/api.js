@@ -10,7 +10,7 @@ import { getWhatsAppMessages } from '../services/database/queries/messaging-quer
 import { getPatientsPhones, getInfos, createPatient, getReferralSources, getPatientTypes, getAddresses, getGenders, getAllPatients, getPatientById, updatePatient, deletePatient } from '../services/database/queries/patient-queries.js';
 import { getPayments, getActiveWorkForInvoice, getCurrentExchangeRate, addInvoice, updateExchangeRate, getPaymentHistoryByWorkId, getExchangeRateForDate, updateExchangeRateForDate } from '../services/database/queries/payment-queries.js';
 import { getWires, getVisitsSummary, addVisit, updateVisit, deleteVisit, getVisitDetailsByID, getLatestWire, getVisitsByWorkId, getVisitById, addVisitByWorkId, updateVisitByWorkId, deleteVisitByWorkId, getLatestWiresByWorkId } from '../services/database/queries/visit-queries.js';
-import { getWorksByPatient, getWorkDetails, addWork, updateWork, finishWork, getActiveWork, getWorkTypes, getWorkKeywords, getWorkDetailsList, addWorkDetail, updateWorkDetail, deleteWorkDetail } from '../services/database/queries/work-queries.js';
+import { getWorksByPatient, getWorkDetails, addWork, updateWork, finishWork, deleteWork, getActiveWork, getWorkTypes, getWorkKeywords, getWorkDetailsList, addWorkDetail, updateWorkDetail, deleteWorkDetail } from '../services/database/queries/work-queries.js';
 import { getAllExpenses, getExpenseById, getExpenseCategories, getExpenseSubcategories, addExpense, updateExpense, deleteExpense, getExpenseSummary, getExpenseTotalsByCurrency } from '../services/database/queries/expense-queries.js';
 import whatsapp from '../services/messaging/whatsapp.js';
 import { sendImg_, sendXray_ } from '../services/messaging/whatsapp-api.js';
@@ -1030,29 +1030,124 @@ router.post("/addInvoice", async (req, res) => {
             });
         }
 
-        // Validate that at least one currency amount is provided
+        // Parse and validate amounts
         const usd = parseInt(usdReceived) || 0;
         const iqd = parseInt(iqdReceived) || 0;
 
+        // Validation 1: Must receive cash in at least one currency
         if (usd === 0 && iqd === 0) {
             return res.status(400).json({
                 status: 'error',
-                message: 'At least one currency amount (USD or IQD) must be provided'
+                message: 'At least one currency amount (USD or IQD) must be greater than zero',
+                code: 'NO_CASH_RECEIVED'
             });
         }
 
+        // Validation 2: Non-negative amounts
+        if (usd < 0 || iqd < 0) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Currency amounts cannot be negative',
+                code: 'NEGATIVE_AMOUNT'
+            });
+        }
+
+        // Get work details to determine account currency
+        const workDetails = await getWorkDetails(workid);
+        if (!workDetails || workDetails.length === 0) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Work record not found',
+                code: 'WORK_NOT_FOUND'
+            });
+        }
+
+        const accountCurrency = workDetails[0].Currency;
+
+        // Determine if this is a same-currency payment
+        const isSameCurrencyPayment =
+            (accountCurrency === 'USD' && usd > 0 && iqd === 0) ||
+            (accountCurrency === 'IQD' && iqd > 0 && usd === 0);
+
+        // For same-currency payments: Force change to NULL (cash handling not tracked)
+        // For cross-currency payments: Validate and use provided change value
+        let changeToSave = null;
+
+        if (isSameCurrencyPayment) {
+            // Same currency - no change tracking needed
+            changeToSave = null;
+        } else {
+            // Cross-currency or mixed payment - validate change
+            const changeAmount = parseInt(change) || 0;
+
+            if (changeAmount < 0) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Change amount cannot be negative',
+                    code: 'NEGATIVE_CHANGE'
+                });
+            }
+
+            if (changeAmount > 0) {
+                // Get exchange rate for validation
+                const exchangeRate = await getExchangeRateForDate(paymentDate);
+
+                // Validation 3: Change cannot exceed IQD received (simple case)
+                if (usd === 0 && changeAmount > iqd) {
+                    return res.status(400).json({
+                        status: 'error',
+                        message: `Change (${changeAmount} IQD) cannot exceed IQD received (${iqd} IQD)`,
+                        code: 'CHANGE_EXCEEDS_IQD_RECEIVED'
+                    });
+                }
+
+                // Validation 4: For USD payments, validate against total IQD value
+                if (usd > 0 && exchangeRate) {
+                    const totalIQDValue = iqd + Math.floor(usd * exchangeRate);
+
+                    if (changeAmount > totalIQDValue) {
+                        return res.status(400).json({
+                            status: 'error',
+                            message: `Change (${changeAmount} IQD) cannot exceed total IQD value in transaction (${totalIQDValue} IQD at rate ${exchangeRate})`,
+                            code: 'CHANGE_EXCEEDS_TOTAL_VALUE',
+                            details: {
+                                usdReceived: usd,
+                                iqdReceived: iqd,
+                                exchangeRate: exchangeRate,
+                                totalIQDValue: totalIQDValue,
+                                changeRequested: changeAmount
+                            }
+                        });
+                    }
+                }
+            }
+
+            changeToSave = changeAmount;
+        }
+
+        // Save invoice with validated data
         const result = await addInvoice({
             workid,
             amountPaid,
             paymentDate,
             usdReceived: usd,
             iqdReceived: iqd,
-            change: parseInt(change) || 0
+            change: changeToSave  // NULL for same-currency, validated number for cross-currency
         });
 
         res.json({ status: 'success', data: result });
     } catch (error) {
         console.error("Error adding invoice:", error);
+
+        // Handle database constraint violations gracefully
+        if (error.message && error.message.includes('CHK_Invoice')) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Payment validation failed: ' + error.message,
+                code: 'DB_CONSTRAINT_VIOLATION'
+            });
+        }
+
         res.status(500).json({ status: 'error', message: error.message });
     }
 });
@@ -3056,7 +3151,7 @@ router.put('/updatework', async (req, res) => {
 router.post('/finishwork', async (req, res) => {
     try {
         const { workId } = req.body;
-        
+
         if (!workId) {
             return res.status(400).json({ error: "Missing required field: workId" });
         }
@@ -3066,14 +3161,60 @@ router.post('/finishwork', async (req, res) => {
         }
 
         const result = await finishWork(parseInt(workId));
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             message: "Work completed successfully",
             rowsAffected: result.rowCount
         });
     } catch (error) {
         console.error("Error finishing work:", error);
         res.status(500).json({ error: "Failed to finish work", details: error.message });
+    }
+});
+
+// Delete work
+router.delete('/deletework', async (req, res) => {
+    try {
+        const { workId } = req.body;
+
+        if (!workId) {
+            return res.status(400).json({ error: "Missing required field: workId" });
+        }
+
+        if (isNaN(parseInt(workId))) {
+            return res.status(400).json({ error: "workId must be a valid number" });
+        }
+
+        const result = await deleteWork(parseInt(workId));
+
+        // Check if work has dependencies that prevent deletion
+        if (!result.canDelete) {
+            const deps = result.dependencies;
+            const dependencyMessages = [];
+
+            if (deps.InvoiceCount > 0) dependencyMessages.push(`${deps.InvoiceCount} payment(s)`);
+            if (deps.VisitCount > 0) dependencyMessages.push(`${deps.VisitCount} visit(s)`);
+            if (deps.DetailCount > 0) dependencyMessages.push(`${deps.DetailCount} detail(s)`);
+            if (deps.DiagnosisCount > 0) dependencyMessages.push(`${deps.DiagnosisCount} diagnosis(es)`);
+            if (deps.ImplantCount > 0) dependencyMessages.push(`${deps.ImplantCount} implant(s)`);
+            if (deps.ScrewCount > 0) dependencyMessages.push(`${deps.ScrewCount} screw(s)`);
+
+            return res.status(409).json({
+                success: false,
+                error: "Cannot delete work with existing records",
+                message: `This work has ${dependencyMessages.join(', ')} that must be deleted first.`,
+                dependencies: deps
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Work deleted successfully",
+            rowsAffected: result.rowCount
+        });
+    } catch (error) {
+        console.error("Error deleting work:", error);
+        res.status(500).json({ error: "Failed to delete work", details: error.message });
     }
 });
 

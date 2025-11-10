@@ -1,11 +1,23 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import UniversalHeader from '../components/react/UniversalHeader.jsx'
+import wsService from '../services/websocket.js'
+import { WebSocketEvents } from '../constants/websocket-events.js'
+import tabManager from '../utils/tab-manager.js'
 import '../../css/pages/appointments.css'
 import '../../css/components/universal-header.css'
 
+// Current date state for WebSocket filtering
+let currentDate = null;
+
 // Initialize the daily appointments page
 function initializePage() {
+    // Name this window so window.open() can reuse/focus it
+    window.name = 'clinic_appointments';
+
+    // Register this tab as singleton - only one appointments tab should exist
+    tabManager.register('appointments');
+
     // Mount Universal Header
     const headerRoot = document.getElementById('universal-header-root');
     if (headerRoot) {
@@ -25,6 +37,7 @@ function initializePage() {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
     const today = `${year}-${month}-${day}`;
+    currentDate = today;
 
     const datePicker = document.getElementById('date-picker');
     if (datePicker) {
@@ -32,7 +45,8 @@ function initializePage() {
     }
     loadAppointments(today);
 
-    console.log('✅ Daily appointments page initialized');
+    // Initialize WebSocket connection for real-time updates
+    initializeWebSocket();
 }
 
 // Initialize when DOM is ready or immediately if already loaded
@@ -48,6 +62,7 @@ function initializeDatePicker() {
 
     if (datePicker) {
         datePicker.addEventListener('change', function() {
+            currentDate = this.value; // Update current date for WebSocket filtering
             loadAppointments(this.value);
         });
     }
@@ -470,19 +485,24 @@ function showError(message) {
 let lastAction = null;
 
 // Action functions
+// Opens patient in new tab to keep appointments page as persistent command center
 window.viewPatient = function(patientId) {
     if (patientId) {
-        window.location.href = `/patient/${patientId}/works`;
+        const url = `/patient/${patientId}/works`;
+        console.log('Opening patient in new tab:', url);
+        window.open(url, '_blank');
     }
 };
 
 // View patient photos (main click action)
+// Opens patient details in new tab so appointments page stays open as command center
 window.viewPatientPhotos = function(patientId) {
     console.log('Clicking patient ID:', patientId);
     if (patientId && patientId !== 'undefined' && patientId !== 'null') {
         const url = `/patient/${patientId}/works`;
-        console.log('Navigating to patient app:', url);
-        window.location.href = url;
+        console.log('Opening patient in new tab:', url);
+        // Open in new tab - keeps appointments page as the persistent dashboard
+        window.open(url, '_blank');
     } else {
         console.error('Invalid patient ID:', patientId);
         alert('Patient ID not found');
@@ -932,3 +952,141 @@ window.switchMobileView = function(view) {
         sections[1].classList.add('active-view');
     }
 };
+
+// ============================================
+// WEBSOCKET INTEGRATION FOR REAL-TIME UPDATES
+// ============================================
+
+/**
+ * Initialize WebSocket connection for real-time appointment updates
+ */
+function initializeWebSocket() {
+    // Create connection status indicator
+    createConnectionStatusIndicator();
+
+    // Determine WebSocket URL based on environment
+    // In development with Vite (port 5173), connect to Express backend (port 3000)
+    // In production, connect to same host
+    const isDevelopment = location.port === '5173';
+    const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = isDevelopment
+        ? 'ws://localhost:3000'
+        : wsProtocol + '//' + location.host;
+
+    // Set the base URL for WebSocket connection
+    wsService.options.baseUrl = wsUrl;
+
+    // Connect to WebSocket server with daily-appointments client type
+    wsService.connect({ clientType: 'daily-appointments' })
+        .then(() => {
+            updateConnectionStatus('connected');
+        })
+        .catch(() => {
+            updateConnectionStatus('disconnected');
+        });
+
+    // Listen for connection events
+    wsService.on('connected', () => {
+        updateConnectionStatus('connected');
+        showNotification('Live updates enabled', 'success');
+    });
+
+    wsService.on('disconnected', () => {
+        updateConnectionStatus('disconnected');
+    });
+
+    wsService.on('reconnecting', () => {
+        updateConnectionStatus('reconnecting');
+    });
+
+    wsService.on('error', () => {
+        updateConnectionStatus('error');
+    });
+
+    // Listen for appointment updates (real-time sync)
+    wsService.on(WebSocketEvents.APPOINTMENTS_UPDATED, (data) => {
+        // Check if the update is for the currently displayed date
+        if (data && data.date === currentDate) {
+            // Show visual feedback
+            flashUpdateIndicator();
+
+            // Reload appointments data
+            loadAppointments(currentDate);
+
+            // Show notification
+            showNotification('Appointments updated', 'info');
+        }
+    });
+}
+
+/**
+ * Create connection status indicator in the UI
+ */
+function createConnectionStatusIndicator() {
+    // Check if indicator already exists
+    if (document.getElementById('ws-status-indicator')) return;
+
+    const indicator = document.createElement('div');
+    indicator.id = 'ws-status-indicator';
+    indicator.className = 'ws-status-indicator';
+    indicator.innerHTML = `
+        <span class="ws-status-dot"></span>
+        <span class="ws-status-text">Connecting...</span>
+    `;
+
+    // Add to header section
+    const headerSection = document.querySelector('.header-section');
+    if (headerSection) {
+        headerSection.appendChild(indicator);
+    }
+}
+
+/**
+ * Update connection status indicator
+ * @param {string} status - Connection status: 'connected', 'disconnected', 'reconnecting', 'error'
+ */
+function updateConnectionStatus(status) {
+    const indicator = document.getElementById('ws-status-indicator');
+    if (!indicator) return;
+
+    const text = indicator.querySelector('.ws-status-text');
+
+    // Remove all status classes
+    indicator.className = 'ws-status-indicator';
+
+    // Add appropriate status class and text
+    switch (status) {
+        case 'connected':
+            indicator.classList.add('ws-connected');
+            text.textContent = 'Live';
+            break;
+        case 'disconnected':
+            indicator.classList.add('ws-disconnected');
+            text.textContent = 'Offline';
+            break;
+        case 'reconnecting':
+            indicator.classList.add('ws-reconnecting');
+            text.textContent = 'Reconnecting...';
+            break;
+        case 'error':
+            indicator.classList.add('ws-error');
+            text.textContent = 'Connection Error';
+            break;
+    }
+}
+
+/**
+ * Flash update indicator to show data was refreshed
+ */
+function flashUpdateIndicator() {
+    const indicator = document.getElementById('ws-status-indicator');
+    if (!indicator) return;
+
+    // Add flash animation class
+    indicator.classList.add('ws-flash');
+
+    // Remove after animation completes
+    setTimeout(() => {
+        indicator.classList.remove('ws-flash');
+    }, 1000);
+}

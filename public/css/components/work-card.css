@@ -8,12 +8,13 @@
 }
 
 .work-card {
+    position: relative;
     background: white;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
     transition: all 0.2s ease;
     border-left: 4px solid transparent;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .work-card.collapsed {
@@ -126,6 +127,7 @@
 
 /* Full Content - Only When Expanded */
 .work-card-full-content {
+    position: relative;
     margin-top: 1rem;
     padding-top: 1rem;
     border-top: 1px solid #e5e7eb;
@@ -148,6 +150,7 @@
     position: absolute;
     top: 1rem;
     right: 1rem;
+    z-index: 10;
 }
 
 .btn-icon {
@@ -200,6 +203,25 @@
 .work-card-dropdown button i {
     width: 16px;
     color: #6b7280;
+}
+
+/* Delete button styling */
+.work-card-dropdown .dropdown-delete-btn {
+    color: #dc2626;
+    border-top: 1px solid #f3f4f6;
+}
+
+.work-card-dropdown .dropdown-delete-btn:hover {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.work-card-dropdown .dropdown-delete-btn i {
+    color: #dc2626;
+}
+
+.work-card-dropdown .dropdown-delete-btn:hover i {
+    color: #991b1b;
 }
 
 /* Progress Section */

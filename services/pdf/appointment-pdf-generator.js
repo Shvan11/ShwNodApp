@@ -4,16 +4,35 @@
  */
 
 import PDFDocument from 'pdfkit';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { executeStoredProcedure, TYPES } from '../database/index.js';
+import { resolvePath } from '../../utils/path-resolver.js';
+
+// Get project root directory
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, '../..');
 
 class AppointmentPDFGenerator {
     constructor() {
-        // Font paths for Arabic/Unicode support
+        // Font paths for Arabic/Unicode support - using cross-platform path resolution
+        const fontsDir = path.join(projectRoot, 'fonts');
+        const platform = process.platform;
+
         this.fonts = {
-            arabic: '/home/administrator/projects/ShwNodApp/fonts/NotoSansArabic.ttf',
-            regular: '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-            bold: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+            // Custom Arabic font - relative to project root
+            arabic: path.join(fontsDir, 'NotoSansArabic.ttf'),
+            // System fonts (platform-specific fallbacks)
+            regular: platform === 'win32'
+                ? 'C:\\Windows\\Fonts\\arial.ttf'
+                : '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+            bold: platform === 'win32'
+                ? 'C:\\Windows\\Fonts\\arialbd.ttf'
+                : '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
         };
+
+        console.log(`PDF Generator initialized with fonts:`, this.fonts);
     }
 
     /**

@@ -116,8 +116,13 @@ const AppointmentForm = ({ patientId, onClose, onSuccess }) => {
 
             const result = await response.json();
             if (result.success) {
-                onSuccess && onSuccess(result);
-                onClose && onClose();
+                // Only call onSuccess, it will handle navigation
+                // Don't call onClose as it might interfere with navigation
+                if (onSuccess) {
+                    onSuccess(result);
+                } else if (onClose) {
+                    onClose();
+                }
             } else {
                 throw new Error(result.error || 'Failed to create appointment');
             }
