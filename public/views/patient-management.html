@@ -163,6 +163,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Initializing Patient Management...');
 
+            // Name this window so tabManager can reuse it
+            window.name = 'clinic_patient_management';
+
             // Mount Universal Header
             const headerRoot = document.getElementById('universal-header-root');
             if (headerRoot) {

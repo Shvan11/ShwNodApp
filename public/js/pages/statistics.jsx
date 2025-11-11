@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import StatisticsComponent from '../components/react/StatisticsComponent.jsx';
 
-// Name this window so it reuses the same tab
+// Name this window so tabManager can reuse it
 window.name = 'clinic_statistics';
 
 // Mount the React app

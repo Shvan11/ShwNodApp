@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
         console.log('🚀 Initializing Appointment Calendar...');
 
-        // Name this window so it reuses the same tab
+        // Name this window so tabManager can reuse it
         window.name = 'clinic_calendar';
 
         // Get URL parameters for initial state
