@@ -40,6 +40,9 @@
     import ExpensesApp from '/js/apps/ExpensesApp.jsx';
 
     document.addEventListener('DOMContentLoaded', function() {
+      // Name this window so it reuses the same tab
+      window.name = 'clinic_expenses';
+
       // Mount Universal Header
       const headerRoot = document.getElementById('universal-header-root');
       if (headerRoot) {
