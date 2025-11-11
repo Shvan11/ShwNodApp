@@ -126,6 +126,7 @@ const AppointmentCard = ({
             } else {
                 return (
                     <button
+                        type="button"
                         className="btn-action btn-success"
                         onClick={() => onCheckIn(appointment.appointmentID)}
                     >
@@ -142,13 +143,15 @@ const AppointmentCard = ({
                 return (
                     <>
                         <button
+                            type="button"
                             className="btn-action btn-info"
                             onClick={() => onMarkSeated(appointment.appointmentID)}
                         >
-                            <i className="fas fa-chair"></i>
+                            <i className="fas fa-tooth"></i>
                             <span>Seat Patient</span>
                         </button>
                         <button
+                            type="button"
                             className="btn-action btn-undo"
                             onClick={() => onUndoState(appointment.appointmentID, 'Present')}
                             title="Undo Check-in"
@@ -161,6 +164,7 @@ const AppointmentCard = ({
                 return (
                     <>
                         <button
+                            type="button"
                             className="btn-action btn-success"
                             onClick={() => onMarkDismissed(appointment.appointmentID)}
                         >
@@ -168,6 +172,7 @@ const AppointmentCard = ({
                             <span>Complete Visit</span>
                         </button>
                         <button
+                            type="button"
                             className="btn-action btn-undo"
                             onClick={() => onUndoState(appointment.appointmentID, 'Seated')}
                             title="Undo Seating"
@@ -179,6 +184,7 @@ const AppointmentCard = ({
             } else if (currentStatus === 'dismissed') {
                 return (
                     <button
+                        type="button"
                         className="btn-action btn-undo btn-undo-only"
                         onClick={() => onUndoState(appointment.appointmentID, 'Dismissed')}
                         title="Undo Dismiss"
@@ -249,7 +255,7 @@ const AppointmentCard = ({
                             )}
                             {seatedTime && (
                                 <span className="status-time-icon status-time-seated" title={`Seated: ${seatedTime}`}>
-                                    <i className="fas fa-chair"></i>
+                                    <i className="fas fa-tooth"></i>
                                     {seatedTime}
                                 </span>
                             )}
