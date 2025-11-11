@@ -49,6 +49,9 @@ const AppointmentCard = ({
     const status = getCurrentStatus();
     const statusClass = status.toLowerCase().replace(' ', '-');
 
+    // Check if patient is waiting (Present but not Seated and not Dismissed)
+    const isWaiting = showStatus && appointment.Present && !appointment.Seated && !appointment.Dismissed;
+
     // Open patient in new tab
     const handlePatientClick = (e) => {
         e.stopPropagation();
@@ -181,7 +184,6 @@ const AppointmentCard = ({
                         title="Undo Dismiss"
                     >
                         <i className="fas fa-undo"></i>
-                        <span>Undo Dismiss</span>
                     </button>
                 );
             }
@@ -197,7 +199,7 @@ const AppointmentCard = ({
 
     return (
         <div
-            className={`appointment-card fade-in-up ${statusClass}`}
+            className={`appointment-card fade-in-up ${statusClass}${isWaiting ? ' waiting-patient' : ''}`}
             data-appointment-id={appointment.appointmentID}
             data-status={statusClass}
             onContextMenu={handleContextMenu}
