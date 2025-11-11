@@ -42,9 +42,19 @@ Configuration is in `.mcp.json`. See `docs/mcp-mssql-setup.md` for MSSQL MCP ser
 - **QR Code Generation**: For WhatsApp authentication and patient records
 
 ### Frontend Structure
-- **Static Files**: `/public/` contains HTML views, CSS, JavaScript, and assets
-- **Modular JS**: Component-based frontend with services layer (`/public/js/services/`)
-- **Views**: Separate HTML files for different features (patient details, messaging, appointments)
+- **Architecture**: Hybrid React + Vanilla JS application
+  - **Primary**: React-based SPAs using ESM imports from CDN (esm.sh)
+  - **Legacy**: Production-ready vanilla JS for complex messaging features
+- **React Apps** (`/public/js/apps/`): DashboardApp, ExpensesApp, PatientApp, AlignerApp, SettingsApp, DailyAppointmentsApp
+- **React Components** (`/public/js/components/react/`): UniversalHeader, PatientManagement, and feature-specific components
+- **React Pages** (`/public/js/pages/*.jsx`): Page-level React components (calendar, grid, statistics, visits, etc.)
+- **Vanilla JS Pages** (`/public/js/pages/*.js`):
+  - WhatsApp messaging system (send.js, whatsapp-auth.js) - Production-ready, 2000+ lines
+  - Template management (template-management.js) - File-based template system
+- **Services Layer** (`/public/js/services/`): Shared utilities (websocket, API client, storage)
+- **Views**: HTML shells that mount React apps or load vanilla JS modules
+
+**Migration Status**: See `docs/REACT_MIGRATION_STATUS.md` for detailed migration tracking and architecture decisions.
 
 ## Environment Variables Required
 

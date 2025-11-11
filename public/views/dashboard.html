@@ -7,204 +7,34 @@
     <link rel="stylesheet" href="../css/main.css">
     <link rel="stylesheet" href="../css/pages/dashboard.css">
     <link rel="stylesheet" href="../fontawesome/css/all.min.css">
+
+    <!-- Import maps for ES modules -->
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@18",
+          "react-dom": "https://esm.sh/react-dom@18",
+          "react-dom/client": "https://esm.sh/react-dom@18/client"
+        }
+      }
+    </script>
 </head>
 <body>
-    <div id="app">
-        <header class="header">
-            <div class="container">
-                <div class="logo">
-                    <img src="../images/logo.png" alt="Shwan Orthodontics">
-                    <h1>Shwan Orthodontics</h1>
-                </div>
-                <div class="user-info">
-                    <span>Welcome to the System</span>
-                </div>
-            </div>
-        </header>
+    <div id="dashboard-root"></div>
 
-        <main class="main-content">
-            <div class="container">
-                <div class="dashboard-grid">
-                    <!-- Calendar -->
-                    <a href="/calendar" class="dashboard-card-link">
-                        <div class="dashboard-card">
-                            <div class="card-icon">
-                                <i class="fas fa-calendar-alt"></i>
-                            </div>
-                            <h3>Calendar</h3>
-                            <p>View and manage monthly appointments</p>
-                            <div class="card-link">
-                                <span>Open Calendar</span>
-                                <i class="fas fa-arrow-right"></i>
-                            </div>
-                        </div>
-                    </a>
+    <!-- Mount React Dashboard -->
+    <script type="module">
+      import React from 'react';
+      import ReactDOM from 'react-dom/client';
+      import DashboardApp from '/js/apps/DashboardApp.jsx';
 
-                    <!-- Today's Appointments -->
-                    <a href="/appointments" class="dashboard-card-link">
-                        <div class="dashboard-card">
-                            <div class="card-icon">
-                                <i class="fas fa-clock"></i>
-                            </div>
-                            <h3>Today's Appointments</h3>
-                            <p>View today's scheduled appointments</p>
-                            <div class="card-link">
-                                <span>View Appointments</span>
-                                <i class="fas fa-arrow-right"></i>
-                            </div>
-                        </div>
-                    </a>
-
-                    <!-- Search / Patient Management -->
-                    <a href="/patient-management" class="dashboard-card-link">
-                        <div class="dashboard-card">
-                            <div class="card-icon">
-                                <i class="fas fa-search"></i>
-                            </div>
-                            <h3>Search Patients</h3>
-                            <p>Quick search and patient management</p>
-                            <div class="card-link">
-                                <span>Search Patients</span>
-                                <i class="fas fa-arrow-right"></i>
-                            </div>
-                        </div>
-                    </a>
-
-                    <!-- WhatsApp Messages -->
-                    <a href="/send" class="dashboard-card-link">
-                        <div class="dashboard-card">
-                            <div class="card-icon">
-                                <i class="fab fa-whatsapp"></i>
-                            </div>
-                            <h3>WhatsApp Messages</h3>
-                            <p>Send appointment reminders and follow-ups</p>
-                            <div class="card-link">
-                                <span>Send Messages</span>
-                                <i class="fas fa-arrow-right"></i>
-                            </div>
-                        </div>
-                    </a>
-
-                    <!-- Aligner Management -->
-                    <a href="/aligner" class="dashboard-card-link">
-                        <div class="dashboard-card">
-                            <div class="card-icon">
-                                <i class="fas fa-tooth"></i>
-                            </div>
-                            <h3>Aligner Management</h3>
-                            <p>Manage aligner sets and delivery batches</p>
-                            <div class="card-link">
-                                <span>Manage Aligners</span>
-                                <i class="fas fa-arrow-right"></i>
-                            </div>
-                        </div>
-                    </a>
-
-                    <!-- Settings -->
-                    <a href="/settings" class="dashboard-card-link">
-                        <div class="dashboard-card">
-                            <div class="card-icon">
-                                <i class="fas fa-cog"></i>
-                            </div>
-                            <h3>Settings</h3>
-                            <p>System settings and preferences</p>
-                            <div class="card-link">
-                                <span>Open Settings</span>
-                                <i class="fas fa-arrow-right"></i>
-                            </div>
-                        </div>
-                    </a>
-
-                    <!-- Expense Management -->
-                    <a href="/expenses" class="dashboard-card-link">
-                        <div class="dashboard-card">
-                            <div class="card-icon">
-                                <i class="fas fa-money-bill-wave"></i>
-                            </div>
-                            <h3>Expense Management</h3>
-                            <p>Track and manage clinic expenses</p>
-                            <div class="card-link">
-                                <span>Manage Expenses</span>
-                                <i class="fas fa-arrow-right"></i>
-                            </div>
-                        </div>
-                    </a>
-
-                    <!-- Template Management -->
-                    <a href="/views/template-management.html" class="dashboard-card-link">
-                        <div class="dashboard-card border-left-purple">
-                            <div class="card-icon gradient-purple">
-                                <i class="fas fa-file-alt"></i>
-                            </div>
-                            <h3>Document Templates</h3>
-                            <p>Manage receipts, invoices, and prescription templates</p>
-                            <div class="card-link">
-                                <span>Manage Templates</span>
-                                <i class="fas fa-arrow-right"></i>
-                            </div>
-                        </div>
-                    </a>
-
-                    <!-- Statistics -->
-                    <a href="/statistics" class="dashboard-card-link">
-                        <div class="dashboard-card">
-                            <div class="card-icon">
-                                <i class="fas fa-chart-bar"></i>
-                            </div>
-                            <h3>Financial Statistics</h3>
-                            <p>View clinic reports and financial analytics</p>
-                            <div class="card-link">
-                                <span>View Statistics</span>
-                                <i class="fas fa-arrow-right"></i>
-                            </div>
-                        </div>
-                    </a>
-
-                    <!-- Add New Patient -->
-                    <a href="/views/patient/add-patient.html" class="dashboard-card-link">
-                        <div class="dashboard-card">
-                            <div class="card-icon">
-                                <i class="fas fa-user-plus"></i>
-                            </div>
-                            <h3>Add New Patient</h3>
-                            <p>Register a new patient in the system</p>
-                            <div class="card-link">
-                                <span>Add Patient</span>
-                                <i class="fas fa-arrow-right"></i>
-                            </div>
-                        </div>
-                    </a>
-
-                    <!-- Quick Actions -->
-                    <div class="dashboard-card quick-actions">
-                        <div class="card-icon">
-                            <i class="fas fa-bolt"></i>
-                        </div>
-                        <h3>Quick Actions</h3>
-                        <div class="quick-actions-list">
-                            <a href="/auth" class="quick-action">
-                                <i class="fab fa-whatsapp"></i>
-                                <span>Connect WhatsApp</span>
-                            </a>
-                            <a href="/views/patient/grid.html" class="quick-action">
-                                <i class="fas fa-th"></i>
-                                <span>View Patients</span>
-                            </a>
-                            <a href="/views/patient/add-patient.html" class="quick-action">
-                                <i class="fas fa-user-plus"></i>
-                                <span>Add New Patient</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
-
-        <footer class="footer">
-            <div class="container">
-                <p>&copy; 2024 Shwan Orthodontics - All Rights Reserved</p>
-            </div>
-        </footer>
-    </div>
+      document.addEventListener('DOMContentLoaded', function() {
+        const root = document.getElementById('dashboard-root');
+        if (root) {
+          const reactRoot = ReactDOM.createRoot(root);
+          reactRoot.render(React.createElement(DashboardApp));
+        }
+      });
+    </script>
 </body>
 </html>
