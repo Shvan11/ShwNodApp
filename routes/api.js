@@ -4097,6 +4097,7 @@ router.get('/aligner/sets/:workId', async (req, res) => {
                 s.AlignerDrID,
                 s.SetUrl,
                 s.SetPdfUrl,
+                s.SetVideo,
                 s.SetCost,
                 s.Currency,
                 ad.DoctorName as AlignerDoctorName,
@@ -4122,7 +4123,7 @@ router.get('/aligner/sets/:workId', async (req, res) => {
                 s.RemainingUpperAligners, s.RemainingLowerAligners,
                 s.CreationDate, s.Days, s.IsActive, s.Notes,
                 s.FolderPath, s.AlignerDrID, s.SetUrl, s.SetPdfUrl,
-                s.SetCost, s.Currency, ad.DoctorName,
+                s.SetVideo, s.SetCost, s.Currency, ad.DoctorName,
                 vp.TotalPaid, vp.Balance, vp.PaymentStatus
             ORDER BY s.SetSequence
         `;
@@ -4147,15 +4148,16 @@ router.get('/aligner/sets/:workId', async (req, res) => {
                 AlignerDrID: columns[13].value,
                 SetUrl: columns[14].value,
                 SetPdfUrl: columns[15].value,
-                SetCost: columns[16].value,
-                Currency: columns[17].value,
-                AlignerDoctorName: columns[18].value,
-                TotalBatches: columns[19].value,
-                DeliveredBatches: columns[20].value,
-                TotalPaid: columns[21].value,
-                Balance: columns[22].value,
-                PaymentStatus: columns[23].value,
-                UnreadActivityCount: columns[24].value || 0
+                SetVideo: columns[16].value,
+                SetCost: columns[17].value,
+                Currency: columns[18].value,
+                AlignerDoctorName: columns[19].value,
+                TotalBatches: columns[20].value,
+                DeliveredBatches: columns[21].value,
+                TotalPaid: columns[22].value,
+                Balance: columns[23].value,
+                PaymentStatus: columns[24].value,
+                UnreadActivityCount: columns[25].value || 0
             })
         );
 
@@ -4434,6 +4436,7 @@ router.put('/aligner/sets/:setId', async (req, res) => {
             AlignerDrID,
             SetUrl,
             SetPdfUrl,
+            SetVideo,
             SetCost,
             Currency,
             Notes,
@@ -4460,6 +4463,7 @@ router.put('/aligner/sets/:setId', async (req, res) => {
                 AlignerDrID = @AlignerDrID,
                 SetUrl = @SetUrl,
                 SetPdfUrl = @SetPdfUrl,
+                SetVideo = @SetVideo,
                 SetCost = @SetCost,
                 Currency = @Currency,
                 Notes = @Notes,
@@ -4478,6 +4482,7 @@ router.put('/aligner/sets/:setId', async (req, res) => {
                 ['AlignerDrID', database.TYPES.Int, AlignerDrID ? parseInt(AlignerDrID) : null],
                 ['SetUrl', database.TYPES.NVarChar, SetUrl || null],
                 ['SetPdfUrl', database.TYPES.NVarChar, SetPdfUrl || null],
+                ['SetVideo', database.TYPES.NVarChar, SetVideo || null],
                 ['SetCost', database.TYPES.Decimal, SetCost ? parseFloat(SetCost) : null],
                 ['Currency', database.TYPES.NVarChar, Currency || null],
                 ['Notes', database.TYPES.NVarChar, Notes || null],

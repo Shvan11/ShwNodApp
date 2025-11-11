@@ -51,6 +51,11 @@ const PatientSets = () => {
     const [quickPdfUrlValue, setQuickPdfUrlValue] = useState('');
     const [savingPdfUrl, setSavingPdfUrl] = useState(false);
 
+    // Quick Video URL editing
+    const [editingVideoForSet, setEditingVideoForSet] = useState(null);
+    const [quickVideoValue, setQuickVideoValue] = useState('');
+    const [savingVideo, setSavingVideo] = useState(false);
+
     // PDF file upload
     const [pdfFile, setPdfFile] = useState(null);
     const [uploadingPdf, setUploadingPdf] = useState(false);
@@ -847,6 +852,70 @@ const PatientSets = () => {
         }
     };
 
+    // Video URL handlers
+    const isValidYouTubeUrl = (url) => {
+        if (!url) return true;
+        const patterns = [
+            /^https?:\/\/(www\.)?youtube\.com\/watch\?v=[\w-]+/,
+            /^https?:\/\/youtu\.be\/[\w-]+/,
+            /^https?:\/\/(www\.)?youtube\.com\/embed\/[\w-]+/
+        ];
+        return patterns.some(pattern => pattern.test(url));
+    };
+
+    const handleStartEditVideo = (set, e) => {
+        e.stopPropagation();
+        setEditingVideoForSet(set.AlignerSetID);
+        setQuickVideoValue(set.SetVideo || '');
+    };
+
+    const handleCancelEditVideo = () => {
+        setEditingVideoForSet(null);
+        setQuickVideoValue('');
+    };
+
+    const handleSaveVideo = async (setId) => {
+        try {
+            setSavingVideo(true);
+
+            // Validate YouTube URL
+            if (quickVideoValue.trim() && !isValidYouTubeUrl(quickVideoValue)) {
+                alert('Please enter a valid YouTube URL\n\nAccepted formats:\n- https://www.youtube.com/watch?v=VIDEO_ID\n- https://youtu.be/VIDEO_ID\n- https://www.youtube.com/embed/VIDEO_ID');
+                return;
+            }
+
+            const currentSet = alignerSets.find(s => s.AlignerSetID === setId);
+            if (!currentSet) {
+                throw new Error('Set not found');
+            }
+
+            const response = await fetch(`/api/aligner/sets/${setId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...currentSet,
+                    SetVideo: quickVideoValue.trim() || null
+                })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to update video URL');
+            }
+
+            await loadAlignerSets(patient.workid);
+            setEditingVideoForSet(null);
+            setQuickVideoValue('');
+
+        } catch (error) {
+            console.error('Error saving video URL:', error);
+            alert('Failed to save video URL: ' + error.message);
+        } finally {
+            setSavingVideo(false);
+        }
+    };
+
     // Notes Operations
     const handleAddLabNote = async (setId) => {
         if (!labNoteText.trim()) {
@@ -1231,6 +1300,20 @@ const PatientSets = () => {
                                                     <span>View PDF</span>
                                                 </button>
                                             )}
+                                            {set.SetVideo && (
+                                                <button
+                                                    className="video-btn"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        window.open(set.SetVideo, '_blank');
+                                                    }}
+                                                    title="Watch case explanation video"
+                                                    style={{ background: '#dc2626' }}
+                                                >
+                                                    <i className="fab fa-youtube"></i>
+                                                    <span>Case Video</span>
+                                                </button>
+                                            )}
                                             {set.SetCost && set.Balance > 0 && (
                                                 <button
                                                     className="payment-btn"
@@ -1450,6 +1533,73 @@ const PatientSets = () => {
                                                     ) : (
                                                         <i className={set.SetPdfUrl ? "fas fa-edit" : "fas fa-plus"}></i>
                                                     )}
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="set-info-item" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                            <i className="fas fa-video"></i>
+                                            <span style={{ flex: 1 }}>
+                                                Case Video: {editingVideoForSet === set.AlignerSetID ? (
+                                                    <div style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center', marginLeft: '0.5rem' }}>
+                                                        <input
+                                                            type="url"
+                                                            value={quickVideoValue}
+                                                            onChange={(e) => setQuickVideoValue(e.target.value)}
+                                                            placeholder="https://youtube.com/watch?v=..."
+                                                            style={{
+                                                                padding: '0.4rem 0.6rem',
+                                                                border: '1px solid #d1d5db',
+                                                                borderRadius: '4px',
+                                                                fontSize: '0.875rem',
+                                                                minWidth: '350px'
+                                                            }}
+                                                            autoFocus
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                    </div>
+                                                ) : set.SetVideo ? (
+                                                    <a href={set.SetVideo} target="_blank" rel="noopener noreferrer" style={{ color: '#dc2626', textDecoration: 'underline' }}>
+                                                        <i className="fab fa-youtube" style={{ marginRight: '0.25rem' }}></i>
+                                                        Watch Case Video
+                                                    </a>
+                                                ) : (
+                                                    <em style={{ color: '#6b7280' }}>Not set</em>
+                                                )}
+                                            </span>
+                                            {editingVideoForSet === set.AlignerSetID ? (
+                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <button
+                                                        className="action-icon-btn edit"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleSaveVideo(set.AlignerSetID);
+                                                        }}
+                                                        disabled={savingVideo}
+                                                        title="Save Video URL"
+                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}
+                                                    >
+                                                        {savingVideo ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
+                                                    </button>
+                                                    <button
+                                                        className="action-icon-btn delete"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleCancelEditVideo();
+                                                        }}
+                                                        title="Cancel"
+                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}
+                                                    >
+                                                        <i className="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    className="action-icon-btn edit"
+                                                    onClick={(e) => handleStartEditVideo(set, e)}
+                                                    title={set.SetVideo ? "Edit Video URL" : "Add Video URL"}
+                                                    style={{ padding: '0.5rem 1rem', fontSize: '1.1rem' }}
+                                                >
+                                                    <i className={set.SetVideo ? "fas fa-edit" : "fas fa-plus"}></i>
                                                 </button>
                                             )}
                                         </div>

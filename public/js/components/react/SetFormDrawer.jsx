@@ -11,6 +11,7 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
         AlignerDrID: '',
         SetUrl: '',
         SetPdfUrl: '',
+        SetVideo: '',
         SetCost: '',
         Currency: 'USD',
         Notes: '',
@@ -61,6 +62,7 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                 AlignerDrID: set.AlignerDrID || '',
                 SetUrl: set.SetUrl || '',
                 SetPdfUrl: set.SetPdfUrl || '',
+                SetVideo: set.SetVideo || '',
                 SetCost: set.SetCost || '',
                 Currency: set.Currency || 'USD',
                 Notes: set.Notes || '',
@@ -106,6 +108,7 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                 AlignerDrID: defaultDoctor,
                 SetUrl: '',
                 SetPdfUrl: '',
+                SetVideo: '',
                 SetCost: '',
                 Currency: 'USD',
                 Notes: '',
@@ -509,6 +512,21 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                                                 onChange={handleChange}
                                                 placeholder="https://drive.google.com/..."
                                             />
+                                        </div>
+
+                                        <div className="form-field">
+                                            <label htmlFor="SetVideo">Case Video URL (YouTube)</label>
+                                            <input
+                                                type="url"
+                                                id="SetVideo"
+                                                name="SetVideo"
+                                                value={formData.SetVideo}
+                                                onChange={handleChange}
+                                                placeholder="https://www.youtube.com/watch?v=..."
+                                            />
+                                            <small style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '0.25rem', display: 'block' }}>
+                                                Add YouTube unlisted video URL for case explanation
+                                            </small>
                                         </div>
 
                                         {/* PDF Upload Section */}
