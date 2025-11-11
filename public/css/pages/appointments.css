@@ -94,6 +94,7 @@ body {
 body.daily-appointments-view {
   margin: 0;
   padding: 0;
+  padding-top: 50px; /* Account for fixed universal header */
   width: 100vw;
   overflow-x: hidden;
   min-height: 100vh;
@@ -390,6 +391,18 @@ body.daily-appointments-view {
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
   border-color: var(--primary-blue-light);
+}
+
+/* Waiting patients (checked-in but not seated) - Red border */
+.appointment-card.waiting-patient {
+  border: 3px solid #ef4444;
+  border-left: 6px solid #dc2626;
+  background: linear-gradient(to right, rgba(239, 68, 68, 0.05) 0%, var(--card-bg) 10%);
+}
+
+.appointment-card.waiting-patient:hover {
+  border-color: #dc2626;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
 }
 
 .appointment-time {
