@@ -22,8 +22,10 @@ import '../../css/components/simplified-calendar-picker.css';
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Initializing React Patient Portal with Router...');
 
-    // Name this window so tabManager can reuse it
-    window.name = 'clinic_patient';
+    // Extract patient ID from URL and name window accordingly
+    const patientIdMatch = window.location.pathname.match(/\/patient\/(\d+)/);
+    const patientId = patientIdMatch ? patientIdMatch[1] : 'unknown';
+    window.name = `clinic_patient_${patientId}`;
 
     // Mount Universal Header
     const headerRoot = document.getElementById('universal-header-root');

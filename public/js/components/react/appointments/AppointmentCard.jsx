@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import tabManager from '../../../utils/tab-manager.js';
 
 /**
  * AppointmentCard Component
@@ -52,12 +53,12 @@ const AppointmentCard = ({
     // Check if patient is waiting (Present but not Seated and not Dismissed)
     const isWaiting = showStatus && appointment.Present && !appointment.Seated && !appointment.Dismissed;
 
-    // Open patient in new tab
+    // Open patient in new tab (or focus existing)
     const handlePatientClick = (e) => {
         e.preventDefault();
         e.stopPropagation();
         if (appointment.PersonID) {
-            window.open(`/patient/${appointment.PersonID}/works`, '_blank');
+            tabManager.openOrFocus(`/patient/${appointment.PersonID}/works`, `patient_${appointment.PersonID}`);
         }
     };
 
