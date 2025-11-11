@@ -82,12 +82,12 @@ const DailyAppointments = () => {
         setNotification(null);
     };
 
-    // Handle check-in
+    // Handle check-in (OPTIMISTIC UPDATE - no reload needed!)
     const handleCheckIn = async (appointmentId) => {
         try {
             const result = await checkInPatient(appointmentId);
             if (result.success) {
-                await loadAppointments(selectedDate);
+                // No loadAppointments() needed! Hook updates state optimistically
                 showNotification('Patient checked in', 'success', {
                     appointmentId,
                     previousState: result.previousState
@@ -98,12 +98,12 @@ const DailyAppointments = () => {
         }
     };
 
-    // Handle mark seated
+    // Handle mark seated (OPTIMISTIC UPDATE - no reload needed!)
     const handleMarkSeated = async (appointmentId) => {
         try {
             const result = await markSeated(appointmentId);
             if (result.success) {
-                await loadAppointments(selectedDate);
+                // No loadAppointments() needed! Hook updates state optimistically
                 showNotification('Patient seated', 'success', {
                     appointmentId,
                     previousState: result.previousState
@@ -114,12 +114,12 @@ const DailyAppointments = () => {
         }
     };
 
-    // Handle mark dismissed
+    // Handle mark dismissed (OPTIMISTIC UPDATE - no reload needed!)
     const handleMarkDismissed = async (appointmentId) => {
         try {
             const result = await markDismissed(appointmentId);
             if (result.success) {
-                await loadAppointments(selectedDate);
+                // No loadAppointments() needed! Hook updates state optimistically
                 showNotification('Visit completed', 'success', {
                     appointmentId,
                     previousState: result.previousState
@@ -130,22 +130,22 @@ const DailyAppointments = () => {
         }
     };
 
-    // Handle undo state
+    // Handle undo state (OPTIMISTIC UPDATE - no reload needed!)
     const handleUndoState = async (appointmentId, stateToUndo) => {
         try {
             await undoState(appointmentId, stateToUndo);
-            await loadAppointments(selectedDate);
+            // No loadAppointments() needed! Hook updates state optimistically
             showNotification(`${stateToUndo} status cleared`, 'info');
         } catch (err) {
             showNotification(`Failed to undo ${stateToUndo}`, 'error');
         }
     };
 
-    // Handle undo action from notification
+    // Handle undo action from notification (OPTIMISTIC UPDATE - no reload needed!)
     const handleUndoAction = async (undoData) => {
         try {
             await undoAction(undoData.appointmentId, undoData.previousState);
-            await loadAppointments(selectedDate);
+            // No loadAppointments() needed! Hook updates state optimistically
             showNotification('Action undone', 'info');
         } catch (err) {
             showNotification('Failed to undo action', 'error');

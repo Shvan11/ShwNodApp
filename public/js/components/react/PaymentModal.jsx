@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import '../../../css/components/invoice-form.css'
+import { formatNumber, parseFormattedNumber, formatCurrency as formatCurrencyUtil } from '../../utils/formatters.js'
 
 const PaymentModal = ({ workData, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
@@ -11,7 +12,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
     const [receiptData, setReceiptData] = useState(null);
     const [completeWorkData, setCompleteWorkData] = useState(null);
 
-    // Form state
+    // Form state - numeric values for calculations
     const [formData, setFormData] = useState({
         paymentDate: new Date().toISOString().substring(0, 10),
         paymentCurrency: 'IQD', // 'USD', 'IQD', 'MIXED'
@@ -20,6 +21,15 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         actualIQD: '',
         change: 0,
         changeManualOverride: false
+    });
+
+    // Display state - formatted strings for display
+    const [displayValues, setDisplayValues] = useState({
+        amountToRegister: '',
+        actualUSD: '',
+        actualIQD: '',
+        change: '',
+        newRateValue: ''
     });
 
     // Calculations and suggestions
@@ -81,6 +91,25 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         }
     }, [formData.actualUSD, formData.actualIQD, formData.amountToRegister, exchangeRate]);
 
+    // Auto-format display values when formData changes (handles auto-population)
+    useEffect(() => {
+        setDisplayValues(prev => ({
+            ...prev,
+            amountToRegister: formatNumber(formData.amountToRegister),
+            actualUSD: formatNumber(formData.actualUSD),
+            actualIQD: formatNumber(formData.actualIQD),
+            change: formatNumber(formData.change)
+        }));
+    }, [formData.amountToRegister, formData.actualUSD, formData.actualIQD, formData.change]);
+
+    // Auto-format exchange rate input
+    useEffect(() => {
+        setDisplayValues(prev => ({
+            ...prev,
+            newRateValue: formatNumber(newRateValue)
+        }));
+    }, [newRateValue]);
+
     const loadExchangeRate = async (date) => {
         try {
             const response = await fetch(`/api/getExchangeRateForDate?date=${date}`);
@@ -101,7 +130,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
     };
 
     const handleSetExchangeRate = async () => {
-        const rate = parseFloat(newRateValue);
+        const rate = parseFormattedNumber(newRateValue);
         if (!rate || rate <= 0) {
             alert('Please enter a valid exchange rate');
             return;
@@ -257,8 +286,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
 
     // Smart calculation for mixed payments
     const handleMixedUSDChange = (value) => {
-        const usd = parseFloat(value) || 0;
-        setFormData(prev => ({ ...prev, actualUSD: value }));
+        const usd = parseFormattedNumber(value) || 0;
+        setFormData(prev => ({ ...prev, actualUSD: usd }));
+        setDisplayValues(prev => ({ ...prev, actualUSD: value }));
 
         if (usd > 0 && !formData.actualIQD && exchangeRate) {
             // Calculate remaining IQD needed
@@ -286,8 +316,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
     };
 
     const handleMixedIQDChange = (value) => {
-        const iqd = parseFloat(value) || 0;
-        setFormData(prev => ({ ...prev, actualIQD: value }));
+        const iqd = parseFormattedNumber(value) || 0;
+        setFormData(prev => ({ ...prev, actualIQD: iqd }));
+        setDisplayValues(prev => ({ ...prev, actualIQD: value }));
 
         if (iqd > 0 && !formData.actualUSD && exchangeRate) {
             // Calculate remaining USD needed
@@ -322,11 +353,50 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         }));
     };
 
-    const handleChangeOverride = (value) => {
+    // Handle formatted money input changes
+    const handleMoneyInputChange = (fieldName, value) => {
+        // Parse the formatted input
+        const numericValue = parseFormattedNumber(value);
+
+        // Update formData with numeric value for calculations
         setFormData(prev => ({
             ...prev,
-            change: value,
+            [fieldName]: numericValue
+        }));
+
+        // Update display value immediately (user is typing)
+        setDisplayValues(prev => ({
+            ...prev,
+            [fieldName]: value
+        }));
+    };
+
+    // Handle blur - ensure proper formatting
+    const handleMoneyInputBlur = (fieldName) => {
+        const numericValue = formData[fieldName];
+        const formatted = formatNumber(numericValue);
+        setDisplayValues(prev => ({
+            ...prev,
+            [fieldName]: formatted
+        }));
+    };
+
+    // Handle focus - allow easy editing
+    const handleMoneyInputFocus = (fieldName) => {
+        // Keep the formatted value, user can edit it
+        // The parseFormattedNumber will handle comma removal
+    };
+
+    const handleChangeOverride = (value) => {
+        const numericValue = parseFormattedNumber(value);
+        setFormData(prev => ({
+            ...prev,
+            change: numericValue,
             changeManualOverride: true
+        }));
+        setDisplayValues(prev => ({
+            ...prev,
+            change: value
         }));
     };
 
@@ -586,11 +656,17 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                         ) : (
                             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                 <input
-                                    type="number"
-                                    value={newRateValue}
-                                    onChange={(e) => setNewRateValue(e.target.value)}
-                                    placeholder="Enter rate (e.g., 1406)"
-                                    min="1"
+                                    type="text"
+                                    value={displayValues.newRateValue}
+                                    onChange={(e) => {
+                                        setNewRateValue(e.target.value);
+                                        setDisplayValues(prev => ({ ...prev, newRateValue: e.target.value }));
+                                    }}
+                                    onBlur={() => {
+                                        const formatted = formatNumber(newRateValue);
+                                        setDisplayValues(prev => ({ ...prev, newRateValue: formatted }));
+                                    }}
+                                    placeholder="Enter rate (e.g., 1,406)"
                                     style={{
                                         flex: 1,
                                         padding: '10px',
@@ -686,12 +762,13 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                             </label>
                             <input
                                 id="amountToRegister"
-                                type="number"
+                                type="text"
                                 name="amountToRegister"
-                                value={formData.amountToRegister}
-                                onChange={handleInputChange}
+                                value={displayValues.amountToRegister}
+                                onChange={(e) => handleMoneyInputChange('amountToRegister', e.target.value)}
+                                onBlur={() => handleMoneyInputBlur('amountToRegister')}
+                                onFocus={() => handleMoneyInputFocus('amountToRegister')}
                                 required
-                                min="0"
                                 placeholder={`Amount to deduct from balance`}
                                 className="large-input"
                             />
@@ -746,12 +823,13 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                         </label>
                                         <input
                                             id="actualUSD"
-                                            type="number"
+                                            type="text"
                                             name="actualUSD"
-                                            value={formData.actualUSD}
-                                            onChange={handleInputChange}
+                                            value={displayValues.actualUSD}
+                                            onChange={(e) => handleMoneyInputChange('actualUSD', e.target.value)}
+                                            onBlur={() => handleMoneyInputBlur('actualUSD')}
+                                            onFocus={() => handleMoneyInputFocus('actualUSD')}
                                             required
-                                            min="0"
                                             placeholder="Enter USD amount"
                                             className="large-input"
                                         />
@@ -765,12 +843,13 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                         </label>
                                         <input
                                             id="actualIQD"
-                                            type="number"
+                                            type="text"
                                             name="actualIQD"
-                                            value={formData.actualIQD}
-                                            onChange={handleInputChange}
+                                            value={displayValues.actualIQD}
+                                            onChange={(e) => handleMoneyInputChange('actualIQD', e.target.value)}
+                                            onBlur={() => handleMoneyInputBlur('actualIQD')}
+                                            onFocus={() => handleMoneyInputFocus('actualIQD')}
                                             required
-                                            min="0"
                                             placeholder="Enter IQD amount"
                                             className="large-input"
                                         />
@@ -798,10 +877,11 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                     <label htmlFor="actualUSD">USD Received:</label>
                                     <input
                                         id="actualUSD"
-                                        type="number"
-                                        value={formData.actualUSD}
+                                        type="text"
+                                        value={displayValues.actualUSD}
                                         onChange={(e) => handleMixedUSDChange(e.target.value)}
-                                        min="0"
+                                        onBlur={() => handleMoneyInputBlur('actualUSD')}
+                                        onFocus={() => handleMoneyInputFocus('actualUSD')}
                                         placeholder="Enter USD amount"
                                     />
                                     {formData.actualUSD && (
@@ -825,10 +905,11 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                     <label htmlFor="actualIQD">IQD Received:</label>
                                     <input
                                         id="actualIQD"
-                                        type="number"
-                                        value={formData.actualIQD}
+                                        type="text"
+                                        value={displayValues.actualIQD}
                                         onChange={(e) => handleMixedIQDChange(e.target.value)}
-                                        min="0"
+                                        onBlur={() => handleMoneyInputBlur('actualIQD')}
+                                        onFocus={() => handleMoneyInputFocus('actualIQD')}
                                         placeholder={calculations.suggestedIQD > 0 ? `Suggested: ${formatNumber(calculations.suggestedIQD)}` : "Enter IQD amount"}
                                     />
                                     {formData.actualIQD && (
@@ -942,11 +1023,12 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                         </label>
                                         <input
                                             id="change"
-                                            type="number"
+                                            type="text"
                                             name="change"
-                                            value={formData.change}
+                                            value={displayValues.change}
                                             onChange={(e) => handleChangeOverride(e.target.value)}
-                                            min="0"
+                                            onBlur={() => handleMoneyInputBlur('change')}
+                                            onFocus={() => handleMoneyInputFocus('change')}
                                             placeholder="0"
                                         />
                                         <small style={{ color: '#6b7280', display: 'block', marginTop: '4px' }}>

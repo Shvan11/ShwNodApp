@@ -10,7 +10,7 @@
 .main-content-area {
     margin-left: 70px;
     min-height: calc(100vh - 50px);
-    padding: 0.25rem 0.75rem 0.75rem 0.75rem;
+    padding: 50px 0.75rem 0.75rem 0.75rem; /* Top padding accounts for 50px fixed header */
     transition: margin-left 0.3s ease;
 }
 

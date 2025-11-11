@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WorkCard from './WorkCard.jsx';
 import PaymentModal from './PaymentModal.jsx';
+import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters.js';
 import '../../../css/components/work-card.css';
 
 const WorkComponent = ({ patientId }) => {
@@ -297,8 +298,8 @@ const WorkComponent = ({ patientId }) => {
         });
 
     const formatCurrency = (amount, currency) => {
-        if (!amount) return 'N/A';
-        return `${amount.toLocaleString()} ${currency || 'USD'}`;
+        if (!amount && amount !== 0) return 'N/A';
+        return formatCurrencyUtil(amount, currency || 'USD');
     };
 
     const formatDate = (dateString) => {

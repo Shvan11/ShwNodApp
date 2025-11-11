@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatCurrency as formatCurrencyUtil } from '../../utils/formatters.js';
 
 const DailyInvoicesModal = ({ selectedDate, onClose }) => {
     const [invoices, setInvoices] = useState([]);
@@ -36,8 +37,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }) => {
     };
 
     const formatCurrency = (amount, currency) => {
-        if (!amount) return '0';
-        return `${amount.toLocaleString()} ${currency}`;
+        return formatCurrencyUtil(amount, currency);
     };
 
     const formatDate = (dateString) => {

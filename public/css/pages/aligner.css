@@ -1,5 +1,10 @@
 /* Aligner Management Page Styles */
 
+/* Account for fixed universal header */
+body {
+    padding-top: 70px; /* 50px header + 20px breathing room */
+}
+
 /* View Mode Toggle */
 .view-mode-toggle,
 .mode-toggle {

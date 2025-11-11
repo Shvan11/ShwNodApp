@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import Chart from 'chart.js/auto';
 import UniversalHeader from './UniversalHeader.jsx';
 import DailyInvoicesModal from './DailyInvoicesModal.jsx';
+import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters.js';
 
 const StatisticsComponent = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -112,7 +113,7 @@ const StatisticsComponent = () => {
                             beginAtZero: true,
                             ticks: {
                                 callback: function(value) {
-                                    return value.toLocaleString() + ' IQD';
+                                    return formatNumber(value) + ' IQD';
                                 }
                             }
                         }
@@ -162,7 +163,7 @@ const StatisticsComponent = () => {
                                 label: function(context) {
                                     const label = context.label || '';
                                     const value = context.parsed || 0;
-                                    return label + ': ' + value.toLocaleString() + ' IQD';
+                                    return label + ': ' + formatNumber(value) + ' IQD';
                                 }
                             }
                         }
@@ -203,8 +204,7 @@ const StatisticsComponent = () => {
 
     // Format currency
     const formatCurrency = (amount, currency = 'IQD') => {
-        if (amount === null || amount === undefined) return '0';
-        return amount.toLocaleString() + ' ' + currency;
+        return formatCurrencyUtil(amount, currency);
     };
 
     // Format date

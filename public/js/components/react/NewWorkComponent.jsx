@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { formatNumber, parseFormattedNumber } from '../../utils/formatters.js';
 
 const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
     const [loading, setLoading] = useState(false);
@@ -41,12 +42,24 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
         createAsFinished: false
     });
 
+    // Display state for formatted values
+    const [displayValues, setDisplayValues] = useState({
+        TotalRequired: ''
+    });
+
     useEffect(() => {
         loadDropdownData();
         if (workId) {
             loadWorkData();
         }
     }, [patientId, workId]);
+
+    // Auto-format display value when formData changes
+    useEffect(() => {
+        setDisplayValues({
+            TotalRequired: formatNumber(formData.TotalRequired)
+        });
+    }, [formData.TotalRequired]);
 
     const loadDropdownData = async () => {
         try {
@@ -449,11 +462,16 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
                         <div className="form-group">
                             <label>Total Required</label>
                             <input
-                                type="number"
-                                value={formData.TotalRequired === 0 ? '' : formData.TotalRequired}
-                                onChange={(e) => setFormData({...formData, TotalRequired: e.target.value})}
-                                min="0"
-                                step="0.01"
+                                type="text"
+                                value={displayValues.TotalRequired}
+                                onChange={(e) => {
+                                    const numericValue = parseFormattedNumber(e.target.value);
+                                    setFormData({...formData, TotalRequired: numericValue});
+                                    setDisplayValues({TotalRequired: e.target.value});
+                                }}
+                                onBlur={() => {
+                                    setDisplayValues({TotalRequired: formatNumber(formData.TotalRequired)});
+                                }}
                                 placeholder="Enter amount (defaults to 0)"
                             />
                         </div>

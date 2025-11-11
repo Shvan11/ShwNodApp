@@ -54,6 +54,7 @@ const AppointmentCard = ({
 
     // Open patient in new tab
     const handlePatientClick = (e) => {
+        e.preventDefault();
         e.stopPropagation();
         if (appointment.PersonID) {
             window.open(`/patient/${appointment.PersonID}/works`, '_blank');
@@ -128,7 +129,11 @@ const AppointmentCard = ({
                     <button
                         type="button"
                         className="btn-action btn-success"
-                        onClick={() => onCheckIn(appointment.appointmentID)}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onCheckIn(appointment.appointmentID);
+                        }}
                     >
                         <i className="fas fa-sign-in-alt"></i>
                         <span>Check In</span>
@@ -145,7 +150,11 @@ const AppointmentCard = ({
                         <button
                             type="button"
                             className="btn-action btn-info"
-                            onClick={() => onMarkSeated(appointment.appointmentID)}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onMarkSeated(appointment.appointmentID);
+                            }}
                         >
                             <i className="fas fa-tooth"></i>
                             <span>Seat Patient</span>
@@ -153,7 +162,11 @@ const AppointmentCard = ({
                         <button
                             type="button"
                             className="btn-action btn-undo"
-                            onClick={() => onUndoState(appointment.appointmentID, 'Present')}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onUndoState(appointment.appointmentID, 'Present');
+                            }}
                             title="Undo Check-in"
                         >
                             <i className="fas fa-undo"></i>
@@ -166,7 +179,11 @@ const AppointmentCard = ({
                         <button
                             type="button"
                             className="btn-action btn-success"
-                            onClick={() => onMarkDismissed(appointment.appointmentID)}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onMarkDismissed(appointment.appointmentID);
+                            }}
                         >
                             <i className="fas fa-check-circle"></i>
                             <span>Complete Visit</span>
@@ -174,7 +191,11 @@ const AppointmentCard = ({
                         <button
                             type="button"
                             className="btn-action btn-undo"
-                            onClick={() => onUndoState(appointment.appointmentID, 'Seated')}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onUndoState(appointment.appointmentID, 'Seated');
+                            }}
                             title="Undo Seating"
                         >
                             <i className="fas fa-undo"></i>
@@ -186,7 +207,11 @@ const AppointmentCard = ({
                     <button
                         type="button"
                         className="btn-action btn-undo btn-undo-only"
-                        onClick={() => onUndoState(appointment.appointmentID, 'Dismissed')}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onUndoState(appointment.appointmentID, 'Dismissed');
+                        }}
                         title="Undo Dismiss"
                     >
                         <i className="fas fa-undo"></i>
