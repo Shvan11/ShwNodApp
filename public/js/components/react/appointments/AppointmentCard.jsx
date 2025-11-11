@@ -156,7 +156,7 @@ const AppointmentCard = ({
                                 onMarkSeated(appointment.appointmentID);
                             }}
                         >
-                            <i className="fas fa-tooth"></i>
+                            <img src="/images/dental_chair.svg" alt="" style={{ width: '1em', height: '1em' }} />
                             <span>Seat Patient</span>
                         </button>
                         <button
@@ -251,7 +251,7 @@ const AppointmentCard = ({
                             className="patient-link"
                             onClick={handlePatientClick}
                         >
-                            <img src="/images/dental_chair.svg" alt="" className="patient-link-icon" />
+                            <i className="fas fa-user-circle patient-link-icon"></i>
                             {appointment.PatientName || 'Unknown'}
                         </a>
                         {appointment.PatientType && (
