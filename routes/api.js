@@ -1054,7 +1054,7 @@ router.post("/addInvoice", async (req, res) => {
 
         // Get work details to determine account currency
         const workDetails = await getWorkDetails(workid);
-        if (!workDetails || workDetails.length === 0) {
+        if (!workDetails) {
             return res.status(400).json({
                 status: 'error',
                 message: 'Work record not found',
@@ -1062,7 +1062,7 @@ router.post("/addInvoice", async (req, res) => {
             });
         }
 
-        const accountCurrency = workDetails[0].Currency;
+        const accountCurrency = workDetails.Currency;
 
         // Determine if this is a same-currency payment
         const isSameCurrencyPayment =

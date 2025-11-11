@@ -514,6 +514,42 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                     <strong> Balance:</strong> {formatCurrency(calculations.remainingBalance, calculations.accountCurrency)}
                 </div>
 
+                {/* Top Actions - Redundant buttons for convenience */}
+                <div className="form-actions" style={{ margin: '0 24px 20px', paddingTop: '0' }}>
+                    <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={onClose}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        className="btn btn-primary btn-lg"
+                        disabled={loading || !exchangeRate}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            // Find and trigger the main form submit
+                            const form = document.querySelector('.invoice-form');
+                            if (form) {
+                                form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                            }
+                        }}
+                    >
+                        {loading ? (
+                            <>
+                                <i className="fas fa-spinner fa-spin"></i>
+                                Saving...
+                            </>
+                        ) : (
+                            <>
+                                <i className="fas fa-save"></i>
+                                Save Payment
+                            </>
+                        )}
+                    </button>
+                </div>
+
                 {/* Exchange Rate Status */}
                 {exchangeRateError && !exchangeRate ? (
                     <div style={{

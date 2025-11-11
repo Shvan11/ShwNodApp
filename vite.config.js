@@ -147,6 +147,16 @@ export default defineConfig({
           }
         }
       },
+      // IMPORTANT: More specific routes must come before less specific ones
+      '/patient-management': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        bypass: (req) => {
+          if (req.url.startsWith('/patient-management')) {
+            return '/views/patient-management.html'
+          }
+        }
+      },
       '/patient': {
         target: 'http://localhost:5173',
         changeOrigin: true,
@@ -155,11 +165,6 @@ export default defineConfig({
             return '/views/patient/react-shell.html'
           }
         }
-      },
-      '/patient-management': {
-        target: 'http://localhost:5173',
-        changeOrigin: true,
-        rewrite: (path) => '/views/patient-management.html'
       },
       '/expenses': {
         target: 'http://localhost:5173',
