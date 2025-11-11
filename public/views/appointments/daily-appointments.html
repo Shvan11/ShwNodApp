@@ -17,95 +17,10 @@
   <!-- Universal Header -->
   <div id="universal-header-root"></div>
 
-  <!-- Page Header with Date Picker -->
-  <div class="header-section">
-    <h1 id="title">Appointments for Today</h1>
-    <div class="date-picker-container">
-      <div class="date-picker-left">
-        <label for="date-picker">Select Date:</label>
-        <input type="date" id="date-picker" />
-      </div>
-    </div>
-  </div>
+  <!-- React App Mount Point -->
+  <div id="daily-appointments-root"></div>
 
-  <!-- Mobile View Toggle -->
-  <div class="mobile-view-toggle">
-    <button class="toggle-btn active" data-view="all" onclick="switchMobileView('all')">
-      <i class="fas fa-calendar-alt"></i>
-      <span>All</span>
-    </button>
-    <button class="toggle-btn" data-view="checked-in" onclick="switchMobileView('checked-in')">
-      <i class="fas fa-user-check"></i>
-      <span>Checked-In</span>
-    </button>
-  </div>
-
-  <!-- Statistics Cards -->
-  <div class="stats-container">
-    <div class="stat-card stat-total">
-      <div class="stat-icon">
-        <i class="fas fa-calendar-check"></i>
-      </div>
-      <div class="stat-content">
-        <div class="stat-label">Total Appointments</div>
-        <div class="stat-value" id="all">0</div>
-      </div>
-    </div>
-
-    <div class="stat-card stat-present">
-      <div class="stat-icon">
-        <i class="fas fa-user-check"></i>
-      </div>
-      <div class="stat-content">
-        <div class="stat-label">Checked In</div>
-        <div class="stat-value" id="present">0</div>
-      </div>
-    </div>
-
-    <div class="stat-card stat-waiting">
-      <div class="stat-icon">
-        <i class="fas fa-clock"></i>
-      </div>
-      <div class="stat-content">
-        <div class="stat-label">Waiting</div>
-        <div class="stat-value" id="waiting">0</div>
-      </div>
-    </div>
-
-    <div class="stat-card stat-completed">
-      <div class="stat-icon">
-        <i class="fas fa-check-circle"></i>
-      </div>
-      <div class="stat-content">
-        <div class="stat-label">Completed</div>
-        <div class="stat-value" id="completed">0</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Main Content - Appointments Lists -->
-  <div class="container full-width">
-    <div class="appointments-section">
-      <h3>All Appointments</h3>
-      <div id="all-appointments-container">
-        <!-- All appointments cards will be rendered here -->
-      </div>
-    </div>
-
-    <div class="appointments-section">
-      <h3>Checked-In Patients</h3>
-      <div id="checked-in-container">
-        <!-- Checked-in appointments cards will be rendered here -->
-      </div>
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <footer>
-    <p>&copy; 2025 Shwan Orthodontics. All rights reserved.</p>
-  </footer>
-
-  <!-- Load modular JavaScript -->
+  <!-- Load React App -->
   <script type="module" src="../../js/pages/daily-appointments.jsx"></script>
 </body>
 
