@@ -1,7 +1,33 @@
 import React from 'react';
+import tabManager from '../utils/tab-manager.js';
 import '../../css/pages/dashboard.css';
 
 const DashboardApp = () => {
+  // Map links to their tabManager window names
+  const getWindowName = (link) => {
+    const nameMap = {
+      '/calendar': 'calendar',
+      '/appointments': 'appointments',
+      '/patient-management': 'patient_management',
+      '/aligner': 'aligner',
+      '/settings': 'settings',
+      '/expenses': 'expenses',
+      '/statistics': 'statistics',
+      '/template-management': 'templates'
+    };
+    return nameMap[link] || null;
+  };
+
+  const handleCardClick = (e, link) => {
+    e.preventDefault();
+    const windowName = getWindowName(link);
+    if (windowName) {
+      tabManager.openOrFocus(link, windowName);
+    } else {
+      window.location.href = link;
+    }
+  };
+
   const dashboardCards = [
     {
       title: 'Calendar',
@@ -117,6 +143,7 @@ const DashboardApp = () => {
                 key={index}
                 href={card.link}
                 className="dashboard-card-link"
+                onClick={(e) => handleCardClick(e, card.link)}
               >
                 <div className={`dashboard-card ${card.borderClass || ''}`}>
                   <div className={`card-icon ${card.gradientClass || ''}`}>
@@ -140,7 +167,12 @@ const DashboardApp = () => {
               <h3>Quick Actions</h3>
               <div className="quick-actions-list">
                 {quickActions.map((action, index) => (
-                  <a key={index} href={action.link} className="quick-action">
+                  <a
+                    key={index}
+                    href={action.link}
+                    className="quick-action"
+                    onClick={(e) => handleCardClick(e, action.link)}
+                  >
                     <i className={action.icon}></i>
                     <span>{action.title}</span>
                   </a>
