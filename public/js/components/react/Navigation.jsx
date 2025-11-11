@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import tabManager from '../../utils/tab-manager.js';
 
 const Navigation = ({ patientId, currentPage }) => {
     const [timepoints, setTimepoints] = useState([]);
@@ -349,7 +350,7 @@ const Navigation = ({ patientId, currentPage }) => {
                     className="sidebar-nav-item calendar-item"
                     onClick={(e) => {
                         e.preventDefault();
-                        window.location.href = '/calendar';
+                        tabManager.openOrFocus('/calendar', 'calendar');
                     }}
                     title="Calendar"
                 >

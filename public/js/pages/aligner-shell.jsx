@@ -10,6 +10,9 @@ import '../../css/components/universal-header.css';
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Initializing Aligner App with React Router...');
 
+    // Name this window so tabManager can reuse it
+    window.name = 'clinic_aligner';
+
     // Mount Universal Header
     const headerRoot = document.getElementById('universal-header-root');
     if (headerRoot) {

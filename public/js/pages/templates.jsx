@@ -7,6 +7,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import TemplateApp from '../apps/TemplateApp.jsx';
 
+// Name this window so tabManager can reuse it
+window.name = 'clinic_templates';
+
 // Mount the app
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

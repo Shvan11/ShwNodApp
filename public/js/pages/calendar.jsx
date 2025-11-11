@@ -13,7 +13,10 @@ import '../../css/components/appointment-calendar.css'
 document.addEventListener('DOMContentLoaded', function() {
     try {
         console.log('🚀 Initializing Appointment Calendar...');
-        
+
+        // Name this window so tabManager can reuse it
+        window.name = 'clinic_calendar';
+
         // Get URL parameters for initial state
         const urlParams = new URLSearchParams(window.location.search);
         const initialDate = urlParams.get('date');

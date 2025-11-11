@@ -144,7 +144,7 @@ const UniversalHeader = () => {
     };
 
     const navigateToDashboard = () => {
-        window.location.href = '/dashboard';
+        tabManager.openOrFocus('/dashboard', 'dashboard');
     };
 
     const navigateToAppointments = () => {
@@ -175,7 +175,7 @@ const UniversalHeader = () => {
                 key: 'search',
                 label: 'Search',
                 icon: 'fas fa-search',
-                onClick: () => window.location.href = '/patient-management',
+                onClick: () => tabManager.openOrFocus('/patient-management', 'patient_management'),
                 isActive: window.location.pathname.includes('/patient-management')
             },
         ];

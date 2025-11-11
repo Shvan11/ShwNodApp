@@ -29,6 +29,9 @@
       import DashboardApp from '/js/apps/DashboardApp.jsx';
 
       document.addEventListener('DOMContentLoaded', function() {
+        // Name this window so tabManager can reuse it
+        window.name = 'clinic_dashboard';
+
         const root = document.getElementById('dashboard-root');
         if (root) {
           const reactRoot = ReactDOM.createRoot(root);

@@ -25,6 +25,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Initializing Settings with React Router...');
 
+            // Name this window so tabManager can reuse it
+            window.name = 'clinic_settings';
+
             // Mount Universal Header
             const headerRoot = document.getElementById('universal-header-root');
             if (headerRoot) {
