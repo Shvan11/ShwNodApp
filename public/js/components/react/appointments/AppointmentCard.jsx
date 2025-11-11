@@ -251,7 +251,7 @@ const AppointmentCard = ({
                             className="patient-link"
                             onClick={handlePatientClick}
                         >
-                            <i className="fas fa-user-circle patient-link-icon"></i>
+                            <img src="/images/dental_chair.svg" alt="" className="patient-link-icon" />
                             {appointment.PatientName || 'Unknown'}
                         </a>
                         {appointment.PatientType && (
