@@ -53,12 +53,12 @@ const AppointmentCard = ({
     // Check if patient is waiting (Present but not Seated and not Dismissed)
     const isWaiting = showStatus && appointment.Present && !appointment.Seated && !appointment.Dismissed;
 
-    // Open patient in new tab (or focus existing)
+    // Open patient in single reusable patient tab
     const handlePatientClick = (e) => {
         e.preventDefault();
         e.stopPropagation();
         if (appointment.PersonID) {
-            tabManager.openOrFocus(`/patient/${appointment.PersonID}/works`, `patient_${appointment.PersonID}`);
+            tabManager.openOrFocus(`/patient/${appointment.PersonID}/works`, 'patient');
         }
     };
 
