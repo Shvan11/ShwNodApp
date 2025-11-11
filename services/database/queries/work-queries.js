@@ -1,4 +1,6 @@
 import { executeQuery, executeStoredProcedure, TYPES } from '../index.js';
+import ConnectionPool from '../ConnectionPool.js';
+import { Request } from 'tedious';
 
 export const getWorksByPatient = async (personId) => {
     return executeQuery(
@@ -170,7 +172,7 @@ export const updateWorkDetail = async (detailId, workDetailData) => {
             ['Note', TYPES.NVarChar, workDetailData.Note || null]
         ],
         null,
-        (results, outputParams) => ({ 
+        (results) => ({ 
             success: true, 
             rowCount: results.length || 0
         })
@@ -182,7 +184,7 @@ export const deleteWorkDetail = async (detailId) => {
         `DELETE FROM tblWorkDetails WHERE ID = @ID`,
         [['ID', TYPES.Int, detailId]],
         null,
-        (results, outputParams) => ({ 
+        (results) => ({ 
             success: true, 
             rowCount: results.length || 0
         })
@@ -270,7 +272,7 @@ export const updateWork = async (workId, workData) => {
             ['KeywordID5', TYPES.Int, workData.KeywordID5 || null]
         ],
         null,
-        (results, outputParams) => ({ 
+        (results) => ({ 
             success: true, 
             rowCount: results.length || 0
         })
@@ -282,11 +284,107 @@ export const finishWork = async (workId) => {
         `UPDATE tblwork SET Finished = 1 WHERE workid = @WorkID`,
         [['WorkID', TYPES.Int, workId]],
         null,
-        (results, outputParams) => ({
+        (results) => ({
             success: true,
             rowCount: results.length || 0
         })
     );
+};
+
+/**
+ * Add work with invoice using SQL transaction
+ * Creates a finished work and a full payment invoice atomically
+ * @param {Object} workData - Work data including all work fields
+ * @returns {Promise<Object>} - { workId, invoiceId }
+ */
+export const addWorkWithInvoice = async (workData) => {
+    const today = new Date().toISOString().split('T')[0];
+    let connection = null;
+
+    try {
+        // Get connection from pool
+        connection = await ConnectionPool.getConnection();
+
+        // Use a single SQL batch with transaction control
+        const result = await new Promise((resolve, reject) => {
+            let workId = null;
+            let invoiceId = null;
+
+            const usdReceived = (workData.Currency === 'USD' || workData.Currency === 'EUR') ? workData.TotalRequired : 0;
+            const iqdReceived = workData.Currency === 'IQD' ? workData.TotalRequired : 0;
+
+            const request = new Request(
+                `BEGIN TRANSACTION;
+
+                DECLARE @workId INT;
+
+                INSERT INTO tblwork (
+                    PersonID, TotalRequired, Currency, Typeofwork, Notes, Finished,
+                    StartDate, DebondDate, FPhotoDate, IPhotoDate, EstimatedDuration,
+                    DrID, NotesDate, KeyWordID1, KeyWordID2, KeywordID3, KeywordID4, KeywordID5
+                )
+                VALUES (
+                    @PersonID, @TotalRequired, @Currency, @Typeofwork, @Notes, 1,
+                    @StartDate, @DebondDate, @FPhotoDate, @IPhotoDate, @EstimatedDuration,
+                    @DrID, @NotesDate, @KeyWordID1, @KeyWordID2, @KeywordID3, @KeywordID4, @KeywordID5
+                );
+
+                SET @workId = SCOPE_IDENTITY();
+
+                INSERT INTO dbo.tblInvoice (workid, Amountpaid, Dateofpayment, USDReceived, IQDReceived, Change)
+                VALUES (@workId, @TotalRequired, @paymentDate, @usdReceived, @iqdReceived, @change);
+
+                COMMIT TRANSACTION;
+
+                SELECT @workId AS workId, SCOPE_IDENTITY() AS invoiceId;`,
+                (err) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve({ workId, invoiceId });
+                    }
+                }
+            );
+
+            request.on('row', (columns) => {
+                workId = columns[0].value;
+                invoiceId = columns[1].value;
+            });
+
+            request.addParameter('PersonID', TYPES.Int, workData.PersonID);
+            request.addParameter('TotalRequired', TYPES.Int, workData.TotalRequired ?? null);
+            request.addParameter('Currency', TYPES.NVarChar, workData.Currency || null);
+            request.addParameter('Typeofwork', TYPES.Int, workData.Typeofwork ?? null);
+            request.addParameter('Notes', TYPES.NVarChar, workData.Notes || null);
+            request.addParameter('StartDate', TYPES.Date, workData.StartDate || null);
+            request.addParameter('DebondDate', TYPES.Date, workData.DebondDate || null);
+            request.addParameter('FPhotoDate', TYPES.Date, workData.FPhotoDate || null);
+            request.addParameter('IPhotoDate', TYPES.Date, workData.IPhotoDate || null);
+            request.addParameter('EstimatedDuration', TYPES.TinyInt, workData.EstimatedDuration ?? null);
+            request.addParameter('DrID', TYPES.Int, workData.DrID);
+            request.addParameter('NotesDate', TYPES.Date, workData.NotesDate || null);
+            request.addParameter('KeyWordID1', TYPES.Int, workData.KeyWordID1 || null);
+            request.addParameter('KeyWordID2', TYPES.Int, workData.KeyWordID2 || null);
+            request.addParameter('KeywordID3', TYPES.Int, workData.KeywordID3 || null);
+            request.addParameter('KeywordID4', TYPES.Int, workData.KeywordID4 || null);
+            request.addParameter('KeywordID5', TYPES.Int, workData.KeywordID5 || null);
+            request.addParameter('paymentDate', TYPES.Date, today);
+            request.addParameter('usdReceived', TYPES.Int, usdReceived);
+            request.addParameter('iqdReceived', TYPES.Int, iqdReceived);
+            request.addParameter('change', TYPES.Int, null);
+
+            connection.execSql(request);
+        });
+
+        return result;
+
+    } catch (error) {
+        throw error;
+    } finally {
+        if (connection) {
+            ConnectionPool.releaseConnection(connection);
+        }
+    }
 };
 
 export const deleteWork = async (workId) => {
@@ -326,7 +424,7 @@ export const deleteWork = async (workId) => {
         `DELETE FROM tblwork WHERE workid = @WorkID`,
         [['WorkID', TYPES.Int, workId]],
         null,
-        (results, outputParams) => ({
+        (results) => ({
             success: true,
             rowCount: results.length || 0
         })

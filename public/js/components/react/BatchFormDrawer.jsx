@@ -74,7 +74,7 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                     ManufactureDate: today,
                     DeliveredToPatientDate: '',
                     Notes: '',
-                    IsActive: true
+                    IsActive: false
                 });
 
                 setComputedFields({
@@ -123,6 +123,12 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
 
         if (!formData.BatchSequence || formData.BatchSequence === '') {
             newErrors.BatchSequence = 'Batch sequence is required';
+        }
+
+        // Validate active batch must have delivery date
+        if (formData.IsActive && !formData.DeliveredToPatientDate) {
+            newErrors.DeliveredToPatientDate = 'Delivery date is required when batch is active (being used by patient)';
+            newErrors.IsActive = 'Cannot mark as active without delivery date';
         }
 
         // Validate upper aligner count doesn't exceed remaining
@@ -369,14 +375,21 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                 </div>
 
                                 <div className="form-field">
-                                    <label htmlFor="DeliveredToPatientDate">Delivered Date</label>
+                                    <label htmlFor="DeliveredToPatientDate">
+                                        Delivered Date <span style={{ fontSize: '0.85rem', fontWeight: 'normal', color: '#6b7280' }}>(optional - usually set later)</span>
+                                    </label>
                                     <input
                                         type="date"
                                         id="DeliveredToPatientDate"
                                         name="DeliveredToPatientDate"
                                         value={formData.DeliveredToPatientDate}
                                         onChange={handleChange}
+                                        className={errors.DeliveredToPatientDate ? 'error' : ''}
+                                        placeholder="Leave empty if not delivered yet"
                                     />
+                                    {errors.DeliveredToPatientDate && (
+                                        <span className="error-message">{errors.DeliveredToPatientDate}</span>
+                                    )}
                                 </div>
 
                                 <div className="form-field">
@@ -416,7 +429,10 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                     checked={formData.IsActive}
                                     onChange={handleChange}
                                 />
-                                <label htmlFor="IsActive">Active Batch</label>
+                                <label htmlFor="IsActive">Active (Being used by patient)</label>
+                                {errors.IsActive && (
+                                    <span className="error-message" style={{ display: 'block', marginTop: '0.25rem' }}>{errors.IsActive}</span>
+                                )}
                             </div>
                         </div>
 

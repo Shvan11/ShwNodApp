@@ -5,7 +5,6 @@
  */
 import { Connection, Request, TYPES } from 'tedious';
 import { executeQuery, executeStoredProcedure } from '../index.js';
-import TransactionManager from '../TransactionManager.js';
 import ConnectionPool from '../ConnectionPool.js';
 import { createWebSocketMessage, MessageSchemas } from '../../messaging/schemas.js';
 import { logger } from '../../core/Logger.js';

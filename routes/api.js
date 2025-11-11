@@ -10,7 +10,7 @@ import { getWhatsAppMessages } from '../services/database/queries/messaging-quer
 import { getPatientsPhones, getInfos, createPatient, getReferralSources, getPatientTypes, getAddresses, getGenders, getAllPatients, getPatientById, updatePatient, deletePatient } from '../services/database/queries/patient-queries.js';
 import { getPayments, getActiveWorkForInvoice, getCurrentExchangeRate, addInvoice, updateExchangeRate, getPaymentHistoryByWorkId, getExchangeRateForDate, updateExchangeRateForDate } from '../services/database/queries/payment-queries.js';
 import { getWires, getVisitsSummary, addVisit, updateVisit, deleteVisit, getVisitDetailsByID, getLatestWire, getVisitsByWorkId, getVisitById, addVisitByWorkId, updateVisitByWorkId, deleteVisitByWorkId, getLatestWiresByWorkId } from '../services/database/queries/visit-queries.js';
-import { getWorksByPatient, getWorkDetails, addWork, updateWork, finishWork, deleteWork, getActiveWork, getWorkTypes, getWorkKeywords, getWorkDetailsList, addWorkDetail, updateWorkDetail, deleteWorkDetail } from '../services/database/queries/work-queries.js';
+import { getWorksByPatient, getWorkDetails, addWork, updateWork, finishWork, deleteWork, getActiveWork, getWorkTypes, getWorkKeywords, getWorkDetailsList, addWorkDetail, updateWorkDetail, deleteWorkDetail, addWorkWithInvoice } from '../services/database/queries/work-queries.js';
 import { getAllExpenses, getExpenseById, getExpenseCategories, getExpenseSubcategories, addExpense, updateExpense, deleteExpense, getExpenseSummary, getExpenseTotalsByCurrency } from '../services/database/queries/expense-queries.js';
 import whatsapp from '../services/messaging/whatsapp.js';
 import { sendImg_, sendXray_ } from '../services/messaging/whatsapp-api.js';
@@ -35,7 +35,6 @@ import config from '../config/config.js';
 import path from 'path';
 import PhoneFormatter from '../utils/phoneFormatter.js';
 import messageState from '../services/state/messageState.js';
-import { createWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
 import { WebSocketEvents, createStandardMessage } from '../services/messaging/websocket-events.js';
 import HealthCheck from '../services/monitoring/HealthCheck.js';
 import * as messagingQueries from '../services/database/queries/messaging-queries.js';
@@ -3101,6 +3100,112 @@ router.post('/addwork', async (req, res) => {
     }
 });
 
+// Add work with invoice (finished work with full payment)
+router.post('/addWorkWithInvoice', async (req, res) => {
+    const workData = req.body;
+    try {
+        // Validate required fields
+        if (!workData.PersonID || !workData.DrID) {
+            return res.status(400).json({
+                error: "Missing required fields: PersonID and DrID are required"
+            });
+        }
+
+        // Validate createAsFinished flag
+        if (!workData.createAsFinished) {
+            return res.status(400).json({
+                error: "createAsFinished flag must be true for this endpoint"
+            });
+        }
+
+        // Validate TotalRequired
+        if (!workData.TotalRequired || parseFloat(workData.TotalRequired) <= 0) {
+            return res.status(400).json({
+                error: "TotalRequired must be greater than 0 for finished work with invoice"
+            });
+        }
+
+        // Validate Currency
+        if (!workData.Currency) {
+            return res.status(400).json({
+                error: "Currency is required for finished work with invoice"
+            });
+        }
+
+        // Validate Typeofwork
+        if (!workData.Typeofwork) {
+            return res.status(400).json({
+                error: "Typeofwork is required"
+            });
+        }
+
+        // Validate data types
+        if (isNaN(parseInt(workData.PersonID)) || isNaN(parseInt(workData.DrID))) {
+            return res.status(400).json({
+                error: "PersonID and DrID must be valid numbers"
+            });
+        }
+
+        // Convert date strings to proper Date objects if provided
+        ['StartDate', 'DebondDate', 'FPhotoDate', 'IPhotoDate', 'NotesDate'].forEach(field => {
+            if (workData[field] && typeof workData[field] === 'string') {
+                const date = new Date(workData[field]);
+                if (isNaN(date.getTime())) {
+                    return res.status(400).json({
+                        error: `Invalid date format for ${field}`
+                    });
+                }
+                workData[field] = date;
+            }
+        });
+
+        // Call service layer function to handle business logic
+        const result = await addWorkWithInvoice(workData);
+
+        res.json({
+            success: true,
+            workId: result.workId,
+            invoiceId: result.invoiceId,
+            message: "Work and invoice created successfully"
+        });
+
+    } catch (error) {
+        console.error("Error adding work with invoice:", error);
+
+        // Handle duplicate active work constraint violation
+        if (error.number === 2601 && error.message.includes('UNQ_tblWork_Active')) {
+            try {
+                const existingWork = await getActiveWork(workData.PersonID);
+                return res.status(409).json({
+                    error: "Patient already has an active work",
+                    details: "This patient already has an active (unfinished) work record. You can finish the existing work and add the new one.",
+                    code: "DUPLICATE_ACTIVE_WORK",
+                    existingWork: existingWork ? {
+                        workId: existingWork.workid,
+                        typeOfWork: existingWork.Typeofwork,
+                        typeName: existingWork.TypeName,
+                        doctor: existingWork.DoctorName,
+                        additionDate: existingWork.AdditionDate,
+                        totalRequired: existingWork.TotalRequired,
+                        currency: existingWork.Currency
+                    } : null
+                });
+            } catch (fetchError) {
+                return res.status(409).json({
+                    error: "Patient already has an active work",
+                    details: "This patient already has an active (unfinished) work record. Please complete or finish the existing work before adding a new one.",
+                    code: "DUPLICATE_ACTIVE_WORK"
+                });
+            }
+        }
+
+        res.status(500).json({
+            error: "Failed to add work with invoice",
+            details: error.message
+        });
+    }
+});
+
 // Update existing work
 router.put('/updatework', async (req, res) => {
     try {
@@ -5085,12 +5190,10 @@ router.post('/aligner/batches', async (req, res) => {
             UpperAlignerCount,
             LowerAlignerCount,
             UpperAlignerStartSequence,
-            UpperAlignerEndSequence,
             LowerAlignerStartSequence,
-            LowerAlignerEndSequence,
             ManufactureDate,
-            ValidityPeriod,
-            NextBatchReadyDate,
+            DeliveredToPatientDate,
+            Days,
             Notes,
             IsActive
         } = req.body;
@@ -5110,17 +5213,15 @@ router.post('/aligner/batches', async (req, res) => {
 
             INSERT INTO tblAlignerBatches (
                 AlignerSetID, BatchSequence, UpperAlignerCount, LowerAlignerCount,
-                UpperAlignerStartSequence, UpperAlignerEndSequence,
-                LowerAlignerStartSequence, LowerAlignerEndSequence,
-                ManufactureDate, ValidityPeriod, NextBatchReadyDate,
+                UpperAlignerStartSequence, LowerAlignerStartSequence,
+                ManufactureDate, DeliveredToPatientDate, Days,
                 Notes, IsActive
             )
             OUTPUT INSERTED.AlignerBatchID INTO @OutputTable
             VALUES (
                 @AlignerSetID, @BatchSequence, @UpperAlignerCount, @LowerAlignerCount,
-                @UpperAlignerStartSequence, @UpperAlignerEndSequence,
-                @LowerAlignerStartSequence, @LowerAlignerEndSequence,
-                @ManufactureDate, @ValidityPeriod, @NextBatchReadyDate,
+                @UpperAlignerStartSequence, @LowerAlignerStartSequence,
+                @ManufactureDate, @DeliveredToPatientDate, @Days,
                 @Notes, @IsActive
             );
 
@@ -5135,12 +5236,10 @@ router.post('/aligner/batches', async (req, res) => {
                 ['UpperAlignerCount', database.TYPES.Int, UpperAlignerCount ? parseInt(UpperAlignerCount) : 0],
                 ['LowerAlignerCount', database.TYPES.Int, LowerAlignerCount ? parseInt(LowerAlignerCount) : 0],
                 ['UpperAlignerStartSequence', database.TYPES.Int, UpperAlignerStartSequence ? parseInt(UpperAlignerStartSequence) : null],
-                ['UpperAlignerEndSequence', database.TYPES.Int, UpperAlignerEndSequence ? parseInt(UpperAlignerEndSequence) : null],
                 ['LowerAlignerStartSequence', database.TYPES.Int, LowerAlignerStartSequence ? parseInt(LowerAlignerStartSequence) : null],
-                ['LowerAlignerEndSequence', database.TYPES.Int, LowerAlignerEndSequence ? parseInt(LowerAlignerEndSequence) : null],
                 ['ManufactureDate', database.TYPES.Date, ManufactureDate || null],
-                ['ValidityPeriod', database.TYPES.Int, ValidityPeriod ? parseInt(ValidityPeriod) : null],
-                ['NextBatchReadyDate', database.TYPES.Date, NextBatchReadyDate || null],
+                ['DeliveredToPatientDate', database.TYPES.Date, DeliveredToPatientDate || null],
+                ['Days', database.TYPES.Int, Days ? parseInt(Days) : null],
                 ['Notes', database.TYPES.NVarChar, Notes || null],
                 ['IsActive', database.TYPES.Bit, IsActive !== undefined ? IsActive : true]
             ],

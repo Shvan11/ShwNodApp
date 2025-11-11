@@ -16,6 +16,7 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
     const [existingWorkData, setExistingWorkData] = useState(null);
     const [pendingFormData, setPendingFormData] = useState(null);
+    const [showFinishedWorkConfirm, setShowFinishedWorkConfirm] = useState(false);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -36,7 +37,8 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
         KeyWordID2: '',
         KeywordID3: '',
         KeywordID4: '',
-        KeywordID5: ''
+        KeywordID5: '',
+        createAsFinished: false
     });
 
     useEffect(() => {
@@ -112,6 +114,26 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
         e.preventDefault();
         setError(null);
 
+        // If createAsFinished is checked and we're adding a new work, show confirmation dialog
+        if (!workId && formData.createAsFinished) {
+            // Validate before showing confirmation
+            if (!formData.TotalRequired || parseFloat(formData.TotalRequired) <= 0) {
+                setError('Cannot create finished work: Total Required must be greater than 0');
+                return;
+            }
+            if (!formData.Currency) {
+                setError('Cannot create finished work: Currency must be selected');
+                return;
+            }
+            setShowFinishedWorkConfirm(true);
+            return;
+        }
+
+        // Continue with normal submission
+        await performSubmit();
+    };
+
+    const performSubmit = async () => {
         try {
             setLoading(true);
             let response;
@@ -124,8 +146,9 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
                     body: JSON.stringify({ workId, ...formData })
                 });
             } else {
-                // Add new work
-                response = await fetch('/api/addwork', {
+                // Add new work - use special endpoint if createAsFinished is true
+                const endpoint = formData.createAsFinished ? '/api/addWorkWithInvoice' : '/api/addwork';
+                response = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(formData)
@@ -205,6 +228,15 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
         setLoading(false);
     };
 
+    const handleConfirmFinishedWork = async () => {
+        setShowFinishedWorkConfirm(false);
+        await performSubmit();
+    };
+
+    const handleCancelFinishedWork = () => {
+        setShowFinishedWorkConfirm(false);
+    };
+
     if (loading && workId) {
         return (
             <div className="new-work-loading">
@@ -268,6 +300,66 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
                             </button>
                             <button
                                 onClick={handleCancelConfirmation}
+                                className="btn-secondary"
+                                disabled={loading}
+                            >
+                                <i className="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Confirmation Dialog for Finished Work with Invoice */}
+            {showFinishedWorkConfirm && (
+                <div className="confirmation-dialog-overlay">
+                    <div className="confirmation-dialog">
+                        <div className="confirmation-header">
+                            <i className="fas fa-check-circle"></i>
+                            <h3>Confirm Completed Work Creation</h3>
+                        </div>
+                        <div className="confirmation-body">
+                            <p>You are about to create:</p>
+                            <div className="existing-work-details">
+                                <div className="detail-section">
+                                    <h4><i className="fas fa-tooth"></i> New Work (FINISHED)</h4>
+                                    <div className="detail-row">
+                                        <strong>Type:</strong> {workTypes.find(t => t.ID == formData.Typeofwork)?.TypeName || 'N/A'}
+                                    </div>
+                                    <div className="detail-row">
+                                        <strong>Doctor:</strong> {doctors.find(d => d.ID == formData.DrID)?.employeeName || 'N/A'}
+                                    </div>
+                                    <div className="detail-row">
+                                        <strong>Total:</strong> {formData.TotalRequired} {formData.Currency}
+                                    </div>
+                                    <div className="detail-row">
+                                        <strong>Status:</strong> <span className="status-completed">Completed</span>
+                                    </div>
+                                </div>
+                                <div className="detail-section">
+                                    <h4><i className="fas fa-file-invoice-dollar"></i> Full Payment Invoice</h4>
+                                    <div className="detail-row">
+                                        <strong>Amount:</strong> {formData.TotalRequired} {formData.Currency}
+                                    </div>
+                                    <div className="detail-row">
+                                        <strong>Date:</strong> Today ({new Date().toLocaleDateString()})
+                                    </div>
+                                </div>
+                            </div>
+                            <p className="confirmation-question">
+                                <strong>This work will be marked as fully paid and finished immediately.</strong>
+                            </p>
+                        </div>
+                        <div className="confirmation-actions">
+                            <button
+                                onClick={handleConfirmFinishedWork}
+                                className="btn-primary"
+                                disabled={loading}
+                            >
+                                <i className="fas fa-check"></i> Confirm & Create
+                            </button>
+                            <button
+                                onClick={handleCancelFinishedWork}
                                 className="btn-secondary"
                                 disabled={loading}
                             >
@@ -378,6 +470,27 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
                             </select>
                         </div>
                     </div>
+
+                    {!workId && (
+                        <div className="form-row">
+                            <div className="form-group full-width">
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.createAsFinished}
+                                        onChange={(e) => setFormData({...formData, createAsFinished: e.target.checked})}
+                                        disabled={!formData.TotalRequired || parseFloat(formData.TotalRequired) <= 0}
+                                    />
+                                    <span>
+                                        <i className="fas fa-check-circle"></i> Mark as fully paid and finished
+                                    </span>
+                                </label>
+                                <small className="form-hint">
+                                    Creates an invoice for the full amount and marks the work as completed
+                                </small>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="form-row">
                         <div className="form-group">
