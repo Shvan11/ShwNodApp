@@ -64,7 +64,8 @@ export default defineConfig({
         aligner: resolve(__dirname, 'public/views/aligner.html'),
         visits: resolve(__dirname, 'public/views/visits.html'),
         expenses: resolve(__dirname, 'public/views/expenses.html'),
-        statistics: resolve(__dirname, 'public/views/statistics.html')
+        statistics: resolve(__dirname, 'public/views/statistics.html'),
+        templates: resolve(__dirname, 'public/views/templates.html')
       }
     }
   },
@@ -175,6 +176,16 @@ export default defineConfig({
         target: 'http://localhost:5173',
         changeOrigin: true,
         rewrite: (path) => '/views/statistics.html'
+      },
+      // Templates - React Router app
+      '/templates': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        bypass: (req) => {
+          if (req.url.startsWith('/templates')) {
+            return '/views/templates.html'
+          }
+        }
       }
     }
   },
