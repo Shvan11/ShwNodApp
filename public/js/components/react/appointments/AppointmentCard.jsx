@@ -147,7 +147,7 @@ const AppointmentCard = ({
                             className="btn-action btn-info"
                             onClick={() => onMarkSeated(appointment.appointmentID)}
                         >
-                            <i className="fas fa-chair"></i>
+                            <i className="fas fa-tooth"></i>
                             <span>Seat Patient</span>
                         </button>
                         <button
@@ -255,7 +255,7 @@ const AppointmentCard = ({
                             )}
                             {seatedTime && (
                                 <span className="status-time-icon status-time-seated" title={`Seated: ${seatedTime}`}>
-                                    <i className="fas fa-chair"></i>
+                                    <i className="fas fa-tooth"></i>
                                     {seatedTime}
                                 </span>
                             )}
