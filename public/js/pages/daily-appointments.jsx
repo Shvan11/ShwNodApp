@@ -4,26 +4,45 @@
  * This file has been refactored from a 1093-line monolith to a clean React SPA.
  * The legacy version has been backed up to daily-appointments-legacy.jsx
  *
- * New component architecture:
- * - DailyAppointments.jsx (main app container)
- * - AppointmentsHeader.jsx (title + date picker + connection status)
- * - StatsCards.jsx (statistics with animated counts)
- * - MobileViewToggle.jsx (mobile view switcher)
- * - AppointmentCard.jsx (individual appointment card)
- * - AppointmentsList.jsx (grid of appointments)
- * - Notification.jsx (notifications with undo)
- * - ContextMenu.jsx (right-click menu)
- * - ConnectionStatus.jsx (WebSocket status indicator)
+ * Architecture:
+ * - DailyAppointmentsApp.jsx (app wrapper in /apps)
+ * - DailyAppointments.jsx (main component)
+ * - 9 sub-components (Header, Stats, Cards, Notifications, etc.)
+ * - 2 custom hooks (useAppointments, useWebSocketSync)
  *
- * Custom hooks:
- * - useAppointments.js (data fetching and state management)
- * - useWebSocketSync.js (real-time WebSocket updates)
+ * Route: /appointments or /daily-appointments
  */
-import { initializeDailyAppointments } from '../components/react/appointments/DailyAppointments.jsx';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import UniversalHeader from '../components/react/UniversalHeader.jsx';
+import DailyAppointmentsApp from '../apps/DailyAppointmentsApp.jsx';
+import tabManager from '../utils/tab-manager.js';
+import '../../css/pages/appointments.css';
+import '../../css/components/universal-header.css';
 
-// Initialize when DOM is ready or immediately if already loaded
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeDailyAppointments);
-} else {
-    initializeDailyAppointments();
-}
+// Initialize the daily appointments application
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Initializing Daily Appointments App...');
+
+    // Name this window so window.open() can reuse/focus it
+    window.name = 'clinic_appointments';
+
+    // Register this tab as singleton - only one appointments tab should exist
+    tabManager.register('appointments');
+
+    // Mount Universal Header
+    const headerRoot = document.getElementById('universal-header-root');
+    if (headerRoot) {
+        const headerReactRoot = ReactDOM.createRoot(headerRoot);
+        headerReactRoot.render(React.createElement(UniversalHeader));
+        console.log('✅ Universal Header initialized');
+    }
+
+    // Mount Daily Appointments App
+    const appRoot = document.getElementById('daily-appointments-root');
+    if (appRoot) {
+        const appReactRoot = ReactDOM.createRoot(appRoot);
+        appReactRoot.render(React.createElement(DailyAppointmentsApp));
+        console.log('✅ Daily Appointments App initialized');
+    }
+});

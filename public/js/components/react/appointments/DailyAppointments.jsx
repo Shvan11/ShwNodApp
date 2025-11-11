@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import ReactDOM from 'react-dom/client';
-import UniversalHeader from '../UniversalHeader.jsx';
 import AppointmentsHeader from './AppointmentsHeader.jsx';
 import StatsCards from './StatsCards.jsx';
 import MobileViewToggle from './MobileViewToggle.jsx';
@@ -9,9 +7,6 @@ import Notification from './Notification.jsx';
 import ContextMenu from './ContextMenu.jsx';
 import { useAppointments } from '../../../hooks/useAppointments.js';
 import { useWebSocketSync } from '../../../hooks/useWebSocketSync.js';
-import tabManager from '../../../utils/tab-manager.js';
-import '../../../../css/pages/appointments.css';
-import '../../../../css/components/universal-header.css';
 
 /**
  * DailyAppointments Component
@@ -266,30 +261,5 @@ const DailyAppointments = () => {
         </div>
     );
 };
-
-/**
- * Initialize the application
- */
-export function initializeDailyAppointments() {
-    // Name this window so window.open() can reuse/focus it
-    window.name = 'clinic_appointments';
-
-    // Register this tab as singleton - only one appointments tab should exist
-    tabManager.register('appointments');
-
-    // Mount Universal Header
-    const headerRoot = document.getElementById('universal-header-root');
-    if (headerRoot) {
-        const headerReactRoot = ReactDOM.createRoot(headerRoot);
-        headerReactRoot.render(<UniversalHeader />);
-    }
-
-    // Mount Daily Appointments App
-    const appRoot = document.getElementById('daily-appointments-root');
-    if (appRoot) {
-        const appReactRoot = ReactDOM.createRoot(appRoot);
-        appReactRoot.render(<DailyAppointments />);
-    }
-}
 
 export default DailyAppointments;
