@@ -1,9 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import singleSpaReact from 'single-spa-react';
-import { BrowserRouter, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
-const DashboardAppContent = () => {
+const DashboardApp = () => {
   const navigate = useNavigate();
 
   const handleCardClick = (e, link) => {
@@ -163,16 +163,8 @@ const DashboardAppContent = () => {
   );
 };
 
-// Wrapper component with BrowserRouter
-const DashboardApp = () => {
-  return (
-    <BrowserRouter>
-      <DashboardAppContent />
-    </BrowserRouter>
-  );
-};
-
 // Single-SPA Lifecycle - React 18 Compatible
+// Note: BrowserRouter is provided by index.html at root level
 const lifecycles = singleSpaReact({
   React,
   ReactDOM,

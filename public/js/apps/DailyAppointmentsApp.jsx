@@ -2,7 +2,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import singleSpaReact from 'single-spa-react';
-import { BrowserRouter } from 'react-router-dom';
 import DailyAppointments from '../components/react/appointments/DailyAppointments.jsx';
 
 /**
@@ -18,13 +17,11 @@ import DailyAppointments from '../components/react/appointments/DailyAppointment
  * - Statistics dashboard
  *
  * Route: /appointments or /daily-appointments
+ *
+ * Note: BrowserRouter is provided by index.html at root level
  */
 const DailyAppointmentsApp = () => {
-    return (
-        <BrowserRouter>
-            <DailyAppointments />
-        </BrowserRouter>
-    );
+    return <DailyAppointments />;
 };
 
 

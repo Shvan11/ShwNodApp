@@ -2,7 +2,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import singleSpaReact from 'single-spa-react';
-import { BrowserRouter } from 'react-router-dom';
 import PatientManagement from '../components/react/PatientManagement.jsx';
 
 /**
@@ -10,13 +9,11 @@ import PatientManagement from '../components/react/PatientManagement.jsx';
  * Provides patient search, grid view, and quick access to patient records
  *
  * Route: /patient-management
+ *
+ * Note: BrowserRouter is provided by index.html at root level
  */
 const PatientManagementApp = () => {
-    return (
-        <BrowserRouter>
-            <PatientManagement />
-        </BrowserRouter>
-    );
+    return <PatientManagement />;
 };
 
 

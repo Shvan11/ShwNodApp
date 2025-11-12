@@ -171,28 +171,34 @@
             if (!existingContainer) {
                 // Create structure for header and apps
                 appContainer.innerHTML = `
-                    <div id="universal-header-root"></div>
-                    <div id="app-container"></div>
+                    <div id="single-spa-root"></div>
                 `;
             }
 
-            // Mount UniversalHeader with its own BrowserRouter
-            const headerRoot = ReactDOM.createRoot(
-                document.getElementById('universal-header-root')
+            // Mount entire application with ONE shared BrowserRouter
+            // This provides routing context to both UniversalHeader and all single-spa apps
+            const appRoot = ReactDOM.createRoot(
+                document.getElementById('single-spa-root')
             );
 
-            headerRoot.render(
+            appRoot.render(
                 React.createElement(BrowserRouter, null,
                     React.createElement(GlobalStateProvider, null,
-                        React.createElement(UniversalHeader)
+                        React.createElement(React.Fragment, null,
+                            React.createElement('div', { id: 'universal-header-root' },
+                                React.createElement(UniversalHeader)
+                            ),
+                            React.createElement('div', { id: 'app-container' })
+                        )
                     )
                 )
             );
 
-            console.log('[SPA] UniversalHeader mounted');
+            console.log('[SPA] Root application mounted with shared Router and GlobalState');
 
             // Import and start single-spa root config
             // This will register all apps and start the routing system
+            // All apps will use the shared BrowserRouter context
             try {
                 await import('/single-spa/root-config.js');
                 console.log('[SPA] Single-SPA started successfully');
