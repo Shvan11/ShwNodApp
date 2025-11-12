@@ -2,8 +2,8 @@
 
 /* Main Layout - Account for fixed universal header */
 .main-layout {
-  padding-top: 80px; /* Space for fixed universal header */
-  min-height: 100vh;
+  padding-top: calc(50px + 2rem); /* UniversalHeader height (50px) + original padding */
+  min-height: calc(100vh - 50px);
 }
 
 /* Container and Base Layout */
