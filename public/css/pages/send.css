@@ -1,9 +1,28 @@
 /* css/pages/send.css */
 
 /* Main Layout - Account for fixed universal header */
-.main-layout {
+.container.main-layout {
   padding-top: calc(50px + 2rem); /* UniversalHeader height (50px) + original padding */
   min-height: calc(100vh - 50px);
+}
+
+/* Mobile adjustments for sticky header */
+@media (max-width: 768px) {
+  .container.main-layout {
+    padding-top: 1rem; /* Reduced padding for sticky header on mobile */
+  }
+}
+
+@media (max-width: 640px) {
+  .container.main-layout {
+    padding-top: 0.75rem; /* Further reduced for smaller screens */
+  }
+}
+
+@media (max-width: 480px) {
+  .container.main-layout {
+    padding-top: 0.5rem; /* Minimal padding for very small screens */
+  }
 }
 
 /* Container and Base Layout */
@@ -14,146 +33,107 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
-/* Critical DOM Element IDs that JavaScript expects */
-#dateSelector {
-  width: 100%;
-  max-width: 300px;
-}
-
-#refreshDateBtn,
-#resetMessagingBtn,
-#restartClientBtn,
-#destroyClientBtn,
-#logoutClientBtn {
-  margin: 0 8px 8px 0;
-}
-
-#messageCount {
-  min-height: 60px;
+/* Page Header Area - ensure visibility below universal header */
+.page-header-area {
+  margin-bottom: 2rem;
+  padding: 0;
   display: flex;
+  justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
-#state {
-  font-size: 18px;
-  font-weight: 600;
-  min-height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-
-#startSendingBtn {
-  padding: 16px 32px;
-  font-size: 18px;
-  font-weight: 600;
-  min-width: 200px;
-  margin: 20px auto;
-  display: block;
-}
-
-#qr {
-  max-width: 300px;
-  height: auto;
-  border: 3px solid #007bff;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-
-#qr-container {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  margin: 20px 0;
-  border: 1px solid #dee2e6;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-#table-container {
-  margin-top: 30px;
-  overflow-x: auto;
-}
-
-h1 {
-  text-align: center;
+.page-header-area h2 {
+  margin: 0;
   color: #333;
-  margin-bottom: 30px;
+  font-size: 1.8rem;
+  flex: 1;
 }
 
-.status-panel {
-  background-color: #f9f9f9;
-  border: 1px solid #e0e0e0;
+.page-header-area .connection-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #f8f9fa;
   border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  font-size: 16px;
+  border: 1px solid #dee2e6;
 }
 
-.loader {
+.page-header-area .connection-indicator {
   display: inline-block;
-  width: 20px;
-  height: 20px;
-  border: 3px solid #f3f3f3;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  border-top: 3px solid #3498db;
-  margin-right: 10px;
-  animation: spin 2s linear infinite;
+  transition: all 0.3s ease;
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.page-header-area .connection-indicator.connected {
+  background-color: #28a745;
+  box-shadow: 0 0 6px rgba(40, 167, 69, 0.6);
 }
 
-#qr-container {
-  text-align: center;
-  margin: 20px 0;
+.page-header-area .connection-indicator.disconnected {
+  background-color: #dc3545;
+  box-shadow: 0 0 6px rgba(220, 53, 69, 0.6);
 }
 
-#qr {
-  max-width: 300px;
-  margin: 0 auto;
-  border: 10px solid white;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+.page-header-area .connection-text {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #495057;
 }
 
-.action-button {
-  display: none;
-  margin: 20px auto;
-  padding: 12px 30px;
-  background-color: #25D366;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.3s;
-  text-align: center;
+@media (max-width: 768px) {
+  .page-header-area {
+    padding: 0;
+    margin-bottom: 1.5rem;
+  }
+
+  .page-header-area h2 {
+    font-size: 1.5rem;
+  }
+
+  .page-header-area .connection-status {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+  }
 }
 
-.action-button:hover {
-  background-color: #128C7E;
+@media (max-width: 480px) {
+  .page-header-area {
+    padding: 0;
+    margin-bottom: 1.25rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .page-header-area h2 {
+    font-size: 1.25rem;
+  }
+
+  .page-header-area .connection-status {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
-.action-button:disabled {
-  background-color: #cccccc;
-  cursor: not-allowed;
+/* Legacy DOM Element IDs - These are no longer used in React version but kept for backward compatibility */
+
+/* Status Area - ensure proper spacing */
+.status-area {
+  margin-bottom: 2rem;
+}
+
+/* Content Area - ensure proper spacing */
+.content-area {
+  margin-top: 1.5rem;
 }
 
 .results-container {
   margin-top: 30px;
-}
-
-.message-count {
-  background-color: #f5f5f5;
-  padding: 10px 15px;
-  border-radius: 4px;
-  font-weight: 500;
-  margin-bottom: 15px;
-  border-left: 4px solid #25D366;
 }
 
 /* Status colors - Enhanced with better contrast */
@@ -236,29 +216,7 @@ tr.false {
 
 /* Status badges - consolidated and enhanced */
 
-/* Legacy action button styles - integrated with new btn system */
-
-.warning-button {
-  background-color: #f0ad4e;
-  border-color: #eea236;
-}
-
-.warning-button:hover {
-  background-color: #ec971f;
-  border-color: #d58512;
-}
-
-/* Animation for urgent restart button */
-.attention {
-  animation: pulse 1.5s infinite;
-  box-shadow: 0 0 10px rgba(240, 173, 78, 0.7);
-}
-
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
+/* Legacy styles removed - now using .btn-warning class */
 
 /* ==============================================
    ADD THESE STYLES TO YOUR EXISTING send.css
@@ -270,14 +228,14 @@ tr.false {
     border: 1px solid #dee2e6;
     border-radius: 8px;
     padding: 24px;
-    margin: 20px 0;
+    margin: 0 0 20px 0;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
 
 .date-controls {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     margin-bottom: 16px;
     flex-wrap: wrap;
 }
@@ -289,18 +247,31 @@ tr.false {
 .date-controls label {
     font-weight: 600;
     color: #333;
-    min-width: 100px;
+    min-width: 80px;
     font-size: 14px;
+    flex-shrink: 0;
+    line-height: 1.4;
+    margin: 0;
+    padding: 0;
 }
 
 .date-dropdown {
-    padding: 10px 14px;
+    padding: 8px 14px;
     border: 2px solid #ced4da;
     border-radius: 6px;
     font-size: 14px;
     background: white;
-    min-width: 200px;
+    min-width: 160px;
+    flex-shrink: 1;
     transition: border-color 0.2s ease;
+    height: auto;
+    line-height: 1.4;
+    margin: 0;
+}
+
+.date-controls .btn {
+    margin: 0;
+    align-self: center;
 }
 
 .date-dropdown:focus {
@@ -309,9 +280,10 @@ tr.false {
     box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
 }
 
-/* Enhanced Button System */
-.btn {
-    padding: 8px 16px;
+/* Enhanced Button System - Scoped to send page */
+#whatsapp-send-root .btn,
+.main-layout .btn {
+    padding: 8px 12px;
     border: none;
     border-radius: 4px;
     cursor: pointer;
@@ -324,76 +296,99 @@ tr.false {
     text-decoration: none;
     line-height: 1.4;
     position: relative;
+    white-space: nowrap;
+    vertical-align: baseline;
 }
 
-.btn:disabled {
-    background-color: #adb5bd !important;
-    color: #6c757d !important;
+#whatsapp-send-root .btn:disabled,
+.main-layout .btn:disabled {
+    background-color: #adb5bd;
+    color: #6c757d;
     cursor: not-allowed;
     transform: none;
 }
 
-.btn:not(:disabled):hover {
+#whatsapp-send-root .btn:not(:disabled):hover,
+.main-layout .btn:not(:disabled):hover {
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.btn:not(:disabled):active {
+#whatsapp-send-root .btn:not(:disabled):active,
+.main-layout .btn:not(:disabled):active {
     transform: translateY(0);
 }
 
-/* Button Color Variants */
-.btn-primary {
+/* Button Color Variants - Scoped to send page */
+#whatsapp-send-root .btn-primary,
+.main-layout .btn-primary {
     background-color: #007bff;
     color: white;
+    border-color: #007bff;
 }
 
-.btn-primary:hover:not(:disabled) {
+#whatsapp-send-root .btn-primary:hover:not(:disabled),
+.main-layout .btn-primary:hover:not(:disabled) {
     background-color: #0056b3;
+    border-color: #0056b3;
 }
 
-.btn-secondary {
+#whatsapp-send-root .btn-secondary,
+.main-layout .btn-secondary {
     background-color: #6c757d;
     color: white;
+    border-color: #6c757d;
 }
 
-.btn-secondary:hover:not(:disabled) {
+#whatsapp-send-root .btn-secondary:hover:not(:disabled),
+.main-layout .btn-secondary:hover:not(:disabled) {
     background-color: #5a6268;
+    border-color: #5a6268;
 }
 
-.btn-success {
+#whatsapp-send-root .btn-success,
+.main-layout .btn-success {
     background-color: #28a745;
     color: white;
+    border-color: #28a745;
 }
 
-.btn-success:hover:not(:disabled) {
+#whatsapp-send-root .btn-success:hover:not(:disabled),
+.main-layout .btn-success:hover:not(:disabled) {
     background-color: #218838;
+    border-color: #218838;
 }
 
-.btn-warning {
+#whatsapp-send-root .btn-warning,
+.main-layout .btn-warning {
     background-color: #ffc107;
     color: #212529;
     border: 1px solid #f0ad4e;
 }
 
-.btn-warning:hover:not(:disabled) {
+#whatsapp-send-root .btn-warning:hover:not(:disabled),
+.main-layout .btn-warning:hover:not(:disabled) {
     background-color: #e0a800;
     border-color: #d58512;
 }
 
-.btn-danger {
+#whatsapp-send-root .btn-danger,
+.main-layout .btn-danger {
     background-color: #dc3545;
     color: white;
+    border-color: #dc3545;
 }
 
-.btn-danger:hover:not(:disabled) {
+#whatsapp-send-root .btn-danger:hover:not(:disabled),
+.main-layout .btn-danger:hover:not(:disabled) {
     background-color: #c82333;
+    border-color: #c82333;
 }
 
 /* Button State Classes - CRITICAL FOR JAVASCRIPT */
 .btn-loading {
-    background-color: #6c757d !important;
-    color: white !important;
+    background-color: #6c757d;
+    color: white;
     pointer-events: none;
     position: relative;
     cursor: wait;
@@ -417,18 +412,18 @@ tr.false {
 }
 
 .btn-confirming {
-    background-color: #fd7e14 !important;
-    color: white !important;
+    background-color: #fd7e14;
+    color: white;
     animation: pulse-attention 1.2s infinite;
     border: 2px solid #f0ad4e;
     box-shadow: 0 0 0 3px rgba(253, 126, 20, 0.3);
 }
 
 .btn-disabled {
-    background-color: #adb5bd !important;
-    color: #6c757d !important;
-    cursor: not-allowed !important;
-    transform: none !important;
+    background-color: #adb5bd;
+    color: #6c757d;
+    cursor: not-allowed;
+    transform: none;
     opacity: 0.65;
 }
 
@@ -603,13 +598,14 @@ tr.false {
 
 /* Live region styling for screen readers */
 [aria-live] {
-    min-height: 1.5em;
     transition: all 0.3s ease;
 }
 
-[aria-live="assertive"] {
+/* Only apply border to assertive live regions that are not toast containers or screen readers */
+[aria-live="assertive"]:not(.toast-container):not(.sr-only):not(#announcer) {
     border-left: 4px solid #007bff;
     padding-left: 12px;
+    min-height: 1.5em;
 }
 
 /* Hidden but accessible content */
@@ -716,30 +712,9 @@ tr.false {
     --transition-slow: 0.5s ease;
 }
 
-/* Enhanced Container with CSS Grid for main layout */
-.main-layout {
-    display: grid;
-    grid-template-areas: 
-        "header header"
-        "controls status"
-        "content content";
-    grid-template-columns: 1fr 1fr;
-    grid-gap: 20px;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-@media (max-width: 768px) {
-    .main-layout {
-        grid-template-areas: 
-            "header"
-            "controls"
-            "status"
-            "content";
-        grid-template-columns: 1fr;
-    }
-}
+/* Enhanced Container with CSS Grid for main layout - REMOVED DUPLICATE */
+/* This duplicate .main-layout definition has been removed to fix padding issues.
+   The grid layout is not needed for the React WhatsApp app as it uses flexbox. */
 
 /* Enhanced Button Focus for Better UX */
 .btn:focus {
@@ -886,11 +861,11 @@ tr.false {
 /* Reduced Motion Support */
 @media (prefers-reduced-motion: reduce) {
     * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms;
+        animation-iteration-count: 1;
+        transition-duration: 0.01ms;
     }
-    
+
     .btn:hover {
         transform: none;
     }
@@ -1116,13 +1091,13 @@ tr.false {
     padding: 16px 24px;
     font-weight: 600;
     min-height: 50px;
-    background: var(--whatsapp-green) !important;
-    color: white !important;
-    border: none !important;
+    background: var(--whatsapp-green);
+    color: white;
+    border: none;
 }
 
 .primary-action:hover:not(:disabled) {
-    background: var(--whatsapp-dark) !important;
+    background: var(--whatsapp-dark);
 }
 
 .secondary-actions {
@@ -1185,8 +1160,8 @@ tr.false {
 
 /* Button Confirmation States */
 .btn-confirming {
-    background-color: #fd7e14 !important;
-    color: white !important;
+    background-color: #fd7e14;
+    color: white;
     animation: pulse-confirm 1s infinite;
     position: relative;
 }
