@@ -9,7 +9,6 @@ const UniversalHeader = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [allPatients, setAllPatients] = useState([]);
     const [isPatientTabOpen, setIsPatientTabOpen] = useState(false);
-    const [isFullscreen, setIsFullscreen] = useState(false);
 
     const searchTimeoutRef = useRef(null);
 
@@ -17,6 +16,9 @@ const UniversalHeader = () => {
         loadPatientData();
         setupNavigationContext();
         // loadAllPatients(); // Temporarily disabled - endpoint doesn't exist
+
+        // Cleanup: Remove any legacy fullscreen preference from localStorage
+        localStorage.removeItem('preferFullscreen');
     }, []);
 
     // Subscribe to patient tab state changes (event-driven)
@@ -25,47 +27,6 @@ const UniversalHeader = () => {
             setIsPatientTabOpen(isOpen);
         });
         return unsubscribe;
-    }, []);
-
-    // Track fullscreen state and auto-restore on page load
-    useEffect(() => {
-        const handleFullscreenChange = () => {
-            const isNowFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
-            setIsFullscreen(isNowFullscreen);
-
-            // Update preference in localStorage
-            if (isNowFullscreen) {
-                localStorage.setItem('preferFullscreen', 'true');
-            } else {
-                localStorage.removeItem('preferFullscreen');
-            }
-        };
-
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-
-        // Auto-restore fullscreen if user prefers it
-        const preferFullscreen = localStorage.getItem('preferFullscreen') === 'true';
-        if (preferFullscreen && !document.fullscreenElement) {
-            const elem = document.documentElement;
-            if (elem.requestFullscreen) {
-                elem.requestFullscreen().catch(err => console.log('Fullscreen request failed:', err));
-            } else if (elem.webkitRequestFullscreen) {
-                elem.webkitRequestFullscreen();
-            } else if (elem.mozRequestFullScreen) {
-                elem.mozRequestFullScreen();
-            }
-        }
-
-        // Initial check
-        setIsFullscreen(!!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement));
-
-        return () => {
-            document.removeEventListener('fullscreenchange', handleFullscreenChange);
-            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-            document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-        };
     }, []);
 
     const loadPatientData = () => {
@@ -218,31 +179,6 @@ const UniversalHeader = () => {
         tabManager.openOrFocus('', 'patient');
     };
 
-    const toggleFullscreen = () => {
-        if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
-            // Exit fullscreen
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) {
-                document.webkitExitFullscreen();
-            } else if (document.mozCancelFullScreen) {
-                document.mozCancelFullScreen();
-            }
-        } else {
-            // Enter fullscreen
-            const elem = document.documentElement;
-            if (elem.requestFullscreen) {
-                elem.requestFullscreen();
-            } else if (elem.webkitRequestFullscreen) {
-                elem.webkitRequestFullscreen();
-            } else if (elem.mozRequestFullScreen) {
-                elem.mozRequestFullScreen();
-            } else if (elem.msRequestFullscreen) {
-                elem.msRequestFullscreen();
-            }
-        }
-    };
-
     // Header navigation items configuration
     const getNavigationItems = () => {
         return [
@@ -367,15 +303,6 @@ const UniversalHeader = () => {
                             </div>
                         )}
                     </div>
-
-                    {/* Fullscreen Toggle Button */}
-                    <button
-                        className="fullscreen-btn"
-                        onClick={toggleFullscreen}
-                        title={isFullscreen ? "Exit Fullscreen (ESC)" : "Enter Fullscreen (F11)"}
-                    >
-                        <i className={isFullscreen ? "fas fa-compress" : "fas fa-expand"} />
-                    </button>
 
                     {/* Back Button */}
                     {navigationContext && navigationContext.breadcrumbs.length > 0 && (
