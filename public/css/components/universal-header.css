@@ -130,6 +130,24 @@
     font-size: 1rem;
 }
 
+/* Disabled button state */
+.nav-btn:disabled,
+.nav-btn.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    pointer-events: none;
+}
+
+.nav-btn:disabled:hover,
+.nav-btn.disabled:hover {
+    transform: none;
+    box-shadow: none;
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
 /* Header Right Section */
 .header-right {
     display: flex;
