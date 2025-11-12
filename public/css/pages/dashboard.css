@@ -40,6 +40,7 @@
 .main-content {
     min-height: calc(100vh - 120px);
     padding: 2rem 0;
+    padding-top: calc(50px + 2rem); /* UniversalHeader height (50px) + original padding */
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
 }
 

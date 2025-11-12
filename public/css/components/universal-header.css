@@ -244,6 +244,28 @@
     color: #718096;
 }
 
+/* Fullscreen Button */
+.fullscreen-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 0.6rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 45px;
+    height: 45px;
+}
+
+.fullscreen-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
 /* Back Button */
 .back-btn {
     background: rgba(255, 255, 255, 0.1);
@@ -411,6 +433,7 @@
     }
 
     .search-toggle-btn,
+    .fullscreen-btn,
     .back-btn {
         width: 36px;
         height: 36px;
@@ -470,6 +493,7 @@
     }
 
     .search-toggle-btn,
+    .fullscreen-btn,
     .back-btn {
         width: 32px;
         height: 32px;
@@ -535,6 +559,7 @@
     }
 
     .search-toggle-btn,
+    .fullscreen-btn,
     .back-btn {
         width: 30px;
         height: 30px;
@@ -575,6 +600,7 @@
     }
 
     .search-toggle-btn,
+    .fullscreen-btn,
     .back-btn {
         width: 28px;
         height: 28px;
@@ -601,6 +627,7 @@
 /* Focus states for accessibility */
 .nav-btn:focus,
 .search-toggle-btn:focus,
+.fullscreen-btn:focus,
 .back-btn:focus {
     outline: 2px solid rgba(255, 255, 255, 0.5);
     outline-offset: 2px;

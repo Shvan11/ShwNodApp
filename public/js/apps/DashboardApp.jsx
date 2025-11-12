@@ -123,18 +123,6 @@ const DashboardApp = () => {
 
   return (
     <div id="app">
-      <header className="header">
-        <div className="container">
-          <div className="logo">
-            <img src="../images/logo.png" alt="Shwan Orthodontics" />
-            <h1>Shwan Orthodontics</h1>
-          </div>
-          <div className="user-info">
-            <span>Welcome to the System</span>
-          </div>
-        </div>
-      </header>
-
       <main className="main-content">
         <div className="container">
           <div className="dashboard-grid">

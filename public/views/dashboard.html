@@ -6,6 +6,7 @@
     <title>Dashboard - Shwan Orthodontics</title>
     <link rel="stylesheet" href="../css/main.css">
     <link rel="stylesheet" href="../css/pages/dashboard.css">
+    <link rel="stylesheet" href="../css/components/universal-header.css">
     <link rel="stylesheet" href="../fontawesome/css/all.min.css">
 
     <!-- Import maps for ES modules -->
@@ -20,12 +21,14 @@
     </script>
 </head>
 <body>
+    <div id="universal-header-root"></div>
     <div id="dashboard-root"></div>
 
     <!-- Mount React Dashboard -->
     <script type="module">
       import React from 'react';
       import ReactDOM from 'react-dom/client';
+      import UniversalHeader from '/js/components/react/UniversalHeader.jsx';
       import DashboardApp from '/js/apps/DashboardApp.jsx';
       import tabManager from '/js/utils/tab-manager.js';
 
@@ -36,6 +39,14 @@
         // Register this tab with heartbeat system
         tabManager.register('dashboard');
 
+        // Mount Universal Header
+        const headerRoot = document.getElementById('universal-header-root');
+        if (headerRoot) {
+          const headerReactRoot = ReactDOM.createRoot(headerRoot);
+          headerReactRoot.render(React.createElement(UniversalHeader));
+        }
+
+        // Mount Dashboard App
         const root = document.getElementById('dashboard-root');
         if (root) {
           const reactRoot = ReactDOM.createRoot(root);
