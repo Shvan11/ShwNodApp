@@ -174,13 +174,21 @@ const UniversalHeader = () => {
     };
 
     const navigateToDashboard = () => {
-        tabManager.openOrFocus('/dashboard', 'dashboard');
+        // Check if tab exists first - use empty URL for focus, full URL for new tab
+        const url = tabManager.isOpen('dashboard') ? '' : '/dashboard';
+        tabManager.openOrFocus(url, 'dashboard');
     };
 
     const navigateToAppointments = () => {
-        // Use TabManager to focus existing appointments tab or open new one
-        // This ensures only one appointments tab exists (singleton behavior)
-        tabManager.openOrFocus('/appointments', 'appointments');
+        // Check if tab exists first - use empty URL for focus, full URL for new tab
+        const url = tabManager.isOpen('appointments') ? '' : '/appointments';
+        tabManager.openOrFocus(url, 'appointments');
+    };
+
+    const navigateToPatientManagement = () => {
+        // Check if tab exists first - use empty URL for focus, full URL for new tab
+        const url = tabManager.isOpen('patient_management') ? '' : '/patient-management';
+        tabManager.openOrFocus(url, 'patient_management');
     };
 
     const focusPatientTab = () => {
@@ -220,7 +228,7 @@ const UniversalHeader = () => {
                 key: 'search',
                 label: 'Search',
                 icon: 'fas fa-search',
-                onClick: () => tabManager.openOrFocus('/patient-management', 'patient_management'),
+                onClick: navigateToPatientManagement,
                 isActive: window.location.pathname.includes('/patient-management')
             },
             {
@@ -325,15 +333,13 @@ const UniversalHeader = () => {
                     </div>
 
                     {/* Fullscreen Exit Button */}
-                    {isFullscreen && (
-                        <button
-                            className="fullscreen-btn"
-                            onClick={exitFullscreen}
-                            title="Exit Fullscreen (ESC)"
-                        >
-                            <i className="fas fa-compress" />
-                        </button>
-                    )}
+                    <button
+                        className="fullscreen-btn"
+                        onClick={exitFullscreen}
+                        title="Exit Fullscreen (ESC)"
+                    >
+                        <i className={isFullscreen ? "fas fa-compress" : "fas fa-compress-alt"} />
+                    </button>
 
                     {/* Back Button */}
                     {navigationContext && navigationContext.breadcrumbs.length > 0 && (
