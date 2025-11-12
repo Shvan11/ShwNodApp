@@ -105,7 +105,7 @@ class TabManager {
 
   /**
    * Smart navigation - focus existing tab or open new one
-   * @param {string} url - URL to navigate to
+   * @param {string} url - URL to navigate to (empty string = focus only, no navigation)
    * @param {string} tabName - Tab name for singleton detection
    * @returns {boolean} - True if focused existing, false if opened new
    */
@@ -114,12 +114,21 @@ class TabManager {
 
     // Check if tab is already open using our detection system
     if (this.isOpen(tabName)) {
-      // Tab exists - focus it without refresh using empty URL
-      const windowRef = window.open('', targetName);
-
-      if (windowRef) {
-        windowRef.focus();
+      // Tab exists - decide whether to navigate or just focus
+      if (url === '') {
+        // Empty URL = focus only (used by header "Patient Tab" button)
+        const windowRef = window.open('', targetName);
+        if (windowRef) {
+          windowRef.focus();
+        }
         return true; // Focused existing
+      } else {
+        // URL provided = navigate to that URL (used by appointments → patient)
+        const windowRef = window.open(url, targetName);
+        if (windowRef) {
+          windowRef.focus();
+        }
+        return true; // Focused and navigated
       }
     }
 
