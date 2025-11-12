@@ -27,18 +27,39 @@ const UniversalHeader = () => {
         return unsubscribe;
     }, []);
 
-    // Track fullscreen state
+    // Track fullscreen state and auto-restore on page load
     useEffect(() => {
         const handleFullscreenChange = () => {
-            setIsFullscreen(!!document.fullscreenElement);
+            const isNowFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+            setIsFullscreen(isNowFullscreen);
+
+            // Update preference in localStorage
+            if (isNowFullscreen) {
+                localStorage.setItem('preferFullscreen', 'true');
+            } else {
+                localStorage.removeItem('preferFullscreen');
+            }
         };
 
         document.addEventListener('fullscreenchange', handleFullscreenChange);
         document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
         document.addEventListener('mozfullscreenchange', handleFullscreenChange);
 
+        // Auto-restore fullscreen if user prefers it
+        const preferFullscreen = localStorage.getItem('preferFullscreen') === 'true';
+        if (preferFullscreen && !document.fullscreenElement) {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen().catch(err => console.log('Fullscreen request failed:', err));
+            } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen();
+            } else if (elem.mozRequestFullScreen) {
+                elem.mozRequestFullScreen();
+            }
+        }
+
         // Initial check
-        setIsFullscreen(!!document.fullscreenElement);
+        setIsFullscreen(!!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement));
 
         return () => {
             document.removeEventListener('fullscreenchange', handleFullscreenChange);
