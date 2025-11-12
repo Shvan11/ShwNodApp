@@ -47,8 +47,11 @@ This document tracks the migration status of the application to a unified React 
 
 ## Files Cleaned Up 🗑️
 
-### Archived Legacy Files
-- `public/js/pages/send.js.backup` - 2122 lines (archived, replaced by WhatsAppSendApp.jsx)
+### Archived Legacy Files (Replaced by React)
+- `public/js/pages/send.js.backup` - 2122 lines (replaced by WhatsAppSendApp.jsx)
+- `public/js/pages/template-management.js.backup` - 431 lines (replaced by TemplateApp.jsx)
+- `public/views/template-management.html.backup` - Legacy template management page
+- `public/template-designer.html.backup` - Legacy template designer (replaced by React TemplateDesigner)
 
 ### Previously Deleted Duplicate/Legacy Files
 - `public/views/expenses-react.html` - Duplicate (not in routing)
@@ -56,11 +59,6 @@ This document tracks the migration status of the application to a unified React 
 - `public/js/pages/daily-appointments-legacy.jsx` - Legacy backup
 - `public/js/pages/daily-appointments-react.jsx` - Duplicate
 - `public/views/test-new-visit.html` - Test file
-
-### Legacy Files to Be Removed (Obsolete)
-- `public/views/template-management.html` - Replaced by TemplateApp.jsx
-- `public/js/pages/template-management.js` - 431 lines (replaced by TemplateApp.jsx)
-- `public/template-designer.html` - Replaced by React TemplateDesigner component
 
 ## Current Architecture
 
