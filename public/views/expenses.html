@@ -38,10 +38,14 @@
     import ReactDOM from 'react-dom/client';
     import UniversalHeader from '/js/components/react/UniversalHeader.jsx';
     import ExpensesApp from '/js/apps/ExpensesApp.jsx';
+    import tabManager from '/js/utils/tab-manager.js';
 
     document.addEventListener('DOMContentLoaded', function() {
       // Name this window so tabManager can reuse it
       window.name = 'clinic_expenses';
+
+      // Register this tab with heartbeat system
+      tabManager.register('expenses');
 
       // Mount Universal Header
       const headerRoot = document.getElementById('universal-header-root');

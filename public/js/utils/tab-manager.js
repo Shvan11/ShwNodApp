@@ -5,13 +5,20 @@
  * Prevents duplicate tabs for specific pages (like appointments dashboard)
  * Uses localStorage heartbeat to detect if a tab is alive
  * Uses window.open() with named targets to focus existing tabs
+ * Uses storage events for real-time cross-tab communication
  */
 
 class TabManager {
   constructor() {
     this.registeredTabs = new Map();
+    this.subscribers = new Map(); // Callbacks for tab state changes
     this.heartbeatInterval = 2000; // 2 seconds
     this.tabTimeout = 5000; // 5 seconds - consider tab dead if no heartbeat
+    this.crashCheckInterval = 60000; // 60 seconds - lightweight crash detection
+
+    // Initialize event-driven system
+    this._initStorageListener();
+    this._startCrashDetection();
   }
 
   /**
@@ -122,6 +129,88 @@ class TabManager {
       windowRef.focus();
     }
     return false; // Opened new
+  }
+
+  /**
+   * Subscribe to tab state changes (event-driven)
+   * @param {string} tabName - Tab name to monitor
+   * @param {Function} callback - Called with (isOpen: boolean) when state changes
+   * @returns {Function} - Unsubscribe function
+   */
+  subscribe(tabName, callback) {
+    if (!this.subscribers.has(tabName)) {
+      this.subscribers.set(tabName, new Set());
+    }
+    this.subscribers.get(tabName).add(callback);
+
+    // Immediately notify current state
+    callback(this.isOpen(tabName));
+
+    // Return unsubscribe function
+    return () => {
+      const callbacks = this.subscribers.get(tabName);
+      if (callbacks) {
+        callbacks.delete(callback);
+        if (callbacks.size === 0) {
+          this.subscribers.delete(tabName);
+        }
+      }
+    };
+  }
+
+  /**
+   * Initialize storage event listener for cross-tab communication
+   * @private
+   */
+  _initStorageListener() {
+    window.addEventListener('storage', (e) => {
+      // Only process tab-related storage events
+      if (!e.key?.startsWith('tab_')) return;
+
+      // Parse which tab changed (e.g., "tab_patient" or "tab_patient_timestamp")
+      const match = e.key.match(/^tab_(.+?)(?:_timestamp)?$/);
+      if (!match) return;
+
+      const tabName = match[1];
+      const isOpen = this.isOpen(tabName);
+
+      // Notify all subscribers for this tab
+      this._notifySubscribers(tabName, isOpen);
+    });
+  }
+
+  /**
+   * Notify all subscribers of a tab state change
+   * @private
+   */
+  _notifySubscribers(tabName, isOpen) {
+    const callbacks = this.subscribers.get(tabName);
+    if (callbacks && callbacks.size > 0) {
+      callbacks.forEach(callback => {
+        try {
+          callback(isOpen);
+        } catch (error) {
+          console.error(`Error in tabManager subscriber for "${tabName}":`, error);
+        }
+      });
+    }
+  }
+
+  /**
+   * Lightweight crash detection (runs every 60 seconds)
+   * Only checks tabs that have active subscribers
+   * @private
+   */
+  _startCrashDetection() {
+    setInterval(() => {
+      // Only check tabs that have active subscribers
+      for (const [tabName, callbacks] of this.subscribers) {
+        if (callbacks.size > 0) {
+          const isOpen = this.isOpen(tabName);
+          this._notifySubscribers(tabName, isOpen);
+        }
+      }
+    }, this.crashCheckInterval);
   }
 
   /**

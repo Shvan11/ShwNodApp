@@ -21,12 +21,16 @@
         import ReactDOM from 'react-dom/client';
         import UniversalHeader from '../js/components/react/UniversalHeader.jsx';
         import SettingsApp from '../js/apps/SettingsApp.jsx';
+        import tabManager from '../js/utils/tab-manager.js';
 
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Initializing Settings with React Router...');
 
             // Name this window so tabManager can reuse it
             window.name = 'clinic_settings';
+
+            // Register this tab with heartbeat system
+            tabManager.register('settings');
 
             // Mount Universal Header
             const headerRoot = document.getElementById('universal-header-root');

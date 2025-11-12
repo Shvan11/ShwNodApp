@@ -159,12 +159,16 @@
         import ReactDOM from 'react-dom/client';
         import UniversalHeader from '/js/components/react/UniversalHeader.jsx';
         import PatientManagement from '/js/components/react/PatientManagement.jsx';
+        import tabManager from '/js/utils/tab-manager.js';
 
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Initializing Patient Management...');
 
             // Name this window so tabManager can reuse it
             window.name = 'clinic_patient_management';
+
+            // Register this tab with heartbeat system
+            tabManager.register('patient_management');
 
             // Mount Universal Header
             const headerRoot = document.getElementById('universal-header-root');
