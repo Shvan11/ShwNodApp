@@ -1,5 +1,11 @@
 /* css/pages/send.css */
 
+/* Main Layout - Account for fixed universal header */
+.main-layout {
+  padding-top: 80px; /* Space for fixed universal header */
+  min-height: 100vh;
+}
+
 /* Container and Base Layout */
 .container {
   max-width: 1200px;
