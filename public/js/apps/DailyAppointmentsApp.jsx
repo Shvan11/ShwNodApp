@@ -1,5 +1,7 @@
 // DailyAppointmentsApp.jsx - Daily Appointments Application
 import React from 'react';
+import ReactDOM from 'react-dom/client';
+import singleSpaReact from 'single-spa-react';
 import DailyAppointments from '../components/react/appointments/DailyAppointments.jsx';
 
 /**
@@ -20,4 +22,21 @@ const DailyAppointmentsApp = () => {
     return <DailyAppointments />;
 };
 
+// Single-SPA Lifecycle Exports
+const lifecycles = singleSpaReact({
+    React,
+    ReactDOM,
+    rootComponent: DailyAppointmentsApp,
+    errorBoundary(err, info, props) {
+        console.error('[DailyAppointmentsApp] Error:', err);
+        return (
+            <div className="error-boundary">
+                <h2>Appointments Error</h2>
+                <p>Failed to load appointments. Please refresh the page.</p>
+            </div>
+        );
+    },
+});
+
+export const { bootstrap, mount, unmount } = lifecycles;
 export default DailyAppointmentsApp;

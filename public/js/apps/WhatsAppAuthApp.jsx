@@ -4,6 +4,8 @@
  */
 
 import React from 'react';
+import ReactDOM from 'react-dom/client';
+import singleSpaReact from 'single-spa-react';
 import { useWhatsAppAuth, AUTH_STATES } from '../hooks/useWhatsAppAuth.js';
 import { StatusDisplay } from '../components/whatsapp-auth/StatusDisplay.jsx';
 import { QRCodeDisplay } from '../components/whatsapp-auth/QRCodeDisplay.jsx';
@@ -69,3 +71,21 @@ export default function WhatsAppAuthApp() {
     </div>
   );
 }
+
+// Single-SPA Lifecycle Exports
+const lifecycles = singleSpaReact({
+    React,
+    ReactDOM,
+    rootComponent: WhatsAppAuthApp,
+    errorBoundary(err, info, props) {
+        console.error('[WhatsAppAuthApp] Error:', err);
+        return (
+            <div className="error-boundary">
+                <h2>WhatsApp Auth Error</h2>
+                <p>Failed to load WhatsApp authentication. Please refresh the page.</p>
+            </div>
+        );
+    },
+});
+
+export const { bootstrap, mount, unmount } = lifecycles;

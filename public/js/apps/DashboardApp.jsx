@@ -1,31 +1,15 @@
 import React from 'react';
-import tabManager from '../utils/tab-manager.js';
+import ReactDOM from 'react-dom/client';
+import singleSpaReact from 'single-spa-react';
+import { useNavigate } from 'react-router-dom';
 import '../../css/pages/dashboard.css';
 
 const DashboardApp = () => {
-  // Map links to their tabManager window names
-  const getWindowName = (link) => {
-    const nameMap = {
-      '/calendar': 'calendar',
-      '/appointments': 'appointments',
-      '/patient-management': 'patient_management',
-      '/aligner': 'aligner',
-      '/settings': 'settings',
-      '/expenses': 'expenses',
-      '/statistics': 'statistics',
-      '/templates': 'templates'
-    };
-    return nameMap[link] || null;
-  };
+  const navigate = useNavigate();
 
   const handleCardClick = (e, link) => {
     e.preventDefault();
-    const windowName = getWindowName(link);
-    if (windowName) {
-      tabManager.openOrFocus(link, windowName);
-    } else {
-      window.location.href = link;
-    }
+    navigate(link);
   };
 
   const dashboardCards = [
@@ -180,4 +164,21 @@ const DashboardApp = () => {
   );
 };
 
+// Single-SPA Lifecycle Exports
+const lifecycles = singleSpaReact({
+  React,
+  ReactDOM,
+  rootComponent: DashboardApp,
+  errorBoundary(err, info, props) {
+    console.error('[DashboardApp] Error:', err);
+    return (
+      <div className="error-boundary">
+        <h2>Dashboard Error</h2>
+        <p>Failed to load dashboard. Please refresh the page.</p>
+      </div>
+    );
+  },
+});
+
+export const { bootstrap, mount, unmount } = lifecycles;
 export default DashboardApp;
