@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import AppointmentsHeader from './AppointmentsHeader.jsx';
 import StatsCards from './StatsCards.jsx';
 import MobileViewToggle from './MobileViewToggle.jsx';
@@ -28,6 +28,9 @@ const DailyAppointments = () => {
     const [contextMenu, setContextMenu] = useState(null);
     const [showFlash, setShowFlash] = useState(false);
 
+    // Track recent local actions to prevent redundant WebSocket reloads
+    const recentActionTimestamp = useRef(null);
+
     // Use custom hooks
     const {
         allAppointments,
@@ -43,12 +46,22 @@ const DailyAppointments = () => {
         calculateStats
     } = useAppointments();
 
-    // WebSocket integration
+    // WebSocket integration - Smart update handling
     const { connectionStatus } = useWebSocketSync(selectedDate, () => {
-        // Reload appointments when WebSocket updates received
-        loadAppointments(selectedDate);
-        flashUpdateIndicator();
-        showNotification('Appointments updated', 'info');
+        // Check if this update is from our own recent action (within last 2 seconds)
+        const now = Date.now();
+        const isOwnAction = recentActionTimestamp.current && (now - recentActionTimestamp.current) < 2000;
+
+        if (isOwnAction) {
+            // Our own action - optimistic update already handled it
+            console.log('📡 WebSocket update from own action - skipping reload');
+            flashUpdateIndicator();
+        } else {
+            // Update from another client - need to reload
+            console.log('📡 WebSocket update from another client - reloading');
+            loadAppointments(selectedDate);
+            flashUpdateIndicator();
+        }
     });
 
     // Load appointments when date changes
@@ -84,6 +97,7 @@ const DailyAppointments = () => {
 
     // Handle check-in (OPTIMISTIC UPDATE - no reload needed!)
     const handleCheckIn = async (appointmentId) => {
+        recentActionTimestamp.current = Date.now(); // Mark this as our action
         try {
             const result = await checkInPatient(appointmentId);
             if (result.success) {
@@ -100,6 +114,7 @@ const DailyAppointments = () => {
 
     // Handle mark seated (OPTIMISTIC UPDATE - no reload needed!)
     const handleMarkSeated = async (appointmentId) => {
+        recentActionTimestamp.current = Date.now(); // Mark this as our action
         try {
             const result = await markSeated(appointmentId);
             if (result.success) {
@@ -116,6 +131,7 @@ const DailyAppointments = () => {
 
     // Handle mark dismissed (OPTIMISTIC UPDATE - no reload needed!)
     const handleMarkDismissed = async (appointmentId) => {
+        recentActionTimestamp.current = Date.now(); // Mark this as our action
         try {
             const result = await markDismissed(appointmentId);
             if (result.success) {
@@ -132,6 +148,7 @@ const DailyAppointments = () => {
 
     // Handle undo state (OPTIMISTIC UPDATE - no reload needed!)
     const handleUndoState = async (appointmentId, stateToUndo) => {
+        recentActionTimestamp.current = Date.now(); // Mark this as our action
         try {
             await undoState(appointmentId, stateToUndo);
             // No loadAppointments() needed! Hook updates state optimistically
@@ -143,6 +160,7 @@ const DailyAppointments = () => {
 
     // Handle undo action from notification (OPTIMISTIC UPDATE - no reload needed!)
     const handleUndoAction = async (undoData) => {
+        recentActionTimestamp.current = Date.now(); // Mark this as our action
         try {
             await undoAction(undoData.appointmentId, undoData.previousState);
             // No loadAppointments() needed! Hook updates state optimistically
