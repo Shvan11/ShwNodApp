@@ -1,27 +1,27 @@
 /**
  * Template Management Application
  * React-based template designer and management system using GrapesJS
+ *
+ * Note: BrowserRouter is provided by index.html at root level
  */
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import singleSpaReact from 'single-spa-react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import TemplateManagement from '../components/templates/TemplateManagement.jsx';
 import TemplateDesigner from '../components/templates/TemplateDesigner.jsx';
 
 const TemplateApp = () => {
     return (
-        <BrowserRouter>
-            <div id="app">
-                <Routes>
-                    <Route path="/templates" element={<TemplateManagement />} />
-                    <Route path="/templates/designer/:templateId" element={<TemplateDesigner />} />
-                    <Route path="/templates/designer" element={<TemplateDesigner />} />
-                    <Route path="*" element={<Navigate to="/templates" replace />} />
-                </Routes>
-            </div>
-        </BrowserRouter>
+        <div id="app">
+            <Routes>
+                <Route path="/templates" element={<TemplateManagement />} />
+                <Route path="/templates/designer/:templateId" element={<TemplateDesigner />} />
+                <Route path="/templates/designer" element={<TemplateDesigner />} />
+                <Route path="*" element={<Navigate to="/templates" replace />} />
+            </Routes>
+        </div>
     );
 };
 
