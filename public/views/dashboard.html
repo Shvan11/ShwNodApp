@@ -27,10 +27,14 @@
       import React from 'react';
       import ReactDOM from 'react-dom/client';
       import DashboardApp from '/js/apps/DashboardApp.jsx';
+      import tabManager from '/js/utils/tab-manager.js';
 
       document.addEventListener('DOMContentLoaded', function() {
         // Name this window so tabManager can reuse it
         window.name = 'clinic_dashboard';
+
+        // Register this tab with heartbeat system
+        tabManager.register('dashboard');
 
         const root = document.getElementById('dashboard-root');
         if (root) {

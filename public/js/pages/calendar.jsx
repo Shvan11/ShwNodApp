@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import AppointmentCalendar from '../components/react/AppointmentCalendar.jsx'
 import UniversalHeader from '../components/react/UniversalHeader.jsx'
+import tabManager from '../utils/tab-manager.js'
 import '../../css/base/variables.css'
 import '../../css/base/reset.css'
 import '../../css/base/typography.css'
@@ -16,6 +17,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Name this window so tabManager can reuse it
         window.name = 'clinic_calendar';
+
+        // Register this tab with heartbeat system
+        tabManager.register('calendar');
 
         // Get URL parameters for initial state
         const urlParams = new URLSearchParams(window.location.search);

@@ -8,13 +8,22 @@ const UniversalHeader = () => {
     const [searchResults, setSearchResults] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [allPatients, setAllPatients] = useState([]);
-    
+    const [isPatientTabOpen, setIsPatientTabOpen] = useState(false);
+
     const searchTimeoutRef = useRef(null);
 
     useEffect(() => {
         loadPatientData();
         setupNavigationContext();
         // loadAllPatients(); // Temporarily disabled - endpoint doesn't exist
+    }, []);
+
+    // Subscribe to patient tab state changes (event-driven)
+    useEffect(() => {
+        const unsubscribe = tabManager.subscribe('patient', (isOpen) => {
+            setIsPatientTabOpen(isOpen);
+        });
+        return unsubscribe;
     }, []);
 
     const loadPatientData = () => {
@@ -153,6 +162,11 @@ const UniversalHeader = () => {
         tabManager.openOrFocus('/appointments', 'appointments');
     };
 
+    const focusPatientTab = () => {
+        // Focus existing patient tab without navigating (no URL)
+        // Uses empty URL to prevent refresh
+        tabManager.openOrFocus('', 'patient');
+    };
 
     // Header navigation items configuration
     const getNavigationItems = () => {
@@ -178,6 +192,14 @@ const UniversalHeader = () => {
                 onClick: () => tabManager.openOrFocus('/patient-management', 'patient_management'),
                 isActive: window.location.pathname.includes('/patient-management')
             },
+            {
+                key: 'patient-tab',
+                label: 'Patient Tab',
+                icon: 'fas fa-user-circle',
+                onClick: focusPatientTab,
+                disabled: !isPatientTabOpen,
+                isActive: false
+            },
         ];
     };
 
@@ -197,8 +219,9 @@ const UniversalHeader = () => {
                         {getNavigationItems().map(item => (
                             <button
                                 key={item.key}
-                                className={`nav-btn ${item.isActive ? 'active' : ''}`}
+                                className={`nav-btn ${item.isActive ? 'active' : ''} ${item.disabled ? 'disabled' : ''}`}
                                 onClick={item.onClick}
+                                disabled={item.disabled}
                             >
                                 <i className={item.icon} />
                                 <span>{item.label}</span>
