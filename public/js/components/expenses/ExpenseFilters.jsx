@@ -40,90 +40,128 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
     };
 
     return (
-        <div className="patient-filter-box">
-            <div className="filter-row">
-                <div className="filter-group">
-                    <label htmlFor="filter-start-date">Start Date</label>
+        <div className="modern-filter-card">
+            <div className="filter-card-header">
+                <div className="filter-header-content">
+                    <i className="fas fa-filter"></i>
+                    <h3>Filter Expenses</h3>
+                </div>
+                <button
+                    type="button"
+                    className="btn-reset-inline"
+                    onClick={onReset}
+                    title="Reset all filters"
+                >
+                    <i className="fas fa-redo"></i>
+                </button>
+            </div>
+
+            <div className="modern-filter-grid">
+                <div className="modern-filter-group">
+                    <label htmlFor="filter-start-date">
+                        <i className="fas fa-calendar-alt"></i>
+                        Start Date
+                    </label>
                     <input
                         type="date"
                         id="filter-start-date"
+                        className="modern-input"
                         value={filters.startDate || ''}
                         onChange={(e) => handleInputChange('startDate', e.target.value)}
                     />
                 </div>
 
-                <div className="filter-group">
-                    <label htmlFor="filter-end-date">End Date</label>
+                <div className="modern-filter-group">
+                    <label htmlFor="filter-end-date">
+                        <i className="fas fa-calendar-alt"></i>
+                        End Date
+                    </label>
                     <input
                         type="date"
                         id="filter-end-date"
+                        className="modern-input"
                         value={filters.endDate || ''}
                         onChange={(e) => handleInputChange('endDate', e.target.value)}
                     />
                 </div>
 
-                <div className="filter-group">
-                    <label htmlFor="filter-category">Category</label>
-                    <select
-                        id="filter-category"
-                        value={filters.categoryId || ''}
-                        onChange={(e) => handleCategoryChange(e.target.value)}
-                    >
-                        <option value="">All Categories</option>
-                        {categories.map(cat => (
-                            <option key={cat.CategoryID} value={cat.CategoryID}>
-                                {cat.CategoryName}
-                            </option>
-                        ))}
-                    </select>
+                <div className="modern-filter-group">
+                    <label htmlFor="filter-category">
+                        <i className="fas fa-folder"></i>
+                        Category
+                    </label>
+                    <div className="select-wrapper">
+                        <select
+                            id="filter-category"
+                            className="modern-select"
+                            value={filters.categoryId || ''}
+                            onChange={(e) => handleCategoryChange(e.target.value)}
+                        >
+                            <option value="">All Categories</option>
+                            {categories.map(cat => (
+                                <option key={cat.CategoryID} value={cat.CategoryID}>
+                                    {cat.CategoryName}
+                                </option>
+                            ))}
+                        </select>
+                        <i className="fas fa-chevron-down select-icon"></i>
+                    </div>
                 </div>
 
-                <div className="filter-group">
-                    <label htmlFor="filter-subcategory">Subcategory</label>
-                    <select
-                        id="filter-subcategory"
-                        value={filters.subcategoryId || ''}
-                        onChange={(e) => handleInputChange('subcategoryId', e.target.value)}
-                        disabled={!filters.categoryId}
-                    >
-                        <option value="">All Subcategories</option>
-                        {subcategories.map(sub => (
-                            <option key={sub.SubcategoryID} value={sub.SubcategoryID}>
-                                {sub.SubcategoryName}
-                            </option>
-                        ))}
-                    </select>
+                <div className="modern-filter-group">
+                    <label htmlFor="filter-subcategory">
+                        <i className="fas fa-tag"></i>
+                        Subcategory
+                    </label>
+                    <div className="select-wrapper">
+                        <select
+                            id="filter-subcategory"
+                            className="modern-select"
+                            value={filters.subcategoryId || ''}
+                            onChange={(e) => handleInputChange('subcategoryId', e.target.value)}
+                            disabled={!filters.categoryId}
+                        >
+                            <option value="">All Subcategories</option>
+                            {subcategories.map(sub => (
+                                <option key={sub.SubcategoryID} value={sub.SubcategoryID}>
+                                    {sub.SubcategoryName}
+                                </option>
+                            ))}
+                        </select>
+                        <i className="fas fa-chevron-down select-icon"></i>
+                    </div>
                 </div>
 
-                <div className="filter-group">
-                    <label htmlFor="filter-currency">Currency</label>
-                    <select
-                        id="filter-currency"
-                        value={filters.currency || ''}
-                        onChange={(e) => handleInputChange('currency', e.target.value)}
-                    >
-                        <option value="">All Currencies</option>
-                        <option value="IQD">IQD</option>
-                        <option value="USD">USD</option>
-                    </select>
+                <div className="modern-filter-group">
+                    <label htmlFor="filter-currency">
+                        <i className="fas fa-dollar-sign"></i>
+                        Currency
+                    </label>
+                    <div className="select-wrapper">
+                        <select
+                            id="filter-currency"
+                            className="modern-select"
+                            value={filters.currency || ''}
+                            onChange={(e) => handleInputChange('currency', e.target.value)}
+                        >
+                            <option value="">All Currencies</option>
+                            <option value="IQD">IQD</option>
+                            <option value="USD">USD</option>
+                        </select>
+                        <i className="fas fa-chevron-down select-icon"></i>
+                    </div>
                 </div>
-            </div>
 
-            <div className="action-buttons">
-                <button
-                    type="button"
-                    className="btn-action btn-secondary"
-                    onClick={onReset}
-                >
-                    Reset Filters
-                </button>
-                <button
-                    type="button"
-                    className="btn-action btn-primary"
-                    onClick={onApply}
-                >
-                    Apply Filters
-                </button>
+                <div className="modern-filter-actions">
+                    <button
+                        type="button"
+                        className="btn-modern btn-modern-primary"
+                        onClick={onApply}
+                    >
+                        <i className="fas fa-check"></i>
+                        Apply Filters
+                    </button>
+                </div>
             </div>
         </div>
     );

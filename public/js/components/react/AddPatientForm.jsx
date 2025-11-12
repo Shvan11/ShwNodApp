@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react'
 
-const AddPatientForm = () => {
+const AddPatientForm = ({ onSuccess, onCancel }) => {
     const [formData, setFormData] = useState({
         patientName: '',
         patientID: '',
@@ -80,12 +80,12 @@ const AddPatientForm = () => {
         }));
     };
 
-    const showAlert = (message, type = 'danger', redirect = null) => {
+    const showAlert = (message, type = 'danger', personId = null) => {
         setAlert({ show: true, message, type });
 
-        if (type === 'success' && redirect) {
+        if (type === 'success' && personId) {
             setTimeout(() => {
-                window.location.href = redirect;
+                onSuccess(personId);
             }, 1500);
         }
     };
@@ -123,7 +123,7 @@ const AddPatientForm = () => {
                 showAlert(
                     `Patient "${formData.patientName}" has been successfully added. Redirecting to works page...`,
                     'success',
-                    `/patient/${personId}/works`
+                    personId
                 );
             } else {
                 showAlert(result.error || 'Failed to add patient. Please try again.');
@@ -480,10 +480,10 @@ const AddPatientForm = () => {
 
                 {/* Form Actions */}
                 <div className="form-actions">
-                    <button 
-                        type="button" 
-                        className="btn btn-secondary" 
-                        onClick={() => window.history.back()}
+                    <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={onCancel}
                         disabled={loading}
                     >
                         <i className="fas fa-times"></i>

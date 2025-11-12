@@ -6227,6 +6227,21 @@ router.get('/expenses/:id', async (req, res) => {
 /**
  * Get all expense categories
  */
+router.get('/expenses/categories', async (req, res) => {
+    try {
+        const categories = await getExpenseCategories();
+        res.json(categories);
+    } catch (error) {
+        console.error('Error fetching expense categories:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch expense categories',
+            message: error.message
+        });
+    }
+});
+
+// Legacy route - kept for backwards compatibility
 router.get('/expenses-categories', async (req, res) => {
     try {
         const categories = await getExpenseCategories();
@@ -6242,9 +6257,24 @@ router.get('/expenses-categories', async (req, res) => {
 });
 
 /**
- * Get expense subcategories (optionally filtered by category)
- * Query params: categoryId (optional)
+ * Get expense subcategories by category ID
  */
+router.get('/expenses/subcategories/:categoryId', async (req, res) => {
+    try {
+        const categoryId = parseInt(req.params.categoryId);
+        const subcategories = await getExpenseSubcategories(categoryId);
+        res.json(subcategories);
+    } catch (error) {
+        console.error('Error fetching expense subcategories:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch expense subcategories',
+            message: error.message
+        });
+    }
+});
+
+// Legacy route - kept for backwards compatibility
 router.get('/expenses-subcategories', async (req, res) => {
     try {
         const categoryId = req.query.categoryId ? parseInt(req.query.categoryId) : null;
@@ -6367,6 +6397,35 @@ router.delete('/expenses/:id', async (req, res) => {
  * Get expense summary by category and currency
  * Query params: startDate, endDate (required)
  */
+router.get('/expenses/summary', async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+
+        if (!startDate || !endDate) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required parameters: startDate, endDate'
+            });
+        }
+
+        const summary = await getExpenseSummary(startDate, endDate);
+        const totals = await getExpenseTotalsByCurrency(startDate, endDate);
+
+        res.json({
+            summary,
+            totals
+        });
+    } catch (error) {
+        console.error('Error fetching expense summary:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch expense summary',
+            message: error.message
+        });
+    }
+});
+
+// Legacy route - kept for backwards compatibility
 router.get('/expenses-summary', async (req, res) => {
     try {
         const { startDate, endDate } = req.query;

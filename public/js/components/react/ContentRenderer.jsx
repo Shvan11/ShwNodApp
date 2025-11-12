@@ -11,6 +11,7 @@ import WorkComponent from './WorkComponent.jsx'
 import NewWorkComponent from './NewWorkComponent.jsx'
 import EditPatientComponent from './EditPatientComponent.jsx'
 import PatientAppointments from './PatientAppointments.jsx'
+import AddPatientForm from './AddPatientForm.jsx'
 import '../../../css/components/new-work-component.css'
 
 const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
@@ -179,6 +180,27 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
                 return (
                     <EditPatientComponent
                         patientId={patientId}
+                    />
+                );
+
+            case 'add':
+                // Add new patient form (when patientId is "new")
+                return (
+                    <AddPatientForm
+                        onSuccess={(newPatientId) => {
+                            console.log('Patient created successfully with ID:', newPatientId);
+                            // Navigate to the new patient's works page
+                            if (newPatientId) {
+                                navigate(`/patient/${newPatientId}/works`);
+                            } else {
+                                // Fallback to patient management if no ID returned
+                                navigate('/patient-management');
+                            }
+                        }}
+                        onCancel={() => {
+                            // Go back to patient management
+                            navigate('/patient-management');
+                        }}
                     />
                 );
 

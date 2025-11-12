@@ -9,8 +9,12 @@ import ExpenseTable from '../components/expenses/ExpenseTable.jsx';
 import ExpenseSummary from '../components/expenses/ExpenseSummary.jsx';
 import ExpenseModal from '../components/expenses/ExpenseModal.jsx';
 import DeleteConfirmModal from '../components/expenses/DeleteConfirmModal.jsx';
+import { ToastContainer, useToast } from '../components/expenses/Toast.jsx';
 
 export default function ExpensesApp() {
+    // Toast notifications
+    const toast = useToast();
+
     // State for filters
     const [filters, setFilters] = useState({
         startDate: null,
@@ -99,7 +103,7 @@ export default function ExpensesApp() {
             setIsExpenseModalOpen(true);
         } catch (err) {
             console.error('Error loading expense:', err);
-            showNotification('Failed to load expense data', 'error');
+            toast.error('Failed to load expense data');
         }
     };
 
@@ -117,17 +121,16 @@ export default function ExpensesApp() {
         try {
             if (currentExpense) {
                 await updateExpense(currentExpense.ID, expenseData);
-                showNotification('Expense updated successfully', 'success');
+                toast.success('Expense updated successfully');
             } else {
                 await createExpense(expenseData);
-                showNotification('Expense created successfully', 'success');
+                toast.success('Expense created successfully');
             }
             setIsExpenseModalOpen(false);
             setCurrentExpense(null);
         } catch (err) {
-            showNotification(
-                currentExpense ? 'Failed to update expense' : 'Failed to create expense',
-                'error'
+            toast.error(
+                currentExpense ? 'Failed to update expense' : 'Failed to create expense'
             );
         }
     };
@@ -138,23 +141,17 @@ export default function ExpensesApp() {
 
         try {
             await deleteExpense(expenseToDelete.ID);
-            showNotification('Expense deleted successfully', 'success');
+            toast.success('Expense deleted successfully');
             setIsDeleteModalOpen(false);
             setExpenseToDelete(null);
         } catch (err) {
-            showNotification('Failed to delete expense', 'error');
+            toast.error('Failed to delete expense');
         }
     };
 
-    // Show notification (simple alert for now - can be enhanced with toast library)
-    const showNotification = (message, type) => {
-        // TODO: Replace with proper toast notification system
-        alert(message);
-    };
-
     return (
-        <div className="aligner-container">
-            <div className="page-header">
+        <div className="expenses-container">
+            <div className="expenses-page-header">
                 <h1>Expense Management</h1>
                 <button
                     className="btn-action btn-primary"
@@ -219,6 +216,9 @@ export default function ExpensesApp() {
                     setExpenseToDelete(null);
                 }}
             />
+
+            {/* Toast Notifications */}
+            <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
         </div>
     );
 }
