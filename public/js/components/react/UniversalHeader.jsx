@@ -197,13 +197,28 @@ const UniversalHeader = () => {
         tabManager.openOrFocus('', 'patient');
     };
 
-    const exitFullscreen = () => {
-        if (document.fullscreenElement) {
-            document.exitFullscreen();
-        } else if (document.webkitFullscreenElement) {
-            document.webkitExitFullscreen();
-        } else if (document.mozFullScreenElement) {
-            document.mozCancelFullScreen();
+    const toggleFullscreen = () => {
+        if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
+            // Exit fullscreen
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            }
+        } else {
+            // Enter fullscreen
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen();
+            } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen();
+            } else if (elem.mozRequestFullScreen) {
+                elem.mozRequestFullScreen();
+            } else if (elem.msRequestFullscreen) {
+                elem.msRequestFullscreen();
+            }
         }
     };
 
@@ -332,13 +347,13 @@ const UniversalHeader = () => {
                         )}
                     </div>
 
-                    {/* Fullscreen Exit Button */}
+                    {/* Fullscreen Toggle Button */}
                     <button
                         className="fullscreen-btn"
-                        onClick={exitFullscreen}
-                        title="Exit Fullscreen (ESC)"
+                        onClick={toggleFullscreen}
+                        title={isFullscreen ? "Exit Fullscreen (ESC)" : "Enter Fullscreen (F11)"}
                     >
-                        <i className={isFullscreen ? "fas fa-compress" : "fas fa-compress-alt"} />
+                        <i className={isFullscreen ? "fas fa-compress" : "fas fa-expand"} />
                     </button>
 
                     {/* Back Button */}
