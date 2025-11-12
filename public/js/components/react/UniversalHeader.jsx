@@ -16,6 +16,9 @@ const UniversalHeader = () => {
         loadPatientData();
         setupNavigationContext();
         // loadAllPatients(); // Temporarily disabled - endpoint doesn't exist
+
+        // Cleanup: Remove any legacy fullscreen preference from localStorage
+        localStorage.removeItem('preferFullscreen');
     }, []);
 
     // Subscribe to patient tab state changes (event-driven)
