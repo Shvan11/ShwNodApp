@@ -13,7 +13,7 @@ const DashboardApp = () => {
       '/settings': 'settings',
       '/expenses': 'expenses',
       '/statistics': 'statistics',
-      '/template-management': 'templates'
+      '/templates': 'templates'
     };
     return nameMap[link] || null;
   };
@@ -82,7 +82,7 @@ const DashboardApp = () => {
       title: 'Document Templates',
       description: 'Manage receipts, invoices, and prescription templates',
       icon: 'fas fa-file-alt',
-      link: '/template-management',
+      link: '/templates',
       linkText: 'Manage Templates',
       borderClass: 'border-left-purple',
       gradientClass: 'gradient-purple'

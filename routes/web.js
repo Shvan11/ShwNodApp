@@ -106,19 +106,18 @@ router.get('/statistics', (_, res) => {
   serveWithFallback(res, '/views/statistics.html', 'Statistics not found');
 });
 
-// Template Management (Legacy - Vanilla JS)
-router.get('/template-management', (_, res) => {
-  serveWithFallback(res, '/views/template-management.html', 'Template management not found');
-});
-
-// Template Designer (Legacy - Vanilla JS)
-router.get('/template-designer', (_, res) => {
-  serveWithFallback(res, '/template-designer.html', 'Template designer not found');
-});
-
-// Templates (New React App with Router - handles /templates, /templates/designer/:id)
+// Templates (React App with Router - handles /templates, /templates/designer/:id)
 router.get('/templates*', (_, res) => {
   serveWithFallback(res, '/views/templates.html', 'Templates not found');
+});
+
+// Legacy redirects (for backward compatibility)
+router.get('/template-management', (_, res) => {
+  res.redirect(301, '/templates');
+});
+
+router.get('/template-designer', (_, res) => {
+  res.redirect(301, '/templates');
 });
 
 // ==============================
