@@ -2,7 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import singleSpaReact from 'single-spa-react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import SettingsComponent from '../components/react/SettingsComponent.jsx';
 
 /**
@@ -14,24 +14,37 @@ import SettingsComponent from '../components/react/SettingsComponent.jsx';
  */
 const SettingsApp = () => {
     return (
-        <Routes>
-            {/* Settings with specific tab */}
-            <Route path="/settings/:tab" element={<SettingsComponent />} />
+        <BrowserRouter>
+            <Routes>
+                {/* Settings with specific tab */}
+                <Route path="/settings/:tab" element={<SettingsComponent />} />
 
-            {/* Default settings route - redirect to general tab */}
-            <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
+                {/* Default settings route - redirect to general tab */}
+                <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
 
-            {/* Redirect unknown routes to general settings */}
-            <Route path="*" element={<Navigate to="/settings/general" replace />} />
-        </Routes>
+                {/* Redirect unknown routes to general settings */}
+                <Route path="*" element={<Navigate to="/settings/general" replace />} />
+            </Routes>
+        </BrowserRouter>
     );
 };
 
 // Single-SPA Lifecycle Exports
+
 const lifecycles = singleSpaReact({
     React,
     ReactDOM,
     rootComponent: SettingsApp,
+    renderType: 'createRoot', // React 18 API
+  domElementGetter: () => {
+    let el = document.getElementById('settings-app-container');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'settings-app-container';
+      document.getElementById('app-container')?.appendChild(el) || document.body.appendChild(el);
+    }
+    return el;
+  },
     errorBoundary(err, info, props) {
         console.error('[SettingsApp] Error:', err);
         return (
@@ -44,4 +57,3 @@ const lifecycles = singleSpaReact({
 });
 
 export const { bootstrap, mount, unmount } = lifecycles;
-export default SettingsApp;

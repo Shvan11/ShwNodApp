@@ -16,7 +16,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import UniversalHeader from '../components/react/UniversalHeader.jsx';
 import DailyAppointmentsApp from '../apps/DailyAppointmentsApp.jsx';
-import tabManager from '../utils/tab-manager.js';
 import '../../css/pages/appointments.css';
 import '../../css/components/universal-header.css';
 
@@ -28,7 +27,6 @@ document.addEventListener('DOMContentLoaded', function() {
     window.name = 'clinic_appointments';
 
     // Register this tab as singleton - only one appointments tab should exist
-    tabManager.register('appointments');
 
     // Mount Universal Header
     const headerRoot = document.getElementById('universal-header-root');

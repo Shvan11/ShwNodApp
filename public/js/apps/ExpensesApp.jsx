@@ -230,6 +230,16 @@ const lifecycles = singleSpaReact({
     React,
     ReactDOM,
     rootComponent: ExpensesApp,
+    renderType: 'createRoot', // React 18 API
+  domElementGetter: () => {
+    let el = document.getElementById('expenses-app-container');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'expenses-app-container';
+      document.getElementById('app-container')?.appendChild(el) || document.body.appendChild(el);
+    }
+    return el;
+  },
     errorBoundary(err, info, props) {
         console.error('[ExpensesApp] Error:', err);
         return (

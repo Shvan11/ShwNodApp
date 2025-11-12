@@ -77,6 +77,16 @@ const lifecycles = singleSpaReact({
     React,
     ReactDOM,
     rootComponent: WhatsAppAuthApp,
+    renderType: 'createRoot', // React 18 API
+  domElementGetter: () => {
+    let el = document.getElementById('whats-app-auth-app-container');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'whats-app-auth-app-container';
+      document.getElementById('app-container')?.appendChild(el) || document.body.appendChild(el);
+    }
+    return el;
+  },
     errorBoundary(err, info, props) {
         console.error('[WhatsAppAuthApp] Error:', err);
         return (

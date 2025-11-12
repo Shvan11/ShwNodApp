@@ -61,6 +61,11 @@ const apps = [
     app: () => import('/js/apps/DailyAppointmentsApp.jsx'),
     activeWhen: (location) => location.pathname === '/appointments',
   },
+  {
+    name: '@clinic/patient-management',
+    app: () => import('/js/apps/PatientManagementApp.jsx'),
+    activeWhen: (location) => location.pathname === '/patient-management',
+  },
 ];
 
 /**

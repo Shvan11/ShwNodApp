@@ -2,7 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import UniversalHeader from '../components/react/UniversalHeader.jsx';
 import PatientApp from '../apps/PatientApp.jsx';
-import tabManager from '../utils/tab-manager.js';
 import '../../css/main.css';
 import '../../css/pages/grid.css';
 import '../../css/pages/work-payments.css';
@@ -27,7 +26,6 @@ document.addEventListener('DOMContentLoaded', function() {
     window.name = 'clinic_patient';
 
     // Register this tab with heartbeat system - enables detection from other tabs
-    tabManager.register('patient');
 
     // Mount Universal Header
     const headerRoot = document.getElementById('universal-header-root');

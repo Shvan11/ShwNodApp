@@ -256,6 +256,16 @@ const lifecycles = singleSpaReact({
     React,
     ReactDOM,
     rootComponent: WhatsAppSendApp,
+    renderType: 'createRoot', // React 18 API
+  domElementGetter: () => {
+    let el = document.getElementById('whats-app-send-app-container');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'whats-app-send-app-container';
+      document.getElementById('app-container')?.appendChild(el) || document.body.appendChild(el);
+    }
+    return el;
+  },
     errorBoundary(err, info, props) {
         console.error('[WhatsAppSendApp] Error:', err);
         return (

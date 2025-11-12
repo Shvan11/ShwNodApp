@@ -2,7 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import UniversalHeader from '../components/react/UniversalHeader.jsx';
 import AlignerApp from '../apps/AlignerApp.jsx';
-import tabManager from '../utils/tab-manager.js';
 import '../../css/main.css';
 import '../../css/pages/aligner.css';
 import '../../css/components/universal-header.css';
@@ -15,7 +14,6 @@ document.addEventListener('DOMContentLoaded', function() {
     window.name = 'clinic_aligner';
 
     // Register this tab with heartbeat system
-    tabManager.register('aligner');
 
     // Mount Universal Header
     const headerRoot = document.getElementById('universal-header-root');

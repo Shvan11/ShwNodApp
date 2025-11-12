@@ -50,13 +50,12 @@ export default defineConfig({
     rollupOptions: {
       input: {
         // Single entry point for the entire SPA
-        main: resolve(__dirname, 'public/index-spa.html'),
+        main: resolve(__dirname, 'public/index.html'),
       },
       output: {
         // Code splitting by app for optimal loading
         manualChunks: {
           'vendor': ['react', 'react-dom', 'react-router-dom'],
-          'single-spa': ['single-spa', 'single-spa-react'],
         }
       }
     }
@@ -90,21 +89,21 @@ export default defineConfig({
         changeOrigin: true
       }
     },
-    // SPA history fallback - serve index-spa.html for all routes
+    // SPA history fallback - serve index.html for all routes
     historyApiFallback: {
       rewrites: [
-        { from: /^\/dashboard/, to: '/index-spa.html' },
-        { from: /^\/patient/, to: '/index-spa.html' },
-        { from: /^\/expenses/, to: '/index-spa.html' },
-        { from: /^\/send/, to: '/index-spa.html' },
-        { from: /^\/auth/, to: '/index-spa.html' },
-        { from: /^\/aligner/, to: '/index-spa.html' },
-        { from: /^\/settings/, to: '/index-spa.html' },
-        { from: /^\/templates/, to: '/index-spa.html' },
-        { from: /^\/appointments/, to: '/index-spa.html' },
-        { from: /^\/calendar/, to: '/index-spa.html' },
-        { from: /^\/statistics/, to: '/index-spa.html' },
-        { from: /^\/patient-management/, to: '/index-spa.html' },
+        { from: /^\/dashboard/, to: '/index.html' },
+        { from: /^\/patient/, to: '/index.html' },
+        { from: /^\/expenses/, to: '/index.html' },
+        { from: /^\/send/, to: '/index.html' },
+        { from: /^\/auth/, to: '/index.html' },
+        { from: /^\/aligner/, to: '/index.html' },
+        { from: /^\/settings/, to: '/index.html' },
+        { from: /^\/templates/, to: '/index.html' },
+        { from: /^\/appointments/, to: '/index.html' },
+        { from: /^\/calendar/, to: '/index.html' },
+        { from: /^\/statistics/, to: '/index.html' },
+        { from: /^\/patient-management/, to: '/index.html' },
       ]
     }
   },
@@ -116,7 +115,7 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['react', 'react-dom'],
+    include: ['react', 'react-dom', 'single-spa'],
     exclude: ['grapesjs', 'grapesjs-preset-newsletter']
   }
 })

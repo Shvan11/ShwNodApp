@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import tabManager from '../../../utils/tab-manager.js';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * AppointmentCard Component
@@ -53,12 +53,14 @@ const AppointmentCard = ({
     // Check if patient is waiting (Present but not Seated and not Dismissed)
     const isWaiting = showStatus && appointment.Present && !appointment.Seated && !appointment.Dismissed;
 
-    // Open patient in single reusable patient tab
+    const navigate = useNavigate();
+
+    // Open patient using React Router navigation
     const handlePatientClick = (e) => {
         e.preventDefault();
         e.stopPropagation();
         if (appointment.PersonID) {
-            tabManager.openOrFocus(`/patient/${appointment.PersonID}/works`, 'patient');
+            navigate(`/patient/${appointment.PersonID}/works`);
         }
     };
 

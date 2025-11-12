@@ -1,10 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import singleSpaReact from 'single-spa-react';
-import { useNavigate } from 'react-router-dom';
-import '../../css/pages/dashboard.css';
+import { BrowserRouter, useNavigate } from 'react-router-dom';
 
-const DashboardApp = () => {
+const DashboardAppContent = () => {
   const navigate = useNavigate();
 
   const handleCardClick = (e, link) => {
@@ -164,11 +163,31 @@ const DashboardApp = () => {
   );
 };
 
-// Single-SPA Lifecycle Exports
+// Wrapper component with BrowserRouter
+const DashboardApp = () => {
+  return (
+    <BrowserRouter>
+      <DashboardAppContent />
+    </BrowserRouter>
+  );
+};
+
+// Single-SPA Lifecycle - React 18 Compatible
 const lifecycles = singleSpaReact({
   React,
   ReactDOM,
   rootComponent: DashboardApp,
+  renderType: 'createRoot', // React 18 API
+  domElementGetter: () => {
+    // Get or create container element
+    let el = document.getElementById('dashboard-app-container');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'dashboard-app-container';
+      document.getElementById('app-container')?.appendChild(el) || document.body.appendChild(el);
+    }
+    return el;
+  },
   errorBoundary(err, info, props) {
     console.error('[DashboardApp] Error:', err);
     return (
@@ -181,4 +200,3 @@ const lifecycles = singleSpaReact({
 });
 
 export const { bootstrap, mount, unmount } = lifecycles;
-export default DashboardApp;

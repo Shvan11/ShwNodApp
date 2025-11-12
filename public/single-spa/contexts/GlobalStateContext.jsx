@@ -33,7 +33,11 @@ export function GlobalStateProvider({ children }) {
   useEffect(() => {
     console.log('[GlobalState] Initializing WebSocket connection');
 
-    const ws = createWebSocketConnection();
+    // Create a new WebSocket instance for this SPA session
+    const ws = createWebSocketConnection({
+      debug: true,
+      autoConnect: false
+    });
 
     // Set up connection event listeners
     ws.on('connection_established', () => {
@@ -62,7 +66,13 @@ export function GlobalStateProvider({ children }) {
       setWhatsappQrCode(data.qr);
     });
 
+    // Store WebSocket instance in state
     setWebsocket(ws);
+
+    // Connect to WebSocket server
+    ws.connect().catch(error => {
+      console.error('[GlobalState] Failed to connect WebSocket:', error);
+    });
 
     // Cleanup on unmount (only when entire app closes)
     return () => {

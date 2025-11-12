@@ -2,7 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import singleSpaReact from 'single-spa-react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import PatientShell from '../components/react/PatientShell.jsx';
 
 /**
@@ -22,24 +22,37 @@ import PatientShell from '../components/react/PatientShell.jsx';
  */
 const PatientApp = () => {
     return (
-        <Routes>
-            {/* Patient routes with page parameter - handles both simple and nested pages */}
-            <Route path="/patient/:patientId/:page/*" element={<PatientShell />} />
+        <BrowserRouter>
+            <Routes>
+                {/* Patient routes with page parameter - handles both simple and nested pages */}
+                <Route path="/patient/:patientId/:page/*" element={<PatientShell />} />
 
-            {/* Default patient route - redirect to works page */}
-            <Route path="/patient/:patientId" element={<Navigate to="works" replace />} />
+                {/* Default patient route - redirect to works page */}
+                <Route path="/patient/:patientId" element={<Navigate to="works" replace />} />
 
-            {/* Redirect unknown routes to patient management */}
-            <Route path="*" element={<Navigate to="/patient-management" replace />} />
-        </Routes>
+                {/* Redirect unknown routes to patient management */}
+                <Route path="*" element={<Navigate to="/patient-management" replace />} />
+            </Routes>
+        </BrowserRouter>
     );
 };
 
 // Single-SPA Lifecycle Exports
+
 const lifecycles = singleSpaReact({
     React,
     ReactDOM,
     rootComponent: PatientApp,
+    renderType: 'createRoot', // React 18 API
+  domElementGetter: () => {
+    let el = document.getElementById('patient-app-container');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'patient-app-container';
+      document.getElementById('app-container')?.appendChild(el) || document.body.appendChild(el);
+    }
+    return el;
+  },
     errorBoundary(err, info, props) {
         console.error('[PatientApp] Error:', err);
         return (
@@ -52,4 +65,3 @@ const lifecycles = singleSpaReact({
 });
 
 export const { bootstrap, mount, unmount } = lifecycles;
-export default PatientApp;

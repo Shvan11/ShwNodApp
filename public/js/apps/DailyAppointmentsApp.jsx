@@ -2,6 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import singleSpaReact from 'single-spa-react';
+import { BrowserRouter } from 'react-router-dom';
 import DailyAppointments from '../components/react/appointments/DailyAppointments.jsx';
 
 /**
@@ -19,14 +20,29 @@ import DailyAppointments from '../components/react/appointments/DailyAppointment
  * Route: /appointments or /daily-appointments
  */
 const DailyAppointmentsApp = () => {
-    return <DailyAppointments />;
+    return (
+        <BrowserRouter>
+            <DailyAppointments />
+        </BrowserRouter>
+    );
 };
+
 
 // Single-SPA Lifecycle Exports
 const lifecycles = singleSpaReact({
     React,
     ReactDOM,
     rootComponent: DailyAppointmentsApp,
+    renderType: 'createRoot', // React 18 API
+  domElementGetter: () => {
+    let el = document.getElementById('daily-appointments-app-container');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'daily-appointments-app-container';
+      document.getElementById('app-container')?.appendChild(el) || document.body.appendChild(el);
+    }
+    return el;
+  },
     errorBoundary(err, info, props) {
         console.error('[DailyAppointmentsApp] Error:', err);
         return (
@@ -39,4 +55,3 @@ const lifecycles = singleSpaReact({
 });
 
 export const { bootstrap, mount, unmount } = lifecycles;
-export default DailyAppointmentsApp;

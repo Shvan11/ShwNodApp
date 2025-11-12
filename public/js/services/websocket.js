@@ -820,7 +820,29 @@ class WebSocketService extends EventEmitter {
   }
 }
 
-// Export singleton instance
+/**
+ * Factory function to create a new WebSocket connection
+ * Industry-standard pattern for dependency injection and testing
+ * @param {Object} options - WebSocket configuration options
+ * @returns {WebSocketService} - New WebSocket service instance
+ */
+export function createWebSocketConnection(options = {}) {
+  return new WebSocketService({
+    debug: true,
+    autoConnect: false,
+    ...options
+  });
+}
+
+/**
+ * Export the WebSocketService class for advanced usage and testing
+ */
+export { WebSocketService };
+
+/**
+ * Default export: Singleton instance for simple usage
+ * Recommended for most use cases where a single shared connection is needed
+ */
 export default new WebSocketService({
   debug: true,
   autoConnect: false
