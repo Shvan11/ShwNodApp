@@ -1,6 +1,8 @@
 // PatientApp.jsx - Patient Portal Router
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import ReactDOM from 'react-dom/client';
+import singleSpaReact from 'single-spa-react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import PatientShell from '../components/react/PatientShell.jsx';
 
 /**
@@ -20,19 +22,34 @@ import PatientShell from '../components/react/PatientShell.jsx';
  */
 const PatientApp = () => {
     return (
-        <BrowserRouter>
-            <Routes>
-                {/* Patient routes with page parameter - handles both simple and nested pages */}
-                <Route path="/patient/:patientId/:page/*" element={<PatientShell />} />
+        <Routes>
+            {/* Patient routes with page parameter - handles both simple and nested pages */}
+            <Route path="/patient/:patientId/:page/*" element={<PatientShell />} />
 
-                {/* Default patient route - redirect to works page */}
-                <Route path="/patient/:patientId" element={<Navigate to="works" replace />} />
+            {/* Default patient route - redirect to works page */}
+            <Route path="/patient/:patientId" element={<Navigate to="works" replace />} />
 
-                {/* Redirect unknown routes to patient management */}
-                <Route path="*" element={<Navigate to="/patient-management" replace />} />
-            </Routes>
-        </BrowserRouter>
+            {/* Redirect unknown routes to patient management */}
+            <Route path="*" element={<Navigate to="/patient-management" replace />} />
+        </Routes>
     );
 };
 
+// Single-SPA Lifecycle Exports
+const lifecycles = singleSpaReact({
+    React,
+    ReactDOM,
+    rootComponent: PatientApp,
+    errorBoundary(err, info, props) {
+        console.error('[PatientApp] Error:', err);
+        return (
+            <div className="error-boundary">
+                <h2>Patient Portal Error</h2>
+                <p>Failed to load patient portal. Please refresh the page.</p>
+            </div>
+        );
+    },
+});
+
+export const { bootstrap, mount, unmount } = lifecycles;
 export default PatientApp;

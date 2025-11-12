@@ -3,6 +3,8 @@
  * Complete WhatsApp messaging system converted to React
  */
 import React, { useState, useCallback, useEffect } from 'react';
+import ReactDOM from 'react-dom/client';
+import singleSpaReact from 'single-spa-react';
 import { useDateManager } from '../hooks/useDateManager.js';
 import { useWhatsAppWebSocket } from '../hooks/useWhatsAppWebSocket.js';
 import { useMessageCount } from '../hooks/useMessageCount.js';
@@ -248,3 +250,21 @@ export default function WhatsAppSendApp() {
         </div>
     );
 }
+
+// Single-SPA Lifecycle Exports
+const lifecycles = singleSpaReact({
+    React,
+    ReactDOM,
+    rootComponent: WhatsAppSendApp,
+    errorBoundary(err, info, props) {
+        console.error('[WhatsAppSendApp] Error:', err);
+        return (
+            <div className="error-boundary">
+                <h2>WhatsApp Send Error</h2>
+                <p>Failed to load WhatsApp messaging. Please refresh the page.</p>
+            </div>
+        );
+    },
+});
+
+export const { bootstrap, mount, unmount } = lifecycles;

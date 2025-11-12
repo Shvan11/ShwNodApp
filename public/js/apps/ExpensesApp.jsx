@@ -3,6 +3,8 @@
  * Complete expense management system with CRUD operations
  */
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom/client';
+import singleSpaReact from 'single-spa-react';
 import { useExpenses, useExpenseMutations } from '../hooks/useExpenses.js';
 import ExpenseFilters from '../components/expenses/ExpenseFilters.jsx';
 import ExpenseTable from '../components/expenses/ExpenseTable.jsx';
@@ -222,3 +224,21 @@ export default function ExpensesApp() {
         </div>
     );
 }
+
+// Single-SPA Lifecycle Exports
+const lifecycles = singleSpaReact({
+    React,
+    ReactDOM,
+    rootComponent: ExpensesApp,
+    errorBoundary(err, info, props) {
+        console.error('[ExpensesApp] Error:', err);
+        return (
+            <div className="error-boundary">
+                <h2>Expenses Error</h2>
+                <p>Failed to load expenses. Please refresh the page.</p>
+            </div>
+        );
+    },
+});
+
+export const { bootstrap, mount, unmount } = lifecycles;

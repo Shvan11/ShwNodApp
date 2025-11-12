@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react'
-import tabManager from '../../utils/tab-manager.js'
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const UniversalHeader = () => {
+    const navigate = useNavigate();
+    const location = useLocation();
+
     const [currentPatient, setCurrentPatient] = useState(null);
     const [navigationContext, setNavigationContext] = useState(null);
     const [isSearchVisible, setIsSearchVisible] = useState(false);
     const [searchResults, setSearchResults] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [allPatients, setAllPatients] = useState([]);
-    const [isPatientTabOpen, setIsPatientTabOpen] = useState(false);
 
     const searchTimeoutRef = useRef(null);
 
@@ -19,15 +21,7 @@ const UniversalHeader = () => {
 
         // Cleanup: Remove any legacy fullscreen preference from localStorage
         localStorage.removeItem('preferFullscreen');
-    }, []);
-
-    // Subscribe to patient tab state changes (event-driven)
-    useEffect(() => {
-        const unsubscribe = tabManager.subscribe('patient', (isOpen) => {
-            setIsPatientTabOpen(isOpen);
-        });
-        return unsubscribe;
-    }, []);
+    }, [location.pathname]); // Re-run when route changes
 
     const loadPatientData = () => {
         const patientCode = extractPatientCodeFromURL();
@@ -45,7 +39,7 @@ const UniversalHeader = () => {
     };
 
     const extractPatientCodeFromURL = () => {
-        const path = window.location.pathname;
+        const path = location.pathname;
         const patientMatch = path.match(/\/patient\/(\d+)/);
         return patientMatch ? patientMatch[1] : null;
     };
@@ -130,9 +124,8 @@ const UniversalHeader = () => {
     };
 
     const navigateToPatient = (patientCode) => {
-        window.location.href = `/patient/${patientCode}/grid`;
+        navigate(`/patient/${patientCode}/grid`);
     };
-
 
     const navigateToSearch = () => {
         // Open the search dropdown instead of navigating immediately
@@ -142,41 +135,24 @@ const UniversalHeader = () => {
     const handleSearchSubmit = (e) => {
         if (e.key === 'Enter' && searchTerm.trim()) {
             // Navigate to patient-management with search term
-            window.location.href = `/patient-management?search=${encodeURIComponent(searchTerm.trim())}`;
+            navigate(`/patient-management?search=${encodeURIComponent(searchTerm.trim())}`);
         }
     };
 
     const navigateBack = () => {
-        if (navigationContext && navigationContext.breadcrumbs.length > 0) {
-            const lastBreadcrumb = navigationContext.breadcrumbs[navigationContext.breadcrumbs.length - 1];
-            window.location.href = lastBreadcrumb.url;
-        } else {
-            window.history.back();
-        }
+        window.history.back();
     };
 
     const navigateToDashboard = () => {
-        // Check if tab exists first - use empty URL for focus, full URL for new tab
-        const url = tabManager.isOpen('dashboard') ? '' : '/dashboard';
-        tabManager.openOrFocus(url, 'dashboard');
+        navigate('/dashboard');
     };
 
     const navigateToAppointments = () => {
-        // Check if tab exists first - use empty URL for focus, full URL for new tab
-        const url = tabManager.isOpen('appointments') ? '' : '/appointments';
-        tabManager.openOrFocus(url, 'appointments');
+        navigate('/appointments');
     };
 
     const navigateToPatientManagement = () => {
-        // Check if tab exists first - use empty URL for focus, full URL for new tab
-        const url = tabManager.isOpen('patient_management') ? '' : '/patient-management';
-        tabManager.openOrFocus(url, 'patient_management');
-    };
-
-    const focusPatientTab = () => {
-        // Focus existing patient tab without navigating (no URL)
-        // Uses empty URL to prevent refresh
-        tabManager.openOrFocus('', 'patient');
+        navigate('/patient-management');
     };
 
     // Header navigation items configuration
@@ -187,29 +163,21 @@ const UniversalHeader = () => {
                 label: 'Dashboard',
                 icon: 'fas fa-home',
                 onClick: navigateToDashboard,
-                isActive: window.location.pathname === '/' || window.location.pathname === '/dashboard'
+                isActive: location.pathname === '/' || location.pathname === '/dashboard'
             },
             {
                 key: 'appointments',
                 label: 'Appointments',
                 icon: 'fas fa-calendar-alt',
                 onClick: navigateToAppointments,
-                isActive: window.location.pathname.includes('/appointment')
+                isActive: location.pathname.includes('/appointment')
             },
             {
                 key: 'search',
                 label: 'Search',
                 icon: 'fas fa-search',
                 onClick: navigateToPatientManagement,
-                isActive: window.location.pathname.includes('/patient-management')
-            },
-            {
-                key: 'patient-tab',
-                label: 'Patient Tab',
-                icon: 'fas fa-user-circle',
-                onClick: focusPatientTab,
-                disabled: !isPatientTabOpen,
-                isActive: false
+                isActive: location.pathname.includes('/patient-management')
             },
         ];
     };
@@ -219,7 +187,7 @@ const UniversalHeader = () => {
             <div className="header-container">
                 {/* Header Left - Logo/Brand */}
                 <div className="header-left">
-                    <div className="logo-section" onClick={() => window.location.href = '/'}>
+                    <div className="logo-section" onClick={() => navigate('/')}>
                         <h1 className="clinic-name">Shwan Orthodontics</h1>
                     </div>
                 </div>
