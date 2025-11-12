@@ -9,6 +9,7 @@ const UniversalHeader = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [allPatients, setAllPatients] = useState([]);
     const [isPatientTabOpen, setIsPatientTabOpen] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
 
     const searchTimeoutRef = useRef(null);
 
@@ -24,6 +25,26 @@ const UniversalHeader = () => {
             setIsPatientTabOpen(isOpen);
         });
         return unsubscribe;
+    }, []);
+
+    // Track fullscreen state
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+
+        // Initial check
+        setIsFullscreen(!!document.fullscreenElement);
+
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+        };
     }, []);
 
     const loadPatientData = () => {
@@ -168,6 +189,16 @@ const UniversalHeader = () => {
         tabManager.openOrFocus('', 'patient');
     };
 
+    const exitFullscreen = () => {
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        } else if (document.webkitFullscreenElement) {
+            document.webkitExitFullscreen();
+        } else if (document.mozFullScreenElement) {
+            document.mozCancelFullScreen();
+        }
+    };
+
     // Header navigation items configuration
     const getNavigationItems = () => {
         return [
@@ -292,6 +323,17 @@ const UniversalHeader = () => {
                             </div>
                         )}
                     </div>
+
+                    {/* Fullscreen Exit Button */}
+                    {isFullscreen && (
+                        <button
+                            className="fullscreen-btn"
+                            onClick={exitFullscreen}
+                            title="Exit Fullscreen (ESC)"
+                        >
+                            <i className="fas fa-compress" />
+                        </button>
+                    )}
 
                     {/* Back Button */}
                     {navigationContext && navigationContext.breadcrumbs.length > 0 && (
