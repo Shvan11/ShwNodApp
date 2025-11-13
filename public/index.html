@@ -175,8 +175,11 @@
                 `;
             }
 
-            // Mount entire application with ONE shared BrowserRouter
-            // This provides routing context to both UniversalHeader and all single-spa apps
+            // Mount entire application with ONE BrowserRouter
+            // This provides routing context to EVERYTHING:
+            // - UniversalHeader can use useNavigate, useLocation
+            // - All single-spa apps inherit Router context (no need for Router in apps)
+            // - Single unified monolithic React tree
             const appRoot = ReactDOM.createRoot(
                 document.getElementById('single-spa-root')
             );
@@ -194,11 +197,11 @@
                 )
             );
 
-            console.log('[SPA] Root application mounted with shared Router and GlobalState');
+            console.log('[SPA] Root application mounted with unified Router tree');
 
             // Import and start single-spa root config
             // This will register all apps and start the routing system
-            // All apps will use the shared BrowserRouter context
+            // All apps automatically inherit Router context from parent
             try {
                 await import('/single-spa/root-config.js');
                 console.log('[SPA] Single-SPA started successfully');

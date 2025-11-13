@@ -20,7 +20,7 @@ import AllSetsList from '../pages/aligner/AllSetsList.jsx';
  * - /aligner/search → Search interface
  * - /aligner/patient/:workId → Direct patient access from search
  *
- * Note: BrowserRouter is provided by index.html at root level
+ * Note: Inherits Router context from index.html BrowserRouter (no Router needed here)
  */
 const AlignerApp = () => {
     return (

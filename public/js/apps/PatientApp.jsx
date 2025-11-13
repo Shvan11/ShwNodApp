@@ -20,7 +20,7 @@ import PatientShell from '../components/react/PatientShell.jsx';
  * - /patient/:patientId/edit-appointment/:appointmentId → Edit appointment
  * - /patient/:patientId/edit → Edit patient information
  *
- * Note: BrowserRouter is provided by index.html at root level
+ * Note: Inherits Router context from index.html BrowserRouter (no Router needed here)
  */
 const PatientApp = () => {
     return (

@@ -164,7 +164,7 @@ const DashboardApp = () => {
 };
 
 // Single-SPA Lifecycle - React 18 Compatible
-// Note: BrowserRouter is provided by index.html at root level
+// Note: Inherits Router context from index.html BrowserRouter (no Router needed here)
 const lifecycles = singleSpaReact({
   React,
   ReactDOM,

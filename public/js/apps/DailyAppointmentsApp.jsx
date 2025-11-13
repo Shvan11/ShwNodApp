@@ -18,7 +18,7 @@ import DailyAppointments from '../components/react/appointments/DailyAppointment
  *
  * Route: /appointments or /daily-appointments
  *
- * Note: BrowserRouter is provided by index.html at root level
+ * Note: Inherits Router context from index.html BrowserRouter (no Router needed here)
  */
 const DailyAppointmentsApp = () => {
     return <DailyAppointments />;

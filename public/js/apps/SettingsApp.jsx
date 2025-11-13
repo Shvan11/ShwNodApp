@@ -12,7 +12,7 @@ import SettingsComponent from '../components/react/SettingsComponent.jsx';
  * - /settings → General settings (default)
  * - /settings/:tab → Specific settings tab (general, database, alignerDoctors, messaging, system, security)
  *
- * Note: BrowserRouter is provided by index.html at root level
+ * Note: Inherits Router context from index.html BrowserRouter (no Router needed here)
  */
 const SettingsApp = () => {
     return (

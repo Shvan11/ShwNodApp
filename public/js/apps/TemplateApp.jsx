@@ -2,7 +2,7 @@
  * Template Management Application
  * React-based template designer and management system using GrapesJS
  *
- * Note: BrowserRouter is provided by index.html at root level
+ * Note: Inherits Router context from index.html BrowserRouter (no Router needed here)
  */
 
 import React from 'react';
