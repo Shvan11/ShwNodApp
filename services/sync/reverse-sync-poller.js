@@ -13,7 +13,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { postgresToSql } from './sync-engine.js';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 
 // Initialize Supabase client (lazy - only if credentials exist)
@@ -47,20 +47,22 @@ const CONFIG = {
 
 /**
  * Load last sync timestamps
+ * Async version to prevent blocking the event loop
  */
-function loadState() {
+async function loadState() {
   try {
-    if (fs.existsSync(STATE_FILE)) {
-      const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-      console.log('📖 Loaded reverse sync state:', {
-        lastNotesSync: state.lastNotesSync,
-        lastBatchesSync: state.lastBatchesSync,
-        lastPollTime: state.lastPollTime
-      });
-      return state;
-    }
+    const data = await fs.readFile(STATE_FILE, 'utf8');
+    const state = JSON.parse(data);
+    console.log('📖 Loaded reverse sync state:', {
+      lastNotesSync: state.lastNotesSync,
+      lastBatchesSync: state.lastBatchesSync,
+      lastPollTime: state.lastPollTime
+    });
+    return state;
   } catch (error) {
-    console.warn('⚠️  Could not load reverse sync state:', error.message);
+    if (error.code !== 'ENOENT') {
+      console.warn('⚠️  Could not load reverse sync state:', error.message);
+    }
   }
 
   // Default: sync from configured lookback window
@@ -77,14 +79,14 @@ function loadState() {
 
 /**
  * Save sync timestamps
+ * Async version to prevent blocking the event loop
  */
-function saveState(state) {
+async function saveState(state) {
   try {
     const dir = path.dirname(STATE_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+    // Ensure directory exists (recursive creates parents if needed)
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(STATE_FILE, JSON.stringify(state, null, 2));
     console.log('💾 Saved reverse sync state');
   } catch (error) {
     console.error('❌ Could not save reverse sync state:', error.message);
@@ -222,14 +224,14 @@ export async function pollForMissedChanges() {
   const startTime = Date.now();
 
   try {
-    const state = loadState();
+    const state = await loadState();
 
     const notesSynced = await pollNotes(state.lastNotesSync);
     const batchesSynced = await pollBatchDays(state.lastBatchesSync);
 
     // Update state with current time
     const now = new Date().toISOString();
-    saveState({
+    await saveState({
       lastNotesSync: now,
       lastBatchesSync: now,
       lastPollTime: now

@@ -111,14 +111,34 @@ class WebSocketService extends EventEmitter {
     
     // Clear any existing timers
     this.clearTimers();
-    
+
+    // Clean up any existing WebSocket connection
+    if (this.state.ws) {
+      try {
+        // Remove event listeners from old connection
+        this.state.ws.onopen = null;
+        this.state.ws.onmessage = null;
+        this.state.ws.onclose = null;
+        this.state.ws.onerror = null;
+
+        // Close old connection if still open
+        if (this.state.ws.readyState === WebSocket.OPEN ||
+            this.state.ws.readyState === WebSocket.CONNECTING) {
+          this.state.ws.close(1000, 'Reconnecting');
+        }
+      } catch (error) {
+        this.log('Error cleaning up old WebSocket:', error);
+      }
+      this.state.ws = null;
+    }
+
     // Build connection URL with parameters
     const url = this.buildConnectionUrl(params);
-    
+
     // Create WebSocket
     try {
       this.state.ws = new WebSocket(url);
-      
+
       // Set up event handlers
       this.state.ws.onopen = this.onOpen;
       this.state.ws.onclose = this.onClose;
@@ -192,16 +212,24 @@ class WebSocketService extends EventEmitter {
     // Close WebSocket if it exists
     if (this.state.ws) {
       try {
-        if (this.state.ws.readyState === WebSocket.OPEN) {
+        // Remove event listeners to prevent memory leaks
+        this.state.ws.onopen = null;
+        this.state.ws.onmessage = null;
+        this.state.ws.onclose = null;
+        this.state.ws.onerror = null;
+
+        // Close the connection if still open
+        if (this.state.ws.readyState === WebSocket.OPEN ||
+            this.state.ws.readyState === WebSocket.CONNECTING) {
           this.state.ws.close(code, reason);
         }
       } catch (error) {
         this.log('Error closing WebSocket:', error);
       }
-      
+
       this.state.ws = null;
     }
-    
+
     // Update state
     this.state.status = 'disconnected';
     this.emit('disconnected', { code, reason });

@@ -8,7 +8,7 @@
  */
 
 import { sqlToPostgres } from './sync-engine.js';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 
 const SYNC_STATE_FILE = path.join(process.cwd(), 'data', 'sync-state.json');
@@ -24,30 +24,32 @@ class SyncScheduler {
 
     /**
      * Load last sync timestamp from file
+     * Async version to prevent blocking the event loop
      */
-    loadState() {
+    async loadState() {
         try {
-            if (fs.existsSync(SYNC_STATE_FILE)) {
-                const state = JSON.parse(fs.readFileSync(SYNC_STATE_FILE, 'utf8'));
-                this.lastSyncTimestamp = state.lastSyncTimestamp ? new Date(state.lastSyncTimestamp) : null;
-                console.log(`📂 Loaded sync state. Last sync: ${this.lastSyncTimestamp || 'Never'}`);
-            }
+            const data = await fs.readFile(SYNC_STATE_FILE, 'utf8');
+            const state = JSON.parse(data);
+            this.lastSyncTimestamp = state.lastSyncTimestamp ? new Date(state.lastSyncTimestamp) : null;
+            console.log(`📂 Loaded sync state. Last sync: ${this.lastSyncTimestamp || 'Never'}`);
         } catch (error) {
-            console.warn('⚠️  Could not load sync state:', error.message);
+            if (error.code !== 'ENOENT') {
+                console.warn('⚠️  Could not load sync state:', error.message);
+            }
         }
     }
 
     /**
      * Save last sync timestamp to file
+     * Async version to prevent blocking the event loop
      */
-    saveState() {
+    async saveState() {
         try {
             const dir = path.dirname(SYNC_STATE_FILE);
-            if (!fs.existsSync(dir)) {
-                fs.mkdirSync(dir, { recursive: true });
-            }
+            // Ensure directory exists (recursive creates parents if needed)
+            await fs.mkdir(dir, { recursive: true });
 
-            fs.writeFileSync(
+            await fs.writeFile(
                 SYNC_STATE_FILE,
                 JSON.stringify({
                     lastSyncTimestamp: this.lastSyncTimestamp,
@@ -79,7 +81,7 @@ class SyncScheduler {
 
             // Update last sync timestamp
             this.lastSyncTimestamp = new Date();
-            this.saveState();
+            await this.saveState();
 
             const duration = ((Date.now() - startTime) / 1000).toFixed(2);
             console.log(`⏱️  Sync completed in ${duration}s\n`);
