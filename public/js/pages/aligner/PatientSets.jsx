@@ -1,5 +1,8 @@
-// PatientSets.jsx - Patient's aligner sets, batches, and notes with full CRUD
-// This page handles both doctor-browse and search routes
+/**
+ * PatientSets - Patient's aligner sets, batches, and notes with full CRUD
+ * This page handles both doctor-browse and search routes
+ * Memoized to prevent unnecessary re-renders
+ */
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../../components/react/ConfirmDialog.jsx';
@@ -1967,4 +1970,5 @@ const PatientSets = () => {
     );
 };
 
-export default PatientSets;
+// Memoize to prevent unnecessary re-renders
+export default React.memo(PatientSets);

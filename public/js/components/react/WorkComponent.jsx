@@ -1,10 +1,15 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WorkCard from './WorkCard.jsx';
 import PaymentModal from './PaymentModal.jsx';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters.js';
 import '../../../css/components/work-card.css';
 
+/**
+ * Work Component
+ * Displays list of patient's treatment works
+ * Memoized to prevent unnecessary re-renders when patientId hasn't changed
+ */
 const WorkComponent = ({ patientId }) => {
     const navigate = useNavigate();
     const [works, setWorks] = useState([]);
@@ -978,4 +983,6 @@ const WorkComponent = ({ patientId }) => {
     );
 };
 
-export default WorkComponent;
+// Memoize to prevent unnecessary re-renders
+// Only re-renders when patientId prop changes
+export default React.memo(WorkComponent);

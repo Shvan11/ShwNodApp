@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <!-- Background -->
+  <rect width="400" height="400" fill="#f3f4f6"/>
+
+  <!-- Camera Icon -->
+  <g transform="translate(100, 120)">
+    <!-- Camera body -->
+    <rect x="20" y="40" width="160" height="120" rx="8" fill="#9ca3af" opacity="0.4"/>
+
+    <!-- Lens -->
+    <circle cx="100" cy="100" r="40" fill="#6b7280" opacity="0.3"/>
+    <circle cx="100" cy="100" r="30" fill="#9ca3af" opacity="0.4"/>
+    <circle cx="100" cy="100" r="15" fill="#6b7280" opacity="0.3"/>
+
+    <!-- Flash -->
+    <rect x="150" y="50" width="20" height="15" rx="3" fill="#6b7280" opacity="0.3"/>
+
+    <!-- Viewfinder -->
+    <rect x="30" y="50" width="30" height="20" rx="3" fill="#6b7280" opacity="0.2"/>
+  </g>
+
+  <!-- Text -->
+  <text x="200" y="280" font-family="Arial, sans-serif" font-size="18" fill="#9ca3af" text-anchor="middle">No Image Available</text>
+</svg>

@@ -72,14 +72,8 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
             return `/DolImgs/${image.name}`;
         }
         
-        // Placeholder images
-        if (element.index < 3) {
-            return '/images/No_img_f.png';
-        } else if (element.index < 6) {
-            return '/images/No_img_o.png';
-        } else {
-            return '/images/No_img_r.png';
-        }
+        // Optimized placeholder image (single SVG replaces 3 PNGs: 327KB → 1KB)
+        return '/images/placeholder.svg';
     };
     
     const getImageProps = (element) => {

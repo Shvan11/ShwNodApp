@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+/**
+ * Patient Management Component
+ * Provides patient search, editing, and management functionality
+ * Memoized to prevent unnecessary re-renders
+ */
 const PatientManagement = () => {
     const [patients, setPatients] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -990,4 +995,5 @@ const PatientManagement = () => {
     );
 };
 
-export default PatientManagement;
+// Memoize to prevent unnecessary re-renders
+export default React.memo(PatientManagement);

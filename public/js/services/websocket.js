@@ -513,14 +513,20 @@ class WebSocketService extends EventEmitter {
       // Handle messages with 'type' field
       if (typeof message === 'object' && message.type) {
         this.log(`Emitting event for message type '${message.type}'`);
-        console.log(`📡 [WebSocket Service] Message received - Type: ${message.type}`);
-        console.log(`📡 [WebSocket Service] Full message:`, JSON.stringify(message, null, 2));
-        console.log(`📡 [WebSocket Service] Data payload:`, JSON.stringify(message.data || message, null, 2));
-        
+
+        // Debug logging - only logs when debug mode is enabled
+        if (this.options.debug) {
+          console.log(`📡 [WebSocket Service] Message received - Type: ${message.type}`);
+          console.log(`📡 [WebSocket Service] Full message:`, JSON.stringify(message, null, 2));
+          console.log(`📡 [WebSocket Service] Data payload:`, JSON.stringify(message.data || message, null, 2));
+        }
+
         // Emit the universal event
         this.emit(message.type, message.data || message);
-        
-        console.log(`📡 [WebSocket Service] Event '${message.type}' emitted successfully`);
+
+        if (this.options.debug) {
+          console.log(`📡 [WebSocket Service] Event '${message.type}' emitted successfully`);
+        }
       }
       
       // Always emit generic message event

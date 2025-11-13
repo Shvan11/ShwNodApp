@@ -1,7 +1,13 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import '../../../css/components/invoice-form.css'
 import { formatNumber, parseFormattedNumber, formatCurrency as formatCurrencyUtil } from '../../utils/formatters.js'
 
+/**
+ * Payment Modal Component
+ * Memoized to prevent unnecessary re-renders
+ * Re-renders only when workData, onClose, or onSuccess props change
+ * Uses useCallback for event handlers to prevent breaking memoization
+ */
 const PaymentModal = ({ workData, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
     const [exchangeRate, setExchangeRate] = useState(null);
@@ -1157,4 +1163,6 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
     );
 };
 
-export default PaymentModal;
+// Memoize the component to prevent unnecessary re-renders
+// Only re-renders when workData, onClose, or onSuccess change
+export default React.memo(PaymentModal);

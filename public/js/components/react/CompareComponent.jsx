@@ -1,7 +1,8 @@
 /**
  * CompareComponent - Advanced image comparison tool for patient portal
- * 
+ *
  * Provides sophisticated image comparison with canvas manipulation tools
+ * Memoized to prevent unnecessary re-renders when props haven't changed
  */
 
 import React, { useState, useEffect, useRef } from 'react'
@@ -1179,4 +1180,6 @@ const CompareComponent = ({ patientId, phone }) => {
     );
 };
 
-export default CompareComponent;
+// Memoize to prevent unnecessary re-renders
+// Only re-renders when patientId or phone props change
+export default React.memo(CompareComponent);
