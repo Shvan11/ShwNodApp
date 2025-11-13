@@ -12,15 +12,9 @@
     min-height: 100vh;
 }
 
-/* Page Header - SCOPED */
+/* Page Header - SCOPED - HIDDEN (using universal header instead) */
 .appointment-form-page .page-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 20px 30px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    display: none;
 }
 
 .appointment-form-page .page-header h1 {
