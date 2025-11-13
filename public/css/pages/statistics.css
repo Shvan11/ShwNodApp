@@ -488,6 +488,9 @@ th.qasa-column {
     padding: 2rem;
     overflow-y: auto;
     flex: 1;
+    min-height: 0; /* Flexbox fix to allow proper scrolling */
+    display: flex;
+    flex-direction: column;
 }
 
 .invoice-summary {
@@ -498,6 +501,7 @@ th.qasa-column {
     padding: 1.5rem;
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     border-radius: 8px;
+    flex-shrink: 0; /* Prevent summary from shrinking */
 }
 
 .summary-item {
@@ -582,12 +586,43 @@ th.qasa-column {
     color: white;
 }
 
+/* States inside modal */
+.modal-content .loading-state,
+.modal-content .error-state,
+.modal-content .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+}
+
+.modal-content .empty-state i {
+    font-size: 3rem;
+    color: #95a5a6;
+    margin-bottom: 1rem;
+}
+
+.modal-content .empty-state p {
+    color: #7f8c8d;
+    font-size: 1.1rem;
+}
+
+/* Table wrapper inside modal */
+.modal-content .table-wrapper {
+    flex: 1;
+    min-height: 0; /* Allow scrolling in flex container */
+    overflow-y: auto;
+}
+
 .modal-footer {
     padding: 1rem 2rem;
     border-top: 1px solid var(--border-color, #e0e0e0);
     display: flex;
     justify-content: flex-end;
     gap: 1rem;
+    flex-shrink: 0; /* Prevent footer from shrinking */
 }
 
 .btn-secondary {
