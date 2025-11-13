@@ -1,7 +1,7 @@
 /* Aligner Management Page Styles */
 
-/* Account for fixed universal header */
-body {
+/* Container padding for fixed universal header */
+.aligner-page-container {
     padding-top: 70px; /* 50px header + 20px breathing room */
 }
 
@@ -1144,6 +1144,7 @@ body {
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.5);
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
@@ -1232,6 +1233,7 @@ body {
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.5);
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
     z-index: 1999;
     animation: fadeIn 0.3s ease;
@@ -1246,12 +1248,12 @@ body {
     max-width: 100%;
     background: white;
     box-shadow: -4px 0 24px rgba(0, 0, 0, 0.2);
-    display: flex !important;
-    flex-direction: column !important;
+    display: flex;
+    flex-direction: column;
     animation: slideInRight 0.3s ease;
     z-index: 2000;
-    overflow: hidden !important;
-    height: 100vh !important;
+    overflow: hidden;
+    height: 100vh;
 }
 
 .drawer-header {
@@ -1262,8 +1264,8 @@ body {
     align-items: center;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    flex-shrink: 0 !important;
-    flex-grow: 0 !important;
+    flex-shrink: 0;
+    flex-grow: 0;
 }
 
 .drawer-header h2 {
@@ -1291,15 +1293,15 @@ body {
 }
 
 .drawer-body {
-    flex: 1 1 0 !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    padding: 0 !important;
-    min-height: 0 !important;
+    flex: 1 1 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0;
+    min-height: 0;
     -webkit-overflow-scrolling: touch;
     max-height: 100%;
-    display: flex !important;
-    flex-direction: column !important;
+    display: flex;
+    flex-direction: column;
 }
 
 .drawer-body > form {
@@ -1324,8 +1326,8 @@ body {
     gap: 0.75rem;
     justify-content: flex-end;
     background: #f8f9fa;
-    flex-shrink: 0 !important;
-    flex-grow: 0 !important;
+    flex-shrink: 0;
+    flex-grow: 0;
     margin-top: auto;
 }
 
@@ -1460,7 +1462,7 @@ body {
 
 /* Utility Classes */
 .hidden {
-    display: none !important;
+    display: none;
 }
 
 /* Toast Notification Animations */

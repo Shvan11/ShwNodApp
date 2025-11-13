@@ -67,6 +67,7 @@
   cursor: pointer;
   transition: all 0.3s ease;
   font-size: 14px;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 
@@ -434,7 +435,7 @@
 .modal {
   display: none;
   position: fixed;
-  z-index: 1000;
+  z-index: var(--z-index-modal);
   left: 0;
   top: 0;
   width: 100%;
@@ -668,7 +669,7 @@ textarea {
   position: fixed;
   top: 20px;
   right: 20px;
-  z-index: 2000;
+  z-index: var(--z-index-tooltip);
   display: flex;
   flex-direction: column;
   gap: 10px;

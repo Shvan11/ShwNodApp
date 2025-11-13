@@ -407,33 +407,33 @@
 }
 
 .btn-card-secondary.btn-add-payment {
-    background: #10b981 !important;
+    background: #10b981;
 }
 
 .btn-card-secondary.btn-add-payment:hover:not(.disabled) {
-    background: #059669 !important;
+    background: #059669;
 }
 
 .btn-card-secondary.btn-add-payment.disabled {
-    background: #9ca3af !important;
+    background: #9ca3af;
     cursor: not-allowed;
     opacity: 0.6;
 }
 
 .btn-card-secondary.btn-print-receipt {
-    background: #3b82f6 !important;
+    background: #3b82f6;
 }
 
 .btn-card-secondary.btn-print-receipt:hover {
-    background: #2563eb !important;
+    background: #2563eb;
 }
 
 .btn-card-secondary.btn-add-set {
-    background: #8b5cf6 !important;
+    background: #8b5cf6;
 }
 
 .btn-card-secondary.btn-add-set:hover {
-    background: #7c3aed !important;
+    background: #7c3aed;
 }
 
 /* No Works Message */
@@ -1015,7 +1015,7 @@
 .no-data {
     text-align: center;
     color: #9ca3af;
-    padding: 2rem !important;
+    padding: 2rem;
     font-style: italic;
 }
 

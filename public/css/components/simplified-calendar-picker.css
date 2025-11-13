@@ -665,7 +665,7 @@
 .appointment-form-page .form-actions .btn-cancel {
     background: white;
     color: #4a5568;
-    border: 2px solid #e1e4e8 !important;
+    border: 2px solid #e1e4e8;
     flex: 0 1 auto;
 }
 
@@ -679,7 +679,7 @@
 .appointment-form-page .form-actions .btn-create {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    border: none !important;
+    border: none;
     box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
     flex: 1 1 auto;
 }

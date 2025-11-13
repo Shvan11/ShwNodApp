@@ -170,24 +170,24 @@
 }
 
 table.work-table tbody tr.active-row {
-    background-color: #f0fdf4 !important;
-    background: #f0fdf4 !important;
-    border-left: 4px solid #059669 !important;
+    background-color: #f0fdf4;
+    background: #f0fdf4;
+    border-left: 4px solid #059669;
 }
 
 table.work-table tbody tr.active-row td {
-    background-color: #f0fdf4 !important;
-    background: #f0fdf4 !important;
+    background-color: #f0fdf4;
+    background: #f0fdf4;
 }
 
 table.work-table tbody tr.active-row:hover {
-    background-color: #dcfce7 !important;
-    background: #dcfce7 !important;
+    background-color: #dcfce7;
+    background: #dcfce7;
 }
 
 table.work-table tbody tr.active-row:hover td {
-    background-color: #dcfce7 !important;
-    background: #dcfce7 !important;
+    background-color: #dcfce7;
+    background: #dcfce7;
 }
 
 .work-table tr.completed-row {
