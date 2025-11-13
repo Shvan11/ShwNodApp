@@ -447,9 +447,10 @@ th.qasa-column {
 
 .daily-invoices-modal {
     width: 1200px;
+    height: 85vh;
 }
 
-.modal-header {
+.daily-invoices-modal .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -457,10 +458,10 @@ th.qasa-column {
     border-bottom: 2px solid var(--border-color, #e0e0e0);
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    flex-shrink: 0; /* Prevent header from shrinking */
+    flex-shrink: 0;
 }
 
-.modal-header h2 {
+.daily-invoices-modal .modal-header h2 {
     margin: 0;
     display: flex;
     align-items: center;
@@ -468,7 +469,7 @@ th.qasa-column {
     font-size: 1.5rem;
 }
 
-.close-btn {
+.daily-invoices-modal .close-btn {
     background: rgba(255, 255, 255, 0.2);
     border: none;
     color: white;
@@ -480,7 +481,7 @@ th.qasa-column {
     transition: all 0.3s ease;
 }
 
-.close-btn:hover {
+.daily-invoices-modal .close-btn:hover {
     background: rgba(255, 255, 255, 0.3);
     transform: rotate(90deg);
 }
@@ -495,9 +496,11 @@ th.qasa-column {
     overflow: hidden;
     width: auto;
     max-width: none;
+    max-height: none;
     box-shadow: none;
     border-radius: 0;
     background-color: transparent;
+    animation: none;
 }
 
 .daily-invoices-modal .invoice-summary {
@@ -513,73 +516,71 @@ th.qasa-column {
     overflow-y: auto;
 }
 
-.summary-item {
+.daily-invoices-modal .summary-item {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
 }
 
-.summary-item .label {
+.daily-invoices-modal .summary-item .label {
     font-size: 0.9rem;
     color: #666;
     font-weight: 500;
 }
 
-.summary-item .value {
+.daily-invoices-modal .summary-item .value {
     font-size: 1.2rem;
     font-weight: bold;
     color: #2c3e50;
 }
 
-.summary-item.highlight {
+.daily-invoices-modal .summary-item.highlight {
     background: rgba(255, 255, 255, 0.8);
     padding: 1rem;
     border-radius: 6px;
 }
 
-.summary-item .value.negative {
+.daily-invoices-modal .summary-item .value.negative {
     color: var(--danger-color, #e74c3c);
 }
 
-.invoices-table {
+.daily-invoices-modal .invoices-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.9rem;
-    display: table; /* Ensure table layout */
-    table-layout: auto; /* Allow normal table sizing */
 }
 
-.invoices-table thead {
+.daily-invoices-modal .invoices-table thead {
     background-color: var(--primary-color, #3498db);
     color: white;
 }
 
-.invoices-table th {
+.daily-invoices-modal .invoices-table th {
     padding: 0.75rem;
     text-align: left;
     font-weight: 600;
 }
 
-.invoices-table td {
+.daily-invoices-modal .invoices-table td {
     padding: 0.75rem;
     border-bottom: 1px solid var(--border-color, #e0e0e0);
 }
 
-.invoices-table tbody tr:hover {
+.daily-invoices-modal .invoices-table tbody tr:hover {
     background-color: rgba(52, 152, 219, 0.05);
 }
 
-.invoice-id {
+.daily-invoices-modal .invoice-id {
     font-family: 'Courier New', monospace;
     font-weight: 600;
     color: var(--primary-color, #3498db);
 }
 
-.patient-name {
+.daily-invoices-modal .patient-name {
     font-weight: 500;
 }
 
-.currency-badge .badge {
+.daily-invoices-modal .currency-badge .badge {
     display: inline-block;
     padding: 0.25rem 0.75rem;
     border-radius: 12px;
@@ -587,12 +588,12 @@ th.qasa-column {
     font-weight: 600;
 }
 
-.currency-badge .badge.IQD {
+.daily-invoices-modal .currency-badge .badge.IQD {
     background: #27ae60;
     color: white;
 }
 
-.currency-badge .badge.USD {
+.daily-invoices-modal .currency-badge .badge.USD {
     background: #3498db;
     color: white;
 }
@@ -628,16 +629,16 @@ th.qasa-column {
     display: block;
 }
 
-.modal-footer {
+.daily-invoices-modal .modal-footer {
     padding: 1rem 2rem;
     border-top: 1px solid var(--border-color, #e0e0e0);
     display: flex;
     justify-content: flex-end;
     gap: 1rem;
-    flex-shrink: 0; /* Prevent footer from shrinking */
+    flex-shrink: 0;
 }
 
-.btn-secondary {
+.daily-invoices-modal .btn-secondary {
     padding: 0.75rem 2rem;
     background-color: var(--secondary-bg, #95a5a6);
     color: white;
@@ -648,7 +649,7 @@ th.qasa-column {
     transition: all 0.3s ease;
 }
 
-.btn-secondary:hover {
+.daily-invoices-modal .btn-secondary:hover {
     background-color: #7f8c8d;
 }
 
@@ -682,18 +683,19 @@ th.qasa-column {
 
     .daily-invoices-modal {
         width: 100%;
+        height: 95vh;
         max-height: 95vh;
     }
 
-    .modal-header {
+    .daily-invoices-modal .modal-header {
         padding: 1rem;
     }
 
-    .modal-content {
+    .daily-invoices-modal .modal-content {
         padding: 1rem;
     }
 
-    .invoice-summary {
+    .daily-invoices-modal .invoice-summary {
         grid-template-columns: 1fr;
     }
 }
