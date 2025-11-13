@@ -440,7 +440,6 @@ th.qasa-column {
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
     max-width: 95%;
     max-height: 90vh;
-    height: 80vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -458,7 +457,7 @@ th.qasa-column {
     border-bottom: 2px solid var(--border-color, #e0e0e0);
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    flex-shrink: 0;
+    flex-shrink: 0; /* Prevent header from shrinking */
 }
 
 .modal-header h2 {
@@ -486,24 +485,32 @@ th.qasa-column {
     transform: rotate(90deg);
 }
 
-.modal-content {
+/* Override global modal-content styles from expenses.css */
+.daily-invoices-modal .modal-content {
     padding: 2rem;
     flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
     overflow: hidden;
+    width: auto;
+    max-width: none;
+    box-shadow: none;
+    border-radius: 0;
+    background-color: transparent;
 }
 
-.invoice-summary {
+.daily-invoices-modal .invoice-summary {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
+    margin-bottom: 1rem;
     padding: 1.5rem;
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     border-radius: 8px;
     flex-shrink: 0;
+    max-height: 250px;
+    overflow-y: auto;
 }
 
 .summary-item {
@@ -538,6 +545,8 @@ th.qasa-column {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.9rem;
+    display: table; /* Ensure table layout */
+    table-layout: auto; /* Allow normal table sizing */
 }
 
 .invoices-table thead {
@@ -589,9 +598,9 @@ th.qasa-column {
 }
 
 /* States inside modal */
-.modal-content .loading-state,
-.modal-content .error-state,
-.modal-content .empty-state {
+.daily-invoices-modal .modal-content .loading-state,
+.daily-invoices-modal .modal-content .error-state,
+.daily-invoices-modal .modal-content .empty-state {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -600,22 +609,23 @@ th.qasa-column {
     min-height: 300px;
 }
 
-.modal-content .empty-state i {
+.daily-invoices-modal .modal-content .empty-state i {
     font-size: 3rem;
     color: #95a5a6;
     margin-bottom: 1rem;
 }
 
-.modal-content .empty-state p {
+.daily-invoices-modal .modal-content .empty-state p {
     color: #7f8c8d;
     font-size: 1.1rem;
 }
 
 /* Table wrapper inside modal */
-.modal-content .table-wrapper {
+.daily-invoices-modal .modal-content .table-wrapper {
     flex: 1;
     min-height: 0;
     overflow: auto;
+    display: block;
 }
 
 .modal-footer {
@@ -624,7 +634,7 @@ th.qasa-column {
     display: flex;
     justify-content: flex-end;
     gap: 1rem;
-    flex-shrink: 0;
+    flex-shrink: 0; /* Prevent footer from shrinking */
 }
 
 .btn-secondary {
