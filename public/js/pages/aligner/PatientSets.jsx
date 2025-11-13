@@ -9,7 +9,6 @@ import ConfirmDialog from '../../components/react/ConfirmDialog.jsx';
 import SetFormDrawer from '../../components/react/SetFormDrawer.jsx';
 import BatchFormDrawer from '../../components/react/BatchFormDrawer.jsx';
 import PaymentFormDrawer from '../../components/react/PaymentFormDrawer.jsx';
-import AlignerModeToggle from '../../components/react/AlignerModeToggle.jsx';
 import { copyToClipboard } from '../../core/utils.js';
 import UniversalLauncher from '../../services/UniversalLauncher.js';
 
@@ -1124,8 +1123,6 @@ const PatientSets = () => {
                     </div>
                 </div>
             )}
-
-            <AlignerModeToggle activeMode={isFromDoctorBrowse ? 'doctors' : 'search'} />
 
             {/* Breadcrumb */}
             <div className="breadcrumb">

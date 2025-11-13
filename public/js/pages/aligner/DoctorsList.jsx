@@ -1,7 +1,6 @@
 // DoctorsList.jsx - Select a doctor to browse their patients
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AlignerModeToggle from '../../components/react/AlignerModeToggle.jsx';
 
 const DoctorsList = () => {
     const navigate = useNavigate();
@@ -44,9 +43,7 @@ const DoctorsList = () => {
     }
 
     return (
-        <div className="aligner-container">
-            <AlignerModeToggle activeMode="doctors" />
-
+        <>
             <div className="section-header">
                 <h2>
                     <i className="fas fa-user-md"></i>
@@ -111,7 +108,7 @@ const DoctorsList = () => {
                     </div>
                 ))}
             </div>
-        </div>
+        </>
     );
 };
 

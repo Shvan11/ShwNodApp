@@ -1,7 +1,6 @@
 // SearchPatient.jsx - Quick search for patients by name/ID/phone
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AlignerModeToggle from '../../components/react/AlignerModeToggle.jsx';
 
 const SearchPatient = () => {
     const navigate = useNavigate();
@@ -61,9 +60,7 @@ const SearchPatient = () => {
     };
 
     return (
-        <div className="aligner-container">
-            <AlignerModeToggle activeMode="search" />
-
+        <>
             {/* Search Box */}
             <div className="search-section">
                 <div className="search-box">
@@ -122,7 +119,7 @@ const SearchPatient = () => {
                     </div>
                 )}
             </div>
-        </div>
+        </>
     );
 };
 
