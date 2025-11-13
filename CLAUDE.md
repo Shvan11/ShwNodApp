@@ -17,9 +17,21 @@ Configuration is in `.mcp.json`. See `docs/mcp-mssql-setup.md` for MSSQL MCP ser
 
 ## Core Commands
 
-- **Start Application**: `node index.js`
-- **Install as Windows Service**: `npm run service:install`  
-- **Uninstall Windows Service**: `npm run service:uninstall`
+### Development
+- **Development Mode**: `npm run dev` - Runs Vite dev server (port 5173) + Express API (port 3000)
+- **Backend Only**: `npm run dev:server` or `node index.js` - Express server only
+- **Frontend Only**: `npm run dev:client` - Vite dev server only
+
+### Production
+- **Build Application**: `npm run build` - Builds optimized production bundle to `/dist`
+- **Start Production**: `npm start` or `node index.js` - Serves built app from `/dist` (port 3000)
+- **Preview Build**: `npm run preview` - Preview production build locally
+
+### Windows Service
+- **Install as Service**: `npm run service:install`
+- **Uninstall Service**: `npm run service:uninstall`
+
+### Testing
 - **Run Tests**: No test framework configured yet
 
 ## Architecture Overview
@@ -42,47 +54,57 @@ Configuration is in `.mcp.json`. See `docs/mcp-mssql-setup.md` for MSSQL MCP ser
 - **QR Code Generation**: For WhatsApp authentication and patient records
 
 ### Frontend Structure
-- **Architecture**: **Single-SPA React Application** ✨
-  - **Framework**: Single-spa orchestrating 9 independent React micro-apps
-  - **Entry Point**: Single HTML file (`index-spa.html`) - loads once, never reloads
-  - **Routing**: React Router at root level for seamless client-side navigation
-  - **State**: Global state via Context API (`GlobalStateContext`) shared across all apps
-  - **Loading**: ESM imports from CDN (esm.sh) with code splitting per app
+- **Architecture**: **Modern React Single-Page Application** ✨
+  - **Framework**: React 19 with React Router for client-side routing
+  - **Entry Point**: Single HTML file (`/public/index.html`) - loads once, never reloads
+  - **Routing**: React Router v7 with nested routes for seamless navigation
+  - **State**: React Context API for shared state management
+  - **Loading**: ESM imports from CDN (esm.sh) for core libraries, Vite bundling for application code
+  - **Build Tool**: Vite for fast development and optimized production builds
 
-- **Single-SPA Configuration** (`/public/single-spa/`):
-  - `root-config.js` - Registers all apps and orchestrates mounting/unmounting
-  - `contexts/GlobalStateContext.jsx` - Shared state (WebSocket, patient, user)
+- **Application Structure** (`/public/js/`):
+  - `App.jsx` - Main application component with routing configuration
+  - `routes/` - Route components for each section of the application
+  - `components/react/` - Reusable React components
+  - `services/` - Shared utilities (WebSocket, API client, storage)
+  - `hooks/` - Custom React hooks for shared logic
 
-- **React Micro-Apps** (`/public/js/apps/`) - All with single-spa lifecycle:
-  - `@clinic/dashboard` - Navigation hub (DashboardApp.jsx)
-  - `@clinic/patient` - Patient portal with React Router (PatientApp.jsx)
-  - `@clinic/expenses` - Expense management (ExpensesApp.jsx)
-  - `@clinic/whatsapp-send` - WhatsApp messaging (WhatsAppSendApp.jsx)
-  - `@clinic/whatsapp-auth` - WhatsApp authentication (WhatsAppAuthApp.jsx)
-  - `@clinic/aligner` - Aligner management with React Router (AlignerApp.jsx)
-  - `@clinic/settings` - Settings with tabs and React Router (SettingsApp.jsx)
-  - `@clinic/templates` - Template designer with GrapesJS (TemplateApp.jsx)
-  - `@clinic/appointments` - Daily appointments (DailyAppointmentsApp.jsx)
+- **Route Components** (`/public/js/routes/`):
+  - `Dashboard.jsx` - Navigation hub and landing page
+  - `PatientRoutes.jsx` - Patient portal with nested routes
+  - `PatientManagement.jsx` - Patient search and grid view
+  - `Expenses.jsx` - Expense management
+  - `WhatsAppSend.jsx` - WhatsApp messaging
+  - `WhatsAppAuth.jsx` - WhatsApp authentication
+  - `AlignerRoutes.jsx` - Aligner management with nested routes
+  - `SettingsRoutes.jsx` - Settings with tabs and nested routes
+  - `TemplateRoutes.jsx` - Template designer with GrapesJS
+  - `DailyAppointments.jsx` - Daily appointments view
+  - `Calendar.jsx` - Monthly calendar view
+  - `Statistics.jsx` - Financial statistics and reports
 
 - **React Components** (`/public/js/components/react/`):
-  - UniversalHeader - Persistent header (mounted once, never unmounts)
-  - PatientManagement, PaymentModal, EditPatientComponent, etc.
+  - `UniversalHeader.jsx` - Persistent header with patient search
+  - `PatientShell.jsx` - Patient portal wrapper with sidebar navigation
+  - `PaymentModal.jsx` - Payment processing modal
+  - `EditPatientComponent.jsx` - Patient information editor
+  - And many more specialized components
 
-- **React Pages** (`/public/js/pages/*.jsx`): Page-level components (calendar, grid, statistics, visits)
+- **Services Layer** (`/public/js/services/`):
+  - `websocket.js` - WebSocket client for real-time updates
+  - `http.js` - HTTP client for API requests
+  - `storage.js` - Local storage utilities
 
-- **Services Layer** (`/public/js/services/`): Shared utilities (websocket, API client, storage)
+- **Hooks** (`/public/js/hooks/`): Custom hooks for shared logic (WebSocket sync, message status, etc.)
 
-- **Hooks** (`/public/js/hooks/`): Custom hooks for shared logic across apps
-
-**Key Benefits of Single-SPA:**
-- ✅ No page reloads - instant navigation between apps
-- ✅ Persistent WebSocket connection shared across all apps
-- ✅ Shared state (current patient, WebSocket, appointments cache)
-- ✅ 45% reduction in network transfer (shared React/Router loaded once)
+**Key Features:**
+- ✅ No page reloads - instant navigation between routes
+- ✅ Persistent WebSocket connection for real-time updates
+- ✅ React Context API for state sharing across components
+- ✅ CDN-loaded core libraries (React, Router) for optimal caching
+- ✅ Vite for fast development and optimized production builds
 - ✅ Native app-like experience with smooth transitions
-- ✅ No tab manager needed - all apps run in single page
-
-**Migration Complete**: 100% React, Single-SPA architecture. See `docs/SINGLE_SPA_MIGRATION_PLAN.md` for migration details.
+- ✅ Server-side rendering ready (all routes served from Express)
 
 ## Environment Variables Required
 

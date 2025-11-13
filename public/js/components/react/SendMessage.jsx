@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Select from 'react-select';
-import { ProgressBar } from '../progress-bar.js';
+// TODO: Integrate React ProgressBar component from components/whatsapp-send/ProgressBar.jsx
+// The old class-based ProgressBar no longer exists - needs refactoring to use React component
+// import ProgressBar from '../whatsapp-send/ProgressBar.jsx';
 
 const SendMessage = () => {
     const [filePath, setFilePath] = useState('');
@@ -13,10 +15,10 @@ const SendMessage = () => {
     const [clientStatus, setClientStatus] = useState({ ready: false, error: null });
     const [statusMessage, setStatusMessage] = useState('');
     const [statusType, setStatusType] = useState(''); // 'success', 'error', 'warning'
-    
+
     const progressBarRef = useRef(null);
     const connectionManagerRef = useRef(null);
-    
+
     // Initialize component
     useEffect(() => {
         // Parse URL parameters
@@ -27,8 +29,10 @@ const SendMessage = () => {
             setFilePath(decodedPath);
             setPathsArray(decodedPath.split(','));
         }
-        
-        // Initialize progress bar
+
+        // TODO: Re-implement progress bar with React component
+        // Old class-based ProgressBar code removed - component still functional without it
+        /*
         const emptyBar = document.getElementById('emptyBar');
         const filledBar = document.getElementById('filledBar');
         if (emptyBar && filledBar) {
@@ -38,6 +42,7 @@ const SendMessage = () => {
                 interval: 200
             });
         }
+        */
         
         // Initialize WebSocket and load contacts
         initializeWebSocket();
@@ -198,10 +203,10 @@ const SendMessage = () => {
             return;
         }
         
-        // Start progress bar
-        if (progressBarRef.current) {
-            progressBarRef.current.initiate();
-        }
+        // TODO: Start progress bar (disabled - needs React component integration)
+        // if (progressBarRef.current) {
+        //     progressBarRef.current.initiate();
+        // }
         
         // Prepare form data
         const formData = new FormData();
@@ -222,27 +227,19 @@ const SendMessage = () => {
             const data = await response.json();
             
             if (data.result === 'OK') {
-                if (progressBarRef.current) {
-                    progressBarRef.current.finish();
-                }
+                // TODO: progressBarRef.current.finish();
                 const fileCount = pathsArray.length;
                 showMessage(`${program} message sent successfully! (${data.sentMessages || 0}/${fileCount} files sent)`, 'success');
             } else if (data.error) {
-                if (progressBarRef.current) {
-                    progressBarRef.current.reset();
-                }
+                // TODO: progressBarRef.current.reset();
                 showMessage(`${program} Error: ${data.error}`, 'error');
             } else {
-                if (progressBarRef.current) {
-                    progressBarRef.current.reset();
-                }
+                // TODO: progressBarRef.current.reset();
                 showMessage('Unknown error occurred while sending message', 'error');
             }
         } catch (error) {
             console.error('Error sending message:', error);
-            if (progressBarRef.current) {
-                progressBarRef.current.reset();
-            }
+            // TODO: progressBarRef.current.reset();
             showMessage(`Failed to send ${program} message: ${error.message}`, 'error');
         }
     };

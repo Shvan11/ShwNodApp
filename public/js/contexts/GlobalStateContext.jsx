@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { createWebSocketConnection } from '/js/services/websocket.js';
+import { createWebSocketConnection } from '../services/websocket.js';
 
 const GlobalStateContext = createContext();
 
 /**
- * Global State Provider for Single-SPA Application
- * Manages shared state across all micro-apps including:
- * - WebSocket connection (persistent across apps)
+ * Global State Provider for React Application
+ * Manages shared state across all components including:
+ * - WebSocket connection (persistent across the app)
  * - Current patient data
  * - User information
  * - Appointments cache
