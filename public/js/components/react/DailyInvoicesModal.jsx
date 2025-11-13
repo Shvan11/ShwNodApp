@@ -84,21 +84,21 @@ const DailyInvoicesModal = ({ selectedDate, onClose }) => {
     if (!selectedDate) return null;
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-container daily-invoices-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="statistics-modal-overlay" onClick={onClose}>
+            <div className="statistics-modal-container" onClick={(e) => e.stopPropagation()}>
                 {/* Modal Header */}
-                <div className="modal-header">
+                <div className="statistics-modal-header">
                     <h2>
                         <i className="fas fa-file-invoice-dollar"></i>
                         Daily Invoices - {formatDate(dateValue)}
                     </h2>
-                    <button className="close-btn" onClick={onClose}>
+                    <button className="statistics-modal-close" onClick={onClose}>
                         <i className="fas fa-times"></i>
                     </button>
                 </div>
 
                 {/* Modal Content */}
-                <div className="modal-content">
+                <div className="statistics-modal-body">
                     {loading && (
                         <div className="loading-state">
                             <div className="spinner"></div>
@@ -125,7 +125,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }) => {
                         <>
                             {/* Summary Cards */}
                             {totals && (
-                                <div className="invoice-summary">
+                                <div className="statistics-invoice-summary">
                                     <div className="summary-item">
                                         <span className="label">Total IQD Received:</span>
                                         <span className="value">{formatCurrency(totals.totalIQD, 'IQD')}</span>
@@ -162,8 +162,8 @@ const DailyInvoicesModal = ({ selectedDate, onClose }) => {
                             )}
 
                             {/* Invoices Table */}
-                            <div className="table-wrapper">
-                                <table className="invoices-table">
+                            <div className="statistics-table-wrapper">
+                                <table className="statistics-invoices-table">
                                     <thead>
                                         <tr>
                                             <th>Invoice #</th>
@@ -211,8 +211,8 @@ const DailyInvoicesModal = ({ selectedDate, onClose }) => {
                 </div>
 
                 {/* Modal Footer */}
-                <div className="modal-footer">
-                    <button className="btn-secondary" onClick={onClose}>
+                <div className="statistics-modal-footer">
+                    <button className="statistics-btn-close" onClick={onClose}>
                         Close
                     </button>
                 </div>
