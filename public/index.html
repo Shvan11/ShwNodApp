@@ -83,7 +83,7 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Single-SPA container */
+        /* Application container */
         #single-spa-application {
             min-height: 100vh;
         }
@@ -101,7 +101,7 @@
             padding-top: 0;
         }
 
-        /* Smooth transitions between apps */
+        /* Smooth transitions between routes */
         .app-transition {
             animation: fadeIn 0.2s ease-in;
         }
@@ -138,8 +138,8 @@
     </style>
 </head>
 <body>
-    <!-- Single-SPA Application Container -->
-    <!-- BrowserRouter and all content will be mounted here by React -->
+    <!-- React Application Container -->
+    <!-- Unified React app with BrowserRouter will be mounted here -->
     <div id="single-spa-application">
         <!-- Initial loading state (removed after React mounts) -->
         <div class="spa-loading">
@@ -147,66 +147,41 @@
         </div>
     </div>
 
-    <!-- Single-SPA Bootstrap Script -->
+    <!-- Unified React Application Bootstrap -->
     <script type="module">
         import React from 'react';
         import ReactDOM from 'react-dom/client';
         import { BrowserRouter } from 'react-router-dom';
 
-        console.log('[SPA] Initializing single-page application');
+        console.log('[App] Initializing unified React application');
 
-        // Import global state provider
-        import { GlobalStateProvider } from '/single-spa/contexts/GlobalStateContext.jsx';
-
-        // Import UniversalHeader (mounted once)
-        import UniversalHeader from '/js/components/react/UniversalHeader.jsx';
+        // Import main App component
+        import App from '/js/App.jsx';
 
         // Wait for ALL resources (including CSS) to load
         window.addEventListener('load', async () => {
-            console.log('[SPA] All resources loaded - mounting application');
+            console.log('[App] All resources loaded - mounting application');
 
-            // Clear loading spinner
+            // Clear loading spinner and prepare root element
             const appContainer = document.getElementById('single-spa-application');
-            const existingContainer = document.getElementById('app-container');
-            if (!existingContainer) {
-                // Create structure for header and apps
-                appContainer.innerHTML = `
-                    <div id="single-spa-root"></div>
-                `;
-            }
+            appContainer.innerHTML = '<div id="app-root"></div>';
 
-            // Mount entire application with ONE BrowserRouter
-            // This provides routing context to EVERYTHING:
-            // - UniversalHeader can use useNavigate, useLocation
-            // - All single-spa apps inherit Router context (no need for Router in apps)
-            // - Single unified monolithic React tree
-            const appRoot = ReactDOM.createRoot(
-                document.getElementById('single-spa-root')
-            );
+            // Mount the unified React application
+            // ONE BrowserRouter, ONE React tree, ALL routes in App.jsx
+            const root = ReactDOM.createRoot(document.getElementById('app-root'));
 
-            appRoot.render(
-                React.createElement(BrowserRouter, null,
-                    React.createElement(GlobalStateProvider, null,
-                        React.createElement(React.Fragment, null,
-                            React.createElement('div', { id: 'universal-header-root' },
-                                React.createElement(UniversalHeader)
-                            ),
-                            React.createElement('div', { id: 'app-container' })
+            try {
+                root.render(
+                    React.createElement(React.StrictMode, null,
+                        React.createElement(BrowserRouter, null,
+                            React.createElement(App)
                         )
                     )
-                )
-            );
+                );
 
-            console.log('[SPA] Root application mounted with unified Router tree');
-
-            // Import and start single-spa root config
-            // This will register all apps and start the routing system
-            // All apps automatically inherit Router context from parent
-            try {
-                await import('/single-spa/root-config.js');
-                console.log('[SPA] Single-SPA started successfully');
+                console.log('[App] Application mounted successfully');
             } catch (error) {
-                console.error('[SPA] Failed to start single-spa:', error);
+                console.error('[App] Failed to mount application:', error);
 
                 // Show error to user
                 appContainer.innerHTML = `
@@ -223,11 +198,11 @@
 
         // Global error handler
         window.addEventListener('error', (event) => {
-            console.error('[SPA] Global error:', event.error);
+            console.error('[App] Global error:', event.error);
         });
 
         window.addEventListener('unhandledrejection', (event) => {
-            console.error('[SPA] Unhandled promise rejection:', event.reason);
+            console.error('[App] Unhandled promise rejection:', event.reason);
         });
 
         // Performance monitoring
@@ -235,7 +210,7 @@
             if (window.performance) {
                 const perfData = window.performance.timing;
                 const pageLoadTime = perfData.loadEventEnd - perfData.navigationStart;
-                console.log(`[SPA] Page load time: ${pageLoadTime}ms`);
+                console.log(`[App] Page load time: ${pageLoadTime}ms`);
             }
         });
     </script>
