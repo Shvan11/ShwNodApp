@@ -414,7 +414,7 @@ const StatisticsComponent = () => {
                                         <td className="amount-cell negative"><strong>{formatCurrency(statistics.summary.totalExpenses.USD, 'USD')}</strong></td>
                                         <td className="amount-cell"><strong>{formatCurrency(statistics.summary.netProfit.USD, 'USD')}</strong></td>
                                         <td className="amount-cell grand-total"><strong>{formatCurrency(statistics.summary.grandTotal.USD, 'USD')}</strong></td>
-                                        <td className="amount-cell qasa-column" colspan="2"><em>(Daily Values Only)</em></td>
+                                        <td className="amount-cell qasa-column" colSpan="2"><em>(Daily Values Only)</em></td>
                                     </tr>
                                 </tfoot>
                             </table>

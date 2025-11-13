@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { createWebSocketConnection } from '../services/websocket.js';
+import wsService from '../services/websocket.js';
 
 const GlobalStateContext = createContext();
 
@@ -31,53 +31,72 @@ export function GlobalStateProvider({ children }) {
 
   // Initialize WebSocket connection once on mount
   useEffect(() => {
-    console.log('[GlobalState] Initializing WebSocket connection');
+    console.log('[GlobalState] Initializing WebSocket connection (using singleton)');
 
-    // Create a new WebSocket instance for this SPA session
-    const ws = createWebSocketConnection({
-      debug: true,
-      autoConnect: false
-    });
+    // Use the singleton WebSocket instance (shared across all components)
+    // This prevents multiple connections and ensures consistent state
+    const ws = wsService;
 
-    // Set up connection event listeners
-    ws.on('connection_established', () => {
+    // Set up connection event listeners BEFORE connecting
+    // Note: WebSocketService emits 'connected', 'disconnected', and 'error' events
+    const handleConnected = () => {
       console.log('[GlobalState] WebSocket connected');
       setIsWebSocketConnected(true);
-    });
+    };
 
-    ws.on('connection_lost', () => {
+    const handleDisconnected = () => {
       console.log('[GlobalState] WebSocket disconnected');
       setIsWebSocketConnected(false);
-    });
+    };
 
-    ws.on('connection_error', (error) => {
+    const handleError = (error) => {
       console.error('[GlobalState] WebSocket error:', error);
       setIsWebSocketConnected(false);
-    });
+    };
+
+    const handleConnecting = () => {
+      console.log('[GlobalState] WebSocket connecting...');
+    };
 
     // WhatsApp events
-    ws.on('whatsapp_client_ready', () => {
+    const handleWhatsAppReady = () => {
       console.log('[GlobalState] WhatsApp client ready');
       setWhatsappClientReady(true);
-    });
+    };
 
-    ws.on('whatsapp_qr_updated', (data) => {
+    const handleWhatsAppQR = (data) => {
       console.log('[GlobalState] WhatsApp QR code updated');
       setWhatsappQrCode(data.qr);
-    });
+    };
+
+    // Register event listeners
+    ws.on('connected', handleConnected);
+    ws.on('disconnected', handleDisconnected);
+    ws.on('error', handleError);
+    ws.on('connecting', handleConnecting);
+    ws.on('whatsapp_client_ready', handleWhatsAppReady);
+    ws.on('whatsapp_qr_updated', handleWhatsAppQR);
 
     // Store WebSocket instance in state
     setWebsocket(ws);
 
-    // Connect to WebSocket server
-    ws.connect().catch(error => {
-      console.error('[GlobalState] Failed to connect WebSocket:', error);
-    });
+    // Note: Don't call connect() here - other components (like useWebSocketSync) will handle connection
+    // This prevents duplicate connections and race conditions
+
+    // Set initial connection status based on current state
+    setIsWebSocketConnected(ws.isConnected);
 
     // Cleanup on unmount (only when entire app closes)
     return () => {
-      console.log('[GlobalState] Cleaning up WebSocket connection');
-      ws.disconnect();
+      console.log('[GlobalState] Cleaning up WebSocket listeners');
+      // Remove event listeners to prevent memory leaks
+      ws.off('connected', handleConnected);
+      ws.off('disconnected', handleDisconnected);
+      ws.off('error', handleError);
+      ws.off('connecting', handleConnecting);
+      ws.off('whatsapp_client_ready', handleWhatsAppReady);
+      ws.off('whatsapp_qr_updated', handleWhatsAppQR);
+      // Note: Don't disconnect here - other components may still need the connection
     };
   }, []);
 

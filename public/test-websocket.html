@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Connection Test</title>
+</head>
+<body>
+    <h1>WebSocket Connection Test</h1>
+    <div id="status">Testing connection...</div>
+    <div id="log"></div>
+
+    <script>
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+
+        function addLog(message, color = 'black') {
+            const p = document.createElement('p');
+            p.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            p.style.color = color;
+            log.appendChild(p);
+            console.log(message);
+        }
+
+        // Determine the WebSocket URL (same logic as the app)
+        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const isDevelopment = location.port === '5173';
+        const host = isDevelopment ? `${location.hostname}:3000` : location.host;
+        const wsUrl = `${protocol}//${host}/?PDate=2025-11-13`;
+
+        addLog(`Attempting to connect to: ${wsUrl}`, 'blue');
+
+        const ws = new WebSocket(wsUrl);
+
+        ws.onopen = function(event) {
+            addLog('WebSocket CONNECTED successfully!', 'green');
+            status.textContent = 'Status: CONNECTED ✅';
+            status.style.color = 'green';
+        };
+
+        ws.onerror = function(event) {
+            addLog('WebSocket ERROR occurred', 'red');
+            addLog(`Error details: ${JSON.stringify(event)}`, 'red');
+            status.textContent = 'Status: ERROR ❌';
+            status.style.color = 'red';
+        };
+
+        ws.onclose = function(event) {
+            addLog(`WebSocket CLOSED: Code ${event.code}, Reason: ${event.reason}`, 'orange');
+            status.textContent = 'Status: CLOSED';
+            status.style.color = 'orange';
+        };
+
+        ws.onmessage = function(event) {
+            addLog(`Received message: ${event.data}`, 'purple');
+        };
+
+        // Timeout test
+        setTimeout(() => {
+            if (ws.readyState !== WebSocket.OPEN) {
+                addLog('Connection TIMEOUT after 10 seconds', 'red');
+                status.textContent = 'Status: TIMEOUT ⏱️';
+                status.style.color = 'red';
+            }
+        }, 10000);
+    </script>
+</body>
+</html>

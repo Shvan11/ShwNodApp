@@ -205,18 +205,27 @@ export function useExpenseSummary(startDate, endDate) {
     const [error, setError] = useState(null);
 
     useEffect(() => {
+        // Skip API call if required parameters are missing
+        if (!startDate || !endDate) {
+            setSummary(null);
+            setLoading(false);
+            setError(null);
+            return;
+        }
+
         const fetchSummary = async () => {
             try {
                 setLoading(true);
                 const queryParams = new URLSearchParams();
-                if (startDate) queryParams.append('startDate', startDate);
-                if (endDate) queryParams.append('endDate', endDate);
+                queryParams.append('startDate', startDate);
+                queryParams.append('endDate', endDate);
 
                 const response = await fetch(`/api/expenses/summary?${queryParams}`);
                 if (!response.ok) throw new Error('Failed to fetch summary');
 
                 const data = await response.json();
                 setSummary(data);
+                setError(null);
             } catch (err) {
                 setError(err.message);
                 console.error('Error fetching summary:', err);

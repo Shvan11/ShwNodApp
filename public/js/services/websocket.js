@@ -17,8 +17,15 @@ class WebSocketService extends EventEmitter {
     
     // Default options
     this.options = {
-      // Base URL for WebSocket connection (defaults to current host with WS/WSS protocol)
-      baseUrl: (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host,
+      // Base URL for WebSocket connection
+      // In development (Vite port 5173), connect to Express server (port 3000)
+      // In production, use the same host/port as the page
+      baseUrl: (() => {
+        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const isDevelopment = location.port === '5173';
+        const host = isDevelopment ? `${location.hostname}:3000` : location.host;
+        return `${protocol}//${host}`;
+      })(),
       
       // Connection parameters
       reconnectInterval: 2000,      // How long to wait before reconnect attempts (ms)
@@ -134,6 +141,10 @@ class WebSocketService extends EventEmitter {
 
     // Build connection URL with parameters
     const url = this.buildConnectionUrl(params);
+
+    // Log connection attempt
+    this.log(`Attempting to connect to: ${url}`);
+    console.log('[WebSocket] Connecting to:', url);
 
     // Create WebSocket
     try {
@@ -426,10 +437,16 @@ class WebSocketService extends EventEmitter {
    */
   onError(event) {
     this.log('WebSocket error:', event);
-    
+    console.error('[WebSocket] Error occurred:', {
+      type: event.type,
+      target: event.target,
+      readyState: this.state.ws?.readyState,
+      url: this.state.ws?.url
+    });
+
     // Emit event
     this.emit('error', event);
-    
+
     // Set status to error
     this.state.status = 'error';
   }

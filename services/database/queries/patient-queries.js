@@ -3,6 +3,7 @@
  */
 import { executeQuery, executeStoredProcedure, TYPES } from '../index.js';
 import fs from 'fs/promises';
+import { createReadStream } from 'fs';
 import * as readline from 'node:readline';
 import config from '../../../config/config.js';
 import { createPathResolver } from '../../../utils/path-resolver.js';
@@ -123,7 +124,7 @@ async function getXrays(xrayDir, pathResolver, pid) {
  */
 async function extractDate(metaFile) {
     return new Promise((resolve, reject) => {
-        const fileStream = fs.createReadStream(metaFile);
+        const fileStream = createReadStream(metaFile);
         const rl = readline.createInterface({
             input: fileStream,
             crlfDelay: Infinity,

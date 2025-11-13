@@ -6199,32 +6199,6 @@ router.get('/expenses', async (req, res) => {
 });
 
 /**
- * Get a single expense by ID
- */
-router.get('/expenses/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const expense = await getExpenseById(parseInt(id));
-
-        if (!expense) {
-            return res.status(404).json({
-                success: false,
-                error: 'Expense not found'
-            });
-        }
-
-        res.json(expense);
-    } catch (error) {
-        console.error('Error fetching expense:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch expense',
-            message: error.message
-        });
-    }
-});
-
-/**
  * Get all expense categories
  */
 router.get('/expenses/categories', async (req, res) => {
@@ -6331,69 +6305,6 @@ router.post('/expenses', async (req, res) => {
 });
 
 /**
- * Update an existing expense
- */
-router.put('/expenses/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { expenseDate, amount, currency, note, categoryId, subcategoryId } = req.body;
-
-        // Validation
-        if (!expenseDate || !amount) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required fields: expenseDate, amount'
-            });
-        }
-
-        const expenseData = {
-            expenseDate,
-            amount: parseInt(amount),
-            currency: currency || 'IQD',
-            note,
-            categoryId: categoryId ? parseInt(categoryId) : null,
-            subcategoryId: subcategoryId ? parseInt(subcategoryId) : null
-        };
-
-        const result = await updateExpense(parseInt(id), expenseData);
-        res.json({
-            success: true,
-            message: 'Expense updated successfully',
-            data: result
-        });
-    } catch (error) {
-        console.error('Error updating expense:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to update expense',
-            message: error.message
-        });
-    }
-});
-
-/**
- * Delete an expense
- */
-router.delete('/expenses/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const result = await deleteExpense(parseInt(id));
-        res.json({
-            success: true,
-            message: 'Expense deleted successfully',
-            data: result
-        });
-    } catch (error) {
-        console.error('Error deleting expense:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to delete expense',
-            message: error.message
-        });
-    }
-});
-
-/**
  * Get expense summary by category and currency
  * Query params: startDate, endDate (required)
  */
@@ -6449,6 +6360,128 @@ router.get('/expenses-summary', async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to fetch expense summary',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Get a single expense by ID
+ * NOTE: This route MUST come after all specific /expenses/* routes
+ * to avoid matching paths like /expenses/categories or /expenses/summary
+ */
+router.get('/expenses/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Validate that id is a valid number
+        const expenseId = parseInt(id);
+        if (isNaN(expenseId)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid expense ID. Must be a number.'
+            });
+        }
+
+        const expense = await getExpenseById(expenseId);
+
+        if (!expense) {
+            return res.status(404).json({
+                success: false,
+                error: 'Expense not found'
+            });
+        }
+
+        res.json(expense);
+    } catch (error) {
+        console.error('Error fetching expense:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch expense',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Update an existing expense
+ * NOTE: This route MUST come after all specific /expenses/* routes
+ */
+router.put('/expenses/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { expenseDate, amount, currency, note, categoryId, subcategoryId } = req.body;
+
+        // Validate that id is a valid number
+        const expenseId = parseInt(id);
+        if (isNaN(expenseId)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid expense ID. Must be a number.'
+            });
+        }
+
+        // Validation
+        if (!expenseDate || !amount) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required fields: expenseDate, amount'
+            });
+        }
+
+        const expenseData = {
+            expenseDate,
+            amount: parseInt(amount),
+            currency: currency || 'IQD',
+            note,
+            categoryId: categoryId ? parseInt(categoryId) : null,
+            subcategoryId: subcategoryId ? parseInt(subcategoryId) : null
+        };
+
+        const result = await updateExpense(expenseId, expenseData);
+        res.json({
+            success: true,
+            message: 'Expense updated successfully',
+            data: result
+        });
+    } catch (error) {
+        console.error('Error updating expense:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update expense',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Delete an expense
+ * NOTE: This route MUST come after all specific /expenses/* routes
+ */
+router.delete('/expenses/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Validate that id is a valid number
+        const expenseId = parseInt(id);
+        if (isNaN(expenseId)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid expense ID. Must be a number.'
+            });
+        }
+
+        const result = await deleteExpense(expenseId);
+        res.json({
+            success: true,
+            message: 'Expense deleted successfully',
+            data: result
+        });
+    } catch (error) {
+        console.error('Error deleting expense:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete expense',
             message: error.message
         });
     }
