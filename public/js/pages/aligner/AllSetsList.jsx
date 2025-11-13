@@ -1,7 +1,6 @@
 // AllSetsList.jsx - Simple list view of all aligner sets from v_allsets
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AlignerModeToggle from '../../components/react/AlignerModeToggle.jsx';
 
 const AllSetsList = () => {
     const navigate = useNavigate();
@@ -84,9 +83,7 @@ const AllSetsList = () => {
     const noNextBatchCount = sets.filter(s => s.NextBatchPresent === 'False').length;
 
     return (
-        <div className="aligner-container">
-            <AlignerModeToggle activeMode="all-sets" />
-
+        <>
             {/* Breadcrumb */}
             <div className="breadcrumb">
                 <button onClick={() => navigate('/aligner')} className="breadcrumb-link">
@@ -312,7 +309,7 @@ const AllSetsList = () => {
                     </table>
                 </div>
             )}
-        </div>
+        </>
     );
 };
 
