@@ -498,11 +498,13 @@ th.qasa-column {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     padding: 1.5rem;
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     border-radius: 8px;
     flex-shrink: 0; /* Prevent summary from shrinking */
+    max-height: 300px; /* Prevent summary from taking all space */
+    overflow-y: auto; /* Allow scrolling if too many items */
 }
 
 .summary-item {
@@ -537,6 +539,8 @@ th.qasa-column {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.9rem;
+    display: table; /* Ensure table layout */
+    table-layout: auto; /* Allow normal table sizing */
 }
 
 .invoices-table thead {
@@ -612,9 +616,11 @@ th.qasa-column {
 
 /* Table wrapper inside modal */
 .modal-content .table-wrapper {
-    flex: 1;
-    min-height: 0; /* Allow scrolling in flex container */
+    flex: 1 1 auto; /* Allow grow, shrink, and auto basis */
+    min-height: 200px; /* Ensure minimum visibility */
     overflow-y: auto;
+    overflow-x: auto;
+    display: block; /* Ensure it renders */
 }
 
 .modal-footer {
