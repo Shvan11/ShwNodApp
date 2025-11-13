@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import '../../../css/components/invoice-form.css'
 import { formatNumber, parseFormattedNumber, formatCurrency as formatCurrencyUtil } from '../../utils/formatters.js'
 
@@ -6,6 +6,7 @@ import { formatNumber, parseFormattedNumber, formatCurrency as formatCurrencyUti
  * Payment Modal Component
  * Memoized to prevent unnecessary re-renders
  * Re-renders only when workData, onClose, or onSuccess props change
+ * Uses useCallback for event handlers to prevent breaking memoization
  */
 const PaymentModal = ({ workData, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
