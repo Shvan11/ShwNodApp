@@ -1,6 +1,7 @@
 // AllSetsList.jsx - Simple list view of all aligner sets from v_allsets
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AlignerModeToggle from '../../components/react/AlignerModeToggle.jsx';
 
 const AllSetsList = () => {
     const navigate = useNavigate();
@@ -84,27 +85,7 @@ const AllSetsList = () => {
 
     return (
         <div className="aligner-container">
-            {/* Mode Toggle */}
-            <div className="mode-toggle">
-                <button className="mode-btn active">
-                    <i className="fas fa-list"></i>
-                    All Sets Overview
-                </button>
-                <button
-                    className="mode-btn"
-                    onClick={() => navigate('/aligner')}
-                >
-                    <i className="fas fa-user-md"></i>
-                    Browse by Doctor
-                </button>
-                <button
-                    className="mode-btn"
-                    onClick={() => navigate('/aligner/search')}
-                >
-                    <i className="fas fa-search"></i>
-                    Quick Search
-                </button>
-            </div>
+            <AlignerModeToggle activeMode="all-sets" />
 
             {/* Breadcrumb */}
             <div className="breadcrumb">
