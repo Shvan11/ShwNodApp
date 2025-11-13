@@ -2,30 +2,26 @@
  * Template Management Application
  * React-based template designer and management system using GrapesJS
  *
- * Note: Uses shared history instance for consistent navigation across all apps
+ * Note: Inherits Router context from index.html BrowserRouter (no Router needed here)
  */
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import singleSpaReact from 'single-spa-react';
-import { Router } from 'react-router';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { sharedHistory } from '/single-spa/shared-history.js';
 import TemplateManagement from '../components/templates/TemplateManagement.jsx';
 import TemplateDesigner from '../components/templates/TemplateDesigner.jsx';
 
 const TemplateApp = () => {
     return (
-        <Router location={sharedHistory.location} navigator={sharedHistory}>
-            <div id="app">
-                <Routes>
-                    <Route path="/templates" element={<TemplateManagement />} />
-                    <Route path="/templates/designer/:templateId" element={<TemplateDesigner />} />
-                    <Route path="/templates/designer" element={<TemplateDesigner />} />
-                    <Route path="*" element={<Navigate to="/templates" replace />} />
-                </Routes>
-            </div>
-        </Router>
+        <div id="app">
+            <Routes>
+                <Route path="/templates" element={<TemplateManagement />} />
+                <Route path="/templates/designer/:templateId" element={<TemplateDesigner />} />
+                <Route path="/templates/designer" element={<TemplateDesigner />} />
+                <Route path="*" element={<Navigate to="/templates" replace />} />
+            </Routes>
+        </div>
     );
 };
 

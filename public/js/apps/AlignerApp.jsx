@@ -2,9 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import singleSpaReact from 'single-spa-react';
-import { Router } from 'react-router';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { sharedHistory } from '/single-spa/shared-history.js';
 import DoctorsList from '../pages/aligner/DoctorsList.jsx';
 import PatientsList from '../pages/aligner/PatientsList.jsx';
 import PatientSets from '../pages/aligner/PatientSets.jsx';
@@ -22,34 +20,32 @@ import AllSetsList from '../pages/aligner/AllSetsList.jsx';
  * - /aligner/search → Search interface
  * - /aligner/patient/:workId → Direct patient access from search
  *
- * Note: Uses shared history instance for consistent navigation across all apps
+ * Note: Inherits Router context from index.html BrowserRouter (no Router needed here)
  */
 const AlignerApp = () => {
     return (
-        <Router location={sharedHistory.location} navigator={sharedHistory}>
-            <Routes>
-                {/* Doctors List */}
-                <Route path="/aligner" element={<DoctorsList />} />
+        <Routes>
+            {/* Doctors List */}
+            <Route path="/aligner" element={<DoctorsList />} />
 
-                {/* All Sets Overview */}
-                <Route path="/aligner/all-sets" element={<AllSetsList />} />
+            {/* All Sets Overview */}
+            <Route path="/aligner/all-sets" element={<AllSetsList />} />
 
-                {/* Doctor's Patients List */}
-                <Route path="/aligner/doctor/:doctorId" element={<PatientsList />} />
+            {/* Doctor's Patients List */}
+            <Route path="/aligner/doctor/:doctorId" element={<PatientsList />} />
 
-                {/* Patient's Aligner Sets (from doctor browse) */}
-                <Route path="/aligner/doctor/:doctorId/patient/:workId" element={<PatientSets />} />
+            {/* Patient's Aligner Sets (from doctor browse) */}
+            <Route path="/aligner/doctor/:doctorId/patient/:workId" element={<PatientSets />} />
 
-                {/* Search Interface */}
-                <Route path="/aligner/search" element={<SearchPatient />} />
+            {/* Search Interface */}
+            <Route path="/aligner/search" element={<SearchPatient />} />
 
-                {/* Patient's Aligner Sets (from search) */}
-                <Route path="/aligner/patient/:workId" element={<PatientSets />} />
+            {/* Patient's Aligner Sets (from search) */}
+            <Route path="/aligner/patient/:workId" element={<PatientSets />} />
 
-                {/* Redirect unknown routes to default */}
-                <Route path="*" element={<Navigate to="/aligner" replace />} />
-            </Routes>
-        </Router>
+            {/* Redirect unknown routes to default */}
+            <Route path="*" element={<Navigate to="/aligner" replace />} />
+        </Routes>
     );
 };
 
