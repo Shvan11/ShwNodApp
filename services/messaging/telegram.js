@@ -3,7 +3,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import { TelegramClient, Api } from "telegram";
 import { CustomFile } from "telegram/client/uploads.js";
 import { StringSession } from "telegram/sessions/index.js";
-import fs from 'fs';
+import fs from 'fs/promises';
 import config from '../../config/config.js';
 import { getPhoneCompatibleFilename } from '../../utils/filename-converter.js';
 
@@ -84,26 +84,21 @@ export async function sendgramfile(phone, filepath) {
             return { result: "ERROR", error: "Invalid file path" };
         }
 
-        // Check if file exists
-        if (!fs.existsSync(filepath)) {
-            console.error(`File not found: ${filepath}`);
-            return { result: "ERROR", error: `File not found: ${filepath}` };
-        }
-
-        // Check if file is readable
+        // Check if file exists and is readable (non-blocking async)
         try {
-            fs.accessSync(filepath, fs.constants.R_OK);
+            await fs.access(filepath);
         } catch (accessError) {
-            console.error(`File not readable: ${filepath}`, accessError);
-            return { result: "ERROR", error: `File not readable: ${filepath}` };
+            console.error(`File not found or not readable: ${filepath}`, accessError);
+            return { result: "ERROR", error: `File not found or not readable: ${filepath}` };
         }
 
         // Convert filename to phone-compatible format
         const originalFilename = filepath.split(/[/\\]/).pop(); // Get filename from path
         const convertedFilename = getPhoneCompatibleFilename(originalFilename);
-        
+
         // Force as photo using CustomFile with .jpg extension and InputMediaUploadedPhoto
-        const fileStats = fs.statSync(filepath);
+        // Non-blocking async stat operation
+        const fileStats = await fs.stat(filepath);
         
         console.log(`=== TELEGRAM PHOTO FORCE ===`);
         console.log(`Original file: ${originalFilename}`);

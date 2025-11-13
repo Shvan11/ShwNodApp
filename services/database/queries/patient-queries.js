@@ -2,10 +2,25 @@
  * Patient-related database queries
  */
 import { executeQuery, executeStoredProcedure, TYPES } from '../index.js';
-import fs from 'fs';
+import fs from 'fs/promises';
 import * as readline from 'node:readline';
 import config from '../../../config/config.js';
 import { createPathResolver } from '../../../utils/path-resolver.js';
+
+/**
+ * Helper function to check if a path exists
+ * Non-blocking async alternative to fs.existsSync()
+ * @param {string} path - The path to check
+ * @returns {Promise<boolean>} - True if path exists, false otherwise
+ */
+async function pathExists(path) {
+    try {
+        await fs.access(path);
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 /**
  * Retrieves patient information for a given patient ID.
@@ -42,12 +57,13 @@ async function getAssets(pid) {
     const xrayDir = pathResolver(`clinic1/${pid}/opg`);
     const assetsDir = pathResolver(`clinic1/${pid}/assets`);
 
-    const xrays = fs.existsSync(xrayDir)
+    // Non-blocking async file operations
+    const xrays = await pathExists(xrayDir)
         ? await getXrays(xrayDir, pathResolver, pid)
         : [];
 
-    const assets = fs.existsSync(assetsDir)
-        ? fs.readdirSync(assetsDir)
+    const assets = await pathExists(assetsDir)
+        ? await fs.readdir(assetsDir)
         : [];
 
     return { xrays, assets };
@@ -61,26 +77,34 @@ async function getAssets(pid) {
  * @returns {Promise<Array>} - A promise that resolves with an array of X-ray objects.
  */
 async function getXrays(xrayDir, pathResolver, pid) {
-    const xrayNames = fs.readdirSync(xrayDir).filter((xrayName) =>
+    // Non-blocking async directory read
+    const allFiles = await fs.readdir(xrayDir);
+    const xrayNames = allFiles.filter((xrayName) =>
         xrayName.endsWith('.dcm') ||
         xrayName.endsWith('.pano') ||
         xrayName.endsWith('.ceph') ||
         xrayName.endsWith('.rvg') ||
         xrayName.startsWith('TASK_')
     );
+
     const xrays = await Promise.all(
         xrayNames.map(async (xrayName) => {
             const xray = { name: xrayName };
             const parentDetailsDirPath = pathResolver(`clinic1/${pid}/opg/.csi_data/.version_4.4`);
-            if (fs.existsSync(parentDetailsDirPath)) {
-                const subDirs = fs.readdirSync(parentDetailsDirPath);
+
+            // Non-blocking async path existence check
+            if (await pathExists(parentDetailsDirPath)) {
+                const subDirs = await fs.readdir(parentDetailsDirPath);
                 for (const subDir of subDirs) {
                     if (subDir.endsWith(xrayName)) {
                         xray.detailsDirName = subDir;
-                        const detailsDirPath = pathResolver(`clinic1/${pid}/opg/.csi_data/.version_4.4/${subDir}`);
-                        if (fs.existsSync(pathResolver(`clinic1/${pid}/opg/.csi_data/.version_4.4/${subDir}/t.png`))) {
+                        const previewPath = pathResolver(`clinic1/${pid}/opg/.csi_data/.version_4.4/${subDir}/t.png`);
+
+                        // Non-blocking async check for preview image
+                        if (await pathExists(previewPath)) {
                             xray.previewImagePartialPath = `/OPG/.csi_data/.version_4.4/${subDir}/t.png`;
                         }
+
                         const metaFile = pathResolver(`clinic1/${pid}/opg/.csi_data/.version_4.4/${subDir}/meta`);
                         xray.date = await extractDate(metaFile);
                     }
