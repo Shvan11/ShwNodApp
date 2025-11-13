@@ -12,11 +12,11 @@ const router = express.Router();
 // ==============================
 
 /**
- * Single-SPA Architecture
+ * Unified React Application Architecture
  *
- * All routes serve the same index-spa.html file.
+ * All routes serve the same index.html file.
  * React Router handles all client-side routing.
- * Single-SPA orchestrates micro-apps based on the current route.
+ * Single unified React app with BrowserRouter.
  *
  * Benefits:
  * - No page reloads - instant navigation
@@ -26,10 +26,10 @@ const router = express.Router();
  * - Native app-like experience
  */
 function serveSingleSPA(res) {
-  const spaFile = path.join(process.cwd(), './dist/index-spa.html');
+  const spaFile = path.join(process.cwd(), './dist/index.html');
   res.sendFile(spaFile, (err) => {
     if (err) {
-      console.error('[SPA] Failed to serve index-spa.html:', err);
+      console.error('[SPA] Failed to serve index.html:', err);
       res.status(500).send('Application failed to load. Please try again.');
     }
   });
@@ -45,26 +45,29 @@ router.get('/template-designer', (_, res) => {
 });
 
 // ==============================
-// SINGLE-SPA ROUTES
+// UNIFIED REACT APP ROUTES
 // ==============================
 //
-// ALL routes serve index-spa.html - client-side routing takes over
+// ALL routes serve index.html - client-side routing takes over
 //
-// Registered Apps (single-spa):
-//   - @clinic/dashboard        → / or /dashboard
-//   - @clinic/patient          → /patient/*
-//   - @clinic/expenses         → /expenses
-//   - @clinic/whatsapp-send    → /send
-//   - @clinic/whatsapp-auth    → /auth
-//   - @clinic/aligner          → /aligner/*
-//   - @clinic/settings         → /settings/*
-//   - @clinic/templates        → /templates/*
-//   - @clinic/appointments     → /appointments
+// Application routes (BrowserRouter):
+//   - /dashboard               → Dashboard
+//   - /patient/*               → Patient Portal (nested routes)
+//   - /patient-management      → Patient Search & Grid
+//   - /appointments            → Daily Appointments
+//   - /calendar                → Calendar View
+//   - /send                    → WhatsApp Send
+//   - /auth                    → WhatsApp Auth
+//   - /aligner/*               → Aligner Management (nested routes)
+//   - /expenses                → Expenses
+//   - /settings/*              → Settings (nested routes)
+//   - /templates/*             → Templates (nested routes)
+//   - /statistics              → Financial Statistics
 //
-// React Router handles all nested routing within each app
+// React Router handles all nested routing within the unified app
 // No page reloads - all navigation is instant
 
-// Catch-all route - serves index-spa.html for ALL routes
+// Catch-all route - serves index.html for ALL routes
 router.get('*', (_, res) => {
   serveSingleSPA(res);
 });

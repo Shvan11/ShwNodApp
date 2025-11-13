@@ -35,13 +35,13 @@
 
   /* Typography */
   --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-  --font-size-xs: 0.75rem;
-  --font-size-sm: 0.875rem;
-  --font-size-base: 1rem;
-  --font-size-lg: 1.125rem;
-  --font-size-xl: 1.25rem;
-  --font-size-2xl: 1.5rem;
-  --font-size-3xl: 2rem;
+  --font-size-xs: 0.7rem;
+  --font-size-sm: 0.8rem;
+  --font-size-base: 0.875rem;
+  --font-size-lg: 0.95rem;
+  --font-size-xl: 1.05rem;
+  --font-size-2xl: 1.2rem;
+  --font-size-3xl: 1.5rem;
 
   /* Spacing */
   --spacing-xs: 0.25rem;
@@ -80,8 +80,9 @@ html {
   box-sizing: inherit;
 }
 
-body {
-  height: 100%;
+/* Body styles removed - managed by global styles in index.html */
+/* The appointments page is now part of the unified React app */
+.daily-appointments-container {
   margin: 0;
   padding: 0;
   font-family: var(--font-family);
@@ -89,13 +90,7 @@ body {
   line-height: 1.5;
   color: #1f2937;
   background-color: var(--page-bg);
-}
-
-body.daily-appointments-view {
-  margin: 0;
-  padding: 0;
-  padding-top: 50px; /* Account for fixed universal header */
-  width: 100vw;
+  width: 100%;
   overflow-x: hidden;
   min-height: 100vh;
 }
@@ -451,7 +446,7 @@ body.daily-appointments-view {
 }
 
 .patient-name {
-  font-size: var(--font-size-base);
+  font-size: 0.875rem;
   font-weight: 600;
   color: #1f2937;
   display: flex;
