@@ -887,13 +887,13 @@
         max-width: 100%;
     }
 
-    /* Aggressive width control */
+    /* Width control for mobile devices */
     .new-visit-form .form-group input,
     .new-visit-form .form-group select,
     .new-visit-form .form-group textarea {
-        width: 100% !important;
-        max-width: 100% !important;
-        box-sizing: border-box !important;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
     }
 
     .new-visit-header h3 {

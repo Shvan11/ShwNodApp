@@ -110,6 +110,7 @@
     align-items: center;
     gap: 0.5rem;
     text-decoration: none;
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
 }
 

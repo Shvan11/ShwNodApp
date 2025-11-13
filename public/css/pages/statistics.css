@@ -365,8 +365,8 @@
 }
 
 th.qasa-column {
-    background-color: #f39c12 !important;
-    color: white !important;
+    background-color: #f39c12;
+    color: white;
 }
 
 .total-row {
@@ -417,7 +417,7 @@ th.qasa-column {
 }
 
 .clickable-row:hover {
-    background-color: rgba(52, 152, 219, 0.1) !important;
+    background-color: rgba(52, 152, 219, 0.1);
 }
 
 /* Modal Styles */

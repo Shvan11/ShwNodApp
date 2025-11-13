@@ -3,6 +3,7 @@
 @import 'base/reset.css';
 @import 'base/variables.css';
 @import 'base/typography.css';
+@import 'base/rtl-support.css';
 
 /* Component styles - only existing files */
 @import 'components/buttons.css';
@@ -11,13 +12,8 @@
 @import 'components/appointment-calendar.css';
 @import 'components/sidebar-navigation.css';
 
-/* Page-specific styles (uncomment as needed) */
-/* @import 'pages/appointments.css'; */
-/* @import 'pages/front.css'; */
-/* @import 'pages/search.css'; */
-/* @import 'pages/visitsSummary.css'; */
+/* Page-specific styles */
 @import 'pages/work-management.css';
-/* etc. */
 
 /* Utility classes - Using proper CSS cascade without !important */
 

@@ -105,4 +105,45 @@
 
     --info-dark: #138496;
     --info-light: #d1ecf1;
+
+    /* Breakpoints for responsive design */
+    --breakpoint-xs: 375px;
+    --breakpoint-sm: 480px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 1024px;
+    --breakpoint-xl: 1400px;
   }
+
+/* RTL (Right-to-Left) Support */
+[dir="rtl"] {
+    direction: rtl;
+}
+
+[dir="rtl"] .text-left {
+    text-align: right;
+}
+
+[dir="rtl"] .text-right {
+    text-align: left;
+}
+
+/* RTL margin/padding adjustments */
+[dir="rtl"] .ml-1 { margin-right: var(--spacing-sm); margin-left: 0; }
+[dir="rtl"] .ml-2 { margin-right: var(--spacing-md); margin-left: 0; }
+[dir="rtl"] .ml-3 { margin-right: var(--spacing-lg); margin-left: 0; }
+[dir="rtl"] .ml-4 { margin-right: var(--spacing-xl); margin-left: 0; }
+
+[dir="rtl"] .mr-1 { margin-left: var(--spacing-sm); margin-right: 0; }
+[dir="rtl"] .mr-2 { margin-left: var(--spacing-md); margin-right: 0; }
+[dir="rtl"] .mr-3 { margin-left: var(--spacing-lg); margin-right: 0; }
+[dir="rtl"] .mr-4 { margin-left: var(--spacing-xl); margin-right: 0; }
+
+[dir="rtl"] .pl-1 { padding-right: var(--spacing-sm); padding-left: 0; }
+[dir="rtl"] .pl-2 { padding-right: var(--spacing-md); padding-left: 0; }
+[dir="rtl"] .pl-3 { padding-right: var(--spacing-lg); padding-left: 0; }
+[dir="rtl"] .pl-4 { padding-right: var(--spacing-xl); padding-left: 0; }
+
+[dir="rtl"] .pr-1 { padding-left: var(--spacing-sm); padding-right: 0; }
+[dir="rtl"] .pr-2 { padding-left: var(--spacing-md); padding-right: 0; }
+[dir="rtl"] .pr-3 { padding-left: var(--spacing-lg); padding-right: 0; }
+[dir="rtl"] .pr-4 { padding-left: var(--spacing-xl); padding-right: 0; }

@@ -1,6 +1,6 @@
 /* pages/sendWa_Tel.css - Styles specific to the SendWa_Tel page */
 
-@import "http://fonts.googleapis.com/css?family=Raleway";
+@import "https://fonts.googleapis.com/css?family=Raleway";
 
 /* Two column layout for the options */
 .two-column-option {
@@ -14,17 +14,18 @@
 }
 
 /* Modal container styles */
-#abc {
+#message-modal-overlay {
   width: 100%;
   height: 100%;
-  opacity: .95;
+  opacity: 0.95;
   top: 0;
   left: 0;
   /* display: none; */
   display: block; /* Show by default */
   position: fixed;
   background-color: #313131;
-  overflow: auto
+  overflow: auto;
+  z-index: var(--z-index-modal);
 }
 
 #close {
@@ -111,7 +112,7 @@ hr {
   transform: translateY(-50%);
   color: #666;
   pointer-events: none;
-  z-index: 1;
+  z-index: 1; /* Minimal z-index for icon positioning */
 }
 
 #phone {

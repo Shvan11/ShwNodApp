@@ -1,0 +1,211 @@
+/* RTL (Right-to-Left) Support - Kurdish/Arabic Language Support */
+
+/* Universal Header RTL Adjustments */
+[dir="rtl"] .universal-header .header-left {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .logo-section {
+    margin-right: 0;
+    margin-left: 2rem;
+}
+
+[dir="rtl"] .header-breadcrumb {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .main-navigation {
+    flex-direction: row-reverse;
+}
+
+/* Drawer/Modal RTL Adjustments */
+[dir="rtl"] .drawer-container {
+    right: auto;
+    left: 0;
+}
+
+[dir="rtl"] .drawer-overlay {
+    animation: slideInLeft 0.3s ease;
+}
+
+@keyframes slideInLeft {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+/* Form Fields RTL */
+[dir="rtl"] input,
+[dir="rtl"] select,
+[dir="rtl"] textarea {
+    text-align: right;
+    direction: rtl;
+}
+
+[dir="rtl"] input[type="number"],
+[dir="rtl"] input[type="tel"],
+[dir="rtl"] input[type="email"] {
+    direction: ltr; /* Keep numbers and emails LTR */
+    text-align: left;
+}
+
+/* Table RTL Adjustments */
+[dir="rtl"] table th,
+[dir="rtl"] table td {
+    text-align: right;
+}
+
+[dir="rtl"] table th:first-child,
+[dir="rtl"] table td:first-child {
+    border-right: none;
+    border-left: 1px solid var(--border-color);
+}
+
+/* Button Icons RTL */
+[dir="rtl"] .btn i,
+[dir="rtl"] .nav-btn i {
+    margin-right: 0;
+    margin-left: 0.5rem;
+}
+
+/* Card Actions RTL */
+[dir="rtl"] .work-card-actions-menu {
+    right: auto;
+    left: 1rem;
+}
+
+/* Breadcrumb RTL */
+[dir="rtl"] .breadcrumb {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .breadcrumb-separator {
+    transform: scaleX(-1);
+}
+
+/* Dropdown Menus RTL */
+[dir="rtl"] .dropdown-menu {
+    right: auto;
+    left: 0;
+}
+
+[dir="rtl"] .quick-search-dropdown {
+    right: auto;
+    left: 0;
+}
+
+/* Grid Layouts RTL */
+[dir="rtl"] .grid-layout,
+[dir="rtl"] .doctors-grid,
+[dir="rtl"] .summary-grid {
+    direction: rtl;
+}
+
+/* Flex Reverse for RTL */
+[dir="rtl"] .flex-row {
+    flex-direction: row-reverse;
+}
+
+/* Border Adjustments for RTL */
+[dir="rtl"] .border-left-purple {
+    border-left: none;
+    border-right: 4px solid #4f46e5;
+}
+
+/* Toast/Notification RTL */
+[dir="rtl"] .toast-container {
+    right: auto;
+    left: 20px;
+}
+
+[dir="rtl"] .toast {
+    border-left: none;
+    border-right: 4px solid;
+    animation: slideInFromLeft 0.3s ease-out;
+}
+
+@keyframes slideInFromLeft {
+    from {
+        transform: translateX(-400px);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+/* Patient Shell & Navigation RTL */
+[dir="rtl"] .patient-nav-tabs {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .sidebar-navigation {
+    right: auto;
+    left: 0;
+}
+
+/* Appointment Calendar RTL */
+[dir="rtl"] .calendar-header {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .calendar-navigation {
+    flex-direction: row-reverse;
+}
+
+/* Work Card RTL */
+[dir="rtl"] .work-card {
+    direction: rtl;
+}
+
+[dir="rtl"] .work-card-header {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .work-card-actions {
+    flex-direction: row-reverse;
+}
+
+/* Aligner Components RTL */
+[dir="rtl"] .aligner-set-card {
+    direction: rtl;
+}
+
+[dir="rtl"] .aligner-drawer-form {
+    right: auto;
+    left: 0;
+}
+
+/* Statistics & Reports RTL */
+[dir="rtl"] .summary-card {
+    direction: rtl;
+}
+
+[dir="rtl"] .chart-container {
+    direction: ltr; /* Keep charts LTR for consistency */
+}
+
+/* Responsive RTL Adjustments */
+@media (max-width: 768px) {
+    [dir="rtl"] .header-right {
+        flex-direction: row-reverse;
+    }
+
+    [dir="rtl"] .main-navigation {
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+}
+
+/* Print RTL Support */
+@media print {
+    [dir="rtl"] body {
+        direction: rtl;
+    }
+
+    [dir="rtl"] * {
+        text-align: right;
+    }
+}

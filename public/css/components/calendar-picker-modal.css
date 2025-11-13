@@ -11,7 +11,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 9999;
+    z-index: var(--z-index-modal);
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
     animation: modalOverlayFadeIn 0.3s ease-out;
 }
@@ -19,10 +20,12 @@
 @keyframes modalOverlayFadeIn {
     from {
         opacity: 0;
+        -webkit-backdrop-filter: blur(0px);
         backdrop-filter: blur(0px);
     }
     to {
         opacity: 1;
+        -webkit-backdrop-filter: blur(4px);
         backdrop-filter: blur(4px);
     }
 }
