@@ -54,30 +54,6 @@ const DoctorsList = () => {
                 </h2>
                 <div className="section-info">
                     <span>{doctors.length} doctor{doctors.length !== 1 ? 's' : ''}</span>
-                    <button
-                        onClick={() => navigate('/aligner/all-sets')}
-                        style={{
-                            marginLeft: '1rem',
-                            padding: '0.5rem 1rem',
-                            backgroundColor: '#f59e0b',
-                            color: 'white',
-                            borderRadius: '6px',
-                            border: 'none',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            transition: 'background-color 0.2s'
-                        }}
-                        onMouseEnter={(e) => e.target.style.backgroundColor = '#d97706'}
-                        onMouseLeave={(e) => e.target.style.backgroundColor = '#f59e0b'}
-                        title="View all aligner sets with next batch status"
-                    >
-                        <i className="fas fa-list-ul"></i>
-                        All Sets Overview
-                    </button>
                     <a
                         href="/settings?tab=alignerDoctors"
                         className="btn-link"
