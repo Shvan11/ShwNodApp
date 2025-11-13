@@ -485,16 +485,22 @@ th.qasa-column {
     transform: rotate(90deg);
 }
 
-.modal-content {
+/* Override global modal-content styles from expenses.css */
+.daily-invoices-modal .modal-content {
     padding: 2rem;
     flex: 1;
-    min-height: 0; /* Flexbox fix to allow proper scrolling */
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* Prevent double scrolling */
+    overflow: hidden;
+    width: auto;
+    max-width: none;
+    box-shadow: none;
+    border-radius: 0;
+    background-color: transparent;
 }
 
-.invoice-summary {
+.daily-invoices-modal .invoice-summary {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
@@ -502,9 +508,9 @@ th.qasa-column {
     padding: 1.5rem;
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     border-radius: 8px;
-    flex-shrink: 0; /* Prevent summary from shrinking */
-    max-height: 300px; /* Prevent summary from taking all space */
-    overflow-y: auto; /* Allow scrolling if too many items */
+    flex-shrink: 0;
+    max-height: 250px;
+    overflow-y: auto;
 }
 
 .summary-item {
@@ -592,9 +598,9 @@ th.qasa-column {
 }
 
 /* States inside modal */
-.modal-content .loading-state,
-.modal-content .error-state,
-.modal-content .empty-state {
+.daily-invoices-modal .modal-content .loading-state,
+.daily-invoices-modal .modal-content .error-state,
+.daily-invoices-modal .modal-content .empty-state {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -603,24 +609,23 @@ th.qasa-column {
     min-height: 300px;
 }
 
-.modal-content .empty-state i {
+.daily-invoices-modal .modal-content .empty-state i {
     font-size: 3rem;
     color: #95a5a6;
     margin-bottom: 1rem;
 }
 
-.modal-content .empty-state p {
+.daily-invoices-modal .modal-content .empty-state p {
     color: #7f8c8d;
     font-size: 1.1rem;
 }
 
 /* Table wrapper inside modal */
-.modal-content .table-wrapper {
-    flex: 1 1 auto; /* Allow grow, shrink, and auto basis */
-    min-height: 200px; /* Ensure minimum visibility */
-    overflow-y: auto;
-    overflow-x: auto;
-    display: block; /* Ensure it renders */
+.daily-invoices-modal .modal-content .table-wrapper {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    display: block;
 }
 
 .modal-footer {
