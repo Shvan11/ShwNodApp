@@ -211,7 +211,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                 </div>
 
                 {/* View Full Calendar Button */}
-                <a href="http://localhost:5173/calendar" target="_blank" className="full-calendar-link">
+                <a href="/calendar" target="_blank" className="full-calendar-link">
                     <i className="fas fa-calendar-alt"></i> Full Calendar
                 </a>
 

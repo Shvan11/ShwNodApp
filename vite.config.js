@@ -43,7 +43,7 @@ export default defineConfig({
     })
   ],
   root: 'public',
-  publicDir: 'assets',
+  publicDir: false, // Disable - Express serves static files in production
   build: {
     outDir: '../dist',
     emptyOutDir: true,
@@ -52,40 +52,44 @@ export default defineConfig({
         // Single entry point for the entire SPA
         main: resolve(__dirname, 'public/index.html'),
       },
+      // Mark CDN-loaded libraries as external to prevent bundling
+      external: ['react', 'react-dom', 'react-dom/client', 'react-router-dom', 'date-fns', 'axios'],
       output: {
-        // Code splitting by app for optimal loading
+        // Code splitting for application code only
         manualChunks: {
-          'vendor': ['react', 'react-dom', 'react-router-dom'],
+          // Don't include CDN libraries in vendor chunk
+          // They're loaded from importmap in index.html
         }
       }
     }
   },
   server: {
-    port: 5173,
+    port: parseInt(process.env.VITE_DEV_PORT || '5173'),
     host: true,
     open: true,
     fs: {
       strict: false
     },
-    // Single-SPA mode: All routes serve the same HTML file
+    // SPA mode: All routes serve the same HTML file
     middlewareMode: false,
     proxy: {
       // Proxy API and data routes to Express server
+      // Target can be overridden with VITE_API_URL environment variable
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_URL || 'http://localhost:3000',
         changeOrigin: true,
         secure: false
       },
       '/health': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_URL || 'http://localhost:3000',
         changeOrigin: true
       },
       '/DolImgs': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_URL || 'http://localhost:3000',
         changeOrigin: true
       },
       '/data': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_URL || 'http://localhost:3000',
         changeOrigin: true
       }
     },

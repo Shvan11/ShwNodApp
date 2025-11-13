@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useState } from 'react';
 import wsService from '../services/websocket.js';
 import { WebSocketEvents } from '../constants/websocket-events.js';
+import { config } from '../config/environment.js';
 
 /**
  * Custom hook for WebSocket real-time appointment updates
@@ -12,12 +13,8 @@ export function useWebSocketSync(currentDate, onAppointmentsUpdated) {
     // Initialize WebSocket connection
     useEffect(() => {
         const initializeWebSocket = async () => {
-            // Determine WebSocket URL based on environment
-            const isDevelopment = location.port === '5173';
-            const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = isDevelopment
-                ? 'ws://localhost:3000'
-                : wsProtocol + '//' + location.host;
+            // Use environment configuration for WebSocket URL
+            const wsUrl = config.wsUrl;
 
             // Set the base URL for WebSocket connection
             wsService.options.baseUrl = wsUrl;
