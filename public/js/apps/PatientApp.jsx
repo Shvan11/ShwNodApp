@@ -2,7 +2,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import singleSpaReact from 'single-spa-react';
+import { Router } from 'react-router';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { sharedHistory } from '/single-spa/shared-history.js';
 import PatientShell from '../components/react/PatientShell.jsx';
 
 /**
@@ -20,20 +22,22 @@ import PatientShell from '../components/react/PatientShell.jsx';
  * - /patient/:patientId/edit-appointment/:appointmentId → Edit appointment
  * - /patient/:patientId/edit → Edit patient information
  *
- * Note: BrowserRouter is provided by index.html at root level
+ * Note: Uses shared history instance for consistent navigation across all apps
  */
 const PatientApp = () => {
     return (
-        <Routes>
-            {/* Patient routes with page parameter - handles both simple and nested pages */}
-            <Route path="/patient/:patientId/:page/*" element={<PatientShell />} />
+        <Router location={sharedHistory.location} navigator={sharedHistory}>
+            <Routes>
+                {/* Patient routes with page parameter - handles both simple and nested pages */}
+                <Route path="/patient/:patientId/:page/*" element={<PatientShell />} />
 
-            {/* Default patient route - redirect to works page */}
-            <Route path="/patient/:patientId" element={<Navigate to="works" replace />} />
+                {/* Default patient route - redirect to works page */}
+                <Route path="/patient/:patientId" element={<Navigate to="works" replace />} />
 
-            {/* Redirect unknown routes to patient management */}
-            <Route path="*" element={<Navigate to="/patient-management" replace />} />
-        </Routes>
+                {/* Redirect unknown routes to patient management */}
+                <Route path="*" element={<Navigate to="/patient-management" replace />} />
+            </Routes>
+        </Router>
     );
 };
 

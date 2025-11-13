@@ -2,7 +2,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import singleSpaReact from 'single-spa-react';
+import { Router } from 'react-router';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { sharedHistory } from '/single-spa/shared-history.js';
 import SettingsComponent from '../components/react/SettingsComponent.jsx';
 
 /**
@@ -12,20 +14,22 @@ import SettingsComponent from '../components/react/SettingsComponent.jsx';
  * - /settings → General settings (default)
  * - /settings/:tab → Specific settings tab (general, database, alignerDoctors, messaging, system, security)
  *
- * Note: BrowserRouter is provided by index.html at root level
+ * Note: Uses shared history instance for consistent navigation across all apps
  */
 const SettingsApp = () => {
     return (
-        <Routes>
-            {/* Settings with specific tab */}
-            <Route path="/settings/:tab" element={<SettingsComponent />} />
+        <Router location={sharedHistory.location} navigator={sharedHistory}>
+            <Routes>
+                {/* Settings with specific tab */}
+                <Route path="/settings/:tab" element={<SettingsComponent />} />
 
-            {/* Default settings route - redirect to general tab */}
-            <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
+                {/* Default settings route - redirect to general tab */}
+                <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
 
-            {/* Redirect unknown routes to general settings */}
-            <Route path="*" element={<Navigate to="/settings/general" replace />} />
-        </Routes>
+                {/* Redirect unknown routes to general settings */}
+                <Route path="*" element={<Navigate to="/settings/general" replace />} />
+            </Routes>
+        </Router>
     );
 };
 

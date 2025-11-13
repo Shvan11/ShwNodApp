@@ -2,6 +2,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import singleSpaReact from 'single-spa-react';
+import { Router } from 'react-router';
+import { sharedHistory } from '/single-spa/shared-history.js';
 import DailyAppointments from '../components/react/appointments/DailyAppointments.jsx';
 
 /**
@@ -18,10 +20,14 @@ import DailyAppointments from '../components/react/appointments/DailyAppointment
  *
  * Route: /appointments or /daily-appointments
  *
- * Note: BrowserRouter is provided by index.html at root level
+ * Note: Uses shared history instance for consistent navigation across all apps
  */
 const DailyAppointmentsApp = () => {
-    return <DailyAppointments />;
+    return (
+        <Router location={sharedHistory.location} navigator={sharedHistory}>
+            <DailyAppointments />
+        </Router>
+    );
 };
 
 

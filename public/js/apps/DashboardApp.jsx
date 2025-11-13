@@ -1,9 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import singleSpaReact from 'single-spa-react';
+import { Router } from 'react-router';
 import { useNavigate } from 'react-router-dom';
+import { sharedHistory } from '/single-spa/shared-history.js';
 
-const DashboardApp = () => {
+const DashboardAppContent = () => {
   const navigate = useNavigate();
 
   const handleCardClick = (e, link) => {
@@ -163,8 +165,17 @@ const DashboardApp = () => {
   );
 };
 
+// Wrapper with shared Router
+const DashboardApp = () => {
+  return (
+    <Router location={sharedHistory.location} navigator={sharedHistory}>
+      <DashboardAppContent />
+    </Router>
+  );
+};
+
 // Single-SPA Lifecycle - React 18 Compatible
-// Note: BrowserRouter is provided by index.html at root level
+// Note: Uses shared history instance for consistent navigation across all apps
 const lifecycles = singleSpaReact({
   React,
   ReactDOM,

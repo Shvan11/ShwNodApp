@@ -2,6 +2,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import singleSpaReact from 'single-spa-react';
+import { Router } from 'react-router';
+import { sharedHistory } from '/single-spa/shared-history.js';
 import PatientManagement from '../components/react/PatientManagement.jsx';
 
 /**
@@ -10,10 +12,14 @@ import PatientManagement from '../components/react/PatientManagement.jsx';
  *
  * Route: /patient-management
  *
- * Note: BrowserRouter is provided by index.html at root level
+ * Note: Uses shared history instance for consistent navigation across all apps
  */
 const PatientManagementApp = () => {
-    return <PatientManagement />;
+    return (
+        <Router location={sharedHistory.location} navigator={sharedHistory}>
+            <PatientManagement />
+        </Router>
+    );
 };
 
 
