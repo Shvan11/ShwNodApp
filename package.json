@@ -40,12 +40,7 @@
     "pdfkit": "^0.17.2",
     "photoswipe": "^5.4.4",
     "qrcode": "^1.5.3",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-router-dom": "^7.9.4",
     "react-select": "^5.10.1",
-    "single-spa": "^6.0.3",
-    "single-spa-react": "^6.0.2",
     "tedious": "^16.6.1",
     "telegram": "^2.19.10",
     "twilio": "^4.21.0",
@@ -55,6 +50,9 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.6.0",
     "concurrently": "^9.2.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.9.4",
     "vite": "^7.0.0"
   }
 }
