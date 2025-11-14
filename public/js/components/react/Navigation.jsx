@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 const Navigation = ({ patientId, currentPage }) => {
+    const navigate = useNavigate();
+    const { tpCode } = useParams();
     const [timepoints, setTimepoints] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [photosExpanded, setPhotosExpanded] = useState(false);
-    const [searchParams] = useSearchParams();
+    const [moreActionsExpanded, setMoreActionsExpanded] = useState(false);
     const photosButtonRef = useRef(null);
+    const moreActionsButtonRef = useRef(null);
     const [flyoutPosition, setFlyoutPosition] = useState({ top: 0 });
+    const [moreActionsFlyoutPosition, setMoreActionsFlyoutPosition] = useState({ top: 0 });
     const [patientInfo, setPatientInfo] = useState(null);
     const [patientsFolder, setPatientsFolder] = useState('');
 
@@ -152,7 +156,7 @@ const Navigation = ({ patientId, currentPage }) => {
         { key: 'works', page: 'works', label: 'Works', icon: 'fas fa-tooth' },
         { key: 'appointments', page: 'appointments', label: 'Appointments', icon: 'fas fa-calendar-check' },
         { key: 'new-appointment', page: 'new-appointment', label: 'New Appointment', icon: 'fas fa-plus-circle' },
-        { key: 'edit-patient', page: 'edit-patient', label: 'Edit Patient', icon: 'fas fa-user-edit' }
+        { key: 'patient-info', page: 'patient-info', label: 'Patient Info', icon: 'fas fa-id-card' }
     ];
 
     const renderNavItem = (item, isActive = false) => {
@@ -175,14 +179,15 @@ const Navigation = ({ patientId, currentPage }) => {
 
     const renderTimepointItem = (timepoint) => {
         // Check if this timepoint is currently active
-        const currentTp = searchParams.get('tp') || '0';
+        const currentTp = tpCode ? tpCode.replace('tp', '') : '0';
         const isActive = currentTp === timepoint.tpCode;
 
         return (
             <Link
                 key={timepoint.tpCode}
-                to={`/patient/${patientId}/grid?tp=${timepoint.tpCode}`}
+                to={`/patient/${patientId}/photos/tp${timepoint.tpCode}`}
                 className={`sidebar-nav-item timepoint-subitem ${isActive ? 'active' : ''}`}
+                onClick={() => setPhotosExpanded(false)}
             >
                 <div className="nav-item-icon">
                     <i className="fas fa-circle" style={{ fontSize: '0.5rem' }} />
@@ -195,7 +200,7 @@ const Navigation = ({ patientId, currentPage }) => {
         );
     };
 
-    const isPhotosPageActive = currentPage === 'grid';
+    const isPhotosPageActive = currentPage === 'photos';
 
     return (
         <div className="patient-sidebar narrow-bar">
@@ -226,7 +231,7 @@ const Navigation = ({ patientId, currentPage }) => {
                         }}
                     >
                         <Link
-                            to={`/patient/${patientId}/grid?tp=0`}
+                            to={`/patient/${patientId}/photos/tp0`}
                             className={`sidebar-nav-item photos-main-btn ${isPhotosPageActive ? 'active' : ''}`}
                             title="Photos"
                         >
@@ -276,27 +281,69 @@ const Navigation = ({ patientId, currentPage }) => {
 
             {/* Sidebar footer */}
             <div className="sidebar-footer">
-                <Link
-                    to={`/patient/${patientId}/compare`}
-                    className={`sidebar-nav-item compare-item ${currentPage === 'compare' ? 'active' : ''}`}
-                    title="Compare"
+                {/* More Actions Button with Flyout */}
+                <div
+                    ref={moreActionsButtonRef}
+                    className="more-actions-wrapper"
+                    onMouseEnter={() => {
+                        if (moreActionsButtonRef.current) {
+                            const rect = moreActionsButtonRef.current.getBoundingClientRect();
+                            setMoreActionsFlyoutPosition({ top: rect.top });
+                        }
+                        setMoreActionsExpanded(true);
+                    }}
+                    onMouseLeave={() => {
+                        setMoreActionsExpanded(false);
+                    }}
                 >
-                    <div className="nav-item-icon">
-                        <i className="fas fa-exchange-alt" />
+                    <div
+                        className={`sidebar-nav-item more-actions-btn ${(currentPage === 'compare' || currentPage === 'xrays') ? 'active' : ''}`}
+                        title="More Actions"
+                    >
+                        <div className="nav-item-icon">
+                            <i className="fas fa-ellipsis-h" />
+                        </div>
+                        <span className="nav-item-label">More Actions</span>
                     </div>
-                    <span className="nav-item-label">Compare</span>
-                </Link>
 
-                <Link
-                    to={`/patient/${patientId}/xrays`}
-                    className={`sidebar-nav-item xrays-item ${currentPage === 'xrays' ? 'active' : ''}`}
-                    title="X-rays"
-                >
-                    <div className="nav-item-icon">
-                        <i className="fas fa-x-ray" />
-                    </div>
-                    <span className="nav-item-label">X-rays</span>
-                </Link>
+                    {/* More Actions Flyout Menu */}
+                    {moreActionsExpanded && (
+                        <div
+                            className="more-actions-flyout"
+                            style={{ top: `${moreActionsFlyoutPosition.top}px` }}
+                            onMouseEnter={() => setMoreActionsExpanded(true)}
+                            onMouseLeave={() => setMoreActionsExpanded(false)}
+                        >
+                            <div className="flyout-header">
+                                <i className="fas fa-ellipsis-h" />
+                                More Actions
+                            </div>
+                            <div className="flyout-content">
+                                <Link
+                                    to={`/patient/${patientId}/compare`}
+                                    className={`flyout-action-item ${currentPage === 'compare' ? 'active' : ''}`}
+                                    onClick={() => setMoreActionsExpanded(false)}
+                                >
+                                    <div className="action-item-icon">
+                                        <i className="fas fa-exchange-alt" />
+                                    </div>
+                                    <span className="action-item-label">Compare Photos</span>
+                                </Link>
+
+                                <Link
+                                    to={`/patient/${patientId}/xrays`}
+                                    className={`flyout-action-item ${currentPage === 'xrays' ? 'active' : ''}`}
+                                    onClick={() => setMoreActionsExpanded(false)}
+                                >
+                                    <div className="action-item-icon">
+                                        <i className="fas fa-x-ray" />
+                                    </div>
+                                    <span className="action-item-label">X-rays</span>
+                                </Link>
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 <div
                     className="sidebar-nav-item csimaging-item"
@@ -330,34 +377,6 @@ const Navigation = ({ patientId, currentPage }) => {
                         <i className="fas fa-folder-open" />
                     </div>
                     <span className="nav-item-label">Open Folder</span>
-                </div>
-
-                <div
-                    className="sidebar-nav-item appointments-item"
-                    onClick={(e) => {
-                        e.preventDefault();
-                        window.location.href = '/daily-appointments';
-                    }}
-                    title="Today's Appointments"
-                >
-                    <div className="nav-item-icon">
-                        <i className="fas fa-calendar-day" />
-                    </div>
-                    <span className="nav-item-label">Today's Appointments</span>
-                </div>
-
-                <div
-                    className="sidebar-nav-item calendar-item"
-                    onClick={(e) => {
-                        e.preventDefault();
-                        navigate('/calendar');
-                    }}
-                    title="Calendar"
-                >
-                    <div className="nav-item-icon">
-                        <i className="fas fa-calendar-alt" />
-                    </div>
-                    <span className="nav-item-label">Calendar</span>
                 </div>
             </div>
         </div>

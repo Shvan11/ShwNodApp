@@ -14,6 +14,8 @@
 
 /* Page-specific styles */
 @import 'pages/work-management.css';
+@import 'pages/patient-info.css';
+@import 'pages/patient-shell.css';
 
 /* Utility classes - Using proper CSS cascade without !important */
 

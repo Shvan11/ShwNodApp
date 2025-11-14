@@ -1,0 +1,260 @@
+/* ===== PATIENT INFO VIEWER ===== */
+
+.patient-info-viewer {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+
+/* Header */
+.patient-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 3px solid #6366f1;
+}
+
+.header-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-title i {
+    font-size: 2rem;
+    color: #6366f1;
+}
+
+.header-title h2 {
+    margin: 0;
+    font-size: 1.75rem;
+    color: #1e293b;
+    font-weight: 700;
+}
+
+.edit-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.edit-btn:hover {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.edit-btn:active {
+    transform: translateY(0);
+}
+
+/* Content Grid */
+.patient-info-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+/* Info Cards */
+.info-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.info-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-bottom: 2px solid #cbd5e0;
+}
+
+.card-header i {
+    font-size: 1.25rem;
+    color: #6366f1;
+}
+
+.card-header h3 {
+    margin: 0;
+    font-size: 1.125rem;
+    color: #1e293b;
+    font-weight: 600;
+}
+
+.card-body {
+    padding: 1.25rem;
+}
+
+/* Info Rows */
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    font-weight: 600;
+    color: #475569;
+    flex-shrink: 0;
+    min-width: 140px;
+}
+
+.info-value {
+    color: #1e293b;
+    text-align: right;
+    flex: 1;
+    word-break: break-word;
+}
+
+/* Alert Row */
+.alert-row {
+    background: #fef3c7;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #fbbf24;
+    margin-top: 0.5rem;
+}
+
+.alert-row .info-label {
+    color: #92400e;
+}
+
+.alert-value {
+    color: #92400e !important;
+    font-weight: 600;
+}
+
+/* Notes Card - Full Width */
+.notes-card {
+    grid-column: 1 / -1;
+}
+
+.notes-content {
+    color: #475569;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    padding: 0.5rem;
+    background: #f8fafc;
+    border-radius: 6px;
+    min-height: 80px;
+}
+
+/* Loading & Error States */
+.loading-container,
+.error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+    gap: 1rem;
+}
+
+.loading-container i {
+    color: #6366f1;
+}
+
+.error-container i {
+    color: #ef4444;
+}
+
+.error-container h3 {
+    color: #1e293b;
+    margin: 0.5rem 0;
+}
+
+.error-container p {
+    color: #64748b;
+    margin: 0.5rem 0 1rem 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .patient-info-viewer {
+        padding: 1rem;
+    }
+
+    .patient-info-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .header-title {
+        justify-content: center;
+    }
+
+    .edit-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .patient-info-content {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .info-row {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .info-label {
+        min-width: auto;
+    }
+
+    .info-value {
+        text-align: left;
+    }
+}
+
+@media (max-width: 480px) {
+    .header-title h2 {
+        font-size: 1.375rem;
+    }
+
+    .header-title i {
+        font-size: 1.5rem;
+    }
+
+    .card-header {
+        padding: 0.875rem 1rem;
+    }
+
+    .card-body {
+        padding: 1rem;
+    }
+
+    .info-row {
+        padding: 0.625rem 0;
+    }
+}

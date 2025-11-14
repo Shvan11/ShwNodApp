@@ -149,7 +149,7 @@ const UniversalHeader = () => {
     };
 
     const navigateToPatient = (patientCode) => {
-        navigate(`/patient/${patientCode}/grid`);
+        navigate(`/patient/${patientCode}/photos/tp0`);
     };
 
     const navigateToSearch = () => {

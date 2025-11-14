@@ -10,11 +10,12 @@ import EditAppointmentForm from './EditAppointmentForm.jsx'
 import WorkComponent from './WorkComponent.jsx'
 import NewWorkComponent from './NewWorkComponent.jsx'
 import EditPatientComponent from './EditPatientComponent.jsx'
+import ViewPatientInfo from './ViewPatientInfo.jsx'
 import PatientAppointments from './PatientAppointments.jsx'
 import AddPatientForm from './AddPatientForm.jsx'
 import '../../../css/components/new-work-component.css'
 
-const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
+const ContentRenderer = ({ patientId, page = 'photos', params = {} }) => {
     const navigate = useNavigate();
     const wildcardParams = useParams();
     const [searchParams] = useSearchParams();
@@ -25,16 +26,17 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
     // Extract workId and visitId from query params for work-specific pages like visits
     const workId = searchParams.get('workId');
     const visitId = searchParams.get('visitId');
-    const tp = searchParams.get('tp');
+
+    // Get tpCode from params (passed from PatientShell)
+    const tpCode = params.tpCode;
 
     const renderContent = () => {
         switch (page) {
-            case 'grid':
             case 'photos':
                 return (
                     <GridComponent
                         patientId={patientId}
-                        tpCode={tp || '0'}
+                        tpCode={tpCode ? tpCode.replace('tp', '') : '0'}
                     />
                 );
 
@@ -175,6 +177,13 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
                             // Go back to previous page after success
                             navigate(-1);
                         }}
+                    />
+                );
+
+            case 'patient-info':
+                return (
+                    <ViewPatientInfo
+                        patientId={patientId}
                     />
                 );
 
