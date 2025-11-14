@@ -17,6 +17,7 @@ import { getContacts } from '../../services/authentication/google.js';
 import { createPathResolver } from '../../utils/path-resolver.js';
 import config from '../../config/config.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import { log } from '../../utils/logger.js';
 
 const router = express.Router();
 
@@ -71,7 +72,7 @@ router.get('/checktwilio', async (req, res) => {
  * Returns the current status of message client initialization and report generation
  */
 router.get('/updaterp', (req, res) => {
-    console.log("Legacy updaterp endpoint called - WebSocket recommended");
+    log.info("Legacy updaterp endpoint called - WebSocket recommended");
 
     let html = '';
     if (messageState.clientReady) {
@@ -125,7 +126,7 @@ router.get("/google", async (req, res) => {
         const contacts = await getContacts(source);
         res.json(contacts);
     } catch (error) {
-        console.error("Error fetching Google contacts:", error);
+        log.error("Error fetching Google contacts:", error);
         return ErrorResponses.internalError(res, "Failed to fetch Google contacts", error);
     }
 });
@@ -148,14 +149,14 @@ router.get('/convert-path', async (req, res) => {
     try {
         const { path: webPath } = req.query;
 
-        console.log('Convert-path request received:', { webPath, machinePath: config.fileSystem.machinePath });
+        log.info('Convert-path request received:', { webPath, machinePath: config.fileSystem.machinePath });
 
         if (!webPath) {
             return ErrorResponses.missingParameter(res, "path");
         }
 
         if (!config.fileSystem.machinePath) {
-            console.error('MACHINE_PATH environment variable not set');
+            log.error('MACHINE_PATH environment variable not set');
             return ErrorResponses.internalError(res, "MACHINE_PATH environment variable not configured");
         }
 
@@ -167,7 +168,7 @@ router.get('/convert-path', async (req, res) => {
             const fileName = webPath.replace('DolImgs/', '');
             const fullPath = pathResolver(`working/${fileName}`);
 
-            console.log('Path conversion successful:', { webPath, fileName, fullPath });
+            log.info('Path conversion successful:', { webPath, fileName, fullPath });
 
             res.json({
                 webPath: webPath,
@@ -175,7 +176,7 @@ router.get('/convert-path', async (req, res) => {
             });
         } else {
             // If not a DolImgs path, return as-is (could be already a full path)
-            console.log('Path not a DolImgs path, returning as-is:', webPath);
+            log.info('Path not a DolImgs path, returning as-is:', webPath);
             res.json({
                 webPath: webPath,
                 fullPath: webPath
@@ -183,7 +184,7 @@ router.get('/convert-path', async (req, res) => {
         }
 
     } catch (error) {
-        console.error('Error converting path:', error);
+        log.error('Error converting path:', error);
         return ErrorResponses.internalError(res, "Internal server error", error);
     }
 });

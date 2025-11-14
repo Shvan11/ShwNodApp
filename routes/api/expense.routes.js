@@ -27,6 +27,7 @@ import {
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { requireRecordAge, getExpenseCreationDate } from '../../middleware/time-based-auth.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import { log } from '../../utils/logger.js';
 
 const router = express.Router();
 
@@ -54,7 +55,7 @@ router.get('/expenses', async (req, res) => {
         const expenses = await getAllExpenses(filters);
         res.json(expenses);
     } catch (error) {
-        console.error('Error fetching expenses:', error);
+        log.error('Error fetching expenses:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch expenses', error);
     }
 });
@@ -67,7 +68,7 @@ router.get('/expenses/categories', async (req, res) => {
         const categories = await getExpenseCategories();
         res.json(categories);
     } catch (error) {
-        console.error('Error fetching expense categories:', error);
+        log.error('Error fetching expense categories:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch expense categories', error);
     }
 });
@@ -78,7 +79,7 @@ router.get('/expenses-categories', async (req, res) => {
         const categories = await getExpenseCategories();
         res.json(categories);
     } catch (error) {
-        console.error('Error fetching expense categories:', error);
+        log.error('Error fetching expense categories:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch expense categories', error);
     }
 });
@@ -92,7 +93,7 @@ router.get('/expenses/subcategories/:categoryId', async (req, res) => {
         const subcategories = await getExpenseSubcategories(categoryId);
         res.json(subcategories);
     } catch (error) {
-        console.error('Error fetching expense subcategories:', error);
+        log.error('Error fetching expense subcategories:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch expense subcategories', error);
     }
 });
@@ -104,7 +105,7 @@ router.get('/expenses-subcategories', async (req, res) => {
         const subcategories = await getExpenseSubcategories(categoryId);
         res.json(subcategories);
     } catch (error) {
-        console.error('Error fetching expense subcategories:', error);
+        log.error('Error fetching expense subcategories:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch expense subcategories', error);
     }
 });
@@ -137,7 +138,7 @@ router.post('/expenses', async (req, res) => {
             data: result
         });
     } catch (error) {
-        console.error('Error creating expense:', error);
+        log.error('Error creating expense:', error);
         return ErrorResponses.internalError(res, 'Failed to create expense', error);
     }
 });
@@ -162,7 +163,7 @@ router.get('/expenses/summary', async (req, res) => {
             totals
         });
     } catch (error) {
-        console.error('Error fetching expense summary:', error);
+        log.error('Error fetching expense summary:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch expense summary', error);
     }
 });
@@ -184,7 +185,7 @@ router.get('/expenses-summary', async (req, res) => {
             totals
         });
     } catch (error) {
-        console.error('Error fetching expense summary:', error);
+        log.error('Error fetching expense summary:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch expense summary', error);
     }
 });
@@ -212,7 +213,7 @@ router.get('/expenses/:id', async (req, res) => {
 
         res.json(expense);
     } catch (error) {
-        console.error('Error fetching expense:', error);
+        log.error('Error fetching expense:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch expense', error);
     }
 });
@@ -261,7 +262,7 @@ router.put('/expenses/:id',
             data: result
         });
         } catch (error) {
-            console.error('Error updating expense:', error);
+            log.error('Error updating expense:', error);
             return ErrorResponses.internalError(res, 'Failed to update expense', error);
         }
     }
@@ -296,7 +297,7 @@ router.delete('/expenses/:id',
             data: result
         });
         } catch (error) {
-            console.error('Error deleting expense:', error);
+            log.error('Error deleting expense:', error);
             return ErrorResponses.internalError(res, 'Failed to delete expense', error);
         }
     }

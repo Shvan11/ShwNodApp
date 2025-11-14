@@ -6,6 +6,7 @@ import { StringSession } from "telegram/sessions/index.js";
 import fs from 'fs/promises';
 import config from '../../config/config.js';
 import { getPhoneCompatibleFilename } from '../../utils/filename-converter.js';
+import { log } from '../../utils/logger.js';
 
 /**
  * Send a document via Telegram bot
@@ -24,7 +25,7 @@ export async function sendDocument(filePath) {
         const bot = new TelegramBot(token);
         return await bot.sendDocument(chatId, filePath);
     } catch (error) {
-        console.error('Error sending document via Telegram bot:', error);
+        log.error('Error sending document via Telegram bot:', error);
         throw error;
     }
 }
@@ -39,9 +40,9 @@ export async function sendgramfile(phone, filepath) {
     const apiId = 22110800;
     const apiHash = "c0611e1cf17abb5e98607e38f900641e";
     const gramSession = config.gram_session;
-    
-    console.log(`Telegram sendgramfile called - Phone: ${phone}, File: ${filepath}`);
-    
+
+    log.info(`Telegram sendgramfile called - Phone: ${phone}, File: ${filepath}`);
+
     // Validate inputs
     if (!phone) {
         return { "result": "ERROR", "error": "Phone number is required" };
@@ -52,13 +53,13 @@ export async function sendgramfile(phone, filepath) {
     }
     
     if (!gramSession) {
-        console.error('Telegram session not configured in environment variables');
+        log.error('Telegram session not configured in environment variables');
         return { "result": "ERROR", "error": "Telegram session not configured. Please set GRAM_SESSION environment variable." };
     }
     
     // Validate phone number format
     if (!phone.startsWith('+')) {
-        console.error(`Invalid phone number format: ${phone}. Must start with +`);
+        log.error(`Invalid phone number format: ${phone}. Must start with +`);
         return { "result": "ERROR", "error": `Invalid phone number format: ${phone}. Must include country code with +.` };
     }
     
@@ -74,10 +75,10 @@ export async function sendgramfile(phone, filepath) {
             requestRetries: 3,
         });
 
-        console.log('Connecting to Telegram...');
+        log.info('Connecting to Telegram...');
         await client.connect();
-        console.log('Connected to Telegram successfully');
-        console.log('Sending to phone:', phone);
+        log.info('Connected to Telegram successfully');
+        log.info('Sending to phone:', phone);
 
         // Validate file path
         if (!filepath || typeof filepath !== 'string') {
@@ -88,7 +89,7 @@ export async function sendgramfile(phone, filepath) {
         try {
             await fs.access(filepath);
         } catch (accessError) {
-            console.error(`File not found or not readable: ${filepath}`, accessError);
+            log.error(`File not found or not readable: ${filepath}`, accessError);
             return { result: "ERROR", error: `File not found or not readable: ${filepath}` };
         }
 
@@ -99,11 +100,11 @@ export async function sendgramfile(phone, filepath) {
         // Force as photo using CustomFile with .jpg extension and InputMediaUploadedPhoto
         // Non-blocking async stat operation
         const fileStats = await fs.stat(filepath);
-        
-        console.log(`=== TELEGRAM PHOTO FORCE ===`);
-        console.log(`Original file: ${originalFilename}`);
-        console.log(`Converted filename: ${convertedFilename}`);
-        console.log(`File size: ${fileStats.size} bytes`);
+
+        log.info(`=== TELEGRAM PHOTO FORCE ===`);
+        log.info(`Original file: ${originalFilename}`);
+        log.info(`Converted filename: ${convertedFilename}`);
+        log.info(`File size: ${fileStats.size} bytes`);
 
         // Create CustomFile with .jpg filename to force photo recognition
         const customFile = new CustomFile(convertedFilename, fileStats.size, filepath);
@@ -124,8 +125,8 @@ export async function sendgramfile(phone, filepath) {
             randomId: Math.floor(Math.random() * 1000000000) // Required random ID
         }));
 
-        console.log(`File sent successfully: ${filepath}`);
-        console.log(`Message ID: ${result?.id}`);
+        log.info(`File sent successfully: ${filepath}`);
+        log.info(`Message ID: ${result?.id}`);
 
         // Gracefully disconnect with timeout
         try {
@@ -135,9 +136,9 @@ export async function sendgramfile(phone, filepath) {
                     setTimeout(() => reject(new Error('Disconnect timeout')), 5000)
                 )
             ]);
-            console.log('Telegram client disconnected successfully');
+            log.info('Telegram client disconnected successfully');
         } catch (disconnectError) {
-            console.warn('Telegram disconnect timeout (non-critical):', disconnectError.message);
+            log.warn('Telegram disconnect timeout (non-critical):', disconnectError.message);
             // Force close if needed
             if (client._connection) {
                 try {
@@ -147,11 +148,11 @@ export async function sendgramfile(phone, filepath) {
                 }
             }
         }
-        
+
         return { "result": "OK", "messageId": result?.id };
     } catch (error) {
-        console.error('Error sending file via Telegram API:', error);
-        
+        log.error('Error sending file via Telegram API:', error);
+
         // More specific error handling
         let errorMessage = error.message;
         if (error.message.includes('PHONE_NUMBER_INVALID')) {
@@ -176,7 +177,7 @@ export async function sendgramfile(phone, filepath) {
                     )
                 ]);
             } catch (disconnectError) {
-                console.warn('Telegram disconnect timeout on error (non-critical):', disconnectError.message);
+                log.warn('Telegram disconnect timeout on error (non-critical):', disconnectError.message);
                 // Force close if needed
                 if (client._connection) {
                     try {

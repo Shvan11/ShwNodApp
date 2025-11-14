@@ -9,6 +9,7 @@
 import express from 'express';
 import HealthCheck from '../../services/monitoring/HealthCheck.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import { log } from '../../utils/logger.js';
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ router.get('/health', (req, res) => {
             ...health
         });
     } catch (error) {
-        console.error('Error getting health status:', error);
+        log.error('Error getting health status:', error);
         ErrorResponses.internalError(res, 'Failed to get health status', error);
     }
 });
@@ -38,7 +39,7 @@ router.get('/health/detailed', (req, res) => {
         const report = HealthCheck.getDetailedReport();
         res.json(report);
     } catch (error) {
-        console.error('Error getting detailed health report:', error);
+        log.error('Error getting detailed health report:', error);
         ErrorResponses.internalError(res, 'Failed to get detailed health report', error);
     }
 });
@@ -54,7 +55,7 @@ router.post('/health/start', (req, res) => {
             message: 'Health monitoring started'
         });
     } catch (error) {
-        console.error('Error starting health monitoring:', error);
+        log.error('Error starting health monitoring:', error);
         ErrorResponses.internalError(res, 'Failed to start health monitoring', error);
     }
 });
@@ -70,7 +71,7 @@ router.post('/health/stop', (req, res) => {
             message: 'Health monitoring stopped'
         });
     } catch (error) {
-        console.error('Error stopping health monitoring:', error);
+        log.error('Error stopping health monitoring:', error);
         ErrorResponses.internalError(res, 'Failed to stop health monitoring', error);
     }
 });

@@ -15,6 +15,7 @@
  */
 
 import express from 'express';
+import { log } from '../../utils/logger.js';
 import * as database from '../../services/database/index.js';
 import {
     getPayments,
@@ -63,7 +64,7 @@ router.get("/getpaymenthistory", async (req, res) => {
         const payments = await getPaymentHistoryByWorkId(parseInt(workId));
         res.json(payments);
     } catch (error) {
-        console.error('Error fetching payment history:', error);
+        log.error('Error fetching payment history:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch payment history', error);
     }
 });
@@ -97,7 +98,7 @@ router.get('/getworkforreceipt/:workId', async (req, res) => {
 
         res.json(result[0]);
     } catch (error) {
-        console.error("Error fetching work for receipt:", error);
+        log.error("Error fetching work for receipt:", error);
         return ErrorResponses.internalError(res, 'Failed to fetch work data', error);
     }
 });
@@ -116,7 +117,7 @@ router.get("/getActiveWorkForInvoice", async (req, res) => {
         const workData = await getActiveWorkForInvoice(PID);
         res.json({ status: 'success', data: workData });
     } catch (error) {
-        console.error("Error getting active work for invoice:", error);
+        log.error("Error getting active work for invoice:", error);
         return ErrorResponses.internalError(res, error.message, error);
     }
 });
@@ -139,7 +140,7 @@ router.get("/getCurrentExchangeRate", async (req, res) => {
 
         res.json({ status: 'success', exchangeRate });
     } catch (error) {
-        console.error("Error getting exchange rate:", error);
+        log.error("Error getting exchange rate:", error);
         return ErrorResponses.internalError(res, error.message, error);
     }
 });
@@ -164,7 +165,7 @@ router.get("/getExchangeRateForDate", async (req, res) => {
 
         res.json({ status: 'success', exchangeRate, date });
     } catch (error) {
-        console.error("Error getting exchange rate for date:", error);
+        log.error("Error getting exchange rate for date:", error);
         return ErrorResponses.internalError(res, error.message, error);
     }
 });
@@ -185,7 +186,7 @@ router.post("/updateExchangeRate", async (req, res) => {
         const result = await updateExchangeRate(exchangeRate);
         res.json({ status: 'success', data: result });
     } catch (error) {
-        console.error("Error updating exchange rate:", error);
+        log.error("Error updating exchange rate:", error);
         return ErrorResponses.internalError(res, error.message, error);
     }
 });
@@ -206,7 +207,7 @@ router.post("/updateExchangeRateForDate", async (req, res) => {
         const result = await updateExchangeRateForDate(date, exchangeRate);
         res.json({ status: 'success', data: result, date, exchangeRate });
     } catch (error) {
-        console.error("Error updating exchange rate for date:", error);
+        log.error("Error updating exchange rate for date:", error);
         return ErrorResponses.internalError(res, error.message, error);
     }
 });
@@ -327,7 +328,7 @@ router.post("/addInvoice", async (req, res) => {
 
         res.json({ status: 'success', data: result });
     } catch (error) {
-        console.error("Error adding invoice:", error);
+        log.error("Error adding invoice:", error);
 
         // Handle database constraint violations gracefully
         if (error.message && error.message.includes('CHK_Invoice')) {
@@ -376,7 +377,7 @@ router.delete("/deleteInvoice/:invoiceId",
             rowsAffected: result.rowCount
         });
         } catch (error) {
-            console.error("Error deleting invoice:", error);
+            log.error("Error deleting invoice:", error);
             return ErrorResponses.internalError(res, error.message, error);
         }
     }
@@ -408,7 +409,7 @@ router.post('/aligner/payments', async (req, res) => {
             return ErrorResponses.badRequest(res, 'workid, Amountpaid, and Dateofpayment are required');
         }
 
-        console.log(`Adding payment for work ID: ${workid}, Set ID: ${AlignerSetID || 'general'}, Amount: ${Amountpaid}`);
+        log.info(`Adding payment for work ID: ${workid}, Set ID: ${AlignerSetID || 'general'}, Amount: ${Amountpaid}`);
 
         // Insert payment into tblInvoice
         const query = `
@@ -442,7 +443,7 @@ router.post('/aligner/payments', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error adding payment:', error);
+        log.error('Error adding payment:', error);
         return ErrorResponses.internalError(res, 'Failed to add payment', error);
     }
 });

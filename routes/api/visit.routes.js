@@ -25,6 +25,7 @@ import {
     getLatestWiresByWorkId
 } from '../../services/database/queries/visit-queries.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import { log } from '../../utils/logger.js';
 
 const router = express.Router();
 
@@ -47,7 +48,7 @@ router.get("/visitsSummary", async (req, res) => {
         const visitsSummary = await getVisitsSummary(PID);
         res.json(visitsSummary);
     } catch (error) {
-        console.error("Error fetching visits summary:", error);
+        log.error("Error fetching visits summary:", error);
         return ErrorResponses.internalError(res, 'Failed to fetch visits summary', error);
     }
 });
@@ -67,7 +68,7 @@ router.get("/getVisitDetailsByID", async (req, res) => {
         const visitDetails = await getVisitDetailsByID(VID);
         res.json(visitDetails);
     } catch (error) {
-        console.error("Error fetching visit details:", error);
+        log.error("Error fetching visit details:", error);
         return ErrorResponses.internalError(res, 'Failed to fetch visit details', error);
     }
 });
@@ -85,7 +86,7 @@ router.get("/getWires", async (req, res) => {
         const wires = await getWires();
         res.json(wires);
     } catch (error) {
-        console.error("Error fetching wires:", error);
+        log.error("Error fetching wires:", error);
         return ErrorResponses.internalError(res, 'Failed to fetch wires', error);
     }
 });
@@ -104,7 +105,7 @@ router.get("/getlatestwires", async (req, res) => {
         const latestWires = await getLatestWiresByWorkId(parseInt(workId));
         res.json(latestWires);
     } catch (error) {
-        console.error("Error fetching latest wires:", error);
+        log.error("Error fetching latest wires:", error);
         return ErrorResponses.internalError(res, 'Failed to fetch latest wires', error);
     }
 });
@@ -124,7 +125,7 @@ router.get("/getLatestwire", async (req, res) => {
         const latestWire = await getLatestWire(PID);
         res.json(latestWire);
     } catch (error) {
-        console.error("Error fetching latest wire:", error);
+        log.error("Error fetching latest wire:", error);
         return ErrorResponses.internalError(res, 'Failed to fetch latest wire', error);
     }
 });
@@ -147,7 +148,7 @@ router.get("/getvisitsbywork", async (req, res) => {
         const visits = await getVisitsByWorkId(parseInt(workId));
         res.json(visits);
     } catch (error) {
-        console.error("Error fetching visits by work:", error);
+        log.error("Error fetching visits by work:", error);
         return ErrorResponses.internalError(res, 'Failed to fetch visits', error);
     }
 });
@@ -169,7 +170,7 @@ router.get("/getvisitbyid", async (req, res) => {
         }
         res.json(visit);
     } catch (error) {
-        console.error("Error fetching visit by ID:", error);
+        log.error("Error fetching visit by ID:", error);
         return ErrorResponses.internalError(res, 'Failed to fetch visit', error);
     }
 });
@@ -188,7 +189,7 @@ router.post("/addvisitbywork", async (req, res) => {
         const result = await addVisitByWorkId(visitData);
         res.json({ success: true, visitId: result.ID });
     } catch (error) {
-        console.error("Error adding visit:", error);
+        log.error("Error adding visit:", error);
         return ErrorResponses.internalError(res, 'Failed to add visit', error);
     }
 });
@@ -207,7 +208,7 @@ router.put("/updatevisitbywork", async (req, res) => {
         await updateVisitByWorkId(parseInt(visitId), visitData);
         res.json({ success: true });
     } catch (error) {
-        console.error("Error updating visit:", error);
+        log.error("Error updating visit:", error);
         return ErrorResponses.internalError(res, 'Failed to update visit', error);
     }
 });
@@ -226,7 +227,7 @@ router.delete("/deletevisitbywork", async (req, res) => {
         await deleteVisitByWorkId(parseInt(visitId));
         res.json({ success: true });
     } catch (error) {
-        console.error("Error deleting visit:", error);
+        log.error("Error deleting visit:", error);
         return ErrorResponses.internalError(res, 'Failed to delete visit', error);
     }
 });
@@ -250,7 +251,7 @@ router.post("/addVisit", async (req, res) => {
         const result = await addVisit(PID, visitDate, upperWireID, lowerWireID, others, next);
         res.json({ status: 'success', data: result });
     } catch (error) {
-        console.error("Error adding visit:", error);
+        log.error("Error adding visit:", error);
         return ErrorResponses.internalError(res, 'Failed to add visit', error);
     }
 });
@@ -270,7 +271,7 @@ router.put("/updateVisit", async (req, res) => {
         const result = await updateVisit(VID, visitDate, upperWireID, lowerWireID, others, next);
         res.json({ status: 'success', data: result });
     } catch (error) {
-        console.error("Error updating visit:", error);
+        log.error("Error updating visit:", error);
         return ErrorResponses.internalError(res, 'Failed to update visit', error);
     }
 });
@@ -290,7 +291,7 @@ router.delete("/deleteVisit", async (req, res) => {
         const result = await deleteVisit(VID);
         res.json({ status: 'success', data: result });
     } catch (error) {
-        console.error("Error deleting visit:", error);
+        log.error("Error deleting visit:", error);
         return ErrorResponses.internalError(res, 'Failed to delete visit', error);
     }
 });

@@ -10,6 +10,7 @@
  */
 
 import express from 'express';
+import { log } from '../../utils/logger.js';
 import * as database from '../../services/database/index.js';
 import multer from 'multer';
 import * as imaging from '../../services/imaging/index.js';
@@ -40,7 +41,7 @@ router.get('/photo-server/status', async (req, res) => {
             isDetectionFresh: photoPathDetector.isDetectionFresh()
         });
     } catch (error) {
-        console.error('Error getting photo server status:', error);
+        log.error('Error getting photo server status:', error);
         res.status(500).json({
             error: error.message || "Failed to get photo server status"
         });
@@ -51,7 +52,7 @@ router.post('/photo-server/re-detect', async (req, res) => {
     try {
         const { default: photoServer } = await import('../../middleware/photo-server.js');
 
-        console.log('🔍 Manual photo path re-detection requested');
+        log.info('🔍 Manual photo path re-detection requested');
         await photoServer.initialize();
 
         const status = photoServer.getStatus();
@@ -61,7 +62,7 @@ router.post('/photo-server/re-detect', async (req, res) => {
             status
         });
     } catch (error) {
-        console.error('Error re-detecting photo paths:', error);
+        log.error('Error re-detecting photo paths:', error);
         res.status(500).json({
             error: error.message || "Failed to re-detect photo paths"
         });
@@ -110,7 +111,7 @@ router.post('/webceph/create-patient', async (req, res) => {
             ['personId', database.TYPES.Int, personId]
         ]);
 
-        console.log(`[WebCeph] Patient created successfully for PersonID: ${personId}`);
+        log.info(`[WebCeph] Patient created successfully for PersonID: ${personId}`);
 
         res.json({
             success: true,
@@ -122,7 +123,7 @@ router.post('/webceph/create-patient', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('[WebCeph] Error creating patient:', error);
+        log.error('[WebCeph] Error creating patient:', error);
         ErrorResponses.serverError(res, 'Failed to create patient in WebCeph', error);
     }
 });
@@ -144,13 +145,13 @@ router.post('/webceph/upload-image', upload.single('image'), async (req, res) =>
         let recordResult;
         try {
             recordResult = await webcephService.addNewRecord(patientID, recordDate);
-            console.log(`[WebCeph] Record created or already exists`);
+            log.info(`[WebCeph] Record created or already exists`);
         } catch (error) {
             // If record already exists, that's fine, continue with upload
             if (!error.message.includes('already exist')) {
                 throw error;
             }
-            console.log(`[WebCeph] Using existing record for ${recordDate}`);
+            log.info(`[WebCeph] Using existing record for ${recordDate}`);
         }
 
         // Step 2: Upload the image to the record
@@ -173,7 +174,7 @@ router.post('/webceph/upload-image', upload.single('image'), async (req, res) =>
         // Upload to WebCeph
         const result = await webcephService.uploadImage(uploadData);
 
-        console.log(`[WebCeph] Image uploaded successfully for patient: ${patientID}`);
+        log.info(`[WebCeph] Image uploaded successfully for patient: ${patientID}`);
 
         res.json({
             success: true,
@@ -185,7 +186,7 @@ router.post('/webceph/upload-image', upload.single('image'), async (req, res) =>
             }
         });
     } catch (error) {
-        console.error('[WebCeph] Error uploading image:', error);
+        log.error('[WebCeph] Error uploading image:', error);
         ErrorResponses.serverError(res, 'Failed to upload image to WebCeph', error);
     }
 });
@@ -231,7 +232,7 @@ router.get('/webceph/patient-link/:personId', async (req, res) => {
             data: result[0]
         });
     } catch (error) {
-        console.error('[WebCeph] Error fetching patient link:', error);
+        log.error('[WebCeph] Error fetching patient link:', error);
         ErrorResponses.serverError(res, 'Failed to fetch WebCeph patient link', error);
     }
 });
@@ -248,7 +249,7 @@ router.get('/webceph/photo-types', async (req, res) => {
             data: photoTypes
         });
     } catch (error) {
-        console.error('[WebCeph] Error fetching photo types:', error);
+        log.error('[WebCeph] Error fetching photo types:', error);
         ErrorResponses.serverError(res, 'Failed to fetch photo types', error);
     }
 });

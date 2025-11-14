@@ -28,6 +28,7 @@ import { WebSocketEvents, createStandardMessage } from '../../services/messaging
 import config from '../../config/config.js';
 import PhoneFormatter from '../../utils/phoneFormatter.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import { log } from '../../utils/logger.js';
 
 const router = express.Router();
 const upload = multer();
@@ -70,7 +71,7 @@ router.get('/wa/send-to-patient', async (req, res) => {
             });
         }
 
-        console.log(`WhatsApp send to patient request - PersonID: ${personId}, AppointmentID: ${appointmentId}`);
+        log.info(`WhatsApp send to patient request - PersonID: ${personId}, AppointmentID: ${appointmentId}`);
 
         // Check if WhatsApp client is ready
         if (!whatsapp.isReady()) {
@@ -127,7 +128,7 @@ router.get('/wa/send-to-patient', async (req, res) => {
         const countryCode = messageData.countryCode || '964'; // Default to Iraq
         const phoneNumber = PhoneFormatter.forWhatsApp(messageData.phone, countryCode);
 
-        console.log(`Sending WhatsApp message to ${phoneNumber}: ${messageData.message.substring(0, 50)}...`);
+        log.info(`Sending WhatsApp message to ${phoneNumber}: ${messageData.message.substring(0, 50)}...`);
 
         // Send single message using WhatsApp service
         const result = await whatsapp.sendSingleMessage(
@@ -157,7 +158,7 @@ router.get('/wa/send-to-patient', async (req, res) => {
         }
 
     } catch (error) {
-        console.error(`Error sending WhatsApp message to patient: ${error.message}`);
+        log.error(`Error sending WhatsApp message to patient: ${error.message}`);
         return sendError(res, ErrorResponses.INTERNAL_ERROR, {
             details: 'Internal server error while sending message',
             error: error.message
@@ -197,7 +198,7 @@ router.get('/wa/send', async (req, res) => {
             });
         }
 
-        console.log(`WhatsApp send request for validated date: ${dateparam}`);
+        log.info(`WhatsApp send request for validated date: ${dateparam}`);
 
         // Check if client is ready
         if (!whatsapp.isReady()) {
@@ -212,7 +213,7 @@ router.get('/wa/send', async (req, res) => {
 
         // Start sending process (non-blocking)
         whatsapp.send(dateparam).catch(error => {
-            console.error(`Error in WhatsApp send process: ${error.message}`);
+            log.error(`Error in WhatsApp send process: ${error.message}`);
 
             // Broadcast error to clients
             if (wsEmitter) {
@@ -236,7 +237,7 @@ router.get('/wa/send', async (req, res) => {
         });
 
     } catch (error) {
-        console.error(`Error starting WhatsApp send: ${error.message}`);
+        log.error(`Error starting WhatsApp send: ${error.message}`);
         return sendError(res, ErrorResponses.INTERNAL_ERROR, {
             details: 'Failed to start sending process',
             error: error.message
@@ -296,7 +297,7 @@ router.post('/sendmedia2', upload.none(), async (req, res) => {
         let phone = req.body.phone;
         const prog = req.body.prog;
 
-        console.log(`Sendmedia2 request - Program: ${prog}, Phone: ${phone}, Files: ${paths.length}`);
+        log.info(`Sendmedia2 request - Program: ${prog}, Phone: ${phone}, Files: ${paths.length}`);
 
         if (!phone || !prog || !paths.length) {
             return sendError(res, ErrorResponses.MISSING_PARAMETERS, {
@@ -323,14 +324,14 @@ router.post('/sendmedia2', upload.none(), async (req, res) => {
 
         if (prog === "WhatsApp") {
             phone = PhoneFormatter.forWhatsApp(phone);
-            console.log(`WhatsApp - Formatted phone: ${phone}`);
+            log.info(`WhatsApp - Formatted phone: ${phone}`);
 
             for (const filePath of paths) {
                 // Resolve Windows path
                 const resolvedPath = resolveWindowsPath(filePath);
-                console.log(`Sending WhatsApp file: ${filePath} -> ${resolvedPath}`);
+                log.info(`Sending WhatsApp file: ${filePath} -> ${resolvedPath}`);
                 state = await sendXray_(phone, resolvedPath);
-                console.log(`WhatsApp result:`, state);
+                log.info(`WhatsApp result:`, state);
                 if (state.result === "OK") {
                     sentMessages += 1;
                 }
@@ -338,14 +339,14 @@ router.post('/sendmedia2', upload.none(), async (req, res) => {
         } else if (prog === "Telegram") {
             const originalPhone = phone;
             phone = PhoneFormatter.forTelegram(phone);
-            console.log(`Telegram - Original phone: ${originalPhone}, Formatted phone: ${phone}`);
+            log.info(`Telegram - Original phone: ${originalPhone}, Formatted phone: ${phone}`);
 
             for (const filePath of paths) {
                 // Resolve Windows path
                 const resolvedPath = resolveWindowsPath(filePath);
-                console.log(`Sending Telegram file: ${filePath} -> ${resolvedPath}`);
+                log.info(`Sending Telegram file: ${filePath} -> ${resolvedPath}`);
                 state = await sendgramfile(phone, resolvedPath);
-                console.log(`Telegram result:`, state);
+                log.info(`Telegram result:`, state);
                 if (state.result === "OK") {
                     sentMessages += 1;
                 }
@@ -357,10 +358,10 @@ router.post('/sendmedia2', upload.none(), async (req, res) => {
         }
 
         state.sentMessages = sentMessages;
-        console.log(`Final result - Sent: ${sentMessages}/${paths.length}, State:`, state);
+        log.info(`Final result - Sent: ${sentMessages}/${paths.length}, State:`, state);
         res.json(state);
     } catch (error) {
-        console.error('Error in sendmedia2:', error);
+        log.error('Error in sendmedia2:', error);
         return sendError(res, ErrorResponses.INTERNAL_ERROR, {
             details: 'Error processing media files',
             error: error.message
@@ -407,7 +408,7 @@ router.get('/wa/qr', async (req, res) => {
         expiryTime: Date.now() + 60000 // QR codes typically expire after 1 minute
       });
     } catch (error) {
-      console.error('Error generating WhatsApp QR code image:', error);
+      log.error('Error generating WhatsApp QR code image:', error);
       return sendError(res, ErrorResponses.INTERNAL_ERROR, {
         details: 'Error generating QR code',
         error: error.message
@@ -433,7 +434,7 @@ router.get('/wa/status', (req, res) => {
         qr: messageState.qr
       });
     } catch (error) {
-      console.error("Error getting WhatsApp client status:", error);
+      log.error("Error getting WhatsApp client status:", error);
       return sendError(res, ErrorResponses.INTERNAL_ERROR, {
         details: 'Failed to get WhatsApp client status',
         error: error.message
@@ -458,7 +459,7 @@ router.get('/wa/detailed-status', async (req, res) => {
             timestamp: Date.now()
         });
     } catch (error) {
-        console.error("Error getting detailed status:", error);
+        log.error("Error getting detailed status:", error);
         return sendError(res, ErrorResponses.INTERNAL_ERROR, {
             details: 'Failed to get detailed status',
             error: error.message
@@ -477,7 +478,7 @@ router.get('/wa/detailed-status', async (req, res) => {
  */
 router.post('/wa/restart', async (req, res) => {
     try {
-      console.log("Restarting WhatsApp client");
+      log.info("Restarting WhatsApp client");
 
       const success = await whatsapp.restart();
 
@@ -487,7 +488,7 @@ router.post('/wa/restart', async (req, res) => {
         result: success ? "restart_initiated" : "restart_failed"
       });
     } catch (error) {
-      console.error("Error restarting WhatsApp client:", error);
+      log.error("Error restarting WhatsApp client:", error);
       return sendError(res, ErrorResponses.INTERNAL_ERROR, {
         details: 'Failed to restart WhatsApp client',
         error: error.message
@@ -502,7 +503,7 @@ router.post('/wa/restart', async (req, res) => {
  */
 router.post('/wa/destroy', async (req, res) => {
   try {
-    console.log("Destroying WhatsApp client - preserving authentication");
+    log.info("Destroying WhatsApp client - preserving authentication");
 
     const result = await whatsapp.simpleDestroy();
 
@@ -520,7 +521,7 @@ router.post('/wa/destroy', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("Error destroying WhatsApp client:", error);
+    log.error("Error destroying WhatsApp client:", error);
     return sendError(res, ErrorResponses.INTERNAL_ERROR, {
       details: 'Failed to destroy WhatsApp client',
       error: error.message
@@ -535,7 +536,7 @@ router.post('/wa/destroy', async (req, res) => {
  */
 router.post('/wa/logout', async (req, res) => {
   try {
-    console.log("Logging out WhatsApp client - clearing authentication");
+    log.info("Logging out WhatsApp client - clearing authentication");
 
     const result = await whatsapp.completeLogout();
 
@@ -553,7 +554,7 @@ router.post('/wa/logout', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("Error logging out WhatsApp client:", error);
+    log.error("Error logging out WhatsApp client:", error);
     return sendError(res, ErrorResponses.INTERNAL_ERROR, {
       details: 'Failed to logout WhatsApp client',
       error: error.message
@@ -569,7 +570,7 @@ router.post('/wa/logout', async (req, res) => {
  */
 router.get('/wa/initialize', (req, res) => {
   try {
-    console.log("WhatsApp initialization request received");
+    log.info("WhatsApp initialization request received");
 
     // Immediately respond with 200 OK
     res.json({
@@ -582,11 +583,11 @@ router.get('/wa/initialize', (req, res) => {
     // Start initialization in background (non-blocking)
     setImmediate(async () => {
       try {
-        console.log("Starting WhatsApp client initialization in background");
+        log.info("Starting WhatsApp client initialization in background");
         await whatsapp.initialize();
-        console.log("Background WhatsApp initialization completed successfully");
+        log.info("Background WhatsApp initialization completed successfully");
       } catch (error) {
-        console.error("Background WhatsApp initialization failed:", error.message);
+        log.error("Background WhatsApp initialization failed:", error.message);
 
         // Broadcast error to WebSocket clients if available
         if (wsEmitter) {
@@ -603,7 +604,7 @@ router.get('/wa/initialize', (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error handling WhatsApp initialization request:", error);
+    log.error("Error handling WhatsApp initialization request:", error);
     return sendError(res, ErrorResponses.INTERNAL_ERROR, {
       details: 'Failed to process initialization request',
       error: error.message

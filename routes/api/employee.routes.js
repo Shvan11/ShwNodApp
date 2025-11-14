@@ -10,6 +10,7 @@
 import express from 'express';
 import * as database from '../../services/database/index.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import { log } from '../../utils/logger.js';
 
 const router = express.Router();
 
@@ -46,7 +47,7 @@ router.get('/employees', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching employees:', error);
+        log.error('Error fetching employees:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch employees', error);
     }
 });
@@ -78,7 +79,7 @@ router.get('/positions', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching positions:', error);
+        log.error('Error fetching positions:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch positions', error);
     }
 });
@@ -115,7 +116,7 @@ router.get('/employees/email-recipients', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching email recipients:', error);
+        log.error('Error fetching email recipients:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch email recipients', error);
     }
 });
@@ -193,7 +194,7 @@ router.post('/employees', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error adding employee:', error);
+        log.error('Error adding employee:', error);
         return ErrorResponses.internalError(res, 'Failed to add employee', error);
     }
 });
@@ -277,7 +278,7 @@ router.put('/employees/:id', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error updating employee:', error);
+        log.error('Error updating employee:', error);
         return ErrorResponses.internalError(res, 'Failed to update employee', error);
     }
 });
@@ -306,7 +307,7 @@ router.delete('/employees/:id', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error deleting employee:', error);
+        log.error('Error deleting employee:', error);
         return ErrorResponses.internalError(res, 'Failed to delete employee', error);
     }
 });

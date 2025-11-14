@@ -5,6 +5,7 @@
 
 import EnvironmentManager from './EnvironmentManager.js';
 import { Connection, TYPES } from 'tedious';
+import { log } from '../../utils/logger.js';
 
 class DatabaseConfigService {
     constructor() {
@@ -89,7 +90,7 @@ class DatabaseConfigService {
                     }
                 };
 
-                console.log(`Testing database connection to ${testConfig.DB_SERVER}\\${testConfig.DB_INSTANCE}`);
+                log.info(`Testing database connection to ${testConfig.DB_SERVER}\\${testConfig.DB_INSTANCE}`);
 
                 const connection = new Connection(connectionConfig);
                 let connectionResult = null;
@@ -97,7 +98,7 @@ class DatabaseConfigService {
                 // Set up event handlers
                 connection.on('connect', (err) => {
                     if (err) {
-                        console.error('Database connection test failed:', err.message);
+                        log.error('Database connection test failed:', err.message);
                         connectionResult = {
                             success: false,
                             message: 'Connection failed',
@@ -106,7 +107,7 @@ class DatabaseConfigService {
                             duration: Date.now() - startTime
                         };
                     } else {
-                        console.log('Database connection test successful');
+                        log.info('Database connection test successful');
                         connectionResult = {
                             success: true,
                             message: 'Connection successful',
@@ -121,14 +122,14 @@ class DatabaseConfigService {
                 });
 
                 connection.on('end', () => {
-                    console.log('Database connection test completed');
+                    log.info('Database connection test completed');
                     if (connectionResult) {
                         resolve(connectionResult);
                     }
                 });
 
                 connection.on('error', (err) => {
-                    console.error('Database connection error:', err.message);
+                    log.error('Database connection error:', err.message);
                     if (!connectionResult) {
                         connectionResult = {
                             success: false,
@@ -144,7 +145,7 @@ class DatabaseConfigService {
                 // Set timeout to prevent hanging
                 const timeout = setTimeout(() => {
                     if (!connectionResult) {
-                        console.warn('Database connection test timed out');
+                        log.warn('Database connection test timed out');
                         connection.close();
                         resolve({
                             success: false,
@@ -163,7 +164,7 @@ class DatabaseConfigService {
                 connection.connect();
 
             } catch (error) {
-                console.error('Database connection test error:', error);
+                log.error('Database connection test error:', error);
                 resolve({
                     success: false,
                     message: 'Test configuration error',
@@ -181,8 +182,8 @@ class DatabaseConfigService {
      */
     async updateConfiguration(newConfig) {
         try {
-            console.log('Updating database configuration...');
-            
+            log.info('Updating database configuration...');
+
             // Validate configuration
             const validation = this.validateConfiguration(newConfig);
             if (!validation.valid) {
@@ -195,9 +196,9 @@ class DatabaseConfigService {
 
             // Update environment file
             const updatedConfig = await this.envManager.updateDatabaseConfig(newConfig);
-            
-            console.log('Database configuration updated successfully');
-            
+
+            log.info('Database configuration updated successfully');
+
             return {
                 success: true,
                 message: 'Database configuration updated successfully',
@@ -207,7 +208,7 @@ class DatabaseConfigService {
             };
 
         } catch (error) {
-            console.error('Failed to update database configuration:', error);
+            log.error('Failed to update database configuration:', error);
             return {
                 success: false,
                 message: 'Configuration update failed',

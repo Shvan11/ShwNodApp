@@ -12,6 +12,7 @@
  */
 
 import express from 'express';
+import { log } from '../../utils/logger.js';
 import * as database from '../../services/database/index.js';
 import { getTimePoints, getTimePointImgs } from '../../services/database/queries/timepoint-queries.js';
 import { getPatientsPhones, getInfos, createPatient, getPatientById, updatePatient, deletePatient } from '../../services/database/queries/patient-queries.js';
@@ -56,7 +57,7 @@ router.get("/settings/patients-folder", async (req, res) => {
         const patientsFolder = await getOption('PatientsFolder');
         res.json({ patientsFolder: patientsFolder || '' });
     } catch (error) {
-        console.error('Error fetching PatientsFolder setting:', error);
+        log.error('Error fetching PatientsFolder setting:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch PatientsFolder setting', error);
     }
 });
@@ -118,7 +119,7 @@ router.get("/getxray", async (req, res) => {
         const imagePath = await imaging.processXrayImage(pid, file, detailsDir);
         res.sendFile(imagePath);
     } catch (error) {
-        console.error('Error processing X-ray:', error);
+        log.error('Error processing X-ray:', error);
         return ErrorResponses.internalError(res, 'X-ray processing failed', {
             message: error.message,
             note: 'X-ray processing tool may not be available in this environment'
@@ -135,7 +136,7 @@ router.get("/getxray", async (req, res) => {
 router.get("/patientloaded", (req, res) => {
     res.sendStatus(200);
     const { pid, screenid: screenID } = req.query;
-    console.log(`PatientLoaded called with pid: ${pid}, screenID: ${screenID}`);
+    log.info(`PatientLoaded called with pid: ${pid}, screenID: ${screenID}`);
 
     // Emit universal event only
     if (wsEmitter) {
@@ -150,7 +151,7 @@ router.get("/patientloaded", (req, res) => {
 router.get("/patientunloaded", (req, res) => {
     res.sendStatus(200);
     const { screenid: screenID } = req.query;
-    console.log(`PatientUnloaded called with screenID: ${screenID}`);
+    log.info(`PatientUnloaded called with screenID: ${screenID}`);
 
     // Emit universal event only
     if (wsEmitter) {
@@ -169,7 +170,7 @@ router.get("/patientsPhones", async (req, res) => {
         const phonesList = await getPatientsPhones();
         res.json(phonesList);
     } catch (error) {
-        console.error("Error fetching patients phones:", error);
+        log.error("Error fetching patients phones:", error);
         return ErrorResponses.internalError(res, 'Failed to fetch patients phones', error);
     }
 });
@@ -263,7 +264,7 @@ router.get('/patients/search', async (req, res) => {
 
         res.json(patients);
     } catch (error) {
-        console.error('Error searching patients:', error);
+        log.error('Error searching patients:', error);
         return ErrorResponses.internalError(res, 'Failed to search patients', error);
     }
 });
@@ -289,7 +290,7 @@ router.get('/getpatient/:personId', async (req, res) => {
 
         res.json(patient);
     } catch (error) {
-        console.error("Error fetching patient:", error);
+        log.error("Error fetching patient:", error);
         return ErrorResponses.internalError(res, 'Failed to fetch patient', error);
     }
 });
@@ -328,7 +329,7 @@ router.post('/patients', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error creating patient:', error);
+        log.error('Error creating patient:', error);
         return ErrorResponses.internalError(res, 'Failed to create patient', error);
     }
 });
@@ -350,7 +351,7 @@ router.put('/patients/:personId', async (req, res) => {
         const result = await updatePatient(personId, patientData);
         res.json({ success: true, message: 'Patient updated successfully' });
     } catch (error) {
-        console.error('Error updating patient:', error);
+        log.error('Error updating patient:', error);
         return ErrorResponses.internalError(res, 'Failed to update patient', error);
     }
 });
@@ -374,7 +375,7 @@ router.delete('/patients/:personId',
             const result = await deletePatient(personId);
             res.json({ success: true, message: 'Patient deleted successfully' });
         } catch (error) {
-            console.error('Error deleting patient:', error);
+            log.error('Error deleting patient:', error);
             return ErrorResponses.internalError(res, 'Failed to delete patient', error);
         }
     }

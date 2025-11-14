@@ -35,6 +35,7 @@ import {
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { requireRecordAge, getWorkCreationDate } from '../../middleware/time-based-auth.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import { log } from '../../utils/logger.js';
 
 const router = express.Router();
 
@@ -53,7 +54,7 @@ router.get("/getworkdetails", async (req, res) => {
         }
         res.json(work);
     } catch (error) {
-        console.error('Error fetching work details:', error);
+        log.error('Error fetching work details:', error);
         return sendError(res, 500, 'Failed to fetch work details', error);
     }
 });
@@ -69,7 +70,7 @@ router.get('/getworks', async (req, res) => {
         const works = await getWorksByPatient(parseInt(personId));
         res.json(works);
     } catch (error) {
-        console.error("Error fetching works:", error);
+        log.error("Error fetching works:", error);
         return sendError(res, 500, 'Failed to fetch works', error);
     }
 });
@@ -124,7 +125,7 @@ router.get('/getwork/:workId', async (req, res) => {
 
         res.json({ success: true, work });
     } catch (error) {
-        console.error("Error fetching work:", error);
+        log.error("Error fetching work:", error);
         return sendError(res, 500, 'Failed to fetch work', error);
     }
 });
@@ -172,7 +173,7 @@ router.post('/addwork', async (req, res) => {
             message: "Work added successfully"
         });
     } catch (error) {
-        console.error("Error adding work:", error);
+        log.error("Error adding work:", error);
 
         // Handle duplicate active work constraint violation
         if (error.number === 2601 && error.message.includes('UNQ_tblWork_Active')) {
@@ -261,7 +262,7 @@ router.post('/addWorkWithInvoice', async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Error adding work with invoice:", error);
+        log.error("Error adding work with invoice:", error);
 
         // Handle duplicate active work constraint violation
         if (error.number === 2601 && error.message.includes('UNQ_tblWork_Active')) {
@@ -338,7 +339,7 @@ router.put('/updatework',
             rowsAffected: result.rowCount
         });
         } catch (error) {
-            console.error("Error updating work:", error);
+            log.error("Error updating work:", error);
             return sendError(res, 500, 'Failed to update work', error);
         }
     }
@@ -364,7 +365,7 @@ router.post('/finishwork', async (req, res) => {
             rowsAffected: result.rowCount
         });
     } catch (error) {
-        console.error("Error finishing work:", error);
+        log.error("Error finishing work:", error);
         return sendError(res, 500, 'Failed to finish work', error);
     }
 });
@@ -416,7 +417,7 @@ router.delete('/deletework',
             rowsAffected: result.rowCount
         });
         } catch (error) {
-            console.error("Error deleting work:", error);
+            log.error("Error deleting work:", error);
             return sendError(res, 500, 'Failed to delete work', error);
         }
     }
@@ -433,7 +434,7 @@ router.get('/getactivework', async (req, res) => {
         const activeWork = await getActiveWork(parseInt(personId));
         res.json(activeWork);
     } catch (error) {
-        console.error("Error fetching active work:", error);
+        log.error("Error fetching active work:", error);
         return sendError(res, 500, 'Failed to fetch active work', error);
     }
 });
@@ -444,7 +445,7 @@ router.get('/getworktypes', async (req, res) => {
         const workTypes = await getWorkTypes();
         res.json(workTypes);
     } catch (error) {
-        console.error("Error fetching work types:", error);
+        log.error("Error fetching work types:", error);
         return sendError(res, 500, 'Failed to fetch work types', error);
     }
 });
@@ -455,7 +456,7 @@ router.get('/getworkkeywords', async (req, res) => {
         const keywords = await getWorkKeywords();
         res.json(keywords);
     } catch (error) {
-        console.error("Error fetching work keywords:", error);
+        log.error("Error fetching work keywords:", error);
         return sendError(res, 500, 'Failed to fetch work keywords', error);
     }
 });
@@ -473,7 +474,7 @@ router.get('/getworkdetailslist', async (req, res) => {
         const workDetailsList = await getWorkDetailsList(parseInt(workId));
         res.json(workDetailsList);
     } catch (error) {
-        console.error("Error fetching work details list:", error);
+        log.error("Error fetching work details list:", error);
         return sendError(res, 500, 'Failed to fetch work details list', error);
     }
 });
@@ -505,7 +506,7 @@ router.post('/addworkdetail', async (req, res) => {
             message: "Work detail added successfully"
         });
     } catch (error) {
-        console.error("Error adding work detail:", error);
+        log.error("Error adding work detail:", error);
         return sendError(res, 500, 'Failed to add work detail', error);
     }
 });
@@ -536,7 +537,7 @@ router.put('/updateworkdetail', async (req, res) => {
             rowsAffected: result.rowCount
         });
     } catch (error) {
-        console.error("Error updating work detail:", error);
+        log.error("Error updating work detail:", error);
         return sendError(res, 500, 'Failed to update work detail', error);
     }
 });
@@ -561,7 +562,7 @@ router.delete('/deleteworkdetail', async (req, res) => {
             rowsAffected: result.rowCount
         });
     } catch (error) {
-        console.error("Error deleting work detail:", error);
+        log.error("Error deleting work detail:", error);
         return sendError(res, 500, 'Failed to delete work detail', error);
     }
 });

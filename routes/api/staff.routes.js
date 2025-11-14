@@ -5,6 +5,7 @@
 import express from 'express';
 import * as database from '../../services/database/index.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import { log } from '../../utils/logger.js';
 
 const router = express.Router();
 
@@ -31,7 +32,7 @@ router.get("/doctors", async (req, res) => {
         );
         res.json(doctors);
     } catch (error) {
-        console.error('Error fetching doctors:', error);
+        log.error('Error fetching doctors:', error);
         ErrorResponses.internalError(res, 'Failed to fetch doctors', error);
     }
 });
@@ -57,7 +58,7 @@ router.get("/operators", async (req, res) => {
         );
         res.json(operators);
     } catch (error) {
-        console.error('Error fetching operators:', error);
+        log.error('Error fetching operators:', error);
         ErrorResponses.internalError(res, 'Failed to fetch operators', error);
     }
 });

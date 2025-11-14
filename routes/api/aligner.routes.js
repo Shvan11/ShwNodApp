@@ -18,6 +18,7 @@ import * as database from '../../services/database/index.js';
 import { uploadSinglePdf, handleUploadError } from '../../middleware/upload.js';
 import driveUploadService from '../../services/google-drive/drive-upload.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import { log } from '../../utils/logger.js';
 
 const router = express.Router();
 
@@ -30,7 +31,7 @@ const router = express.Router();
  */
 router.get('/aligner/doctors', async (req, res) => {
     try {
-        console.log('Fetching aligner doctors');
+        log.info('Fetching aligner doctors');
 
         const query = `
             SELECT DISTINCT
@@ -64,7 +65,7 @@ router.get('/aligner/doctors', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching aligner doctors:', error);
+        log.error('Error fetching aligner doctors:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch aligner doctors', error);
     }
 });
@@ -75,7 +76,7 @@ router.get('/aligner/doctors', async (req, res) => {
  */
 router.get('/aligner/all-sets', async (req, res) => {
     try {
-        console.log('Fetching all aligner sets from v_allsets');
+        log.info('Fetching all aligner sets from v_allsets');
 
         const query = `
             SELECT
@@ -135,7 +136,7 @@ router.get('/aligner/all-sets', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching all aligner sets:', error);
+        log.error('Error fetching all aligner sets:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch aligner sets', error);
     }
 });
@@ -146,7 +147,7 @@ router.get('/aligner/all-sets', async (req, res) => {
  */
 router.get('/aligner/patients/all', async (req, res) => {
     try {
-        console.log('Fetching all aligner patients');
+        log.info('Fetching all aligner patients');
 
         const query = `
             SELECT DISTINCT
@@ -197,7 +198,7 @@ router.get('/aligner/patients/all', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching all aligner patients:', error);
+        log.error('Error fetching all aligner patients:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch all aligner patients', error);
     }
 });
@@ -214,7 +215,7 @@ router.get('/aligner/patients/by-doctor/:doctorId', async (req, res) => {
             return ErrorResponses.invalidParameter(res, 'doctorId', 'Valid doctorId is required');
         }
 
-        console.log(`Fetching all patients for doctor ID: ${doctorId}`);
+        log.info(`Fetching all patients for doctor ID: ${doctorId}`);
 
         const query = `
             SELECT DISTINCT
@@ -274,7 +275,7 @@ router.get('/aligner/patients/by-doctor/:doctorId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching patients by doctor:', error);
+        log.error('Error fetching patients by doctor:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch patients by doctor', error);
     }
 });
@@ -293,7 +294,7 @@ router.get('/aligner/patients', async (req, res) => {
         }
 
         const searchTerm = search.trim();
-        console.log(`Searching for aligner patients: ${searchTerm}${doctorId ? ` (Doctor ID: ${doctorId})` : ''}`);
+        log.info(`Searching for aligner patients: ${searchTerm}${doctorId ? ` (Doctor ID: ${doctorId})` : ''}`);
 
         // Build query with optional doctor filter
         let query = `
@@ -354,7 +355,7 @@ router.get('/aligner/patients', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error searching aligner patients:', error);
+        log.error('Error searching aligner patients:', error);
         return ErrorResponses.internalError(res, 'Failed to search aligner patients', error);
     }
 });
@@ -370,7 +371,7 @@ router.get('/aligner/sets/:workId', async (req, res) => {
             return ErrorResponses.invalidParameter(res, 'workId', 'Valid workId is required');
         }
 
-        console.log(`Fetching aligner sets for work ID: ${workId}`);
+        log.info(`Fetching aligner sets for work ID: ${workId}`);
 
         // Query aligner sets with batch summary, payment info, and activity flags
         const query = `
@@ -458,12 +459,12 @@ router.get('/aligner/sets/:workId', async (req, res) => {
         // DEBUG: Log unread activity counts
         const setsWithUnread = (sets || []).filter(s => s.UnreadActivityCount > 0);
         if (setsWithUnread.length > 0) {
-            console.log('🔔 [MAIN APP] Sets with unread doctor notes:', setsWithUnread.map(s => ({
+            log.info('🔔 [MAIN APP] Sets with unread doctor notes:', setsWithUnread.map(s => ({
                 SetID: s.AlignerSetID,
                 UnreadCount: s.UnreadActivityCount
             })));
         } else {
-            console.log('📭 [MAIN APP] No sets with unread doctor notes for workId:', workId);
+            log.info('📭 [MAIN APP] No sets with unread doctor notes for workId:', workId);
         }
 
         res.json({
@@ -473,7 +474,7 @@ router.get('/aligner/sets/:workId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching aligner sets:', error);
+        log.error('Error fetching aligner sets:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch aligner sets', error);
     }
 });
@@ -489,7 +490,7 @@ router.post('/aligner/payments', async (req, res) => {
             return ErrorResponses.badRequest(res, 'workid, Amountpaid, and Dateofpayment are required');
         }
 
-        console.log(`Adding payment for work ID: ${workid}, Set ID: ${AlignerSetID || 'general'}, Amount: ${Amountpaid}`);
+        log.info(`Adding payment for work ID: ${workid}, Set ID: ${AlignerSetID || 'general'}, Amount: ${Amountpaid}`);
 
         // Insert payment into tblInvoice
         const query = `
@@ -523,7 +524,7 @@ router.post('/aligner/payments', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error adding payment:', error);
+        log.error('Error adding payment:', error);
         return ErrorResponses.internalError(res, 'Failed to add payment', error);
     }
 });
@@ -539,7 +540,7 @@ router.get('/aligner/batches/:setId', async (req, res) => {
             return ErrorResponses.invalidParameter(res, 'setId', 'Valid setId is required');
         }
 
-        console.log(`Fetching batches for aligner set ID: ${setId}`);
+        log.info(`Fetching batches for aligner set ID: ${setId}`);
 
         // Query batches for the set
         const query = `
@@ -595,7 +596,7 @@ router.get('/aligner/batches/:setId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching aligner batches:', error);
+        log.error('Error fetching aligner batches:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch aligner batches', error);
     }
 });
@@ -628,7 +629,7 @@ router.post('/aligner/sets', async (req, res) => {
             return ErrorResponses.badRequest(res, 'WorkID and AlignerDrID are required');
         }
 
-        console.log('Creating new aligner set:', req.body);
+        log.info('Creating new aligner set:', req.body);
 
         const query = `
             DECLARE @OutputTable TABLE (AlignerSetID INT);
@@ -685,7 +686,7 @@ router.post('/aligner/sets', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error creating aligner set:', error);
+        log.error('Error creating aligner set:', error);
         return ErrorResponses.internalError(res, 'Failed to create aligner set', error);
     }
 });
@@ -716,7 +717,7 @@ router.put('/aligner/sets/:setId', async (req, res) => {
             return ErrorResponses.invalidParameter(res, 'setId', 'Valid setId is required');
         }
 
-        console.log(`Updating aligner set ${setId}:`, req.body);
+        log.info(`Updating aligner set ${setId}:`, req.body);
 
         const query = `
             UPDATE tblAlignerSets
@@ -763,7 +764,7 @@ router.put('/aligner/sets/:setId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error updating aligner set:', error);
+        log.error('Error updating aligner set:', error);
         return ErrorResponses.internalError(res, 'Failed to update aligner set', error);
     }
 });
@@ -779,7 +780,7 @@ router.delete('/aligner/sets/:setId', async (req, res) => {
             return ErrorResponses.invalidParameter(res, 'setId', 'Valid setId is required');
         }
 
-        console.log(`Deleting aligner set ${setId}`);
+        log.info(`Deleting aligner set ${setId}`);
 
         // Delete batches first (foreign key constraint)
         const deleteBatchesQuery = `
@@ -807,7 +808,7 @@ router.delete('/aligner/sets/:setId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error deleting aligner set:', error);
+        log.error('Error deleting aligner set:', error);
         return ErrorResponses.internalError(res, 'Failed to delete aligner set', error);
     }
 });
@@ -866,7 +867,7 @@ router.get('/aligner/notes/:setId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching aligner set notes:', error);
+        log.error('Error fetching aligner set notes:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch notes', error);
     }
 });
@@ -918,7 +919,7 @@ router.post('/aligner/notes', async (req, res) => {
 
         const noteId = result && result.length > 0 ? result[0] : null;
 
-        console.log(`Lab added note to aligner set ${AlignerSetID}`);
+        log.info(`Lab added note to aligner set ${AlignerSetID}`);
 
         res.json({
             success: true,
@@ -927,7 +928,7 @@ router.post('/aligner/notes', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error adding lab note:', error);
+        log.error('Error adding lab note:', error);
         return ErrorResponses.internalError(res, 'Failed to add note', error);
     }
 });
@@ -963,7 +964,7 @@ router.patch('/aligner/notes/:noteId/toggle-read', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error toggling note read status:', error);
+        log.error('Error toggling note read status:', error);
         return ErrorResponses.internalError(res, 'Failed to toggle read status', error);
     }
 });
@@ -1021,7 +1022,7 @@ router.patch('/aligner/notes/:noteId', async (req, res) => {
             ]
         );
 
-        console.log(`Note ${noteId} updated`);
+        log.info(`Note ${noteId} updated`);
 
         res.json({
             success: true,
@@ -1029,7 +1030,7 @@ router.patch('/aligner/notes/:noteId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error updating note:', error);
+        log.error('Error updating note:', error);
         return ErrorResponses.internalError(res, 'Failed to update note', error);
     }
 });
@@ -1073,7 +1074,7 @@ router.delete('/aligner/notes/:noteId', async (req, res) => {
             [['noteId', database.TYPES.Int, parseInt(noteId)]]
         );
 
-        console.log(`Note ${noteId} deleted`);
+        log.info(`Note ${noteId} deleted`);
 
         res.json({
             success: true,
@@ -1081,7 +1082,7 @@ router.delete('/aligner/notes/:noteId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error deleting note:', error);
+        log.error('Error deleting note:', error);
         return ErrorResponses.internalError(res, 'Failed to delete note', error);
     }
 });
@@ -1121,7 +1122,7 @@ router.get('/aligner/notes/:noteId/status', async (req, res) => {
         }
 
     } catch (error) {
-        console.error('Error getting note status:', error);
+        log.error('Error getting note status:', error);
         return ErrorResponses.internalError(res, 'Failed to get note status', error);
     }
 });
@@ -1176,7 +1177,7 @@ router.get('/aligner/activity/:setId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching activities:', error);
+        log.error('Error fetching activities:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch activities', error);
     }
 });
@@ -1203,7 +1204,7 @@ router.patch('/aligner/activity/:activityId/mark-read', async (req, res) => {
             [['activityId', database.TYPES.Int, parseInt(activityId)]]
         );
 
-        console.log(`Activity ${activityId} marked as read`);
+        log.info(`Activity ${activityId} marked as read`);
 
         res.json({
             success: true,
@@ -1211,7 +1212,7 @@ router.patch('/aligner/activity/:activityId/mark-read', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error marking activity as read:', error);
+        log.error('Error marking activity as read:', error);
         return ErrorResponses.internalError(res, 'Failed to mark activity as read', error);
     }
 });
@@ -1238,7 +1239,7 @@ router.patch('/aligner/activity/set/:setId/mark-all-read', async (req, res) => {
             [['setId', database.TYPES.Int, parseInt(setId)]]
         );
 
-        console.log(`All activities for set ${setId} marked as read`);
+        log.info(`All activities for set ${setId} marked as read`);
 
         res.json({
             success: true,
@@ -1246,7 +1247,7 @@ router.patch('/aligner/activity/set/:setId/mark-all-read', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error marking all activities as read:', error);
+        log.error('Error marking all activities as read:', error);
         return ErrorResponses.internalError(res, 'Failed to mark all activities as read', error);
     }
 });
@@ -1277,7 +1278,7 @@ router.post('/aligner/batches', async (req, res) => {
             return ErrorResponses.badRequest(res, 'AlignerSetID is required');
         }
 
-        console.log('Creating new aligner batch:', req.body);
+        log.info('Creating new aligner batch:', req.body);
 
         const query = `
             DECLARE @OutputTable TABLE (AlignerBatchID INT);
@@ -1326,7 +1327,7 @@ router.post('/aligner/batches', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error creating aligner batch:', error);
+        log.error('Error creating aligner batch:', error);
         return ErrorResponses.internalError(res, 'Failed to create aligner batch', error);
     }
 });
@@ -1357,7 +1358,7 @@ router.put('/aligner/batches/:batchId', async (req, res) => {
             return ErrorResponses.invalidParameter(res, 'batchId', 'Valid batchId is required');
         }
 
-        console.log(`Updating aligner batch ${batchId}:`, req.body);
+        log.info(`Updating aligner batch ${batchId}:`, req.body);
 
         const query = `
             UPDATE tblAlignerBatches
@@ -1404,7 +1405,7 @@ router.put('/aligner/batches/:batchId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error updating aligner batch:', error);
+        log.error('Error updating aligner batch:', error);
         return ErrorResponses.internalError(res, 'Failed to update aligner batch', error);
     }
 });
@@ -1420,7 +1421,7 @@ router.patch('/aligner/batches/:batchId/deliver', async (req, res) => {
             return ErrorResponses.invalidParameter(res, 'batchId', 'Valid batchId is required');
         }
 
-        console.log(`Marking batch ${batchId} as delivered`);
+        log.info(`Marking batch ${batchId} as delivered`);
 
         const query = `
             UPDATE tblAlignerBatches
@@ -1439,7 +1440,7 @@ router.patch('/aligner/batches/:batchId/deliver', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error marking batch as delivered:', error);
+        log.error('Error marking batch as delivered:', error);
         return ErrorResponses.internalError(res, 'Failed to mark batch as delivered', error);
     }
 });
@@ -1455,7 +1456,7 @@ router.delete('/aligner/batches/:batchId', async (req, res) => {
             return ErrorResponses.invalidParameter(res, 'batchId', 'Valid batchId is required');
         }
 
-        console.log(`Deleting aligner batch ${batchId}`);
+        log.info(`Deleting aligner batch ${batchId}`);
 
         const query = `
             DELETE FROM tblAlignerBatches WHERE AlignerBatchID = @batchId
@@ -1472,7 +1473,7 @@ router.delete('/aligner/batches/:batchId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error deleting aligner batch:', error);
+        log.error('Error deleting aligner batch:', error);
         return ErrorResponses.internalError(res, 'Failed to delete aligner batch', error);
     }
 });
@@ -1533,7 +1534,7 @@ router.post('/aligner/sets/:setId/upload-pdf', uploadSinglePdf, handleUploadErro
             try {
                 await driveUploadService.deletePdf(setInfo.DriveFileId);
             } catch (error) {
-                console.warn('Failed to delete old PDF from Drive:', error);
+                log.warn('Failed to delete old PDF from Drive:', error);
                 // Continue with upload even if deletion fails
             }
         }
@@ -1582,7 +1583,7 @@ router.post('/aligner/sets/:setId/upload-pdf', uploadSinglePdf, handleUploadErro
         });
 
     } catch (error) {
-        console.error('Error uploading PDF:', error);
+        log.error('Error uploading PDF:', error);
         return ErrorResponses.internalError(res, 'Failed to upload PDF', error);
     }
 });
@@ -1616,7 +1617,7 @@ router.delete('/aligner/sets/:setId/pdf', async (req, res) => {
             try {
                 await driveUploadService.deletePdf(driveFileId);
             } catch (error) {
-                console.warn('Failed to delete from Drive:', error);
+                log.warn('Failed to delete from Drive:', error);
                 // Continue with database update even if Drive deletion fails
             }
         }
@@ -1642,7 +1643,7 @@ router.delete('/aligner/sets/:setId/pdf', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error deleting PDF:', error);
+        log.error('Error deleting PDF:', error);
         return ErrorResponses.internalError(res, 'Failed to delete PDF', error);
     }
 });
@@ -1679,7 +1680,7 @@ router.get('/aligner-doctors', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching aligner doctors:', error);
+        log.error('Error fetching aligner doctors:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch aligner doctors', error);
     }
 });
@@ -1738,7 +1739,7 @@ router.post('/aligner-doctors', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error adding aligner doctor:', error);
+        log.error('Error adding aligner doctor:', error);
         return ErrorResponses.internalError(res, 'Failed to add aligner doctor', error);
     }
 });
@@ -1795,7 +1796,7 @@ router.put('/aligner-doctors/:drID', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error updating aligner doctor:', error);
+        log.error('Error updating aligner doctor:', error);
         return ErrorResponses.internalError(res, 'Failed to update aligner doctor', error);
     }
 });
@@ -1833,7 +1834,7 @@ router.delete('/aligner-doctors/:drID', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error deleting aligner doctor:', error);
+        log.error('Error deleting aligner doctor:', error);
         return ErrorResponses.internalError(res, 'Failed to delete aligner doctor', error);
     }
 });

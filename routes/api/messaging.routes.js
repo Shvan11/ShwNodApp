@@ -13,6 +13,7 @@
  */
 
 import express from 'express';
+import { log } from '../../utils/logger.js';
 import * as database from '../../services/database/index.js';
 import * as messagingQueries from '../../services/database/queries/messaging-queries.js';
 import { getWhatsAppMessages } from '../../services/database/queries/messaging-queries.js';
@@ -76,7 +77,7 @@ router.post('/batch-status-update', async (req, res) => {
         res.json(result);
 
     } catch (error) {
-        console.error('Error in batch status update:', error);
+        log.error('Error in batch status update:', error);
         return ErrorResponses.internalError(res, error.message, error);
     }
 });
@@ -136,7 +137,7 @@ router.get('/status/:date', async (req, res) => {
 
         res.json(result);
     } catch (error) {
-        console.error('Error getting message status:', error);
+        log.error('Error getting message status:', error);
         return ErrorResponses.internalError(res, error.message, error);
     }
 });
@@ -148,7 +149,7 @@ router.get('/status/:date', async (req, res) => {
 router.get('/count/:date', async (req, res) => {
     try {
         const { date } = req.params;
-        console.log(`Getting message count for date: ${date}`);
+        log.info(`Getting message count for date: ${date}`);
 
         // Get actual WhatsApp messages to be sent for the date
         const whatsappMessages = await getWhatsAppMessages(date);
@@ -171,11 +172,11 @@ router.get('/count/:date', async (req, res) => {
                 messageCount.pending = existingMessages.messages.filter(m => m.status === 0).length;
             }
         } catch (msgError) {
-            console.warn('Could not get existing message statuses:', msgError.message);
+            log.warn('Could not get existing message statuses:', msgError.message);
             // Continue without existing message data
         }
 
-        console.log(`Message count for ${date}:`, messageCount);
+        log.info(`Message count for ${date}:`, messageCount);
 
         res.json({
             success: true,
@@ -184,7 +185,7 @@ router.get('/count/:date', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error getting message count:', error);
+        log.error('Error getting message count:', error);
         return ErrorResponses.internalError(res, error.message, error);
     }
 });
@@ -196,7 +197,7 @@ router.get('/count/:date', async (req, res) => {
 router.post('/reset/:date', async (req, res) => {
     try {
         const { date } = req.params;
-        console.log(`Resetting messaging for date: ${date}`);
+        log.info(`Resetting messaging for date: ${date}`);
 
         // Execute the stored procedure
         const result = await database.executeStoredProcedure(
@@ -231,7 +232,7 @@ router.post('/reset/:date', async (req, res) => {
                     smsRecordsReset: 0
                 };
 
-                console.log(`Reset completed for ${date}:`, resetStats);
+                log.info(`Reset completed for ${date}:`, resetStats);
                 return resetStats;
             }
         );
@@ -244,7 +245,7 @@ router.post('/reset/:date', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error resetting messaging:', error);
+        log.error('Error resetting messaging:', error);
         return ErrorResponses.internalError(res, 'Failed to reset messaging status', error);
     }
 });
@@ -256,7 +257,7 @@ router.post('/reset/:date', async (req, res) => {
 router.get('/details/:date', async (req, res) => {
     try {
         const { date } = req.params;
-        console.log(`Getting message details for date: ${date}`);
+        log.info(`Getting message details for date: ${date}`);
 
         const result = {
             date: date,
@@ -305,11 +306,11 @@ router.get('/details/:date', async (req, res) => {
                 });
             }
         } catch (msgError) {
-            console.warn('Could not get message statuses for details:', msgError.message);
+            log.warn('Could not get message statuses for details:', msgError.message);
             result.existingMessages = [];
         }
 
-        console.log(`Message details for ${date}: ${result.summary.totalMessages} messages to send, ${result.existingMessages.length} existing messages`);
+        log.info(`Message details for ${date}: ${result.summary.totalMessages} messages to send, ${result.existingMessages.length} existing messages`);
 
         res.json({
             success: true,
@@ -318,7 +319,7 @@ router.get('/details/:date', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error getting message details:', error);
+        log.error('Error getting message details:', error);
         return ErrorResponses.internalError(res, error.message, error);
     }
 });

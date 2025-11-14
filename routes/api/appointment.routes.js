@@ -24,6 +24,7 @@ import {
 } from '../../services/database/queries/appointment-queries.js';
 import { WebSocketEvents } from '../../services/messaging/websocket-events.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import { log } from '../../utils/logger.js';
 
 const router = express.Router();
 
@@ -55,7 +56,7 @@ router.get("/appointment-details", async (req, res) => {
         );
         res.json(details);
     } catch (error) {
-        console.error('Error fetching appointment details:', error);
+        log.error('Error fetching appointment details:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch appointment details', error);
     }
 });
@@ -67,7 +68,7 @@ router.get("/appointment-details", async (req, res) => {
 router.get("/AppsUpdated", async (req, res) => {
     res.sendStatus(200);
     const { PDate } = req.query;
-    console.log(`AppsUpdated called with date: ${PDate}`);
+    log.info(`AppsUpdated called with date: ${PDate}`);
 
     // Emit universal event only
     wsEmitter.emit(WebSocketEvents.DATA_UPDATED, PDate);
@@ -96,7 +97,7 @@ router.get("/getAllTodayApps", async (req, res) => {
         const result = await getAllTodayApps(AppsDate);
         res.json(result);
     } catch (error) {
-        console.error("Error fetching all today appointments:", error);
+        log.error("Error fetching all today appointments:", error);
         return ErrorResponses.internalError(res, "Failed to fetch appointments", error);
     }
 });
@@ -114,7 +115,7 @@ router.get("/getPresentTodayApps", async (req, res) => {
         const result = await getPresentTodayApps(AppsDate);
         res.json(result);
     } catch (error) {
-        console.error("Error fetching present appointments:", error);
+        log.error("Error fetching present appointments:", error);
         return ErrorResponses.internalError(res, "Failed to fetch present appointments", error);
     }
 });
@@ -133,14 +134,14 @@ router.post("/updateAppointmentState", async (req, res) => {
         // Format time as string for the modified stored procedure
         const now = new Date();
         const currentTime = time || `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-        console.log(`Updating appointment ${appointmentID} with state: ${state}, time: ${currentTime}`);
+        log.info(`Updating appointment ${appointmentID} with state: ${state}, time: ${currentTime}`);
         const result = await updatePresent(appointmentID, state, currentTime);
 
         wsEmitter.emit(WebSocketEvents.DATA_UPDATED, new Date().toISOString().split('T')[0]);
 
         res.json(result);
     } catch (error) {
-        console.error("Error updating appointment state:", error);
+        log.error("Error updating appointment state:", error);
         return ErrorResponses.internalError(res, "Failed to update appointment state", error);
     }
 });
@@ -157,14 +158,14 @@ router.post("/undoAppointmentState", async (req, res) => {
         }
 
         // Use dedicated undo procedure that doesn't affect other applications
-        console.log(`Undoing appointment ${appointmentID} state: ${state}`);
+        log.info(`Undoing appointment ${appointmentID} state: ${state}`);
         const result = await undoAppointmentState(appointmentID, state);
 
         wsEmitter.emit(WebSocketEvents.DATA_UPDATED, new Date().toISOString().split('T')[0]);
 
         res.json(result);
     } catch (error) {
-        console.error("Error undoing appointment state:", error);
+        log.error("Error undoing appointment state:", error);
         return ErrorResponses.internalError(res, "Failed to undo appointment state", error);
     }
 });
@@ -241,9 +242,9 @@ router.post("/appointments", async (req, res) => {
         // Get the newly created appointment ID
         const newAppointmentId = result.insertId || result.recordset?.[0]?.appointmentID;
 
-        console.log(`New appointment created - ID: ${newAppointmentId}, Patient: ${PersonID}, Doctor: ${doctorCheck[0]?.employeeName || 'Unknown'}, Date: ${AppDate}`);
-        console.log('Result object:', result);
-        console.log('Doctor check result:', doctorCheck);
+        log.info(`New appointment created - ID: ${newAppointmentId}, Patient: ${PersonID}, Doctor: ${doctorCheck[0]?.employeeName || 'Unknown'}, Date: ${AppDate}`);
+        log.info('Result object:', result);
+        log.info('Doctor check result:', doctorCheck);
 
         // Emit WebSocket event for real-time updates
         if (wsEmitter) {
@@ -265,7 +266,7 @@ router.post("/appointments", async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error creating appointment:', error);
+        log.error('Error creating appointment:', error);
         return ErrorResponses.internalError(res, 'Failed to create appointment', error);
     }
 });
@@ -315,7 +316,7 @@ router.get("/patient-appointments/:patientId", async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching patient appointments:', error);
+        log.error('Error fetching patient appointments:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch appointments', error);
     }
 });
@@ -359,7 +360,7 @@ router.get("/appointments/:appointmentId", async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching appointment:', error);
+        log.error('Error fetching appointment:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch appointment', error);
     }
 });
@@ -406,7 +407,7 @@ router.put("/appointments/:appointmentId", async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error updating appointment:', error);
+        log.error('Error updating appointment:', error);
         return ErrorResponses.internalError(res, 'Failed to update appointment', error);
     }
 });
@@ -435,7 +436,7 @@ router.delete("/appointments/:appointmentId", async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error deleting appointment:', error);
+        log.error('Error deleting appointment:', error);
         return ErrorResponses.internalError(res, 'Failed to delete appointment', error);
     }
 });
@@ -520,7 +521,7 @@ router.post("/appointments/quick-checkin", async (req, res) => {
                     ['appointmentID', database.TYPES.Int, apt.appointmentID]
                 ]);
 
-                console.log(`Patient ${PersonID} checked in to existing appointment ${apt.appointmentID} at ${currentTime}`);
+                log.info(`Patient ${PersonID} checked in to existing appointment ${apt.appointmentID} at ${currentTime}`);
 
                 // Emit WebSocket event for real-time updates
                 if (wsEmitter) {
@@ -590,7 +591,7 @@ router.post("/appointments/quick-checkin", async (req, res) => {
 
         const newAppointmentId = result?.[0]?.appointmentID;
 
-        console.log(`Quick check-in: Created appointment ${newAppointmentId} for patient ${PersonID} and marked present at ${currentTime}`);
+        log.info(`Quick check-in: Created appointment ${newAppointmentId} for patient ${PersonID} and marked present at ${currentTime}`);
 
         // Emit WebSocket event for real-time updates
         if (wsEmitter) {
@@ -614,7 +615,7 @@ router.post("/appointments/quick-checkin", async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error in quick check-in:', error);
+        log.error('Error in quick check-in:', error);
         return ErrorResponses.internalError(res, 'Failed to check in patient', error);
     }
 });

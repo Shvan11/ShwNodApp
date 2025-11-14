@@ -3,6 +3,7 @@
  * Handles financial statistics and daily invoice reports
  */
 import express from 'express';
+import { log } from '../../utils/logger.js';
 import * as database from '../../services/database/index.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
@@ -108,7 +109,7 @@ router.get('/statistics', async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Error fetching statistics:", error);
+        log.error("Error fetching statistics:", error);
         ErrorResponses.internalError(res, 'Failed to fetch statistics', error);
     }
 });
@@ -176,7 +177,7 @@ router.get('/daily-invoices', async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Error fetching daily invoices:", error);
+        log.error("Error fetching daily invoices:", error);
         ErrorResponses.internalError(res, 'Failed to fetch daily invoices', error);
     }
 });
