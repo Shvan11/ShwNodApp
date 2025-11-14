@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 import config from './config/config.js';
 import { setupWebSocketServer } from './utils/websocket.js';
 import { setupMiddleware } from './middleware/index.js';
-import apiRoutes from './routes/api.js';
+import apiRoutes from './routes/api/index.js';
 import webRoutes from './routes/web.js';
 import calendarRoutes from './routes/calendar.js';
 import adminRoutes from './routes/admin.js';
@@ -110,7 +110,7 @@ async function initializeApplication() {
     const wsEmitter = setupWebSocketServer(server);
 
     // Inject WebSocket emitter into API routes to avoid circular imports
-    const { setWebSocketEmitter } = await import('./routes/api.js');
+    const { setWebSocketEmitter } = await import('./routes/api/index.js');
     setWebSocketEmitter(wsEmitter);
 
     // Use routes
