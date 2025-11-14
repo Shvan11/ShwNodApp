@@ -11,16 +11,33 @@ export default function Expenses() {
   // Toast notifications
   const toast = useToast();
 
-  // State for filters
-  const [filters, setFilters] = useState({
-    startDate: null,
-    endDate: null,
-    categoryId: null,
-    subcategoryId: null,
-    currency: null
-  });
+  // Initialize default date range (current month)
+  const getDefaultDateRange = () => {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  const [appliedFilters, setAppliedFilters] = useState({});
+    const formatDateString = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    return {
+      startDate: formatDateString(firstDay),
+      endDate: formatDateString(lastDay),
+      categoryId: null,
+      subcategoryId: null,
+      currency: null
+    };
+  };
+
+  // State for filters - initialize with default date range
+  const [filters, setFilters] = useState(getDefaultDateRange);
+
+  // Applied filters - start with same default to prevent loading all expenses
+  const [appliedFilters, setAppliedFilters] = useState(getDefaultDateRange);
 
   // State for modals
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
@@ -39,13 +56,6 @@ export default function Expenses() {
     loading: mutationLoading,
     error: mutationError
   } = useExpenseMutations(refetch);
-
-  // Apply filters when component mounts with default date range
-  useEffect(() => {
-    if (filters.startDate && filters.endDate && !appliedFilters.startDate) {
-      setAppliedFilters(filters);
-    }
-  }, [filters.startDate, filters.endDate]);
 
   // Handle filter changes (updates local state only, not applied yet)
   const handleFilterChange = (updates) => {

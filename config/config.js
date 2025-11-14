@@ -3,7 +3,14 @@
  * Loads environment variables and provides configuration for the application
  */
 import dotenv from 'dotenv';
-dotenv.config();
+
+// Load base .env file first (shared configuration)
+dotenv.config({ path: '.env' });
+
+// Then load environment-specific overrides
+if (process.env.NODE_ENV === 'development') {
+  dotenv.config({ path: '.env.development', override: true });
+}
 
 // Check for required environment variables
 const requiredEnvVars = [

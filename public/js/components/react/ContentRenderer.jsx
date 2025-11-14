@@ -25,6 +25,8 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
     // Extract workId and visitId from query params for work-specific pages like visits
     const workId = searchParams.get('workId');
     const visitId = searchParams.get('visitId');
+    const tp = searchParams.get('tp');
+
     const renderContent = () => {
         switch (page) {
             case 'grid':
@@ -32,7 +34,7 @@ const ContentRenderer = ({ patientId, page = 'grid', params = {} }) => {
                 return (
                     <GridComponent
                         patientId={patientId}
-                        tpCode={params.tp || '0'}
+                        tpCode={tp || '0'}
                     />
                 );
 

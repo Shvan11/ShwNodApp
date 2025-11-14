@@ -54,7 +54,7 @@ export default function ExpenseSummary({ startDate, endDate, expenses }) {
     return (
         <div className="summary-container">
             <div className="summary-grid">
-                <div className="summary-card">
+                <div className="summary-card total-count">
                     <div className="summary-label">Total Expenses</div>
                     <div className="summary-value">{count}</div>
                 </div>

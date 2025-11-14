@@ -253,6 +253,10 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
+.summary-card.total-count {
+  background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
+}
+
 .summary-card.currency-iqd {
   background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
 }

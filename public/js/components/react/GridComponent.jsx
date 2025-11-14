@@ -110,21 +110,41 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                         return;
                     }
                     
-                    // Load PhotoSwipe UMD versions for browser compatibility
-                    await new Promise((resolve, reject) => {
-                        const script1 = document.createElement('script');
-                        script1.src = '/photoswipe/dist/umd/photoswipe.umd.min.js';
-                        script1.onload = () => {
-                            const script2 = document.createElement('script');
-                            script2.src = '/photoswipe/dist/umd/photoswipe-lightbox.umd.min.js';
-                            script2.onload = resolve;
-                            script2.onerror = reject;
-                            document.head.appendChild(script2);
-                        };
-                        script1.onerror = reject;
-                        document.head.appendChild(script1);
-                    });
-                    
+                    // Load PhotoSwipe UMD versions for browser compatibility (if not already loaded)
+                    if (!window.PhotoSwipe || !window.PhotoSwipeLightbox) {
+                        await new Promise((resolve, reject) => {
+                            // Check if PhotoSwipe main script is already loaded
+                            if (!window.PhotoSwipe) {
+                                const script1 = document.createElement('script');
+                                script1.src = '/photoswipe/dist/umd/photoswipe.umd.min.js';
+                                script1.onload = () => {
+                                    // Load PhotoSwipeLightbox after PhotoSwipe
+                                    if (!window.PhotoSwipeLightbox) {
+                                        const script2 = document.createElement('script');
+                                        script2.src = '/photoswipe/dist/umd/photoswipe-lightbox.umd.min.js';
+                                        script2.onload = resolve;
+                                        script2.onerror = reject;
+                                        document.head.appendChild(script2);
+                                    } else {
+                                        resolve();
+                                    }
+                                };
+                                script1.onerror = reject;
+                                document.head.appendChild(script1);
+                            } else if (!window.PhotoSwipeLightbox) {
+                                // PhotoSwipe loaded but not PhotoSwipeLightbox
+                                const script2 = document.createElement('script');
+                                script2.src = '/photoswipe/dist/umd/photoswipe-lightbox.umd.min.js';
+                                script2.onload = resolve;
+                                script2.onerror = reject;
+                                document.head.appendChild(script2);
+                            } else {
+                                // Both already loaded
+                                resolve();
+                            }
+                        });
+                    }
+
                     if (!window.PhotoSwipeLightbox) {
                         throw new Error('PhotoSwipeLightbox not available');
                     }
@@ -230,7 +250,7 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                                         const convertedPath = fullPath;
                                         console.log('Converted to full path:', convertedPath);
                                         
-                                        const sendMessageUrl = `/views/messaging/send-message.html?file=${encodeURIComponent(convertedPath)}`;
+                                        const sendMessageUrl = `/send-message?file=${encodeURIComponent(convertedPath)}`;
                                         window.open(sendMessageUrl, '_blank');
                                         
                                     } catch (error) {

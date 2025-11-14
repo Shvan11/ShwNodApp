@@ -23,6 +23,7 @@ const PatientRoutes = React.lazy(() => import('./routes/PatientRoutes.jsx'));
 const Expenses = React.lazy(() => import('./routes/Expenses.jsx'));
 const WhatsAppSend = React.lazy(() => import('./routes/WhatsAppSend.jsx'));
 const WhatsAppAuth = React.lazy(() => import('./routes/WhatsAppAuth.jsx'));
+const SendMessage = React.lazy(() => import('./components/react/SendMessage.jsx'));
 const AlignerRoutes = React.lazy(() => import('./routes/AlignerRoutes.jsx'));
 const SettingsRoutes = React.lazy(() => import('./routes/SettingsRoutes.jsx'));
 const TemplateRoutes = React.lazy(() => import('./routes/TemplateRoutes.jsx'));
@@ -142,6 +143,7 @@ export default function App() {
                   </RouteErrorBoundary>
                 }
               />
+
               <Route
                 path="/calendar"
                 element={
@@ -157,6 +159,14 @@ export default function App() {
                 element={
                   <RouteErrorBoundary routeName="WhatsApp Send">
                     <WhatsAppSend />
+                  </RouteErrorBoundary>
+                }
+              />
+              <Route
+                path="/send-message"
+                element={
+                  <RouteErrorBoundary routeName="Send Message">
+                    <SendMessage />
                   </RouteErrorBoundary>
                 }
               />

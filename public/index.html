@@ -13,6 +13,7 @@
 
     <!-- TomSelect for patient search -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css">
+    <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
 
     <!-- Application CSS -->
     <link rel="stylesheet" href="/css/main.css">
@@ -54,6 +55,9 @@
     <link rel="stylesheet" href="/css/components/aligner-drawer-form.css">
     <link rel="stylesheet" href="/css/components/whatsapp-auth.css">
 
+    <!-- PhotoSwipe CSS for image lightbox -->
+    <link rel="stylesheet" href="/photoswipe/dist/photoswipe.css">
+
     <!-- Loading spinner animation for React.lazy() -->
     <style>
         @keyframes spin {
@@ -62,19 +66,9 @@
         }
     </style>
 
-    <!-- Import Map for ESM Dependencies -->
-    <script type="importmap">
-    {
-        "imports": {
-            "react": "https://esm.sh/react@19.1.0",
-            "react-dom": "https://esm.sh/react-dom@19.1.0",
-            "react-dom/client": "https://esm.sh/react-dom@19.1.0/client",
-            "react-router-dom": "https://esm.sh/react-router-dom@7.9.4",
-            "date-fns": "https://esm.sh/date-fns@2.30.0",
-            "axios": "https://esm.sh/axios@1.6.0"
-        }
-    }
-    </script>
+    <!-- React and dependencies are bundled by Vite for optimal performance -->
+    <!-- Using latest stable React 19.1.0 with full bundling (best practice 2025) -->
+    <!-- No CDN imports - everything is optimized and tree-shaken in the build -->
 
     <!-- Global Styles -->
     <style>

@@ -442,8 +442,35 @@ export async function updatePatient(personId, patientData) {
  * @returns {Promise<Object>} - A promise that resolves with the delete result.
  */
 export async function deletePatient(personId) {
-    // Note: This is a hard delete. In production, you might want to implement soft delete.
-    const query = 'DELETE FROM dbo.tblpatients WHERE PersonID = @personId';
-    await executeQuery(query, [['personId', TYPES.Int, personId]]);
-    return { success: true };
+    // Note: This is a hard delete with cascade in code
+    // Foreign keys with NO_ACTION prevent direct deletion, so we delete related records first
+
+    try {
+        // Delete in order based on dependencies:
+        // 1. Delete works (has NO_ACTION constraint)
+        await executeQuery('DELETE FROM dbo.tblwork WHERE PersonID = @personId', [['personId', TYPES.Int, personId]]);
+
+        // 2. Delete carried wires (has NO_ACTION constraint)
+        await executeQuery('DELETE FROM dbo.tblCarriedWires WHERE PersonID = @personId', [['personId', TYPES.Int, personId]]);
+
+        // 3. Delete waiting records (has NO_ACTION constraint)
+        await executeQuery('DELETE FROM dbo.tblWaiting WHERE PersonID = @personId', [['personId', TYPES.Int, personId]]);
+
+        // 4. Delete appointments (has CASCADE, but we'll explicitly delete for clarity)
+        await executeQuery('DELETE FROM dbo.tblappointments WHERE PersonID = @personId', [['personId', TYPES.Int, personId]]);
+
+        // 5. Delete opened records (has CASCADE)
+        await executeQuery('DELETE FROM dbo.tblOpened WHERE PersonID = @personId', [['personId', TYPES.Int, personId]]);
+
+        // 6. Delete screws (has CASCADE)
+        await executeQuery('DELETE FROM dbo.tblscrews WHERE PersonID = @personId', [['personId', TYPES.Int, personId]]);
+
+        // 7. Finally, delete the patient
+        await executeQuery('DELETE FROM dbo.tblpatients WHERE PersonID = @personId', [['personId', TYPES.Int, personId]]);
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error in deletePatient cascade:', error);
+        throw new Error(`Failed to delete patient and related records: ${error.message}`);
+    }
 }

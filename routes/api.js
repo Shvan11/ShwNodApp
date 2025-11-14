@@ -28,6 +28,14 @@ import sms from '../services/messaging/sms.js';
 import * as imaging from '../services/imaging/index.js';
 import multer from 'multer';
 import { sendgramfile } from '../services/messaging/telegram.js';
+import { authenticate, authorize } from '../middleware/auth.js';
+import {
+  requireRecordAge,
+  getPatientCreationDate,
+  getWorkCreationDate,
+  getInvoiceCreationDate,
+  getExpenseCreationDate
+} from '../middleware/time-based-auth.js';
 import qrcode from 'qrcode';
 import { uploadSinglePdf, handleUploadError } from '../middleware/upload.js';
 import driveUploadService from '../services/google-drive/drive-upload.js';
@@ -1151,9 +1159,18 @@ router.post("/addInvoice", async (req, res) => {
     }
 });
 
-router.delete("/deleteInvoice/:invoiceId", async (req, res) => {
-    try {
-        const { invoiceId } = req.params;
+// Delete invoice - Protected: Secretary can only delete invoices created today
+router.delete("/deleteInvoice/:invoiceId",
+    authenticate,
+    authorize(['admin', 'secretary']),
+    requireRecordAge({
+        resourceType: 'invoice',
+        operation: 'delete',
+        getRecordDate: getInvoiceCreationDate
+    }),
+    async (req, res) => {
+        try {
+            const { invoiceId } = req.params;
 
         if (!invoiceId) {
             return res.status(400).json({
@@ -1179,11 +1196,12 @@ router.delete("/deleteInvoice/:invoiceId", async (req, res) => {
             message: 'Invoice deleted successfully',
             rowsAffected: result.rowCount
         });
-    } catch (error) {
-        console.error("Error deleting invoice:", error);
-        res.status(500).json({ status: 'error', message: error.message });
+        } catch (error) {
+            console.error("Error deleting invoice:", error);
+            res.status(500).json({ status: 'error', message: error.message });
+        }
     }
-});
+);
 
 router.post("/updateExchangeRate", async (req, res) => {
     try {
@@ -2667,19 +2685,28 @@ router.put('/patients/:personId', async (req, res) => {
     }
 });
 
-// Delete patient
-router.delete('/patients/:personId', async (req, res) => {
-    try {
-        const personId = parseInt(req.params.personId);
-        const result = await deletePatient(personId);
-        res.json({ success: true, message: 'Patient deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting patient:', error);
-        res.status(500).json({
-            error: error.message || "Failed to delete patient"
-        });
+// Delete patient - Protected: Secretary can only delete patients created today
+router.delete('/patients/:personId',
+    authenticate,
+    authorize(['admin', 'secretary']),
+    requireRecordAge({
+        resourceType: 'patient',
+        operation: 'delete',
+        getRecordDate: getPatientCreationDate
+    }),
+    async (req, res) => {
+        try {
+            const personId = parseInt(req.params.personId);
+            const result = await deletePatient(personId);
+            res.json({ success: true, message: 'Patient deleted successfully' });
+        } catch (error) {
+            console.error('Error deleting patient:', error);
+            res.status(500).json({
+                error: error.message || "Failed to delete patient"
+            });
+        }
     }
-});
+);
 
 // Create new patient
 router.post('/patients', async (req, res) => {
@@ -3206,10 +3233,19 @@ router.post('/addWorkWithInvoice', async (req, res) => {
     }
 });
 
-// Update existing work
-router.put('/updatework', async (req, res) => {
-    try {
-        const { workId, ...workData } = req.body;
+// Update existing work - Protected: Secretary cannot edit money fields for old works
+router.put('/updatework',
+    authenticate,
+    authorize(['admin', 'secretary']),
+    requireRecordAge({
+        resourceType: 'work',
+        operation: 'update',
+        getRecordDate: getWorkCreationDate,
+        restrictedFields: ['TotalRequired', 'Paid', 'Discount'] // Money-related fields
+    }),
+    async (req, res) => {
+        try {
+            const { workId, ...workData } = req.body;
         
         if (!workId) {
             return res.status(400).json({ error: "Missing required field: workId" });
@@ -3241,16 +3277,17 @@ router.put('/updatework', async (req, res) => {
         });
 
         const result = await updateWork(parseInt(workId), workData);
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             message: "Work updated successfully",
             rowsAffected: result.rowCount
         });
-    } catch (error) {
-        console.error("Error updating work:", error);
-        res.status(500).json({ error: "Failed to update work", details: error.message });
+        } catch (error) {
+            console.error("Error updating work:", error);
+            res.status(500).json({ error: "Failed to update work", details: error.message });
+        }
     }
-});
+);
 
 // Finish/Complete work
 router.post('/finishwork', async (req, res) => {
@@ -3277,10 +3314,18 @@ router.post('/finishwork', async (req, res) => {
     }
 });
 
-// Delete work
-router.delete('/deletework', async (req, res) => {
-    try {
-        const { workId } = req.body;
+// Delete work - Protected: Secretary can only delete works created today
+router.delete('/deletework',
+    authenticate,
+    authorize(['admin', 'secretary']),
+    requireRecordAge({
+        resourceType: 'work',
+        operation: 'delete',
+        getRecordDate: getWorkCreationDate
+    }),
+    async (req, res) => {
+        try {
+            const { workId } = req.body;
 
         if (!workId) {
             return res.status(400).json({ error: "Missing required field: workId" });
@@ -3317,11 +3362,12 @@ router.delete('/deletework', async (req, res) => {
             message: "Work deleted successfully",
             rowsAffected: result.rowCount
         });
-    } catch (error) {
-        console.error("Error deleting work:", error);
-        res.status(500).json({ error: "Failed to delete work", details: error.message });
+        } catch (error) {
+            console.error("Error deleting work:", error);
+            res.status(500).json({ error: "Failed to delete work", details: error.message });
+        }
     }
-});
+);
 
 // Get active work for a patient
 router.get('/getactivework', async (req, res) => {
@@ -6404,12 +6450,20 @@ router.get('/expenses/:id', async (req, res) => {
 });
 
 /**
- * Update an existing expense
+ * Update an existing expense - Protected: Secretary can only edit expenses created today
  * NOTE: This route MUST come after all specific /expenses/* routes
  */
-router.put('/expenses/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
+router.put('/expenses/:id',
+    authenticate,
+    authorize(['admin', 'secretary']),
+    requireRecordAge({
+        resourceType: 'expense',
+        operation: 'update',
+        getRecordDate: getExpenseCreationDate
+    }),
+    async (req, res) => {
+        try {
+            const { id } = req.params;
         const { expenseDate, amount, currency, note, categoryId, subcategoryId } = req.body;
 
         // Validate that id is a valid number
@@ -6444,23 +6498,32 @@ router.put('/expenses/:id', async (req, res) => {
             message: 'Expense updated successfully',
             data: result
         });
-    } catch (error) {
-        console.error('Error updating expense:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to update expense',
-            message: error.message
-        });
+        } catch (error) {
+            console.error('Error updating expense:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to update expense',
+                message: error.message
+            });
+        }
     }
-});
+);
 
 /**
- * Delete an expense
+ * Delete an expense - Protected: Secretary can only delete expenses created today
  * NOTE: This route MUST come after all specific /expenses/* routes
  */
-router.delete('/expenses/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
+router.delete('/expenses/:id',
+    authenticate,
+    authorize(['admin', 'secretary']),
+    requireRecordAge({
+        resourceType: 'expense',
+        operation: 'delete',
+        getRecordDate: getExpenseCreationDate
+    }),
+    async (req, res) => {
+        try {
+            const { id } = req.params;
 
         // Validate that id is a valid number
         const expenseId = parseInt(id);
@@ -6477,15 +6540,16 @@ router.delete('/expenses/:id', async (req, res) => {
             message: 'Expense deleted successfully',
             data: result
         });
-    } catch (error) {
-        console.error('Error deleting expense:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to delete expense',
-            message: error.message
-        });
+        } catch (error) {
+            console.error('Error deleting expense:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to delete expense',
+                message: error.message
+            });
+        }
     }
-});
+);
 
 // Get work data for receipt from V_Report view (includes patient info, appointment, etc.)
 router.get('/getworkforreceipt/:workId', async (req, res) => {

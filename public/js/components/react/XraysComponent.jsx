@@ -37,7 +37,7 @@ const XraysComponent = ({ patientId }) => {
     
     const handleSendClick = (xray) => {
         const xrayUrl = `/api/getxray/?code=${patientId}&file=${xray.name}&detailsDir=${xray.detailsDirName}`;
-        const sendMessageUrl = `/views/messaging/send-message.html?file=${encodeURIComponent(xrayUrl)}`;
+        const sendMessageUrl = `/send-message?file=${encodeURIComponent(xrayUrl)}`;
         window.open(sendMessageUrl, '_blank');
     };
 

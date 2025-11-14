@@ -2,24 +2,14 @@
  * ExpenseFilters Component
  * Provides filtering interface for expenses with date range, category, and currency filters
  */
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useCategories, useSubcategories } from '../../hooks/useExpenses.js';
 
 export default function ExpenseFilters({ filters, onFilterChange, onApply, onReset }) {
     const { categories } = useCategories();
     const { subcategories } = useSubcategories(filters.categoryId);
 
-    // Set default date range to current month on mount
-    useEffect(() => {
-        const now = new Date();
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-        onFilterChange({
-            startDate: formatDateString(firstDay),
-            endDate: formatDateString(lastDay)
-        });
-    }, []);
+    // No need to set default dates here - parent component handles initialization
 
     const handleInputChange = (field, value) => {
         onFilterChange({ [field]: value });

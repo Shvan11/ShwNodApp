@@ -13,7 +13,11 @@ import calendarRoutes from './routes/calendar.js';
 import adminRoutes from './routes/admin.js';
 import syncWebhookRoutes from './routes/sync-webhook.js';
 import emailApiRoutes from './routes/email-api.js';
+import authRoutes from './routes/auth.js';
+import userManagementRoutes from './routes/user-management.js';
 import whatsappService from './services/messaging/whatsapp.js';
+import session from 'express-session';
+import SQLiteStore from 'connect-sqlite3';
 import driveClient from './services/google-drive/google-drive-client.js';
 import messageState from './services/state/messageState.js';
 import { createWebSocketMessage, MessageSchemas } from './services/messaging/schemas.js';
@@ -66,15 +70,34 @@ async function initializeApplication() {
     console.log('⚙️  Setting up middleware...');
     setupMiddleware(app);
 
-    // Setup static files
+    // ===== ADDED: Session configuration for authentication =====
+    console.log('🔐 Setting up session management...');
+    const SQLiteStoreSession = SQLiteStore(session);
+
+    app.use(session({
+      store: new SQLiteStoreSession({
+        db: 'sessions.db',
+        dir: './data'
+      }),
+      secret: process.env.SESSION_SECRET || 'shwan-orthodontics-secret-change-in-production',
+      resave: false,
+      saveUninitialized: false,
+      rolling: true, // Reset expiration on every request
+      cookie: {
+        httpOnly: true,
+        secure: false, // Allow HTTP for local development
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days default
+        sameSite: 'lax',
+        path: '/' // Ensure cookie is sent for all paths
+      },
+      name: 'shwan.sid' // Custom cookie name
+    }));
+
+    console.log('✅ Session management configured');
+
+    // Setup static files (MUST BE AFTER AUTHENTICATION to protect routes)
     console.log('📁 Setting up static file serving...');
 
-    // IMPORTANT: Express server (port 3000) always serves built files from dist/
-    // For development: Use Vite dev server at http://localhost:5173 (npm run dev)
-    // For production: Use Express server at http://localhost:3000 (after npm run build)
-    console.log('🚀 Serving built files from dist directory');
-    app.use(express.static('./dist'));
-    
     // Use path resolver for cross-platform compatibility
     const pathResolver = createPathResolver(config.fileSystem.machinePath);
     app.use('/DolImgs', express.static(pathResolver('working')));
@@ -92,11 +115,41 @@ async function initializeApplication() {
 
     // Use routes
     console.log('🛣️  Setting up routes...');
+
+    // ===== AUTHENTICATION MIDDLEWARE (MUST BE BEFORE ROUTES) =====
+    // Public routes - NO authentication required
+    app.use('/api/auth', authRoutes);
+
+    // Serve login page BEFORE auth check (public access)
+    app.get('/login.html', (req, res) => {
+      res.sendFile(path.join(process.cwd(), './public/login.html'));
+    });
+
+    if (process.env.AUTHENTICATION_ENABLED === 'true') {
+      console.log('🔐 Authentication ENABLED - Protecting routes');
+      const { authenticate, authenticateWeb } = await import('./middleware/auth.js');
+
+      // Protect API routes (returns 401 JSON)
+      app.use('/api', authenticate);
+
+      // Protect web routes (redirects to /login.html)
+      app.use('/', authenticateWeb);
+    } else {
+      console.log('⚠️  Authentication DISABLED - All routes are public');
+    }
+
+    // ===== MOUNT ROUTES (AFTER AUTHENTICATION) =====
     app.use('/api', apiRoutes);
     app.use('/api/calendar', calendarRoutes);
-    app.use('/api/email', emailApiRoutes); // Email API routes
-    app.use('/', syncWebhookRoutes); // Sync webhook endpoints (SQL Server ↔ Supabase)
-    app.use('/', adminRoutes); // Admin routes
+    app.use('/api/email', emailApiRoutes);
+    app.use('/api/users', userManagementRoutes); // User management (admin only)
+    app.use('/', syncWebhookRoutes);
+    app.use('/', adminRoutes);
+
+    // Serve built SPA files (AFTER auth check, so protected)
+    app.use(express.static('./dist'));
+
+    // Final catch-all for SPA routing
     app.use('/', webRoutes);
 
     // ===== ADDED: Initialize health monitoring =====

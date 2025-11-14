@@ -953,18 +953,40 @@ const PatientManagement = () => {
                         <div style={{ padding: '1.5rem' }}>
                             <div style={{
                                 backgroundColor: '#fef2f2',
-                                border: '1px solid #fecaca',
+                                border: '2px solid #dc2626',
                                 borderRadius: '8px',
-                                padding: '1rem',
+                                padding: '1.5rem',
                                 marginBottom: '1.5rem'
                             }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                                    <i className="fas fa-exclamation-triangle" style={{ color: '#dc2626', fontSize: '1.5rem' }}></i>
-                                    <strong style={{ color: '#991b1b' }}>Warning: This action cannot be undone!</strong>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                                    <i className="fas fa-exclamation-triangle" style={{ color: '#dc2626', fontSize: '2rem' }}></i>
+                                    <strong style={{ color: '#991b1b', fontSize: '1.1rem' }}>PERMANENT DELETION WARNING</strong>
                                 </div>
-                                <p style={{ margin: 0, color: '#7f1d1d' }}>
-                                    Are you sure you want to delete patient <strong>{selectedPatient.PatientName}</strong>?
-                                    This will permanently remove all patient data including works, payments, and appointments.
+                                <p style={{ margin: '0 0 1rem 0', color: '#7f1d1d', fontSize: '1rem', fontWeight: '600' }}>
+                                    Are you sure you want to permanently delete patient <strong>{selectedPatient.PatientName}</strong>?
+                                </p>
+                                <div style={{
+                                    backgroundColor: '#ffffff',
+                                    padding: '1rem',
+                                    borderRadius: '6px',
+                                    border: '1px solid #fca5a5',
+                                    marginBottom: '1rem'
+                                }}>
+                                    <p style={{ margin: '0 0 0.5rem 0', color: '#991b1b', fontWeight: '600' }}>
+                                        The following data will be PERMANENTLY DELETED:
+                                    </p>
+                                    <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem', color: '#7f1d1d' }}>
+                                        <li>All treatment works and procedures</li>
+                                        <li>All payment records</li>
+                                        <li>All appointments (past and future)</li>
+                                        <li>All visit records</li>
+                                        <li>All orthodontic records (wires, screws, etc.)</li>
+                                        <li>Patient photos and documents</li>
+                                        <li>All other patient data</li>
+                                    </ul>
+                                </div>
+                                <p style={{ margin: 0, color: '#991b1b', fontWeight: '700', fontSize: '0.95rem' }}>
+                                    ⚠️ THIS ACTION CANNOT BE UNDONE! ⚠️
                                 </p>
                             </div>
 

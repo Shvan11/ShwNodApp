@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Shwan Orthodontics</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-container {
+      background: white;
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      width: 100%;
+      max-width: 420px;
+      animation: slideUp 0.4s ease-out;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .logo-icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 8px;
+      font-size: 28px;
+      text-align: center;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 32px;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .form-group {
+      margin-bottom: 24px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #444;
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: all 0.3s;
+      font-family: inherit;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    input:disabled {
+      background: #f5f5f5;
+      cursor: not-allowed;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    input[type="checkbox"] {
+      margin-right: 8px;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .checkbox-label {
+      color: #666;
+      font-size: 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .btn-login {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .btn-login:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-login:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .btn-login:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .message {
+      padding: 14px 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      display: none;
+      animation: slideDown 0.3s ease-out;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .error-message {
+      background: #fee;
+      color: #c33;
+      border-left: 4px solid #c33;
+    }
+
+    .success-message {
+      background: #efe;
+      color: #3c3;
+      border-left: 4px solid #3c3;
+    }
+
+    .info-message {
+      background: #e3f2fd;
+      color: #1976d2;
+      border-left: 4px solid #1976d2;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    .footer-text {
+      color: #999;
+      font-size: 12px;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      border-top-color: transparent;
+      animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="logo">
+      <div class="logo-icon">🦷</div>
+      <h1>Shwan Orthodontics</h1>
+      <p class="subtitle">Please sign in to continue</p>
+    </div>
+
+    <div id="errorMessage" class="message error-message"></div>
+    <div id="successMessage" class="message success-message"></div>
+    <div id="infoMessage" class="message info-message"></div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input
+          type="text"
+          id="username"
+          name="username"
+          placeholder="Enter your username"
+          required
+          autofocus
+          autocomplete="username"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input
+          type="password"
+          id="password"
+          name="password"
+          placeholder="Enter your password"
+          required
+          autocomplete="current-password"
+        >
+      </div>
+
+      <div class="checkbox-group">
+        <input type="checkbox" id="rememberMe" name="rememberMe">
+        <label for="rememberMe" class="checkbox-label">Remember me for 30 days</label>
+      </div>
+
+      <button type="submit" class="btn-login" id="loginButton">
+        <span id="buttonText">Sign In</span>
+        <span id="buttonLoading" class="hidden">
+          <span class="loading-spinner"></span>Signing in...
+        </span>
+      </button>
+    </form>
+
+    <div class="footer">
+      <p class="footer-text">© 2025 Shwan Orthodontics. All rights reserved.</p>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const errorDiv = document.getElementById('errorMessage');
+    const successDiv = document.getElementById('successMessage');
+    const infoDiv = document.getElementById('infoMessage');
+    const loginButton = document.getElementById('loginButton');
+    const buttonText = document.getElementById('buttonText');
+    const buttonLoading = document.getElementById('buttonLoading');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+
+    // Hide all messages
+    function hideMessages() {
+      errorDiv.style.display = 'none';
+      successDiv.style.display = 'none';
+      infoDiv.style.display = 'none';
+    }
+
+    // Show error message
+    function showError(message) {
+      hideMessages();
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+    }
+
+    // Show success message
+    function showSuccess(message) {
+      hideMessages();
+      successDiv.textContent = message;
+      successDiv.style.display = 'block';
+    }
+
+    // Show info message
+    function showInfo(message) {
+      hideMessages();
+      infoDiv.textContent = message;
+      infoDiv.style.display = 'block';
+    }
+
+    // Set loading state
+    function setLoading(isLoading) {
+      loginButton.disabled = isLoading;
+      usernameInput.disabled = isLoading;
+      passwordInput.disabled = isLoading;
+
+      if (isLoading) {
+        buttonText.classList.add('hidden');
+        buttonLoading.classList.remove('hidden');
+      } else {
+        buttonText.classList.remove('hidden');
+        buttonLoading.classList.add('hidden');
+      }
+    }
+
+    // Check if already logged in
+    async function checkAuthStatus() {
+      try {
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include' // Include cookies
+        });
+        const data = await response.json();
+
+        if (data.success && data.user) {
+          showInfo('Already logged in. Redirecting...');
+          setTimeout(() => {
+            window.location.href = '/dashboard';
+          }, 1000);
+        }
+      } catch (error) {
+        // Not logged in, continue to show login form
+      }
+    }
+
+    // Handle form submission
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideMessages();
+      setLoading(true);
+
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value;
+      const rememberMe = document.getElementById('rememberMe').checked;
+
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include', // IMPORTANT: Include cookies in request
+          body: JSON.stringify({ username, password, rememberMe })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          showSuccess(`Welcome, ${data.user.fullName || data.user.username}! Redirecting...`);
+          passwordInput.value = ''; // Clear password
+
+          // Redirect after short delay
+          setTimeout(() => {
+            window.location.href = '/dashboard';
+          }, 1200);
+        } else {
+          showError(data.error || 'Login failed. Please try again.');
+          setLoading(false);
+          passwordInput.value = ''; // Clear password
+          passwordInput.focus();
+        }
+      } catch (error) {
+        console.error('Login error:', error);
+        showError('Connection error. Please check your network and try again.');
+        setLoading(false);
+      }
+    });
+
+    // Check auth status on page load
+    checkAuthStatus();
+
+    // No credential hints - manage users in Settings → User Management
+  </script>
+</body>
+</html>

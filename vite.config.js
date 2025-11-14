@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import { readFileSync } from 'fs'
@@ -34,7 +34,12 @@ function templateDesignerPlugin() {
   }
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Load env file based on mode (development, production, etc.)
+  const env = loadEnv(mode, process.cwd(), '');
+  const apiUrl = env.VITE_API_URL || 'http://localhost:3001';
+
+  return {
   plugins: [
     templateDesignerPlugin(), // Handle template-designer specifically
     react({
@@ -52,13 +57,13 @@ export default defineConfig({
         // Single entry point for the entire SPA
         main: resolve(__dirname, 'public/index.html'),
       },
-      // Mark CDN-loaded libraries as external to prevent bundling
-      external: ['react', 'react-dom', 'react-dom/client', 'react-router-dom', 'date-fns', 'axios'],
       output: {
-        // Code splitting for application code only
+        // Optimal code splitting strategy for production
         manualChunks: {
-          // Don't include CDN libraries in vendor chunk
-          // They're loaded from importmap in index.html
+          // Vendor chunk: React and core libraries (cached separately)
+          'vendor-react': ['react', 'react-dom', 'react-dom/client', 'react-router-dom'],
+          // Utils chunk: Utility libraries
+          'vendor-utils': ['date-fns', 'axios']
         }
       }
     }
@@ -74,22 +79,22 @@ export default defineConfig({
     middlewareMode: false,
     proxy: {
       // Proxy API and data routes to Express server
-      // Target can be overridden with VITE_API_URL environment variable
+      // Target loaded from .env.development or defaults to 3001
       '/api': {
-        target: process.env.VITE_API_URL || 'http://localhost:3000',
+        target: apiUrl,
         changeOrigin: true,
         secure: false
       },
       '/health': {
-        target: process.env.VITE_API_URL || 'http://localhost:3000',
+        target: apiUrl,
         changeOrigin: true
       },
       '/DolImgs': {
-        target: process.env.VITE_API_URL || 'http://localhost:3000',
+        target: apiUrl,
         changeOrigin: true
       },
       '/data': {
-        target: process.env.VITE_API_URL || 'http://localhost:3000',
+        target: apiUrl,
         changeOrigin: true
       }
     },
@@ -119,7 +124,9 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'single-spa'],
+    // Pre-bundle React dependencies for faster dev server startup
+    include: ['react', 'react-dom', 'react-dom/client', 'react-router-dom', 'date-fns', 'axios'],
     exclude: ['grapesjs', 'grapesjs-preset-newsletter']
   }
-})
+};
+});
