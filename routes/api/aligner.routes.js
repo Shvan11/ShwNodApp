@@ -20,6 +20,18 @@ import driveUploadService from '../../services/google-drive/drive-upload.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 import { timeouts } from '../../middleware/timeout.js';
+import {
+    validateAndCreateSet,
+    validateAndCreateDoctor,
+    validateAndUpdateDoctor,
+    validateAndDeleteDoctor,
+    AlignerValidationError
+} from '../../services/business/AlignerService.js';
+import {
+    uploadPdfForSet,
+    deletePdfFromSet,
+    AlignerPdfError
+} from '../../services/business/AlignerPdfService.js';
 
 const router = express.Router();
 
@@ -609,76 +621,8 @@ router.get('/aligner/batches/:setId', async (req, res) => {
  */
 router.post('/aligner/sets', async (req, res) => {
     try {
-        const {
-            WorkID,
-            SetSequence,
-            Type,
-            UpperAlignersCount,
-            LowerAlignersCount,
-            Days,
-            AlignerDrID,
-            SetUrl,
-            SetPdfUrl,
-            SetCost,
-            Currency,
-            Notes,
-            IsActive
-        } = req.body;
-
-        // Validation
-        if (!WorkID || !AlignerDrID) {
-            return ErrorResponses.badRequest(res, 'WorkID and AlignerDrID are required');
-        }
-
-        log.info('Creating new aligner set:', req.body);
-
-        const query = `
-            DECLARE @OutputTable TABLE (AlignerSetID INT);
-
-            -- If creating a new active set, deactivate all other sets for this work
-            IF @IsActive = 1
-            BEGIN
-                UPDATE tblAlignerSets
-                SET IsActive = 0
-                WHERE WorkID = @WorkID AND IsActive = 1;
-            END
-
-            INSERT INTO tblAlignerSets (
-                WorkID, SetSequence, Type, UpperAlignersCount, LowerAlignersCount,
-                RemainingUpperAligners, RemainingLowerAligners, Days, AlignerDrID,
-                SetUrl, SetPdfUrl, SetCost, Currency, Notes, IsActive, CreationDate
-            )
-            OUTPUT INSERTED.AlignerSetID INTO @OutputTable
-            VALUES (
-                @WorkID, @SetSequence, @Type, @UpperAlignersCount, @LowerAlignersCount,
-                @UpperAlignersCount, @LowerAlignersCount, @Days, @AlignerDrID,
-                @SetUrl, @SetPdfUrl, @SetCost, @Currency, @Notes, @IsActive, GETDATE()
-            );
-
-            SELECT AlignerSetID FROM @OutputTable;
-        `;
-
-        const result = await database.executeQuery(
-            query,
-            [
-                ['WorkID', database.TYPES.Int, parseInt(WorkID)],
-                ['SetSequence', database.TYPES.Int, SetSequence ? parseInt(SetSequence) : null],
-                ['Type', database.TYPES.NVarChar, Type || null],
-                ['UpperAlignersCount', database.TYPES.Int, UpperAlignersCount ? parseInt(UpperAlignersCount) : 0],
-                ['LowerAlignersCount', database.TYPES.Int, LowerAlignersCount ? parseInt(LowerAlignersCount) : 0],
-                ['Days', database.TYPES.Int, Days ? parseInt(Days) : null],
-                ['AlignerDrID', database.TYPES.Int, parseInt(AlignerDrID)],
-                ['SetUrl', database.TYPES.NVarChar, SetUrl || null],
-                ['SetPdfUrl', database.TYPES.NVarChar, SetPdfUrl || null],
-                ['SetCost', database.TYPES.Decimal, SetCost ? parseFloat(SetCost) : null],
-                ['Currency', database.TYPES.NVarChar, Currency || null],
-                ['Notes', database.TYPES.NVarChar, Notes || null],
-                ['IsActive', database.TYPES.Bit, IsActive !== undefined ? IsActive : true]
-            ],
-            (columns) => columns[0].value
-        );
-
-        const newSetId = result && result.length > 0 ? result[0] : null;
+        // Delegate to service layer for business logic and creation
+        const newSetId = await validateAndCreateSet(req.body);
 
         res.json({
             success: true,
@@ -688,6 +632,12 @@ router.post('/aligner/sets', async (req, res) => {
 
     } catch (error) {
         log.error('Error creating aligner set:', error);
+
+        // Handle validation errors from service layer
+        if (error instanceof AlignerValidationError) {
+            return ErrorResponses.badRequest(res, error.message, { code: error.code, ...error.details });
+        }
+
         return ErrorResponses.internalError(res, 'Failed to create aligner set', error);
     }
 });
@@ -1503,89 +1453,26 @@ router.post('/aligner/sets/:setId/upload-pdf', timeouts.long, uploadSinglePdf, h
             return ErrorResponses.badRequest(res, validation.error);
         }
 
-        // Get set information
-        const setQuery = `
-            SELECT
-                s.AlignerSetID,
-                s.WorkID,
-                s.SetSequence,
-                s.DriveFileId,
-                w.PersonID,
-                p.PatientName,
-                p.FirstName,
-                p.LastName
-            FROM tblAlignerSets s
-            INNER JOIN tblWork w ON s.WorkID = w.workid
-            INNER JOIN tblPatients p ON w.PersonID = p.PersonID
-            WHERE s.AlignerSetID = @setId
-        `;
-
-        const setResult = await database.executeQuery(setQuery, [
-            ['setId', database.TYPES.Int, setId]
-        ]);
-
-        if (!setResult || setResult.length === 0) {
-            return ErrorResponses.notFound(res, 'Aligner set');
-        }
-
-        const setInfo = setResult[0];
-        const patientName = setInfo.PatientName || `${setInfo.FirstName} ${setInfo.LastName}`;
-
-        // Delete old file from Drive if exists
-        if (setInfo.DriveFileId) {
-            try {
-                await driveUploadService.deletePdf(setInfo.DriveFileId);
-            } catch (error) {
-                log.warn('Failed to delete old PDF from Drive:', error);
-                // Continue with upload even if deletion fails
-            }
-        }
-
-        // Upload to Google Drive
-        const uploadResult = await driveUploadService.uploadPdfForSet(
-            {
-                buffer: req.file.buffer,
-                originalName: req.file.originalname
-            },
-            {
-                patientId: setInfo.PersonID,
-                patientName: patientName,
-                workId: setInfo.WorkID,
-                setSequence: setInfo.SetSequence
-            },
-            uploaderEmail
-        );
-
-        // Update database
-        const updateQuery = `
-            UPDATE tblAlignerSets
-            SET
-                SetPdfUrl = @url,
-                DriveFileId = @fileId,
-                PdfUploadedAt = GETDATE(),
-                PdfUploadedBy = @uploadedBy
-            WHERE AlignerSetID = @setId
-        `;
-
-        await database.executeQuery(updateQuery, [
-            ['url', database.TYPES.NVarChar, uploadResult.url],
-            ['fileId', database.TYPES.NVarChar, uploadResult.fileId],
-            ['uploadedBy', database.TYPES.NVarChar, uploaderEmail],
-            ['setId', database.TYPES.Int, setId]
-        ]);
+        // Delegate to service layer for PDF upload workflow
+        const result = await uploadPdfForSet(setId, req.file, uploaderEmail);
 
         res.json({
             success: true,
             message: 'PDF uploaded successfully',
-            data: {
-                url: uploadResult.url,
-                fileName: uploadResult.fileName,
-                size: uploadResult.size
-            }
+            data: result
         });
 
     } catch (error) {
         log.error('Error uploading PDF:', error);
+
+        // Handle errors from service layer
+        if (error instanceof AlignerPdfError) {
+            if (error.code === 'SET_NOT_FOUND') {
+                return ErrorResponses.notFound(res, 'Aligner set');
+            }
+            return ErrorResponses.internalError(res, error.message, error.details);
+        }
+
         return ErrorResponses.internalError(res, 'Failed to upload PDF', error);
     }
 });
@@ -1597,47 +1484,8 @@ router.delete('/aligner/sets/:setId/pdf', async (req, res) => {
     try {
         const setId = parseInt(req.params.setId);
 
-        // Get set information
-        const setQuery = `
-            SELECT DriveFileId
-            FROM tblAlignerSets
-            WHERE AlignerSetID = @setId
-        `;
-
-        const setResult = await database.executeQuery(setQuery, [
-            ['setId', database.TYPES.Int, setId]
-        ]);
-
-        if (!setResult || setResult.length === 0) {
-            return ErrorResponses.notFound(res, 'Aligner set');
-        }
-
-        const driveFileId = setResult[0].DriveFileId;
-
-        // Delete from Google Drive if exists
-        if (driveFileId) {
-            try {
-                await driveUploadService.deletePdf(driveFileId);
-            } catch (error) {
-                log.warn('Failed to delete from Drive:', error);
-                // Continue with database update even if Drive deletion fails
-            }
-        }
-
-        // Update database
-        const updateQuery = `
-            UPDATE tblAlignerSets
-            SET
-                SetPdfUrl = NULL,
-                DriveFileId = NULL,
-                PdfUploadedAt = NULL,
-                PdfUploadedBy = NULL
-            WHERE AlignerSetID = @setId
-        `;
-
-        await database.executeQuery(updateQuery, [
-            ['setId', database.TYPES.Int, setId]
-        ]);
+        // Delegate to service layer for PDF deletion workflow
+        await deletePdfFromSet(setId);
 
         res.json({
             success: true,
@@ -1646,6 +1494,15 @@ router.delete('/aligner/sets/:setId/pdf', async (req, res) => {
 
     } catch (error) {
         log.error('Error deleting PDF:', error);
+
+        // Handle errors from service layer
+        if (error instanceof AlignerPdfError) {
+            if (error.code === 'SET_NOT_FOUND') {
+                return ErrorResponses.notFound(res, 'Aligner set');
+            }
+            return ErrorResponses.internalError(res, error.message, error.details);
+        }
+
         return ErrorResponses.internalError(res, 'Failed to delete PDF', error);
     }
 });
@@ -1692,47 +1549,8 @@ router.get('/aligner-doctors', async (req, res) => {
  */
 router.post('/aligner-doctors', async (req, res) => {
     try {
-        const { DoctorName, DoctorEmail, LogoPath } = req.body;
-
-        if (!DoctorName || DoctorName.trim() === '') {
-            return ErrorResponses.badRequest(res, 'Doctor name is required');
-        }
-
-        // Check if email already exists (if provided)
-        if (DoctorEmail && DoctorEmail.trim() !== '') {
-            const emailCheck = await database.executeQuery(
-                'SELECT DrID FROM AlignerDoctors WHERE DoctorEmail = @email',
-                [['email', database.TYPES.NVarChar, DoctorEmail.trim()]],
-                (columns) => columns[0].value
-            );
-
-            if (emailCheck && emailCheck.length > 0) {
-                return ErrorResponses.conflict(res, 'A doctor with this email already exists');
-            }
-        }
-
-        // Insert without specifying DrID - it will be auto-generated by IDENTITY column
-        const insertQuery = `
-            DECLARE @OutputTable TABLE (DrID INT);
-
-            INSERT INTO AlignerDoctors (DoctorName, DoctorEmail, LogoPath)
-            OUTPUT INSERTED.DrID INTO @OutputTable
-            VALUES (@name, @email, @logo);
-
-            SELECT DrID FROM @OutputTable;
-        `;
-
-        const result = await database.executeQuery(
-            insertQuery,
-            [
-                ['name', database.TYPES.NVarChar, DoctorName.trim()],
-                ['email', database.TYPES.VarChar, DoctorEmail && DoctorEmail.trim() !== '' ? DoctorEmail.trim() : null],
-                ['logo', database.TYPES.NVarChar, LogoPath && LogoPath.trim() !== '' ? LogoPath.trim() : null]
-            ],
-            (columns) => columns[0].value
-        );
-
-        const newDrID = result && result.length > 0 ? result[0] : null;
+        // Delegate to service layer for validation and creation
+        const newDrID = await validateAndCreateDoctor(req.body);
 
         res.json({
             success: true,
@@ -1742,6 +1560,15 @@ router.post('/aligner-doctors', async (req, res) => {
 
     } catch (error) {
         log.error('Error adding aligner doctor:', error);
+
+        // Handle validation errors from service layer
+        if (error instanceof AlignerValidationError) {
+            if (error.code === 'EMAIL_ALREADY_EXISTS') {
+                return ErrorResponses.conflict(res, error.message);
+            }
+            return ErrorResponses.badRequest(res, error.message, { code: error.code, ...error.details });
+        }
+
         return ErrorResponses.internalError(res, 'Failed to add aligner doctor', error);
     }
 });
@@ -1752,45 +1579,9 @@ router.post('/aligner-doctors', async (req, res) => {
 router.put('/aligner-doctors/:drID', async (req, res) => {
     try {
         const { drID } = req.params;
-        const { DoctorName, DoctorEmail, LogoPath } = req.body;
 
-        if (!DoctorName || DoctorName.trim() === '') {
-            return ErrorResponses.badRequest(res, 'Doctor name is required');
-        }
-
-        // Check if email already exists for another doctor (if provided)
-        if (DoctorEmail && DoctorEmail.trim() !== '') {
-            const emailCheck = await database.executeQuery(
-                'SELECT DrID FROM AlignerDoctors WHERE DoctorEmail = @email AND DrID != @drID',
-                [
-                    ['email', database.TYPES.NVarChar, DoctorEmail.trim()],
-                    ['drID', database.TYPES.Int, parseInt(drID)]
-                ],
-                (columns) => columns[0].value
-            );
-
-            if (emailCheck && emailCheck.length > 0) {
-                return ErrorResponses.conflict(res, 'Another doctor with this email already exists');
-            }
-        }
-
-        const updateQuery = `
-            UPDATE AlignerDoctors
-            SET DoctorName = @name,
-                DoctorEmail = @email,
-                LogoPath = @logo
-            WHERE DrID = @drID
-        `;
-
-        await database.executeQuery(
-            updateQuery,
-            [
-                ['name', database.TYPES.NVarChar, DoctorName.trim()],
-                ['email', database.TYPES.NVarChar, DoctorEmail && DoctorEmail.trim() !== '' ? DoctorEmail.trim() : null],
-                ['logo', database.TYPES.NVarChar, LogoPath && LogoPath.trim() !== '' ? LogoPath.trim() : null],
-                ['drID', database.TYPES.Int, parseInt(drID)]
-            ]
-        );
+        // Delegate to service layer for validation and update
+        await validateAndUpdateDoctor(drID, req.body);
 
         res.json({
             success: true,
@@ -1799,6 +1590,15 @@ router.put('/aligner-doctors/:drID', async (req, res) => {
 
     } catch (error) {
         log.error('Error updating aligner doctor:', error);
+
+        // Handle validation errors from service layer
+        if (error instanceof AlignerValidationError) {
+            if (error.code === 'EMAIL_ALREADY_EXISTS') {
+                return ErrorResponses.conflict(res, error.message);
+            }
+            return ErrorResponses.badRequest(res, error.message, { code: error.code, ...error.details });
+        }
+
         return ErrorResponses.internalError(res, 'Failed to update aligner doctor', error);
     }
 });
@@ -1810,25 +1610,8 @@ router.delete('/aligner-doctors/:drID', async (req, res) => {
     try {
         const { drID } = req.params;
 
-        // Check if doctor has any aligner sets
-        const setsCheck = await database.executeQuery(
-            'SELECT COUNT(*) as SetCount FROM tblAlignerSets WHERE AlignerDrID = @drID',
-            [['drID', database.TYPES.Int, parseInt(drID)]],
-            (columns) => columns[0].value
-        );
-
-        const setCount = setsCheck && setsCheck.length > 0 ? setsCheck[0] : 0;
-
-        if (setCount > 0) {
-            return ErrorResponses.badRequest(res, `Cannot delete doctor. They have ${setCount} aligner set(s) associated with them. Please reassign or delete those sets first.`);
-        }
-
-        const deleteQuery = 'DELETE FROM AlignerDoctors WHERE DrID = @drID';
-
-        await database.executeQuery(
-            deleteQuery,
-            [['drID', database.TYPES.Int, parseInt(drID)]]
-        );
+        // Delegate to service layer for dependency checking and deletion
+        await validateAndDeleteDoctor(drID);
 
         res.json({
             success: true,
@@ -1837,6 +1620,12 @@ router.delete('/aligner-doctors/:drID', async (req, res) => {
 
     } catch (error) {
         log.error('Error deleting aligner doctor:', error);
+
+        // Handle validation errors from service layer
+        if (error instanceof AlignerValidationError) {
+            return ErrorResponses.badRequest(res, error.message, error.details);
+        }
+
         return ErrorResponses.internalError(res, 'Failed to delete aligner doctor', error);
     }
 });
