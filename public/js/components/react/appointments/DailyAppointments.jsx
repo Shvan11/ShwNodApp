@@ -234,6 +234,7 @@ const DailyAppointments = () => {
                     loading={loading}
                     onCheckIn={handleCheckIn}
                     emptyMessage="No appointments scheduled for this date."
+                    className={mobileView === 'all' ? 'active-view' : ''}
                 />
 
                 <AppointmentsList
@@ -246,6 +247,7 @@ const DailyAppointments = () => {
                     onUndoState={handleUndoState}
                     onContextMenu={handleContextMenu}
                     emptyMessage="No patients checked in yet."
+                    className={mobileView === 'checked-in' ? 'active-view' : ''}
                 />
             </div>
 

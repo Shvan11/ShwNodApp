@@ -15,7 +15,8 @@ const AppointmentsList = ({
     onMarkDismissed,
     onUndoState,
     onContextMenu,
-    emptyMessage = 'No appointments found.'
+    emptyMessage = 'No appointments found.',
+    className = ''
 }) => {
     // Sort checked-in appointments by check-in time (earliest first)
     const sortedAppointments = showStatus && appointments
@@ -36,7 +37,7 @@ const AppointmentsList = ({
     // Render loading skeleton
     if (loading) {
         return (
-            <div className="appointments-section">
+            <div className={`appointments-section ${className}`}>
                 <h3>{title}</h3>
                 <div className="appointments-grid">
                     {[1, 2, 3].map(i => (
@@ -53,7 +54,7 @@ const AppointmentsList = ({
     // Render empty state
     if (!sortedAppointments || sortedAppointments.length === 0) {
         return (
-            <div className="appointments-section">
+            <div className={`appointments-section ${className}`}>
                 <h3>{title}</h3>
                 <p className="no-appointments">{emptyMessage}</p>
             </div>
@@ -62,7 +63,7 @@ const AppointmentsList = ({
 
     // Render appointments grid
     return (
-        <div className="appointments-section">
+        <div className={`appointments-section ${className}`}>
             <h3>{title}</h3>
             <div className="appointments-grid">
                 {sortedAppointments.map(appointment => (
