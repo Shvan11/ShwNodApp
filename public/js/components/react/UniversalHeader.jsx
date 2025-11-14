@@ -11,21 +11,28 @@ const UniversalHeader = () => {
     const [searchResults, setSearchResults] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [allPatients, setAllPatients] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null);
 
     const searchTimeoutRef = useRef(null);
 
+    // Load user info once on mount
     useEffect(() => {
-        loadPatientData();
-        setupNavigationContext();
+        loadCurrentUser();
         // loadAllPatients(); // Temporarily disabled - endpoint doesn't exist
 
         // Cleanup: Remove any legacy fullscreen preference from localStorage
         localStorage.removeItem('preferFullscreen');
+    }, []); // Only run once on mount
+
+    // Load patient data and setup navigation context when route changes
+    useEffect(() => {
+        loadPatientData();
+        setupNavigationContext();
     }, [location.pathname]); // Re-run when route changes
 
     const loadPatientData = () => {
         const patientCode = extractPatientCodeFromURL();
-        
+
         if (patientCode) {
             fetch(`/api/getinfos?code=${patientCode}`)
                 .then(response => response.json())
@@ -36,6 +43,17 @@ const UniversalHeader = () => {
                 })
                 .catch(error => console.error('Error loading patient data:', error));
         }
+    };
+
+    const loadCurrentUser = () => {
+        fetch('/api/auth/me')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.user) {
+                    setCurrentUser(data.user);
+                }
+            })
+            .catch(error => console.error('Error loading user info:', error));
     };
 
     const extractPatientCodeFromURL = () => {
@@ -222,12 +240,23 @@ const UniversalHeader = () => {
 
                 {/* Header Right - Quick Actions */}
                 <div className="header-right">
+                    {/* Current User Info */}
+                    {currentUser && (
+                        <div className="user-info">
+                            <i className="fas fa-user-circle" />
+                            <div className="user-details">
+                                <span className="user-name">{currentUser.fullName || currentUser.username}</span>
+                                <span className="user-role">{currentUser.role}</span>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Quick Search */}
                     <div className="quick-search-section">
                         <button className="search-toggle-btn" onClick={toggleSearch}>
                             <i className="fas fa-search" />
                         </button>
-                        
+
                         {isSearchVisible && (
                             <div className="quick-search-dropdown">
                                 <input
@@ -242,7 +271,7 @@ const UniversalHeader = () => {
                                     lang="ar"
                                     dir="rtl"
                                 />
-                                
+
                                 {searchResults.length > 0 && (
                                     <div className="search-results">
                                         {searchResults.map(patient => (
@@ -262,7 +291,7 @@ const UniversalHeader = () => {
                                         ))}
                                     </div>
                                 )}
-                                
+
                                 {searchTerm.length >= 2 && searchResults.length === 0 && (
                                     <div className="no-results">
                                         No patients found matching "{searchTerm}"
