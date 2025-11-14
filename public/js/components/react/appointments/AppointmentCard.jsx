@@ -137,9 +137,9 @@ const AppointmentCard = ({
                             e.stopPropagation();
                             onCheckIn(appointment.appointmentID);
                         }}
+                        title="Check In"
                     >
-                        <i className="fas fa-sign-in-alt"></i>
-                        <span>Check In</span>
+                        <i className="fas fa-sign-in-alt" style={{ fontSize: '1.25em' }}></i>
                     </button>
                 );
             }
@@ -158,9 +158,9 @@ const AppointmentCard = ({
                                 e.stopPropagation();
                                 onMarkSeated(appointment.appointmentID);
                             }}
+                            title="Seat Patient"
                         >
-                            <img src="/images/dental_chair.svg" alt="" style={{ width: '1em', height: '1em' }} />
-                            <span>Seat Patient</span>
+                            <img src="/images/dental_chair.svg" alt="Seat Patient" style={{ width: '1.25em', height: '1.25em' }} />
                         </button>
                         <button
                             type="button"
@@ -172,7 +172,7 @@ const AppointmentCard = ({
                             }}
                             title="Undo Check-in"
                         >
-                            <i className="fas fa-undo"></i>
+                            <i className="fas fa-undo" style={{ fontSize: '1.1em' }}></i>
                         </button>
                     </>
                 );
@@ -187,9 +187,9 @@ const AppointmentCard = ({
                                 e.stopPropagation();
                                 onMarkDismissed(appointment.appointmentID);
                             }}
+                            title="Complete Visit"
                         >
-                            <i className="fas fa-check-circle"></i>
-                            <span>Complete Visit</span>
+                            <i className="fas fa-check-circle" style={{ fontSize: '1.25em' }}></i>
                         </button>
                         <button
                             type="button"
@@ -201,7 +201,7 @@ const AppointmentCard = ({
                             }}
                             title="Undo Seating"
                         >
-                            <i className="fas fa-undo"></i>
+                            <i className="fas fa-undo" style={{ fontSize: '1.1em' }}></i>
                         </button>
                     </>
                 );
@@ -217,7 +217,7 @@ const AppointmentCard = ({
                         }}
                         title="Undo Dismiss"
                     >
-                        <i className="fas fa-undo"></i>
+                        <i className="fas fa-undo" style={{ fontSize: '1.1em' }}></i>
                     </button>
                 );
             }
