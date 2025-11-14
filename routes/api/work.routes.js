@@ -36,6 +36,12 @@ import { authenticate, authorize } from '../../middleware/auth.js';
 import { requireRecordAge, getWorkCreationDate } from '../../middleware/time-based-auth.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
+import {
+    validateAndCreateWork,
+    validateAndCreateWorkWithInvoice,
+    validateAndDeleteWork,
+    WorkValidationError
+} from '../../services/business/WorkService.js';
 
 const router = express.Router();
 
@@ -132,41 +138,10 @@ router.get('/getwork/:workId', async (req, res) => {
 
 // Add new work
 router.post('/addwork', async (req, res) => {
-    const workData = req.body;  // Moved outside try block so it's accessible in catch
     try {
+        // Delegate to service layer for validation and creation
+        const result = await validateAndCreateWork(req.body);
 
-        // Validate required fields
-        if (!workData.PersonID || !workData.DrID) {
-            return ErrorResponses.badRequest(res, 'Missing required fields: PersonID and DrID are required');
-        }
-
-        // Default TotalRequired to 0 if empty or not provided
-        if (workData.TotalRequired === '' || workData.TotalRequired === null || workData.TotalRequired === undefined) {
-            workData.TotalRequired = 0;
-        }
-
-        // Validate Typeofwork is required
-        if (!workData.Typeofwork) {
-            return ErrorResponses.badRequest(res, 'Typeofwork is required');
-        }
-
-        // Validate data types
-        if (isNaN(parseInt(workData.PersonID)) || isNaN(parseInt(workData.DrID))) {
-            return ErrorResponses.badRequest(res, 'PersonID and DrID must be valid numbers');
-        }
-
-        // Convert date strings to proper Date objects if provided
-        ['StartDate', 'DebondDate', 'FPhotoDate', 'IPhotoDate', 'NotesDate'].forEach(field => {
-            if (workData[field] && typeof workData[field] === 'string') {
-                const date = new Date(workData[field]);
-                if (isNaN(date.getTime())) {
-                    return ErrorResponses.invalidParameter(res, field, 'Invalid date format');
-                }
-                workData[field] = date;
-            }
-        });
-
-        const result = await addWork(workData);
         res.json({
             success: true,
             workId: result.workid,
@@ -175,31 +150,12 @@ router.post('/addwork', async (req, res) => {
     } catch (error) {
         log.error("Error adding work:", error);
 
-        // Handle duplicate active work constraint violation
-        if (error.number === 2601 && error.message.includes('UNQ_tblWork_Active')) {
-            try {
-                // Fetch the existing active work details to show to the user
-                const existingWork = await getActiveWork(workData.PersonID);
-                return ErrorResponses.conflict(res, 'Patient already has an active work', {
-                    message: 'This patient already has an active (unfinished) work record. You can finish the existing work and add the new one.',
-                    code: 'DUPLICATE_ACTIVE_WORK',
-                    existingWork: existingWork ? {
-                        workId: existingWork.workid,
-                        typeOfWork: existingWork.Typeofwork,
-                        typeName: existingWork.TypeName,
-                        doctor: existingWork.DoctorName,
-                        additionDate: existingWork.AdditionDate,
-                        totalRequired: existingWork.TotalRequired,
-                        currency: existingWork.Currency
-                    } : null
-                });
-            } catch (fetchError) {
-                // If we can't fetch the existing work, return basic error
-                return ErrorResponses.conflict(res, 'Patient already has an active work', {
-                    message: 'This patient already has an active (unfinished) work record. Please complete or finish the existing work before adding a new one.',
-                    code: 'DUPLICATE_ACTIVE_WORK'
-                });
+        // Handle validation errors from service layer
+        if (error instanceof WorkValidationError) {
+            if (error.code === 'DUPLICATE_ACTIVE_WORK') {
+                return ErrorResponses.conflict(res, 'Patient already has an active work', error.details);
             }
+            return ErrorResponses.badRequest(res, error.message, { code: error.code, ...error.details });
         }
 
         return sendError(res, 500, 'Failed to add work', error);
@@ -208,51 +164,9 @@ router.post('/addwork', async (req, res) => {
 
 // Add work with invoice (finished work with full payment)
 router.post('/addWorkWithInvoice', async (req, res) => {
-    const workData = req.body;
     try {
-        // Validate required fields
-        if (!workData.PersonID || !workData.DrID) {
-            return ErrorResponses.badRequest(res, 'Missing required fields: PersonID and DrID are required');
-        }
-
-        // Validate createAsFinished flag
-        if (!workData.createAsFinished) {
-            return ErrorResponses.badRequest(res, 'createAsFinished flag must be true for this endpoint');
-        }
-
-        // Validate TotalRequired
-        if (!workData.TotalRequired || parseFloat(workData.TotalRequired) <= 0) {
-            return ErrorResponses.badRequest(res, 'TotalRequired must be greater than 0 for finished work with invoice');
-        }
-
-        // Validate Currency
-        if (!workData.Currency) {
-            return ErrorResponses.badRequest(res, 'Currency is required for finished work with invoice');
-        }
-
-        // Validate Typeofwork
-        if (!workData.Typeofwork) {
-            return ErrorResponses.badRequest(res, 'Typeofwork is required');
-        }
-
-        // Validate data types
-        if (isNaN(parseInt(workData.PersonID)) || isNaN(parseInt(workData.DrID))) {
-            return ErrorResponses.badRequest(res, 'PersonID and DrID must be valid numbers');
-        }
-
-        // Convert date strings to proper Date objects if provided
-        ['StartDate', 'DebondDate', 'FPhotoDate', 'IPhotoDate', 'NotesDate'].forEach(field => {
-            if (workData[field] && typeof workData[field] === 'string') {
-                const date = new Date(workData[field]);
-                if (isNaN(date.getTime())) {
-                    return ErrorResponses.invalidParameter(res, field, 'Invalid date format');
-                }
-                workData[field] = date;
-            }
-        });
-
-        // Call service layer function to handle business logic
-        const result = await addWorkWithInvoice(workData);
+        // Delegate to service layer for validation and creation
+        const result = await validateAndCreateWorkWithInvoice(req.body);
 
         res.json({
             success: true,
@@ -264,29 +178,12 @@ router.post('/addWorkWithInvoice', async (req, res) => {
     } catch (error) {
         log.error("Error adding work with invoice:", error);
 
-        // Handle duplicate active work constraint violation
-        if (error.number === 2601 && error.message.includes('UNQ_tblWork_Active')) {
-            try {
-                const existingWork = await getActiveWork(workData.PersonID);
-                return ErrorResponses.conflict(res, 'Patient already has an active work', {
-                    message: 'This patient already has an active (unfinished) work record. You can finish the existing work and add the new one.',
-                    code: 'DUPLICATE_ACTIVE_WORK',
-                    existingWork: existingWork ? {
-                        workId: existingWork.workid,
-                        typeOfWork: existingWork.Typeofwork,
-                        typeName: existingWork.TypeName,
-                        doctor: existingWork.DoctorName,
-                        additionDate: existingWork.AdditionDate,
-                        totalRequired: existingWork.TotalRequired,
-                        currency: existingWork.Currency
-                    } : null
-                });
-            } catch (fetchError) {
-                return ErrorResponses.conflict(res, 'Patient already has an active work', {
-                    message: 'This patient already has an active (unfinished) work record. Please complete or finish the existing work before adding a new one.',
-                    code: 'DUPLICATE_ACTIVE_WORK'
-                });
+        // Handle validation errors from service layer
+        if (error instanceof WorkValidationError) {
+            if (error.code === 'DUPLICATE_ACTIVE_WORK') {
+                return ErrorResponses.conflict(res, 'Patient already has an active work', error.details);
             }
+            return ErrorResponses.badRequest(res, error.message, { code: error.code, ...error.details });
         }
 
         return sendError(res, 500, 'Failed to add work with invoice', error);
@@ -383,41 +280,30 @@ router.delete('/deletework',
         try {
             const { workId } = req.body;
 
-        if (!workId) {
-            return ErrorResponses.missingParameter(res, 'workId');
-        }
+            if (!workId) {
+                return ErrorResponses.missingParameter(res, 'workId');
+            }
 
-        if (isNaN(parseInt(workId))) {
-            return ErrorResponses.invalidParameter(res, 'workId', 'Must be a valid number');
-        }
+            if (isNaN(parseInt(workId))) {
+                return ErrorResponses.invalidParameter(res, 'workId', 'Must be a valid number');
+            }
 
-        const result = await deleteWork(parseInt(workId));
+            // Delegate to service layer for validation and deletion
+            const result = await validateAndDeleteWork(parseInt(workId));
 
-        // Check if work has dependencies that prevent deletion
-        if (!result.canDelete) {
-            const deps = result.dependencies;
-            const dependencyMessages = [];
-
-            if (deps.InvoiceCount > 0) dependencyMessages.push(`${deps.InvoiceCount} payment(s)`);
-            if (deps.VisitCount > 0) dependencyMessages.push(`${deps.VisitCount} visit(s)`);
-            if (deps.DetailCount > 0) dependencyMessages.push(`${deps.DetailCount} detail(s)`);
-            if (deps.DiagnosisCount > 0) dependencyMessages.push(`${deps.DiagnosisCount} diagnosis(es)`);
-            if (deps.ImplantCount > 0) dependencyMessages.push(`${deps.ImplantCount} implant(s)`);
-            if (deps.ScrewCount > 0) dependencyMessages.push(`${deps.ScrewCount} screw(s)`);
-
-            return ErrorResponses.conflict(res, 'Cannot delete work with existing records', {
-                message: `This work has ${dependencyMessages.join(', ')} that must be deleted first.`,
-                dependencies: deps
+            res.json({
+                success: true,
+                message: "Work deleted successfully",
+                rowsAffected: result.rowCount
             });
-        }
-
-        res.json({
-            success: true,
-            message: "Work deleted successfully",
-            rowsAffected: result.rowCount
-        });
         } catch (error) {
             log.error("Error deleting work:", error);
+
+            // Handle validation errors from service layer
+            if (error instanceof WorkValidationError) {
+                return ErrorResponses.conflict(res, error.message, error.details);
+            }
+
             return sendError(res, 500, 'Failed to delete work', error);
         }
     }
