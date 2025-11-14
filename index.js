@@ -31,6 +31,7 @@ import { createPathResolver } from './utils/path-resolver.js';
 import queueProcessor from './services/sync/queue-processor.js';
 import { startPeriodicPolling, stopPeriodicPolling } from './services/sync/reverse-sync-poller.js';
 import { log } from './utils/logger.js';
+import { requestTimeout, TIMEOUTS } from './middleware/timeout.js';
 
 // Get current file and directory name for ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -95,6 +96,12 @@ async function initializeApplication() {
     }));
 
     log.info('✅ Session management configured');
+
+    // ===== ADDED: Request timeout configuration =====
+    log.info('⏱️  Setting up request timeout middleware...');
+    // Set global timeout for all requests (30 seconds default)
+    app.use(requestTimeout(TIMEOUTS.DEFAULT));
+    log.info(`✅ Global request timeout set to ${TIMEOUTS.DEFAULT}ms (30 seconds)`);
 
     // Setup static files (MUST BE AFTER AUTHENTICATION to protect routes)
     log.info('📁 Setting up static file serving...');

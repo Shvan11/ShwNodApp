@@ -29,6 +29,7 @@ import config from '../../config/config.js';
 import PhoneFormatter from '../../utils/phoneFormatter.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
+import { timeouts } from '../../middleware/timeout.js';
 
 const router = express.Router();
 const upload = multer();
@@ -170,8 +171,9 @@ router.get('/wa/send-to-patient', async (req, res) => {
  * Send WhatsApp messages in batch for a specific date
  * GET /wa/send
  * Query params: date (YYYY-MM-DD format)
+ * Note: Uses extended timeout (5 minutes) due to batch processing
  */
-router.get('/wa/send', async (req, res) => {
+router.get('/wa/send', timeouts.whatsappSend, async (req, res) => {
     const dateparam = req.query.date;
 
     try {
@@ -253,8 +255,9 @@ router.get('/wa/send', async (req, res) => {
  * Send media (base64 encoded image) via WhatsApp
  * POST /sendmedia
  * Body: { file: base64Image, phone: phoneNumber }
+ * Note: Uses extended timeout (2 minutes) for file upload
  */
-router.post('/sendmedia', async (req, res) => {
+router.post('/sendmedia', timeouts.long, async (req, res) => {
     const { file: imgData, phone } = req.body;
     const base64Data = imgData.replace(/^data:image\/png;base64,/, '');
     try {
@@ -290,8 +293,9 @@ router.get('/sendxrayfile', async (req, res) => {
  * Send multiple media files via WhatsApp or Telegram
  * POST /sendmedia2
  * Body: { file: comma-separated paths, phone: phoneNumber, prog: "WhatsApp"|"Telegram" }
+ * Note: Uses extended timeout (2 minutes) for multiple file uploads
  */
-router.post('/sendmedia2', upload.none(), async (req, res) => {
+router.post('/sendmedia2', timeouts.long, upload.none(), async (req, res) => {
     try {
         const paths = req.body.file.split(',');
         let phone = req.body.phone;

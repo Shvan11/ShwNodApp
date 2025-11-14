@@ -19,6 +19,7 @@ import { uploadSinglePdf, handleUploadError } from '../../middleware/upload.js';
 import driveUploadService from '../../services/google-drive/drive-upload.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
+import { timeouts } from '../../middleware/timeout.js';
 
 const router = express.Router();
 
@@ -1484,8 +1485,9 @@ router.delete('/aligner/batches/:batchId', async (req, res) => {
 
 /**
  * Upload PDF for an aligner set (staff page)
+ * Note: Uses extended timeout (2 minutes) for file upload to Google Drive
  */
-router.post('/aligner/sets/:setId/upload-pdf', uploadSinglePdf, handleUploadError, async (req, res) => {
+router.post('/aligner/sets/:setId/upload-pdf', timeouts.long, uploadSinglePdf, handleUploadError, async (req, res) => {
     try {
         const setId = parseInt(req.params.setId);
         const uploaderEmail = 'staff@shwan.local'; // Staff uploads (no auth required)
