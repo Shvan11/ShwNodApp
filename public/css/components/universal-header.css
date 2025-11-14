@@ -12,7 +12,7 @@
     border-bottom: 2px solid #5a67d8;
     width: 100%;
     max-width: 100vw;
-    overflow-x: hidden;
+    overflow: hidden;
     box-sizing: border-box;
 }
 
@@ -163,7 +163,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem 1rem;
+    padding: 0.375rem 0.75rem;
     background: rgba(255, 255, 255, 0.1);
     border: 2px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
@@ -171,6 +171,7 @@
     transition: all 0.3s ease;
     -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
+    max-height: 42px;
 }
 
 .user-info:hover {
@@ -199,93 +200,6 @@
     font-size: 0.75rem;
     opacity: 0.85;
     text-transform: capitalize;
-}
-
-/* Quick Search */
-.quick-search-section {
-    position: relative;
-}
-
-.search-toggle-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    color: white;
-    padding: 0.6rem;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 45px;
-    height: 45px;
-}
-
-.search-toggle-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: scale(1.1);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-}
-
-.quick-search-dropdown {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    margin-top: 0.5rem;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-    min-width: 350px;
-    max-width: 400px;
-    z-index: 1001;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    overflow: hidden;
-}
-
-.quick-search-input {
-    width: 100%;
-    padding: 1rem;
-    border: none;
-    font-size: 1rem;
-    outline: none;
-    background: #f8f9ff;
-    border-bottom: 1px solid #e2e8f0;
-}
-
-.quick-search-input::placeholder {
-    color: #a0aec0;
-}
-
-.search-results {
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.search-result-item {
-    padding: 1rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border-bottom: 1px solid #f1f5f9;
-}
-
-.search-result-item:hover {
-    background: #f8f9ff;
-    border-left: 4px solid #667eea;
-}
-
-.search-result-item:last-child {
-    border-bottom: none;
-}
-
-.patient-name {
-    font-weight: 600;
-    color: #2d3748;
-    margin-bottom: 0.25rem;
-}
-
-.patient-details {
-    font-size: 0.85rem;
-    color: #718096;
 }
 
 /* Back Button */
@@ -463,14 +377,6 @@
         margin-right: 0.25rem;
     }
 
-    .quick-search-dropdown {
-        right: 0;
-        left: auto;
-        min-width: 280px;
-        max-width: calc(100vw - 1rem);
-    }
-
-    .search-toggle-btn,
     .back-btn {
         width: 36px;
         height: 36px;
@@ -541,7 +447,6 @@
         display: none;
     }
 
-    .search-toggle-btn,
     .back-btn {
         width: 32px;
         height: 32px;
@@ -599,14 +504,6 @@
         display: none;
     }
 
-    .quick-search-dropdown {
-        min-width: calc(100vw - 0.625rem);
-        max-width: calc(100vw - 0.625rem);
-        left: 0.3125rem;
-        right: 0.3125rem;
-    }
-
-    .search-toggle-btn,
     .back-btn {
         width: 30px;
         height: 30px;
@@ -646,7 +543,6 @@
         font-size: 0.625rem;
     }
 
-    .search-toggle-btn,
     .back-btn {
         width: 28px;
         height: 28px;
@@ -654,63 +550,9 @@
     }
 }
 
-/* Animation for dropdown */
-.quick-search-dropdown {
-    animation: slideDown 0.3s ease-out;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
 /* Focus states for accessibility */
 .nav-btn:focus,
-.search-toggle-btn:focus,
 .back-btn:focus {
     outline: 2px solid rgba(255, 255, 255, 0.5);
     outline-offset: 2px;
-}
-
-.quick-search-input:focus {
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-    .quick-search-dropdown {
-        background: #2d3748;
-        border-color: #4a5568;
-    }
-    
-    .quick-search-input {
-        background: #4a5568;
-        color: white;
-    }
-    
-    .quick-search-input::placeholder {
-        color: #a0aec0;
-    }
-    
-    .search-result-item {
-        border-bottom-color: #4a5568;
-    }
-    
-    .search-result-item:hover {
-        background: #4a5568;
-    }
-    
-    .patient-name {
-        color: #e2e8f0;
-    }
-    
-    .patient-details {
-        color: #a0aec0;
-    }
 }

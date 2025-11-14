@@ -201,13 +201,13 @@ export async function createPatient(patientData) {
             patientID, PatientName, Phone, FirstName, LastName,
             DateofBirth, Gender, Phone2, Email, AddressID,
             ReferralSourceID, PatientTypeID, Notes, Alerts,
-            Language, CountryCode
+            Language, CountryCode, EstimatedCost, Currency
         )
         VALUES (
             @patientID, @patientName, @phone, @firstName, @lastName,
             @dateOfBirth, @gender, @phone2, @email, @addressID,
             @referralSourceID, @patientTypeID, @notes, @alerts,
-            @language, @countryCode
+            @language, @countryCode, @estimatedCost, @currency
         );
         SELECT SCOPE_IDENTITY() AS PersonID;
     `;
@@ -228,7 +228,9 @@ export async function createPatient(patientData) {
         ['notes', TYPES.NVarChar, patientData.notes || null],
         ['alerts', TYPES.NVarChar, patientData.alerts || null],
         ['language', TYPES.TinyInt, patientData.language ? parseInt(patientData.language) : 0],
-        ['countryCode', TYPES.NVarChar, patientData.countryCode || null]
+        ['countryCode', TYPES.NVarChar, patientData.countryCode || null],
+        ['estimatedCost', TYPES.Int, patientData.estimatedCost ? parseInt(patientData.estimatedCost) : null],
+        ['currency', TYPES.NVarChar, patientData.currency || null]
     ];
 
     const result = await executeQuery(
@@ -312,7 +314,8 @@ export async function getPatientById(personId) {
         `SELECT p.PersonID, p.patientID, p.PatientName, p.FirstName, p.LastName,
                 p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
                 p.AddressID, p.ReferralSourceID, p.PatientTypeID,
-                p.Notes, p.Alerts, p.Language, p.CountryCode
+                p.Notes, p.Alerts, p.Language, p.CountryCode,
+                p.EstimatedCost, p.Currency
          FROM dbo.tblpatients p
          WHERE p.PersonID = @personId`,
         [['personId', TYPES.Int, personId]],
@@ -333,7 +336,9 @@ export async function getPatientById(personId) {
             Notes: columns[13].value,
             Alerts: columns[14].value,
             Language: columns[15].value,
-            CountryCode: columns[16].value
+            CountryCode: columns[16].value,
+            EstimatedCost: columns[17].value,
+            Currency: columns[18].value
         })
     );
     return result[0] || null;
@@ -408,7 +413,9 @@ export async function updatePatient(personId, patientData) {
             Notes = @notes,
             Alerts = @alerts,
             Language = @language,
-            CountryCode = @countryCode
+            CountryCode = @countryCode,
+            EstimatedCost = @estimatedCost,
+            Currency = @currency
         WHERE PersonID = @personId
     `;
 
@@ -429,7 +436,9 @@ export async function updatePatient(personId, patientData) {
         ['notes', TYPES.NVarChar, patientData.Notes || null],
         ['alerts', TYPES.NVarChar, patientData.Alerts || null],
         ['language', TYPES.TinyInt, patientData.Language ? parseInt(patientData.Language) : 0],
-        ['countryCode', TYPES.NVarChar, patientData.CountryCode || null]
+        ['countryCode', TYPES.NVarChar, patientData.CountryCode || null],
+        ['estimatedCost', TYPES.Int, patientData.EstimatedCost ? parseInt(patientData.EstimatedCost) : null],
+        ['currency', TYPES.NVarChar, patientData.Currency || null]
     ];
 
     await executeQuery(query, parameters);

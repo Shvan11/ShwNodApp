@@ -244,6 +244,14 @@ const ViewPatientInfo = ({ patientId }) => {
                             <span className="info-label">Referral Source:</span>
                             <span className="info-value">{getReferralSourceName(patientData.ReferralSourceID)}</span>
                         </div>
+                        {patientData.EstimatedCost && (
+                            <div className="info-row">
+                                <span className="info-label">Estimated Cost (Consultation):</span>
+                                <span className="info-value" style={{ fontWeight: '600', color: '#059669' }}>
+                                    {parseInt(patientData.EstimatedCost).toLocaleString()} {patientData.Currency || 'IQD'}
+                                </span>
+                            </div>
+                        )}
                         {patientData.Alerts && (
                             <div className="info-row alert-row">
                                 <span className="info-label">

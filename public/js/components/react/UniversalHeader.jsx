@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const UniversalHeader = () => {
@@ -7,21 +7,11 @@ const UniversalHeader = () => {
 
     const [currentPatient, setCurrentPatient] = useState(null);
     const [navigationContext, setNavigationContext] = useState(null);
-    const [isSearchVisible, setIsSearchVisible] = useState(false);
-    const [searchResults, setSearchResults] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [allPatients, setAllPatients] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
-
-    const searchTimeoutRef = useRef(null);
 
     // Load user info once on mount
     useEffect(() => {
         loadCurrentUser();
-        // loadAllPatients(); // Temporarily disabled - endpoint doesn't exist
-
-        // Cleanup: Remove any legacy fullscreen preference from localStorage
-        localStorage.removeItem('preferFullscreen');
     }, []); // Only run once on mount
 
     // Load patient data and setup navigation context when route changes
@@ -101,67 +91,8 @@ const UniversalHeader = () => {
         return 'Dashboard';
     };
 
-    const loadAllPatients = () => {
-        // Temporarily disabled - endpoint doesn't exist
-        // TODO: Create /api/getallpatients endpoint or use alternative
-        setAllPatients([]);
-    };
-
-    const handleSearchInput = (event) => {
-        const value = event.target.value;
-        setSearchTerm(value);
-        
-        // Clear existing timeout
-        if (searchTimeoutRef.current) {
-            clearTimeout(searchTimeoutRef.current);
-        }
-        
-        // Set new timeout for debounced search
-        searchTimeoutRef.current = setTimeout(() => {
-            performSearch(value);
-        }, 300);
-    };
-
-    const performSearch = (term) => {
-        if (!term || term.length < 2) {
-            setSearchResults([]);
-            return;
-        }
-        
-        const filtered = allPatients
-            .filter(patient => 
-                patient.name?.toLowerCase().includes(term.toLowerCase()) ||
-                patient.phone?.includes(term) ||
-                patient.code?.toString().includes(term)
-            )
-            .slice(0, 8); // Limit to 8 results
-        
-        setSearchResults(filtered);
-    };
-
-    const toggleSearch = () => {
-        setIsSearchVisible(!isSearchVisible);
-        if (isSearchVisible) {
-            // Clear search when hiding
-            setSearchTerm('');
-            setSearchResults([]);
-        }
-    };
-
     const navigateToPatient = (patientCode) => {
         navigate(`/patient/${patientCode}/photos/tp0`);
-    };
-
-    const navigateToSearch = () => {
-        // Open the search dropdown instead of navigating immediately
-        setIsSearchVisible(true);
-    };
-
-    const handleSearchSubmit = (e) => {
-        if (e.key === 'Enter' && searchTerm.trim()) {
-            // Navigate to patient-management with search term
-            navigate(`/patient-management?search=${encodeURIComponent(searchTerm.trim())}`);
-        }
     };
 
     const navigateBack = () => {
@@ -257,56 +188,6 @@ const UniversalHeader = () => {
                             </div>
                         </div>
                     )}
-
-                    {/* Quick Search */}
-                    <div className="quick-search-section">
-                        <button className="search-toggle-btn" onClick={toggleSearch}>
-                            <i className="fas fa-search" />
-                        </button>
-
-                        {isSearchVisible && (
-                            <div className="quick-search-dropdown">
-                                <input
-                                    type="text"
-                                    placeholder="Search patients (Arabic name)..."
-                                    value={searchTerm}
-                                    onChange={handleSearchInput}
-                                    onKeyDown={handleSearchSubmit}
-                                    className="quick-search-input"
-                                    autoFocus
-                                    style={{ direction: 'rtl', textAlign: 'right' }}
-                                    lang="ar"
-                                    dir="rtl"
-                                />
-
-                                {searchResults.length > 0 && (
-                                    <div className="search-results">
-                                        {searchResults.map(patient => (
-                                            <div
-                                                key={patient.code}
-                                                className="search-result-item"
-                                                onClick={() => {
-                                                    navigateToPatient(patient.code);
-                                                    toggleSearch();
-                                                }}
-                                            >
-                                                <div className="patient-name">{patient.name}</div>
-                                                <div className="patient-details">
-                                                    ID: {patient.code} | Phone: {patient.phone}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {searchTerm.length >= 2 && searchResults.length === 0 && (
-                                    <div className="no-results">
-                                        No patients found matching "{searchTerm}"
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
 
                     {/* Back Button */}
                     {navigationContext && navigationContext.breadcrumbs.length > 0 && (

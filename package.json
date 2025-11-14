@@ -52,7 +52,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.9.4",
-    "react-select": "^5.10.1",
+    "react-select": "^5.10.2",
     "tedious": "^16.6.1",
     "telegram": "^2.19.10",
     "twilio": "^4.21.0",

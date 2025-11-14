@@ -427,7 +427,7 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
     };
 
     const handleTimepointClick = (tp) => {
-        navigate(`/patient/${patientId}/grid?tp=${tp}`);
+        navigate(`/patient/${patientId}/photos/tp${tp}`);
     };
 
     return (

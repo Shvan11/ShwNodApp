@@ -269,6 +269,7 @@ router.get('/patients/search', async (req, res) => {
                     p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
                     p.AddressID, p.ReferralSourceID, p.PatientTypeID,
                     p.Notes, p.Alerts, p.Language, p.CountryCode,
+                    p.EstimatedCost, p.Currency,
                     g.Gender as GenderName, a.Zone as AddressName,
                     r.Referral as ReferralSource, pt.PatientType as PatientTypeName
             FROM dbo.tblpatients p
@@ -301,10 +302,12 @@ router.get('/patients/search', async (req, res) => {
                 Alerts: columns[14].value,
                 Language: columns[15].value,
                 CountryCode: columns[16].value,
-                GenderName: columns[17].value,
-                AddressName: columns[18].value,
-                ReferralSource: columns[19].value,
-                PatientTypeName: columns[20].value
+                EstimatedCost: columns[17].value,
+                Currency: columns[18].value,
+                GenderName: columns[19].value,
+                AddressName: columns[20].value,
+                ReferralSource: columns[21].value,
+                PatientTypeName: columns[22].value
             })
         );
 

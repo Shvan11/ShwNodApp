@@ -45,7 +45,9 @@ const EditPatientComponent = ({ patientId }) => {
         Notes: '',
         Alerts: '',
         Language: '0',
-        CountryCode: ''
+        CountryCode: '',
+        EstimatedCost: '',
+        Currency: 'IQD'
     });
 
     const loadDropdownData = useCallback(async () => {
@@ -99,7 +101,9 @@ const EditPatientComponent = ({ patientId }) => {
                 Notes: data.Notes || '',
                 Alerts: data.Alerts || '',
                 Language: (data.Language !== null && data.Language !== undefined) ? data.Language.toString() : '0',
-                CountryCode: data.CountryCode || ''
+                CountryCode: data.CountryCode || '',
+                EstimatedCost: data.EstimatedCost || '',
+                Currency: data.Currency || 'IQD'
             });
         } catch (err) {
             console.error('Error loading patient data:', err);
@@ -530,6 +534,31 @@ const EditPatientComponent = ({ patientId }) => {
                                     {type.name}
                                 </option>
                             ))}
+                        </select>
+                    </div>
+                </div>
+
+                <div className="form-row">
+                    <div className="form-group">
+                        <label>Estimated Cost (Consultation)</label>
+                        <input
+                            type="number"
+                            value={formData.EstimatedCost}
+                            onChange={(e) => setFormData({...formData, EstimatedCost: e.target.value})}
+                            placeholder="Cost quoted at consultation"
+                            min="0"
+                            step="1000"
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>Currency</label>
+                        <select
+                            value={formData.Currency}
+                            onChange={(e) => setFormData({...formData, Currency: e.target.value})}
+                        >
+                            <option value="IQD">Iraqi Dinar (IQD)</option>
+                            <option value="USD">US Dollar (USD)</option>
+                            <option value="EUR">Euro (EUR)</option>
                         </select>
                     </div>
                 </div>

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import AsyncSelect from 'react-select/async';
 
 /**
  * Patient Management Component
@@ -25,10 +26,6 @@ const PatientManagement = () => {
     // Dropdown quick search
     const [showQuickSearch, setShowQuickSearch] = useState(true);
     const [allPatients, setAllPatients] = useState([]);
-    const nameSelectRef = useRef(null);
-    const phoneSelectRef = useRef(null);
-    const idSelectRef = useRef(null);
-    const tomSelectRefs = useRef({});
 
     // Dropdown data
     const [genders, setGenders] = useState([]);
@@ -70,21 +67,6 @@ const PatientManagement = () => {
         }
     }, []);
 
-    // Initialize TomSelect when allPatients data is loaded
-    useEffect(() => {
-        if (allPatients.length > 0 && showQuickSearch) {
-            initializeTomSelect();
-        }
-        return () => {
-            // Cleanup TomSelect instances
-            Object.values(tomSelectRefs.current).forEach(select => {
-                if (select && select.destroy) {
-                    select.destroy();
-                }
-            });
-        };
-    }, [allPatients, showQuickSearch]);
-
     const loadAllPatientsForDropdown = async () => {
         try {
             const response = await fetch('/api/patientsPhones');
@@ -96,80 +78,93 @@ const PatientManagement = () => {
         }
     };
 
-    const initializeTomSelect = () => {
-        if (typeof window.TomSelect === 'undefined') {
-            console.error('TomSelect library not loaded');
+    // Handle patient selection from quick search
+    const handleQuickSearchSelect = (selectedOption) => {
+        if (selectedOption && selectedOption.value) {
+            window.location.href = `/patient/${selectedOption.value}/works`;
+        }
+    };
+
+    // Async search function for name (with RTL support)
+    // Searches from the beginning of the name for better performance
+    const loadNameOptions = (inputValue, callback) => {
+        if (!inputValue || inputValue.length < 2) {
+            callback([]);
             return;
         }
 
-        const baseSettings = {
-            maxItems: 1,
-            placeholder: 'Type to search...',
-            create: false,
-            sortField: { field: 'text', direction: 'asc' }
-        };
+        const filtered = allPatients
+            .filter(p => p.name && p.name.startsWith(inputValue))
+            .slice(0, 50) // Limit to 50 results for performance
+            .map(p => ({ value: p.id, label: p.name }));
 
-        const handleChange = (value) => {
-            if (value) {
-                // Navigate to patient page using new React Router format
-                window.location.href = `/patient/${value}/works`;
+        callback(filtered);
+    };
+
+    // Async search function for phone
+    const loadPhoneOptions = (inputValue, callback) => {
+        if (!inputValue || inputValue.length < 2) {
+            callback([]);
+            return;
+        }
+
+        const filtered = allPatients
+            .filter(p => p.phone && p.phone.includes(inputValue))
+            .slice(0, 50)
+            .map(p => ({ value: p.id, label: p.phone }));
+
+        callback(filtered);
+    };
+
+    // Async search function for ID
+    const loadIdOptions = (inputValue, callback) => {
+        if (!inputValue || inputValue.length < 1) {
+            callback([]);
+            return;
+        }
+
+        const filtered = allPatients
+            .filter(p => p.id.toString().includes(inputValue))
+            .slice(0, 50)
+            .map(p => ({ value: p.id, label: p.id.toString() }));
+
+        callback(filtered);
+    };
+
+    // Custom styles for React Select
+    const selectStyles = {
+        control: (provided) => ({
+            ...provided,
+            minHeight: '44px',
+            borderColor: '#d1d5db',
+            '&:hover': {
+                borderColor: '#3b82f6'
             }
-        };
+        }),
+        menu: (provided) => ({
+            ...provided,
+            zIndex: 100
+        })
+    };
 
-        const clearAllSelects = () => {
-            Object.values(tomSelectRefs.current).forEach(select => {
-                if (select && select.clear) {
-                    select.clear(true);
-                }
-            });
-        };
-
-        // Name dropdown
-        if (nameSelectRef.current && !tomSelectRefs.current.name) {
-            const nameOptions = allPatients.map(p => ({ value: p.id, text: p.name }));
-            tomSelectRefs.current.name = new window.TomSelect(nameSelectRef.current, {
-                ...baseSettings,
-                options: nameOptions,
-                onChange: (value) => {
-                    if (value) {
-                        clearAllSelects();
-                        handleChange(value);
-                    }
-                }
-            });
-        }
-
-        // Phone dropdown
-        if (phoneSelectRef.current && !tomSelectRefs.current.phone) {
-            const phoneOptions = allPatients
-                .filter(p => p.phone)
-                .map(p => ({ value: p.id, text: p.phone }));
-            tomSelectRefs.current.phone = new window.TomSelect(phoneSelectRef.current, {
-                ...baseSettings,
-                options: phoneOptions,
-                onChange: (value) => {
-                    if (value) {
-                        clearAllSelects();
-                        handleChange(value);
-                    }
-                }
-            });
-        }
-
-        // ID dropdown
-        if (idSelectRef.current && !tomSelectRefs.current.id) {
-            const idOptions = allPatients.map(p => ({ value: p.id, text: p.id.toString() }));
-            tomSelectRefs.current.id = new window.TomSelect(idSelectRef.current, {
-                ...baseSettings,
-                options: idOptions,
-                onChange: (value) => {
-                    if (value) {
-                        clearAllSelects();
-                        handleChange(value);
-                    }
-                }
-            });
-        }
+    // RTL styles for Arabic name search
+    const selectStylesRTL = {
+        ...selectStyles,
+        input: (provided) => ({
+            ...provided,
+            direction: 'rtl',
+            textAlign: 'right'
+        }),
+        singleValue: (provided) => ({
+            ...provided,
+            direction: 'rtl',
+            textAlign: 'right'
+        }),
+        placeholder: (provided) => ({
+            ...provided,
+            direction: 'rtl',
+            textAlign: 'right'
+        })
     };
 
     // Auto-search when any name field changes (with debounce)
@@ -462,23 +457,53 @@ const PatientManagement = () => {
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem', color: '#1e3a8a' }}>
                                 <i className="fas fa-user" style={{ marginRight: '0.5rem' }}></i>
-                                Search by Name
+                                Search by Name (Arabic)
                             </label>
-                            <select ref={nameSelectRef} id="patient-name-select"></select>
+                            <AsyncSelect
+                                cacheOptions
+                                defaultOptions={false}
+                                loadOptions={loadNameOptions}
+                                onChange={handleQuickSearchSelect}
+                                placeholder="اكتب للبحث..."
+                                isClearable
+                                styles={selectStylesRTL}
+                                noOptionsMessage={() => "لم يتم العثور على مرضى"}
+                                loadingMessage={() => "جاري البحث..."}
+                            />
                         </div>
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem', color: '#1e3a8a' }}>
                                 <i className="fas fa-phone" style={{ marginRight: '0.5rem' }}></i>
                                 Search by Phone
                             </label>
-                            <select ref={phoneSelectRef} id="patient-phone-select"></select>
+                            <AsyncSelect
+                                cacheOptions
+                                defaultOptions={false}
+                                loadOptions={loadPhoneOptions}
+                                onChange={handleQuickSearchSelect}
+                                placeholder="Type to search by phone..."
+                                isClearable
+                                styles={selectStyles}
+                                noOptionsMessage={() => "No patients found"}
+                                loadingMessage={() => "Searching..."}
+                            />
                         </div>
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem', color: '#1e3a8a' }}>
                                 <i className="fas fa-id-card" style={{ marginRight: '0.5rem' }}></i>
                                 Search by ID
                             </label>
-                            <select ref={idSelectRef} id="patient-id-select"></select>
+                            <AsyncSelect
+                                cacheOptions
+                                defaultOptions={false}
+                                loadOptions={loadIdOptions}
+                                onChange={handleQuickSearchSelect}
+                                placeholder="Type to search by ID..."
+                                isClearable
+                                styles={selectStyles}
+                                noOptionsMessage={() => "No patients found"}
+                                loadingMessage={() => "Searching..."}
+                            />
                         </div>
                     </div>
                 </div>
