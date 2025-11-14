@@ -175,8 +175,10 @@ async function initializeApplication() {
     }
 
     // Connect WhatsApp service to WebSocket emitter
+    console.log('💬 DEBUG: About to connect WhatsApp service...');
     log.info('💬 Connecting WhatsApp service...');
     whatsappService.setEmitter(wsEmitter);
+    console.log('✅ DEBUG: WhatsApp service connected');
 
     // Set up comprehensive WhatsApp event handlers
     whatsappService.on('MessageSent', async (person) => {
@@ -336,7 +338,10 @@ async function initializeApplication() {
     });
 
     // Start server
+    console.log('🚀 DEBUG: About to start HTTP server...');
+    log.info('🚀 About to start HTTP server...');
     await startServer();
+    console.log('✅ DEBUG: startServer() completed');
 
     // ===== ADDED: Automatic WhatsApp client initialization =====
     await initializeWhatsAppOnStartup();
@@ -360,9 +365,12 @@ async function initializeApplication() {
 function startServer() {
   return new Promise((resolve, reject) => {
     const serverInstance = server.listen(port, (error) => {
+      console.log('🔥 DEBUG: server.listen callback fired, error=', error);
       if (error) {
         reject(error);
       } else {
+        console.log('🔥 DEBUG: No error, about to log "Server listening"');
+        console.log(`✅ Server listening on port: ${port}`);
         log.info(`✅ Server listening on port: ${port}`);
 
         // Start SQL Server → PostgreSQL sync (webhook-based, zero polling)

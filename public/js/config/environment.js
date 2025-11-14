@@ -11,14 +11,12 @@ const isDevelopment = import.meta.env?.MODE === 'development';
 
 // Get API URL
 // In production: Same origin as the page
-// In development: Can override with VITE_API_URL or defaults to localhost:3000
+// In development: Use VITE_API_URL from .env.development
 const getApiUrl = () => {
-  if (typeof import.meta.env?.VITE_API_URL !== 'undefined') {
-    return import.meta.env.VITE_API_URL;
-  }
+  const viteApiUrl = import.meta.env?.VITE_API_URL;
 
-  if (isDevelopment) {
-    return 'http://localhost:3000';
+  if (viteApiUrl) {
+    return viteApiUrl;
   }
 
   // Production: Use same origin

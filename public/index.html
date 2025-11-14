@@ -175,6 +175,32 @@
         </div>
     </div>
 
+    <!-- Global Fetch Interceptor for Authentication -->
+    <script>
+        // Intercept all fetch requests to handle 401 authentication errors globally
+        // This ensures consistent redirect behavior across all components
+        (function() {
+            const originalFetch = window.fetch;
+
+            window.fetch = function(...args) {
+                return originalFetch.apply(this, args)
+                    .then(response => {
+                        // Check for 401 Unauthorized
+                        if (response.status === 401) {
+                            console.warn('[Auth] 401 Unauthorized detected - redirecting to login');
+                            // Redirect to login page
+                            window.location.href = '/login.html';
+                            // Return a rejected promise to prevent further processing
+                            return Promise.reject(new Error('Authentication required'));
+                        }
+                        return response;
+                    });
+            };
+
+            console.log('[Auth] Global fetch interceptor installed');
+        })();
+    </script>
+
     <!-- Unified React Application Bootstrap -->
     <script type="module">
         import React from 'react';

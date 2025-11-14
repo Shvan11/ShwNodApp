@@ -40,6 +40,10 @@ export default defineConfig(({ mode }) => {
   const apiUrl = env.VITE_API_URL || 'http://localhost:3001';
 
   return {
+  // Define environment variables to expose to the client
+  define: {
+    'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL),
+  },
   plugins: [
     templateDesignerPlugin(), // Handle template-designer specifically
     react({

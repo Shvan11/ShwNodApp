@@ -14,14 +14,15 @@
 import express from 'express';
 import { log } from '../../utils/logger.js';
 import * as database from '../../services/database/index.js';
-import { getTimePoints, getTimePointImgs } from '../../services/database/queries/timepoint-queries.js';
-import { getPatientsPhones, getInfos, createPatient, getPatientById, updatePatient, deletePatient } from '../../services/database/queries/patient-queries.js';
+import { getPatientsPhones, createPatient, getPatientById, updatePatient, deletePatient } from '../../services/database/queries/patient-queries.js';
 import * as imaging from '../../services/imaging/index.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { requireRecordAge, getPatientCreationDate } from '../../middleware/time-based-auth.js';
 import { WebSocketEvents } from '../../services/messaging/websocket-events.js';
 import { getOption } from '../../services/database/queries/options-queries.js';
-import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import { ErrorResponses } from '../../utils/error-response.js';
+import * as PatientService from '../../services/business/PatientService.js';
+import { PatientValidationError } from '../../services/business/PatientService.js';
 
 const router = express.Router();
 
@@ -43,9 +44,24 @@ export function setWebSocketEmitter(emitter) {
  * GET /getinfos?code={patientId}
  */
 router.get("/getinfos", async (req, res) => {
-    const { code: pid } = req.query;
-    const infos = await getInfos(pid);
-    res.json(infos);
+    try {
+        const { code: patientId } = req.query;
+        const info = await PatientService.getPatientInfo(patientId);
+        res.json(info);
+    } catch (error) {
+        if (error instanceof PatientValidationError) {
+            return res.status(400).json({
+                error: error.message,
+                code: error.code,
+                details: error.details
+            });
+        }
+        log.error('Error fetching patient info:', error);
+        res.status(500).json({
+            error: 'Failed to fetch patient information',
+            message: error.message
+        });
+    }
 });
 
 /**
@@ -69,9 +85,24 @@ router.get("/settings/patients-folder", async (req, res) => {
  * GET /gettimepoints?code={patientId}
  */
 router.get("/gettimepoints", async (req, res) => {
-    const { code: pid } = req.query;
-    const timepoints = await getTimePoints(pid);
-    res.json(timepoints);
+    try {
+        const { code: patientId } = req.query;
+        const timepoints = await PatientService.getPatientTimePoints(patientId);
+        res.json(timepoints);
+    } catch (error) {
+        if (error instanceof PatientValidationError) {
+            return res.status(400).json({
+                error: error.message,
+                code: error.code,
+                details: error.details
+            });
+        }
+        log.error('Error fetching time points:', error);
+        res.status(500).json({
+            error: 'Failed to fetch time points',
+            message: error.message
+        });
+    }
 });
 
 /**
@@ -79,9 +110,24 @@ router.get("/gettimepoints", async (req, res) => {
  * GET /gettimepointimgs?code={patientId}&tp={timepoint}
  */
 router.get("/gettimepointimgs", async (req, res) => {
-    const { code: pid, tp } = req.query;
-    const timepointimgs = await getTimePointImgs(pid, tp);
-    res.json(timepointimgs);
+    try {
+        const { code: patientId, tp } = req.query;
+        const timepointimgs = await PatientService.getPatientTimePointImages(patientId, tp);
+        res.json(timepointimgs);
+    } catch (error) {
+        if (error instanceof PatientValidationError) {
+            return res.status(400).json({
+                error: error.message,
+                code: error.code,
+                details: error.details
+            });
+        }
+        log.error('Error fetching time point images:', error);
+        res.status(500).json({
+            error: 'Failed to fetch time point images',
+            message: error.message
+        });
+    }
 });
 
 /**

@@ -72,8 +72,12 @@ const PatientShell = () => {
 
     // Fetch patient data when patient ID changes
     useEffect(() => {
-        if (patientId) {
+        // Skip fetching for non-numeric IDs (like "new" for add patient form)
+        if (patientId && !isNaN(parseInt(patientId)) && patientId !== 'new') {
             fetchPatientData(patientId);
+        } else if (patientId === 'new') {
+            // Set placeholder data for new patient form
+            setPatientData({ name: 'New Patient', loading: false, error: null });
         }
     }, [patientId, fetchPatientData]);
 

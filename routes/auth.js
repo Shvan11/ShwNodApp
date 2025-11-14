@@ -103,21 +103,29 @@ router.post('/logout', (req, res) => {
  * Get current user info
  */
 router.get('/me', (req, res) => {
-  if (!req.session || !req.session.userId) {
-    return res.status(401).json({
+  try {
+    if (!req.session || !req.session.userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Not authenticated'
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        username: req.session.username,
+        fullName: req.session.fullName,
+        role: req.session.userRole
+      }
+    });
+  } catch (error) {
+    console.error('[Auth /me] Error:', error);
+    res.status(500).json({
       success: false,
-      error: 'Not authenticated'
+      error: 'Internal server error'
     });
   }
-
-  res.json({
-    success: true,
-    user: {
-      username: req.session.username,
-      fullName: req.session.fullName,
-      role: req.session.userRole
-    }
-  });
 });
 
 /**

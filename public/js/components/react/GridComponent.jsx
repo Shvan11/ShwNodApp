@@ -26,6 +26,12 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
     ];
     
     const loadTimepoints = async () => {
+        // Skip loading if patientId is not a valid number
+        if (!patientId || isNaN(parseInt(patientId))) {
+            setLoadingTimepoints(false);
+            return;
+        }
+
         try {
             setLoadingTimepoints(true);
             const response = await fetch(`/api/gettimepoints?code=${patientId}`);
@@ -44,6 +50,12 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
     };
 
     const loadGalleryImages = async () => {
+        // Skip loading if patientId is not a valid number
+        if (!patientId || isNaN(parseInt(patientId))) {
+            setLoading(false);
+            return;
+        }
+
         try {
             setLoading(true);
 

@@ -18,9 +18,9 @@ Configuration is in `.mcp.json`. See `docs/mcp-mssql-setup.md` for MSSQL MCP ser
 ## Core Commands
 
 ### Development
-- **Development Mode**: `npm run dev` - Runs Vite dev server (port 5173) + Express API (port 3000)
-- **Backend Only**: `npm run dev:server` or `node index.js` - Express server only
-- **Frontend Only**: `npm run dev:client` - Vite dev server only
+- **Development Mode**: `npm run dev` - Runs Vite dev server (port 5173) + Express API (port 3001)
+- **Backend Only**: `npm run dev:server` - Express server only (port 3001)
+- **Frontend Only**: `npm run dev:client` - Vite dev server only (port 5173)
 
 ### Production
 - **Build Application**: `npm run build` - Builds optimized production bundle to `/dist`
@@ -111,7 +111,7 @@ Configuration is in `.mcp.json`. See `docs/mcp-mssql-setup.md` for MSSQL MCP ser
 Essential for database connectivity:
 - `DB_SERVER`, `DB_INSTANCE`, `DB_USER`, `DB_PASSWORD`
 - `MACHINE_PATH` - File system path for patient images
-- `PORT` - Server port (defaults to 3000)
+- `PORT` - Server port (3001 in development via `.env.development`, 3000 in production by default)
 
 Optional service integrations:
 - `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`
@@ -208,12 +208,34 @@ Set `MACHINE_PATH` to your network path:
 - **WSL**: `/mnt/your-server/clinic1` or `/mnt/c/clinic1`
 
 ### Port Configuration
-The application runs on **port 3000** by default.
 
+The application uses environment-specific port configuration:
+
+**Development Mode** (`npm run dev`):
+- Backend (Express): **Port 3001**
+- Frontend (Vite): **Port 5173**
+- Configuration: `.env.development` sets `PORT=3001`
+- Vite proxies API requests to `http://localhost:3001`
+
+**Production Mode** (`npm start`):
+- Backend (Express): **Port 3000** (default)
+- No Vite - Express serves built files from `/dist`
+- Configuration: Falls back to default port 3000 if `PORT` is not set in `.env`
+
+**Custom Port Override**:
 You can override the port by setting the `PORT` environment variable:
 ```bash
-export PORT=8080  # Use custom port
+# Development
+export PORT=8080  # Add to .env.development
+
+# Production
+export PORT=8080  # Add to .env or set in environment
 ```
+
+**Configuration Files**:
+- `.env` - Production settings (shared configuration)
+- `.env.development` - Development-specific overrides (PORT=3001, VITE_DEV_PORT=5173)
+- `config/config.js` - Loads environment-specific files based on NODE_ENV
 
 ## Development Notes
 

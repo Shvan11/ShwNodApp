@@ -47,9 +47,16 @@ const UniversalHeader = () => {
 
     const loadCurrentUser = () => {
         fetch('/api/auth/me')
-            .then(response => response.json())
+            .then(response => {
+                if (response.status === 401) {
+                    // Not authenticated - redirect to login
+                    window.location.href = '/login.html';
+                    return null;
+                }
+                return response.json();
+            })
             .then(data => {
-                if (data.success && data.user) {
+                if (data && data.success && data.user) {
                     setCurrentUser(data.user);
                 }
             })

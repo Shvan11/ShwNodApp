@@ -18,13 +18,18 @@ class WebSocketService extends EventEmitter {
     // Default options
     this.options = {
       // Base URL for WebSocket connection
-      // In development (Vite port 5173), connect to Express server (port 3000)
+      // In development, use VITE_API_URL from .env.development
       // In production, use the same host/port as the page
       baseUrl: (() => {
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const isDevelopment = location.port === '5173';
-        const host = isDevelopment ? `${location.hostname}:3000` : location.host;
-        return `${protocol}//${host}`;
+        const apiUrl = import.meta.env.VITE_API_URL;
+
+        if (apiUrl) {
+          const url = new URL(apiUrl);
+          return `${protocol}//${url.host}`;
+        }
+
+        return `${protocol}//${location.host}`;
       })(),
       
       // Connection parameters
