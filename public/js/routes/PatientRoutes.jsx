@@ -7,7 +7,8 @@ import PatientShell from '../components/react/PatientShell.jsx';
  *
  * Routes:
  * - /patient/:patientId/works → Patient works/treatment records
- * - /patient/:patientId/grid → Patient photos grid
+ * - /patient/:patientId/photos/tp0 → Patient photos grid (default timepoint)
+ * - /patient/:patientId/photos/tp1 → Patient photos for specific timepoint
  * - /patient/:patientId/compare → Photo comparison view
  * - /patient/:patientId/xrays → X-rays view
  * - /patient/:patientId/visits → Visit summary (with ?workId query param)
@@ -15,7 +16,8 @@ import PatientShell from '../components/react/PatientShell.jsx';
  * - /patient/:patientId/payments → Payment records
  * - /patient/:patientId/new-appointment → New appointment form
  * - /patient/:patientId/edit-appointment/:appointmentId → Edit appointment
- * - /patient/:patientId/edit → Edit patient information
+ * - /patient/:patientId/patient-info → View patient information
+ * - /patient/:patientId/edit-patient → Edit patient information
  */
 export default function PatientRoutes() {
   return (

@@ -7,6 +7,11 @@ const PatientShell = () => {
     // React Router hooks
     const { patientId, page } = useParams();
     const [searchParams] = useSearchParams();
+    const wildcardParams = useParams();
+
+    // Extract tpCode from wildcard path (e.g., "tp1" from /photos/tp1)
+    const wildcardPath = wildcardParams['*'] || '';
+    const tpCode = wildcardPath.match(/^tp(\d+)$/)?.[0] || null;
 
     const [patientData, setPatientData] = useState({ name: '', loading: true, error: null });
     const [workData, setWorkData] = useState({ typeName: '', loading: false, error: null });
@@ -89,7 +94,7 @@ const PatientShell = () => {
 
     // Extract additional params from URL
     const params = {
-        tp: searchParams.get('tp'),
+        tpCode: tpCode,
         view: searchParams.get('view'),
         filter: searchParams.get('filter'),
     };
@@ -134,11 +139,11 @@ const PatientShell = () => {
                         )}
 
                         {/* Current Page */}
-                        {page && page !== 'grid' && page !== 'works' && (
+                        {page && page !== 'photos' && page !== 'works' && (
                             <>
                                 <span className="breadcrumb-separator">/</span>
                                 <span className="breadcrumb-item active">
-                                    <i className={`fas fa-${page === 'visits' ? 'calendar-check' : page === 'appointments' ? 'calendar-alt' : page === 'xrays' ? 'x-ray' : 'file'}`}></i>
+                                    <i className={`fas fa-${page === 'visits' ? 'calendar-check' : page === 'appointments' ? 'calendar-alt' : page === 'xrays' ? 'x-ray' : page === 'patient-info' ? 'id-card' : 'file'}`}></i>
                                     {' '}
                                     {page.charAt(0).toUpperCase() + page.slice(1).replace(/-/g, ' ')}
                                 </span>
