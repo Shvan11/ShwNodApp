@@ -34,6 +34,11 @@ import {
     getInvoiceCreationDate
 } from '../../middleware/time-based-auth.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import {
+    validateAndCreateInvoice,
+    createAlignerPayment,
+    PaymentValidationError
+} from '../../services/business/PaymentService.js';
 
 const router = express.Router();
 
@@ -245,90 +250,27 @@ router.post("/addInvoice", async (req, res) => {
             return ErrorResponses.badRequest(res, 'Missing required parameters: workid, amountPaid, paymentDate');
         }
 
-        // Parse and validate amounts
-        const usd = parseInt(usdReceived) || 0;
-        const iqd = parseInt(iqdReceived) || 0;
-
-        // Validation 1: Must receive cash in at least one currency
-        if (usd === 0 && iqd === 0) {
-            return ErrorResponses.badRequest(res, 'At least one currency amount (USD or IQD) must be greater than zero', { code: 'NO_CASH_RECEIVED' });
-        }
-
-        // Validation 2: Non-negative amounts
-        if (usd < 0 || iqd < 0) {
-            return ErrorResponses.badRequest(res, 'Currency amounts cannot be negative', { code: 'NEGATIVE_AMOUNT' });
-        }
-
-        // Get work details to determine account currency
-        const workDetails = await getWorkDetails(workid);
-        if (!workDetails) {
-            return ErrorResponses.badRequest(res, 'Work record not found', { code: 'WORK_NOT_FOUND' });
-        }
-
-        const accountCurrency = workDetails.Currency;
-
-        // Determine if this is a same-currency payment
-        const isSameCurrencyPayment =
-            (accountCurrency === 'USD' && usd > 0 && iqd === 0) ||
-            (accountCurrency === 'IQD' && iqd > 0 && usd === 0);
-
-        // For same-currency payments: Force change to NULL (cash handling not tracked)
-        // For cross-currency payments: Validate and use provided change value
-        let changeToSave = null;
-
-        if (isSameCurrencyPayment) {
-            // Same currency - no change tracking needed
-            changeToSave = null;
-        } else {
-            // Cross-currency or mixed payment - validate change
-            const changeAmount = parseInt(change) || 0;
-
-            if (changeAmount < 0) {
-                return ErrorResponses.badRequest(res, 'Change amount cannot be negative', { code: 'NEGATIVE_CHANGE' });
-            }
-
-            if (changeAmount > 0) {
-                // Get exchange rate for validation
-                const exchangeRate = await getExchangeRateForDate(paymentDate);
-
-                // Validation 3: Change cannot exceed IQD received (simple case)
-                if (usd === 0 && changeAmount > iqd) {
-                    return ErrorResponses.badRequest(res, `Change (${changeAmount} IQD) cannot exceed IQD received (${iqd} IQD)`, { code: 'CHANGE_EXCEEDS_IQD_RECEIVED' });
-                }
-
-                // Validation 4: For USD payments, validate against total IQD value
-                if (usd > 0 && exchangeRate) {
-                    const totalIQDValue = iqd + Math.floor(usd * exchangeRate);
-
-                    if (changeAmount > totalIQDValue) {
-                        return ErrorResponses.badRequest(res, `Change (${changeAmount} IQD) cannot exceed total IQD value in transaction (${totalIQDValue} IQD at rate ${exchangeRate})`, {
-                            code: 'CHANGE_EXCEEDS_TOTAL_VALUE',
-                            usdReceived: usd,
-                            iqdReceived: iqd,
-                            exchangeRate: exchangeRate,
-                            totalIQDValue: totalIQDValue,
-                            changeRequested: changeAmount
-                        });
-                    }
-                }
-            }
-
-            changeToSave = changeAmount;
-        }
-
-        // Save invoice with validated data
-        const result = await addInvoice({
+        // Delegate to service layer for validation and creation
+        const result = await validateAndCreateInvoice({
             workid,
             amountPaid,
             paymentDate,
-            usdReceived: usd,
-            iqdReceived: iqd,
-            change: changeToSave  // NULL for same-currency, validated number for cross-currency
+            usdReceived,
+            iqdReceived,
+            change
         });
 
         res.json({ status: 'success', data: result });
     } catch (error) {
         log.error("Error adding invoice:", error);
+
+        // Handle validation errors from service layer
+        if (error instanceof PaymentValidationError) {
+            return ErrorResponses.badRequest(res, error.message, {
+                code: error.code,
+                ...error.details
+            });
+        }
 
         // Handle database constraint violations gracefully
         if (error.message && error.message.includes('CHK_Invoice')) {
@@ -409,36 +351,20 @@ router.post('/aligner/payments', async (req, res) => {
             return ErrorResponses.badRequest(res, 'workid, Amountpaid, and Dateofpayment are required');
         }
 
-        log.info(`Adding payment for work ID: ${workid}, Set ID: ${AlignerSetID || 'general'}, Amount: ${Amountpaid}`);
-
-        // Insert payment into tblInvoice
-        const query = `
-            INSERT INTO tblInvoice (workid, Amountpaid, Dateofpayment, ActualAmount, ActualCur, Change, AlignerSetID)
-            VALUES (@workid, @Amountpaid, @Dateofpayment, @ActualAmount, @ActualCur, @Change, @AlignerSetID);
-            SELECT SCOPE_IDENTITY() AS invoiceID;
-        `;
-
-        const result = await database.executeQuery(
-            query,
-            [
-                ['workid', database.TYPES.Int, parseInt(workid)],
-                ['Amountpaid', database.TYPES.Decimal, parseFloat(Amountpaid)],
-                ['Dateofpayment', database.TYPES.Date, new Date(Dateofpayment)],
-                ['ActualAmount', database.TYPES.Decimal, ActualAmount ? parseFloat(ActualAmount) : null],
-                ['ActualCur', database.TYPES.NVarChar, ActualCur || null],
-                ['Change', database.TYPES.Decimal, Change ? parseFloat(Change) : null],
-                ['AlignerSetID', database.TYPES.Int, AlignerSetID || null]
-            ],
-            (columns) => ({
-                invoiceID: columns[0].value
-            })
-        );
-
-        const invoiceID = result && result.length > 0 ? result[0].invoiceID : null;
+        // Delegate to service layer
+        const result = await createAlignerPayment({
+            workid,
+            AlignerSetID,
+            Amountpaid,
+            Dateofpayment,
+            ActualAmount,
+            ActualCur,
+            Change
+        });
 
         res.json({
             success: true,
-            invoiceID: invoiceID,
+            invoiceID: result.invoiceID,
             message: 'Payment added successfully'
         });
 
