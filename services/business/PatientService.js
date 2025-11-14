@@ -32,7 +32,7 @@ export class PatientValidationError extends Error {
  * Validate patient ID
  * @param {string|number} patientId - Patient ID to validate
  * @throws {PatientValidationError} If validation fails
- * @returns {number} Validated patient ID as integer
+ * @returns {string} Validated patient ID as string
  */
 function validatePatientId(patientId) {
     // Check if provided
@@ -43,8 +43,11 @@ function validatePatientId(patientId) {
         );
     }
 
+    // Convert to string for validation
+    const pidString = String(patientId).trim();
+
     // Check if valid number
-    const pid = parseInt(patientId);
+    const pid = parseInt(pidString);
     if (isNaN(pid)) {
         throw new PatientValidationError(
             'Patient ID must be a valid number',
@@ -62,7 +65,8 @@ function validatePatientId(patientId) {
         );
     }
 
-    return pid;
+    // Return validated string (not the parsed integer)
+    return pidString;
 }
 
 /**
