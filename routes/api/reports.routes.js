@@ -6,6 +6,12 @@ import express from 'express';
 import { log } from '../../utils/logger.js';
 import * as database from '../../services/database/index.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import {
+    calculateMonthlyStatistics,
+    enrichInvoicesWithDetails,
+    validateMonthYear,
+    validateDate
+} from '../../services/business/FinancialReportService.js';
 
 const router = express.Router();
 
@@ -23,21 +29,12 @@ router.get('/statistics', async (req, res) => {
             return ErrorResponses.badRequest(res, 'Missing required parameters: month and year are required');
         }
 
-        const monthNum = parseInt(month);
-        const yearNum = parseInt(year);
+        // Delegate validation to service layer
+        const { month: monthNum, year: yearNum } = validateMonthYear(month, year);
         const exRate = exchangeRate ? parseInt(exchangeRate) : 1450; // Default exchange rate
 
-        // Validate month and year ranges
-        if (monthNum < 1 || monthNum > 12) {
-            return ErrorResponses.invalidParameter(res, 'month', 'must be between 1 and 12');
-        }
-
-        if (yearNum < 2000 || yearNum > 2100) {
-            return ErrorResponses.invalidParameter(res, 'year', 'must be between 2000 and 2100');
-        }
-
         // Execute the stored procedure
-        const result = await database.executeStoredProcedure(
+        const dailyData = await database.executeStoredProcedure(
             'ProcGrandTotal',
             [
                 ['month', database.TYPES.Int, monthNum],
@@ -55,61 +52,26 @@ router.get('/statistics', async (req, res) => {
             }
         );
 
-        // Calculate monthly totals
-        let totalIQD = 0;
-        let totalUSD = 0;
-        let totalExpensesIQD = 0;
-        let totalExpensesUSD = 0;
-        let finalQasaIQD = 0;
-        let finalQasaUSD = 0;
-
-        result.forEach(day => {
-            totalIQD += day.SumIQD || 0;
-            totalUSD += day.SumUSD || 0;
-            totalExpensesIQD += Math.abs(day.ExpensesIQD || 0);
-            totalExpensesUSD += Math.abs(day.ExpensesUSD || 0);
-            // Use the last day's Qasa values as the final balance
-            finalQasaIQD = day.QasaIQD || 0;
-            finalQasaUSD = day.QasaUSD || 0;
-        });
-
-        const netIQD = totalIQD - totalExpensesIQD;
-        const netUSD = totalUSD - totalExpensesUSD;
-        const grandTotalUSD = (netIQD / exRate) + netUSD;
-        const grandTotalIQD = netIQD + (netUSD * exRate);
+        // Delegate calculation to service layer
+        const summary = calculateMonthlyStatistics(dailyData, exRate);
 
         res.json({
             success: true,
             month: monthNum,
             year: yearNum,
             exchangeRate: exRate,
-            dailyData: result,
-            summary: {
-                totalRevenue: {
-                    IQD: totalIQD,
-                    USD: totalUSD
-                },
-                totalExpenses: {
-                    IQD: totalExpensesIQD,
-                    USD: totalExpensesUSD
-                },
-                netProfit: {
-                    IQD: netIQD,
-                    USD: netUSD
-                },
-                grandTotal: {
-                    USD: Math.round(grandTotalUSD * 100) / 100,
-                    IQD: Math.round(grandTotalIQD)
-                },
-                cashBox: {
-                    IQD: finalQasaIQD,
-                    USD: finalQasaUSD
-                }
-            }
+            dailyData: dailyData,
+            summary: summary
         });
 
     } catch (error) {
         log.error("Error fetching statistics:", error);
+
+        // Handle validation errors from service layer
+        if (error.message.includes('Month') || error.message.includes('Year')) {
+            return ErrorResponses.badRequest(res, error.message);
+        }
+
         ErrorResponses.internalError(res, 'Failed to fetch statistics', error);
     }
 });
@@ -128,14 +90,11 @@ router.get('/daily-invoices', async (req, res) => {
             return ErrorResponses.missingParameter(res, 'date');
         }
 
-        // Validate date format
-        const dateObj = new Date(date);
-        if (isNaN(dateObj.getTime())) {
-            return ErrorResponses.invalidParameter(res, 'date', 'Invalid date format');
-        }
+        // Delegate validation to service layer
+        const dateObj = validateDate(date);
 
         // Execute the stored procedure
-        const result = await database.executeStoredProcedure(
+        const baseInvoices = await database.executeStoredProcedure(
             'ProDailyInvoices',
             [['iDate', database.TYPES.Date, dateObj]],
             null,
@@ -148,26 +107,8 @@ router.get('/daily-invoices', async (req, res) => {
             }
         );
 
-        // Get IQDReceived and USDReceived for each invoice
-        const enrichedInvoices = await Promise.all(result.map(async (invoice) => {
-            const invoiceDetails = await database.executeQuery(
-                'SELECT IQDReceived, USDReceived FROM tblInvoice WHERE invoiceID = @invoiceID',
-                [['invoiceID', database.TYPES.Int, invoice.invoiceID]],
-                (columns) => {
-                    const row = {};
-                    columns.forEach(column => {
-                        row[column.metadata.colName] = column.value;
-                    });
-                    return row;
-                }
-            );
-
-            return {
-                ...invoice,
-                IQDReceived: invoiceDetails[0]?.IQDReceived || 0,
-                USDReceived: invoiceDetails[0]?.USDReceived || 0
-            };
-        }));
+        // Delegate enrichment to service layer
+        const enrichedInvoices = await enrichInvoicesWithDetails(baseInvoices);
 
         res.json({
             success: true,
@@ -178,6 +119,12 @@ router.get('/daily-invoices', async (req, res) => {
 
     } catch (error) {
         log.error("Error fetching daily invoices:", error);
+
+        // Handle validation errors from service layer
+        if (error.message === 'Invalid date format') {
+            return ErrorResponses.invalidParameter(res, 'date', error.message);
+        }
+
         ErrorResponses.internalError(res, 'Failed to fetch daily invoices', error);
     }
 });

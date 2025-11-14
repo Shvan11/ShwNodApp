@@ -21,6 +21,11 @@ import messageState from '../../services/state/messageState.js';
 import whatsapp from '../../services/messaging/whatsapp.js';
 import { WebSocketEvents, createStandardMessage } from '../../services/messaging/websocket-events.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import {
+    transformMessageStatuses,
+    calculateMessageCount,
+    getMessageDetails
+} from '../../services/business/MessagingService.js';
 
 const router = express.Router();
 
@@ -90,49 +95,9 @@ router.get('/status/:date', async (req, res) => {
         const { date } = req.params;
         const result = await messagingQueries.getMessageStatusByDate(date);
 
-        // Transform the database format to frontend format
+        // Delegate to service layer for status transformation
         if (result && result.messages) {
-            result.messages = result.messages.map(msg => {
-                // Convert sentStatus (boolean) + deliveryStatus (string) to numeric status
-                let status = 0; // Default to pending
-
-                if (!msg.sentStatus) {
-                    // Not sent yet
-                    status = 0;
-                } else if (msg.deliveryStatus === 'ERROR') {
-                    // Failed
-                    status = -1;
-                } else if (msg.deliveryStatus === 'SERVER') {
-                    // Received by WhatsApp server
-                    status = 1; // Server
-                } else if (msg.deliveryStatus === 'DEVICE') {
-                    // Delivered to user's device
-                    status = 2; // Device
-                } else if (msg.deliveryStatus === 'read' || msg.deliveryStatus === 'READ'.toUpperCase()) {
-                    // Read by user
-                    status = 3; // Read
-                } else if (msg.deliveryStatus === 'PLAYED') {
-                    // Voice message played
-                    status = 4; // Played
-                } else if (msg.sentStatus) {
-                    // Sent but no delivery status yet
-                    status = 1;
-                }
-
-                return {
-                    ...msg,
-                    status: status,
-                    // Map field names to what frontend expects
-                    name: msg.patientName,
-                    phone: msg.phone,
-                    timeSent: msg.sentTimestamp,
-                    message: '', // Will be populated if needed
-                    messageId: msg.messageId,
-                    // Include original values for debugging
-                    originalSentStatus: msg.sentStatus,
-                    originalDeliveryStatus: msg.deliveryStatus
-                };
-            });
+            result.messages = transformMessageStatuses(result.messages);
         }
 
         res.json(result);
@@ -154,27 +119,21 @@ router.get('/count/:date', async (req, res) => {
         // Get actual WhatsApp messages to be sent for the date
         const whatsappMessages = await getWhatsAppMessages(date);
 
-        // whatsappMessages returns [numbers, messages, ids, names]
-        const [numbers, messages, ids, names] = whatsappMessages || [[], [], [], []];
-        const messageCount = {
-            date: date,
-            totalMessages: numbers.length,
-            eligibleForMessaging: numbers.length,
-            alreadySent: 0,
-            pending: 0
-        };
-
         // Get existing message statuses for this date
+        let existingMessages = [];
         try {
-            const existingMessages = await messagingQueries.getMessageStatusByDate(date);
-            if (existingMessages && existingMessages.messages) {
-                messageCount.alreadySent = existingMessages.messages.filter(m => m.status >= 1).length;
-                messageCount.pending = existingMessages.messages.filter(m => m.status === 0).length;
+            const statusResult = await messagingQueries.getMessageStatusByDate(date);
+            if (statusResult && statusResult.messages) {
+                existingMessages = statusResult.messages;
             }
         } catch (msgError) {
             log.warn('Could not get existing message statuses:', msgError.message);
             // Continue without existing message data
         }
+
+        // Delegate to service layer for count calculation
+        const messageCount = calculateMessageCount(whatsappMessages, existingMessages);
+        messageCount.date = date;
 
         log.info(`Message count for ${date}:`, messageCount);
 
@@ -259,58 +218,22 @@ router.get('/details/:date', async (req, res) => {
         const { date } = req.params;
         log.info(`Getting message details for date: ${date}`);
 
-        const result = {
-            date: date,
-            messagesToSend: [],
-            existingMessages: [],
-            summary: {
-                totalMessages: 0,
-                eligibleForMessaging: 0,
-                messagesSent: 0,
-                messagesDelivered: 0,
-                messagesFailed: 0,
-                messagesPending: 0
-            }
-        };
-
         // Get WhatsApp messages to be sent for the date
         const whatsappMessages = await getWhatsAppMessages(date);
 
-        // whatsappMessages returns [numbers, messages, ids, names]
-        const [numbers, messages, ids, names] = whatsappMessages || [[], [], [], []];
-
-        if (numbers.length > 0) {
-            // Convert arrays to objects for frontend
-            result.messagesToSend = numbers.map((number, index) => ({
-                id: ids[index] || '',
-                number: number || '',
-                name: names[index] || '',
-                message: messages[index] || ''
-            }));
-            result.summary.totalMessages = numbers.length;
-            result.summary.eligibleForMessaging = numbers.length;
-        }
-
         // Get existing message statuses
+        let existingMessages = [];
         try {
             const messageStatuses = await messagingQueries.getMessageStatusByDate(date);
             if (messageStatuses && messageStatuses.messages) {
-                result.existingMessages = messageStatuses.messages;
-
-                // Count message statuses
-                result.existingMessages.forEach(msg => {
-                    if (msg.status === 0) result.summary.messagesPending++;
-                    else if (msg.status === 1) result.summary.messagesSent++;
-                    else if (msg.status >= 2) result.summary.messagesDelivered++;
-                    else if (msg.status === -1) result.summary.messagesFailed++;
-                });
+                existingMessages = messageStatuses.messages;
             }
         } catch (msgError) {
             log.warn('Could not get message statuses for details:', msgError.message);
-            result.existingMessages = [];
         }
 
-        log.info(`Message details for ${date}: ${result.summary.totalMessages} messages to send, ${result.existingMessages.length} existing messages`);
+        // Delegate to service layer for multi-source coordination and summary
+        const result = getMessageDetails(date, whatsappMessages, existingMessages);
 
         res.json({
             success: true,
