@@ -23,6 +23,7 @@ import {
     undoAppointmentState
 } from '../../services/database/queries/appointment-queries.js';
 import { WebSocketEvents } from '../../services/messaging/websocket-events.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 
@@ -55,7 +56,7 @@ router.get("/appointment-details", async (req, res) => {
         res.json(details);
     } catch (error) {
         console.error('Error fetching appointment details:', error);
-        res.status(500).json({ error: 'Failed to fetch appointment details' });
+        return ErrorResponses.internalError(res, 'Failed to fetch appointment details', error);
     }
 });
 
@@ -90,13 +91,13 @@ router.get("/getAllTodayApps", async (req, res) => {
     try {
         const { AppsDate } = req.query;
         if (!AppsDate) {
-            return res.status(400).json({ error: "Missing required parameter: AppsDate" });
+            return ErrorResponses.badRequest(res, "Missing required parameter: AppsDate");
         }
         const result = await getAllTodayApps(AppsDate);
         res.json(result);
     } catch (error) {
         console.error("Error fetching all today appointments:", error);
-        res.status(500).json({ error: "Failed to fetch appointments" });
+        return ErrorResponses.internalError(res, "Failed to fetch appointments", error);
     }
 });
 
@@ -108,13 +109,13 @@ router.get("/getPresentTodayApps", async (req, res) => {
     try {
         const { AppsDate } = req.query;
         if (!AppsDate) {
-            return res.status(400).json({ error: "Missing required parameter: AppsDate" });
+            return ErrorResponses.badRequest(res, "Missing required parameter: AppsDate");
         }
         const result = await getPresentTodayApps(AppsDate);
         res.json(result);
     } catch (error) {
         console.error("Error fetching present appointments:", error);
-        res.status(500).json({ error: "Failed to fetch present appointments" });
+        return ErrorResponses.internalError(res, "Failed to fetch present appointments", error);
     }
 });
 
@@ -126,7 +127,7 @@ router.post("/updateAppointmentState", async (req, res) => {
     try {
         const { appointmentID, state, time } = req.body;
         if (!appointmentID || !state) {
-            return res.status(400).json({ error: "Missing required parameters: appointmentID, state" });
+            return ErrorResponses.badRequest(res, "Missing required parameters: appointmentID, state");
         }
 
         // Format time as string for the modified stored procedure
@@ -140,7 +141,7 @@ router.post("/updateAppointmentState", async (req, res) => {
         res.json(result);
     } catch (error) {
         console.error("Error updating appointment state:", error);
-        res.status(500).json({ error: "Failed to update appointment state" });
+        return ErrorResponses.internalError(res, "Failed to update appointment state", error);
     }
 });
 
@@ -152,7 +153,7 @@ router.post("/undoAppointmentState", async (req, res) => {
     try {
         const { appointmentID, state } = req.body;
         if (!appointmentID || !state) {
-            return res.status(400).json({ error: "Missing required parameters: appointmentID, state" });
+            return ErrorResponses.badRequest(res, "Missing required parameters: appointmentID, state");
         }
 
         // Use dedicated undo procedure that doesn't affect other applications
@@ -164,7 +165,7 @@ router.post("/undoAppointmentState", async (req, res) => {
         res.json(result);
     } catch (error) {
         console.error("Error undoing appointment state:", error);
-        res.status(500).json({ error: "Failed to undo appointment state" });
+        return ErrorResponses.internalError(res, "Failed to undo appointment state", error);
     }
 });
 
@@ -178,27 +179,18 @@ router.post("/appointments", async (req, res) => {
 
         // Validate required fields
         if (!PersonID || !AppDate || !AppDetail || !DrID) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required fields: PersonID, AppDate, AppDetail, DrID'
-            });
+            return ErrorResponses.badRequest(res, 'Missing required fields: PersonID, AppDate, AppDetail, DrID');
         }
 
         // Validate data types
         if (isNaN(parseInt(PersonID)) || isNaN(parseInt(DrID))) {
-            return res.status(400).json({
-                success: false,
-                error: 'PersonID and DrID must be valid numbers'
-            });
+            return ErrorResponses.badRequest(res, 'PersonID and DrID must be valid numbers');
         }
 
         // Validate date format
         const appointmentDate = new Date(AppDate);
         if (isNaN(appointmentDate.getTime())) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid date format for AppDate'
-            });
+            return ErrorResponses.badRequest(res, 'Invalid date format for AppDate');
         }
 
         // Check if doctor exists and is actually a doctor
@@ -210,10 +202,7 @@ router.post("/appointments", async (req, res) => {
         `, [['drID', database.TYPES.Int, parseInt(DrID)]]);
 
         if (!doctorCheck || doctorCheck.length === 0) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid doctor ID or employee is not a doctor'
-            });
+            return ErrorResponses.badRequest(res, 'Invalid doctor ID or employee is not a doctor');
         }
 
         // Check for appointment conflicts (same patient, same day)
@@ -227,10 +216,7 @@ router.post("/appointments", async (req, res) => {
         ]);
 
         if (conflictCheck && conflictCheck.length > 0) {
-            return res.status(400).json({
-                success: false,
-                error: 'Patient already has an appointment on this date'
-            });
+            return ErrorResponses.conflict(res, 'Patient already has an appointment on this date');
         }
 
         // Insert new appointment (defaults will be applied automatically)
@@ -280,11 +266,7 @@ router.post("/appointments", async (req, res) => {
 
     } catch (error) {
         console.error('Error creating appointment:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to create appointment',
-            details: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to create appointment', error);
     }
 });
 
@@ -297,10 +279,7 @@ router.get("/patient-appointments/:patientId", async (req, res) => {
         const { patientId } = req.params;
 
         if (!patientId || isNaN(parseInt(patientId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid patient ID'
-            });
+            return ErrorResponses.badRequest(res, 'Invalid patient ID');
         }
 
         const query = `
@@ -337,11 +316,7 @@ router.get("/patient-appointments/:patientId", async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching patient appointments:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch appointments',
-            details: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch appointments', error);
     }
 });
 
@@ -354,10 +329,7 @@ router.get("/appointments/:appointmentId", async (req, res) => {
         const { appointmentId } = req.params;
 
         if (!appointmentId || isNaN(parseInt(appointmentId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid appointment ID'
-            });
+            return ErrorResponses.badRequest(res, 'Invalid appointment ID');
         }
 
         const query = `
@@ -378,10 +350,7 @@ router.get("/appointments/:appointmentId", async (req, res) => {
         ]);
 
         if (!result || result.length === 0) {
-            return res.status(404).json({
-                success: false,
-                error: 'Appointment not found'
-            });
+            return ErrorResponses.notFound(res, 'Appointment');
         }
 
         res.json({
@@ -391,11 +360,7 @@ router.get("/appointments/:appointmentId", async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching appointment:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch appointment',
-            details: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch appointment', error);
     }
 });
 
@@ -409,18 +374,12 @@ router.put("/appointments/:appointmentId", async (req, res) => {
         const { PersonID, AppDate, AppDetail, DrID } = req.body;
 
         if (!appointmentId || isNaN(parseInt(appointmentId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid appointment ID'
-            });
+            return ErrorResponses.badRequest(res, 'Invalid appointment ID');
         }
 
         // Validate required fields
         if (!PersonID || !AppDate || !AppDetail || !DrID) {
-            return res.status(400).json({
-                success: false,
-                error: 'PersonID, AppDate, AppDetail, and DrID are required'
-            });
+            return ErrorResponses.badRequest(res, 'PersonID, AppDate, AppDetail, and DrID are required');
         }
 
         // Use CAST to convert string to datetime2 on SQL Server side to avoid timezone conversion
@@ -448,11 +407,7 @@ router.put("/appointments/:appointmentId", async (req, res) => {
 
     } catch (error) {
         console.error('Error updating appointment:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to update appointment',
-            details: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to update appointment', error);
     }
 });
 
@@ -465,10 +420,7 @@ router.delete("/appointments/:appointmentId", async (req, res) => {
         const { appointmentId } = req.params;
 
         if (!appointmentId || isNaN(parseInt(appointmentId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid appointment ID'
-            });
+            return ErrorResponses.badRequest(res, 'Invalid appointment ID');
         }
 
         const query = `DELETE FROM tblappointments WHERE appointmentID = @appointmentId`;
@@ -484,11 +436,7 @@ router.delete("/appointments/:appointmentId", async (req, res) => {
 
     } catch (error) {
         console.error('Error deleting appointment:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to delete appointment',
-            details: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to delete appointment', error);
     }
 });
 
@@ -503,18 +451,12 @@ router.post("/appointments/quick-checkin", async (req, res) => {
 
         // Validate required fields
         if (!PersonID) {
-            return res.status(400).json({
-                success: false,
-                error: 'PersonID is required'
-            });
+            return ErrorResponses.badRequest(res, 'PersonID is required');
         }
 
         // Validate PersonID is a number
         if (isNaN(parseInt(PersonID))) {
-            return res.status(400).json({
-                success: false,
-                error: 'PersonID must be a valid number'
-            });
+            return ErrorResponses.badRequest(res, 'PersonID must be a valid number');
         }
 
         // Set defaults for optional fields
@@ -610,10 +552,7 @@ router.post("/appointments/quick-checkin", async (req, res) => {
             `, [['drID', database.TYPES.Int, doctorId]]);
 
             if (!doctorCheck || doctorCheck.length === 0) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Invalid doctor ID or employee is not a doctor'
-                });
+                return ErrorResponses.badRequest(res, 'Invalid doctor ID or employee is not a doctor');
             }
         }
 
@@ -676,11 +615,7 @@ router.post("/appointments/quick-checkin", async (req, res) => {
 
     } catch (error) {
         console.error('Error in quick check-in:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to check in patient',
-            details: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to check in patient', error);
     }
 });
 

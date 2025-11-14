@@ -9,6 +9,7 @@
 
 import express from 'express';
 import * as database from '../../services/database/index.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 
@@ -46,11 +47,7 @@ router.get('/employees', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching employees:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch employees',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch employees', error);
     }
 });
 
@@ -82,11 +79,7 @@ router.get('/positions', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching positions:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch positions',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch positions', error);
     }
 });
 
@@ -123,11 +116,7 @@ router.get('/employees/email-recipients', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching email recipients:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch email recipients',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch email recipients', error);
     }
 });
 
@@ -151,17 +140,11 @@ router.post('/employees', async (req, res) => {
         const { employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments } = req.body;
 
         if (!employeeName || employeeName.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                error: 'Employee name is required'
-            });
+            return ErrorResponses.badRequest(res, 'Employee name is required');
         }
 
         if (!Position) {
-            return res.status(400).json({
-                success: false,
-                error: 'Position is required'
-            });
+            return ErrorResponses.badRequest(res, 'Position is required');
         }
 
         // Check if email already exists (if provided)
@@ -173,10 +156,7 @@ router.post('/employees', async (req, res) => {
             );
 
             if (emailCheck && emailCheck.length > 0) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'An employee with this email already exists'
-                });
+                return ErrorResponses.badRequest(res, 'An employee with this email already exists');
             }
         }
 
@@ -214,11 +194,7 @@ router.post('/employees', async (req, res) => {
 
     } catch (error) {
         console.error('Error adding employee:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to add employee',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to add employee', error);
     }
 });
 
@@ -246,17 +222,11 @@ router.put('/employees/:id', async (req, res) => {
         const { employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments } = req.body;
 
         if (!employeeName || employeeName.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                error: 'Employee name is required'
-            });
+            return ErrorResponses.badRequest(res, 'Employee name is required');
         }
 
         if (!Position) {
-            return res.status(400).json({
-                success: false,
-                error: 'Position is required'
-            });
+            return ErrorResponses.badRequest(res, 'Position is required');
         }
 
         // Check if email already exists for another employee (if provided)
@@ -271,10 +241,7 @@ router.put('/employees/:id', async (req, res) => {
             );
 
             if (emailCheck && emailCheck.length > 0) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Another employee with this email already exists'
-                });
+                return ErrorResponses.badRequest(res, 'Another employee with this email already exists');
             }
         }
 
@@ -311,11 +278,7 @@ router.put('/employees/:id', async (req, res) => {
 
     } catch (error) {
         console.error('Error updating employee:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to update employee',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to update employee', error);
     }
 });
 
@@ -344,11 +307,7 @@ router.delete('/employees/:id', async (req, res) => {
 
     } catch (error) {
         console.error('Error deleting employee:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to delete employee',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to delete employee', error);
     }
 });
 

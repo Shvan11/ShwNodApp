@@ -8,6 +8,7 @@
  */
 
 import express from 'express';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 import { getReferralSources, getPatientTypes, getAddresses, getGenders } from '../../services/database/queries/patient-queries.js';
 
 const router = express.Router();
@@ -22,9 +23,7 @@ router.get('/referral-sources', async (req, res) => {
         res.json(referralSources);
     } catch (error) {
         console.error('Error fetching referral sources:', error);
-        res.status(500).json({
-            error: error.message || "Failed to fetch referral sources"
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch referral sources', error);
     }
 });
 
@@ -38,9 +37,7 @@ router.get('/patient-types', async (req, res) => {
         res.json(patientTypes);
     } catch (error) {
         console.error('Error fetching patient types:', error);
-        res.status(500).json({
-            error: error.message || "Failed to fetch patient types"
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch patient types', error);
     }
 });
 
@@ -54,9 +51,7 @@ router.get('/addresses', async (req, res) => {
         res.json(addresses);
     } catch (error) {
         console.error('Error fetching addresses:', error);
-        res.status(500).json({
-            error: error.message || "Failed to fetch addresses"
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch addresses', error);
     }
 });
 
@@ -70,9 +65,7 @@ router.get('/genders', async (req, res) => {
         res.json(genders);
     } catch (error) {
         console.error('Error fetching genders:', error);
-        res.status(500).json({
-            error: error.message || "Failed to fetch genders"
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch genders', error);
     }
 });
 

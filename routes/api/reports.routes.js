@@ -4,6 +4,7 @@
  */
 import express from 'express';
 import * as database from '../../services/database/index.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 
@@ -18,10 +19,7 @@ router.get('/statistics', async (req, res) => {
 
         // Validate required parameters
         if (!month || !year) {
-            return res.status(400).json({
-                success: false,
-                error: "Missing required parameters: month and year are required"
-            });
+            return ErrorResponses.badRequest(res, 'Missing required parameters: month and year are required');
         }
 
         const monthNum = parseInt(month);
@@ -30,17 +28,11 @@ router.get('/statistics', async (req, res) => {
 
         // Validate month and year ranges
         if (monthNum < 1 || monthNum > 12) {
-            return res.status(400).json({
-                success: false,
-                error: "Invalid month: must be between 1 and 12"
-            });
+            return ErrorResponses.invalidParameter(res, 'month', 'must be between 1 and 12');
         }
 
         if (yearNum < 2000 || yearNum > 2100) {
-            return res.status(400).json({
-                success: false,
-                error: "Invalid year: must be between 2000 and 2100"
-            });
+            return ErrorResponses.invalidParameter(res, 'year', 'must be between 2000 and 2100');
         }
 
         // Execute the stored procedure
@@ -117,11 +109,7 @@ router.get('/statistics', async (req, res) => {
 
     } catch (error) {
         console.error("Error fetching statistics:", error);
-        res.status(500).json({
-            success: false,
-            error: "Failed to fetch statistics",
-            message: error.message
-        });
+        ErrorResponses.internalError(res, 'Failed to fetch statistics', error);
     }
 });
 
@@ -136,19 +124,13 @@ router.get('/daily-invoices', async (req, res) => {
 
         // Validate required parameter
         if (!date) {
-            return res.status(400).json({
-                success: false,
-                error: "Missing required parameter: date"
-            });
+            return ErrorResponses.missingParameter(res, 'date');
         }
 
         // Validate date format
         const dateObj = new Date(date);
         if (isNaN(dateObj.getTime())) {
-            return res.status(400).json({
-                success: false,
-                error: "Invalid date format"
-            });
+            return ErrorResponses.invalidParameter(res, 'date', 'Invalid date format');
         }
 
         // Execute the stored procedure
@@ -195,11 +177,7 @@ router.get('/daily-invoices', async (req, res) => {
 
     } catch (error) {
         console.error("Error fetching daily invoices:", error);
-        res.status(500).json({
-            success: false,
-            error: "Failed to fetch daily invoices",
-            message: error.message
-        });
+        ErrorResponses.internalError(res, 'Failed to fetch daily invoices', error);
     }
 });
 

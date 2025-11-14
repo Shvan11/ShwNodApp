@@ -14,6 +14,7 @@ import * as database from '../../services/database/index.js';
 import multer from 'multer';
 import * as imaging from '../../services/imaging/index.js';
 import webcephService from '../../services/webceph/webceph-service.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 const upload = multer();
@@ -82,13 +83,13 @@ router.post('/webceph/create-patient', async (req, res) => {
         const { personId, patientData } = req.body;
 
         if (!personId) {
-            return res.status(400).json({ error: 'PersonID is required' });
+            return ErrorResponses.missingParameter(res, 'personId');
         }
 
         // Validate patient data
         const validation = webcephService.validatePatientData(patientData);
         if (!validation.valid) {
-            return res.status(400).json({ error: validation.errors.join(', ') });
+            return ErrorResponses.invalidParameter(res, 'patientData', validation.errors.join(', '));
         }
 
         // Create patient in WebCeph
@@ -122,10 +123,7 @@ router.post('/webceph/create-patient', async (req, res) => {
         });
     } catch (error) {
         console.error('[WebCeph] Error creating patient:', error);
-        res.status(500).json({
-            error: 'Failed to create patient in WebCeph',
-            details: error.message
-        });
+        ErrorResponses.serverError(res, 'Failed to create patient in WebCeph', error);
     }
 });
 
@@ -139,7 +137,7 @@ router.post('/webceph/upload-image', upload.single('image'), async (req, res) =>
         const { patientID, recordDate, targetClass } = req.body;
 
         if (!req.file) {
-            return res.status(400).json({ error: 'Image file is required' });
+            return ErrorResponses.missingParameter(res, 'image');
         }
 
         // Step 1: Create a new record for this date (if it doesn't exist)
@@ -169,7 +167,7 @@ router.post('/webceph/upload-image', upload.single('image'), async (req, res) =>
         // Validate upload data
         const validation = webcephService.validateUploadData(uploadData);
         if (!validation.valid) {
-            return res.status(400).json({ error: validation.errors.join(', ') });
+            return ErrorResponses.invalidParameter(res, 'uploadData', validation.errors.join(', '));
         }
 
         // Upload to WebCeph
@@ -188,10 +186,7 @@ router.post('/webceph/upload-image', upload.single('image'), async (req, res) =>
         });
     } catch (error) {
         console.error('[WebCeph] Error uploading image:', error);
-        res.status(500).json({
-            error: 'Failed to upload image to WebCeph',
-            details: error.message
-        });
+        ErrorResponses.serverError(res, 'Failed to upload image to WebCeph', error);
     }
 });
 
@@ -204,7 +199,7 @@ router.get('/webceph/patient-link/:personId', async (req, res) => {
         const { personId } = req.params;
 
         if (!personId) {
-            return res.status(400).json({ error: 'PersonID is required' });
+            return ErrorResponses.missingParameter(res, 'personId');
         }
 
         const query = `
@@ -237,10 +232,7 @@ router.get('/webceph/patient-link/:personId', async (req, res) => {
         });
     } catch (error) {
         console.error('[WebCeph] Error fetching patient link:', error);
-        res.status(500).json({
-            error: 'Failed to fetch WebCeph patient link',
-            details: error.message
-        });
+        ErrorResponses.serverError(res, 'Failed to fetch WebCeph patient link', error);
     }
 });
 
@@ -257,7 +249,7 @@ router.get('/webceph/photo-types', async (req, res) => {
         });
     } catch (error) {
         console.error('[WebCeph] Error fetching photo types:', error);
-        res.status(500).json({ error: 'Failed to fetch photo types' });
+        ErrorResponses.serverError(res, 'Failed to fetch photo types', error);
     }
 });
 

@@ -18,6 +18,7 @@ import {
     bulkUpdateOptions
 } from '../../services/database/queries/options-queries.js';
 import DatabaseConfigService from '../../services/config/DatabaseConfigService.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 
@@ -33,7 +34,7 @@ router.get("/options", async (req, res) => {
         res.json({ status: 'success', options });
     } catch (error) {
         console.error("Error getting options:", error);
-        res.status(500).json({ status: 'error', message: error.message });
+        return ErrorResponses.internalError(res, 'Failed to retrieve system options', error);
     }
 });
 
@@ -47,16 +48,13 @@ router.get("/options/:optionName", async (req, res) => {
         const value = await getOption(optionName);
 
         if (value === null) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'Option not found'
-            });
+            return ErrorResponses.notFound(res, 'Option');
         }
 
         res.json({ status: 'success', optionName, value });
     } catch (error) {
         console.error("Error getting option:", error);
-        res.status(500).json({ status: 'error', message: error.message });
+        return ErrorResponses.internalError(res, 'Failed to retrieve option', error);
     }
 });
 
@@ -70,25 +68,19 @@ router.put("/options/:optionName", async (req, res) => {
         const { value } = req.body;
 
         if (!value) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Value is required'
-            });
+            return ErrorResponses.missingParameter(res, 'value');
         }
 
         const updated = await updateOption(optionName, value);
 
         if (!updated) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'Option not found or could not be updated'
-            });
+            return ErrorResponses.notFound(res, 'Option', { reason: 'Option not found or could not be updated' });
         }
 
         res.json({ status: 'success', message: 'Option updated successfully' });
     } catch (error) {
         console.error("Error updating option:", error);
-        res.status(500).json({ status: 'error', message: error.message });
+        return ErrorResponses.internalError(res, 'Failed to update option', error);
     }
 });
 
@@ -103,7 +95,7 @@ router.get("/options/pattern/:pattern", async (req, res) => {
         res.json({ status: 'success', options });
     } catch (error) {
         console.error("Error getting options by pattern:", error);
-        res.status(500).json({ status: 'error', message: error.message });
+        return ErrorResponses.internalError(res, 'Failed to retrieve options by pattern', error);
     }
 });
 
@@ -116,10 +108,7 @@ router.put("/options/bulk", async (req, res) => {
         const { options } = req.body;
 
         if (!options || !Array.isArray(options)) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Options array is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'options', { reason: 'Options array is required' });
         }
 
         const result = await bulkUpdateOptions(options);
@@ -131,7 +120,7 @@ router.put("/options/bulk", async (req, res) => {
         });
     } catch (error) {
         console.error("Error bulk updating options:", error);
-        res.status(500).json({ status: 'error', message: error.message });
+        return ErrorResponses.internalError(res, 'Failed to bulk update options', error);
     }
 });
 
@@ -154,19 +143,11 @@ router.get('/config/database', async (req, res) => {
                 timestamp: result.timestamp
             });
         } else {
-            res.status(500).json({
-                success: false,
-                message: 'Failed to get database configuration',
-                error: result.error
-            });
+            return ErrorResponses.internalError(res, 'Failed to get database configuration', { error: result.error });
         }
     } catch (error) {
         console.error('Error getting database configuration:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to get database configuration', error);
     }
 });
 
@@ -179,10 +160,7 @@ router.post('/config/database/test', async (req, res) => {
         const testConfig = req.body;
 
         if (!testConfig || typeof testConfig !== 'object') {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid configuration provided'
-            });
+            return ErrorResponses.badRequest(res, 'Invalid configuration provided');
         }
 
         console.log('Testing database connection...');
@@ -194,11 +172,7 @@ router.post('/config/database/test', async (req, res) => {
 
     } catch (error) {
         console.error('Error testing database connection:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Connection test failed',
-            error: error.message
-        });
+        return ErrorResponses.internalError(res, 'Connection test failed', error);
     }
 });
 
@@ -211,10 +185,7 @@ router.put('/config/database', async (req, res) => {
         const newConfig = req.body;
 
         if (!newConfig || typeof newConfig !== 'object') {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid configuration provided'
-            });
+            return ErrorResponses.badRequest(res, 'Invalid configuration provided');
         }
 
         console.log('Updating database configuration...');
@@ -233,11 +204,7 @@ router.put('/config/database', async (req, res) => {
 
     } catch (error) {
         console.error('Error updating database configuration:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Configuration update failed',
-            error: error.message
-        });
+        return ErrorResponses.internalError(res, 'Configuration update failed', error);
     }
 });
 
@@ -251,11 +218,7 @@ router.get('/config/database/status', async (req, res) => {
         res.json(result);
     } catch (error) {
         console.error('Error getting configuration status:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to get configuration status',
-            error: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to get configuration status', error);
     }
 });
 
@@ -272,11 +235,7 @@ router.post('/config/database/backup', async (req, res) => {
 
     } catch (error) {
         console.error('Error creating configuration backup:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Backup creation failed',
-            error: error.message
-        });
+        return ErrorResponses.internalError(res, 'Backup creation failed', error);
     }
 });
 
@@ -293,11 +252,7 @@ router.post('/config/database/restore', async (req, res) => {
 
     } catch (error) {
         console.error('Error restoring configuration from backup:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Restore failed',
-            error: error.message
-        });
+        return ErrorResponses.internalError(res, 'Restore failed', error);
     }
 });
 
@@ -317,11 +272,7 @@ router.get('/config/database/export', async (req, res) => {
 
     } catch (error) {
         console.error('Error exporting configuration:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Export failed',
-            error: error.message
-        });
+        return ErrorResponses.internalError(res, 'Export failed', error);
     }
 });
 
@@ -338,11 +289,7 @@ router.get('/config/database/presets', (req, res) => {
         });
     } catch (error) {
         console.error('Error getting connection presets:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to get presets',
-            error: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to get presets', error);
     }
 });
 
@@ -373,11 +320,7 @@ router.post('/system/restart', async (req, res) => {
 
     } catch (error) {
         console.error('Error initiating restart:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Restart failed',
-            error: error.message
-        });
+        return ErrorResponses.internalError(res, 'Restart failed', error);
     }
 });
 

@@ -4,6 +4,7 @@
  */
 import express from 'express';
 import * as database from '../../services/database/index.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 
@@ -31,7 +32,7 @@ router.get("/doctors", async (req, res) => {
         res.json(doctors);
     } catch (error) {
         console.error('Error fetching doctors:', error);
-        res.status(500).json({ error: 'Failed to fetch doctors' });
+        ErrorResponses.internalError(res, 'Failed to fetch doctors', error);
     }
 });
 
@@ -57,7 +58,7 @@ router.get("/operators", async (req, res) => {
         res.json(operators);
     } catch (error) {
         console.error('Error fetching operators:', error);
-        res.status(500).json({ error: 'Failed to fetch operators' });
+        ErrorResponses.internalError(res, 'Failed to fetch operators', error);
     }
 });
 

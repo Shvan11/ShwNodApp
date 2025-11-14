@@ -17,6 +17,7 @@ import express from 'express';
 import * as database from '../../services/database/index.js';
 import { uploadSinglePdf, handleUploadError } from '../../middleware/upload.js';
 import driveUploadService from '../../services/google-drive/drive-upload.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 
@@ -64,11 +65,7 @@ router.get('/aligner/doctors', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching aligner doctors:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch aligner doctors',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch aligner doctors', error);
     }
 });
 
@@ -139,11 +136,7 @@ router.get('/aligner/all-sets', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching all aligner sets:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch aligner sets',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch aligner sets', error);
     }
 });
 
@@ -205,11 +198,7 @@ router.get('/aligner/patients/all', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching all aligner patients:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch all aligner patients',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch all aligner patients', error);
     }
 });
 
@@ -222,10 +211,7 @@ router.get('/aligner/patients/by-doctor/:doctorId', async (req, res) => {
         const { doctorId } = req.params;
 
         if (!doctorId || isNaN(parseInt(doctorId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid doctorId is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'doctorId', 'Valid doctorId is required');
         }
 
         console.log(`Fetching all patients for doctor ID: ${doctorId}`);
@@ -289,11 +275,7 @@ router.get('/aligner/patients/by-doctor/:doctorId', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching patients by doctor:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch patients by doctor',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch patients by doctor', error);
     }
 });
 
@@ -307,10 +289,7 @@ router.get('/aligner/patients', async (req, res) => {
         const { search, doctorId } = req.query;
 
         if (!search || search.trim().length < 2) {
-            return res.status(400).json({
-                success: false,
-                error: 'Search term must be at least 2 characters'
-            });
+            return ErrorResponses.badRequest(res, 'Search term must be at least 2 characters');
         }
 
         const searchTerm = search.trim();
@@ -376,11 +355,7 @@ router.get('/aligner/patients', async (req, res) => {
 
     } catch (error) {
         console.error('Error searching aligner patients:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to search aligner patients',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to search aligner patients', error);
     }
 });
 
@@ -392,10 +367,7 @@ router.get('/aligner/sets/:workId', async (req, res) => {
         const { workId } = req.params;
 
         if (!workId || isNaN(parseInt(workId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid workId is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'workId', 'Valid workId is required');
         }
 
         console.log(`Fetching aligner sets for work ID: ${workId}`);
@@ -502,11 +474,7 @@ router.get('/aligner/sets/:workId', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching aligner sets:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch aligner sets',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch aligner sets', error);
     }
 });
 
@@ -518,10 +486,7 @@ router.post('/aligner/payments', async (req, res) => {
         const { workid, AlignerSetID, Amountpaid, Dateofpayment, ActualAmount, ActualCur, Change } = req.body;
 
         if (!workid || !Amountpaid || !Dateofpayment) {
-            return res.status(400).json({
-                success: false,
-                error: 'workid, Amountpaid, and Dateofpayment are required'
-            });
+            return ErrorResponses.badRequest(res, 'workid, Amountpaid, and Dateofpayment are required');
         }
 
         console.log(`Adding payment for work ID: ${workid}, Set ID: ${AlignerSetID || 'general'}, Amount: ${Amountpaid}`);
@@ -559,11 +524,7 @@ router.post('/aligner/payments', async (req, res) => {
 
     } catch (error) {
         console.error('Error adding payment:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to add payment',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to add payment', error);
     }
 });
 
@@ -575,10 +536,7 @@ router.get('/aligner/batches/:setId', async (req, res) => {
         const { setId } = req.params;
 
         if (!setId || isNaN(parseInt(setId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid setId is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'setId', 'Valid setId is required');
         }
 
         console.log(`Fetching batches for aligner set ID: ${setId}`);
@@ -638,11 +596,7 @@ router.get('/aligner/batches/:setId', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching aligner batches:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch aligner batches',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch aligner batches', error);
     }
 });
 
@@ -671,10 +625,7 @@ router.post('/aligner/sets', async (req, res) => {
 
         // Validation
         if (!WorkID || !AlignerDrID) {
-            return res.status(400).json({
-                success: false,
-                error: 'WorkID and AlignerDrID are required'
-            });
+            return ErrorResponses.badRequest(res, 'WorkID and AlignerDrID are required');
         }
 
         console.log('Creating new aligner set:', req.body);
@@ -735,11 +686,7 @@ router.post('/aligner/sets', async (req, res) => {
 
     } catch (error) {
         console.error('Error creating aligner set:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to create aligner set',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to create aligner set', error);
     }
 });
 
@@ -766,10 +713,7 @@ router.put('/aligner/sets/:setId', async (req, res) => {
         } = req.body;
 
         if (!setId || isNaN(parseInt(setId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid setId is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'setId', 'Valid setId is required');
         }
 
         console.log(`Updating aligner set ${setId}:`, req.body);
@@ -820,11 +764,7 @@ router.put('/aligner/sets/:setId', async (req, res) => {
 
     } catch (error) {
         console.error('Error updating aligner set:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to update aligner set',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to update aligner set', error);
     }
 });
 
@@ -836,10 +776,7 @@ router.delete('/aligner/sets/:setId', async (req, res) => {
         const { setId } = req.params;
 
         if (!setId || isNaN(parseInt(setId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid setId is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'setId', 'Valid setId is required');
         }
 
         console.log(`Deleting aligner set ${setId}`);
@@ -871,11 +808,7 @@ router.delete('/aligner/sets/:setId', async (req, res) => {
 
     } catch (error) {
         console.error('Error deleting aligner set:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to delete aligner set',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to delete aligner set', error);
     }
 });
 
@@ -889,10 +822,7 @@ router.get('/aligner/notes/:setId', async (req, res) => {
         const { setId } = req.params;
 
         if (!setId || isNaN(parseInt(setId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid setId is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'setId', 'Valid setId is required');
         }
 
         const query = `
@@ -937,11 +867,7 @@ router.get('/aligner/notes/:setId', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching aligner set notes:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch notes',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch notes', error);
     }
 });
 
@@ -953,10 +879,7 @@ router.post('/aligner/notes', async (req, res) => {
         const { AlignerSetID, NoteText } = req.body;
 
         if (!AlignerSetID || !NoteText || NoteText.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                error: 'Set ID and note text are required'
-            });
+            return ErrorResponses.badRequest(res, 'Set ID and note text are required');
         }
 
         // Verify that the set exists
@@ -973,10 +896,7 @@ router.post('/aligner/notes', async (req, res) => {
         );
 
         if (!setExists || setExists.length === 0) {
-            return res.status(404).json({
-                success: false,
-                error: 'Aligner set not found'
-            });
+            return ErrorResponses.notFound(res, 'Aligner set');
         }
 
         // Insert note as 'Lab' type
@@ -1008,11 +928,7 @@ router.post('/aligner/notes', async (req, res) => {
 
     } catch (error) {
         console.error('Error adding lab note:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to add note',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to add note', error);
     }
 });
 
@@ -1026,10 +942,7 @@ router.patch('/aligner/notes/:noteId/toggle-read', async (req, res) => {
         const { noteId } = req.params;
 
         if (!noteId || isNaN(parseInt(noteId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid note ID is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'noteId', 'Valid note ID is required');
         }
 
         // Toggle IsRead status
@@ -1051,11 +964,7 @@ router.patch('/aligner/notes/:noteId/toggle-read', async (req, res) => {
 
     } catch (error) {
         console.error('Error toggling note read status:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to toggle read status',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to toggle read status', error);
     }
 });
 
@@ -1068,17 +977,11 @@ router.patch('/aligner/notes/:noteId', async (req, res) => {
         const { NoteText } = req.body;
 
         if (!noteId || isNaN(parseInt(noteId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid note ID is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'noteId', 'Valid note ID is required');
         }
 
         if (!NoteText || NoteText.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                error: 'Note text is required'
-            });
+            return ErrorResponses.badRequest(res, 'Note text is required');
         }
 
         // Verify note exists
@@ -1098,10 +1001,7 @@ router.patch('/aligner/notes/:noteId', async (req, res) => {
         );
 
         if (!existingNote || existingNote.length === 0) {
-            return res.status(404).json({
-                success: false,
-                error: 'Note not found'
-            });
+            return ErrorResponses.notFound(res, 'Note');
         }
 
         // Update note
@@ -1130,11 +1030,7 @@ router.patch('/aligner/notes/:noteId', async (req, res) => {
 
     } catch (error) {
         console.error('Error updating note:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to update note',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to update note', error);
     }
 });
 
@@ -1146,10 +1042,7 @@ router.delete('/aligner/notes/:noteId', async (req, res) => {
         const { noteId } = req.params;
 
         if (!noteId || isNaN(parseInt(noteId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid note ID is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'noteId', 'Valid note ID is required');
         }
 
         // Verify note exists
@@ -1166,10 +1059,7 @@ router.delete('/aligner/notes/:noteId', async (req, res) => {
         );
 
         if (!existingNote || existingNote.length === 0) {
-            return res.status(404).json({
-                success: false,
-                error: 'Note not found'
-            });
+            return ErrorResponses.notFound(res, 'Note');
         }
 
         // Delete note
@@ -1192,11 +1082,7 @@ router.delete('/aligner/notes/:noteId', async (req, res) => {
 
     } catch (error) {
         console.error('Error deleting note:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to delete note',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to delete note', error);
     }
 });
 
@@ -1208,10 +1094,7 @@ router.get('/aligner/notes/:noteId/status', async (req, res) => {
         const { noteId } = req.params;
 
         if (!noteId || isNaN(parseInt(noteId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid note ID is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'noteId', 'Valid note ID is required');
         }
 
         const query = `
@@ -1234,19 +1117,12 @@ router.get('/aligner/notes/:noteId/status', async (req, res) => {
                 isRead: results[0].IsRead
             });
         } else {
-            res.status(404).json({
-                success: false,
-                error: 'Note not found'
-            });
+            return ErrorResponses.notFound(res, 'Note');
         }
 
     } catch (error) {
         console.error('Error getting note status:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to get note status',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to get note status', error);
     }
 });
 
@@ -1260,10 +1136,7 @@ router.get('/aligner/activity/:setId', async (req, res) => {
         const { setId } = req.params;
 
         if (!setId || isNaN(parseInt(setId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid setId is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'setId', 'Valid setId is required');
         }
 
         const query = `
@@ -1304,11 +1177,7 @@ router.get('/aligner/activity/:setId', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching activities:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch activities',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch activities', error);
     }
 });
 
@@ -1320,10 +1189,7 @@ router.patch('/aligner/activity/:activityId/mark-read', async (req, res) => {
         const { activityId } = req.params;
 
         if (!activityId || isNaN(parseInt(activityId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid activityId is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'activityId', 'Valid activityId is required');
         }
 
         const query = `
@@ -1346,11 +1212,7 @@ router.patch('/aligner/activity/:activityId/mark-read', async (req, res) => {
 
     } catch (error) {
         console.error('Error marking activity as read:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to mark activity as read',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to mark activity as read', error);
     }
 });
 
@@ -1362,10 +1224,7 @@ router.patch('/aligner/activity/set/:setId/mark-all-read', async (req, res) => {
         const { setId } = req.params;
 
         if (!setId || isNaN(parseInt(setId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid setId is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'setId', 'Valid setId is required');
         }
 
         const query = `
@@ -1388,11 +1247,7 @@ router.patch('/aligner/activity/set/:setId/mark-all-read', async (req, res) => {
 
     } catch (error) {
         console.error('Error marking all activities as read:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to mark all activities as read',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to mark all activities as read', error);
     }
 });
 
@@ -1419,10 +1274,7 @@ router.post('/aligner/batches', async (req, res) => {
 
         // Validation
         if (!AlignerSetID) {
-            return res.status(400).json({
-                success: false,
-                error: 'AlignerSetID is required'
-            });
+            return ErrorResponses.badRequest(res, 'AlignerSetID is required');
         }
 
         console.log('Creating new aligner batch:', req.body);
@@ -1475,11 +1327,7 @@ router.post('/aligner/batches', async (req, res) => {
 
     } catch (error) {
         console.error('Error creating aligner batch:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to create aligner batch',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to create aligner batch', error);
     }
 });
 
@@ -1506,10 +1354,7 @@ router.put('/aligner/batches/:batchId', async (req, res) => {
         } = req.body;
 
         if (!batchId || isNaN(parseInt(batchId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid batchId is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'batchId', 'Valid batchId is required');
         }
 
         console.log(`Updating aligner batch ${batchId}:`, req.body);
@@ -1560,11 +1405,7 @@ router.put('/aligner/batches/:batchId', async (req, res) => {
 
     } catch (error) {
         console.error('Error updating aligner batch:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to update aligner batch',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to update aligner batch', error);
     }
 });
 
@@ -1576,10 +1417,7 @@ router.patch('/aligner/batches/:batchId/deliver', async (req, res) => {
         const { batchId } = req.params;
 
         if (!batchId || isNaN(parseInt(batchId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid batchId is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'batchId', 'Valid batchId is required');
         }
 
         console.log(`Marking batch ${batchId} as delivered`);
@@ -1602,11 +1440,7 @@ router.patch('/aligner/batches/:batchId/deliver', async (req, res) => {
 
     } catch (error) {
         console.error('Error marking batch as delivered:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to mark batch as delivered',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to mark batch as delivered', error);
     }
 });
 
@@ -1618,10 +1452,7 @@ router.delete('/aligner/batches/:batchId', async (req, res) => {
         const { batchId } = req.params;
 
         if (!batchId || isNaN(parseInt(batchId))) {
-            return res.status(400).json({
-                success: false,
-                error: 'Valid batchId is required'
-            });
+            return ErrorResponses.invalidParameter(res, 'batchId', 'Valid batchId is required');
         }
 
         console.log(`Deleting aligner batch ${batchId}`);
@@ -1642,11 +1473,7 @@ router.delete('/aligner/batches/:batchId', async (req, res) => {
 
     } catch (error) {
         console.error('Error deleting aligner batch:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to delete aligner batch',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to delete aligner batch', error);
     }
 });
 
@@ -1664,19 +1491,13 @@ router.post('/aligner/sets/:setId/upload-pdf', uploadSinglePdf, handleUploadErro
 
         // Validate file exists
         if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                error: 'No file uploaded. Please select a PDF file.'
-            });
+            return ErrorResponses.badRequest(res, 'No file uploaded. Please select a PDF file.');
         }
 
         // Validate PDF
         const validation = driveUploadService.validatePdfFile(req.file.buffer, req.file.mimetype);
         if (!validation.valid) {
-            return res.status(400).json({
-                success: false,
-                error: validation.error
-            });
+            return ErrorResponses.badRequest(res, validation.error);
         }
 
         // Get set information
@@ -1701,10 +1522,7 @@ router.post('/aligner/sets/:setId/upload-pdf', uploadSinglePdf, handleUploadErro
         ]);
 
         if (!setResult || setResult.length === 0) {
-            return res.status(404).json({
-                success: false,
-                error: 'Aligner set not found'
-            });
+            return ErrorResponses.notFound(res, 'Aligner set');
         }
 
         const setInfo = setResult[0];
@@ -1765,10 +1583,7 @@ router.post('/aligner/sets/:setId/upload-pdf', uploadSinglePdf, handleUploadErro
 
     } catch (error) {
         console.error('Error uploading PDF:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message || 'Failed to upload PDF'
-        });
+        return ErrorResponses.internalError(res, 'Failed to upload PDF', error);
     }
 });
 
@@ -1791,10 +1606,7 @@ router.delete('/aligner/sets/:setId/pdf', async (req, res) => {
         ]);
 
         if (!setResult || setResult.length === 0) {
-            return res.status(404).json({
-                success: false,
-                error: 'Aligner set not found'
-            });
+            return ErrorResponses.notFound(res, 'Aligner set');
         }
 
         const driveFileId = setResult[0].DriveFileId;
@@ -1831,10 +1643,7 @@ router.delete('/aligner/sets/:setId/pdf', async (req, res) => {
 
     } catch (error) {
         console.error('Error deleting PDF:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to delete PDF'
-        });
+        return ErrorResponses.internalError(res, 'Failed to delete PDF', error);
     }
 });
 
@@ -1871,11 +1680,7 @@ router.get('/aligner-doctors', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching aligner doctors:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch aligner doctors',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch aligner doctors', error);
     }
 });
 
@@ -1887,10 +1692,7 @@ router.post('/aligner-doctors', async (req, res) => {
         const { DoctorName, DoctorEmail, LogoPath } = req.body;
 
         if (!DoctorName || DoctorName.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                error: 'Doctor name is required'
-            });
+            return ErrorResponses.badRequest(res, 'Doctor name is required');
         }
 
         // Check if email already exists (if provided)
@@ -1902,10 +1704,7 @@ router.post('/aligner-doctors', async (req, res) => {
             );
 
             if (emailCheck && emailCheck.length > 0) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'A doctor with this email already exists'
-                });
+                return ErrorResponses.conflict(res, 'A doctor with this email already exists');
             }
         }
 
@@ -1940,11 +1739,7 @@ router.post('/aligner-doctors', async (req, res) => {
 
     } catch (error) {
         console.error('Error adding aligner doctor:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to add aligner doctor',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to add aligner doctor', error);
     }
 });
 
@@ -1957,10 +1752,7 @@ router.put('/aligner-doctors/:drID', async (req, res) => {
         const { DoctorName, DoctorEmail, LogoPath } = req.body;
 
         if (!DoctorName || DoctorName.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                error: 'Doctor name is required'
-            });
+            return ErrorResponses.badRequest(res, 'Doctor name is required');
         }
 
         // Check if email already exists for another doctor (if provided)
@@ -1975,10 +1767,7 @@ router.put('/aligner-doctors/:drID', async (req, res) => {
             );
 
             if (emailCheck && emailCheck.length > 0) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Another doctor with this email already exists'
-                });
+                return ErrorResponses.conflict(res, 'Another doctor with this email already exists');
             }
         }
 
@@ -2007,11 +1796,7 @@ router.put('/aligner-doctors/:drID', async (req, res) => {
 
     } catch (error) {
         console.error('Error updating aligner doctor:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to update aligner doctor',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to update aligner doctor', error);
     }
 });
 
@@ -2032,10 +1817,7 @@ router.delete('/aligner-doctors/:drID', async (req, res) => {
         const setCount = setsCheck && setsCheck.length > 0 ? setsCheck[0] : 0;
 
         if (setCount > 0) {
-            return res.status(400).json({
-                success: false,
-                error: `Cannot delete doctor. They have ${setCount} aligner set(s) associated with them. Please reassign or delete those sets first.`
-            });
+            return ErrorResponses.badRequest(res, `Cannot delete doctor. They have ${setCount} aligner set(s) associated with them. Please reassign or delete those sets first.`);
         }
 
         const deleteQuery = 'DELETE FROM AlignerDoctors WHERE DrID = @drID';
@@ -2052,11 +1834,7 @@ router.delete('/aligner-doctors/:drID', async (req, res) => {
 
     } catch (error) {
         console.error('Error deleting aligner doctor:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to delete aligner doctor',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to delete aligner doctor', error);
     }
 });
 

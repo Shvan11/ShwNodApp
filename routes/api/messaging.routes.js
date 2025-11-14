@@ -19,6 +19,7 @@ import { getWhatsAppMessages } from '../../services/database/queries/messaging-q
 import messageState from '../../services/state/messageState.js';
 import whatsapp from '../../services/messaging/whatsapp.js';
 import { WebSocketEvents, createStandardMessage } from '../../services/messaging/websocket-events.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 
@@ -44,10 +45,7 @@ router.get('/circuit-breaker-status', (req, res) => {
             ...status
         });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        return ErrorResponses.internalError(res, error.message, error);
     }
 });
 
@@ -59,10 +57,7 @@ router.post('/reset-circuit-breaker', (req, res) => {
         const result = messagingQueries.resetCircuitBreaker();
         res.json(result);
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        return ErrorResponses.internalError(res, error.message, error);
     }
 });
 
@@ -74,10 +69,7 @@ router.post('/batch-status-update', async (req, res) => {
         const { updates } = req.body;
 
         if (!updates || !Array.isArray(updates)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Updates array is required'
-            });
+            return ErrorResponses.badRequest(res, 'Updates array is required');
         }
 
         const result = await messagingQueries.batchUpdateMessageStatuses(updates, wsEmitter);
@@ -85,10 +77,7 @@ router.post('/batch-status-update', async (req, res) => {
 
     } catch (error) {
         console.error('Error in batch status update:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        return ErrorResponses.internalError(res, error.message, error);
     }
 });
 
@@ -148,10 +137,7 @@ router.get('/status/:date', async (req, res) => {
         res.json(result);
     } catch (error) {
         console.error('Error getting message status:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        return ErrorResponses.internalError(res, error.message, error);
     }
 });
 
@@ -199,11 +185,7 @@ router.get('/count/:date', async (req, res) => {
 
     } catch (error) {
         console.error('Error getting message count:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message,
-            timestamp: Date.now()
-        });
+        return ErrorResponses.internalError(res, error.message, error);
     }
 });
 
@@ -263,12 +245,7 @@ router.post('/reset/:date', async (req, res) => {
 
     } catch (error) {
         console.error('Error resetting messaging:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message,
-            message: 'Failed to reset messaging status',
-            timestamp: Date.now()
-        });
+        return ErrorResponses.internalError(res, 'Failed to reset messaging status', error);
     }
 });
 
@@ -342,11 +319,7 @@ router.get('/details/:date', async (req, res) => {
 
     } catch (error) {
         console.error('Error getting message details:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message,
-            timestamp: Date.now()
-        });
+        return ErrorResponses.internalError(res, error.message, error);
     }
 });
 

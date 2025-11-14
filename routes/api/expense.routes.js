@@ -26,6 +26,7 @@ import {
 } from '../../services/database/queries/expense-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { requireRecordAge, getExpenseCreationDate } from '../../middleware/time-based-auth.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 
@@ -54,11 +55,7 @@ router.get('/expenses', async (req, res) => {
         res.json(expenses);
     } catch (error) {
         console.error('Error fetching expenses:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch expenses',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch expenses', error);
     }
 });
 
@@ -71,11 +68,7 @@ router.get('/expenses/categories', async (req, res) => {
         res.json(categories);
     } catch (error) {
         console.error('Error fetching expense categories:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch expense categories',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch expense categories', error);
     }
 });
 
@@ -86,11 +79,7 @@ router.get('/expenses-categories', async (req, res) => {
         res.json(categories);
     } catch (error) {
         console.error('Error fetching expense categories:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch expense categories',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch expense categories', error);
     }
 });
 
@@ -104,11 +93,7 @@ router.get('/expenses/subcategories/:categoryId', async (req, res) => {
         res.json(subcategories);
     } catch (error) {
         console.error('Error fetching expense subcategories:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch expense subcategories',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch expense subcategories', error);
     }
 });
 
@@ -120,11 +105,7 @@ router.get('/expenses-subcategories', async (req, res) => {
         res.json(subcategories);
     } catch (error) {
         console.error('Error fetching expense subcategories:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch expense subcategories',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch expense subcategories', error);
     }
 });
 
@@ -137,10 +118,7 @@ router.post('/expenses', async (req, res) => {
 
         // Validation
         if (!expenseDate || !amount) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required fields: expenseDate, amount'
-            });
+            return ErrorResponses.badRequest(res, 'Missing required fields: expenseDate, amount');
         }
 
         const expenseData = {
@@ -160,11 +138,7 @@ router.post('/expenses', async (req, res) => {
         });
     } catch (error) {
         console.error('Error creating expense:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to create expense',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to create expense', error);
     }
 });
 
@@ -177,10 +151,7 @@ router.get('/expenses/summary', async (req, res) => {
         const { startDate, endDate } = req.query;
 
         if (!startDate || !endDate) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required parameters: startDate, endDate'
-            });
+            return ErrorResponses.badRequest(res, 'Missing required parameters: startDate, endDate');
         }
 
         const summary = await getExpenseSummary(startDate, endDate);
@@ -192,11 +163,7 @@ router.get('/expenses/summary', async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching expense summary:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch expense summary',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch expense summary', error);
     }
 });
 
@@ -206,10 +173,7 @@ router.get('/expenses-summary', async (req, res) => {
         const { startDate, endDate } = req.query;
 
         if (!startDate || !endDate) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required parameters: startDate, endDate'
-            });
+            return ErrorResponses.badRequest(res, 'Missing required parameters: startDate, endDate');
         }
 
         const summary = await getExpenseSummary(startDate, endDate);
@@ -221,11 +185,7 @@ router.get('/expenses-summary', async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching expense summary:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch expense summary',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch expense summary', error);
     }
 });
 
@@ -241,29 +201,19 @@ router.get('/expenses/:id', async (req, res) => {
         // Validate that id is a valid number
         const expenseId = parseInt(id);
         if (isNaN(expenseId)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid expense ID. Must be a number.'
-            });
+            return ErrorResponses.badRequest(res, 'Invalid expense ID. Must be a number.');
         }
 
         const expense = await getExpenseById(expenseId);
 
         if (!expense) {
-            return res.status(404).json({
-                success: false,
-                error: 'Expense not found'
-            });
+            return ErrorResponses.notFound(res, 'Expense');
         }
 
         res.json(expense);
     } catch (error) {
         console.error('Error fetching expense:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch expense',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to fetch expense', error);
     }
 });
 
@@ -287,18 +237,12 @@ router.put('/expenses/:id',
         // Validate that id is a valid number
         const expenseId = parseInt(id);
         if (isNaN(expenseId)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid expense ID. Must be a number.'
-            });
+            return ErrorResponses.badRequest(res, 'Invalid expense ID. Must be a number.');
         }
 
         // Validation
         if (!expenseDate || !amount) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required fields: expenseDate, amount'
-            });
+            return ErrorResponses.badRequest(res, 'Missing required fields: expenseDate, amount');
         }
 
         const expenseData = {
@@ -318,11 +262,7 @@ router.put('/expenses/:id',
         });
         } catch (error) {
             console.error('Error updating expense:', error);
-            res.status(500).json({
-                success: false,
-                error: 'Failed to update expense',
-                message: error.message
-            });
+            return ErrorResponses.internalError(res, 'Failed to update expense', error);
         }
     }
 );
@@ -346,10 +286,7 @@ router.delete('/expenses/:id',
         // Validate that id is a valid number
         const expenseId = parseInt(id);
         if (isNaN(expenseId)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid expense ID. Must be a number.'
-            });
+            return ErrorResponses.badRequest(res, 'Invalid expense ID. Must be a number.');
         }
 
         const result = await deleteExpense(expenseId);
@@ -360,11 +297,7 @@ router.delete('/expenses/:id',
         });
         } catch (error) {
             console.error('Error deleting expense:', error);
-            res.status(500).json({
-                success: false,
-                error: 'Failed to delete expense',
-                message: error.message
-            });
+            return ErrorResponses.internalError(res, 'Failed to delete expense', error);
         }
     }
 );

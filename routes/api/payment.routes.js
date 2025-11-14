@@ -32,6 +32,7 @@ import {
     requireRecordAge,
     getInvoiceCreationDate
 } from '../../middleware/time-based-auth.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 
@@ -57,13 +58,13 @@ router.get("/getpaymenthistory", async (req, res) => {
     try {
         const { workId } = req.query;
         if (!workId) {
-            return res.status(400).json({ error: 'workId is required' });
+            return ErrorResponses.missingParameter(res, 'workId');
         }
         const payments = await getPaymentHistoryByWorkId(parseInt(workId));
         res.json(payments);
     } catch (error) {
         console.error('Error fetching payment history:', error);
-        res.status(500).json({ error: 'Failed to fetch payment history' });
+        return ErrorResponses.internalError(res, 'Failed to fetch payment history', error);
     }
 });
 
@@ -75,7 +76,7 @@ router.get('/getworkforreceipt/:workId', async (req, res) => {
     try {
         const { workId } = req.params;
         if (!workId) {
-            return res.status(400).json({ error: "Missing required parameter: workId" });
+            return ErrorResponses.missingParameter(res, 'workId');
         }
 
         const result = await database.executeQuery(
@@ -91,13 +92,13 @@ router.get('/getworkforreceipt/:workId', async (req, res) => {
         );
 
         if (!result || result.length === 0) {
-            return res.status(404).json({ error: "Work not found" });
+            return ErrorResponses.notFound(res, 'Work');
         }
 
         res.json(result[0]);
     } catch (error) {
         console.error("Error fetching work for receipt:", error);
-        res.status(500).json({ error: "Failed to fetch work data" });
+        return ErrorResponses.internalError(res, 'Failed to fetch work data', error);
     }
 });
 
@@ -109,14 +110,14 @@ router.get("/getActiveWorkForInvoice", async (req, res) => {
     try {
         const { PID } = req.query;
         if (!PID) {
-            return res.status(400).json({ status: 'error', message: 'Missing required parameter: PID' });
+            return ErrorResponses.missingParameter(res, 'PID');
         }
 
         const workData = await getActiveWorkForInvoice(PID);
         res.json({ status: 'success', data: workData });
     } catch (error) {
         console.error("Error getting active work for invoice:", error);
-        res.status(500).json({ status: 'error', message: error.message });
+        return ErrorResponses.internalError(res, error.message, error);
     }
 });
 
@@ -133,16 +134,13 @@ router.get("/getCurrentExchangeRate", async (req, res) => {
         const exchangeRate = await getCurrentExchangeRate();
 
         if (exchangeRate === null || exchangeRate === undefined) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'No exchange rate set for today. Please set today\'s exchange rate first.'
-            });
+            return ErrorResponses.notFound(res, 'Exchange rate for today', 'Please set today\'s exchange rate first.');
         }
 
         res.json({ status: 'success', exchangeRate });
     } catch (error) {
         console.error("Error getting exchange rate:", error);
-        res.status(500).json({ status: 'error', message: error.message });
+        return ErrorResponses.internalError(res, error.message, error);
     }
 });
 
@@ -155,26 +153,19 @@ router.get("/getExchangeRateForDate", async (req, res) => {
         const { date } = req.query;
 
         if (!date) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Date parameter is required'
-            });
+            return ErrorResponses.missingParameter(res, 'date');
         }
 
         const exchangeRate = await getExchangeRateForDate(date);
 
         if (exchangeRate === null || exchangeRate === undefined) {
-            return res.status(404).json({
-                status: 'error',
-                message: `No exchange rate set for ${date}`,
-                date: date
-            });
+            return ErrorResponses.notFound(res, `Exchange rate for ${date}`, { date: date });
         }
 
         res.json({ status: 'success', exchangeRate, date });
     } catch (error) {
         console.error("Error getting exchange rate for date:", error);
-        res.status(500).json({ status: 'error', message: error.message });
+        return ErrorResponses.internalError(res, error.message, error);
     }
 });
 
@@ -188,17 +179,14 @@ router.post("/updateExchangeRate", async (req, res) => {
         const { exchangeRate } = req.body;
 
         if (!exchangeRate || exchangeRate <= 0) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Valid exchange rate is required'
-            });
+            return ErrorResponses.badRequest(res, 'Valid exchange rate is required');
         }
 
         const result = await updateExchangeRate(exchangeRate);
         res.json({ status: 'success', data: result });
     } catch (error) {
         console.error("Error updating exchange rate:", error);
-        res.status(500).json({ status: 'error', message: error.message });
+        return ErrorResponses.internalError(res, error.message, error);
     }
 });
 
@@ -212,17 +200,14 @@ router.post("/updateExchangeRateForDate", async (req, res) => {
         const { date, exchangeRate } = req.body;
 
         if (!date || !exchangeRate || exchangeRate <= 0) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Valid date and exchange rate are required'
-            });
+            return ErrorResponses.badRequest(res, 'Valid date and exchange rate are required');
         }
 
         const result = await updateExchangeRateForDate(date, exchangeRate);
         res.json({ status: 'success', data: result, date, exchangeRate });
     } catch (error) {
         console.error("Error updating exchange rate for date:", error);
-        res.status(500).json({ status: 'error', message: error.message });
+        return ErrorResponses.internalError(res, error.message, error);
     }
 });
 
@@ -256,10 +241,7 @@ router.post("/addInvoice", async (req, res) => {
         const { workid, amountPaid, paymentDate, usdReceived, iqdReceived, change } = req.body;
 
         if (!workid || !amountPaid || !paymentDate) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Missing required parameters: workid, amountPaid, paymentDate'
-            });
+            return ErrorResponses.badRequest(res, 'Missing required parameters: workid, amountPaid, paymentDate');
         }
 
         // Parse and validate amounts
@@ -268,30 +250,18 @@ router.post("/addInvoice", async (req, res) => {
 
         // Validation 1: Must receive cash in at least one currency
         if (usd === 0 && iqd === 0) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'At least one currency amount (USD or IQD) must be greater than zero',
-                code: 'NO_CASH_RECEIVED'
-            });
+            return ErrorResponses.badRequest(res, 'At least one currency amount (USD or IQD) must be greater than zero', { code: 'NO_CASH_RECEIVED' });
         }
 
         // Validation 2: Non-negative amounts
         if (usd < 0 || iqd < 0) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Currency amounts cannot be negative',
-                code: 'NEGATIVE_AMOUNT'
-            });
+            return ErrorResponses.badRequest(res, 'Currency amounts cannot be negative', { code: 'NEGATIVE_AMOUNT' });
         }
 
         // Get work details to determine account currency
         const workDetails = await getWorkDetails(workid);
         if (!workDetails) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Work record not found',
-                code: 'WORK_NOT_FOUND'
-            });
+            return ErrorResponses.badRequest(res, 'Work record not found', { code: 'WORK_NOT_FOUND' });
         }
 
         const accountCurrency = workDetails.Currency;
@@ -313,11 +283,7 @@ router.post("/addInvoice", async (req, res) => {
             const changeAmount = parseInt(change) || 0;
 
             if (changeAmount < 0) {
-                return res.status(400).json({
-                    status: 'error',
-                    message: 'Change amount cannot be negative',
-                    code: 'NEGATIVE_CHANGE'
-                });
+                return ErrorResponses.badRequest(res, 'Change amount cannot be negative', { code: 'NEGATIVE_CHANGE' });
             }
 
             if (changeAmount > 0) {
@@ -326,11 +292,7 @@ router.post("/addInvoice", async (req, res) => {
 
                 // Validation 3: Change cannot exceed IQD received (simple case)
                 if (usd === 0 && changeAmount > iqd) {
-                    return res.status(400).json({
-                        status: 'error',
-                        message: `Change (${changeAmount} IQD) cannot exceed IQD received (${iqd} IQD)`,
-                        code: 'CHANGE_EXCEEDS_IQD_RECEIVED'
-                    });
+                    return ErrorResponses.badRequest(res, `Change (${changeAmount} IQD) cannot exceed IQD received (${iqd} IQD)`, { code: 'CHANGE_EXCEEDS_IQD_RECEIVED' });
                 }
 
                 // Validation 4: For USD payments, validate against total IQD value
@@ -338,17 +300,13 @@ router.post("/addInvoice", async (req, res) => {
                     const totalIQDValue = iqd + Math.floor(usd * exchangeRate);
 
                     if (changeAmount > totalIQDValue) {
-                        return res.status(400).json({
-                            status: 'error',
-                            message: `Change (${changeAmount} IQD) cannot exceed total IQD value in transaction (${totalIQDValue} IQD at rate ${exchangeRate})`,
+                        return ErrorResponses.badRequest(res, `Change (${changeAmount} IQD) cannot exceed total IQD value in transaction (${totalIQDValue} IQD at rate ${exchangeRate})`, {
                             code: 'CHANGE_EXCEEDS_TOTAL_VALUE',
-                            details: {
-                                usdReceived: usd,
-                                iqdReceived: iqd,
-                                exchangeRate: exchangeRate,
-                                totalIQDValue: totalIQDValue,
-                                changeRequested: changeAmount
-                            }
+                            usdReceived: usd,
+                            iqdReceived: iqd,
+                            exchangeRate: exchangeRate,
+                            totalIQDValue: totalIQDValue,
+                            changeRequested: changeAmount
                         });
                     }
                 }
@@ -373,14 +331,10 @@ router.post("/addInvoice", async (req, res) => {
 
         // Handle database constraint violations gracefully
         if (error.message && error.message.includes('CHK_Invoice')) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Payment validation failed: ' + error.message,
-                code: 'DB_CONSTRAINT_VIOLATION'
-            });
+            return ErrorResponses.badRequest(res, 'Payment validation failed: ' + error.message, { code: 'DB_CONSTRAINT_VIOLATION' });
         }
 
-        res.status(500).json({ status: 'error', message: error.message });
+        return ErrorResponses.internalError(res, error.message, error);
     }
 });
 
@@ -404,10 +358,7 @@ router.delete("/deleteInvoice/:invoiceId",
             const { invoiceId } = req.params;
 
         if (!invoiceId) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Invoice ID is required'
-            });
+            return ErrorResponses.missingParameter(res, 'invoiceId');
         }
 
         const result = await database.executeQuery(
@@ -416,10 +367,7 @@ router.delete("/deleteInvoice/:invoiceId",
         );
 
         if (result.rowCount === 0) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'Invoice not found'
-            });
+            return ErrorResponses.notFound(res, 'Invoice');
         }
 
         res.json({
@@ -429,7 +377,7 @@ router.delete("/deleteInvoice/:invoiceId",
         });
         } catch (error) {
             console.error("Error deleting invoice:", error);
-            res.status(500).json({ status: 'error', message: error.message });
+            return ErrorResponses.internalError(res, error.message, error);
         }
     }
 );
@@ -457,10 +405,7 @@ router.post('/aligner/payments', async (req, res) => {
         const { workid, AlignerSetID, Amountpaid, Dateofpayment, ActualAmount, ActualCur, Change } = req.body;
 
         if (!workid || !Amountpaid || !Dateofpayment) {
-            return res.status(400).json({
-                success: false,
-                error: 'workid, Amountpaid, and Dateofpayment are required'
-            });
+            return ErrorResponses.badRequest(res, 'workid, Amountpaid, and Dateofpayment are required');
         }
 
         console.log(`Adding payment for work ID: ${workid}, Set ID: ${AlignerSetID || 'general'}, Amount: ${Amountpaid}`);
@@ -498,11 +443,7 @@ router.post('/aligner/payments', async (req, res) => {
 
     } catch (error) {
         console.error('Error adding payment:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to add payment',
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, 'Failed to add payment', error);
     }
 });
 

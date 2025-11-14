@@ -34,6 +34,7 @@ import {
 } from '../../services/database/queries/work-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { requireRecordAge, getWorkCreationDate } from '../../middleware/time-based-auth.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 
@@ -44,16 +45,16 @@ router.get("/getworkdetails", async (req, res) => {
     try {
         const { workId } = req.query;
         if (!workId) {
-            return res.status(400).json({ error: "Missing required parameter: workId" });
+            return ErrorResponses.missingParameter(res, 'workId');
         }
         const work = await getWorkDetails(parseInt(workId));
         if (!work) {
-            return res.status(404).json({ error: "Work not found" });
+            return ErrorResponses.notFound(res, 'Work');
         }
         res.json(work);
     } catch (error) {
         console.error('Error fetching work details:', error);
-        res.status(500).json({ error: 'Failed to fetch work details' });
+        return sendError(res, 500, 'Failed to fetch work details', error);
     }
 });
 
@@ -62,14 +63,14 @@ router.get('/getworks', async (req, res) => {
     try {
         const { code: personId } = req.query;
         if (!personId) {
-            return res.status(400).json({ error: "Missing required parameter: code (PersonID)" });
+            return ErrorResponses.missingParameter(res, 'code (PersonID)');
         }
 
         const works = await getWorksByPatient(parseInt(personId));
         res.json(works);
     } catch (error) {
         console.error("Error fetching works:", error);
-        res.status(500).json({ error: "Failed to fetch works" });
+        return sendError(res, 500, 'Failed to fetch works', error);
     }
 });
 
@@ -78,7 +79,7 @@ router.get('/getwork/:workId', async (req, res) => {
     try {
         const { workId } = req.params;
         if (!workId) {
-            return res.status(400).json({ error: "Missing required parameter: workId" });
+            return ErrorResponses.missingParameter(res, 'workId');
         }
 
         const query = `
@@ -118,13 +119,13 @@ router.get('/getwork/:workId', async (req, res) => {
         );
 
         if (!work) {
-            return res.status(404).json({ success: false, error: "Work not found" });
+            return ErrorResponses.notFound(res, 'Work');
         }
 
         res.json({ success: true, work });
     } catch (error) {
         console.error("Error fetching work:", error);
-        res.status(500).json({ success: false, error: "Failed to fetch work" });
+        return sendError(res, 500, 'Failed to fetch work', error);
     }
 });
 
@@ -135,9 +136,7 @@ router.post('/addwork', async (req, res) => {
 
         // Validate required fields
         if (!workData.PersonID || !workData.DrID) {
-            return res.status(400).json({
-                error: "Missing required fields: PersonID and DrID are required"
-            });
+            return ErrorResponses.badRequest(res, 'Missing required fields: PersonID and DrID are required');
         }
 
         // Default TotalRequired to 0 if empty or not provided
@@ -147,16 +146,12 @@ router.post('/addwork', async (req, res) => {
 
         // Validate Typeofwork is required
         if (!workData.Typeofwork) {
-            return res.status(400).json({
-                error: "Typeofwork is required"
-            });
+            return ErrorResponses.badRequest(res, 'Typeofwork is required');
         }
 
         // Validate data types
         if (isNaN(parseInt(workData.PersonID)) || isNaN(parseInt(workData.DrID))) {
-            return res.status(400).json({
-                error: "PersonID and DrID must be valid numbers"
-            });
+            return ErrorResponses.badRequest(res, 'PersonID and DrID must be valid numbers');
         }
 
         // Convert date strings to proper Date objects if provided
@@ -164,9 +159,7 @@ router.post('/addwork', async (req, res) => {
             if (workData[field] && typeof workData[field] === 'string') {
                 const date = new Date(workData[field]);
                 if (isNaN(date.getTime())) {
-                    return res.status(400).json({
-                        error: `Invalid date format for ${field}`
-                    });
+                    return ErrorResponses.invalidParameter(res, field, 'Invalid date format');
                 }
                 workData[field] = date;
             }
@@ -186,10 +179,9 @@ router.post('/addwork', async (req, res) => {
             try {
                 // Fetch the existing active work details to show to the user
                 const existingWork = await getActiveWork(workData.PersonID);
-                return res.status(409).json({
-                    error: "Patient already has an active work",
-                    details: "This patient already has an active (unfinished) work record. You can finish the existing work and add the new one.",
-                    code: "DUPLICATE_ACTIVE_WORK",
+                return ErrorResponses.conflict(res, 'Patient already has an active work', {
+                    message: 'This patient already has an active (unfinished) work record. You can finish the existing work and add the new one.',
+                    code: 'DUPLICATE_ACTIVE_WORK',
                     existingWork: existingWork ? {
                         workId: existingWork.workid,
                         typeOfWork: existingWork.Typeofwork,
@@ -202,15 +194,14 @@ router.post('/addwork', async (req, res) => {
                 });
             } catch (fetchError) {
                 // If we can't fetch the existing work, return basic error
-                return res.status(409).json({
-                    error: "Patient already has an active work",
-                    details: "This patient already has an active (unfinished) work record. Please complete or finish the existing work before adding a new one.",
-                    code: "DUPLICATE_ACTIVE_WORK"
+                return ErrorResponses.conflict(res, 'Patient already has an active work', {
+                    message: 'This patient already has an active (unfinished) work record. Please complete or finish the existing work before adding a new one.',
+                    code: 'DUPLICATE_ACTIVE_WORK'
                 });
             }
         }
 
-        res.status(500).json({ error: "Failed to add work", details: error.message });
+        return sendError(res, 500, 'Failed to add work', error);
     }
 });
 
@@ -220,44 +211,32 @@ router.post('/addWorkWithInvoice', async (req, res) => {
     try {
         // Validate required fields
         if (!workData.PersonID || !workData.DrID) {
-            return res.status(400).json({
-                error: "Missing required fields: PersonID and DrID are required"
-            });
+            return ErrorResponses.badRequest(res, 'Missing required fields: PersonID and DrID are required');
         }
 
         // Validate createAsFinished flag
         if (!workData.createAsFinished) {
-            return res.status(400).json({
-                error: "createAsFinished flag must be true for this endpoint"
-            });
+            return ErrorResponses.badRequest(res, 'createAsFinished flag must be true for this endpoint');
         }
 
         // Validate TotalRequired
         if (!workData.TotalRequired || parseFloat(workData.TotalRequired) <= 0) {
-            return res.status(400).json({
-                error: "TotalRequired must be greater than 0 for finished work with invoice"
-            });
+            return ErrorResponses.badRequest(res, 'TotalRequired must be greater than 0 for finished work with invoice');
         }
 
         // Validate Currency
         if (!workData.Currency) {
-            return res.status(400).json({
-                error: "Currency is required for finished work with invoice"
-            });
+            return ErrorResponses.badRequest(res, 'Currency is required for finished work with invoice');
         }
 
         // Validate Typeofwork
         if (!workData.Typeofwork) {
-            return res.status(400).json({
-                error: "Typeofwork is required"
-            });
+            return ErrorResponses.badRequest(res, 'Typeofwork is required');
         }
 
         // Validate data types
         if (isNaN(parseInt(workData.PersonID)) || isNaN(parseInt(workData.DrID))) {
-            return res.status(400).json({
-                error: "PersonID and DrID must be valid numbers"
-            });
+            return ErrorResponses.badRequest(res, 'PersonID and DrID must be valid numbers');
         }
 
         // Convert date strings to proper Date objects if provided
@@ -265,9 +244,7 @@ router.post('/addWorkWithInvoice', async (req, res) => {
             if (workData[field] && typeof workData[field] === 'string') {
                 const date = new Date(workData[field]);
                 if (isNaN(date.getTime())) {
-                    return res.status(400).json({
-                        error: `Invalid date format for ${field}`
-                    });
+                    return ErrorResponses.invalidParameter(res, field, 'Invalid date format');
                 }
                 workData[field] = date;
             }
@@ -290,10 +267,9 @@ router.post('/addWorkWithInvoice', async (req, res) => {
         if (error.number === 2601 && error.message.includes('UNQ_tblWork_Active')) {
             try {
                 const existingWork = await getActiveWork(workData.PersonID);
-                return res.status(409).json({
-                    error: "Patient already has an active work",
-                    details: "This patient already has an active (unfinished) work record. You can finish the existing work and add the new one.",
-                    code: "DUPLICATE_ACTIVE_WORK",
+                return ErrorResponses.conflict(res, 'Patient already has an active work', {
+                    message: 'This patient already has an active (unfinished) work record. You can finish the existing work and add the new one.',
+                    code: 'DUPLICATE_ACTIVE_WORK',
                     existingWork: existingWork ? {
                         workId: existingWork.workid,
                         typeOfWork: existingWork.Typeofwork,
@@ -305,18 +281,14 @@ router.post('/addWorkWithInvoice', async (req, res) => {
                     } : null
                 });
             } catch (fetchError) {
-                return res.status(409).json({
-                    error: "Patient already has an active work",
-                    details: "This patient already has an active (unfinished) work record. Please complete or finish the existing work before adding a new one.",
-                    code: "DUPLICATE_ACTIVE_WORK"
+                return ErrorResponses.conflict(res, 'Patient already has an active work', {
+                    message: 'This patient already has an active (unfinished) work record. Please complete or finish the existing work before adding a new one.',
+                    code: 'DUPLICATE_ACTIVE_WORK'
                 });
             }
         }
 
-        res.status(500).json({
-            error: "Failed to add work with invoice",
-            details: error.message
-        });
+        return sendError(res, 500, 'Failed to add work with invoice', error);
     }
 });
 
@@ -335,19 +307,17 @@ router.put('/updatework',
             const { workId, ...workData } = req.body;
 
         if (!workId) {
-            return res.status(400).json({ error: "Missing required field: workId" });
+            return ErrorResponses.missingParameter(res, 'workId');
         }
 
         // Validate DrID is provided
         if (!workData.DrID) {
-            return res.status(400).json({ error: "DrID is required" });
+            return ErrorResponses.badRequest(res, 'DrID is required');
         }
 
         // Validate data types
         if (isNaN(parseInt(workId)) || isNaN(parseInt(workData.DrID))) {
-            return res.status(400).json({
-                error: "workId and DrID must be valid numbers"
-            });
+            return ErrorResponses.badRequest(res, 'workId and DrID must be valid numbers');
         }
 
         // Convert date strings to proper Date objects if provided
@@ -355,9 +325,7 @@ router.put('/updatework',
             if (workData[field] && typeof workData[field] === 'string') {
                 const date = new Date(workData[field]);
                 if (isNaN(date.getTime())) {
-                    return res.status(400).json({
-                        error: `Invalid date format for ${field}`
-                    });
+                    return ErrorResponses.invalidParameter(res, field, 'Invalid date format');
                 }
                 workData[field] = date;
             }
@@ -371,7 +339,7 @@ router.put('/updatework',
         });
         } catch (error) {
             console.error("Error updating work:", error);
-            res.status(500).json({ error: "Failed to update work", details: error.message });
+            return sendError(res, 500, 'Failed to update work', error);
         }
     }
 );
@@ -382,11 +350,11 @@ router.post('/finishwork', async (req, res) => {
         const { workId } = req.body;
 
         if (!workId) {
-            return res.status(400).json({ error: "Missing required field: workId" });
+            return ErrorResponses.missingParameter(res, 'workId');
         }
 
         if (isNaN(parseInt(workId))) {
-            return res.status(400).json({ error: "workId must be a valid number" });
+            return ErrorResponses.invalidParameter(res, 'workId', 'Must be a valid number');
         }
 
         const result = await finishWork(parseInt(workId));
@@ -397,7 +365,7 @@ router.post('/finishwork', async (req, res) => {
         });
     } catch (error) {
         console.error("Error finishing work:", error);
-        res.status(500).json({ error: "Failed to finish work", details: error.message });
+        return sendError(res, 500, 'Failed to finish work', error);
     }
 });
 
@@ -415,11 +383,11 @@ router.delete('/deletework',
             const { workId } = req.body;
 
         if (!workId) {
-            return res.status(400).json({ error: "Missing required field: workId" });
+            return ErrorResponses.missingParameter(res, 'workId');
         }
 
         if (isNaN(parseInt(workId))) {
-            return res.status(400).json({ error: "workId must be a valid number" });
+            return ErrorResponses.invalidParameter(res, 'workId', 'Must be a valid number');
         }
 
         const result = await deleteWork(parseInt(workId));
@@ -436,9 +404,7 @@ router.delete('/deletework',
             if (deps.ImplantCount > 0) dependencyMessages.push(`${deps.ImplantCount} implant(s)`);
             if (deps.ScrewCount > 0) dependencyMessages.push(`${deps.ScrewCount} screw(s)`);
 
-            return res.status(409).json({
-                success: false,
-                error: "Cannot delete work with existing records",
+            return ErrorResponses.conflict(res, 'Cannot delete work with existing records', {
                 message: `This work has ${dependencyMessages.join(', ')} that must be deleted first.`,
                 dependencies: deps
             });
@@ -451,7 +417,7 @@ router.delete('/deletework',
         });
         } catch (error) {
             console.error("Error deleting work:", error);
-            res.status(500).json({ error: "Failed to delete work", details: error.message });
+            return sendError(res, 500, 'Failed to delete work', error);
         }
     }
 );
@@ -461,14 +427,14 @@ router.get('/getactivework', async (req, res) => {
     try {
         const { code: personId } = req.query;
         if (!personId) {
-            return res.status(400).json({ error: "Missing required parameter: code (PersonID)" });
+            return ErrorResponses.missingParameter(res, 'code (PersonID)');
         }
 
         const activeWork = await getActiveWork(parseInt(personId));
         res.json(activeWork);
     } catch (error) {
         console.error("Error fetching active work:", error);
-        res.status(500).json({ error: "Failed to fetch active work" });
+        return sendError(res, 500, 'Failed to fetch active work', error);
     }
 });
 
@@ -479,7 +445,7 @@ router.get('/getworktypes', async (req, res) => {
         res.json(workTypes);
     } catch (error) {
         console.error("Error fetching work types:", error);
-        res.status(500).json({ error: "Failed to fetch work types" });
+        return sendError(res, 500, 'Failed to fetch work types', error);
     }
 });
 
@@ -490,7 +456,7 @@ router.get('/getworkkeywords', async (req, res) => {
         res.json(keywords);
     } catch (error) {
         console.error("Error fetching work keywords:", error);
-        res.status(500).json({ error: "Failed to fetch work keywords" });
+        return sendError(res, 500, 'Failed to fetch work keywords', error);
     }
 });
 
@@ -501,14 +467,14 @@ router.get('/getworkdetailslist', async (req, res) => {
     try {
         const { workId } = req.query;
         if (!workId) {
-            return res.status(400).json({ error: "Missing required parameter: workId" });
+            return ErrorResponses.missingParameter(res, 'workId');
         }
 
         const workDetailsList = await getWorkDetailsList(parseInt(workId));
         res.json(workDetailsList);
     } catch (error) {
         console.error("Error fetching work details list:", error);
-        res.status(500).json({ error: "Failed to fetch work details list" });
+        return sendError(res, 500, 'Failed to fetch work details list', error);
     }
 });
 
@@ -519,23 +485,17 @@ router.post('/addworkdetail', async (req, res) => {
 
         // Validate required fields
         if (!workDetailData.WorkID) {
-            return res.status(400).json({
-                error: "Missing required field: WorkID"
-            });
+            return ErrorResponses.missingParameter(res, 'WorkID');
         }
 
         // Validate data types
         if (isNaN(parseInt(workDetailData.WorkID))) {
-            return res.status(400).json({
-                error: "WorkID must be a valid number"
-            });
+            return ErrorResponses.invalidParameter(res, 'WorkID', 'Must be a valid number');
         }
 
         // Validate CanalsNo if provided
         if (workDetailData.CanalsNo && isNaN(parseInt(workDetailData.CanalsNo))) {
-            return res.status(400).json({
-                error: "CanalsNo must be a valid number"
-            });
+            return ErrorResponses.invalidParameter(res, 'CanalsNo', 'Must be a valid number');
         }
 
         const result = await addWorkDetail(workDetailData);
@@ -546,7 +506,7 @@ router.post('/addworkdetail', async (req, res) => {
         });
     } catch (error) {
         console.error("Error adding work detail:", error);
-        res.status(500).json({ error: "Failed to add work detail", details: error.message });
+        return sendError(res, 500, 'Failed to add work detail', error);
     }
 });
 
@@ -556,21 +516,17 @@ router.put('/updateworkdetail', async (req, res) => {
         const { detailId, ...workDetailData } = req.body;
 
         if (!detailId) {
-            return res.status(400).json({ error: "Missing required field: detailId" });
+            return ErrorResponses.missingParameter(res, 'detailId');
         }
 
         // Validate data types
         if (isNaN(parseInt(detailId))) {
-            return res.status(400).json({
-                error: "detailId must be a valid number"
-            });
+            return ErrorResponses.invalidParameter(res, 'detailId', 'Must be a valid number');
         }
 
         // Validate CanalsNo if provided
         if (workDetailData.CanalsNo && isNaN(parseInt(workDetailData.CanalsNo))) {
-            return res.status(400).json({
-                error: "CanalsNo must be a valid number"
-            });
+            return ErrorResponses.invalidParameter(res, 'CanalsNo', 'Must be a valid number');
         }
 
         const result = await updateWorkDetail(parseInt(detailId), workDetailData);
@@ -581,7 +537,7 @@ router.put('/updateworkdetail', async (req, res) => {
         });
     } catch (error) {
         console.error("Error updating work detail:", error);
-        res.status(500).json({ error: "Failed to update work detail", details: error.message });
+        return sendError(res, 500, 'Failed to update work detail', error);
     }
 });
 
@@ -591,11 +547,11 @@ router.delete('/deleteworkdetail', async (req, res) => {
         const { detailId } = req.body;
 
         if (!detailId) {
-            return res.status(400).json({ error: "Missing required field: detailId" });
+            return ErrorResponses.missingParameter(res, 'detailId');
         }
 
         if (isNaN(parseInt(detailId))) {
-            return res.status(400).json({ error: "detailId must be a valid number" });
+            return ErrorResponses.invalidParameter(res, 'detailId', 'Must be a valid number');
         }
 
         const result = await deleteWorkDetail(parseInt(detailId));
@@ -606,7 +562,7 @@ router.delete('/deleteworkdetail', async (req, res) => {
         });
     } catch (error) {
         console.error("Error deleting work detail:", error);
-        res.status(500).json({ error: "Failed to delete work detail", details: error.message });
+        return sendError(res, 500, 'Failed to delete work detail', error);
     }
 });
 

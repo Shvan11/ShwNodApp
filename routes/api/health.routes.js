@@ -8,6 +8,7 @@
 
 import express from 'express';
 import HealthCheck from '../../services/monitoring/HealthCheck.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 
@@ -25,11 +26,7 @@ router.get('/health', (req, res) => {
         });
     } catch (error) {
         console.error('Error getting health status:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to get health status',
-            error: error.message
-        });
+        ErrorResponses.internalError(res, 'Failed to get health status', error);
     }
 });
 
@@ -42,11 +39,7 @@ router.get('/health/detailed', (req, res) => {
         res.json(report);
     } catch (error) {
         console.error('Error getting detailed health report:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to get detailed health report',
-            error: error.message
-        });
+        ErrorResponses.internalError(res, 'Failed to get detailed health report', error);
     }
 });
 
@@ -62,11 +55,7 @@ router.post('/health/start', (req, res) => {
         });
     } catch (error) {
         console.error('Error starting health monitoring:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to start health monitoring',
-            error: error.message
-        });
+        ErrorResponses.internalError(res, 'Failed to start health monitoring', error);
     }
 });
 
@@ -82,11 +71,7 @@ router.post('/health/stop', (req, res) => {
         });
     } catch (error) {
         console.error('Error stopping health monitoring:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to stop health monitoring',
-            error: error.message
-        });
+        ErrorResponses.internalError(res, 'Failed to stop health monitoring', error);
     }
 });
 

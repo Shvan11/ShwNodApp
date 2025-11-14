@@ -24,6 +24,7 @@ import {
     deleteVisitByWorkId,
     getLatestWiresByWorkId
 } from '../../services/database/queries/visit-queries.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 
@@ -40,14 +41,14 @@ router.get("/visitsSummary", async (req, res) => {
     try {
         const { PID } = req.query;
         if (!PID) {
-            return res.status(400).json({ error: "Missing required parameter: PID" });
+            return ErrorResponses.missingParameter(res, 'PID');
         }
 
         const visitsSummary = await getVisitsSummary(PID);
         res.json(visitsSummary);
     } catch (error) {
         console.error("Error fetching visits summary:", error);
-        res.status(500).json({ error: "Failed to fetch visits summary" });
+        return ErrorResponses.internalError(res, 'Failed to fetch visits summary', error);
     }
 });
 
@@ -60,14 +61,14 @@ router.get("/getVisitDetailsByID", async (req, res) => {
     try {
         const { VID } = req.query;
         if (!VID) {
-            return res.status(400).json({ error: "Missing required parameter: VID" });
+            return ErrorResponses.missingParameter(res, 'VID');
         }
 
         const visitDetails = await getVisitDetailsByID(VID);
         res.json(visitDetails);
     } catch (error) {
         console.error("Error fetching visit details:", error);
-        res.status(500).json({ error: "Failed to fetch visit details" });
+        return ErrorResponses.internalError(res, 'Failed to fetch visit details', error);
     }
 });
 
@@ -85,7 +86,7 @@ router.get("/getWires", async (req, res) => {
         res.json(wires);
     } catch (error) {
         console.error("Error fetching wires:", error);
-        res.status(500).json({ error: "Failed to fetch wires" });
+        return ErrorResponses.internalError(res, 'Failed to fetch wires', error);
     }
 });
 
@@ -98,13 +99,13 @@ router.get("/getlatestwires", async (req, res) => {
     try {
         const { workId } = req.query;
         if (!workId) {
-            return res.status(400).json({ error: "Missing required parameter: workId" });
+            return ErrorResponses.missingParameter(res, 'workId');
         }
         const latestWires = await getLatestWiresByWorkId(parseInt(workId));
         res.json(latestWires);
     } catch (error) {
         console.error("Error fetching latest wires:", error);
-        res.status(500).json({ error: "Failed to fetch latest wires" });
+        return ErrorResponses.internalError(res, 'Failed to fetch latest wires', error);
     }
 });
 
@@ -117,14 +118,14 @@ router.get("/getLatestwire", async (req, res) => {
     try {
         const { PID } = req.query;
         if (!PID) {
-            return res.status(400).json({ error: "Missing required parameter: PID" });
+            return ErrorResponses.missingParameter(res, 'PID');
         }
 
         const latestWire = await getLatestWire(PID);
         res.json(latestWire);
     } catch (error) {
         console.error("Error fetching latest wire:", error);
-        res.status(500).json({ error: "Failed to fetch latest wire" });
+        return ErrorResponses.internalError(res, 'Failed to fetch latest wire', error);
     }
 });
 
@@ -141,13 +142,13 @@ router.get("/getvisitsbywork", async (req, res) => {
     try {
         const { workId } = req.query;
         if (!workId) {
-            return res.status(400).json({ error: "Missing required parameter: workId" });
+            return ErrorResponses.missingParameter(res, 'workId');
         }
         const visits = await getVisitsByWorkId(parseInt(workId));
         res.json(visits);
     } catch (error) {
         console.error("Error fetching visits by work:", error);
-        res.status(500).json({ error: "Failed to fetch visits" });
+        return ErrorResponses.internalError(res, 'Failed to fetch visits', error);
     }
 });
 
@@ -160,16 +161,16 @@ router.get("/getvisitbyid", async (req, res) => {
     try {
         const { visitId } = req.query;
         if (!visitId) {
-            return res.status(400).json({ error: "Missing required parameter: visitId" });
+            return ErrorResponses.missingParameter(res, 'visitId');
         }
         const visit = await getVisitById(parseInt(visitId));
         if (!visit) {
-            return res.status(404).json({ error: "Visit not found" });
+            return ErrorResponses.notFound(res, 'Visit');
         }
         res.json(visit);
     } catch (error) {
         console.error("Error fetching visit by ID:", error);
-        res.status(500).json({ error: "Failed to fetch visit" });
+        return ErrorResponses.internalError(res, 'Failed to fetch visit', error);
     }
 });
 
@@ -182,13 +183,13 @@ router.post("/addvisitbywork", async (req, res) => {
     try {
         const visitData = req.body;
         if (!visitData.WorkID || !visitData.VisitDate) {
-            return res.status(400).json({ error: "Missing required fields: WorkID and VisitDate" });
+            return ErrorResponses.badRequest(res, 'Missing required fields: WorkID and VisitDate');
         }
         const result = await addVisitByWorkId(visitData);
         res.json({ success: true, visitId: result.ID });
     } catch (error) {
         console.error("Error adding visit:", error);
-        res.status(500).json({ error: "Failed to add visit" });
+        return ErrorResponses.internalError(res, 'Failed to add visit', error);
     }
 });
 
@@ -201,13 +202,13 @@ router.put("/updatevisitbywork", async (req, res) => {
     try {
         const { visitId, ...visitData } = req.body;
         if (!visitId || !visitData.VisitDate) {
-            return res.status(400).json({ error: "Missing required fields: visitId and VisitDate" });
+            return ErrorResponses.badRequest(res, 'Missing required fields: visitId and VisitDate');
         }
         await updateVisitByWorkId(parseInt(visitId), visitData);
         res.json({ success: true });
     } catch (error) {
         console.error("Error updating visit:", error);
-        res.status(500).json({ error: "Failed to update visit" });
+        return ErrorResponses.internalError(res, 'Failed to update visit', error);
     }
 });
 
@@ -220,13 +221,13 @@ router.delete("/deletevisitbywork", async (req, res) => {
     try {
         const { visitId } = req.body;
         if (!visitId) {
-            return res.status(400).json({ error: "Missing required field: visitId" });
+            return ErrorResponses.badRequest(res, 'Missing required field: visitId');
         }
         await deleteVisitByWorkId(parseInt(visitId));
         res.json({ success: true });
     } catch (error) {
         console.error("Error deleting visit:", error);
-        res.status(500).json({ error: "Failed to delete visit" });
+        return ErrorResponses.internalError(res, 'Failed to delete visit', error);
     }
 });
 
@@ -243,14 +244,14 @@ router.post("/addVisit", async (req, res) => {
     try {
         const { PID, visitDate, upperWireID, lowerWireID, others, next } = req.body;
         if (!PID || !visitDate) {
-            return res.status(400).json({ status: 'error', message: 'Missing required parameters' });
+            return ErrorResponses.badRequest(res, 'Missing required parameters');
         }
 
         const result = await addVisit(PID, visitDate, upperWireID, lowerWireID, others, next);
         res.json({ status: 'success', data: result });
     } catch (error) {
         console.error("Error adding visit:", error);
-        res.status(500).json({ status: 'error', message: error.message });
+        return ErrorResponses.internalError(res, 'Failed to add visit', error);
     }
 });
 
@@ -263,14 +264,14 @@ router.put("/updateVisit", async (req, res) => {
     try {
         const { VID, visitDate, upperWireID, lowerWireID, others, next } = req.body;
         if (!VID || !visitDate) {
-            return res.status(400).json({ status: 'error', message: 'Missing required parameters' });
+            return ErrorResponses.badRequest(res, 'Missing required parameters');
         }
 
         const result = await updateVisit(VID, visitDate, upperWireID, lowerWireID, others, next);
         res.json({ status: 'success', data: result });
     } catch (error) {
         console.error("Error updating visit:", error);
-        res.status(500).json({ status: 'error', message: error.message });
+        return ErrorResponses.internalError(res, 'Failed to update visit', error);
     }
 });
 
@@ -283,14 +284,14 @@ router.delete("/deleteVisit", async (req, res) => {
     try {
         const { VID } = req.body;
         if (!VID) {
-            return res.status(400).json({ status: 'error', message: 'Missing required parameter: VID' });
+            return ErrorResponses.missingParameter(res, 'VID');
         }
 
         const result = await deleteVisit(VID);
         res.json({ status: 'success', data: result });
     } catch (error) {
         console.error("Error deleting visit:", error);
-        res.status(500).json({ status: 'error', message: error.message });
+        return ErrorResponses.internalError(res, 'Failed to delete visit', error);
     }
 });
 

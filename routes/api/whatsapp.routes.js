@@ -27,6 +27,7 @@ import { WebSocketEvents, createStandardMessage } from '../../services/messaging
 // Utilities
 import config from '../../config/config.js';
 import PhoneFormatter from '../../utils/phoneFormatter.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 const upload = multer();
@@ -57,17 +58,15 @@ router.get('/wa/send-to-patient', async (req, res) => {
 
         // Validate required parameters
         if (!personId || !appointmentId) {
-            return res.status(400).json({
-                success: false,
-                message: "Both personId and appointmentId parameters are required"
+            return sendError(res, ErrorResponses.MISSING_PARAMETERS, {
+                required: ['personId', 'appointmentId']
             });
         }
 
         // Validate parameters are numeric
         if (isNaN(parseInt(personId)) || isNaN(parseInt(appointmentId))) {
-            return res.status(400).json({
-                success: false,
-                message: "personId and appointmentId must be valid numbers"
+            return sendError(res, ErrorResponses.INVALID_INPUT, {
+                details: 'personId and appointmentId must be valid numbers'
             });
         }
 
@@ -76,9 +75,9 @@ router.get('/wa/send-to-patient', async (req, res) => {
         // Check if WhatsApp client is ready
         if (!whatsapp.isReady()) {
             const status = whatsapp.getStatus();
-            return res.status(400).json({
-                success: false,
-                message: "WhatsApp client is not ready. Please wait for initialization to complete.",
+            return sendError(res, ErrorResponses.SERVICE_UNAVAILABLE, {
+                service: 'WhatsApp',
+                details: 'WhatsApp client is not ready. Please wait for initialization to complete.',
                 clientStatus: status,
                 requiresRestart: status.circuitBreakerOpen
             });
@@ -103,9 +102,9 @@ router.get('/wa/send-to-patient', async (req, res) => {
         );
 
         if (!messageData) {
-            return res.status(404).json({
-                success: false,
-                message: "No data returned from stored procedure"
+            return sendError(res, ErrorResponses.NOT_FOUND, {
+                resource: 'message data',
+                details: 'No data returned from stored procedure'
             });
         }
 
@@ -118,9 +117,8 @@ router.get('/wa/send-to-patient', async (req, res) => {
                 errorMessage = "Invalid phone number";
             }
 
-            return res.status(400).json({
-                success: false,
-                message: errorMessage,
+            return sendError(res, ErrorResponses.INVALID_INPUT, {
+                details: errorMessage,
                 result: messageData.result
             });
         }
@@ -152,18 +150,16 @@ router.get('/wa/send-to-patient', async (req, res) => {
                 }
             });
         } else {
-            res.status(500).json({
-                success: false,
-                message: "Failed to send WhatsApp message",
-                error: result.error
+            return sendError(res, ErrorResponses.OPERATION_FAILED, {
+                operation: 'send WhatsApp message',
+                details: result.error
             });
         }
 
     } catch (error) {
         console.error(`Error sending WhatsApp message to patient: ${error.message}`);
-        res.status(500).json({
-            success: false,
-            message: "Internal server error while sending message",
+        return sendError(res, ErrorResponses.INTERNAL_ERROR, {
+            details: 'Internal server error while sending message',
             error: error.message
         });
     }
@@ -180,27 +176,24 @@ router.get('/wa/send', async (req, res) => {
     try {
         // Enhanced input validation
         if (!dateparam) {
-            return res.status(400).json({
-                success: false,
-                message: "Date parameter is required"
+            return sendError(res, ErrorResponses.MISSING_PARAMETERS, {
+                required: ['date']
             });
         }
 
         // Validate date format (YYYY-MM-DD)
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
         if (!dateRegex.test(dateparam)) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid date format. Expected YYYY-MM-DD"
+            return sendError(res, ErrorResponses.INVALID_INPUT, {
+                details: 'Invalid date format. Expected YYYY-MM-DD'
             });
         }
 
         // Validate that it's a valid date
         const dateObj = new Date(dateparam);
         if (isNaN(dateObj.getTime()) || dateObj.toISOString().slice(0, 10) !== dateparam) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid date value"
+            return sendError(res, ErrorResponses.INVALID_INPUT, {
+                details: 'Invalid date value'
             });
         }
 
@@ -209,9 +202,9 @@ router.get('/wa/send', async (req, res) => {
         // Check if client is ready
         if (!whatsapp.isReady()) {
             const status = whatsapp.getStatus();
-            return res.status(400).json({
-                success: false,
-                message: "WhatsApp client is not ready. Please wait for initialization to complete.",
+            return sendError(res, ErrorResponses.SERVICE_UNAVAILABLE, {
+                service: 'WhatsApp',
+                details: 'WhatsApp client is not ready. Please wait for initialization to complete.',
                 clientStatus: status,
                 requiresRestart: status.circuitBreakerOpen
             });
@@ -244,9 +237,8 @@ router.get('/wa/send', async (req, res) => {
 
     } catch (error) {
         console.error(`Error starting WhatsApp send: ${error.message}`);
-        res.status(500).json({
-            success: false,
-            message: `Failed to start sending process: ${error.message}`,
+        return sendError(res, ErrorResponses.INTERNAL_ERROR, {
+            details: 'Failed to start sending process',
             error: error.message
         });
     }
@@ -268,7 +260,10 @@ router.post('/sendmedia', async (req, res) => {
         await sendImg_(phone, base64Data);
         res.send('OK');
     } catch (error) {
-        res.status(500).send('Failed to send image');
+        return sendError(res, ErrorResponses.OPERATION_FAILED, {
+            operation: 'send image',
+            details: error.message
+        });
     }
 });
 
@@ -283,7 +278,10 @@ router.get('/sendxrayfile', async (req, res) => {
         const state = await sendXray_(phone, file);
         res.json(state);
     } catch (error) {
-        res.status(500).json({ error: 'Failed to send X-ray file' });
+        return sendError(res, ErrorResponses.OPERATION_FAILED, {
+            operation: 'send X-ray file',
+            details: error.message
+        });
     }
 });
 
@@ -301,9 +299,8 @@ router.post('/sendmedia2', upload.none(), async (req, res) => {
         console.log(`Sendmedia2 request - Program: ${prog}, Phone: ${phone}, Files: ${paths.length}`);
 
         if (!phone || !prog || !paths.length) {
-            return res.status(400).json({
-                result: "ERROR",
-                error: "Missing required parameters (phone, prog, or file)"
+            return sendError(res, ErrorResponses.MISSING_PARAMETERS, {
+                required: ['phone', 'prog', 'file']
             });
         }
 
@@ -354,9 +351,8 @@ router.post('/sendmedia2', upload.none(), async (req, res) => {
                 }
             }
         } else {
-            return res.status(400).json({
-                result: "ERROR",
-                error: `Unsupported program: ${prog}. Use 'WhatsApp' or 'Telegram'`
+            return sendError(res, ErrorResponses.INVALID_INPUT, {
+                details: `Unsupported program: ${prog}. Use 'WhatsApp' or 'Telegram'`
             });
         }
 
@@ -365,9 +361,9 @@ router.post('/sendmedia2', upload.none(), async (req, res) => {
         res.json(state);
     } catch (error) {
         console.error('Error in sendmedia2:', error);
-        res.status(500).json({
-            result: "ERROR",
-            error: error.message || "Internal server error"
+        return sendError(res, ErrorResponses.INTERNAL_ERROR, {
+            details: 'Error processing media files',
+            error: error.message
         });
     }
 });
@@ -388,8 +384,9 @@ router.get('/wa/qr', async (req, res) => {
 
       // Just check if QR code is available
       if (!messageState || !messageState.qr) {
-        return res.status(404).json({
-          error: 'QR code not available yet',
+        return sendError(res, ErrorResponses.NOT_FOUND, {
+          resource: 'QR code',
+          details: 'QR code not available yet',
           status: 'waiting',
           timestamp: Date.now()
         });
@@ -411,7 +408,10 @@ router.get('/wa/qr', async (req, res) => {
       });
     } catch (error) {
       console.error('Error generating WhatsApp QR code image:', error);
-      res.status(500).json({ error: 'Error generating QR code' });
+      return sendError(res, ErrorResponses.INTERNAL_ERROR, {
+        details: 'Error generating QR code',
+        error: error.message
+      });
     }
 });
 
@@ -434,9 +434,8 @@ router.get('/wa/status', (req, res) => {
       });
     } catch (error) {
       console.error("Error getting WhatsApp client status:", error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to get WhatsApp client status",
+      return sendError(res, ErrorResponses.INTERNAL_ERROR, {
+        details: 'Failed to get WhatsApp client status',
         error: error.message
       });
     }
@@ -460,8 +459,8 @@ router.get('/wa/detailed-status', async (req, res) => {
         });
     } catch (error) {
         console.error("Error getting detailed status:", error);
-        res.status(500).json({
-            success: false,
+        return sendError(res, ErrorResponses.INTERNAL_ERROR, {
+            details: 'Failed to get detailed status',
             error: error.message
         });
     }
@@ -489,9 +488,8 @@ router.post('/wa/restart', async (req, res) => {
       });
     } catch (error) {
       console.error("Error restarting WhatsApp client:", error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to restart WhatsApp client",
+      return sendError(res, ErrorResponses.INTERNAL_ERROR, {
+        details: 'Failed to restart WhatsApp client',
         error: error.message
       });
     }
@@ -516,17 +514,15 @@ router.post('/wa/destroy', async (req, res) => {
         authPreserved: true
       });
     } else {
-      res.status(500).json({
-        success: false,
-        message: result.error || "Destroy failed",
-        error: result.error
+      return sendError(res, ErrorResponses.OPERATION_FAILED, {
+        operation: 'destroy WhatsApp client',
+        details: result.error || 'Destroy failed'
       });
     }
   } catch (error) {
     console.error("Error destroying WhatsApp client:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to destroy WhatsApp client",
+    return sendError(res, ErrorResponses.INTERNAL_ERROR, {
+      details: 'Failed to destroy WhatsApp client',
       error: error.message
     });
   }
@@ -551,17 +547,15 @@ router.post('/wa/logout', async (req, res) => {
         authCleared: true
       });
     } else {
-      res.status(500).json({
-        success: false,
-        message: result.error || "Logout failed",
-        error: result.error
+      return sendError(res, ErrorResponses.OPERATION_FAILED, {
+        operation: 'logout WhatsApp client',
+        details: result.error || 'Logout failed'
       });
     }
   } catch (error) {
     console.error("Error logging out WhatsApp client:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to logout WhatsApp client",
+    return sendError(res, ErrorResponses.INTERNAL_ERROR, {
+      details: 'Failed to logout WhatsApp client',
       error: error.message
     });
   }
@@ -610,9 +604,8 @@ router.get('/wa/initialize', (req, res) => {
 
   } catch (error) {
     console.error("Error handling WhatsApp initialization request:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to process initialization request",
+    return sendError(res, ErrorResponses.INTERNAL_ERROR, {
+      details: 'Failed to process initialization request',
       error: error.message
     });
   }

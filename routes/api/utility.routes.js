@@ -16,6 +16,7 @@ import messageState from '../../services/state/messageState.js';
 import { getContacts } from '../../services/authentication/google.js';
 import { createPathResolver } from '../../utils/path-resolver.js';
 import config from '../../config/config.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 
@@ -40,7 +41,7 @@ router.get('/sendtwilio', async (req, res) => {
         await sms.sendSms(dateparam);
         res.send("SMS sent successfully");
     } catch (error) {
-        res.status(500).send("Failed to send SMS");
+        return ErrorResponses.internalError(res, "Failed to send SMS", error);
     }
 });
 
@@ -57,7 +58,7 @@ router.get('/checktwilio', async (req, res) => {
         await sms.checksms(dateparam);
         res.send("SMS check completed");
     } catch (error) {
-        res.status(500).send("Failed to check SMS");
+        return ErrorResponses.internalError(res, "Failed to check SMS", error);
     }
 });
 
@@ -118,17 +119,14 @@ router.get("/google", async (req, res) => {
     try {
         const { source } = req.query;
         if (!source) {
-            return res.status(400).json({ error: "Missing required parameter: source" });
+            return ErrorResponses.missingParameter(res, "source");
         }
 
         const contacts = await getContacts(source);
         res.json(contacts);
     } catch (error) {
         console.error("Error fetching Google contacts:", error);
-        res.status(500).json({
-            error: "Failed to fetch Google contacts",
-            message: error.message
-        });
+        return ErrorResponses.internalError(res, "Failed to fetch Google contacts", error);
     }
 });
 
@@ -153,16 +151,12 @@ router.get('/convert-path', async (req, res) => {
         console.log('Convert-path request received:', { webPath, machinePath: config.fileSystem.machinePath });
 
         if (!webPath) {
-            return res.status(400).json({
-                error: "Missing path parameter"
-            });
+            return ErrorResponses.missingParameter(res, "path");
         }
 
         if (!config.fileSystem.machinePath) {
             console.error('MACHINE_PATH environment variable not set');
-            return res.status(500).json({
-                error: "MACHINE_PATH environment variable not configured"
-            });
+            return ErrorResponses.internalError(res, "MACHINE_PATH environment variable not configured");
         }
 
         // Create path resolver
@@ -190,9 +184,7 @@ router.get('/convert-path', async (req, res) => {
 
     } catch (error) {
         console.error('Error converting path:', error);
-        res.status(500).json({
-            error: error.message || "Internal server error"
-        });
+        return ErrorResponses.internalError(res, "Internal server error", error);
     }
 });
 

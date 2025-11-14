@@ -20,6 +20,7 @@ import { authenticate, authorize } from '../../middleware/auth.js';
 import { requireRecordAge, getPatientCreationDate } from '../../middleware/time-based-auth.js';
 import { WebSocketEvents } from '../../services/messaging/websocket-events.js';
 import { getOption } from '../../services/database/queries/options-queries.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
 
 const router = express.Router();
 
@@ -56,7 +57,7 @@ router.get("/settings/patients-folder", async (req, res) => {
         res.json({ patientsFolder: patientsFolder || '' });
     } catch (error) {
         console.error('Error fetching PatientsFolder setting:', error);
-        res.status(500).json({ error: 'Failed to fetch PatientsFolder setting' });
+        return ErrorResponses.internalError(res, 'Failed to fetch PatientsFolder setting', error);
     }
 });
 
@@ -111,17 +112,16 @@ router.get("/getxray", async (req, res) => {
         const { code: pid, file, detailsDir } = req.query;
 
         if (!pid || !file) {
-            return res.status(400).json({ error: 'Missing required parameters: code and file' });
+            return ErrorResponses.badRequest(res, 'Missing required parameters: code and file');
         }
 
         const imagePath = await imaging.processXrayImage(pid, file, detailsDir);
         res.sendFile(imagePath);
     } catch (error) {
         console.error('Error processing X-ray:', error);
-        res.status(500).json({
-            error: 'X-ray processing failed',
+        return ErrorResponses.internalError(res, 'X-ray processing failed', {
             message: error.message,
-            details: 'X-ray processing tool may not be available in this environment'
+            note: 'X-ray processing tool may not be available in this environment'
         });
     }
 });
@@ -170,7 +170,7 @@ router.get("/patientsPhones", async (req, res) => {
         res.json(phonesList);
     } catch (error) {
         console.error("Error fetching patients phones:", error);
-        res.status(500).json({ error: "Failed to fetch patients phones" });
+        return ErrorResponses.internalError(res, 'Failed to fetch patients phones', error);
     }
 });
 
@@ -264,9 +264,7 @@ router.get('/patients/search', async (req, res) => {
         res.json(patients);
     } catch (error) {
         console.error('Error searching patients:', error);
-        res.status(500).json({
-            error: error.message || "Failed to search patients"
-        });
+        return ErrorResponses.internalError(res, 'Failed to search patients', error);
     }
 });
 
@@ -280,19 +278,19 @@ router.get('/getpatient/:personId', async (req, res) => {
     try {
         const { personId } = req.params;
         if (!personId) {
-            return res.status(400).json({ error: "Missing required parameter: personId" });
+            return ErrorResponses.missingParameter(res, 'personId');
         }
 
         const patient = await getPatientById(parseInt(personId));
 
         if (!patient) {
-            return res.status(404).json({ error: "Patient not found" });
+            return ErrorResponses.notFound(res, 'Patient');
         }
 
         res.json(patient);
     } catch (error) {
         console.error("Error fetching patient:", error);
-        res.status(500).json({ error: "Failed to fetch patient" });
+        return ErrorResponses.internalError(res, 'Failed to fetch patient', error);
     }
 });
 
@@ -306,9 +304,7 @@ router.post('/patients', async (req, res) => {
 
         // Basic validation
         if (!patientData.patientName || !patientData.patientName.trim()) {
-            return res.status(400).json({
-                error: "Patient name is required"
-            });
+            return ErrorResponses.badRequest(res, 'Patient name is required');
         }
 
         // Trim string values
@@ -333,9 +329,7 @@ router.post('/patients', async (req, res) => {
 
     } catch (error) {
         console.error('Error creating patient:', error);
-        res.status(500).json({
-            error: error.message || "Failed to create patient"
-        });
+        return ErrorResponses.internalError(res, 'Failed to create patient', error);
     }
 });
 
@@ -350,18 +344,14 @@ router.put('/patients/:personId', async (req, res) => {
 
         // Basic validation
         if (!patientData.PatientName || !patientData.PatientName.trim()) {
-            return res.status(400).json({
-                error: "Patient name is required"
-            });
+            return ErrorResponses.badRequest(res, 'Patient name is required');
         }
 
         const result = await updatePatient(personId, patientData);
         res.json({ success: true, message: 'Patient updated successfully' });
     } catch (error) {
         console.error('Error updating patient:', error);
-        res.status(500).json({
-            error: error.message || "Failed to update patient"
-        });
+        return ErrorResponses.internalError(res, 'Failed to update patient', error);
     }
 });
 
@@ -385,9 +375,7 @@ router.delete('/patients/:personId',
             res.json({ success: true, message: 'Patient deleted successfully' });
         } catch (error) {
             console.error('Error deleting patient:', error);
-            res.status(500).json({
-                error: error.message || "Failed to delete patient"
-            });
+            return ErrorResponses.internalError(res, 'Failed to delete patient', error);
         }
     }
 );
