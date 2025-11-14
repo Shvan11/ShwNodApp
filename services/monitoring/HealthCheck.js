@@ -3,6 +3,7 @@ import EventEmitter from 'events';
 import ResourceManager from '../core/ResourceManager.js';
 import ConnectionPool from '../database/ConnectionPool.js';
 import messageState from '../state/messageState.js';
+import { log } from '../../utils/logger.js';
 
 /**
  * Health check system for monitoring system components
@@ -115,7 +116,7 @@ class HealthCheckService extends EventEmitter {
       this.startCheck(name, interval);
     }
     
-    console.log(`Health check registered: ${name} (interval: ${interval}ms)`);
+    log.info(`Health check registered: ${name} (interval: ${interval}ms)`);
   }
 
   /**
@@ -163,7 +164,7 @@ class HealthCheckService extends EventEmitter {
       
       if (!result.healthy) {
         this.emit('check-failed', checkResult);
-        console.warn(`Health check failed: ${name} - ${result.message}`);
+        log.warn(`Health check failed: ${name} - ${result.message}`);
       }
 
     } catch (error) {
@@ -177,7 +178,7 @@ class HealthCheckService extends EventEmitter {
 
       this.lastResults.set(name, errorResult);
       this.emit('check-error', errorResult);
-      console.error(`Health check error for ${name}:`, error);
+      log.error(`Health check error for ${name}:`, error);
     }
   }
 
@@ -186,11 +187,11 @@ class HealthCheckService extends EventEmitter {
    */
   start() {
     if (this.isRunning) {
-      console.log('Health checks already running');
+      log.info('Health checks already running');
       return;
     }
 
-    console.log('Starting health check service');
+    log.info('Starting health check service');
     this.isRunning = true;
 
     // Start all registered checks with their default intervals
@@ -217,7 +218,7 @@ class HealthCheckService extends EventEmitter {
       return;
     }
 
-    console.log('Stopping health check service');
+    log.info('Stopping health check service');
     this.isRunning = false;
 
     // Clear all intervals
@@ -290,8 +291,8 @@ class HealthCheckService extends EventEmitter {
     
     this.checks.delete(name);
     this.lastResults.delete(name);
-    
-    console.log(`Health check removed: ${name}`);
+
+    log.info(`Health check removed: ${name}`);
   }
 
   /**
@@ -299,13 +300,13 @@ class HealthCheckService extends EventEmitter {
    */
   updateCheckInterval(name, newInterval) {
     if (!this.checks.has(name)) {
-      console.warn(`Health check ${name} not found`);
+      log.warn(`Health check ${name} not found`);
       return;
     }
 
     if (this.isRunning) {
       this.startCheck(name, newInterval);
-      console.log(`Health check interval updated: ${name} -> ${newInterval}ms`);
+      log.info(`Health check interval updated: ${name} -> ${newInterval}ms`);
     }
   }
 }

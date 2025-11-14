@@ -2,6 +2,7 @@
 import twilio from 'twilio';
 import config from '../../config/config.js';
 import * as database from '../database/queries/messaging-queries.js';
+import { log } from '../../utils/logger.js';
 
 /**
  * Service for SMS messaging operations
@@ -10,9 +11,9 @@ class SmsService {
     constructor() {
         const accountSid = config.twilio.accountSid;
         const authToken = config.twilio.authToken;
-        
+
         if (!accountSid || !authToken) {
-            console.warn('Twilio credentials not configured');
+            log.warn('Twilio credentials not configured');
             this.client = null;
         } else {
             this.client = twilio(accountSid, authToken);
@@ -47,7 +48,7 @@ class SmsService {
                         this.sentSmsList.push({ id: sms.id, sid: message.sid });
                     }
                 } catch (error) {
-                    console.error('Error sending SMS:', error);
+                    log.error('Error sending SMS:', error);
                 }
             }
         }
@@ -84,7 +85,7 @@ class SmsService {
                             return { id: sid.id, status: message.status };
                         });
                 } catch (error) {
-                    console.error('Error checking SMS status:', error);
+                    log.error('Error checking SMS status:', error);
                     return { id: sid.id, status: 'error' };
                 }
             })

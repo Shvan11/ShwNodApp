@@ -8,6 +8,7 @@
  */
 
 import { executeQuery, TYPES } from '../services/database/index.js';
+import { log } from '../utils/logger.js';
 
 /**
  * Check if date is today (simple!)
@@ -78,7 +79,7 @@ export function requireRecordAge(options) {
       // Record created today - allow operation
       next();
     } catch (error) {
-      console.error('Date-based auth error:', error);
+      log.error('Date-based auth error:', error);
       res.status(500).json({
         error: 'Authorization check failed',
         message: error.message

@@ -3,6 +3,7 @@ const { MessageMedia } = whatsapp;
 import fs from 'fs';
 import waInstance from './whatsapp.js';
 import { getPhoneCompatibleFilename } from '../../utils/filename-converter.js';
+import { log } from '../../utils/logger.js';
 
 /**
  * Send an image to a WhatsApp number (base64)
@@ -25,7 +26,7 @@ export async function sendImg_(number, base64Image) {
       return "OK";
     });
   } catch (error) {
-    console.error("Error in sendImg_:", error);
+    log.error("Error in sendImg_:", error);
     return "ERROR";
   }
 }
@@ -42,7 +43,7 @@ export async function sendXray_(number, file) {
 
     // Check if file exists
     if (!fs.existsSync(file)) {
-      console.error(`File not found: ${file}`);
+      log.error(`File not found: ${file}`);
       return { result: "ERROR", error: `File not found: ${file}` };
     }
 
@@ -50,7 +51,7 @@ export async function sendXray_(number, file) {
     try {
       fs.accessSync(file, fs.constants.R_OK);
     } catch (accessError) {
-      console.error(`File not readable: ${file}`, accessError);
+      log.error(`File not readable: ${file}`, accessError);
       return { result: "ERROR", error: `File not readable: ${file}` };
     }
 
@@ -67,8 +68,8 @@ export async function sendXray_(number, file) {
       
       // Ensure correct MIME type for images (critical for WhatsApp to display as photo)
       media.mimetype = 'image/jpeg';
-      
-      console.log(`Sending file: ${originalFilename} as ${convertedFilename} with MIME type: ${media.mimetype}`);
+
+      log.info(`Sending file: ${originalFilename} as ${convertedFilename} with MIME type: ${media.mimetype}`);
 
       // Remove + prefix if present for WhatsApp number validation
       const cleanNumber = number.startsWith('+') ? number.substring(1) : number;
@@ -85,7 +86,7 @@ export async function sendXray_(number, file) {
       return { result: "OK" };
     });
   } catch (error) {
-    console.error("Error in sendXray_:", error);
+    log.error("Error in sendXray_:", error);
     return { result: "ERROR", error: error.message };
   }
 }

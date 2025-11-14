@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 import config from './config/config.js';
 import { setupWebSocketServer } from './utils/websocket.js';
 import { setupMiddleware } from './middleware/index.js';
-import apiRoutes from './routes/api.js';
+import apiRoutes from './routes/api/index.js';
 import webRoutes from './routes/web.js';
 import calendarRoutes from './routes/calendar.js';
 import adminRoutes from './routes/admin.js';
@@ -30,6 +30,8 @@ import { testConnection, testConnectionWithRetry } from './services/database/ind
 import { createPathResolver } from './utils/path-resolver.js';
 import queueProcessor from './services/sync/queue-processor.js';
 import { startPeriodicPolling, stopPeriodicPolling } from './services/sync/reverse-sync-poller.js';
+import { log } from './utils/logger.js';
+import { requestTimeout, TIMEOUTS } from './middleware/timeout.js';
 
 // Get current file and directory name for ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -44,34 +46,34 @@ const port = config.server.port || 3000;
 
 // Create HTTP server
 const server = createServer(app);
-console.log('🌐 HTTP server created');
+log.info('🌐 HTTP server created');
 
 // ===== ADDED: Enhanced startup sequence with error handling =====
 async function initializeApplication() {
   try {
-    console.log('🚀 Starting Shwan Orthodontics Application...');
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`Port: ${port}`);
+    log.info('🚀 Starting Shwan Orthodontics Application...');
+    log.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    log.info(`Port: ${port}`);
 
     // ===== ADDED: Test database connectivity with retry logic =====
-    console.log('📊 Testing database connectivity...');
+    log.info('📊 Testing database connectivity...');
     const dbTest = await testConnectionWithRetry();
     if (!dbTest.success) {
-      console.error('❌ Database connection failed after retries:', dbTest.error);
-      console.log('💡 Please check your database configuration and ensure the server is running');
-      console.log('🔄 Application will continue to retry database connection in background');
+      log.error('❌ Database connection failed after retries:', dbTest.error);
+      log.info('💡 Please check your database configuration and ensure the server is running');
+      log.info('🔄 Application will continue to retry database connection in background');
       // Start background retry mechanism
       startBackgroundDatabaseRetry();
     } else {
-      console.log('✅ Database connection successful');
+      log.info('✅ Database connection successful');
     }
 
     // Setup middleware
-    console.log('⚙️  Setting up middleware...');
+    log.info('⚙️  Setting up middleware...');
     setupMiddleware(app);
 
     // ===== ADDED: Session configuration for authentication =====
-    console.log('🔐 Setting up session management...');
+    log.info('🔐 Setting up session management...');
     const SQLiteStoreSession = SQLiteStore(session);
 
     app.use(session({
@@ -93,10 +95,16 @@ async function initializeApplication() {
       name: 'shwan.sid' // Custom cookie name
     }));
 
-    console.log('✅ Session management configured');
+    log.info('✅ Session management configured');
+
+    // ===== ADDED: Request timeout configuration =====
+    log.info('⏱️  Setting up request timeout middleware...');
+    // Set global timeout for all requests (30 seconds default)
+    app.use(requestTimeout(TIMEOUTS.DEFAULT));
+    log.info(`✅ Global request timeout set to ${TIMEOUTS.DEFAULT}ms (30 seconds)`);
 
     // Setup static files (MUST BE AFTER AUTHENTICATION to protect routes)
-    console.log('📁 Setting up static file serving...');
+    log.info('📁 Setting up static file serving...');
 
     // Use path resolver for cross-platform compatibility
     const pathResolver = createPathResolver(config.fileSystem.machinePath);
@@ -106,15 +114,15 @@ async function initializeApplication() {
     app.use('/data', express.static('./data')); // Serve data directory for template files
 
     // Setup WebSocket
-    console.log('🔌 Setting up WebSocket server...');
+    log.info('🔌 Setting up WebSocket server...');
     const wsEmitter = setupWebSocketServer(server);
 
     // Inject WebSocket emitter into API routes to avoid circular imports
-    const { setWebSocketEmitter } = await import('./routes/api.js');
+    const { setWebSocketEmitter } = await import('./routes/api/index.js');
     setWebSocketEmitter(wsEmitter);
 
     // Use routes
-    console.log('🛣️  Setting up routes...');
+    log.info('🛣️  Setting up routes...');
 
     // ===== AUTHENTICATION MIDDLEWARE (MUST BE BEFORE ROUTES) =====
     // Public routes - NO authentication required
@@ -126,7 +134,7 @@ async function initializeApplication() {
     });
 
     if (process.env.AUTHENTICATION_ENABLED === 'true') {
-      console.log('🔐 Authentication ENABLED - Protecting routes');
+      log.info('🔐 Authentication ENABLED - Protecting routes');
       const { authenticate, authenticateWeb } = await import('./middleware/auth.js');
 
       // Protect API routes (returns 401 JSON)
@@ -135,7 +143,7 @@ async function initializeApplication() {
       // Protect web routes (redirects to /login.html)
       app.use('/', authenticateWeb);
     } else {
-      console.log('⚠️  Authentication DISABLED - All routes are public');
+      log.info('⚠️  Authentication DISABLED - All routes are public');
     }
 
     // ===== MOUNT ROUTES (AFTER AUTHENTICATION) =====
@@ -153,26 +161,26 @@ async function initializeApplication() {
     app.use('/', webRoutes);
 
     // ===== ADDED: Initialize health monitoring =====
-    console.log('🏥 Starting health monitoring...');
+    log.info('🏥 Starting health monitoring...');
     HealthCheck.start();
 
     // Initialize Google Drive client
-    console.log('📁 Initializing Google Drive client...');
+    log.info('📁 Initializing Google Drive client...');
     const driveInitialized = driveClient.initialize();
     if (driveInitialized) {
-      console.log('✅ Google Drive client initialized successfully');
+      log.info('✅ Google Drive client initialized successfully');
     } else {
-      console.log('⚠️  Google Drive not configured. PDF upload will be disabled.');
-      console.log('💡 To enable PDF uploads, configure Google Drive credentials in .env');
+      log.info('⚠️  Google Drive not configured. PDF upload will be disabled.');
+      log.info('💡 To enable PDF uploads, configure Google Drive credentials in .env');
     }
 
     // Connect WhatsApp service to WebSocket emitter
-    console.log('💬 Connecting WhatsApp service...');
+    log.info('💬 Connecting WhatsApp service...');
     whatsappService.setEmitter(wsEmitter);
 
     // Set up comprehensive WhatsApp event handlers
     whatsappService.on('MessageSent', async (person) => {
-        console.log("MessageSent event fired:", person);
+        log.info("MessageSent event fired:", person);
         try {
             await messageState.addPerson(person);
             
@@ -205,14 +213,14 @@ async function initializeApplication() {
                 wsEmitter.emit('broadcast_message', progressMessage);
             }
             
-            console.log("MessageSent processed successfully");
+            log.info("MessageSent processed successfully");
         } catch (error) {
-            console.error("Error handling MessageSent event:", error);
+            log.error("Error handling MessageSent event:", error);
         }
     });
 
     whatsappService.on('MessageFailed', async (person) => {
-        console.log("MessageFailed event fired:", person);
+        log.info("MessageFailed event fired:", person);
         try {
             person.success = '&times;';
             await messageState.addPerson(person);
@@ -247,14 +255,14 @@ async function initializeApplication() {
                 wsEmitter.emit('broadcast_message', progressMessage);
             }
             
-            console.log("MessageFailed processed successfully");
+            log.info("MessageFailed processed successfully");
         } catch (error) {
-            console.error("Error handling MessageFailed event:", error);
+            log.error("Error handling MessageFailed event:", error);
         }
     });
 
     whatsappService.on('finishedSending', async () => {
-        console.log("finishedSending event fired");
+        log.info("finishedSending event fired");
         try {
             await messageState.setFinishedSending(true);
             
@@ -273,12 +281,12 @@ async function initializeApplication() {
                 wsEmitter.emit('broadcast_message', message);
             }
         } catch (error) {
-            console.error("Error handling finishedSending event:", error);
+            log.error("Error handling finishedSending event:", error);
         }
     });
 
     whatsappService.on('ClientIsReady', async () => {
-        console.log("ClientIsReady event fired");
+        log.info("ClientIsReady event fired");
         try {
             await messageState.setClientReady(true);
             
@@ -291,14 +299,14 @@ async function initializeApplication() {
                 wsEmitter.emit('broadcast_message', message);
             }
             
-            console.log("✅ WhatsApp client is ready and state updated");
+            log.info("✅ WhatsApp client is ready and state updated");
         } catch (error) {
-            console.error("❌ Error updating WhatsApp client ready state:", error);
+            log.error("❌ Error updating WhatsApp client ready state:", error);
         }
     });
 
     whatsappService.on('qr', async (qr) => {
-        console.log("QR event fired");
+        log.info("QR event fired");
         try {
             await messageState.setQR(qr);
             
@@ -311,19 +319,19 @@ async function initializeApplication() {
                 wsEmitter.emit('broadcast_message', message);
             }
         } catch (error) {
-            console.error("Error handling QR event:", error);
+            log.error("Error handling QR event:", error);
         }
     });
 
     // ===== ADDED: Enhanced error handling for startup =====
     // Handle uncaught exceptions gracefully during startup
     process.on('uncaughtException', (error) => {
-      console.error('💥 Uncaught Exception during startup:', error);
+      log.error('💥 Uncaught Exception during startup:', error);
       gracefulShutdown('uncaughtException');
     });
 
     process.on('unhandledRejection', (reason, promise) => {
-      console.error('💥 Unhandled Rejection during startup at:', promise, 'reason:', reason);
+      log.error('💥 Unhandled Rejection during startup at:', promise, 'reason:', reason);
       gracefulShutdown('unhandledRejection');
     });
 
@@ -333,16 +341,16 @@ async function initializeApplication() {
     // ===== ADDED: Automatic WhatsApp client initialization =====
     await initializeWhatsAppOnStartup();
 
-    console.log('🎉 Application started successfully!');
-    console.log(`🌐 Server running at http://localhost:${port}`);
-    console.log(`🔒 HTTPS available via Caddy at https://clinic.local`);
-    console.log(`📊 Health check available at http://localhost:${port}/api/health`);
+    log.info('🎉 Application started successfully!');
+    log.info(`🌐 Server running at http://localhost:${port}`);
+    log.info(`🔒 HTTPS available via Caddy at https://clinic.local`);
+    log.info(`📊 Health check available at http://localhost:${port}/api/health`);
     
     return { wsEmitter };
 
   } catch (error) {
-    console.error('💥 Failed to initialize application:', error);
-    console.log('🔄 Attempting graceful shutdown...');
+    log.error('💥 Failed to initialize application:', error);
+    log.info('🔄 Attempting graceful shutdown...');
     await gracefulShutdown('initialization-error');
     process.exit(1);
   }
@@ -355,29 +363,29 @@ function startServer() {
       if (error) {
         reject(error);
       } else {
-        console.log(`✅ Server listening on port: ${port}`);
+        log.info(`✅ Server listening on port: ${port}`);
 
         // Start SQL Server → PostgreSQL sync (webhook-based, zero polling)
         try {
           queueProcessor.start();
-          console.log('✅ Queue processor started - Webhook-based sync enabled (SQL Server → Supabase)');
-          console.log('   Real-time: SQL Server triggers webhook on data changes');
-          console.log('   Reverse sync: Supabase webhooks handle doctor edits (see routes/sync-webhook.js)');
+          log.info('✅ Queue processor started - Webhook-based sync enabled (SQL Server → Supabase)');
+          log.info('   Real-time: SQL Server triggers webhook on data changes');
+          log.info('   Reverse sync: Supabase webhooks handle doctor edits (see routes/sync-webhook.js)');
         } catch (error) {
-          console.warn('⚠️  Queue processor failed to start:', error.message);
-          console.log('   Sync will not be available. Check Supabase credentials.');
+          log.warn('⚠️  Queue processor failed to start:', error.message);
+          log.info('   Sync will not be available. Check Supabase credentials.');
         }
 
         // Start reverse sync poller (Supabase → SQL Server)
         // Catches missed changes when server was offline + periodic hourly checks
         try {
           startPeriodicPolling(); // Uses env config or defaults to 60 min
-          console.log('✅ Reverse sync poller started (Supabase → SQL Server)');
-          console.log('   Startup: Catches changes missed while server was offline');
-          console.log('   Periodic: Hourly checks as fallback for webhook failures');
+          log.info('✅ Reverse sync poller started (Supabase → SQL Server)');
+          log.info('   Startup: Catches changes missed while server was offline');
+          log.info('   Periodic: Hourly checks as fallback for webhook failures');
         } catch (error) {
-          console.warn('⚠️  Reverse sync poller failed to start:', error.message);
-          console.log('   Missed changes will not be recovered. Check Supabase configuration.');
+          log.warn('⚠️  Reverse sync poller failed to start:', error.message);
+          log.info('   Missed changes will not be recovered. Check Supabase configuration.');
         }
 
         resolve(serverInstance);
@@ -387,10 +395,10 @@ function startServer() {
     // Handle server errors
     serverInstance.on('error', (error) => {
       if (error.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${port} is already in use`);
-        console.log('💡 Please check if another instance is running or use a different port');
+        log.error(`❌ Port ${port} is already in use`);
+        log.info('💡 Please check if another instance is running or use a different port');
       } else {
-        console.error('❌ Server error:', error);
+        log.error('❌ Server error:', error);
       }
       reject(error);
     });
@@ -399,50 +407,50 @@ function startServer() {
 
 // ===== ADDED: Comprehensive graceful shutdown =====
 async function gracefulShutdown(signal) {
-  console.log(`\n🛑 Graceful shutdown initiated by ${signal}`);
+  log.info(`\n🛑 Graceful shutdown initiated by ${signal}`);
   
   try {
     // Stop accepting new connections
     if (server) {
-      console.log('🔌 Closing HTTP server...');
+      log.info('🔌 Closing HTTP server...');
       server.close(() => {
-        console.log('✅ HTTP server closed');
+        log.info('✅ HTTP server closed');
       });
     }
 
     // Stop health monitoring
-    console.log('🏥 Stopping health monitoring...');
+    log.info('🏥 Stopping health monitoring...');
     HealthCheck.stop();
 
     // Stop reverse sync poller
-    console.log('🔄 Stopping reverse sync poller...');
+    log.info('🔄 Stopping reverse sync poller...');
     stopPeriodicPolling();
 
     // Clean up WhatsApp service
     if (whatsappService) {
-      console.log('💬 Shutting down WhatsApp service...');
+      log.info('💬 Shutting down WhatsApp service...');
       await whatsappService.gracefulShutdown();
     }
 
     // Clean up message state
     if (messageState) {
-      console.log('📊 Cleaning up message state...');
+      log.info('📊 Cleaning up message state...');
       await messageState.cleanup();
     }
 
     // Close database connections
-    console.log('🗄️  Closing database connections...');
+    log.info('🗄️  Closing database connections...');
     await ConnectionPool.cleanup();
 
     // Final resource cleanup via Resource Manager
-    console.log('🧹 Final resource cleanup...');
+    log.info('🧹 Final resource cleanup...');
     // ResourceManager will handle its own cleanup via process handlers
 
-    console.log('✅ Graceful shutdown completed successfully');
+    log.info('✅ Graceful shutdown completed successfully');
     process.exit(0);
 
   } catch (error) {
-    console.error('❌ Error during graceful shutdown:', error);
+    log.error('❌ Error during graceful shutdown:', error);
     process.exit(1);
   }
 }
@@ -450,19 +458,19 @@ async function gracefulShutdown(signal) {
 // ===== ADDED: Enhanced process signal handlers =====
 // Handle termination signals
 process.on('SIGTERM', () => {
-  console.log('\n📡 Received SIGTERM signal');
+  log.info('\n📡 Received SIGTERM signal');
   gracefulShutdown('SIGTERM');
 });
 
 process.on('SIGINT', () => {
-  console.log('\n📡 Received SIGINT signal (Ctrl+C)');
+  log.info('\n📡 Received SIGINT signal (Ctrl+C)');
   gracefulShutdown('SIGINT');
 });
 
 // Handle Windows specific signals
 if (process.platform === 'win32') {
   process.on('SIGHUP', () => {
-    console.log('\n📡 Received SIGHUP signal');
+    log.info('\n📡 Received SIGHUP signal');
     gracefulShutdown('SIGHUP');
   });
 }
@@ -500,11 +508,11 @@ async function initializeWhatsAppOnStartup() {
   const autoInit = process.env.WHATSAPP_AUTO_INIT !== 'false';
   
   if (!autoInit) {
-    console.log('📱 WhatsApp auto-initialization disabled via WHATSAPP_AUTO_INIT=false');
+    log.info('📱 WhatsApp auto-initialization disabled via WHATSAPP_AUTO_INIT=false');
     return;
   }
 
-  console.log('📱 Starting automatic WhatsApp client initialization...');
+  log.info('📱 Starting automatic WhatsApp client initialization...');
   
   try {
     // Add a small delay to ensure all services are ready
@@ -512,13 +520,13 @@ async function initializeWhatsAppOnStartup() {
     
     // Check if WhatsApp service is ready
     if (!whatsappService) {
-      console.log('⚠️  WhatsApp service not available, skipping auto-initialization');
+      log.info('⚠️  WhatsApp service not available, skipping auto-initialization');
       return;
     }
 
     // Check current state
     const currentState = whatsappService.getStatus();
-    console.log(`📱 Current WhatsApp state: ${currentState.state || 'unknown'}`);
+    log.info(`📱 Current WhatsApp state: ${currentState.state || 'unknown'}`);
     
     // Only initialize if client is disconnected
     if (currentState.state === 'DISCONNECTED' || currentState.state === 'ERROR') {
@@ -526,9 +534,9 @@ async function initializeWhatsAppOnStartup() {
       const hasExistingSession = await whatsappService.checkExistingSession();
       
       if (hasExistingSession) {
-        console.log('📱 Found existing session - initializing WhatsApp client...');
+        log.info('📱 Found existing session - initializing WhatsApp client...');
       } else {
-        console.log('📱 No existing session - initializing WhatsApp client (will require QR scan)...');
+        log.info('📱 No existing session - initializing WhatsApp client (will require QR scan)...');
       }
       
       // Initialize with a timeout
@@ -540,23 +548,23 @@ async function initializeWhatsAppOnStartup() {
       await Promise.race([initPromise, timeoutPromise]);
       
       if (hasExistingSession) {
-        console.log('✅ WhatsApp client initialization completed - session should be restored');
+        log.info('✅ WhatsApp client initialization completed - session should be restored');
       } else {
-        console.log('✅ WhatsApp client initialization started - waiting for QR scan');
+        log.info('✅ WhatsApp client initialization started - waiting for QR scan');
       }
       
     } else if (currentState.state === 'CONNECTED') {
-      console.log('✅ WhatsApp client already connected');
+      log.info('✅ WhatsApp client already connected');
     } else if (currentState.state === 'INITIALIZING') {
-      console.log('📱 WhatsApp client already initializing');
+      log.info('📱 WhatsApp client already initializing');
     } else {
-      console.log(`📱 WhatsApp client in state: ${currentState.state}, skipping initialization`);
+      log.info(`📱 WhatsApp client in state: ${currentState.state}, skipping initialization`);
     }
     
   } catch (error) {
     // Don't fail the entire application if WhatsApp initialization fails
-    console.warn('⚠️  WhatsApp auto-initialization failed (application will continue):', error.message);
-    console.log('💡 WhatsApp can be initialized manually later via the web interface');
+    log.warn('⚠️  WhatsApp auto-initialization failed (application will continue):', error.message);
+    log.info('💡 WhatsApp can be initialized manually later via the web interface');
   }
 }
 
@@ -568,7 +576,7 @@ function startBackgroundDatabaseRetry() {
     try {
       const dbTest = await testConnection();
       if (dbTest.success) {
-        console.log('✅ Database connection restored!');
+        log.info('✅ Database connection restored!');
         clearInterval(retryInterval);
       }
     } catch (error) {
@@ -581,8 +589,8 @@ function startBackgroundDatabaseRetry() {
 export { gracefulShutdown };
 
 // ===== ADDED: Log application readiness =====
-console.log('🎯 Application initialization complete - ready to serve requests');
-console.log(`📋 Available endpoints:
+log.info('🎯 Application initialization complete - ready to serve requests');
+log.info(`📋 Available endpoints:
   • Main Application: http://localhost:${port} (via Caddy: https://clinic.local)
   • API Health Check: http://localhost:${port}/api/health
   • Basic Health: http://localhost:${port}/health/basic
@@ -595,6 +603,6 @@ if (process.env.NODE_ENV === 'development') {
   setInterval(() => {
     const usage = process.memoryUsage();
     const uptime = process.uptime();
-    console.log(`📊 Performance: Memory ${Math.round(usage.heapUsed / 1024 / 1024)}MB, Uptime ${Math.floor(uptime)}s`);
+    log.info(`📊 Performance: Memory ${Math.round(usage.heapUsed / 1024 / 1024)}MB, Uptime ${Math.floor(uptime)}s`);
   }, 30000);
 }

@@ -4,6 +4,7 @@
  */
 import bcrypt from 'bcryptjs';
 import { executeQuery, TYPES } from '../services/database/index.js';
+import { log } from '../utils/logger.js';
 
 /**
  * Authentication middleware - checks if user is logged in
@@ -130,7 +131,7 @@ export async function verifyCredentials(username, password) {
     };
 
   } catch (error) {
-    console.error('Error verifying credentials:', error);
+    log.error('Error verifying credentials:', error);
     return {
       success: false,
       error: 'Authentication failed. Please try again.'

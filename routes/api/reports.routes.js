@@ -1,0 +1,185 @@
+/**
+ * Reports & Statistics Routes
+ * Handles financial statistics and daily invoice reports
+ */
+import express from 'express';
+import { log } from '../../utils/logger.js';
+import * as database from '../../services/database/index.js';
+import { sendError, ErrorResponses } from '../../utils/error-response.js';
+
+const router = express.Router();
+
+/**
+ * GET /statistics
+ * Get monthly financial statistics
+ * Query params: month, year, exchangeRate (optional)
+ */
+router.get('/statistics', async (req, res) => {
+    try {
+        const { month, year, exchangeRate } = req.query;
+
+        // Validate required parameters
+        if (!month || !year) {
+            return ErrorResponses.badRequest(res, 'Missing required parameters: month and year are required');
+        }
+
+        const monthNum = parseInt(month);
+        const yearNum = parseInt(year);
+        const exRate = exchangeRate ? parseInt(exchangeRate) : 1450; // Default exchange rate
+
+        // Validate month and year ranges
+        if (monthNum < 1 || monthNum > 12) {
+            return ErrorResponses.invalidParameter(res, 'month', 'must be between 1 and 12');
+        }
+
+        if (yearNum < 2000 || yearNum > 2100) {
+            return ErrorResponses.invalidParameter(res, 'year', 'must be between 2000 and 2100');
+        }
+
+        // Execute the stored procedure
+        const result = await database.executeStoredProcedure(
+            'ProcGrandTotal',
+            [
+                ['month', database.TYPES.Int, monthNum],
+                ['year', database.TYPES.Int, yearNum],
+                ['Ex', database.TYPES.Int, exRate]
+            ],
+            null, // beforeExec callback
+            (columns) => {
+                // Row mapper - convert columns to object
+                const row = {};
+                columns.forEach(column => {
+                    row[column.metadata.colName] = column.value;
+                });
+                return row;
+            }
+        );
+
+        // Calculate monthly totals
+        let totalIQD = 0;
+        let totalUSD = 0;
+        let totalExpensesIQD = 0;
+        let totalExpensesUSD = 0;
+        let finalQasaIQD = 0;
+        let finalQasaUSD = 0;
+
+        result.forEach(day => {
+            totalIQD += day.SumIQD || 0;
+            totalUSD += day.SumUSD || 0;
+            totalExpensesIQD += Math.abs(day.ExpensesIQD || 0);
+            totalExpensesUSD += Math.abs(day.ExpensesUSD || 0);
+            // Use the last day's Qasa values as the final balance
+            finalQasaIQD = day.QasaIQD || 0;
+            finalQasaUSD = day.QasaUSD || 0;
+        });
+
+        const netIQD = totalIQD - totalExpensesIQD;
+        const netUSD = totalUSD - totalExpensesUSD;
+        const grandTotalUSD = (netIQD / exRate) + netUSD;
+        const grandTotalIQD = netIQD + (netUSD * exRate);
+
+        res.json({
+            success: true,
+            month: monthNum,
+            year: yearNum,
+            exchangeRate: exRate,
+            dailyData: result,
+            summary: {
+                totalRevenue: {
+                    IQD: totalIQD,
+                    USD: totalUSD
+                },
+                totalExpenses: {
+                    IQD: totalExpensesIQD,
+                    USD: totalExpensesUSD
+                },
+                netProfit: {
+                    IQD: netIQD,
+                    USD: netUSD
+                },
+                grandTotal: {
+                    USD: Math.round(grandTotalUSD * 100) / 100,
+                    IQD: Math.round(grandTotalIQD)
+                },
+                cashBox: {
+                    IQD: finalQasaIQD,
+                    USD: finalQasaUSD
+                }
+            }
+        });
+
+    } catch (error) {
+        log.error("Error fetching statistics:", error);
+        ErrorResponses.internalError(res, 'Failed to fetch statistics', error);
+    }
+});
+
+/**
+ * GET /daily-invoices
+ * Get daily invoices for a specific date
+ * Query params: date (YYYY-MM-DD format)
+ */
+router.get('/daily-invoices', async (req, res) => {
+    try {
+        const { date } = req.query;
+
+        // Validate required parameter
+        if (!date) {
+            return ErrorResponses.missingParameter(res, 'date');
+        }
+
+        // Validate date format
+        const dateObj = new Date(date);
+        if (isNaN(dateObj.getTime())) {
+            return ErrorResponses.invalidParameter(res, 'date', 'Invalid date format');
+        }
+
+        // Execute the stored procedure
+        const result = await database.executeStoredProcedure(
+            'ProDailyInvoices',
+            [['iDate', database.TYPES.Date, dateObj]],
+            null,
+            (columns) => {
+                const row = {};
+                columns.forEach(column => {
+                    row[column.metadata.colName] = column.value;
+                });
+                return row;
+            }
+        );
+
+        // Get IQDReceived and USDReceived for each invoice
+        const enrichedInvoices = await Promise.all(result.map(async (invoice) => {
+            const invoiceDetails = await database.executeQuery(
+                'SELECT IQDReceived, USDReceived FROM tblInvoice WHERE invoiceID = @invoiceID',
+                [['invoiceID', database.TYPES.Int, invoice.invoiceID]],
+                (columns) => {
+                    const row = {};
+                    columns.forEach(column => {
+                        row[column.metadata.colName] = column.value;
+                    });
+                    return row;
+                }
+            );
+
+            return {
+                ...invoice,
+                IQDReceived: invoiceDetails[0]?.IQDReceived || 0,
+                USDReceived: invoiceDetails[0]?.USDReceived || 0
+            };
+        }));
+
+        res.json({
+            success: true,
+            date: date,
+            count: enrichedInvoices.length,
+            invoices: enrichedInvoices
+        });
+
+    } catch (error) {
+        log.error("Error fetching daily invoices:", error);
+        ErrorResponses.internalError(res, 'Failed to fetch daily invoices', error);
+    }
+});
+
+export default router;

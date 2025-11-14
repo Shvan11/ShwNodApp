@@ -3,6 +3,7 @@ import stateEvents from './stateEvents.js';
 // ===== FIXED: Import both the class and instance =====
 import StateManager, { StateManager as StateManagerClass } from './StateManager.js';
 import { MessageSchemas } from '../messaging/schemas.js';
+import { log } from '../../utils/logger.js';
 
 class MessageStateManager {
   constructor() {
@@ -48,9 +49,9 @@ class MessageStateManager {
         lastRequested: null
       }));
 
-      console.log('✅ MessageStateManager initialized successfully');
+      log.info('✅ MessageStateManager initialized successfully');
     } catch (error) {
-      console.error('❌ Error initializing MessageStateManager:', error);
+      log.error('❌ Error initializing MessageStateManager:', error);
       throw error;
     }
   }
@@ -135,7 +136,7 @@ class MessageStateManager {
         });
       }
 
-      console.error(`Failed to update message status for ${messageId}:`, error);
+      log.error(`Failed to update message status for ${messageId}:`, error);
       stateEvents.emit('message_status_error', { messageId, error: error.message });
       throw error;
     }
@@ -231,7 +232,7 @@ class MessageStateManager {
     // Add this line to emit the event when viewers connect
     stateEvents.emit('qr_viewer_connected');
 
-    console.log(`QR viewer ${viewerId || 'unknown'} registered. Active viewers: ${result.activeViewers}`);
+    log.info(`QR viewer ${viewerId || 'unknown'} registered. Active viewers: ${result.activeViewers}`);
     return result;
   }
 
@@ -301,7 +302,7 @@ class MessageStateManager {
       const actualCount = current.activeViewers || 0;
 
       if (expectedCount !== actualCount) {
-        console.warn(`QR viewer count mismatch - Expected: ${expectedCount}, Actual: ${actualCount}`);
+        log.warn(`QR viewer count mismatch - Expected: ${expectedCount}, Actual: ${actualCount}`);
         // Correct the count
         return {
           ...current,
@@ -314,7 +315,7 @@ class MessageStateManager {
     });
 
     if (result.activeViewers !== activeViewerIds.length) {
-      console.log(`Corrected QR viewer count to ${activeViewerIds.length}`);
+      log.info(`Corrected QR viewer count to ${activeViewerIds.length}`);
     }
 
     return result;
@@ -356,7 +357,7 @@ class MessageStateManager {
    * Reset all state
    */
   async reset() {
-    console.log("Resetting message state");
+    log.info("Resetting message state");
 
     await Promise.all([
       StateManager.atomicOperation(this.stateKeys.CLIENT_STATUS, () => ({
@@ -451,7 +452,7 @@ class MessageStateManager {
 
   // Cleanup methods
   cleanupQR() {
-    console.log("Cleaning up QR code");
+    log.info("Cleaning up QR code");
     StateManager.atomicOperation(this.stateKeys.QR_STATUS, (qrStatus) => ({
       ...(qrStatus || {}),
       qr: null,

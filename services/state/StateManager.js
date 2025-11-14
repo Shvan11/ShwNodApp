@@ -1,4 +1,6 @@
 // services/state/StateManager.js
+import { log } from '../../utils/logger.js';
+
 /**
  * Thread-safe state manager with atomic operations
  */
@@ -191,7 +193,7 @@ class StateManager {
     }
     
     if (expiredKeys.length > 0) {
-      console.warn(`Cleaning up ${expiredKeys.length} expired locks:`, expiredKeys);
+      log.warn(`Cleaning up ${expiredKeys.length} expired locks:`, expiredKeys);
       expiredKeys.forEach(key => this.locks.delete(key));
     }
     
@@ -287,8 +289,8 @@ class StateManager {
     if (backup.operations) {
       this.operations = backup.operations;
     }
-    
-    console.log(`State restored from backup (${backup.timestamp}), ${this.state.size} keys restored`);
+
+    log.info(`State restored from backup (${backup.timestamp}), ${this.state.size} keys restored`);
   }
 
   /**
@@ -332,8 +334,8 @@ class StateManager {
       if (importData.metadata?.operations) {
         this.operations = importData.metadata.operations;
       }
-      
-      console.log(`State imported, ${this.state.size} keys loaded`);
+
+      log.info(`State imported, ${this.state.size} keys loaded`);
     } catch (error) {
       throw new Error(`Failed to import state: ${error.message}`);
     }
@@ -343,16 +345,16 @@ class StateManager {
    * Clean up resources
    */
   cleanup() {
-    console.log('Cleaning up StateManager...');
-    
+    log.info('Cleaning up StateManager...');
+
     // Log final statistics
     const validation = this.validateState();
-    console.log('Final state validation:', validation);
-    
+    log.info('Final state validation:', validation);
+
     // Clear everything
     this.clear();
-    
-    console.log('StateManager cleanup completed');
+
+    log.info('StateManager cleanup completed');
   }
 
   /**
