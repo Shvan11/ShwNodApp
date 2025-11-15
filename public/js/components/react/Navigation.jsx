@@ -154,8 +154,8 @@ const Navigation = ({ patientId, currentPage }) => {
     // Define static navigation items (Photos removed - will be its own expandable section)
     const staticNavItems = [
         { key: 'works', page: 'works', label: 'Works', icon: 'fas fa-tooth' },
-        { key: 'appointments', page: 'appointments', label: 'Appointments', icon: 'fas fa-calendar-check' },
         { key: 'new-appointment', page: 'new-appointment', label: 'New Appointment', icon: 'fas fa-plus-circle' },
+        { key: 'appointments', page: 'appointments', label: 'Appointments', icon: 'fas fa-calendar-check' },
         { key: 'patient-info', page: 'patient-info', label: 'Patient Info', icon: 'fas fa-id-card' }
     ];
 
@@ -296,6 +296,43 @@ const Navigation = ({ patientId, currentPage }) => {
                         setMoreActionsExpanded(false);
                     }}
                 >
+
+                    <div
+                        className="sidebar-nav-item csimaging-item"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            handleOpenCSImaging();
+                        }}
+                        title="Open CS Imaging Trophy"
+                    >
+                        <div className="nav-item-icon">
+                            <i className="fas fa-radiation" />
+                        </div>
+                        <span className="nav-item-label">CS Imaging</span>
+                    </div>
+
+                    <div
+                        className="sidebar-nav-item folder-item"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            if (!patientsFolder) {
+                                alert('Patients folder path is not configured. Please check settings.');
+                                return;
+                            }
+                            // Construct full path: PatientsFolder + PatientID
+                            const fullPath = `${patientsFolder}${patientId}`;
+                            window.location.href = `explorer:${fullPath}`;
+                        }}
+                        title="Open Patient Folder"
+                    >
+                        <div className="nav-item-icon">
+                            <i className="fas fa-folder-open" />
+                        </div>
+                        <span className="nav-item-label">Open Folder</span>
+                    </div>
+
+
+
                     <div
                         className={`sidebar-nav-item more-actions-btn ${(currentPage === 'compare' || currentPage === 'xrays') ? 'active' : ''}`}
                         title="More Actions"
@@ -345,39 +382,7 @@ const Navigation = ({ patientId, currentPage }) => {
                     )}
                 </div>
 
-                <div
-                    className="sidebar-nav-item csimaging-item"
-                    onClick={(e) => {
-                        e.preventDefault();
-                        handleOpenCSImaging();
-                    }}
-                    title="Open CS Imaging Trophy"
-                >
-                    <div className="nav-item-icon">
-                        <i className="fas fa-radiation" />
-                    </div>
-                    <span className="nav-item-label">CS Imaging</span>
-                </div>
 
-                <div
-                    className="sidebar-nav-item folder-item"
-                    onClick={(e) => {
-                        e.preventDefault();
-                        if (!patientsFolder) {
-                            alert('Patients folder path is not configured. Please check settings.');
-                            return;
-                        }
-                        // Construct full path: PatientsFolder + PatientID
-                        const fullPath = `${patientsFolder}${patientId}`;
-                        window.location.href = `explorer:${fullPath}`;
-                    }}
-                    title="Open Patient Folder"
-                >
-                    <div className="nav-item-icon">
-                        <i className="fas fa-folder-open" />
-                    </div>
-                    <span className="nav-item-label">Open Folder</span>
-                </div>
             </div>
         </div>
     );
