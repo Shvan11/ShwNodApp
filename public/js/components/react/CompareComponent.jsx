@@ -103,6 +103,11 @@ const CompareComponent = ({ patientId, phone }) => {
     };
     
     const loadTimepoints = async () => {
+        if (!patientId || patientId === 'new') {
+            setLoading(false);
+            return;
+        }
+
         try {
             setLoading(true);
             const response = await fetch(`/api/gettimepoints?code=${patientId}`);

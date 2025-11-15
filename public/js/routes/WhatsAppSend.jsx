@@ -182,6 +182,8 @@ export default function WhatsAppSend() {
           onReset={handleReset}
           onSendEmail={handleSendEmail}
           loading={countLoading}
+          resetConfirm={resetConfirm}
+          emailConfirm={emailConfirm}
         />
 
         {/* Status and Action Area */}

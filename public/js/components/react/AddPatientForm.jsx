@@ -1,7 +1,9 @@
 /**
  * AddPatientForm - React component for adding new patients
- * 
- * Provides a comprehensive form for patient registration following the app's design patterns
+ *
+ * Provides a comprehensive tabbed form for patient registration
+ * - Desktop: Tabbed interface for organized data entry
+ * - Mobile: Accordion/stacked layout for easy mobile access
  */
 
 import React, { useState, useEffect } from 'react'
@@ -33,6 +35,18 @@ const AddPatientForm = ({ onSuccess, onCancel }) => {
         patientTypes: [],
         addresses: [],
         genders: []
+    });
+
+    // Tab state for desktop view
+    const [activeTab, setActiveTab] = useState('basic');
+
+    // Accordion state for mobile view
+    const [expandedSections, setExpandedSections] = useState({
+        basic: true,
+        contact: false,
+        personal: false,
+        medical: false,
+        additional: false
     });
 
     // Load dropdown data on component mount
@@ -96,7 +110,7 @@ const AddPatientForm = ({ onSuccess, onCancel }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         // Basic validation
         if (!formData.patientName.trim()) {
             showAlert('Patient name is required.');
@@ -119,20 +133,365 @@ const AddPatientForm = ({ onSuccess, onCancel }) => {
 
             if (response.ok) {
                 const personId = result.personId;
-                // Redirect to patient's works page
                 showAlert(
                     `Patient "${formData.patientName}" has been successfully added. Redirecting to works page...`,
                     'success',
                     personId
                 );
             } else {
-                showAlert(result.error || 'Failed to add patient. Please try again.');
+                if (response.status === 409 && result.code === 'DUPLICATE_PATIENT_NAME') {
+                    showAlert(
+                        `A patient with the name "${formData.patientName}" already exists. Please use a different name or check existing patients.`,
+                        'danger'
+                    );
+                } else {
+                    showAlert(result.error || 'Failed to add patient. Please try again.');
+                }
             }
         } catch (error) {
             console.error('Error adding patient:', error);
             showAlert('Network error. Please check your connection and try again.');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const toggleAccordion = (section) => {
+        setExpandedSections(prev => ({
+            ...prev,
+            [section]: !prev[section]
+        }));
+    };
+
+    const tabs = [
+        { id: 'basic', label: 'Basic Info', icon: 'fas fa-user' },
+        { id: 'contact', label: 'Contact', icon: 'fas fa-address-book' },
+        { id: 'personal', label: 'Personal', icon: 'fas fa-user-circle' },
+        { id: 'medical', label: 'Medical', icon: 'fas fa-stethoscope' },
+        { id: 'additional', label: 'Additional', icon: 'fas fa-clipboard' }
+    ];
+
+    // Render Basic Information Fields
+    const renderBasicInfo = () => (
+        <div className="tab-content-section">
+            <div className="form-row">
+                <div className="form-group full-width">
+                    <label className="form-label">
+                        <i className="fas fa-signature"></i>
+                        Patient Name <span className="required">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        name="patientName"
+                        value={formData.patientName}
+                        onChange={handleInputChange}
+                        className="form-control"
+                        placeholder="Enter full patient name"
+                        required
+                    />
+                </div>
+            </div>
+
+            <div className="form-row">
+                <div className="form-group">
+                    <label className="form-label">
+                        <i className="fas fa-user"></i>
+                        First Name
+                    </label>
+                    <input
+                        type="text"
+                        name="firstName"
+                        value={formData.firstName}
+                        onChange={handleInputChange}
+                        className="form-control"
+                        placeholder="First name"
+                    />
+                </div>
+                <div className="form-group">
+                    <label className="form-label">
+                        <i className="fas fa-user"></i>
+                        Last Name
+                    </label>
+                    <input
+                        type="text"
+                        name="lastName"
+                        value={formData.lastName}
+                        onChange={handleInputChange}
+                        className="form-control"
+                        placeholder="Last name"
+                    />
+                </div>
+            </div>
+
+            <div className="form-row">
+                <div className="form-group">
+                    <label className="form-label">
+                        <i className="fas fa-id-card"></i>
+                        Patient ID
+                    </label>
+                    <input
+                        type="text"
+                        name="patientID"
+                        value={formData.patientID}
+                        onChange={handleInputChange}
+                        className="form-control"
+                        placeholder="Auto-generated if empty"
+                        maxLength="6"
+                    />
+                </div>
+            </div>
+        </div>
+    );
+
+    // Render Contact Information Fields
+    const renderContactInfo = () => (
+        <div className="tab-content-section">
+            <div className="form-row">
+                <div className="form-group">
+                    <label className="form-label">
+                        <i className="fas fa-phone"></i>
+                        Primary Phone
+                    </label>
+                    <input
+                        type="tel"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleInputChange}
+                        className="form-control"
+                        placeholder="Primary phone number"
+                    />
+                </div>
+                <div className="form-group">
+                    <label className="form-label">
+                        <i className="fas fa-phone-alt"></i>
+                        Secondary Phone
+                    </label>
+                    <input
+                        type="tel"
+                        name="phone2"
+                        value={formData.phone2}
+                        onChange={handleInputChange}
+                        className="form-control"
+                        placeholder="Secondary phone number"
+                    />
+                </div>
+            </div>
+
+            <div className="form-row">
+                <div className="form-group">
+                    <label className="form-label">
+                        <i className="fas fa-envelope"></i>
+                        Email Address
+                    </label>
+                    <input
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        className="form-control"
+                        placeholder="patient@example.com"
+                    />
+                </div>
+                <div className="form-group">
+                    <label className="form-label">
+                        <i className="fas fa-globe"></i>
+                        Country Code
+                    </label>
+                    <input
+                        type="text"
+                        name="countryCode"
+                        value={formData.countryCode}
+                        onChange={handleInputChange}
+                        className="form-control"
+                        placeholder="e.g., +1, +44"
+                        maxLength="5"
+                    />
+                </div>
+            </div>
+        </div>
+    );
+
+    // Render Personal Information Fields
+    const renderPersonalInfo = () => (
+        <div className="tab-content-section">
+            <div className="form-row">
+                <div className="form-group">
+                    <label className="form-label">
+                        <i className="fas fa-calendar"></i>
+                        Date of Birth
+                    </label>
+                    <input
+                        type="date"
+                        name="dateOfBirth"
+                        value={formData.dateOfBirth}
+                        onChange={handleInputChange}
+                        className="form-control"
+                    />
+                </div>
+                <div className="form-group">
+                    <label className="form-label">
+                        <i className="fas fa-venus-mars"></i>
+                        Gender
+                    </label>
+                    <select
+                        name="gender"
+                        value={formData.gender}
+                        onChange={handleInputChange}
+                        className="form-control"
+                    >
+                        <option value="">Select Gender</option>
+                        {dropdownData.genders.map(gender => (
+                            <option key={gender.id} value={gender.id}>
+                                {gender.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            <div className="form-row">
+                <div className="form-group">
+                    <label className="form-label">
+                        <i className="fas fa-language"></i>
+                        Language
+                    </label>
+                    <select
+                        name="language"
+                        value={formData.language}
+                        onChange={handleInputChange}
+                        className="form-control"
+                    >
+                        <option value="0">English</option>
+                        <option value="1">Arabic</option>
+                        <option value="2">Kurdish</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    );
+
+    // Render Medical Information Fields
+    const renderMedicalInfo = () => (
+        <div className="tab-content-section">
+            <div className="form-row">
+                <div className="form-group">
+                    <label className="form-label">
+                        <i className="fas fa-user-tag"></i>
+                        Patient Type
+                    </label>
+                    <select
+                        name="patientTypeID"
+                        value={formData.patientTypeID}
+                        onChange={handleInputChange}
+                        className="form-control"
+                    >
+                        <option value="">Select Patient Type</option>
+                        {dropdownData.patientTypes.map(type => (
+                            <option key={type.id} value={type.id}>
+                                {type.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <div className="form-group">
+                    <label className="form-label">
+                        <i className="fas fa-handshake"></i>
+                        Referral Source
+                    </label>
+                    <select
+                        name="referralSourceID"
+                        value={formData.referralSourceID}
+                        onChange={handleInputChange}
+                        className="form-control"
+                    >
+                        <option value="">Select Referral Source</option>
+                        {dropdownData.referralSources.map(source => (
+                            <option key={source.id} value={source.id}>
+                                {source.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            <div className="form-row">
+                <div className="form-group">
+                    <label className="form-label">
+                        <i className="fas fa-map-marker-alt"></i>
+                        Address
+                    </label>
+                    <select
+                        name="addressID"
+                        value={formData.addressID}
+                        onChange={handleInputChange}
+                        className="form-control"
+                    >
+                        <option value="">Select Address</option>
+                        {dropdownData.addresses.map(address => (
+                            <option key={address.id} value={address.id}>
+                                {address.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+        </div>
+    );
+
+    // Render Additional Information Fields
+    const renderAdditionalInfo = () => (
+        <div className="tab-content-section">
+            <div className="form-row">
+                <div className="form-group full-width">
+                    <label className="form-label">
+                        <i className="fas fa-sticky-note"></i>
+                        Notes
+                    </label>
+                    <textarea
+                        name="notes"
+                        value={formData.notes}
+                        onChange={handleInputChange}
+                        className="form-control"
+                        rows="3"
+                        maxLength="100"
+                        placeholder="Additional notes about the patient..."
+                    />
+                </div>
+            </div>
+
+            <div className="form-row">
+                <div className="form-group full-width">
+                    <label className="form-label">
+                        <i className="fas fa-exclamation-triangle"></i>
+                        Alerts
+                    </label>
+                    <textarea
+                        name="alerts"
+                        value={formData.alerts}
+                        onChange={handleInputChange}
+                        className="form-control"
+                        rows="3"
+                        placeholder="Important alerts or warnings..."
+                    />
+                </div>
+            </div>
+        </div>
+    );
+
+    const renderTabContent = (tabId) => {
+        switch (tabId) {
+            case 'basic':
+                return renderBasicInfo();
+            case 'contact':
+                return renderContactInfo();
+            case 'personal':
+                return renderPersonalInfo();
+            case 'medical':
+                return renderMedicalInfo();
+            case 'additional':
+                return renderAdditionalInfo();
+            default:
+                return null;
         }
     };
 
@@ -150,336 +509,9 @@ const AddPatientForm = ({ onSuccess, onCancel }) => {
                 </div>
             )}
 
-            <form onSubmit={handleSubmit}>
-                <div className="form-content">
-                    {/* Left Column */}
-                    <div className="form-column">
-                        {/* Basic Information Section */}
-                        <div className="form-section">
-                            <h3 className="form-section-title">
-                                <i className="fas fa-user"></i>
-                                Basic Information
-                            </h3>
-                            
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        <i className="fas fa-signature"></i>
-                                        Patient Name <span className="required">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="patientName"
-                                        value={formData.patientName}
-                                        onChange={handleInputChange}
-                                        className="form-control"
-                                        placeholder="Enter full patient name"
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        <i className="fas fa-user"></i>
-                                        First Name
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="firstName"
-                                        value={formData.firstName}
-                                        onChange={handleInputChange}
-                                        className="form-control"
-                                        placeholder="First name"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        <i className="fas fa-user"></i>
-                                        Last Name
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="lastName"
-                                        value={formData.lastName}
-                                        onChange={handleInputChange}
-                                        className="form-control"
-                                        placeholder="Last name"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        <i className="fas fa-id-card"></i>
-                                        Patient ID
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="patientID"
-                                        value={formData.patientID}
-                                        onChange={handleInputChange}
-                                        className="form-control"
-                                        placeholder="Auto-generated if empty"
-                                        maxLength="6"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Contact Information Section */}
-                        <div className="form-section">
-                            <h3 className="form-section-title">
-                                <i className="fas fa-address-book"></i>
-                                Contact Information
-                            </h3>
-                            
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        <i className="fas fa-phone"></i>
-                                        Primary Phone
-                                    </label>
-                                    <input
-                                        type="tel"
-                                        name="phone"
-                                        value={formData.phone}
-                                        onChange={handleInputChange}
-                                        className="form-control"
-                                        placeholder="Primary phone number"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        <i className="fas fa-phone-alt"></i>
-                                        Secondary Phone
-                                    </label>
-                                    <input
-                                        type="tel"
-                                        name="phone2"
-                                        value={formData.phone2}
-                                        onChange={handleInputChange}
-                                        className="form-control"
-                                        placeholder="Secondary phone number"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        <i className="fas fa-envelope"></i>
-                                        Email Address
-                                    </label>
-                                    <input
-                                        type="email"
-                                        name="email"
-                                        value={formData.email}
-                                        onChange={handleInputChange}
-                                        className="form-control"
-                                        placeholder="patient@example.com"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        <i className="fas fa-globe"></i>
-                                        Country Code
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="countryCode"
-                                        value={formData.countryCode}
-                                        onChange={handleInputChange}
-                                        className="form-control"
-                                        placeholder="e.g., +1, +44"
-                                        maxLength="5"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right Column */}
-                    <div className="form-column">
-                        {/* Personal Information Section */}
-                        <div className="form-section">
-                            <h3 className="form-section-title">
-                                <i className="fas fa-user-circle"></i>
-                                Personal Information
-                            </h3>
-                            
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        <i className="fas fa-calendar"></i>
-                                        Date of Birth
-                                    </label>
-                                    <input
-                                        type="date"
-                                        name="dateOfBirth"
-                                        value={formData.dateOfBirth}
-                                        onChange={handleInputChange}
-                                        className="form-control"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        <i className="fas fa-venus-mars"></i>
-                                        Gender
-                                    </label>
-                                    <select
-                                        name="gender"
-                                        value={formData.gender}
-                                        onChange={handleInputChange}
-                                        className="form-control"
-                                    >
-                                        <option value="">Select Gender</option>
-                                        {dropdownData.genders.map(gender => (
-                                            <option key={gender.id} value={gender.id}>
-                                                {gender.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        <i className="fas fa-language"></i>
-                                        Language
-                                    </label>
-                                    <select
-                                        name="language"
-                                        value={formData.language}
-                                        onChange={handleInputChange}
-                                        className="form-control"
-                                    >
-                                        <option value="0">English</option>
-                                        <option value="1">Arabic</option>
-                                        <option value="2">Kurdish</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Medical Information Section */}
-                        <div className="form-section">
-                            <h3 className="form-section-title">
-                                <i className="fas fa-stethoscope"></i>
-                                Medical Information
-                            </h3>
-                            
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        <i className="fas fa-user-tag"></i>
-                                        Patient Type
-                                    </label>
-                                    <select
-                                        name="patientTypeID"
-                                        value={formData.patientTypeID}
-                                        onChange={handleInputChange}
-                                        className="form-control"
-                                    >
-                                        <option value="">Select Patient Type</option>
-                                        {dropdownData.patientTypes.map(type => (
-                                            <option key={type.id} value={type.id}>
-                                                {type.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        <i className="fas fa-handshake"></i>
-                                        Referral Source
-                                    </label>
-                                    <select
-                                        name="referralSourceID"
-                                        value={formData.referralSourceID}
-                                        onChange={handleInputChange}
-                                        className="form-control"
-                                    >
-                                        <option value="">Select Referral Source</option>
-                                        {dropdownData.referralSources.map(source => (
-                                            <option key={source.id} value={source.id}>
-                                                {source.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        <i className="fas fa-map-marker-alt"></i>
-                                        Address
-                                    </label>
-                                    <select
-                                        name="addressID"
-                                        value={formData.addressID}
-                                        onChange={handleInputChange}
-                                        className="form-control"
-                                    >
-                                        <option value="">Select Address</option>
-                                        {dropdownData.addresses.map(address => (
-                                            <option key={address.id} value={address.id}>
-                                                {address.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Full-width Additional Information Section */}
-                <div className="form-section full-width">
-                    <h3 className="form-section-title">
-                        <i className="fas fa-clipboard"></i>
-                        Additional Information
-                    </h3>
-                    
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label className="form-label">
-                                <i className="fas fa-sticky-note"></i>
-                                Notes
-                            </label>
-                            <textarea
-                                name="notes"
-                                value={formData.notes}
-                                onChange={handleInputChange}
-                                className="form-control"
-                                rows="3"
-                                maxLength="100"
-                                placeholder="Additional notes about the patient..."
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">
-                                <i className="fas fa-exclamation-triangle"></i>
-                                Alerts
-                            </label>
-                            <textarea
-                                name="alerts"
-                                value={formData.alerts}
-                                onChange={handleInputChange}
-                                className="form-control"
-                                rows="3"
-                                placeholder="Important alerts or warnings..."
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Form Actions */}
-                <div className="form-actions">
+            <form onSubmit={handleSubmit} className="patient-form">
+                {/* Form Actions - Top */}
+                <div className="form-actions form-actions-top">
                     <button
                         type="button"
                         className="btn btn-secondary"
@@ -487,22 +519,96 @@ const AddPatientForm = ({ onSuccess, onCancel }) => {
                         disabled={loading}
                     >
                         <i className="fas fa-times"></i>
-                        Cancel
+                        <span className="btn-text">Cancel</span>
                     </button>
-                    <button 
-                        type="submit" 
+                    <button
+                        type="submit"
                         className="btn btn-primary"
                         disabled={loading}
                     >
                         {loading ? (
                             <>
                                 <div className="loading-spinner"></div>
-                                Adding Patient...
+                                <span className="btn-text">Adding Patient...</span>
                             </>
                         ) : (
                             <>
                                 <i className="fas fa-save"></i>
-                                Add Patient
+                                <span className="btn-text">Add Patient</span>
+                            </>
+                        )}
+                    </button>
+                </div>
+
+                {/* Desktop Tabbed View */}
+                <div className="form-tabs-container desktop-only">
+                    <div className="tabs-header">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
+                                onClick={() => setActiveTab(tab.id)}
+                            >
+                                <i className={tab.icon}></i>
+                                <span className="tab-label">{tab.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="tabs-content">
+                        {renderTabContent(activeTab)}
+                    </div>
+                </div>
+
+                {/* Mobile Accordion View */}
+                <div className="form-accordion-container mobile-only">
+                    {tabs.map(tab => (
+                        <div key={tab.id} className="accordion-section">
+                            <button
+                                type="button"
+                                className={`accordion-header ${expandedSections[tab.id] ? 'expanded' : ''}`}
+                                onClick={() => toggleAccordion(tab.id)}
+                            >
+                                <div className="accordion-title">
+                                    <i className={tab.icon}></i>
+                                    <span>{tab.label}</span>
+                                </div>
+                                <i className={`fas fa-chevron-${expandedSections[tab.id] ? 'up' : 'down'}`}></i>
+                            </button>
+                            {expandedSections[tab.id] && (
+                                <div className="accordion-content">
+                                    {renderTabContent(tab.id)}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                {/* Form Actions - Bottom */}
+                <div className="form-actions form-actions-bottom">
+                    <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={onCancel}
+                        disabled={loading}
+                    >
+                        <i className="fas fa-times"></i>
+                        <span className="btn-text">Cancel</span>
+                    </button>
+                    <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={loading}
+                    >
+                        {loading ? (
+                            <>
+                                <div className="loading-spinner"></div>
+                                <span className="btn-text">Adding Patient...</span>
+                            </>
+                        ) : (
+                            <>
+                                <i className="fas fa-save"></i>
+                                <span className="btn-text">Add Patient</span>
                             </>
                         )}
                     </button>

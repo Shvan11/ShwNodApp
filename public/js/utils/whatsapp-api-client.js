@@ -67,6 +67,7 @@ export class APIClient {
             return await RetryManager.withRetry(async () => {
                 const response = await fetch(url, {
                     signal: abortController.signal,
+                    credentials: 'include', // Include session cookies for authentication
                     headers: {
                         'Content-Type': 'application/json',
                         ...options.headers
@@ -78,14 +79,21 @@ export class APIClient {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
+                const contentType = response.headers.get('content-type');
+                if (!contentType?.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('[API Client] Expected JSON but got:', contentType);
+                    throw new Error(`Expected JSON but got ${contentType}`);
+                }
+
                 const data = await response.json();
                 return validateApiResponse(data, options.expectedFields || []);
             }, {
                 maxAttempts: url.includes('/messaging/status/') ? 1 : CONFIG.RETRY_MAX_ATTEMPTS,
-                onRetry: (error, attempt, delay) => {
-                    // Only log retries for important requests, not message status
-                    if (!url.includes('/messaging/status/')) {
-                        console.warn(`API request retry ${attempt} for ${url} after ${delay}ms:`, error.message);
+                onRetry: (error, attempt) => {
+                    // Only log retries for important requests
+                    if (!url.includes('/messaging/status/') && !url.includes('/messaging/count/')) {
+                        console.warn(`Retry ${attempt}: ${error.message}`);
                     }
                 }
             });

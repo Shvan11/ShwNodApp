@@ -281,7 +281,7 @@ export async function getWhatsAppMessages(date) {
   const operationName = 'getWhatsAppMessages';
   
   return dbCircuitBreaker.execute(async () => {
-    logger.message.info('Retrieving WhatsApp messages', { date });
+    logger.message.debug('Retrieving WhatsApp messages', { date });
     
     return ConnectionPool.withConnection(async (connection) => {
       return executeStoredProcedureWithConnection(
@@ -307,9 +307,9 @@ export async function getWhatsAppMessages(date) {
           const ids = result.map(r => r.id || '');
           const names = result.map(r => r.name || '');
           
-          logger.message.info('WhatsApp messages retrieved successfully', { 
-            messageCount: result.length, 
-            date 
+          logger.message.debug('WhatsApp messages retrieved successfully', {
+            messageCount: result.length,
+            date
           });
           
           if (result.length > 0) {
@@ -771,8 +771,8 @@ export async function getMessageStatusByDate(date) {
   const operationName = 'getMessageStatusByDate';
   
   return dbCircuitBreaker.execute(async () => {
-    logger.message.info('Retrieving message status summary', { date });
-    
+    logger.message.debug('Retrieving message status summary', { date });
+
     return executeStoredProcedure(
       'GetMessageStatusByDate',
       [['Date', TYPES.Date, date]],
@@ -803,11 +803,11 @@ export async function getMessageStatusByDate(date) {
           failed: result.filter(r => r.deliveryStatus === 'ERROR').length
         };
         
-        logger.message.info('Message status summary retrieved', { 
-          date, 
-          total: summary.total, 
-          sent: summary.sent, 
-          read: summary.read 
+        logger.message.debug('Message status summary retrieved', {
+          date,
+          total: summary.total,
+          sent: summary.sent,
+          read: summary.read
         });
         
         return {

@@ -349,9 +349,9 @@ router.get('/getpatient/:personId', async (req, res) => {
  * POST /patients
  */
 router.post('/patients', async (req, res) => {
-    try {
-        const patientData = req.body;
+    const patientData = req.body;
 
+    try {
         // Basic validation
         if (!patientData.patientName || !patientData.patientName.trim()) {
             return ErrorResponses.badRequest(res, 'Patient name is required');
@@ -378,7 +378,18 @@ router.post('/patients', async (req, res) => {
         });
 
     } catch (error) {
-        log.error('Error creating patient:', error);
+        // Handle duplicate patient name error
+        if (error.code === 'DUPLICATE_PATIENT_NAME') {
+            log.warn(`Duplicate patient name attempted: ${patientData.patientName}`);
+            return res.status(409).json({
+                success: false,
+                error: error.message,
+                code: 'DUPLICATE_PATIENT_NAME',
+                existingPatientId: error.existingPatientId
+            });
+        }
+
+        log.error('Error creating patient', { error });
         return ErrorResponses.internalError(res, 'Failed to create patient', error);
     }
 });

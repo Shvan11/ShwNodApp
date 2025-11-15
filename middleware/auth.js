@@ -22,6 +22,7 @@ export function authenticate(req, res, next) {
   }
 
   // Not authenticated - return 401
+  log.warn(`Authentication failed for ${req.method} ${req.path}`);
   return res.status(401).json({
     success: false,
     error: 'Authentication required',
@@ -153,6 +154,11 @@ export async function hashPassword(password) {
  * Minimal overhead for internal use
  */
 export function authenticateWeb(req, res, next) {
+  // Skip for API routes - they have their own auth middleware
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+
   // If logged in, continue
   if (req.session && req.session.userId) {
     return next();

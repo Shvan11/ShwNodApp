@@ -121,12 +121,20 @@ const PatientShell = () => {
 
                         <span className="breadcrumb-separator">/</span>
 
-                        {/* Patient Link */}
-                        <Link to={`/patient/${patientId}/works`} className="breadcrumb-item breadcrumb-link">
-                            <i className="fas fa-user"></i>
-                            {' '}
-                            {patientData.loading ? `Patient ${patientId}` : patientData.name}
-                        </Link>
+                        {/* Patient Link - Disabled for new patients */}
+                        {patientId === 'new' ? (
+                            <span className="breadcrumb-item active">
+                                <i className="fas fa-user"></i>
+                                {' '}
+                                {patientData.name}
+                            </span>
+                        ) : (
+                            <Link to={`/patient/${patientId}/works`} className="breadcrumb-item breadcrumb-link">
+                                <i className="fas fa-user"></i>
+                                {' '}
+                                {patientData.loading ? `Patient ${patientId}` : patientData.name}
+                            </Link>
+                        )}
 
                         {/* Work Level (if workId is present) */}
                         {workId && workData.typeName && (

@@ -51,10 +51,10 @@ export function setWebSocketEmitter(emitter) {
 
 /**
  * Send WhatsApp message to a specific patient for an appointment
- * GET /wa/send-to-patient
+ * GET /send-to-patient (mounted at /api/wa)
  * Query params: personId, appointmentId
  */
-router.get('/wa/send-to-patient', async (req, res) => {
+router.get('/send-to-patient', async (req, res) => {
     try {
         const { personId, appointmentId } = req.query;
 
@@ -169,11 +169,11 @@ router.get('/wa/send-to-patient', async (req, res) => {
 
 /**
  * Send WhatsApp messages in batch for a specific date
- * GET /wa/send
+ * GET /send (mounted at /api/wa)
  * Query params: date (YYYY-MM-DD format)
  * Note: Uses extended timeout (5 minutes) due to batch processing
  */
-router.get('/wa/send', timeouts.whatsappSend, async (req, res) => {
+router.get('/send', timeouts.whatsappSend, async (req, res) => {
     const dateparam = req.query.date;
 
     try {
@@ -379,10 +379,10 @@ router.post('/sendmedia2', timeouts.long, upload.none(), async (req, res) => {
 
 /**
  * Get WhatsApp QR code for authentication
- * GET /wa/qr
+ * GET /qr (mounted at /api/wa)
  * Returns QR code as base64 data URL or error if not available
  */
-router.get('/wa/qr', async (req, res) => {
+router.get('/qr', async (req, res) => {
     try {
       // Do NOT register as QR viewer here - we only register via WebSockets
       // REMOVE: messageState.registerQRViewer();
@@ -422,10 +422,10 @@ router.get('/wa/qr', async (req, res) => {
 
 /**
  * Get WhatsApp client status
- * GET /wa/status
+ * GET /status (mounted at /api/wa)
  * Returns current client status including readiness and activity
  */
-router.get('/wa/status', (req, res) => {
+router.get('/status', (req, res) => {
     try {
       const status = whatsapp.getStatus();
 
@@ -448,10 +448,10 @@ router.get('/wa/status', (req, res) => {
 
 /**
  * Get detailed WhatsApp status including message state dump
- * GET /wa/detailed-status
+ * GET /detailed-status (mounted at /api/wa)
  * Returns comprehensive status information for debugging
  */
-router.get('/wa/detailed-status', async (req, res) => {
+router.get('/detailed-status', async (req, res) => {
     try {
         const stateDump = messageState.dump(true); // Get detailed dump
         const clientStatus = whatsapp.getStatus();
@@ -477,10 +477,10 @@ router.get('/wa/detailed-status', async (req, res) => {
 
 /**
  * Restart WhatsApp client
- * POST /wa/restart
+ * POST /restart (mounted at /api/wa)
  * Safely closes the existing client and creates a new one
  */
-router.post('/wa/restart', async (req, res) => {
+router.post('/restart', async (req, res) => {
     try {
       log.info("Restarting WhatsApp client");
 
@@ -502,10 +502,10 @@ router.post('/wa/restart', async (req, res) => {
 
 /**
  * Destroy WhatsApp client - close browser but preserve authentication
- * POST /wa/destroy
+ * POST /destroy (mounted at /api/wa)
  * This closes the browser/puppeteer but keeps authentication for reconnection
  */
-router.post('/wa/destroy', async (req, res) => {
+router.post('/destroy', async (req, res) => {
   try {
     log.info("Destroying WhatsApp client - preserving authentication");
 
@@ -535,10 +535,10 @@ router.post('/wa/destroy', async (req, res) => {
 
 /**
  * Logout WhatsApp client - completely clear authentication
- * POST /wa/logout
+ * POST /logout (mounted at /api/wa)
  * This logs out from WhatsApp and removes all authentication data
  */
-router.post('/wa/logout', async (req, res) => {
+router.post('/logout', async (req, res) => {
   try {
     log.info("Logging out WhatsApp client - clearing authentication");
 
@@ -568,11 +568,11 @@ router.post('/wa/logout', async (req, res) => {
 
 /**
  * Initialize WhatsApp client asynchronously
- * GET /wa/initialize
+ * GET /initialize (mounted at /api/wa)
  * Returns 200 OK immediately and starts initialization in background
  * Suitable for external applications that need to trigger initialization
  */
-router.get('/wa/initialize', (req, res) => {
+router.get('/initialize', (_req, res) => {
   try {
     log.info("WhatsApp initialization request received");
 

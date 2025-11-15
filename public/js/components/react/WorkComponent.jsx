@@ -53,7 +53,7 @@ const WorkComponent = ({ patientId }) => {
     });
 
     useEffect(() => {
-        if (patientId) {
+        if (patientId && patientId !== 'new') {
             loadWorks();
             loadPatientInfo();
         }

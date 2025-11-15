@@ -87,6 +87,11 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
     };
 
     const loadWorkData = async () => {
+        if (!patientId || patientId === 'new') {
+            setLoading(false);
+            return;
+        }
+
         try {
             setLoading(true);
             const response = await fetch(`/api/getworks?code=${patientId}`);

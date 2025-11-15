@@ -204,13 +204,11 @@ function executeStoredProcedure(procedureName, params, beforeExec, rowMapper, re
       // Handle return values/output parameters
       request.on('returnValue', (parameterName, value) => {
         outParams.push({ parameterName, value });
-        console.log(`${procedureName} output: ${parameterName} = ${value}`);
       });
 
       // Handle completion
-      request.on('requestCompleted', (rowCount, more) => {
+      request.on('requestCompleted', () => {
         try {
-          console.log(`Stored procedure ${procedureName} completed: ${rowCount} rows returned`);
           const finalResult = resultMapper ? resultMapper(result, outParams) : result;
           resolve(finalResult);
         } catch (resultMappingError) {

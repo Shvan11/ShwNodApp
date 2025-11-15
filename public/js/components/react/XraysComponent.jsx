@@ -6,14 +6,16 @@ const XraysComponent = ({ patientId }) => {
     const [error, setError] = useState(null);
     
     useEffect(() => {
-        loadXrays();
+        if (patientId && patientId !== 'new') {
+            loadXrays();
+        }
     }, [patientId]);
-    
+
     const loadXrays = async () => {
         try {
             setLoading(true);
             console.log('Loading X-rays for patient:', patientId);
-            
+
             const response = await fetch(`/api/getinfos?code=${patientId}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);

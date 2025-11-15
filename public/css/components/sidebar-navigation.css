@@ -111,6 +111,28 @@
     background: #fbbf24;
 }
 
+/* Disabled state for new patient form */
+.sidebar-nav-item.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+    background: transparent;
+}
+
+.sidebar-nav-item.disabled:hover {
+    background: transparent;
+    color: #94a3b8;
+}
+
+.sidebar-nav-item.disabled .nav-item-label {
+    background: #ef4444;
+    border-color: #dc2626;
+}
+
+.sidebar-nav-item.disabled .nav-item-label::before {
+    border-right-color: #ef4444;
+}
+
 .nav-item-icon {
     display: flex;
     align-items: center;

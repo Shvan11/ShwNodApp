@@ -194,8 +194,26 @@ export async function getActiveWID(PID) {
  * Creates a new patient record in the database.
  * @param {Object} patientData - The patient data object.
  * @returns {Promise<Object>} - A promise that resolves with the created patient information.
+ * @throws {Error} - Throws an error if a patient with the same name already exists.
  */
 export async function createPatient(patientData) {
+    // Check for duplicate patient name (case-insensitive)
+    const duplicateCheck = await executeQuery(
+        'SELECT PersonID, PatientName FROM dbo.tblpatients WHERE PatientName = @patientName',
+        [['patientName', TYPES.NVarChar, patientData.patientName]],
+        (columns) => ({
+            personId: columns[0].value,
+            patientName: columns[1].value
+        })
+    );
+
+    if (duplicateCheck && duplicateCheck.length > 0) {
+        const error = new Error(`A patient with the name "${patientData.patientName}" already exists.`);
+        error.code = 'DUPLICATE_PATIENT_NAME';
+        error.existingPatientId = duplicateCheck[0].personId;
+        throw error;
+    }
+
     const query = `
         INSERT INTO dbo.tblpatients (
             patientID, PatientName, Phone, FirstName, LastName,

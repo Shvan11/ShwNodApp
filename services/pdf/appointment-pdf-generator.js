@@ -303,9 +303,6 @@ class AppointmentPDFGenerator {
                     { align: 'center' }
                 );
         }
-
-        // Return to the last page
-        doc.switchToPage(pageCount - 1);
     }
 
     /**

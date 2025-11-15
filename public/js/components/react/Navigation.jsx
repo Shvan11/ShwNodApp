@@ -17,12 +17,15 @@ const Navigation = ({ patientId, currentPage }) => {
     const [patientInfo, setPatientInfo] = useState(null);
     const [patientsFolder, setPatientsFolder] = useState('');
 
+    // Check if this is the "new patient" form
+    const isNewPatient = patientId === 'new';
+
     // Cache for timepoints
     const [cache, setCache] = useState(new Map());
     const cacheTimeout = 5 * 60 * 1000; // 5 minutes
 
     const loadTimepoints = useCallback(async (patientId) => {
-        if (!patientId) return;
+        if (!patientId || patientId === 'new') return;
 
         const cacheKey = `patient_${patientId}`;
         const cached = cache.get(cacheKey);
@@ -66,8 +69,11 @@ const Navigation = ({ patientId, currentPage }) => {
     }, [cache, cacheTimeout]);
 
     useEffect(() => {
-        loadTimepoints(patientId);
-        loadPatientInfo(patientId);
+        // Skip API calls for new patient form
+        if (patientId && patientId !== 'new') {
+            loadTimepoints(patientId);
+            loadPatientInfo(patientId);
+        }
         loadPatientsFolder();
     }, [patientId, loadTimepoints]);
 
@@ -100,7 +106,7 @@ const Navigation = ({ patientId, currentPage }) => {
     };
 
     const loadPatientInfo = async (patientId) => {
-        if (!patientId) return;
+        if (!patientId || patientId === 'new') return;
 
         try {
             const response = await fetch(`/api/getinfos?code=${patientId}`);
@@ -160,7 +166,23 @@ const Navigation = ({ patientId, currentPage }) => {
     ];
 
     const renderNavItem = (item, isActive = false) => {
-        const className = `sidebar-nav-item ${isActive ? 'active' : ''} ${item.highlight ? 'highlighted' : ''}`;
+        const isDisabled = isNewPatient;
+        const className = `sidebar-nav-item ${isActive ? 'active' : ''} ${item.highlight ? 'highlighted' : ''} ${isDisabled ? 'disabled' : ''}`;
+
+        if (isDisabled) {
+            return (
+                <div
+                    key={item.key}
+                    className={className}
+                    title="Save patient first to access this section"
+                >
+                    <div className="nav-item-icon">
+                        <i className={item.icon} />
+                    </div>
+                    <span className="nav-item-label">{item.label}</span>
+                </div>
+            );
+        }
 
         return (
             <Link
@@ -220,6 +242,7 @@ const Navigation = ({ patientId, currentPage }) => {
                         ref={photosButtonRef}
                         className="photos-wrapper"
                         onMouseEnter={() => {
+                            if (isNewPatient) return; // Disable for new patients
                             if (photosButtonRef.current) {
                                 const rect = photosButtonRef.current.getBoundingClientRect();
                                 setFlyoutPosition({ top: rect.top });
@@ -230,16 +253,28 @@ const Navigation = ({ patientId, currentPage }) => {
                             setPhotosExpanded(false);
                         }}
                     >
-                        <Link
-                            to={`/patient/${patientId}/photos/tp0`}
-                            className={`sidebar-nav-item photos-main-btn ${isPhotosPageActive ? 'active' : ''}`}
-                            title="Photos"
-                        >
-                            <div className="nav-item-icon">
-                                <i className="fas fa-images" />
+                        {isNewPatient ? (
+                            <div
+                                className={`sidebar-nav-item photos-main-btn disabled`}
+                                title="Save patient first to access photos"
+                            >
+                                <div className="nav-item-icon">
+                                    <i className="fas fa-images" />
+                                </div>
+                                <span className="nav-item-label">Photos</span>
                             </div>
-                            <span className="nav-item-label">Photos</span>
-                        </Link>
+                        ) : (
+                            <Link
+                                to={`/patient/${patientId}/photos/tp0`}
+                                className={`sidebar-nav-item photos-main-btn ${isPhotosPageActive ? 'active' : ''}`}
+                                title="Photos"
+                            >
+                                <div className="nav-item-icon">
+                                    <i className="fas fa-images" />
+                                </div>
+                                <span className="nav-item-label">Photos</span>
+                            </Link>
+                        )}
 
                         {/* Flyout menu for timepoints */}
                         {photosExpanded && (
@@ -286,6 +321,7 @@ const Navigation = ({ patientId, currentPage }) => {
                     ref={moreActionsButtonRef}
                     className="more-actions-wrapper"
                     onMouseEnter={() => {
+                        if (isNewPatient) return; // Disable for new patients
                         if (moreActionsButtonRef.current) {
                             const rect = moreActionsButtonRef.current.getBoundingClientRect();
                             setMoreActionsFlyoutPosition({ top: rect.top });
@@ -298,12 +334,13 @@ const Navigation = ({ patientId, currentPage }) => {
                 >
 
                     <div
-                        className="sidebar-nav-item csimaging-item"
+                        className={`sidebar-nav-item csimaging-item ${isNewPatient ? 'disabled' : ''}`}
                         onClick={(e) => {
                             e.preventDefault();
+                            if (isNewPatient) return;
                             handleOpenCSImaging();
                         }}
-                        title="Open CS Imaging Trophy"
+                        title={isNewPatient ? "Save patient first to access CS Imaging" : "Open CS Imaging Trophy"}
                     >
                         <div className="nav-item-icon">
                             <i className="fas fa-radiation" />
@@ -312,9 +349,10 @@ const Navigation = ({ patientId, currentPage }) => {
                     </div>
 
                     <div
-                        className="sidebar-nav-item folder-item"
+                        className={`sidebar-nav-item folder-item ${isNewPatient ? 'disabled' : ''}`}
                         onClick={(e) => {
                             e.preventDefault();
+                            if (isNewPatient) return;
                             if (!patientsFolder) {
                                 alert('Patients folder path is not configured. Please check settings.');
                                 return;
@@ -323,7 +361,7 @@ const Navigation = ({ patientId, currentPage }) => {
                             const fullPath = `${patientsFolder}${patientId}`;
                             window.location.href = `explorer:${fullPath}`;
                         }}
-                        title="Open Patient Folder"
+                        title={isNewPatient ? "Save patient first to access folder" : "Open Patient Folder"}
                     >
                         <div className="nav-item-icon">
                             <i className="fas fa-folder-open" />
@@ -334,8 +372,8 @@ const Navigation = ({ patientId, currentPage }) => {
 
 
                     <div
-                        className={`sidebar-nav-item more-actions-btn ${(currentPage === 'compare' || currentPage === 'xrays') ? 'active' : ''}`}
-                        title="More Actions"
+                        className={`sidebar-nav-item more-actions-btn ${(currentPage === 'compare' || currentPage === 'xrays') ? 'active' : ''} ${isNewPatient ? 'disabled' : ''}`}
+                        title={isNewPatient ? "Save patient first to access more actions" : "More Actions"}
                     >
                         <div className="nav-item-icon">
                             <i className="fas fa-ellipsis-h" />
