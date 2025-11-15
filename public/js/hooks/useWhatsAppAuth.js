@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { config } from '../config/environment.js';
 
 // Authentication States
 export const AUTH_STATES = {
@@ -58,7 +59,9 @@ export const useWhatsAppAuth = () => {
   const fetchQRCode = useCallback(async () => {
     try {
       console.log('Fetching QR code from API...');
-      const response = await fetch('/api/wa/qr');
+      const response = await fetch('/api/wa/qr', {
+        credentials: 'include' // Include session cookies for authentication
+      });
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -76,9 +79,9 @@ export const useWhatsAppAuth = () => {
     }
   }, []);
 
-  // Handle QR code update
+  // Handle QR code update (QR is already converted to data URL by server)
   const handleQRUpdate = useCallback((data) => {
-    console.log('QR Code updated:', !!data.qr);
+    console.log('QR Code updated - has QR:', !!data.qr);
 
     if (authState === AUTH_STATES.AUTHENTICATED) {
       console.log('Already authenticated, ignoring QR update');
@@ -93,6 +96,7 @@ export const useWhatsAppAuth = () => {
 
     setAuthState(AUTH_STATES.QR_REQUIRED);
     setQrCode(data.qr);
+    console.log('QR Code received and set');
   }, [authState]);
 
   // Handle client ready
@@ -112,6 +116,8 @@ export const useWhatsAppAuth = () => {
   // Handle initial state
   const handleInitialState = useCallback((data) => {
     console.log('Initial state received:', data);
+    console.log('Initial state has QR:', !!data?.qr);
+    console.log('Initial state clientReady:', data?.clientReady);
 
     if (!data) {
       console.log('No data received');
@@ -123,7 +129,7 @@ export const useWhatsAppAuth = () => {
       setAuthState(AUTH_STATES.AUTHENTICATED);
       setClientReady(true);
     } else if (data.qr) {
-      console.log('QR code found, checking for existing session');
+      console.log('QR code found in initial state (already converted by server)');
       setAuthState(AUTH_STATES.CHECKING_SESSION);
       setQrCode(data.qr);
 
@@ -142,12 +148,13 @@ export const useWhatsAppAuth = () => {
       setAuthState(AUTH_STATES.ERROR);
       setError(data.error);
     } else {
-      console.log('No specific state, checking for session');
+      console.log('No specific state (no QR, no clientReady), checking for session');
       setAuthState(AUTH_STATES.CHECKING_SESSION);
 
       setTimeout(() => {
         setAuthState((currentState) => {
           if (currentState === AUTH_STATES.CHECKING_SESSION) {
+            console.log('Timeout reached, moving to QR_REQUIRED');
             return AUTH_STATES.QR_REQUIRED;
           }
           return currentState;
@@ -158,8 +165,8 @@ export const useWhatsAppAuth = () => {
 
   // Setup WebSocket connection
   const setupWebSocket = useCallback(() => {
-    const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${location.host}?clientType=auth&needsQR=true&timestamp=${Date.now()}`;
+    // Use the centralized environment configuration (same as appointments page)
+    const wsUrl = `${config.wsUrl}?clientType=auth&needsQR=true&timestamp=${Date.now()}`;
 
     console.log('Connecting to:', wsUrl);
 
@@ -183,7 +190,11 @@ export const useWhatsAppAuth = () => {
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        console.log('WebSocket message:', message.type);
+
+        // Only log important messages (not heartbeats)
+        if (message.type !== 'heartbeat_pong') {
+          console.log('WebSocket message:', message.type);
+        }
 
         switch (message.type) {
           case 'whatsapp_qr_updated':
@@ -194,6 +205,9 @@ export const useWhatsAppAuth = () => {
             break;
           case 'whatsapp_initial_state_response':
             handleInitialState(message.data);
+            break;
+          case 'heartbeat_pong':
+            // Heartbeat response - connection is alive (silently handled)
             break;
           default:
             console.log('Unhandled message:', message);
@@ -250,7 +264,10 @@ export const useWhatsAppAuth = () => {
 
   const handleRestart = useCallback(async () => {
     try {
-      const response = await fetch('/api/wa/restart', { method: 'POST' });
+      const response = await fetch('/api/wa/restart', {
+        method: 'POST',
+        credentials: 'include'
+      });
       const result = await response.json();
 
       if (result.success) {
@@ -270,7 +287,10 @@ export const useWhatsAppAuth = () => {
 
   const handleDestroy = useCallback(async () => {
     try {
-      const response = await fetch('/api/wa/destroy', { method: 'POST' });
+      const response = await fetch('/api/wa/destroy', {
+        method: 'POST',
+        credentials: 'include'
+      });
       const result = await response.json();
 
       if (result.success) {
@@ -288,7 +308,10 @@ export const useWhatsAppAuth = () => {
   const handleLogout = useCallback(async () => {
     try {
       console.log('Starting logout process...');
-      const response = await fetch('/api/wa/logout', { method: 'POST' });
+      const response = await fetch('/api/wa/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
       const result = await response.json();
 
       if (result.success) {
@@ -297,7 +320,10 @@ export const useWhatsAppAuth = () => {
 
         // Restart client after logout
         try {
-          const restartResponse = await fetch('/api/wa/restart', { method: 'POST' });
+          const restartResponse = await fetch('/api/wa/restart', {
+            method: 'POST',
+            credentials: 'include'
+          });
           const restartResult = await restartResponse.json();
 
           if (restartResult.success) {
@@ -321,7 +347,7 @@ export const useWhatsAppAuth = () => {
     }
   }, [requestInitialState]);
 
-  // Initialize WebSocket on mount
+  // Initialize WebSocket on mount (only once!)
   useEffect(() => {
     setupWebSocket();
 
@@ -334,7 +360,8 @@ export const useWhatsAppAuth = () => {
         clearTimeout(reconnectTimerRef.current);
       }
     };
-  }, [setupWebSocket, stopQRRefreshTimer]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty array = run only once on mount
 
   // Manage QR refresh timer based on auth state
   useEffect(() => {
@@ -343,7 +370,8 @@ export const useWhatsAppAuth = () => {
     } else {
       stopQRRefreshTimer();
     }
-  }, [authState, startQRRefreshTimer, stopQRRefreshTimer]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authState]); // Only depend on authState changes
 
   // Handle page visibility
   useEffect(() => {
@@ -355,7 +383,8 @@ export const useWhatsAppAuth = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [authState, requestInitialState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authState]); // Only depend on authState changes
 
   // Handle successful authentication redirect
   useEffect(() => {

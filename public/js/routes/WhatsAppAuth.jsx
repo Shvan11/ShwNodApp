@@ -25,7 +25,7 @@ export default function WhatsAppAuth() {
         return <StatusDisplay authState={authState} />;
 
       case AUTH_STATES.QR_REQUIRED:
-        return <QRCodeDisplay qrCode={qrCode} onFetchQR={actions.fetchQRCode} />;
+        return <QRCodeDisplay qrCode={qrCode} />;
 
       case AUTH_STATES.AUTHENTICATED:
         return <SuccessDisplay />;

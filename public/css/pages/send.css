@@ -162,55 +162,238 @@
   font-weight: 600;
 }
 
+/* Message Status Table Container */
+.message-status-table {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-top: 20px;
+}
+
+.message-status-table h3 {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+/* Table responsive wrapper */
+.table-responsive {
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+
 /* Table styling */
-table {
+.status-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 10px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-table th {
+.status-table thead {
   background-color: #25D366;
   color: white;
+}
+
+.status-table th {
   padding: 12px;
   text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
 }
 
-table td {
-  padding: 10px;
+.status-table td {
+  padding: 10px 12px;
   border-bottom: 1px solid #e0e0e0;
+  font-size: 14px;
 }
 
-tr:nth-child(even) {
+.status-table tbody tr:nth-child(even) {
   background-color: #f9f9f9;
 }
 
-tr:hover {
+.status-table tbody tr:hover {
   background-color: #f1f1f1;
 }
 
+/* Status indicator dot */
+.status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* Status cell styling */
+.status-cell {
+  font-weight: 500;
+}
+
 /* Row status classes */
-tr.true {
+.status-row.status-pending {
+  border-left: 4px solid #f39c12;
+}
+
+.status-row.status-sent {
   border-left: 4px solid #27ae60;
 }
 
-tr.false {
-  border-left: 4px solid #c0392b;
+.status-row.status-delivered {
+  border-left: 4px solid #007bff;
 }
 
-/* Responsive adjustments */
+.status-row.status-read {
+  border-left: 4px solid #8e44ad;
+}
+
+.status-row.status-error,
+.status-row.status-failed {
+  border-left: 4px solid #dc3545;
+}
+
+/* Status indicator colors */
+.status-indicator.status-pending {
+  background-color: #f39c12;
+}
+
+.status-indicator.status-sent {
+  background-color: #27ae60;
+}
+
+.status-indicator.status-delivered {
+  background-color: #007bff;
+}
+
+.status-indicator.status-read {
+  background-color: #8e44ad;
+}
+
+.status-indicator.status-error,
+.status-indicator.status-failed {
+  background-color: #dc3545;
+}
+
+/* Table Summary Section */
+.table-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+}
+
+.summary-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  background: white;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #495057;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  white-space: nowrap;
+}
+
+.summary-item:first-child {
+  background: #007bff;
+  color: white;
+  font-weight: 600;
+}
+
+/* Message preview truncation */
+.message-preview {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Results placeholder */
+.results-placeholder {
+  text-align: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-top: 20px;
+}
+
+.placeholder-text {
+  font-size: 16px;
+  color: #6c757d;
+  margin: 0;
+}
+
+.placeholder-text .status-icon {
+  font-size: 24px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+/* Responsive adjustments for tables */
 @media (max-width: 768px) {
-  table {
-      font-size: 14px;
+  .message-status-table {
+      padding: 16px;
   }
-  
-  table th, table td {
-      padding: 8px;
+
+  .message-status-table h3 {
+      font-size: 1.1rem;
   }
-  
-  .status-panel {
-      font-size: 14px;
+
+  .status-table {
+      font-size: 13px;
+  }
+
+  .status-table th,
+  .status-table td {
+      padding: 8px 6px;
+  }
+
+  .message-preview {
+      max-width: 120px;
+  }
+
+  .table-summary {
+      gap: 8px;
+      padding: 12px;
+  }
+
+  .summary-item {
+      padding: 6px 12px;
+      font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .message-status-table {
+      padding: 12px;
+  }
+
+  .status-table {
+      font-size: 12px;
+  }
+
+  .status-table th,
+  .status-table td {
+      padding: 6px 4px;
+  }
+
+  /* Stack summary items vertically on very small screens */
+  .table-summary {
+      flex-direction: column;
+      gap: 6px;
+  }
+
+  .summary-item {
+      width: 100%;
+      justify-content: space-between;
   }
 }
 
@@ -281,10 +464,10 @@ tr.false {
 }
 
 /* Enhanced Button System - Scoped to send page */
-#whatsapp-send-root .btn,
-.main-layout .btn {
+/* Using .container.main-layout for higher specificity than buttons.css */
+.container.main-layout .btn {
     padding: 8px 12px;
-    border: none;
+    border: 1px solid transparent;
     border-radius: 4px;
     cursor: pointer;
     font-size: 14px;
@@ -300,87 +483,74 @@ tr.false {
     vertical-align: baseline;
 }
 
-#whatsapp-send-root .btn:disabled,
-.main-layout .btn:disabled {
+.container.main-layout .btn:disabled {
     background-color: #adb5bd;
     color: #6c757d;
     cursor: not-allowed;
     transform: none;
 }
 
-#whatsapp-send-root .btn:not(:disabled):hover,
-.main-layout .btn:not(:disabled):hover {
+.container.main-layout .btn:not(:disabled):hover {
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-#whatsapp-send-root .btn:not(:disabled):active,
-.main-layout .btn:not(:disabled):active {
+.container.main-layout .btn:not(:disabled):active {
     transform: translateY(0);
 }
 
 /* Button Color Variants - Scoped to send page */
-#whatsapp-send-root .btn-primary,
-.main-layout .btn-primary {
+.container.main-layout .btn-primary {
     background-color: #007bff;
     color: white;
     border-color: #007bff;
 }
 
-#whatsapp-send-root .btn-primary:hover:not(:disabled),
-.main-layout .btn-primary:hover:not(:disabled) {
+.container.main-layout .btn-primary:hover:not(:disabled) {
     background-color: #0056b3;
     border-color: #0056b3;
 }
 
-#whatsapp-send-root .btn-secondary,
-.main-layout .btn-secondary {
+.container.main-layout .btn-secondary {
     background-color: #6c757d;
     color: white;
     border-color: #6c757d;
 }
 
-#whatsapp-send-root .btn-secondary:hover:not(:disabled),
-.main-layout .btn-secondary:hover:not(:disabled) {
+.container.main-layout .btn-secondary:hover:not(:disabled) {
     background-color: #5a6268;
     border-color: #5a6268;
 }
 
-#whatsapp-send-root .btn-success,
-.main-layout .btn-success {
+.container.main-layout .btn-success {
     background-color: #28a745;
     color: white;
     border-color: #28a745;
 }
 
-#whatsapp-send-root .btn-success:hover:not(:disabled),
-.main-layout .btn-success:hover:not(:disabled) {
+.container.main-layout .btn-success:hover:not(:disabled) {
     background-color: #218838;
     border-color: #218838;
 }
 
-#whatsapp-send-root .btn-warning,
-.main-layout .btn-warning {
+.container.main-layout .btn-warning {
     background-color: #ffc107;
     color: #212529;
-    border: 1px solid #f0ad4e;
+    border-color: #f0ad4e;
 }
 
-#whatsapp-send-root .btn-warning:hover:not(:disabled),
-.main-layout .btn-warning:hover:not(:disabled) {
+.container.main-layout .btn-warning:hover:not(:disabled) {
     background-color: #e0a800;
     border-color: #d58512;
 }
 
-#whatsapp-send-root .btn-danger,
-.main-layout .btn-danger {
+.container.main-layout .btn-danger {
     background-color: #dc3545;
     color: white;
     border-color: #dc3545;
 }
 
-#whatsapp-send-root .btn-danger:hover:not(:disabled),
-.main-layout .btn-danger:hover:not(:disabled) {
+.container.main-layout .btn-danger:hover:not(:disabled) {
     background-color: #c82333;
     border-color: #c82333;
 }
@@ -636,31 +806,31 @@ tr.false {
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .date-controls label {
         min-width: auto;
         margin-bottom: 8px;
     }
-    
+
     .date-dropdown {
         min-width: auto;
         width: 100%;
     }
-    
-    .btn {
+
+    .container.main-layout .btn {
         width: 100%;
         justify-content: center;
         margin-bottom: 8px;
     }
-    
-    .btn:last-child {
+
+    .container.main-layout .btn:last-child {
         margin-bottom: 0;
     }
-    
+
     .date-selection-panel {
         padding: 16px;
     }
-    
+
     .qr-image {
         max-width: 250px;
     }
@@ -1085,7 +1255,7 @@ tr.false {
     box-shadow: var(--box-shadow);
 }
 
-.primary-action {
+.container.main-layout .primary-action {
     grid-column: 1 / -1;
     font-size: 18px;
     padding: 16px 24px;
@@ -1096,7 +1266,7 @@ tr.false {
     border: none;
 }
 
-.primary-action:hover:not(:disabled) {
+.container.main-layout .primary-action:hover:not(:disabled) {
     background: var(--whatsapp-dark);
 }
 
@@ -1222,7 +1392,7 @@ tr.false {
         margin: 16px 0;
     }
     
-    .primary-action {
+    .container.main-layout .primary-action {
         font-size: 18px;
         padding: 18px 24px;
         min-height: 56px;

@@ -9,6 +9,7 @@ import { getLatestVisitsSum } from '../services/database/queries/visit-queries.j
 import { createWebSocketMessage, validateWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
 import { WebSocketEvents, createStandardMessage } from '../services/messaging/websocket-events.js';
 import { logger } from '../services/core/Logger.js';
+import qrcode from 'qrcode';
 /**
  * WebSocket Connection Manager
  * Manages different types of WebSocket connections
@@ -649,7 +650,22 @@ function setupWebSocketServer(server) {
       } else {
         html = '<p>Initializing the client...</p>';
       }
-      
+
+      // Convert QR code to data URL if present
+      let qrDataUrl = null;
+      if (!isClientReady && messageState.qr) {
+        try {
+          qrDataUrl = await qrcode.toDataURL(messageState.qr, {
+            margin: 4,
+            scale: 6,
+            errorCorrectionLevel: 'M'
+          });
+        } catch (error) {
+          logger.websocket.error('Failed to convert QR code to data URL:', error);
+          qrDataUrl = messageState.qr; // Fallback to raw string
+        }
+      }
+
       // Create response similar to /api/update endpoint
       const responseData = {
         success: true,
@@ -659,7 +675,7 @@ function setupWebSocketServer(server) {
         initializing: clientStatus.initializing || false,
         clientStatus: clientStatus,
         persons: messageState.persons || [],
-        qr: isClientReady ? null : messageState.qr,
+        qr: qrDataUrl,
         stats: stateDump,
         sentMessages: stateDump.sentMessages || 0,
         failedMessages: stateDump.failedMessages || 0,

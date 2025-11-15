@@ -82,6 +82,11 @@ export function useMessageStatus(currentDate, messageStatusUpdate) {
                 setMessages([]);
             }
         } catch (err) {
+            // Ignore AbortError - this is expected when a request is cancelled
+            if (err.name === 'AbortError') {
+                return;
+            }
+
             // Don't show error for missing data - it's normal for dates with no messages
             if (err.message.includes('HTTP 404') || err.message.includes('Not Found')) {
                 console.log(`No message data available for date: ${currentDate}`);

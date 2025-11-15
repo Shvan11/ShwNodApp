@@ -8,6 +8,7 @@ import * as messagingQueries from '../database/queries/messaging-queries.js';
 import { createWebSocketMessage, MessageSchemas } from './schemas.js';
 import { messageSessionManager } from './MessageSessionManager.js';
 import { logger } from '../core/Logger.js';
+import qrcode from 'qrcode';
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth } = pkg;
 
@@ -717,11 +718,28 @@ class WhatsAppService extends EventEmitter {
       this.emit('qr', qr);
 
       if (this.wsEmitter) {
-        const message = createWebSocketMessage(
-          MessageSchemas.WebSocketMessage.QR_UPDATE,
-          { qr, clientReady: false }
-        );
-        this.broadcastToClients(message);
+        // Convert QR string to data URL for client display
+        try {
+          const qrImageUrl = await qrcode.toDataURL(qr, {
+            margin: 4,
+            scale: 6,
+            errorCorrectionLevel: 'M'
+          });
+
+          const message = createWebSocketMessage(
+            MessageSchemas.WebSocketMessage.QR_UPDATE,
+            { qr: qrImageUrl, clientReady: false }
+          );
+          this.broadcastToClients(message);
+        } catch (error) {
+          logger.whatsapp.error('Failed to convert QR code to data URL:', error);
+          // Fallback: send raw QR string
+          const message = createWebSocketMessage(
+            MessageSchemas.WebSocketMessage.QR_UPDATE,
+            { qr, clientReady: false }
+          );
+          this.broadcastToClients(message);
+        }
       }
     });
 

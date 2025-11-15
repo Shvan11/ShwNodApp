@@ -3,28 +3,11 @@
  * Shows QR code for WhatsApp authentication
  */
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-export const QRCodeDisplay = ({ qrCode, onFetchQR }) => {
-  const [qrImage, setQrImage] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchQR = async () => {
-      setLoading(true);
-      try {
-        const qr = await onFetchQR();
-        setQrImage(qr);
-      } catch (error) {
-        console.error('Failed to fetch QR:', error);
-        setQrImage(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchQR();
-  }, [qrCode, onFetchQR]);
+export const QRCodeDisplay = ({ qrCode }) => {
+  // QR code comes directly from WebSocket via props
+  // No need to fetch from API - WebSocket already provides it!
 
   return (
     <div className="qr-section">
@@ -34,7 +17,7 @@ export const QRCodeDisplay = ({ qrCode, onFetchQR }) => {
       </div>
 
       <div className="qr-code-container">
-        {loading || !qrImage ? (
+        {!qrCode ? (
           <div className="qr-placeholder">
             <div className="qr-loading">
               <span className="loading-spinner"></span>
@@ -43,7 +26,7 @@ export const QRCodeDisplay = ({ qrCode, onFetchQR }) => {
           </div>
         ) : (
           <img
-            src={qrImage}
+            src={qrCode}
             className="qr-code"
             alt="WhatsApp QR Code for authentication"
           />

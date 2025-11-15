@@ -59,6 +59,11 @@ export function useMessageCount(currentDate) {
             const message = formatMessageCountDisplay(count);
             setDisplayMessage(message);
         } catch (err) {
+            // Ignore AbortError - this is expected when a request is cancelled
+            if (err.name === 'AbortError') {
+                return;
+            }
+
             console.error('Failed to load message count:', err);
             setError(err.message || 'Failed to load message count');
             setDisplayMessage('Failed to load message count');
