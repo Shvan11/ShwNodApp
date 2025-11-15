@@ -63,10 +63,10 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
 
     const loadDropdownData = async () => {
         try {
-            const [typesRes, keywordsRes, doctorsRes] = await Promise.all([
+            const [typesRes, keywordsRes, employeesRes] = await Promise.all([
                 fetch('/api/getworktypes'),
                 fetch('/api/getworkkeywords'),
-                fetch('/api/doctors')
+                fetch('/api/employees?percentage=true')
             ]);
 
             if (typesRes.ok) {
@@ -77,9 +77,9 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
                 const kw = await keywordsRes.json();
                 setKeywords(kw);
             }
-            if (doctorsRes.ok) {
-                const docs = await doctorsRes.json();
-                setDoctors(docs);
+            if (employeesRes.ok) {
+                const data = await employeesRes.json();
+                setDoctors(data?.employees || []);
             }
         } catch (err) {
             console.error('Error loading dropdown data:', err);

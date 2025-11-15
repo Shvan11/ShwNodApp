@@ -168,7 +168,6 @@ class AppointmentPDFGenerator {
             return;
         }
 
-        const tableTop = doc.y;
         const rowHeight = 25;
         const colWidths = {
             time: 70,
@@ -187,12 +186,6 @@ class AppointmentPDFGenerator {
             detail: 480        // type + typeWidth
         };
 
-        // Table header
-        doc.fontSize(10)
-            .font('NotoArabic')
-            .fillColor('#000000');
-
-        let x = 50;
         const headers = [
             { label: 'Time', width: colWidths.time },
             { label: 'Patient Name', width: colWidths.patient },
@@ -201,45 +194,44 @@ class AppointmentPDFGenerator {
             { label: 'Detail', width: colWidths.detail }
         ];
 
-        headers.forEach(header => {
-            doc.text(header.label, x, tableTop, { width: header.width, align: 'left' });
-            x += header.width;
-        });
+        // Helper function to add table headers
+        const addTableHeader = (startY) => {
+            doc.fontSize(10)
+                .font('NotoArabic')
+                .fillColor('#000000');
 
-        // Header underline
-        doc.strokeColor('#cccccc')
-            .lineWidth(1)
-            .moveTo(50, tableTop + 15)
-            .lineTo(545, tableTop + 15)
-            .stroke();
+            let x = 50;
+            headers.forEach(header => {
+                doc.text(header.label, x, startY, { width: header.width, align: 'left' });
+                x += header.width;
+            });
+
+            // Header underline
+            doc.strokeColor('#cccccc')
+                .lineWidth(1)
+                .moveTo(50, startY + 15)
+                .lineTo(545, startY + 15)
+                .stroke();
+
+            return startY + 20; // Return Y position after header
+        };
+
+        // Add initial header
+        let currentY = addTableHeader(doc.y);
 
         // Table rows
         doc.font('NotoArabic').fontSize(9);
 
         appointments.forEach((apt, index) => {
-            const y = tableTop + 20 + (index + 1) * rowHeight;
+            // Calculate next row position
+            const nextY = currentY + rowHeight;
 
-            // Check if we need a new page
-            if (y > 700) {
+            // Check if we need a new page (leave 100px margin at bottom for footer)
+            if (nextY > doc.page.height - 100) {
                 doc.addPage();
-                // Re-add headers on new page
-                const newTableTop = 50;
-                doc.font('NotoArabic').fontSize(10);
-                let newX = 50;
-                headers.forEach(header => {
-                    doc.text(header.label, newX, newTableTop, { width: header.width, align: 'left' });
-                    newX += header.width;
-                });
-                doc.strokeColor('#cccccc')
-                    .lineWidth(1)
-                    .moveTo(50, newTableTop + 15)
-                    .lineTo(545, newTableTop + 15)
-                    .stroke();
-
+                currentY = addTableHeader(50);
                 doc.font('NotoArabic').fontSize(9);
             }
-
-            const currentY = y > 700 ? 70 : y;
 
             // Alternate row background
             if (index % 2 === 0) {
@@ -285,6 +277,9 @@ class AppointmentPDFGenerator {
                 align: 'left',
                 ellipsis: true
             });
+
+            // Move to next row
+            currentY += rowHeight;
         });
     }
 

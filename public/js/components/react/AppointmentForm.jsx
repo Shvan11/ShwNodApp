@@ -32,12 +32,13 @@ const AppointmentForm = ({ patientId, onClose, onSuccess }) => {
 
     const loadDoctors = async () => {
         try {
-            const response = await fetch('/api/doctors');
-            if (!response.ok) throw new Error('Failed to load doctors');
+            // Fetch all employees who can receive appointments (doctors, hygienists, etc.)
+            const response = await fetch('/api/employees?getAppointments=true');
+            if (!response.ok) throw new Error('Failed to load employees');
             const data = await response.json();
-            setDoctors(data || []);
+            setDoctors(data?.employees || []);
         } catch (err) {
-            console.error('Error loading doctors:', err);
+            console.error('Error loading employees:', err);
             setError(err.message);
         }
     };

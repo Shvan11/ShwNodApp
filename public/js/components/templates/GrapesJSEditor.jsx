@@ -5,6 +5,7 @@
 
 import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import grapesjs from 'grapesjs';
+import 'grapesjs/dist/css/grapes.min.css';
 
 const GrapesJSEditor = forwardRef(({ template }, ref) => {
     const containerRef = useRef(null);

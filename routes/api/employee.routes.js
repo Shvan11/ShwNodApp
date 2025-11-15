@@ -15,15 +15,62 @@ import { log } from '../../utils/logger.js';
 const router = express.Router();
 
 /**
- * Get all employees
+ * Get all employees with flexible filtering
  * GET /employees
+ *
+ * Query Parameters (all optional):
+ * - getAppointments: 'true' to filter only employees who can receive appointments
+ * - receiveEmail: 'true' to filter only employees who receive email notifications
+ * - percentage: 'true' to filter only employees with percentage-based compensation
+ * - position: position ID or name to filter by specific position
+ *
+ * Examples:
+ * - GET /api/employees                           -> All employees
+ * - GET /api/employees?getAppointments=true      -> Only employees who can take appointments (doctors, hygienists, etc.)
+ * - GET /api/employees?receiveEmail=true         -> Only employees who receive emails
+ * - GET /api/employees?position=Doctor           -> Only doctors
+ * - GET /api/employees?getAppointments=true&position=Hygienist -> Only hygienists who can take appointments
  */
 router.get('/employees', async (req, res) => {
     try {
+        const { getAppointments, receiveEmail, percentage, position } = req.query;
+
+        // Build WHERE clause conditions
+        const conditions = [];
+
+        if (getAppointments === 'true') {
+            conditions.push('e.getAppointments = 1');
+        }
+
+        if (receiveEmail === 'true') {
+            conditions.push('e.receiveEmail = 1');
+            conditions.push('e.Email IS NOT NULL');
+            conditions.push("e.Email != ''");
+        }
+
+        if (percentage === 'true') {
+            conditions.push('e.Percentage = 1');
+        }
+
+        if (position) {
+            // Support filtering by position name or ID
+            if (isNaN(position)) {
+                conditions.push(`p.PositionName = '${position.replace(/'/g, "''")}'`);
+            } else {
+                conditions.push(`e.Position = ${parseInt(position)}`);
+            }
+        }
+
+        const whereClause = conditions.length > 0
+            ? `WHERE ${conditions.join(' AND ')}`
+            : '';
+
         const query = `
-            SELECT ID, employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments
-            FROM tblEmployees
-            ORDER BY employeeName
+            SELECT e.ID, e.employeeName, e.Position, p.PositionName, e.Email, e.Phone, e.Percentage, e.receiveEmail, e.getAppointments
+            FROM tblEmployees e
+            LEFT JOIN tblPositions p ON e.Position = p.ID
+            ${whereClause}
+            ORDER BY e.employeeName
         `;
 
         const employees = await database.executeQuery(
@@ -33,11 +80,12 @@ router.get('/employees', async (req, res) => {
                 ID: columns[0].value,
                 employeeName: columns[1].value,
                 Position: columns[2].value,
-                Email: columns[3].value,
-                Phone: columns[4].value,
-                Percentage: columns[5].value,
-                receiveEmail: columns[6].value,
-                getAppointments: columns[7].value
+                PositionName: columns[3].value,
+                Email: columns[4].value,
+                Phone: columns[5].value,
+                Percentage: columns[6].value,
+                receiveEmail: columns[7].value,
+                getAppointments: columns[8].value
             })
         );
 
@@ -84,42 +132,6 @@ router.get('/positions', async (req, res) => {
     }
 });
 
-/**
- * Get employees eligible for email notifications
- * GET /employees/email-recipients
- */
-router.get('/employees/email-recipients', async (req, res) => {
-    try {
-        const query = `
-            SELECT ID, employeeName, Email
-            FROM tblEmployees
-            WHERE receiveEmail = 1
-              AND Email IS NOT NULL
-              AND Email != ''
-            ORDER BY employeeName
-        `;
-
-        const recipients = await database.executeQuery(
-            query,
-            [],
-            (columns) => ({
-                ID: columns[0].value,
-                employeeName: columns[1].value,
-                Email: columns[2].value
-            })
-        );
-
-        res.json({
-            success: true,
-            recipients: recipients || [],
-            count: recipients ? recipients.length : 0
-        });
-
-    } catch (error) {
-        log.error('Error fetching email recipients:', error);
-        return ErrorResponses.internalError(res, 'Failed to fetch email recipients', error);
-    }
-});
 
 /**
  * Add new employee

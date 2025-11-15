@@ -89,16 +89,18 @@ class EmailService {
 
     /**
      * Get employee email recipients from database
+     * Uses the unified /api/employees endpoint with receiveEmail filter
      */
     async getEmployeeRecipients() {
         try {
+            // Query employees with receiveEmail = true and valid email addresses
             const query = `
-                SELECT ID, employeeName, Email
-                FROM tblEmployees
-                WHERE receiveEmail = 1
-                  AND Email IS NOT NULL
-                  AND Email != ''
-                ORDER BY employeeName
+                SELECT e.ID, e.employeeName, e.Email
+                FROM tblEmployees e
+                WHERE e.receiveEmail = 1
+                  AND e.Email IS NOT NULL
+                  AND e.Email != ''
+                ORDER BY e.employeeName
             `;
 
             const recipients = await executeQuery(

@@ -12,6 +12,10 @@ const ViewPatientInfo = ({ patientId }) => {
         referralSources: [],
         patientTypes: []
     });
+    const [editingCost, setEditingCost] = useState(false);
+    const [costValue, setCostValue] = useState('');
+    const [currencyValue, setCurrencyValue] = useState('IQD');
+    const [savingCost, setSavingCost] = useState(false);
 
     const loadPatientData = useCallback(async () => {
         if (!patientId) {
@@ -99,6 +103,65 @@ const ViewPatientInfo = ({ patientId }) => {
             age--;
         }
         return `${age} years`;
+    };
+
+    const handleEditCost = () => {
+        setCostValue(patientData.EstimatedCost || '');
+        setCurrencyValue(patientData.Currency || 'IQD');
+        setEditingCost(true);
+    };
+
+    const handleSaveCost = async () => {
+        try {
+            setSavingCost(true);
+            const response = await fetch(`/api/patients/${patientId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ...patientData,
+                    EstimatedCost: costValue || null,
+                    Currency: currencyValue
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update estimated cost');
+            }
+
+            // Update local state
+            setPatientData({
+                ...patientData,
+                EstimatedCost: costValue || null,
+                Currency: currencyValue
+            });
+            setEditingCost(false);
+        } catch (err) {
+            console.error('Error saving cost:', err);
+            alert('Failed to save estimated cost');
+        } finally {
+            setSavingCost(false);
+        }
+    };
+
+    const handleCancelCost = () => {
+        setEditingCost(false);
+        setCostValue('');
+        setCurrencyValue('IQD');
+    };
+
+    const formatNumberWithCommas = (value) => {
+        if (!value) return '';
+        return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    };
+
+    const handleCostInputChange = (e) => {
+        // Remove non-numeric characters except for the value itself
+        const rawValue = e.target.value.replace(/,/g, '');
+        if (rawValue === '' || /^\d+$/.test(rawValue)) {
+            setCostValue(rawValue);
+        }
     };
 
     if (loading) {
@@ -244,14 +307,95 @@ const ViewPatientInfo = ({ patientId }) => {
                             <span className="info-label">Referral Source:</span>
                             <span className="info-value">{getReferralSourceName(patientData.ReferralSourceID)}</span>
                         </div>
-                        {patientData.EstimatedCost && (
-                            <div className="info-row">
-                                <span className="info-label">Estimated Cost (Consultation):</span>
-                                <span className="info-value" style={{ fontWeight: '600', color: '#059669' }}>
-                                    {parseInt(patientData.EstimatedCost).toLocaleString()} {patientData.Currency || 'IQD'}
+                        <div className="info-row">
+                            <span className="info-label">
+                                Estimated Cost (Consultation):
+                                {!editingCost && (
+                                    <button
+                                        onClick={handleEditCost}
+                                        style={{
+                                            marginLeft: '0.5rem',
+                                            background: 'none',
+                                            border: 'none',
+                                            color: '#3b82f6',
+                                            cursor: 'pointer',
+                                            fontSize: '0.9rem',
+                                            padding: '0.25rem'
+                                        }}
+                                        title="Edit estimated cost"
+                                    >
+                                        <i className="fas fa-pen"></i>
+                                    </button>
+                                )}
+                            </span>
+                            {editingCost ? (
+                                <span className="info-value" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                    <input
+                                        type="text"
+                                        value={formatNumberWithCommas(costValue)}
+                                        onChange={handleCostInputChange}
+                                        placeholder="Enter cost"
+                                        style={{
+                                            width: '150px',
+                                            padding: '0.25rem 0.5rem',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '4px',
+                                            fontSize: '0.9rem'
+                                        }}
+                                    />
+                                    <select
+                                        value={currencyValue}
+                                        onChange={(e) => setCurrencyValue(e.target.value)}
+                                        style={{
+                                            padding: '0.25rem 0.5rem',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '4px',
+                                            fontSize: '0.9rem'
+                                        }}
+                                    >
+                                        <option value="IQD">IQD</option>
+                                        <option value="USD">USD</option>
+                                        <option value="EUR">EUR</option>
+                                    </select>
+                                    <button
+                                        onClick={handleSaveCost}
+                                        disabled={savingCost}
+                                        style={{
+                                            padding: '0.25rem 0.75rem',
+                                            backgroundColor: '#059669',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: savingCost ? 'not-allowed' : 'pointer',
+                                            fontSize: '0.85rem'
+                                        }}
+                                    >
+                                        {savingCost ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-check"></i>}
+                                    </button>
+                                    <button
+                                        onClick={handleCancelCost}
+                                        disabled={savingCost}
+                                        style={{
+                                            padding: '0.25rem 0.75rem',
+                                            backgroundColor: '#6b7280',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: savingCost ? 'not-allowed' : 'pointer',
+                                            fontSize: '0.85rem'
+                                        }}
+                                    >
+                                        <i className="fas fa-times"></i>
+                                    </button>
                                 </span>
-                            </div>
-                        )}
+                            ) : (
+                                <span className="info-value" style={{ fontWeight: '600', color: '#059669' }}>
+                                    {patientData.EstimatedCost
+                                        ? `${formatNumberWithCommas(patientData.EstimatedCost)} ${patientData.Currency || 'IQD'}`
+                                        : 'Not set'}
+                                </span>
+                            )}
+                        </div>
                         {patientData.Alerts && (
                             <div className="info-row alert-row">
                                 <span className="info-label">

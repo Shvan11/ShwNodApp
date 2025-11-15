@@ -542,12 +542,15 @@ const EditPatientComponent = ({ patientId }) => {
                     <div className="form-group">
                         <label>Estimated Cost (Consultation)</label>
                         <input
-                            type="number"
-                            value={formData.EstimatedCost}
-                            onChange={(e) => setFormData({...formData, EstimatedCost: e.target.value})}
+                            type="text"
+                            value={formData.EstimatedCost ? formData.EstimatedCost.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') : ''}
+                            onChange={(e) => {
+                                const rawValue = e.target.value.replace(/,/g, '');
+                                if (rawValue === '' || /^\d+$/.test(rawValue)) {
+                                    setFormData({...formData, EstimatedCost: rawValue});
+                                }
+                            }}
                             placeholder="Cost quoted at consultation"
-                            min="0"
-                            step="1000"
                         />
                     </div>
                     <div className="form-group">
