@@ -645,41 +645,125 @@ th.qasa-column {
     background-color: #7f8c8d;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
+/* ===== RESPONSIVE MOBILE DESIGN ===== */
+
+/* Tablets and medium screens */
+@media (max-width: 1024px) {
     .statistics-container {
-        padding: 1rem;
+        padding: 1.5rem;
     }
 
     .controls-section {
-        flex-direction: column;
-        gap: 1rem;
+        padding: 1.25rem;
     }
 
     .summary-cards {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
     }
 
     .charts-section {
         grid-template-columns: 1fr;
     }
+}
+
+/* Mobile devices */
+@media (max-width: 768px) {
+    .statistics-container {
+        padding: 1rem;
+    }
+
+    .page-title h1 {
+        font-size: 1.5rem;
+    }
+
+    .controls-section {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+    }
+
+    .date-selector {
+        flex-direction: column;
+        width: 100%;
+        align-items: stretch;
+    }
+
+    .date-display {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .form-select,
+    .form-input {
+        width: 100%;
+        padding: 12px;
+        font-size: 16px;
+        min-height: 44px;
+    }
+
+    .btn-nav,
+    .btn-action {
+        width: 100%;
+        padding: 12px 16px;
+        font-size: 16px;
+        min-height: 48px;
+        justify-content: center;
+    }
+
+    .actions {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .summary-cards {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .summary-card {
+        padding: 1.25rem;
+    }
+
+    .charts-section {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+
+    .chart-container {
+        height: 250px;
+    }
 
     .data-table {
-        font-size: 0.8rem;
+        font-size: 0.8125rem;
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .data-table th,
     .data-table td {
-        padding: 0.5rem;
+        padding: 10px 8px;
+        font-size: 0.8125rem;
     }
 
+    .data-table th {
+        font-size: 0.75rem;
+    }
+
+    /* Modal adjustments */
     .statistics-modal-container {
         width: 100%;
+        max-width: 100%;
         height: 95vh;
+        border-radius: 0;
     }
 
     .statistics-modal-header {
         padding: 1rem;
+    }
+
+    .statistics-modal-header h2 {
+        font-size: 1.25rem;
     }
 
     .statistics-modal-body {
@@ -688,5 +772,146 @@ th.qasa-column {
 
     .statistics-invoice-summary {
         grid-template-columns: 1fr;
+        padding: 1rem;
+    }
+
+    .statistics-invoices-table {
+        font-size: 0.8125rem;
+    }
+
+    .statistics-btn-close {
+        width: 100%;
+    }
+}
+
+/* Small mobile devices */
+@media (max-width: 640px) {
+    .statistics-container {
+        padding: 0.75rem;
+    }
+
+    .page-title h1 {
+        font-size: 1.375rem;
+    }
+
+    .controls-section {
+        padding: 0.875rem;
+    }
+
+    .summary-card {
+        padding: 1rem;
+    }
+
+    .card-header h3 {
+        font-size: 1rem;
+    }
+
+    .amount-row .amount {
+        font-size: 1.125rem;
+    }
+
+    .chart-container {
+        height: 220px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 8px 6px;
+        font-size: 0.75rem;
+    }
+
+    .statistics-modal-header h2 {
+        font-size: 1.125rem;
+    }
+
+    .statistics-modal-body {
+        padding: 0.875rem;
+    }
+
+    .statistics-invoice-summary {
+        padding: 0.875rem;
+    }
+
+    .statistics-invoices-table {
+        font-size: 0.75rem;
+    }
+
+    .statistics-invoices-table th,
+    .statistics-invoices-table td {
+        padding: 8px 6px;
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 480px) {
+    .statistics-container {
+        padding: 0.625rem;
+    }
+
+    .page-title h1 {
+        font-size: 1.25rem;
+    }
+
+    .controls-section {
+        padding: 0.75rem;
+    }
+
+    .btn-nav,
+    .btn-action {
+        padding: 14px;
+    }
+
+    .summary-card {
+        padding: 0.875rem;
+    }
+
+    .chart-container {
+        height: 200px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 6px 4px;
+        font-size: 0.6875rem;
+    }
+
+    .statistics-modal-header {
+        padding: 0.875rem;
+    }
+
+    .statistics-modal-body {
+        padding: 0.75rem;
+    }
+
+    .statistics-btn-close {
+        padding: 14px 16px;
+    }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .btn-nav,
+    .btn-action,
+    .form-select,
+    .form-input {
+        min-height: 48px;
+    }
+
+    .btn-nav:active:not(:disabled),
+    .btn-action:active:not(:disabled) {
+        transform: scale(0.98);
+        opacity: 0.9;
+    }
+
+    .clickable-row {
+        -webkit-tap-highlight-color: rgba(52, 152, 219, 0.1);
+    }
+
+    .clickable-row:active {
+        background-color: rgba(52, 152, 219, 0.15);
+    }
+
+    .statistics-btn-close:active {
+        transform: scale(0.98);
     }
 }

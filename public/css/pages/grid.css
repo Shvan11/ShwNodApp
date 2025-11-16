@@ -23,3 +23,58 @@
   object-fit: contain; /* ✅ Show entire image without cropping */
 }
 
+/* ===== MOBILE RESPONSIVE DESIGN ===== */
+
+/* Tablets and medium screens */
+@media (max-width: 1024px) {
+  #dolph_gallery {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 0 16px 16px 16px;
+  }
+}
+
+/* Mobile devices */
+@media (max-width: 768px) {
+  #dolph_gallery {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    padding: 0 12px 12px 12px;
+  }
+
+  #dolph_gallery a {
+    border-radius: 8px;
+    min-height: 150px;
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 640px) {
+  #dolph_gallery {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 0 16px 16px 16px;
+  }
+
+  #dolph_gallery a {
+    min-height: 200px;
+    border-radius: 8px;
+  }
+
+  #dolph_gallery img {
+    object-fit: contain;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 480px) {
+  #dolph_gallery {
+    padding: 0 12px 12px 12px;
+    gap: 10px;
+  }
+
+  #dolph_gallery a {
+    min-height: 180px;
+  }
+}
+

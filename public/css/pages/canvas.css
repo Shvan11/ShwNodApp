@@ -153,3 +153,195 @@ body {
   .toggle input:checked~.labels::before {
     opacity: 1;
   }
+
+/* ===== MOBILE RESPONSIVE DESIGN ===== */
+
+/* Tablets and medium screens */
+@media (max-width: 1024px) {
+  #canvas {
+    max-width: 100%;
+    max-height: 500px;
+    float: none;
+    margin: 10px auto;
+    display: block;
+  }
+
+  .controls {
+    max-width: 100%;
+    margin: 10px auto;
+  }
+
+  .ctrls1, .ctrls2, .ctrls3 {
+    width: 100%;
+    max-width: 380px;
+  }
+}
+
+/* Mobile devices */
+@media (max-width: 768px) {
+  body {
+    padding: 0.5rem;
+  }
+
+  #canvas {
+    max-width: 100%;
+    max-height: 400px;
+    float: none;
+    margin: 8px auto;
+    display: block;
+    border-width: 1px;
+  }
+
+  #waimg {
+    float: none;
+    max-width: 50px;
+    margin: 8px auto;
+    display: block;
+  }
+
+  .controls {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    margin: 8px 0;
+    padding: 12px;
+    box-sizing: border-box;
+  }
+
+  .ctrls1, .ctrls2, .ctrls3 {
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 8px;
+  }
+
+  .timesphotos {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .times, .photostype {
+    padding: 8px;
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .PButton, .selections {
+    padding: 12px 16px;
+    font-size: 14px;
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .toggle {
+    --width: 90px;
+    --height: calc(var(--width) / 3);
+  }
+
+  .toggle .labels {
+    font-size: 14px;
+    top: 6px;
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 640px) {
+  #canvas {
+    max-height: 350px;
+    margin: 6px auto;
+  }
+
+  .controls {
+    padding: 10px;
+    margin: 6px 0;
+  }
+
+  .ctrls1, .ctrls2, .ctrls3 {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .PButton, .selections {
+    width: 100%;
+    max-width: 100%;
+    padding: 14px;
+    font-size: 16px;
+    box-sizing: border-box;
+  }
+
+  .timesphotos {
+    flex-direction: column;
+  }
+
+  .times, .photostype {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .toggle {
+    --width: 100%;
+    max-width: 200px;
+    margin: 0 auto;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 480px) {
+  body {
+    padding: 0.25rem;
+  }
+
+  #canvas {
+    max-height: 300px;
+    margin: 4px auto;
+  }
+
+  #waimg {
+    max-width: 40px;
+  }
+
+  .controls {
+    padding: 8px;
+    margin: 4px 0;
+  }
+
+  .PButton, .selections {
+    padding: 12px;
+    font-size: 15px;
+    min-height: 48px;
+  }
+
+  .toggle .labels {
+    font-size: 12px;
+    top: 7px;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .PButton, .selections {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  .PButton:active, .selections:active {
+    transform: scale(0.98);
+    background-color: #d4a373;
+  }
+
+  .toggle {
+    cursor: pointer;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  }
+}
