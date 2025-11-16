@@ -47,8 +47,8 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
     // Calculate exact dynamic height for time slot based on actual CSS values
     const getTimeSlotHeight = (timeSlot) => {
         const maxValidAppointments = getMaxValidAppointmentsForTimeSlot(timeSlot);
-        const baseHeight = 80; // Minimum height in pixels
-        
+        const baseHeight = 85; // MUST match --calendar-slot-min-height in CSS
+
         if (maxValidAppointments <= 1) {
             return baseHeight;
         }
