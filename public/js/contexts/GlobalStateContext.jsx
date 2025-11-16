@@ -47,14 +47,8 @@ export function GlobalStateProvider({ children }) {
       console.log('[GlobalState] WebSocket connected');
       setIsWebSocketConnected(true);
 
-      // Request initial WhatsApp state when connected
-      console.log('[GlobalState] Requesting initial WhatsApp state...');
-      ws.send({
-        type: 'request_whatsapp_initial_state',
-        data: { timestamp: Date.now() }
-      }).catch(error => {
-        console.error('[GlobalState] Failed to request initial state:', error);
-      });
+      // NOTE: Initial WhatsApp state is requested by useWhatsAppWebSocket hook
+      // with the current date, so we don't need to request it here
     };
 
     const handleDisconnected = () => {

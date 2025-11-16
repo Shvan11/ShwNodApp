@@ -134,16 +134,24 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
         // Validate upper aligner count doesn't exceed remaining
         if (set && formData.UpperAlignerCount) {
             const upperCount = parseInt(formData.UpperAlignerCount);
-            if (!isNaN(upperCount) && upperCount > set.RemainingUpperAligners) {
-                newErrors.UpperAlignerCount = `Cannot exceed ${set.RemainingUpperAligners} remaining upper aligners`;
+            // When editing, add back the current batch's count to get available total
+            const currentUpperCount = batch ? (parseInt(batch.UpperAlignerCount) || 0) : 0;
+            const availableUpper = set.RemainingUpperAligners + currentUpperCount;
+
+            if (!isNaN(upperCount) && upperCount > availableUpper) {
+                newErrors.UpperAlignerCount = `Cannot exceed ${availableUpper} available upper aligners (${set.RemainingUpperAligners} remaining + ${currentUpperCount} from this batch)`;
             }
         }
 
         // Validate lower aligner count doesn't exceed remaining
         if (set && formData.LowerAlignerCount) {
             const lowerCount = parseInt(formData.LowerAlignerCount);
-            if (!isNaN(lowerCount) && lowerCount > set.RemainingLowerAligners) {
-                newErrors.LowerAlignerCount = `Cannot exceed ${set.RemainingLowerAligners} remaining lower aligners`;
+            // When editing, add back the current batch's count to get available total
+            const currentLowerCount = batch ? (parseInt(batch.LowerAlignerCount) || 0) : 0;
+            const availableLower = set.RemainingLowerAligners + currentLowerCount;
+
+            if (!isNaN(lowerCount) && lowerCount > availableLower) {
+                newErrors.LowerAlignerCount = `Cannot exceed ${availableLower} available lower aligners (${set.RemainingLowerAligners} remaining + ${currentLowerCount} from this batch)`;
             }
         }
 

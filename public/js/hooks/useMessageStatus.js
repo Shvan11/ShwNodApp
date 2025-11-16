@@ -88,11 +88,12 @@ export function useMessageStatus(currentDate, messageStatusUpdate) {
             }
 
             // Don't show error for missing data - it's normal for dates with no messages
-            if (err.message.includes('HTTP 404') || err.message.includes('Not Found')) {
+            const errorMessage = err.message || err.toString() || 'Unknown error';
+            if (errorMessage.includes('HTTP 404') || errorMessage.includes('Not Found')) {
                 console.log(`No message data available for date: ${currentDate}`);
                 setMessages([]);
             } else {
-                console.warn('Failed to load message status table:', err.message);
+                console.warn('Failed to load message status table:', errorMessage);
                 setMessages([]);
             }
         } finally {

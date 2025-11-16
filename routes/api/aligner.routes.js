@@ -1294,15 +1294,14 @@ router.put('/aligner/batches/:batchId', async (req, res) => {
             UpperAlignerCount,
             LowerAlignerCount,
             UpperAlignerStartSequence,
-            UpperAlignerEndSequence,
             LowerAlignerStartSequence,
-            LowerAlignerEndSequence,
             ManufactureDate,
             DeliveredToPatientDate,
-            ValidityPeriod,
-            NextBatchReadyDate,
             Notes,
-            IsActive
+            IsActive,
+            Days
+            // Note: UpperAlignerEndSequence, LowerAlignerEndSequence, ValidityPeriod, NextBatchReadyDate
+            // are computed columns - they're calculated automatically by the database
         } = req.body;
 
         if (!batchId || isNaN(parseInt(batchId))) {
@@ -1311,6 +1310,8 @@ router.put('/aligner/batches/:batchId', async (req, res) => {
 
         log.info(`Updating aligner batch ${batchId}:`, req.body);
 
+        // Note: UpperAlignerEndSequence, LowerAlignerEndSequence, ValidityPeriod, and NextBatchReadyDate
+        // are computed columns and should not be included in UPDATE statements
         const query = `
             UPDATE tblAlignerBatches
             SET
@@ -1318,15 +1319,12 @@ router.put('/aligner/batches/:batchId', async (req, res) => {
                 UpperAlignerCount = @UpperAlignerCount,
                 LowerAlignerCount = @LowerAlignerCount,
                 UpperAlignerStartSequence = @UpperAlignerStartSequence,
-                UpperAlignerEndSequence = @UpperAlignerEndSequence,
                 LowerAlignerStartSequence = @LowerAlignerStartSequence,
-                LowerAlignerEndSequence = @LowerAlignerEndSequence,
                 ManufactureDate = @ManufactureDate,
                 DeliveredToPatientDate = @DeliveredToPatientDate,
-                ValidityPeriod = @ValidityPeriod,
-                NextBatchReadyDate = @NextBatchReadyDate,
                 Notes = @Notes,
-                IsActive = @IsActive
+                IsActive = @IsActive,
+                Days = @Days
             WHERE AlignerBatchID = @batchId
         `;
 
@@ -1337,15 +1335,12 @@ router.put('/aligner/batches/:batchId', async (req, res) => {
                 ['UpperAlignerCount', database.TYPES.Int, UpperAlignerCount ? parseInt(UpperAlignerCount) : 0],
                 ['LowerAlignerCount', database.TYPES.Int, LowerAlignerCount ? parseInt(LowerAlignerCount) : 0],
                 ['UpperAlignerStartSequence', database.TYPES.Int, UpperAlignerStartSequence ? parseInt(UpperAlignerStartSequence) : null],
-                ['UpperAlignerEndSequence', database.TYPES.Int, UpperAlignerEndSequence ? parseInt(UpperAlignerEndSequence) : null],
                 ['LowerAlignerStartSequence', database.TYPES.Int, LowerAlignerStartSequence ? parseInt(LowerAlignerStartSequence) : null],
-                ['LowerAlignerEndSequence', database.TYPES.Int, LowerAlignerEndSequence ? parseInt(LowerAlignerEndSequence) : null],
                 ['ManufactureDate', database.TYPES.Date, ManufactureDate || null],
                 ['DeliveredToPatientDate', database.TYPES.Date, DeliveredToPatientDate || null],
-                ['ValidityPeriod', database.TYPES.Int, ValidityPeriod ? parseInt(ValidityPeriod) : null],
-                ['NextBatchReadyDate', database.TYPES.Date, NextBatchReadyDate || null],
                 ['Notes', database.TYPES.NVarChar, Notes || null],
                 ['IsActive', database.TYPES.Bit, IsActive !== undefined ? IsActive : true],
+                ['Days', database.TYPES.Int, Days ? parseInt(Days) : null],
                 ['batchId', database.TYPES.Int, parseInt(batchId)]
             ]
         );

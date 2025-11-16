@@ -69,7 +69,8 @@ router.get('/template-designer', (_, res) => {
 // No page reloads - all navigation is instant
 
 // Catch-all route - serves index.html for ALL routes
-router.get('*', (_, res) => {
+// Note: Express 5 requires named wildcard parameters (use /*splat instead of *)
+router.get('/*splat', (_, res) => {
   serveSingleSPA(res);
 });
 

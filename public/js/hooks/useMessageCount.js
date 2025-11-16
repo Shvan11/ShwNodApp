@@ -64,7 +64,8 @@ export function useMessageCount(currentDate) {
                 return;
             }
 
-            console.error('Failed to load message count:', err);
+            // Only log actual errors (not cancellations)
+            console.warn('Failed to load message count:', err.message || err);
             setError(err.message || 'Failed to load message count');
             setDisplayMessage('Failed to load message count');
             setMessageCount(null);

@@ -26,6 +26,39 @@ export function useWhatsAppWebSocket(currentDate) {
 
     const wsRef = useRef(null);
     const reconnectTimerRef = useRef(null);
+    const currentDateRef = useRef(currentDate);
+    const lastRequestedDateRef = useRef(null);
+
+    // Keep currentDateRef updated
+    useEffect(() => {
+        currentDateRef.current = currentDate;
+    }, [currentDate]);
+
+    // Request initial state from server (defined before setupWebSocket)
+    const requestInitialState = useCallback(() => {
+        if (wsRef.current && wsRef.current.isConnected) {
+            const dateToRequest = currentDateRef.current;
+
+            // Prevent duplicate requests for the same date
+            if (lastRequestedDateRef.current === dateToRequest) {
+                console.log(`[useWhatsAppWebSocket] Skipping duplicate initial state request for date: ${dateToRequest}`);
+                return;
+            }
+
+            lastRequestedDateRef.current = dateToRequest;
+            console.log(`[useWhatsAppWebSocket] Requesting initial state from server for date: ${dateToRequest}`);
+
+            wsRef.current.send({
+                type: 'request_whatsapp_initial_state',
+                data: {
+                    date: dateToRequest,
+                    timestamp: Date.now()
+                }
+            }).catch(error => {
+                console.error('Failed to request initial state:', error);
+            });
+        }
+    }, []); // No dependencies - uses ref
 
     // Setup WebSocket service using connection manager
     const setupWebSocket = useCallback(async () => {
@@ -141,25 +174,9 @@ export function useWhatsAppWebSocket(currentDate) {
             console.error('Failed to setup WebSocket listeners:', error);
             setConnectionStatus(UI_STATES.ERROR);
         }
-    }, [currentDate]);
+    }, []); // Empty dependency - only setup once on mount
 
-    // Request initial state from server
-    const requestInitialState = useCallback(() => {
-        if (wsRef.current && wsRef.current.isConnected) {
-            console.log('Requesting initial state from server...');
-            wsRef.current.send({
-                type: 'request_whatsapp_initial_state',
-                data: {
-                    date: currentDate,
-                    timestamp: Date.now()
-                }
-            }).catch(error => {
-                console.error('Failed to request initial state:', error);
-            });
-        }
-    }, [currentDate]);
-
-    // Setup WebSocket on mount
+    // Setup WebSocket on mount (only once)
     useEffect(() => {
         let cleanup;
 
@@ -179,8 +196,19 @@ export function useWhatsAppWebSocket(currentDate) {
             if (reconnectTimerRef.current) {
                 clearTimeout(reconnectTimerRef.current);
             }
+            // Reset last requested date
+            lastRequestedDateRef.current = null;
         };
     }, [setupWebSocket]);
+
+    // Request initial state when date changes (without reconnecting WebSocket)
+    useEffect(() => {
+        // Only request if we have an active connection
+        if (connectionStatus === UI_STATES.CONNECTED && currentDate) {
+            console.log(`[useWhatsAppWebSocket] Date changed to ${currentDate}, requesting initial state...`);
+            requestInitialState();
+        }
+    }, [currentDate, connectionStatus, requestInitialState]);
 
     return {
         connectionStatus,

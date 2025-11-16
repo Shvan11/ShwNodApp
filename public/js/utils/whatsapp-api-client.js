@@ -55,7 +55,7 @@ export class APIClient {
 
         // Cancel previous request with same ID if needed
         if (options.cancelPrevious && this.abortControllers.has(options.cancelPrevious)) {
-            this.abortControllers.get(options.cancelPrevious).abort('Request superseded by new request');
+            this.abortControllers.get(options.cancelPrevious).abort();
         }
 
         // Create abort controller
@@ -116,14 +116,14 @@ export class APIClient {
 
     cancelRequest(requestKey) {
         if (this.abortControllers.has(requestKey)) {
-            this.abortControllers.get(requestKey).abort('Request cancelled manually');
+            this.abortControllers.get(requestKey).abort();
             this.abortControllers.delete(requestKey);
         }
     }
 
     cancelAllRequests() {
         for (const [, controller] of this.abortControllers) {
-            controller.abort('All requests cancelled');
+            controller.abort();
         }
         this.abortControllers.clear();
     }
