@@ -112,6 +112,7 @@ async function initializeApplication() {
     app.use('/clinic-assets', express.static(pathResolver('clinic1'))); // Changed from /assets to avoid conflict with Vite built assets
     app.use('/photoswipe', express.static('./public/photoswipe/'));
     app.use('/data', express.static('./data')); // Serve data directory for template files
+    app.use('/images', express.static('./public/images')); // Serve images directory for production mode
 
     // Setup WebSocket
     log.info('🔌 Setting up WebSocket server...');
