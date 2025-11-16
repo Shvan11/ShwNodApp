@@ -166,7 +166,7 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view',
     );
     
     // Use uniform height provided by parent component to ensure all slots for same time have same height
-    const calculatedHeight = uniformHeight || 80; // Fallback to 80px if no uniformHeight provided
+    const calculatedHeight = uniformHeight || 85; // MUST match --calendar-slot-min-height in CSS
     
     return (
         <div
