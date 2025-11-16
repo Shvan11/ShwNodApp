@@ -407,7 +407,7 @@
 .settings-section {
     background: white;
     border-radius: 12px;
-    padding: 2.5rem;
+    /* Padding removed - handled by .settings-content > * parent selector */
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     border: 1px solid #e9ecef;
     transition: all 0.3s ease;
@@ -453,7 +453,8 @@
     color: var(--primary-color);
 }
 
-.settings-content {
+/* Form fields container - DO NOT confuse with .settings-content (the outer wrapper!) */
+.settings-form-fields {
     display: grid;
     gap: 1.5rem;
 }
@@ -684,9 +685,7 @@
         padding: 1.5rem;
     }
 
-    .settings-section {
-        padding: 1.5rem;
-    }
+    /* .settings-section padding removed - handled by .settings-content > * parent */
 
     .settings-section h3 {
         font-size: 1.5rem;
