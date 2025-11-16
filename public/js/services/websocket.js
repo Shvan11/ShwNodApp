@@ -31,22 +31,26 @@ class WebSocketService extends EventEmitter {
 
         return `${protocol}//${location.host}`;
       })(),
-      
+
       // Connection parameters
       reconnectInterval: 2000,      // How long to wait before reconnect attempts (ms)
       reconnectDecay: 1.5,          // Backoff factor for reconnect attempts
       maxReconnectInterval: 30000,  // Maximum reconnect interval (ms)
       maxReconnectAttempts: 20,     // Maximum number of reconnect attempts (null = infinite)
-      
+
+      // Connection timeout (progressive)
+      initialConnectionTimeout: 30000,   // First connection: 30s (allows for backend startup)
+      reconnectionTimeout: 10000,        // Reconnections: 10s (faster for network issues)
+
       // Heartbeat configuration
       heartbeatInterval: 30000,     // Interval for sending heartbeats (ms)
       heartbeatTimeout: 15000,      // Timeout for heartbeat response (increased from 5000)
-      
+
       // Message handling
       maxQueueSize: 100,            // Maximum number of queued messages
       autoReconnect: true,          // Whether to automatically reconnect
       debug: false,                 // Enable debug logging
-      
+
       // Override with provided options
       ...options
     };
@@ -64,7 +68,8 @@ class WebSocketService extends EventEmitter {
       messageQueue: [],         // Queue for messages to send when reconnected
       pendingMessages: new Map(), // Map of message ID -> { resolve, reject, timeout }
       forceClose: false,        // Whether close was requested (to prevent auto-reconnect)
-      screenId: null, // Screen ID for this connection (loaded on demand)
+      screenId: null,           // Screen ID for this connection (loaded on demand)
+      hasConnectedBefore: false, // Track if we've ever successfully connected
     };
     
     // Bind methods to ensure correct 'this' context
@@ -177,14 +182,35 @@ class WebSocketService extends EventEmitter {
         
         this.once('connected', onConnect);
         this.once('error', onError);
-        
+
+        // Progressive timeout: First connection gets more time, reconnections are faster
+        const isFirstConnection = !this.state.hasConnectedBefore;
+        const timeoutDuration = isFirstConnection
+          ? this.options.initialConnectionTimeout
+          : this.options.reconnectionTimeout;
+
+        this.log(`Setting connection timeout: ${timeoutDuration}ms (${isFirstConnection ? 'initial' : 'reconnection'})`);
+
+        // For initial connection, show helpful message halfway through
+        if (isFirstConnection) {
+          setTimeout(() => {
+            if (this.state.status === 'connecting') {
+              console.log('[WebSocket] Still connecting... Server may be starting up. Please wait.');
+              this.emit('connecting_slow', {
+                message: 'Server may be starting up',
+                elapsed: timeoutDuration / 2
+              });
+            }
+          }, timeoutDuration / 2);
+        }
+
         // Set timeout for connection
         setTimeout(() => {
           this.off('connected', onConnect);
           this.off('error', onError);
 
           if (this.state.status !== 'connected') {
-            const error = new Error('Connection timeout');
+            const error = new Error(`Connection timeout after ${timeoutDuration}ms`);
 
             // Close the underlying WebSocket to trigger onClose → scheduleReconnect
             // This ensures auto-reconnect starts immediately instead of leaving a hanging connection
@@ -199,7 +225,7 @@ class WebSocketService extends EventEmitter {
             this.emit('error', error);
             reject(error);
           }
-        }, 10000); // 10 second timeout
+        }, timeoutDuration);
       });
     } catch (error) {
       this.log('Error creating WebSocket:', error);
@@ -402,18 +428,19 @@ class WebSocketService extends EventEmitter {
    */
   onOpen(event) {
     this.log('WebSocket connected');
-    
+
     // Update state
     this.state.status = 'connected';
     this.state.reconnectAttempts = 0;
     this.state.lastActivity = Date.now();
-    
+    this.state.hasConnectedBefore = true; // Mark that we've successfully connected
+
     // Start heartbeat
     this.startHeartbeat();
-    
+
     // Process queued messages
     this.processQueue();
-    
+
     // Emit event
     this.emit('connected', event);
   }
