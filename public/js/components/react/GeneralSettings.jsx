@@ -191,7 +191,7 @@ const GeneralSettings = ({ onChangesUpdate }) => {
                             <span>Loading settings...</span>
                         </div>
                     ) : (
-                        <div className="settings-content">
+                        <div className="settings-form-fields">
                             {Object.keys(options).length === 0 ? (
                                 <p className="no-settings">No settings found. Please check your database configuration.</p>
                             ) : (
