@@ -1,9 +1,11 @@
 /**
  * Custom hook for WhatsApp WebSocket connection management
+ * Uses centralized connection manager to prevent duplicate connections
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useGlobalState } from '../contexts/GlobalStateContext.jsx';
 import { UI_STATES, CONFIG } from '../utils/whatsapp-send-constants.js';
+import connectionManager from '../services/websocket-connection-manager.js';
 
 /**
  * Custom hook for managing WhatsApp WebSocket connection
@@ -25,10 +27,20 @@ export function useWhatsAppWebSocket(currentDate) {
     const wsRef = useRef(null);
     const reconnectTimerRef = useRef(null);
 
-    // Import and setup WebSocket service
+    // Setup WebSocket service using connection manager
     const setupWebSocket = useCallback(async () => {
         try {
-            const { default: websocketService } = await import('../services/websocket.js');
+            console.log('[useWhatsAppWebSocket] Setting up WebSocket connection');
+
+            // Use connection manager to ensure single connection
+            await connectionManager.ensureConnected('waStatus', {
+                PDate: currentDate
+            });
+
+            console.log('[useWhatsAppWebSocket] WebSocket connected via connection manager');
+
+            // Get the WebSocket service from connection manager
+            const websocketService = connectionManager.getService();
 
             // Setup event handlers
             const handleConnecting = () => setConnectionStatus(UI_STATES.CONNECTING);
@@ -103,19 +115,12 @@ export function useWhatsAppWebSocket(currentDate) {
             websocketService.on('whatsapp_sending_finished', handleSendingFinished);
             websocketService.on('whatsapp_initial_state_response', handleInitialState);
 
-            // Connect with parameters
-            try {
-                await websocketService.connect({
-                    PDate: currentDate,
-                    clientType: 'waStatus'
-                });
-                // Connection successful - handleConnected will be called
-            } catch (error) {
-                // Initial connection failed, but auto-reconnect will retry automatically
-                console.error('Initial WebSocket connection failed, auto-reconnect will retry:', error);
+            // Set connection status based on current state
+            if (websocketService.isConnected) {
+                setConnectionStatus(UI_STATES.CONNECTED);
+                requestInitialState();
+            } else {
                 setConnectionStatus(UI_STATES.CONNECTING);
-                // Don't set ERROR state - let handleConnected/handleDisconnected handle state updates
-                // Don't disconnect - let auto-reconnect do its job
             }
 
             wsRef.current = websocketService;
@@ -154,19 +159,23 @@ export function useWhatsAppWebSocket(currentDate) {
         }
     }, [currentDate]);
 
-    // Setup WebSocket on mount and when date changes
+    // Setup WebSocket on mount
     useEffect(() => {
         let cleanup;
 
         setupWebSocket().then(cleanupFn => {
             cleanup = cleanupFn;
+        }).catch(error => {
+            console.error('[useWhatsAppWebSocket] Failed to setup WebSocket:', error);
+            setConnectionStatus(UI_STATES.ERROR);
         });
 
         return () => {
+            console.log('[useWhatsAppWebSocket] Cleanup - removing event listeners');
             if (cleanup) cleanup();
-            if (wsRef.current) {
-                wsRef.current.disconnect();
-            }
+            // Remove our client type from connection manager
+            connectionManager.removeClientType('waStatus');
+            // Clear any reconnect timers
             if (reconnectTimerRef.current) {
                 clearTimeout(reconnectTimerRef.current);
             }

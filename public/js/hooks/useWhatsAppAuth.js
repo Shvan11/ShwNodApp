@@ -1,11 +1,12 @@
 /**
  * WhatsApp Authentication Hook
  * Manages WhatsApp client authentication state and WebSocket connection
- * Refactored to use singleton WebSocket service and GlobalStateContext
+ * Uses centralized connection manager to prevent duplicate connections
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useGlobalState } from '../contexts/GlobalStateContext.jsx';
+import connectionManager from '../services/websocket-connection-manager.js';
 
 // Authentication States
 export const AUTH_STATES = {
@@ -134,30 +135,38 @@ export const useWhatsAppAuth = () => {
     }
   }, []);
 
-  // Setup WebSocket connection using singleton service
+  // Setup WebSocket connection using connection manager
   const setupWebSocket = useCallback(async () => {
     try {
-      // Import singleton WebSocket service
-      const websocketService = (await import('../services/websocket.js')).default;
-      wsRef.current = websocketService;
+      console.log('[useWhatsAppAuth] Setting up WebSocket connection');
 
-      console.log('Setting up WebSocket with singleton service');
+      // Use connection manager to ensure single connection
+      await connectionManager.ensureConnected('auth', {
+        needsQR: true,
+        timestamp: Date.now()
+      });
+
+      console.log('[useWhatsAppAuth] WebSocket connected via connection manager');
+
+      // Get the WebSocket service from connection manager
+      const websocketService = connectionManager.getService();
+      wsRef.current = websocketService;
 
       // Setup connection event handlers
       const handleConnected = () => {
-        console.log('WebSocket connected');
+        console.log('[useWhatsAppAuth] WebSocket connected');
         setAuthState(AUTH_STATES.CONNECTED);
         setConnectionAttempts(0);
         requestInitialState();
       };
 
       const handleDisconnected = () => {
-        console.log('WebSocket disconnected');
+        console.log('[useWhatsAppAuth] WebSocket disconnected');
         setAuthState(AUTH_STATES.DISCONNECTED);
       };
 
       const handleError = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('[useWhatsAppAuth] WebSocket error:', error);
         setAuthState(AUTH_STATES.ERROR);
         setError('WebSocket connection failed');
       };
@@ -169,20 +178,12 @@ export const useWhatsAppAuth = () => {
       websocketService.on('error', handleError);
       websocketService.on('whatsapp_initial_state_response', handleInitialState);
 
-      // Connect with auth client parameters
-      try {
-        await websocketService.connect({
-          clientType: 'auth',
-          needsQR: true,
-          timestamp: Date.now()
-        });
-        // Connection successful - handleConnected will be called
-      } catch (error) {
-        // Initial connection failed, but auto-reconnect will retry automatically
-        console.error('Initial WebSocket connection failed, auto-reconnect will retry:', error);
+      // Set initial state based on current connection
+      if (websocketService.isConnected) {
+        setAuthState(AUTH_STATES.CONNECTED);
+        requestInitialState();
+      } else {
         setAuthState(AUTH_STATES.CONNECTING);
-        // Don't set ERROR state - let handleConnected/handleDisconnected handle state updates
-        // Don't disconnect - let auto-reconnect do its job
       }
 
       // Return cleanup function
@@ -323,15 +324,21 @@ export const useWhatsAppAuth = () => {
 
     setupWebSocket().then(cleanupFn => {
       cleanup = cleanupFn;
+    }).catch(error => {
+      console.error('[useWhatsAppAuth] Failed to setup WebSocket:', error);
+      setAuthState(AUTH_STATES.ERROR);
+      setError('Failed to setup WebSocket connection');
     });
 
     return () => {
+      console.log('[useWhatsAppAuth] Cleanup - removing event listeners');
       stopQRRefreshTimer();
       if (cleanup) {
         cleanup();
       }
-      // Note: We don't disconnect the singleton service here as it's shared
-      // The singleton service manages its own connection lifecycle
+      // Remove our client type from connection manager
+      connectionManager.removeClientType('auth');
+      // Clear reconnect timer
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
       }

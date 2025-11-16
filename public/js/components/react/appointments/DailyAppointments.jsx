@@ -7,10 +7,13 @@ import Notification from './Notification.jsx';
 import ContextMenu from './ContextMenu.jsx';
 import { useAppointments } from '../../../hooks/useAppointments.js';
 import { useWebSocketSync } from '../../../hooks/useWebSocketSync.js';
+import { actionIdManager } from '../../../utils/action-id.js';
 
 /**
  * DailyAppointments Component
  * Main application for daily appointments management
+ *
+ * Enhanced with robust action ID tracking for event source detection
  */
 const DailyAppointments = () => {
     // Get today's date in local timezone
@@ -28,9 +31,6 @@ const DailyAppointments = () => {
     const [contextMenu, setContextMenu] = useState(null);
     const [showFlash, setShowFlash] = useState(false);
 
-    // Track recent local actions to prevent redundant WebSocket reloads
-    const recentActionTimestamp = useRef(null);
-
     // Use custom hooks
     const {
         allAppointments,
@@ -46,19 +46,18 @@ const DailyAppointments = () => {
         calculateStats
     } = useAppointments();
 
-    // WebSocket integration - Smart update handling
-    const { connectionStatus } = useWebSocketSync(selectedDate, () => {
-        // Check if this update is from our own recent action (within last 2 seconds)
-        const now = Date.now();
-        const isOwnAction = recentActionTimestamp.current && (now - recentActionTimestamp.current) < 2000;
+    // WebSocket integration - Robust action ID based update handling
+    const { connectionStatus } = useWebSocketSync(selectedDate, (data) => {
+        // Check if this update is from our own action using action ID
+        const isOwnAction = data?.actionId && actionIdManager.isOwnAction(data.actionId);
 
         if (isOwnAction) {
             // Our own action - optimistic update already handled it
-            console.log('📡 WebSocket update from own action - skipping reload');
+            console.log('📡 [DailyAppointments] WebSocket update from own action - skipping reload');
             flashUpdateIndicator();
         } else {
             // Update from another client - need to reload
-            console.log('📡 WebSocket update from another client - reloading');
+            console.log('📡 [DailyAppointments] WebSocket update from another client - reloading');
             loadAppointments(selectedDate);
             flashUpdateIndicator();
         }
@@ -97,10 +96,12 @@ const DailyAppointments = () => {
 
     // Handle check-in (OPTIMISTIC UPDATE - no reload needed!)
     const handleCheckIn = async (appointmentId) => {
-        recentActionTimestamp.current = Date.now(); // Mark this as our action
         try {
             const result = await checkInPatient(appointmentId);
             if (result.success) {
+                // Register action ID for tracking
+                actionIdManager.registerAction(result.actionId);
+
                 // No loadAppointments() needed! Hook updates state optimistically
                 showNotification('Patient checked in', 'success', {
                     appointmentId,
@@ -114,10 +115,12 @@ const DailyAppointments = () => {
 
     // Handle mark seated (OPTIMISTIC UPDATE - no reload needed!)
     const handleMarkSeated = async (appointmentId) => {
-        recentActionTimestamp.current = Date.now(); // Mark this as our action
         try {
             const result = await markSeated(appointmentId);
             if (result.success) {
+                // Register action ID for tracking
+                actionIdManager.registerAction(result.actionId);
+
                 // No loadAppointments() needed! Hook updates state optimistically
                 showNotification('Patient seated', 'success', {
                     appointmentId,
@@ -131,10 +134,12 @@ const DailyAppointments = () => {
 
     // Handle mark dismissed (OPTIMISTIC UPDATE - no reload needed!)
     const handleMarkDismissed = async (appointmentId) => {
-        recentActionTimestamp.current = Date.now(); // Mark this as our action
         try {
             const result = await markDismissed(appointmentId);
             if (result.success) {
+                // Register action ID for tracking
+                actionIdManager.registerAction(result.actionId);
+
                 // No loadAppointments() needed! Hook updates state optimistically
                 showNotification('Visit completed', 'success', {
                     appointmentId,
@@ -148,7 +153,6 @@ const DailyAppointments = () => {
 
     // Handle undo state (OPTIMISTIC UPDATE - no reload needed!)
     const handleUndoState = async (appointmentId, stateToUndo) => {
-        recentActionTimestamp.current = Date.now(); // Mark this as our action
         try {
             await undoState(appointmentId, stateToUndo);
             // No loadAppointments() needed! Hook updates state optimistically
@@ -160,7 +164,6 @@ const DailyAppointments = () => {
 
     // Handle undo action from notification (OPTIMISTIC UPDATE - no reload needed!)
     const handleUndoAction = async (undoData) => {
-        recentActionTimestamp.current = Date.now(); // Mark this as our action
         try {
             await undoAction(undoData.appointmentId, undoData.previousState);
             // No loadAppointments() needed! Hook updates state optimistically

@@ -128,10 +128,11 @@ router.get("/getPresentTodayApps", async (req, res) => {
 /**
  * Update patient appointment state (Present, Seated, or Dismissed)
  * Records the time when each state transition occurs
+ * Enhanced with action ID tracking for event source detection
  */
 router.post("/updateAppointmentState", async (req, res) => {
     try {
-        const { appointmentID, state, time } = req.body;
+        const { appointmentID, state, time, actionId } = req.body;
         if (!appointmentID || !state) {
             return ErrorResponses.badRequest(res, "Missing required parameters: appointmentID, state");
         }
@@ -139,10 +140,17 @@ router.post("/updateAppointmentState", async (req, res) => {
         // Format time as string for the modified stored procedure
         const now = new Date();
         const currentTime = time || `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-        log.info(`Updating appointment ${appointmentID} with state: ${state}, time: ${currentTime}`);
+        log.info(`Updating appointment ${appointmentID} with state: ${state}, time: ${currentTime}, actionId: ${actionId || 'none'}`);
         const result = await updatePresent(appointmentID, state, currentTime);
 
-        wsEmitter.emit(WebSocketEvents.DATA_UPDATED, new Date().toISOString().split('T')[0]);
+        // Emit WebSocket event with actionId for source tracking
+        const appointmentDate = new Date().toISOString().split('T')[0];
+
+        // Use proper WebSocket event with data payload including actionId
+        if (wsEmitter) {
+            // Emit DATA_UPDATED event with enhanced data including actionId
+            wsEmitter.emit(WebSocketEvents.DATA_UPDATED, appointmentDate, actionId);
+        }
 
         res.json(result);
     } catch (error) {

@@ -1,14 +1,21 @@
 import { useState, useCallback } from 'react';
+import { generateActionId } from '../utils/action-id.js';
 
 /**
  * Custom hook for managing appointments data and actions with OPTIMISTIC UPDATES
  *
- * KEY IMPROVEMENT: Optimistic updates with proper list separation
- * - allAppointments: Non-checked-in only (Present IS NULL from AllTodayApps)
- * - checkedInAppointments: Checked-in only (Present/Seated/Dismissed from PresentTodayApps)
- * - Optimistic updates move appointments between lists instantly
- * - No page scrolling issues
- * - No unnecessary reloads
+ * KEY IMPROVEMENTS:
+ * 1. Optimistic updates with proper list separation
+ *    - allAppointments: Non-checked-in only (Present IS NULL from AllTodayApps)
+ *    - checkedInAppointments: Checked-in only (Present/Seated/Dismissed from PresentTodayApps)
+ *    - Optimistic updates move appointments between lists instantly
+ *    - No page scrolling issues
+ *    - No unnecessary reloads
+ *
+ * 2. Action ID tracking for event source detection
+ *    - Each action gets a unique ID
+ *    - Server echoes the ID in WebSocket broadcasts
+ *    - Enables robust detection of own actions vs external updates
  */
 export function useAppointments() {
     // TWO SEPARATE LISTS (matching database structure)
@@ -114,8 +121,12 @@ export function useAppointments() {
     /**
      * Check in a patient (Scheduled → Present)
      * OPTIMISTIC: Moves from "All" to "Checked In" list immediately
+     * Returns actionId for event source detection
      */
     const checkInPatient = useCallback(async (appointmentId) => {
+        // Generate unique action ID for tracking
+        const actionId = generateActionId();
+
         // Find appointment in "All Appointments" list
         const appointment = allAppointments.find(a => a.appointmentID === appointmentId);
         if (!appointment) {
@@ -142,14 +153,15 @@ export function useAppointments() {
         moveToCheckedIn(appointmentId, checkedInAppointment);
 
         try {
-            // Sync with server
+            // Sync with server (includes actionId for tracking)
             const response = await fetch('/api/updateAppointmentState', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     appointmentID: appointmentId,
                     state: 'Present',
-                    time: currentTime
+                    time: currentTime,
+                    actionId: actionId  // Track this action
                 })
             });
 
@@ -160,7 +172,7 @@ export function useAppointments() {
             const result = await response.json();
             console.log('✅ Check-in confirmed by server:', result);
 
-            return { success: true, previousState: 'Scheduled' };
+            return { success: true, previousState: 'Scheduled', actionId };
         } catch (err) {
             console.error('❌ Check-in failed, rolling back:', err);
             // ROLLBACK: Move back to "All Appointments"
@@ -173,8 +185,12 @@ export function useAppointments() {
     /**
      * Mark patient as seated (Present → Seated)
      * OPTIMISTIC: Updates in "Checked In" list only (NO reload needed!)
+     * Returns actionId for event source detection
      */
     const markSeated = useCallback(async (appointmentId) => {
+        // Generate unique action ID for tracking
+        const actionId = generateActionId();
+
         const appointment = checkedInAppointments.find(a => a.appointmentID === appointmentId);
         if (!appointment) {
             throw new Error('Appointment not found');
@@ -199,7 +215,8 @@ export function useAppointments() {
                 body: JSON.stringify({
                     appointmentID: appointmentId,
                     state: 'Seated',
-                    time: currentTime
+                    time: currentTime,
+                    actionId: actionId  // Track this action
                 })
             });
 
@@ -210,7 +227,7 @@ export function useAppointments() {
             const result = await response.json();
             console.log('✅ Seat confirmed by server:', result);
 
-            return { success: true, previousState: 'Present' };
+            return { success: true, previousState: 'Present', actionId };
         } catch (err) {
             console.error('❌ Seat failed, rolling back:', err);
             updateCheckedInAppointment(appointmentId, previousState);
@@ -221,8 +238,12 @@ export function useAppointments() {
     /**
      * Mark patient as dismissed (Seated → Dismissed)
      * OPTIMISTIC: Updates in "Checked In" list only (NO reload needed!)
+     * Returns actionId for event source detection
      */
     const markDismissed = useCallback(async (appointmentId) => {
+        // Generate unique action ID for tracking
+        const actionId = generateActionId();
+
         const appointment = checkedInAppointments.find(a => a.appointmentID === appointmentId);
         if (!appointment) {
             throw new Error('Appointment not found');
@@ -247,7 +268,8 @@ export function useAppointments() {
                 body: JSON.stringify({
                     appointmentID: appointmentId,
                     state: 'Dismissed',
-                    time: currentTime
+                    time: currentTime,
+                    actionId: actionId  // Track this action
                 })
             });
 
@@ -258,7 +280,7 @@ export function useAppointments() {
             const result = await response.json();
             console.log('✅ Dismiss confirmed by server:', result);
 
-            return { success: true, previousState: 'Seated' };
+            return { success: true, previousState: 'Seated', actionId };
         } catch (err) {
             console.error('❌ Dismiss failed, rolling back:', err);
             updateCheckedInAppointment(appointmentId, previousState);

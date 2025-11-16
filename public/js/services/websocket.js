@@ -38,13 +38,13 @@ class WebSocketService extends EventEmitter {
       maxReconnectInterval: 30000,  // Maximum reconnect interval (ms)
       maxReconnectAttempts: 20,     // Maximum number of reconnect attempts (null = infinite)
 
-      // Connection timeout (progressive)
-      initialConnectionTimeout: 30000,   // First connection: 30s (allows for backend startup)
-      reconnectionTimeout: 10000,        // Reconnections: 10s (faster for network issues)
+      // Connection timeout (progressive) - INCREASED to accommodate database queries
+      initialConnectionTimeout: 45000,   // First connection: 45s (allows for backend startup + DB queries)
+      reconnectionTimeout: 15000,        // Reconnections: 15s (increased from 10s for slow DB)
 
       // Heartbeat configuration
       heartbeatInterval: 30000,     // Interval for sending heartbeats (ms)
-      heartbeatTimeout: 15000,      // Timeout for heartbeat response (increased from 5000)
+      heartbeatTimeout: 20000,      // Timeout for heartbeat response (increased from 15000)
 
       // Message handling
       maxQueueSize: 100,            // Maximum number of queued messages

@@ -31,14 +31,18 @@ export function GlobalStateProvider({ children }) {
 
   // Initialize WebSocket connection once on mount
   useEffect(() => {
-    console.log('[GlobalState] Initializing WebSocket connection (using singleton)');
+    console.log('[GlobalState] Initializing WebSocket event listeners (NOT connecting - other hooks handle connection)');
 
     // Use the singleton WebSocket instance (shared across all components)
     // This prevents multiple connections and ensures consistent state
     const ws = wsService;
 
-    // Set up connection event listeners BEFORE connecting
-    // Note: WebSocketService emits 'connected', 'disconnected', and 'error' events
+    // Track last timeout error to prevent console spam
+    let lastTimeoutErrorLog = 0;
+
+    // Set up connection event listeners
+    // NOTE: We do NOT call connect() here - other hooks (useWebSocketSync, etc.) handle connection
+    // This prevents multiple connect() calls on the same singleton instance
     const handleConnected = () => {
       console.log('[GlobalState] WebSocket connected');
       setIsWebSocketConnected(true);
@@ -59,7 +63,16 @@ export function GlobalStateProvider({ children }) {
     };
 
     const handleError = (error) => {
-      console.error('[GlobalState] WebSocket error:', error);
+      // Reduce console spam from timeout errors during auto-reconnect
+      const isTimeoutError = error && error.message && error.message.includes('Connection timeout');
+      const now = Date.now();
+
+      if (!isTimeoutError || !lastTimeoutErrorLog || (now - lastTimeoutErrorLog) > 60000) {
+        console.error('[GlobalState] WebSocket error:', error);
+        if (isTimeoutError) {
+          lastTimeoutErrorLog = now;
+        }
+      }
       setIsWebSocketConnected(false);
     };
 
@@ -116,13 +129,15 @@ export function GlobalStateProvider({ children }) {
     // Store WebSocket instance in state
     setWebsocket(ws);
 
-    // Note: Don't call connect() here - other components (like useWebSocketSync) will handle connection
-    // This prevents duplicate connections and race conditions
-
     // Set initial connection status based on current state
     setIsWebSocketConnected(ws.isConnected);
 
-    // If WebSocket is already connected, request initial state immediately
+    // NOTE: We do NOT call connect() here
+    // The first component that needs the connection (useWebSocketSync, useWhatsAppWebSocket, etc.)
+    // will handle connecting via the connection manager
+    // This prevents duplicate connect() calls and race conditions
+
+    // If WebSocket is already connected (from another component), request initial state
     if (ws.isConnected) {
       console.log('[GlobalState] WebSocket already connected, requesting initial state...');
       ws.send({

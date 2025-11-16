@@ -1,33 +1,35 @@
 import { useEffect, useCallback, useState } from 'react';
-import wsService from '../services/websocket.js';
+import connectionManager from '../services/websocket-connection-manager.js';
 import { WebSocketEvents } from '../constants/websocket-events.js';
 import { config } from '../config/environment.js';
 
 /**
  * Custom hook for WebSocket real-time appointment updates
  * Manages connection state and listens for appointment updates
+ *
+ * Uses the centralized connection manager to prevent duplicate connections
  */
 export function useWebSocketSync(currentDate, onAppointmentsUpdated) {
     const [connectionStatus, setConnectionStatus] = useState('connecting');
 
-    // Initialize WebSocket connection
+    // Initialize WebSocket connection using connection manager
     useEffect(() => {
         const initializeWebSocket = async () => {
-            // Use environment configuration for WebSocket URL
-            const wsUrl = config.wsUrl;
-
-            // Set the base URL for WebSocket connection
-            wsService.options.baseUrl = wsUrl;
+            console.log('[useWebSocketSync] Requesting WebSocket connection');
 
             try {
-                // Connect to WebSocket server with daily-appointments client type
-                await wsService.connect({ clientType: 'daily-appointments' });
+                // Use connection manager to ensure single connection
+                await connectionManager.ensureConnected('daily-appointments', {
+                    PDate: currentDate
+                });
+
                 setConnectionStatus('connected');
+                console.log('[useWebSocketSync] WebSocket connected successfully');
             } catch (err) {
                 // Initial connection failed, but auto-reconnect will retry automatically
-                console.error('Initial WebSocket connection failed, auto-reconnect will retry:', err);
-                setConnectionStatus('connecting'); // Keep status as 'connecting', not 'disconnected'
-                // Don't call disconnect() - let auto-reconnect do its job
+                console.error('[useWebSocketSync] Connection failed, auto-reconnect will retry:', err);
+                setConnectionStatus('connecting');
+                // Don't disconnect - let auto-reconnect handle it
             }
         };
 
@@ -35,29 +37,35 @@ export function useWebSocketSync(currentDate, onAppointmentsUpdated) {
 
         // Cleanup on unmount
         return () => {
-            wsService.disconnect();
+            console.log('[useWebSocketSync] Cleanup - removing client type from connection manager');
+            // Remove our client type, but DON'T disconnect
+            // (other components may still need the connection)
+            connectionManager.removeClientType('daily-appointments');
         };
     }, []);
 
     // Listen for connection events
     useEffect(() => {
+        // Get the WebSocket service from connection manager
+        const wsService = connectionManager.getService();
+
         const handleConnected = () => {
-            console.log('WebSocket connected');
+            console.log('[useWebSocketSync] WebSocket connected');
             setConnectionStatus('connected');
         };
 
         const handleDisconnected = () => {
-            console.log('WebSocket disconnected');
+            console.log('[useWebSocketSync] WebSocket disconnected');
             setConnectionStatus('disconnected');
         };
 
         const handleReconnecting = () => {
-            console.log('WebSocket reconnecting...');
+            console.log('[useWebSocketSync] WebSocket reconnecting...');
             setConnectionStatus('reconnecting');
         };
 
         const handleError = () => {
-            console.error('WebSocket error');
+            console.error('[useWebSocketSync] WebSocket error');
             setConnectionStatus('error');
         };
 
@@ -77,11 +85,14 @@ export function useWebSocketSync(currentDate, onAppointmentsUpdated) {
 
     // Listen for appointment updates
     useEffect(() => {
+        // Get the WebSocket service from connection manager
+        const wsService = connectionManager.getService();
+
         const handleAppointmentsUpdated = (data) => {
             // Only reload if the update is for the currently displayed date
             if (data && data.date === currentDate) {
-                console.log('📡 Appointments updated via WebSocket for date:', currentDate);
-                onAppointmentsUpdated();
+                console.log('📡 [useWebSocketSync] Appointments updated via WebSocket for date:', currentDate);
+                onAppointmentsUpdated(data);
             }
         };
 
