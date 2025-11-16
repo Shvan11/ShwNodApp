@@ -42,6 +42,15 @@ export function GlobalStateProvider({ children }) {
     const handleConnected = () => {
       console.log('[GlobalState] WebSocket connected');
       setIsWebSocketConnected(true);
+
+      // Request initial WhatsApp state when connected
+      console.log('[GlobalState] Requesting initial WhatsApp state...');
+      ws.send({
+        type: 'request_whatsapp_initial_state',
+        data: { timestamp: Date.now() }
+      }).catch(error => {
+        console.error('[GlobalState] Failed to request initial state:', error);
+      });
     };
 
     const handleDisconnected = () => {
@@ -59,14 +68,40 @@ export function GlobalStateProvider({ children }) {
     };
 
     // WhatsApp events
-    const handleWhatsAppReady = () => {
-      console.log('[GlobalState] WhatsApp client ready');
-      setWhatsappClientReady(true);
+    const handleWhatsAppReady = (data) => {
+      console.log('[GlobalState] WhatsApp client ready:', data);
+      setWhatsappClientReady(data?.clientReady ?? true);
+      // If client is ready, clear QR code
+      if (data?.clientReady) {
+        setWhatsappQrCode(null);
+      }
     };
 
     const handleWhatsAppQR = (data) => {
       console.log('[GlobalState] WhatsApp QR code updated');
       setWhatsappQrCode(data.qr);
+      // If showing QR, client is not ready
+      if (data.qr) {
+        setWhatsappClientReady(false);
+      }
+    };
+
+    const handleInitialState = (data) => {
+      console.log('[GlobalState] WhatsApp initial state received:', data);
+      if (data) {
+        // Set client ready status
+        if (data.clientReady !== undefined) {
+          setWhatsappClientReady(data.clientReady);
+          console.log('[GlobalState] Initial clientReady:', data.clientReady);
+        }
+        // Set QR code if available
+        if (data.qr) {
+          setWhatsappQrCode(data.qr);
+          console.log('[GlobalState] Initial QR code available');
+        } else {
+          setWhatsappQrCode(null);
+        }
+      }
     };
 
     // Register event listeners
@@ -76,6 +111,7 @@ export function GlobalStateProvider({ children }) {
     ws.on('connecting', handleConnecting);
     ws.on('whatsapp_client_ready', handleWhatsAppReady);
     ws.on('whatsapp_qr_updated', handleWhatsAppQR);
+    ws.on('whatsapp_initial_state_response', handleInitialState);
 
     // Store WebSocket instance in state
     setWebsocket(ws);
@@ -85,6 +121,17 @@ export function GlobalStateProvider({ children }) {
 
     // Set initial connection status based on current state
     setIsWebSocketConnected(ws.isConnected);
+
+    // If WebSocket is already connected, request initial state immediately
+    if (ws.isConnected) {
+      console.log('[GlobalState] WebSocket already connected, requesting initial state...');
+      ws.send({
+        type: 'request_whatsapp_initial_state',
+        data: { timestamp: Date.now() }
+      }).catch(error => {
+        console.error('[GlobalState] Failed to request initial state:', error);
+      });
+    }
 
     // Cleanup on unmount (only when entire app closes)
     return () => {
@@ -96,6 +143,7 @@ export function GlobalStateProvider({ children }) {
       ws.off('connecting', handleConnecting);
       ws.off('whatsapp_client_ready', handleWhatsAppReady);
       ws.off('whatsapp_qr_updated', handleWhatsAppQR);
+      ws.off('whatsapp_initial_state_response', handleInitialState);
       // Note: Don't disconnect here - other components may still need the connection
     };
   }, []);
