@@ -360,85 +360,89 @@ function setupWebSocketServer(server) {
       const url = new URL(req.url, 'http://localhost');
       const screenID = url.searchParams.get('screenID');
       const date = url.searchParams.get('PDate');
-      const clientType = url.searchParams.get('clientType');
+      const clientTypeParam = url.searchParams.get('clientType');
+
+      // Support multiple client types (comma-separated)
+      const clientTypes = clientTypeParam ? clientTypeParam.split(',').map(t => t.trim()) : [];
+
       // Create a unique ID for this connection
       const clientIP = req.socket.remoteAddress;
-      const viewerId = `${clientIP}-${clientType}-${date || 'unknown'}-${Date.now()}`;
-      
+      const viewerId = `${clientIP}-${clientTypes.join('-')}-${date || 'unknown'}-${Date.now()}`;
+
       // Store viewer ID on the connection object
       ws.viewerId = viewerId;
       ws.qrViewerRegistered = false;
-      logger.websocket.debug('New connection', { screenID, date, clientType });
-  
-      // Register connection based on type
-      if (clientType === 'waStatus') {
-        logger.websocket.debug('WhatsApp status client connected');
-        // WhatsApp status client
-        connectionManager.registerConnection(ws, 'waStatus', {
-          date: date,
-          ipAddress: req.socket.remoteAddress,
-          viewerId: viewerId
-        });
-        
-       // Register as QR viewer ONLY if explicitly requested via 'needsQR' parameter
-       const needsQR = url.searchParams.get('needsQR') === 'true';
-       if (needsQR && messageState && typeof messageState.registerQRViewer === 'function') {
-        const registered = messageState.registerQRViewer(viewerId);
-        ws.qrViewerRegistered = true; // Mark as registered
-        logger.websocket.debug('QR viewer registered', { viewerId });
-        } else {
-          logger.websocket.debug('Connected for status only', { needsQR });
+      logger.websocket.debug('New connection', { screenID, date, clientTypes });
+
+      //Register connection for ALL client types
+      const needsQR = url.searchParams.get('needsQR') === 'true';
+
+      // Register for each client type
+      for (const clientType of clientTypes) {
+        if (clientType === 'waStatus') {
+          logger.websocket.debug('Registering WhatsApp status client');
+          connectionManager.registerConnection(ws, 'waStatus', {
+            date: date,
+            ipAddress: req.socket.remoteAddress,
+            viewerId: viewerId
+          });
+
+          // Register as QR viewer ONLY if explicitly requested
+          if (needsQR && messageState && typeof messageState.registerQRViewer === 'function' && !ws.qrViewerRegistered) {
+            messageState.registerQRViewer(viewerId);
+            ws.qrViewerRegistered = true;
+            logger.websocket.debug('QR viewer registered', { viewerId });
+          }
+
+          // Store date for filtering updates
+          ws.waDate = date;
+          ws.isWaClient = true;
+
+        } else if (clientType === 'auth') {
+          logger.websocket.debug('Registering authentication client');
+          connectionManager.registerConnection(ws, 'auth', {
+            ipAddress: req.socket.remoteAddress,
+            viewerId: viewerId
+          });
+
+          // Register as QR viewer if explicitly requested
+          if (needsQR && messageState && typeof messageState.registerQRViewer === 'function' && !ws.qrViewerRegistered) {
+            messageState.registerQRViewer(viewerId);
+            ws.qrViewerRegistered = true;
+            logger.websocket.debug('QR viewer registered for auth client', { viewerId });
+          }
+
+        } else if (clientType === 'daily-appointments') {
+          logger.websocket.debug('Registering daily appointments client');
+          connectionManager.registerConnection(ws, 'daily-appointments', {
+            date: date,
+            ipAddress: req.socket.remoteAddress
+          });
         }
-        
-        // Store date for filtering updates
-        ws.waDate = date;
-        ws.isWaClient = true;
-      } else if (screenID) {
-        // Regular appointment screen
+      }
+
+      // Legacy support: screenID-based connection
+      if (screenID && clientTypes.length === 0) {
+        logger.websocket.debug('Legacy screen connection', { screenID });
         connectionManager.registerConnection(ws, 'screen', {
           screenId: screenID,
           date: date,
           ipAddress: req.socket.remoteAddress
         });
-  
-        logger.websocket.debug('Screen connected', { screenID });
-  
-        // Send initial data immediately
         sendInitialData(ws, date, connectionManager);
-      } else if (clientType === 'auth') {
-        // Authentication client - register for QR events if needed
-        logger.websocket.debug('Authentication client connected');
-        connectionManager.registerConnection(ws, 'auth', {
-          ipAddress: req.socket.remoteAddress,
-          viewerId: viewerId
-        });
-        
-        // Register as QR viewer if explicitly requested
-        const needsQR = url.searchParams.get('needsQR') === 'true';
-        if (needsQR && messageState && typeof messageState.registerQRViewer === 'function') {
-          const registered = messageState.registerQRViewer(viewerId);
-          ws.qrViewerRegistered = true; // Mark as registered
-          logger.websocket.debug('QR viewer registered for auth client', { viewerId });
-        } else {
-          logger.websocket.debug('Auth client connected without QR', { needsQR });
-        }
-      } else if (clientType === 'daily-appointments') {
-        // Daily appointments view - register as daily appointments type
-        logger.websocket.debug('Daily appointments client connected');
-        connectionManager.registerConnection(ws, 'daily-appointments', {
-          date: date,
-          ipAddress: req.socket.remoteAddress
-        });
-        
-        // Send initial data immediately
-        sendInitialData(ws, date, connectionManager);
-      } else {
-        // Generic connection
+      }
+
+      // If no client types registered, treat as generic
+      if (clientTypes.length === 0 && !screenID) {
+        logger.websocket.debug('Generic client connected');
         connectionManager.registerConnection(ws, 'generic', {
           ipAddress: req.socket.remoteAddress
         });
-  
-        logger.websocket.debug('Generic client connected');
+      }
+
+      // Send initial data if this is an appointment client
+      if (clientTypes.includes('daily-appointments') || screenID) {
+        sendInitialData(ws, date, connectionManager);
       }
   
       // Handle messages from clients
@@ -819,28 +823,35 @@ function setupWebSocketServer(server) {
  * @param {ConnectionManager} connectionManager - Connection manager
  */
 function setupGlobalEventHandlers(emitter, connectionManager) {
-  // Handle appointment updates
-  const handleAppointmentUpdate = async (dateParam) => {
-    logger.websocket.info('Received appointment update event', { date: dateParam });
+  // Handle appointment updates with action ID tracking
+  const handleAppointmentUpdate = async (dateParam, actionId = null) => {
+    logger.websocket.info('Received appointment update event', { date: dateParam, actionId });
 
     try {
       const appointmentData = await getPresentAps(dateParam);
-      logger.websocket.debug('Fetched appointment data', { 
-        date: dateParam, 
-        appointmentCount: appointmentData.appointments ? appointmentData.appointments.length : 0 
+      logger.websocket.debug('Fetched appointment data', {
+        date: dateParam,
+        appointmentCount: appointmentData.appointments ? appointmentData.appointments.length : 0,
+        actionId
       });
 
+      // Include actionId in the message for event source detection
       const message = createStandardMessage(
         WebSocketEvents.APPOINTMENTS_UPDATED,
-        { tableData: appointmentData, date: dateParam }
+        {
+          tableData: appointmentData,
+          date: dateParam,
+          actionId: actionId || null  // Include actionId for tracking
+        }
       );
 
       // Broadcast to screens and daily appointments clients specifically
       const screenUpdates = connectionManager.broadcastToScreens(message);
       const dailyAppointmentsUpdates = connectionManager.broadcastToDailyAppointments(message);
-      logger.websocket.info('Broadcast appointment updates', { 
-        screenUpdates, 
-        dailyAppointmentsUpdates 
+      logger.websocket.info('Broadcast appointment updates', {
+        screenUpdates,
+        dailyAppointmentsUpdates,
+        actionId
       });
     } catch (error) {
       logger.websocket.error('Error fetching appointment data', error, { date: dateParam });
