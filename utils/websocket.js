@@ -1002,7 +1002,7 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
         connectionManager.broadcastToWaStatus(message);
         break;
       case MessageSchemas.WebSocketMessage.CLIENT_READY:
-        connectionManager.broadcastToWaStatus(message);
+        connectionManager.broadcastToAll(message);
         break;
       case MessageSchemas.WebSocketMessage.MESSAGE_STATUS:
         connectionManager.broadcastToWaStatus(message);
