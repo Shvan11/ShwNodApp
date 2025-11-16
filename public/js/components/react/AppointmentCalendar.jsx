@@ -28,9 +28,31 @@ const AppointmentCalendar = ({
     const [viewMode, setViewMode] = useState(initialViewMode);
     const [selectedDoctorId, setSelectedDoctorId] = useState(null);
     const [showEarlySlots, setShowEarlySlots] = useState(false);
-    
+    const [isMobile, setIsMobile] = useState(false);
+
     // Use external selected slot if provided (for controlled mode)
     const selectedSlot = externalSelectedSlot || internalSelectedSlot;
+
+    // Mobile detection - Force day view on mobile devices
+    useEffect(() => {
+        const checkMobile = () => {
+            const mobile = window.innerWidth <= 768;
+            setIsMobile(mobile);
+
+            // Force day view on mobile
+            if (mobile && viewMode !== 'day') {
+                setViewMode('day');
+            }
+        };
+
+        // Check on mount
+        checkMobile();
+
+        // Add resize listener
+        window.addEventListener('resize', checkMobile);
+
+        return () => window.removeEventListener('resize', checkMobile);
+    }, [viewMode]);
     
     // Utility functions
     // Week starts on Saturday (day 6)
@@ -174,6 +196,9 @@ const AppointmentCalendar = ({
         if (viewMode === 'month') {
             // Navigate by month
             newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
+        } else if (viewMode === 'day') {
+            // Navigate by day (mobile-friendly)
+            newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1));
         } else {
             // Navigate by week
             newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
@@ -188,10 +213,15 @@ const AppointmentCalendar = ({
     
     // Event handlers
     const handleViewModeChange = useCallback((newViewMode) => {
+        // On mobile, always stay in day view
+        if (isMobile && newViewMode !== 'day') {
+            return;
+        }
+
         setViewMode(newViewMode);
         // Fetch new data for the new view mode
         fetchCalendarData(currentDate, selectedDoctorId, newViewMode);
-    }, [currentDate, selectedDoctorId, fetchCalendarData]);
+    }, [currentDate, selectedDoctorId, fetchCalendarData, isMobile]);
 
     const handleDoctorChange = useCallback((doctorId) => {
         setSelectedDoctorId(doctorId);

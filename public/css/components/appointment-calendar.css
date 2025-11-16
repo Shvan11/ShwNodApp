@@ -863,76 +863,240 @@
     animation: fadeIn 0.3s ease-in;
 }
 
-/* Responsive Design */
+/* Responsive Design - Mobile First Approach */
+
+/* Tablet: Reduce column width but keep week view */
 @media (max-width: 1200px) {
-    .calendar-grid {
-        grid-template-columns: var(--calendar-time-width) repeat(6, 120px);
-    }
-    
     :root {
-        --calendar-day-width: 120px;
-        --calendar-slot-height: 60px;
+        --calendar-day-width: 160px;
+        --calendar-time-width: 110px;
     }
-    
+
+    .calendar-grid {
+        grid-template-columns: var(--calendar-time-width) repeat(6, var(--calendar-day-width));
+        min-width: 1070px;
+    }
+
     .calendar-header {
-        padding: 12px 16px;
+        padding: 16px 20px;
+        min-height: 80px;
     }
-    
+
     .week-text {
-        font-size: 16px;
+        font-size: 18px;
+    }
+
+    .stat-item {
+        min-width: 75px;
+        padding: 10px 14px;
+    }
+
+    .stat-value {
+        font-size: 20px;
     }
 }
 
+/* Mobile: FORCE Day View Only - Touch-Friendly Design */
 @media (max-width: 768px) {
+    /* Container adjustments */
     .appointment-calendar {
-        height: auto;
-        max-height: none;
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+        margin: 0;
     }
-    
+
+    /* Header: Stack vertically, touch-friendly */
     .calendar-header {
         flex-direction: column;
-        gap: 16px;
-        align-items: stretch;
+        gap: 12px;
         padding: 16px;
+        min-height: auto;
     }
-    
+
+    /* Navigation: Larger touch targets */
     .calendar-navigation {
-        justify-content: center;
+        width: 100%;
+        justify-content: space-between;
+        order: 1;
     }
-    
-    .calendar-stats {
-        justify-content: center;
-        flex-wrap: wrap;
+
+    .nav-button {
+        width: 52px;
+        height: 52px;
+        font-size: 20px;
     }
-    
-    .view-controls {
-        justify-content: center;
-    }
-    
-    .calendar-grid {
-        overflow-x: auto;
-        min-width: 800px;
-    }
-    
-    :root {
-        --calendar-slot-height: 50px;
-    }
-    
+
     .week-display {
+        flex: 1;
         min-width: auto;
     }
-    
+
+    .week-text {
+        font-size: 16px;
+        font-weight: 700;
+    }
+
+    .today-button {
+        font-size: 11px;
+        padding: 4px 12px;
+    }
+
+    /* CRITICAL: Force day view on mobile - hide week/month toggles */
+    .view-controls {
+        display: none !important;
+    }
+
+    /* Stats: Smaller, horizontal scroll if needed */
+    .calendar-stats {
+        width: 100%;
+        justify-content: flex-start;
+        overflow-x: auto;
+        gap: 8px;
+        padding-bottom: 4px;
+        order: 3;
+    }
+
     .stat-item {
-        min-width: 60px;
-        padding: 6px 8px;
+        min-width: 70px;
+        padding: 8px 12px;
+        flex-shrink: 0;
     }
-    
+
     .stat-label {
-        font-size: 10px;
+        font-size: 9px;
     }
-    
+
     .stat-value {
+        font-size: 18px;
+    }
+
+    /* Doctor filter - full width on mobile */
+    .doctor-filter {
+        width: 100%;
+        order: 2;
+    }
+
+    .doctor-filter-select {
+        flex: 1;
+    }
+
+    /* Early slots toggle */
+    .early-slots-toggle {
+        font-size: 12px;
+        padding: 6px 12px;
+    }
+
+    /* CRITICAL: Calendar Grid - Single Column (Day View Only) */
+    .calendar-grid {
+        grid-template-columns: 80px 1fr !important;
+        min-width: 100% !important;
+        overflow-x: hidden;
+        gap: 1px;
+    }
+
+    /* Time column - narrower on mobile */
+    :root {
+        --calendar-time-width: 80px;
+        --calendar-slot-min-height: 75px;
+    }
+
+    .time-header {
+        height: 80px;
+        font-size: 13px;
+    }
+
+    .time-slot-label {
+        font-size: 13px;
+        min-height: 75px;
+    }
+
+    /* Day header - larger for touch */
+    .day-header {
+        height: 80px;
+        padding: 10px;
+    }
+
+    .day-name {
+        font-size: 12px;
+    }
+
+    .day-date {
+        font-size: 32px;
+    }
+
+    .day-appointment-count {
+        font-size: 10px;
+        padding: 3px 8px;
+    }
+
+    /* Time slots - larger touch targets */
+    .time-slot {
+        min-height: 75px;
+        padding: 8px;
+        border-left-width: 3px !important;
+    }
+
+    .time-slot.available:hover,
+    .time-slot.booked:hover {
+        transform: none; /* Disable transform on mobile touch */
+    }
+
+    /* Appointment content - optimized for mobile */
+    .patient-name {
+        font-size: 13px;
+    }
+
+    .appointment-detail {
+        font-size: 12px;
+    }
+
+    .appointment-count {
+        font-size: 11px;
+        padding: 5px 8px;
+    }
+
+    .appointment-item {
+        padding: 6px 8px;
+        min-height: 24px;
+    }
+
+    .patient-name-compact {
+        font-size: 12px;
+    }
+
+    .appointment-detail-compact {
+        font-size: 11px;
+    }
+}
+
+/* Very Small Mobile (iPhone SE, etc.) */
+@media (max-width: 375px) {
+    .calendar-header {
+        padding: 12px;
+    }
+
+    .nav-button {
+        width: 48px;
+        height: 48px;
+        font-size: 18px;
+    }
+
+    .week-text {
         font-size: 14px;
+    }
+
+    .day-date {
+        font-size: 28px;
+    }
+
+    .stat-item {
+        min-width: 65px;
+        padding: 6px 10px;
+    }
+
+    .stat-value {
+        font-size: 16px;
     }
 }
 
