@@ -2,14 +2,17 @@
  * Custom hook for WhatsApp WebSocket connection management
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useGlobalState } from '../contexts/GlobalStateContext.jsx';
 import { UI_STATES, CONFIG } from '../utils/whatsapp-send-constants.js';
 
 /**
  * Custom hook for managing WhatsApp WebSocket connection
  */
 export function useWhatsAppWebSocket(currentDate) {
+    // Use global state for clientReady instead of duplicating listener
+    const { whatsappClientReady: clientReady } = useGlobalState();
+
     const [connectionStatus, setConnectionStatus] = useState(UI_STATES.DISCONNECTED);
-    const [clientReady, setClientReady] = useState(false);
     const [sendingProgress, setSendingProgress] = useState({
         started: false,
         finished: false,
@@ -37,10 +40,6 @@ export function useWhatsAppWebSocket(currentDate) {
             const handleError = (error) => {
                 setConnectionStatus(UI_STATES.ERROR);
                 console.error('WebSocket error:', error);
-            };
-
-            const handleClientReady = (data) => {
-                setClientReady(data.clientReady || data.state === 'ready');
             };
 
             const handleMessageStatus = (data) => {
@@ -75,9 +74,7 @@ export function useWhatsAppWebSocket(currentDate) {
 
             const handleInitialState = (data) => {
                 if (data) {
-                    if (data.clientReady !== undefined) {
-                        setClientReady(data.clientReady || false);
-                    }
+                    // clientReady is now managed by GlobalStateContext, no need to set it here
 
                     if (data.sendingProgress && data.sendingProgress.started && !data.sendingProgress.finished) {
                         setSendingProgress(data.sendingProgress);
@@ -95,11 +92,11 @@ export function useWhatsAppWebSocket(currentDate) {
             };
 
             // Register event handlers
+            // NOTE: whatsapp_client_ready is managed by GlobalStateContext - no duplicate listener needed
             websocketService.on('connecting', handleConnecting);
             websocketService.on('connected', handleConnected);
             websocketService.on('disconnected', handleDisconnected);
             websocketService.on('error', handleError);
-            websocketService.on('whatsapp_client_ready', handleClientReady);
             websocketService.on('whatsapp_message_status', handleMessageStatus);
             websocketService.on('whatsapp_sending_started', handleSendingStarted);
             websocketService.on('whatsapp_sending_progress', handleSendingProgress);
@@ -120,7 +117,6 @@ export function useWhatsAppWebSocket(currentDate) {
                 websocketService.off('connected', handleConnected);
                 websocketService.off('disconnected', handleDisconnected);
                 websocketService.off('error', handleError);
-                websocketService.off('whatsapp_client_ready', handleClientReady);
                 websocketService.off('whatsapp_message_status', handleMessageStatus);
                 websocketService.off('whatsapp_sending_started', handleSendingStarted);
                 websocketService.off('whatsapp_sending_progress', handleSendingProgress);

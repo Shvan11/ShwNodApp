@@ -1,10 +1,11 @@
 /**
  * WhatsApp Authentication Hook
  * Manages WhatsApp client authentication state and WebSocket connection
+ * Refactored to use singleton WebSocket service and GlobalStateContext
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { config } from '../config/environment.js';
+import { useGlobalState } from '../contexts/GlobalStateContext.jsx';
 
 // Authentication States
 export const AUTH_STATES = {
@@ -29,9 +30,10 @@ const CONFIG = {
 };
 
 export const useWhatsAppAuth = () => {
+  // Use GlobalStateContext for QR code and client ready status (single source of truth)
+  const { whatsappQrCode: qrCode, whatsappClientReady: clientReady } = useGlobalState();
+
   const [authState, setAuthState] = useState(AUTH_STATES.INITIALIZING);
-  const [clientReady, setClientReady] = useState(false);
-  const [qrCode, setQrCode] = useState(null);
   const [error, setError] = useState(null);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
 
@@ -39,23 +41,23 @@ export const useWhatsAppAuth = () => {
   const qrRefreshTimerRef = useRef(null);
   const reconnectTimerRef = useRef(null);
 
-  // Request initial state from server
+  // Request initial state from server (using singleton service)
   const requestInitialState = useCallback(() => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+    if (!wsRef.current || !wsRef.current.isConnected) {
       console.warn('WebSocket not ready, cannot request initial state');
       return;
     }
 
     console.log('Requesting WhatsApp initial state...');
-    const message = {
+    wsRef.current.send({
       type: 'request_whatsapp_initial_state',
       data: { timestamp: Date.now() }
-    };
-
-    wsRef.current.send(JSON.stringify(message));
+    }).catch(error => {
+      console.error('Failed to request initial state:', error);
+    });
   }, []);
 
-  // Fetch QR code from API
+  // Fetch QR code from API (fallback method)
   const fetchQRCode = useCallback(async () => {
     try {
       console.log('Fetching QR code from API...');
@@ -79,41 +81,10 @@ export const useWhatsAppAuth = () => {
     }
   }, []);
 
-  // Handle QR code update (QR is already converted to data URL by server)
-  const handleQRUpdate = useCallback((data) => {
-    console.log('QR Code updated - has QR:', !!data.qr);
+  // NOTE: handleQRUpdate and handleClientReady removed - now managed by GlobalStateContext
+  // QR code and client ready state are automatically synced from GlobalStateContext
 
-    if (authState === AUTH_STATES.AUTHENTICATED) {
-      console.log('Already authenticated, ignoring QR update');
-      return;
-    }
-
-    if (authState === AUTH_STATES.CHECKING_SESSION) {
-      console.log('Still checking session, storing QR for later');
-      setQrCode(data.qr);
-      return;
-    }
-
-    setAuthState(AUTH_STATES.QR_REQUIRED);
-    setQrCode(data.qr);
-    console.log('QR Code received and set');
-  }, [authState]);
-
-  // Handle client ready
-  const handleClientReady = useCallback((data) => {
-    console.log('Client ready:', data);
-    const isReady = data.clientReady || data.state === 'ready';
-
-    if (isReady) {
-      setAuthState(AUTH_STATES.AUTHENTICATED);
-      setClientReady(true);
-    } else {
-      setAuthState(AUTH_STATES.QR_REQUIRED);
-      setClientReady(false);
-    }
-  }, []);
-
-  // Handle initial state
+  // Handle initial state - now only manages authState, not qrCode/clientReady
   const handleInitialState = useCallback((data) => {
     console.log('Initial state received:', data);
     console.log('Initial state has QR:', !!data?.qr);
@@ -124,14 +95,14 @@ export const useWhatsAppAuth = () => {
       return;
     }
 
+    // qrCode and clientReady are managed by GlobalStateContext
+    // We only need to manage authState here
     if (data.clientReady) {
       console.log('Client is ready, setting AUTHENTICATED state');
       setAuthState(AUTH_STATES.AUTHENTICATED);
-      setClientReady(true);
     } else if (data.qr) {
-      console.log('QR code found in initial state (already converted by server)');
+      console.log('QR code found in initial state');
       setAuthState(AUTH_STATES.CHECKING_SESSION);
-      setQrCode(data.qr);
 
       // Wait to see if session restores
       setTimeout(() => {
@@ -163,71 +134,61 @@ export const useWhatsAppAuth = () => {
     }
   }, []);
 
-  // Setup WebSocket connection
-  const setupWebSocket = useCallback(() => {
-    // Use the centralized environment configuration (same as appointments page)
-    const wsUrl = `${config.wsUrl}?clientType=auth&needsQR=true&timestamp=${Date.now()}`;
+  // Setup WebSocket connection using singleton service
+  const setupWebSocket = useCallback(async () => {
+    try {
+      // Import singleton WebSocket service
+      const websocketService = (await import('../services/websocket.js')).default;
+      wsRef.current = websocketService;
 
-    console.log('Connecting to:', wsUrl);
+      console.log('Setting up WebSocket with singleton service');
 
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+      // Setup connection event handlers
+      const handleConnected = () => {
+        console.log('WebSocket connected');
+        setAuthState(AUTH_STATES.CONNECTED);
+        setConnectionAttempts(0);
+        requestInitialState();
+      };
 
-    ws.onopen = () => {
-      console.log('WebSocket connected');
-      setAuthState(AUTH_STATES.CONNECTED);
-      setConnectionAttempts(0);
+      const handleDisconnected = () => {
+        console.log('WebSocket disconnected');
+        setAuthState(AUTH_STATES.DISCONNECTED);
+      };
 
-      // Send heartbeat
-      ws.send(JSON.stringify({
-        type: 'heartbeat_ping',
-        data: { timestamp: Date.now() }
-      }));
+      const handleError = (error) => {
+        console.error('WebSocket error:', error);
+        setAuthState(AUTH_STATES.ERROR);
+        setError('WebSocket connection failed');
+      };
 
-      requestInitialState();
-    };
+      // NOTE: whatsapp_qr_updated and whatsapp_client_ready are managed by GlobalStateContext
+      // We only need to listen to whatsapp_initial_state_response for auth flow management
+      websocketService.on('connected', handleConnected);
+      websocketService.on('disconnected', handleDisconnected);
+      websocketService.on('error', handleError);
+      websocketService.on('whatsapp_initial_state_response', handleInitialState);
 
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
+      // Connect with auth client parameters
+      await websocketService.connect({
+        clientType: 'auth',
+        needsQR: true,
+        timestamp: Date.now()
+      });
 
-        // Only log important messages (not heartbeats)
-        if (message.type !== 'heartbeat_pong') {
-          console.log('WebSocket message:', message.type);
-        }
-
-        switch (message.type) {
-          case 'whatsapp_qr_updated':
-            handleQRUpdate(message.data);
-            break;
-          case 'whatsapp_client_ready':
-            handleClientReady(message.data);
-            break;
-          case 'whatsapp_initial_state_response':
-            handleInitialState(message.data);
-            break;
-          case 'heartbeat_pong':
-            // Heartbeat response - connection is alive (silently handled)
-            break;
-          default:
-            console.log('Unhandled message:', message);
-        }
-      } catch (error) {
-        console.error('Error parsing message:', error);
-      }
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
-      setAuthState(AUTH_STATES.DISCONNECTED);
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      // Return cleanup function
+      return () => {
+        websocketService.off('connected', handleConnected);
+        websocketService.off('disconnected', handleDisconnected);
+        websocketService.off('error', handleError);
+        websocketService.off('whatsapp_initial_state_response', handleInitialState);
+      };
+    } catch (error) {
+      console.error('Failed to setup WebSocket:', error);
       setAuthState(AUTH_STATES.ERROR);
-      setError('WebSocket connection failed');
-    };
-  }, [requestInitialState, handleQRUpdate, handleClientReady, handleInitialState]);
+      setError('Failed to initialize WebSocket');
+    }
+  }, [requestInitialState, handleInitialState]);
 
   // Start QR refresh timer
   const startQRRefreshTimer = useCallback(() => {
@@ -349,19 +310,37 @@ export const useWhatsAppAuth = () => {
 
   // Initialize WebSocket on mount (only once!)
   useEffect(() => {
-    setupWebSocket();
+    let cleanup;
+
+    setupWebSocket().then(cleanupFn => {
+      cleanup = cleanupFn;
+    });
 
     return () => {
       stopQRRefreshTimer();
-      if (wsRef.current) {
-        wsRef.current.close();
+      if (cleanup) {
+        cleanup();
       }
+      // Note: We don't disconnect the singleton service here as it's shared
+      // The singleton service manages its own connection lifecycle
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty array = run only once on mount
+
+  // Sync authState with global qrCode and clientReady values
+  useEffect(() => {
+    // Update authState based on global state changes
+    if (clientReady && authState !== AUTH_STATES.AUTHENTICATED) {
+      console.log('Global clientReady changed to true, setting AUTHENTICATED');
+      setAuthState(AUTH_STATES.AUTHENTICATED);
+    } else if (!clientReady && qrCode && authState === AUTH_STATES.AUTHENTICATED) {
+      console.log('Global clientReady changed to false with QR, setting QR_REQUIRED');
+      setAuthState(AUTH_STATES.QR_REQUIRED);
+    }
+  }, [clientReady, qrCode, authState]);
 
   // Manage QR refresh timer based on auth state
   useEffect(() => {

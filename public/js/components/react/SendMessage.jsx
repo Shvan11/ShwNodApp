@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Select from 'react-select';
+import { useGlobalState } from '../../contexts/GlobalStateContext.jsx';
 // TODO: Integrate React ProgressBar component from components/whatsapp-send/ProgressBar.jsx
 // The old class-based ProgressBar no longer exists - needs refactoring to use React component
 // import ProgressBar from '../whatsapp-send/ProgressBar.jsx';
 
 const SendMessage = () => {
+    // Use global state for WhatsApp client ready status
+    const { whatsappClientReady } = useGlobalState();
+
     const [filePath, setFilePath] = useState('');
     const [pathsArray, setPathsArray] = useState([]);
     const [selectedSource, setSelectedSource] = useState('pat');
@@ -12,7 +16,7 @@ const SendMessage = () => {
     const [selectedContact, setSelectedContact] = useState(null);
     const [phoneNumber, setPhoneNumber] = useState('');
     const [program, setProgram] = useState('WhatsApp');
-    const [clientStatus, setClientStatus] = useState({ ready: false, error: null });
+    const [clientError, setClientError] = useState(null);
     const [statusMessage, setStatusMessage] = useState('');
     const [statusType, setStatusType] = useState(''); // 'success', 'error', 'warning'
 
@@ -43,10 +47,17 @@ const SendMessage = () => {
             });
         }
         */
-        
+
         // Initialize WebSocket and load contacts
         initializeWebSocket();
         loadContacts('pat');
+
+        // Cleanup function - no listeners to clean up since we use GlobalStateContext
+        // WebSocket cleanup is handled by the singleton service
+        return () => {
+            // connectionManagerRef cleanup is handled by the singleton service
+            // No manual listener cleanup needed - we use GlobalStateContext
+        };
     }, []);
     
     // Initialize WebSocket connection
@@ -54,44 +65,24 @@ const SendMessage = () => {
         try {
             const websocketService = (await import('../../services/websocket.js')).default;
             connectionManagerRef.current = websocketService;
-            
-            // Setup WebSocket event handlers
-            connectionManagerRef.current.on('whatsapp_client_ready', (data) => {
-                setClientStatus({
-                    ready: data.clientReady || data.state === 'ready',
-                    error: null
-                });
-            });
-            
-            connectionManagerRef.current.on('whatsapp_initial_state_response', (data) => {
-                if (data) {
-                    setClientStatus({
-                        ready: data.clientReady || false,
-                        error: data.error || null
-                    });
-                }
-            });
-            
+
+            // NOTE: whatsapp_client_ready is managed by GlobalStateContext - no duplicate listener needed
+            // The whatsappClientReady state is already available from useGlobalState hook
+
             // Connect to WebSocket
             await connectionManagerRef.current.connect({
                 clientType: 'send-message',
                 timestamp: Date.now()
             });
-            
-            // Request initial state
-            if (connectionManagerRef.current.isConnected) {
-                connectionManagerRef.current.send({
-                    type: 'request_whatsapp_initial_state',
-                    data: { timestamp: Date.now() }
-                }).catch(error => {
-                    console.error('Failed to request initial state:', error);
-                    fallbackStatusCheck();
-                });
-            } else {
+
+            // No need to request initial state for clientReady - GlobalStateContext handles it
+            // Just check if we need fallback for error handling
+            if (!connectionManagerRef.current.isConnected) {
                 fallbackStatusCheck();
             }
         } catch (error) {
             console.error('Failed to initialize WebSocket:', error);
+            setClientError(error.message);
             fallbackStatusCheck();
         }
     };
@@ -194,9 +185,9 @@ const SendMessage = () => {
         }
         
         // Check WhatsApp client status if WhatsApp is selected
-        if (program === 'WhatsApp' && !clientStatus.ready) {
-            if (clientStatus.error) {
-                showMessage(`WhatsApp Error: ${clientStatus.error}`, 'error');
+        if (program === 'WhatsApp' && !whatsappClientReady) {
+            if (clientError) {
+                showMessage(`WhatsApp Error: ${clientError}`, 'error');
             } else {
                 showAuthenticationRequired();
             }

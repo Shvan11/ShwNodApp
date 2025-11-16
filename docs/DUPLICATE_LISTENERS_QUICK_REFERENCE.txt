@@ -1,0 +1,121 @@
+DUPLICATE WEBSOCKET LISTENERS - QUICK REFERENCE
+================================================
+
+ISSUE #1: whatsapp_client_ready - TRIPLE REGISTRATION
+-------------------------------------------------------
+Location 1: /home/user/ShwNodApp/public/js/contexts/GlobalStateContext.jsx
+  Line: 77
+  Handler: handleWhatsAppReady()
+  State: whatsappClientReady
+  Action: setWhatsappClientReady(true)
+
+Location 2: /home/user/ShwNodApp/public/js/hooks/useWhatsAppWebSocket.js
+  Line: 102
+  Handler: handleClientReady()
+  State: clientReady (hook local state)
+  Action: setClientReady(data.clientReady || data.state === 'ready')
+
+Location 3: /home/user/ShwNodApp/public/js/components/react/SendMessage.jsx
+  Line: 59
+  Handler: Inline arrow function
+  State: clientStatus.ready (component local state)
+  Action: setClientStatus({ ready: data.clientReady || data.state === 'ready', error: null })
+
+Result: Same event triggers 3 separate state updates simultaneously
+
+
+ISSUE #2: whatsapp_qr_updated - DUAL REGISTRATION
+---------------------------------------------------
+Location 1: /home/user/ShwNodApp/public/js/contexts/GlobalStateContext.jsx
+  Line: 78
+  Handler: handleWhatsAppQR()
+  WebSocket: Singleton service
+  State: whatsappQrCode
+  
+Location 2: /home/user/ShwNodApp/public/js/hooks/useWhatsAppAuth.js
+  Line: 200
+  Handler: handleQRUpdate()
+  WebSocket: Raw WebSocket (NOT singleton)
+  State: qrCode (local to useWhatsAppAuth)
+
+Result: Different QR code values in GlobalState vs useWhatsAppAuth
+Cause: useWhatsAppAuth uses raw WebSocket, not the singleton service
+
+
+ISSUE #3: DUPLICATE QR VIEWER VERIFICATION LOOP
+------------------------------------------------
+File: /home/user/ShwNodApp/utils/websocket.js
+Lines: 1054-1076 (First interval)
+Lines: 1078-1093 (Second interval - DUPLICATE)
+
+Function Called Twice Per Minute:
+  messageState.verifyQRViewerCount(activeViewerIds)
+
+Impact: Unnecessary CPU usage, double verification of QR viewers
+
+
+ISSUE #4: NO LISTENER CLEANUP
+------------------------------
+File: /home/user/ShwNodApp/public/js/components/react/SendMessage.jsx
+Lines: 59, 66 - Listeners registered
+Missing: useEffect cleanup function to call websocketService.off()
+
+Impact: Memory leak - listeners accumulate on each component mount
+
+
+ISSUE #5: INCONSISTENT WEBSOCKET IMPLEMENTATIONS
+-------------------------------------------------
+GlobalStateContext: wsService (singleton)
+useWhatsAppWebSocket: websocketService (singleton)
+useWebSocketSync: wsService (singleton)
+useWhatsAppAuth: new WebSocket() (RAW - NOT SINGLETON)
+SendMessage: connectionManagerRef (singleton)
+
+Impact: useWhatsAppAuth doesn't share events with other components
+
+
+FILES NEEDING FIXES
+===================
+
+1. /home/user/ShwNodApp/public/js/contexts/GlobalStateContext.jsx
+   - KEEP whatsapp_client_ready listener (PRIMARY)
+   - KEEP whatsapp_qr_updated listener
+   - Status: OK
+
+2. /home/user/ShwNodApp/public/js/hooks/useWhatsAppWebSocket.js
+   - REMOVE line 102 (whatsapp_client_ready)
+   - REMOVE line 107 (whatsapp_initial_state_response - partial dup)
+   - Use useGlobalState() instead
+   - Status: FIX REQUIRED
+
+3. /home/user/ShwNodApp/public/js/components/react/SendMessage.jsx
+   - REMOVE lines 59, 66 (listeners)
+   - ADD useEffect cleanup
+   - Use useGlobalState() instead
+   - Status: FIX REQUIRED
+
+4. /home/user/ShwNodApp/public/js/hooks/useWhatsAppAuth.js
+   - REPLACE raw WebSocket with singleton service
+   - Use useGlobalState() for QR code
+   - Status: MAJOR REFACTOR
+
+5. /home/user/ShwNodApp/utils/websocket.js
+   - REMOVE lines 1078-1093 (second interval)
+   - Status: FIX REQUIRED
+
+
+PRIORITY ORDER
+==============
+
+CRITICAL (Fix First):
+1. Remove duplicate QR viewer verification loop (websocket.js:1078-1093)
+2. Remove whatsapp_client_ready listener from useWhatsAppWebSocket.js:102
+3. Remove listeners from SendMessage.jsx + add cleanup
+
+HIGH (Fix Next):
+4. Refactor useWhatsAppAuth to use singleton WebSocket
+5. Verify all components use useGlobalState for shared state
+
+MEDIUM (Can Wait):
+6. Simplify event routing complexity
+7. Add comprehensive testing for event flow

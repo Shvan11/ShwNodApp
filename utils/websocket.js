@@ -1075,23 +1075,6 @@ function setupPeriodicCleanup(connectionManager) {
     }
   }, 60000); // Every minute
 
-  setInterval(() => {
-    // Get all active WhatsApp status connections with their viewer IDs
-    const activeViewerIds = [];
-    connectionManager.waStatusConnections.forEach(ws => {
-      if (ws.qrViewerRegistered && ws.viewerId) {
-        activeViewerIds.push(ws.viewerId);
-      }
-    });
-    
-    // Verify QR viewer count matches actual connections
-    if (messageState && typeof messageState.verifyQRViewerCount === 'function') {
-      messageState.verifyQRViewerCount(activeViewerIds);
-    }
-    
-    // Rest of your cleanup code...
-  }, 60000); // Every minute
-
 }
 
 /**
