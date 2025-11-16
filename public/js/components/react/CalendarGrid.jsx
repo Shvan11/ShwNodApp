@@ -53,27 +53,28 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
             return baseHeight;
         }
         
-        // FINE-TUNED calculation with extra padding for safety:
-        // appointment-content.multiple padding: 4px (top/bottom = 8px total)
-        // appointment-count: font-size 13px + padding 4px + margin-bottom 4px = ~30px
-        // appointments-list padding: 2px (top/bottom = 4px total)
-        // appointment-item: min-height 25px + padding 8px + margin-bottom 2px = 40px per item
-        // gap between items: 2px * (count-1)
-        // extra safety margin: 20px
-        
-        const contentPadding = 8; // 4px top + 4px bottom
-        const countHeaderHeight = 30; // font + padding + margin
-        const listPadding = 4; // 2px top + 2px bottom
-        const itemHeight = 40; // 25px min-height + 8px padding + 2px margin + safety
-        const gapBetweenItems = Math.max(0, (maxValidAppointments - 1) * 2); // 2px gap between items
-        const safetyMargin = 20; // Extra space to prevent truncation
-        
-        const calculatedHeight = contentPadding + countHeaderHeight + listPadding + 
-                                (maxValidAppointments * itemHeight) + gapBetweenItems + safetyMargin;
-        
-        // Debug logging (remove after testing)
-        console.log(`TimeSlot ${timeSlot}: ${maxValidAppointments} appointments = ${calculatedHeight}px`);
-        
+        // FINE-TUNED calculation matching NEW CSS values:
+        // .time-slot padding: 10px (top/bottom = 20px total)
+        // .appointment-content.multiple: gap 8px, padding 2px (top/bottom = 4px)
+        // .appointment-count: height ~32px (font 12px + padding 12px + margin 2px + box 8px)
+        // .appointments-list: gap 6px between items, padding 0
+        // .appointment-item: min-height 28px + padding 16px (8px * 2) + box-shadow = ~48px per item
+        // gap between items in list: 6px * (count-1)
+        // extra safety margin: 25px
+
+        const timeSlotPadding = 20; // 10px top + 10px bottom
+        const contentPadding = 4; // appointment-content.multiple padding: 2px top + 2px bottom
+        const countHeaderHeight = 32; // font + padding + margin + border-radius
+        const contentGap = 8; // gap between count and list
+        const itemHeight = 48; // 28px min + 16px padding + shadow/spacing
+        const itemGap = 6; // gap between appointment items
+        const gapBetweenItems = Math.max(0, (maxValidAppointments - 1) * itemGap);
+        const safetyMargin = 25; // Extra space to prevent truncation
+
+        const calculatedHeight = timeSlotPadding + contentPadding + countHeaderHeight +
+                                contentGap + (maxValidAppointments * itemHeight) +
+                                gapBetweenItems + safetyMargin;
+
         return calculatedHeight;
     };
 
