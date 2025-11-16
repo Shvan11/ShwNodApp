@@ -70,18 +70,23 @@ const SendMessage = () => {
             // The whatsappClientReady state is already available from useGlobalState hook
 
             // Connect to WebSocket
-            await connectionManagerRef.current.connect({
-                clientType: 'send-message',
-                timestamp: Date.now()
-            });
+            try {
+                await connectionManagerRef.current.connect({
+                    clientType: 'send-message',
+                    timestamp: Date.now()
+                });
+                // Connection successful
+            } catch (error) {
+                // Initial connection failed, but auto-reconnect will retry automatically
+                console.error('Initial WebSocket connection failed, auto-reconnect will retry:', error);
+                // Use fallback API polling while waiting for reconnection
+                fallbackStatusCheck();
+                // Don't set persistent error - auto-reconnect is handling it
+            }
 
             // No need to request initial state for clientReady - GlobalStateContext handles it
-            // Just check if we need fallback for error handling
-            if (!connectionManagerRef.current.isConnected) {
-                fallbackStatusCheck();
-            }
         } catch (error) {
-            console.error('Failed to initialize WebSocket:', error);
+            console.error('Failed to initialize WebSocket module:', error);
             setClientError(error.message);
             fallbackStatusCheck();
         }

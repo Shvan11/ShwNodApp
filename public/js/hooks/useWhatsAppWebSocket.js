@@ -104,10 +104,19 @@ export function useWhatsAppWebSocket(currentDate) {
             websocketService.on('whatsapp_initial_state_response', handleInitialState);
 
             // Connect with parameters
-            await websocketService.connect({
-                PDate: currentDate,
-                clientType: 'waStatus'
-            });
+            try {
+                await websocketService.connect({
+                    PDate: currentDate,
+                    clientType: 'waStatus'
+                });
+                // Connection successful - handleConnected will be called
+            } catch (error) {
+                // Initial connection failed, but auto-reconnect will retry automatically
+                console.error('Initial WebSocket connection failed, auto-reconnect will retry:', error);
+                setConnectionStatus(UI_STATES.CONNECTING);
+                // Don't set ERROR state - let handleConnected/handleDisconnected handle state updates
+                // Don't disconnect - let auto-reconnect do its job
+            }
 
             wsRef.current = websocketService;
 
@@ -124,7 +133,7 @@ export function useWhatsAppWebSocket(currentDate) {
                 websocketService.off('whatsapp_initial_state_response', handleInitialState);
             };
         } catch (error) {
-            console.error('Failed to setup WebSocket:', error);
+            console.error('Failed to setup WebSocket listeners:', error);
             setConnectionStatus(UI_STATES.ERROR);
         }
     }, [currentDate]);

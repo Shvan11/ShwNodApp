@@ -182,9 +182,20 @@ class WebSocketService extends EventEmitter {
         setTimeout(() => {
           this.off('connected', onConnect);
           this.off('error', onError);
-          
+
           if (this.state.status !== 'connected') {
             const error = new Error('Connection timeout');
+
+            // Close the underlying WebSocket to trigger onClose → scheduleReconnect
+            // This ensures auto-reconnect starts immediately instead of leaving a hanging connection
+            if (this.state.ws) {
+              try {
+                this.state.ws.close(1000, 'Connection timeout');
+              } catch (e) {
+                this.log('Error closing WebSocket on timeout:', e);
+              }
+            }
+
             this.emit('error', error);
             reject(error);
           }

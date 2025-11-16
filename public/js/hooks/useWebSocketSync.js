@@ -24,8 +24,10 @@ export function useWebSocketSync(currentDate, onAppointmentsUpdated) {
                 await wsService.connect({ clientType: 'daily-appointments' });
                 setConnectionStatus('connected');
             } catch (err) {
-                console.error('WebSocket connection failed:', err);
-                setConnectionStatus('disconnected');
+                // Initial connection failed, but auto-reconnect will retry automatically
+                console.error('Initial WebSocket connection failed, auto-reconnect will retry:', err);
+                setConnectionStatus('connecting'); // Keep status as 'connecting', not 'disconnected'
+                // Don't call disconnect() - let auto-reconnect do its job
             }
         };
 
