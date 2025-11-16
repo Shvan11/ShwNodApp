@@ -394,10 +394,10 @@
     box-sizing: border-box;
 }
 
-/* CRITICAL: Time Slot Label - Perfect Alignment with Content Cells */
+/* CRITICAL: Time Slot Label - Dynamic Height (JS calculates based on max appointments) */
 .time-slot-label {
     min-height: var(--calendar-slot-min-height);
-    height: var(--calendar-slot-min-height); /* Explicit height for alignment */
+    /* NO explicit height - JavaScript sets this dynamically via inline styles */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -496,10 +496,11 @@
     color: white;
 }
 
-/* CRITICAL: Time Slots - Perfect Alignment with Time Labels */
+/* CRITICAL: Time Slots - Dynamic Height (JS sets height based on max appointments per time) */
 .time-slot {
     min-height: var(--calendar-slot-min-height);
-    height: var(--calendar-slot-min-height); /* Explicit height for alignment */
+    /* NO explicit height - JavaScript calculates and sets this via inline styles */
+    /* This allows slots to expand for multiple appointments while maintaining alignment */
     background: white;
     border-bottom: 2px solid var(--calendar-border);
     cursor: pointer;
