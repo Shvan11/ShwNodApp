@@ -170,11 +170,20 @@ export const useWhatsAppAuth = () => {
       websocketService.on('whatsapp_initial_state_response', handleInitialState);
 
       // Connect with auth client parameters
-      await websocketService.connect({
-        clientType: 'auth',
-        needsQR: true,
-        timestamp: Date.now()
-      });
+      try {
+        await websocketService.connect({
+          clientType: 'auth',
+          needsQR: true,
+          timestamp: Date.now()
+        });
+        // Connection successful - handleConnected will be called
+      } catch (error) {
+        // Initial connection failed, but auto-reconnect will retry automatically
+        console.error('Initial WebSocket connection failed, auto-reconnect will retry:', error);
+        setAuthState(AUTH_STATES.CONNECTING);
+        // Don't set ERROR state - let handleConnected/handleDisconnected handle state updates
+        // Don't disconnect - let auto-reconnect do its job
+      }
 
       // Return cleanup function
       return () => {
@@ -184,9 +193,9 @@ export const useWhatsAppAuth = () => {
         websocketService.off('whatsapp_initial_state_response', handleInitialState);
       };
     } catch (error) {
-      console.error('Failed to setup WebSocket:', error);
+      console.error('Failed to setup WebSocket listeners:', error);
       setAuthState(AUTH_STATES.ERROR);
-      setError('Failed to initialize WebSocket');
+      setError('Failed to setup WebSocket');
     }
   }, [requestInitialState, handleInitialState]);
 
