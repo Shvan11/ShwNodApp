@@ -78,3 +78,155 @@
   text-align: center;
   border: 1px solid #fecaca;
 }
+
+/* ===== MOBILE RESPONSIVE DESIGN ===== */
+
+/* Tablets and medium screens */
+@media (max-width: 1024px) {
+  .work-component table,
+  .invoice-list table {
+    font-size: 13px;
+  }
+
+  .work-component th,
+  .work-component td,
+  .invoice-list th,
+  .invoice-list td {
+    padding: 10px 12px;
+  }
+}
+
+/* Mobile devices */
+@media (max-width: 768px) {
+  /* Table wrapper for horizontal scroll */
+  .work-component,
+  .invoice-list {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .work-component table,
+  .invoice-list table {
+    min-width: 600px;
+    font-size: 12px;
+    margin-top: 0.75rem;
+  }
+
+  .work-component th,
+  .work-component td,
+  .invoice-list th,
+  .invoice-list td {
+    padding: 10px;
+    font-size: 12px;
+  }
+
+  .work-component th,
+  .invoice-list th {
+    font-size: 11px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .work-component td:first-child,
+  .invoice-list td:first-child {
+    width: 50px;
+    position: sticky;
+    left: 0;
+    background-color: #ffffff;
+    z-index: 5;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .work-component tbody tr:hover td:first-child,
+  .invoice-list tbody tr:hover td:first-child {
+    background-color: #f9fafb;
+  }
+
+  .work-component .empty-state,
+  .invoice-list .empty-state {
+    padding: 1.5rem 1rem;
+    font-size: 14px;
+  }
+
+  .work-component .error-message,
+  .invoice-list .error-message {
+    padding: 0.875rem;
+    font-size: 13px;
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 640px) {
+  .work-component table,
+  .invoice-list table {
+    min-width: 550px;
+    font-size: 11px;
+  }
+
+  .work-component th,
+  .work-component td,
+  .invoice-list th,
+  .invoice-list td {
+    padding: 8px;
+    font-size: 11px;
+  }
+
+  .work-component th,
+  .invoice-list th {
+    font-size: 10px;
+    letter-spacing: 0.3px;
+  }
+
+  .work-component td:first-child,
+  .invoice-list td:first-child {
+    width: 40px;
+    padding: 8px 6px;
+  }
+
+  .work-component .empty-state,
+  .invoice-list .empty-state {
+    padding: 1.25rem 0.75rem;
+    font-size: 13px;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 480px) {
+  .work-component table,
+  .invoice-list table {
+    min-width: 500px;
+  }
+
+  .work-component th,
+  .work-component td,
+  .invoice-list th,
+  .invoice-list td {
+    padding: 8px 6px;
+  }
+
+  .work-component .empty-state,
+  .invoice-list .empty-state {
+    padding: 1rem;
+    font-size: 12px;
+  }
+
+  .work-component .error-message,
+  .invoice-list .error-message {
+    padding: 0.75rem;
+    font-size: 12px;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .work-component tbody tr,
+  .invoice-list tbody tr {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.05);
+  }
+
+  .work-component tbody tr:active td,
+  .invoice-list tbody tr:active td {
+    background-color: #f3f4f6;
+  }
+}

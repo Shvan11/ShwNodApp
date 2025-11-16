@@ -41,5 +41,168 @@ body {
   
   .x_item p {
     color: #ffffff;
-    margin-right: 10px; 
+    margin-right: 10px;
   }
+
+/* ===== MOBILE RESPONSIVE DESIGN ===== */
+
+/* Tablets and medium screens */
+@media (max-width: 1024px) {
+  .xrays-container {
+    padding: 1rem;
+  }
+
+  .xrays {
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .x_img {
+    max-height: 60px;
+    max-width: 90px;
+  }
+}
+
+/* Mobile devices */
+@media (max-width: 768px) {
+  body {
+    padding: 0.5rem;
+  }
+
+  .xrays-container {
+    padding: 0.75rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .xrays {
+    width: 100%;
+    justify-content: center;
+    gap: 10px;
+    padding: 0;
+  }
+
+  .x_item {
+    flex-direction: column;
+    align-items: center;
+    margin: 8px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    min-width: 120px;
+  }
+
+  .x_img_container {
+    margin: 8px 0;
+  }
+
+  .x_img {
+    max-height: 80px;
+    max-width: 120px;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+
+  .x_img:active {
+    transform: scale(1.05);
+  }
+
+  .x_item button {
+    margin-left: 0;
+    margin-top: 8px;
+    padding: 10px 16px;
+    min-height: 44px;
+    min-width: 100px;
+    font-size: 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .x_item p {
+    margin-right: 0;
+    margin-bottom: 8px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 640px) {
+  .xrays-container {
+    padding: 0.5rem;
+  }
+
+  .xrays {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .x_item {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 12px;
+    box-sizing: border-box;
+  }
+
+  .x_img {
+    max-height: 100px;
+    max-width: 150px;
+  }
+
+  .x_item button {
+    width: 100%;
+    max-width: 200px;
+    margin: 12px auto 0;
+    padding: 12px;
+    font-size: 16px;
+  }
+
+  .x_item p {
+    font-size: 15px;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 480px) {
+  .xrays-container {
+    padding: 0.375rem;
+  }
+
+  .x_item {
+    padding: 10px;
+  }
+
+  .x_img {
+    max-height: 90px;
+    max-width: 140px;
+  }
+
+  .x_item button {
+    padding: 14px;
+    font-size: 16px;
+    min-height: 48px;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .x_item button {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  .x_item button:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+  }
+
+  .x_img {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  }
+}
