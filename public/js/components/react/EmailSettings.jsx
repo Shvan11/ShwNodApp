@@ -153,8 +153,8 @@ const EmailSettings = ({ onChangesUpdate }) => {
     const hasChanges = Object.keys(pendingChanges).length > 0;
 
     return (
-        <div className="settings-tab-content">
-            <div className="settings-section">
+        <div className="email-settings">
+            <div className="settings-section-inner">
                 <div className="section-header">
                     <h3>Email Configuration</h3>
                     <p className="section-description">

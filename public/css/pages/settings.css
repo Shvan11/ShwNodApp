@@ -122,14 +122,26 @@
     font-weight: 600;
 }
 
-/* Tab Content Styles - Full Width */
+/* Tab Content Styles - Consistent Width System */
 .settings-content {
     flex: 1;
     background: #f8f9fa;
     padding: 2rem;
-    max-width: 1400px; /* Maximum content width for readability */
     width: 100%;
-    margin: 0 auto; /* Center the content */
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+}
+
+/* Inner wrapper - ensures all tabs have same max-width */
+.settings-content > * {
+    width: 100%;
+    max-width: 1400px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    min-height: 500px;
+    padding: 2.5rem;
     box-sizing: border-box;
 }
 
@@ -174,9 +186,9 @@
     color: #6b7280;
 }
 
-.placeholder-description {
-    font-size: 1rem !important;
-    color: #94a3b8 !important;
+.settings-placeholder .placeholder-description {
+    font-size: 1rem;
+    color: #94a3b8;
     max-width: 500px;
 }
 
@@ -218,9 +230,9 @@
     font-weight: 500;
 }
 
-/* General Settings Tab Styles */
+/* General Settings Tab Styles - No padding (handled by parent) */
 .general-settings {
-    padding: 2rem;
+    /* Padding removed - handled by .settings-content > * */
 }
 
 .section-description {
@@ -229,9 +241,9 @@
     font-size: 0.95rem;
 }
 
-/* Database Settings Tab Styles */
+/* Database Settings Tab Styles - No padding (handled by parent) */
 .database-settings {
-    padding: 2rem;
+    /* Padding removed - handled by .settings-content > * */
 }
 
 .config-group {
@@ -636,6 +648,10 @@
         padding: 1.5rem;
     }
 
+    .settings-content > * {
+        padding: 2rem;
+    }
+
     .tab-buttons {
         padding: 0 0.5rem;
     }
@@ -662,6 +678,10 @@
 
     .settings-content {
         padding: 1rem;
+    }
+
+    .settings-content > * {
+        padding: 1.5rem;
     }
 
     .settings-section {
@@ -696,11 +716,6 @@
 
     .tab-button i {
         font-size: 1rem;
-    }
-
-    .general-settings,
-    .database-settings {
-        padding: 1.5rem;
     }
 
     .settings-placeholder {
@@ -738,6 +753,10 @@
 }
 
 @media (max-width: 480px) {
+    .settings-content > * {
+        padding: 1.25rem;
+    }
+
     .tab-header h2 {
         font-size: 1.75rem;
     }
@@ -765,7 +784,7 @@
     }
 
     .coming-soon-badge {
-        display: none; /* Hide on very small screens */
+        display: none;
     }
 
     .settings-section h3 {
@@ -773,9 +792,9 @@
     }
 }
 
-/* Aligner Doctors Settings Styles */
+/* Aligner Doctors Settings Styles - No padding (handled by parent) */
 .aligner-doctors-settings {
-    padding: 2rem;
+    /* Padding removed - handled by .settings-content > * */
 }
 
 .aligner-doctors-settings .section-header {
@@ -1177,5 +1196,316 @@
     .btn-save {
         width: 100%;
         justify-content: center;
+    }
+}
+
+/* Unified Styles for ALL Settings Tabs */
+.btn-success {
+    background: #10b981;
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background: #059669;
+    transform: translateY(-2px);
+}
+
+.badge-info {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.badge-muted {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+/* Role badges - unified across all components */
+.role-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.role-badge.admin {
+    background: #10b981;
+    color: white;
+}
+
+.role-badge.doctor {
+    background: #3b82f6;
+    color: white;
+}
+
+.role-badge.receptionist,
+.role-badge.secretary {
+    background: #f59e0b;
+    color: white;
+}
+
+.role-badge.user {
+    background: #6b7280;
+    color: white;
+}
+
+/* Status badges - unified */
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.status-badge.active {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-badge.inactive {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* Message alerts - unified */
+.message,
+.alert {
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 14px;
+}
+
+.message.success,
+.alert.success {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+.message.error,
+.alert.error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.alert-warning {
+    background: #fef3c7;
+    color: #92400e;
+    border-left: 4px solid #f59e0b;
+}
+
+/* Form styles - unified for all tabs */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea,
+.form-control {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus,
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.form-text,
+.field-help {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+.required {
+    color: #ef4444;
+}
+
+/* Section cards - unified */
+.section-card {
+    background: white;
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.section-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Tables - unified */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    background: #f8f9fa;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 2px solid #e2e8f0;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+td {
+    padding: 12px;
+    border-bottom: 1px solid #e2e8f0;
+    color: var(--text-primary);
+}
+
+tr:hover {
+    background: #f8f9fa;
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+/* Modal overlay - unified */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header h4 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.modal-header.modal-success {
+    color: #10b981;
+}
+
+.modal-header.modal-error {
+    color: #ef4444;
+}
+
+.modal-header.modal-info {
+    color: #3b82f6;
+}
+
+.modal-body {
+    padding: 2rem;
+}
+
+.modal-footer {
+    padding: 1.5rem 2rem;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Password requirements - unified */
+.password-requirements {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 4px;
+    margin-top: 8px;
+    font-size: 13px;
+    color: #666;
+}
+
+.password-requirements ul {
+    margin: 8px 0 0 0;
+    padding-left: 20px;
+}
+
+.password-requirements li {
+    margin-bottom: 4px;
+}
+
+/* Header layouts - unified */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.header h2 {
+    margin: 0;
+    font-size: 1.8rem;
+    color: var(--primary-color);
+}
+
+.button-group-left,
+.button-group-right {
+    display: flex;
+    gap: 1rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+/* Responsive - unified */
+@media (max-width: 768px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .button-group-left,
+    .button-group-right {
+        flex-direction: column;
     }
 }
