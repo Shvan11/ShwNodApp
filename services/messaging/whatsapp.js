@@ -17,6 +17,8 @@ class ClientStateManager {
   constructor() {
     this.state = 'DISCONNECTED'; // DISCONNECTED, INITIALIZING, CONNECTED, ERROR, DESTROYED
     this.client = null;
+    this.browser = null;  // MEMORY LEAK FIX: Track browser for force close
+    this.page = null;     // MEMORY LEAK FIX: Track page for cleanup
     this.initializationPromise = null;
     this.initializationAbortController = null;
     this.reconnectTimer = null;
@@ -317,6 +319,17 @@ class WhatsAppService extends EventEmitter {
     // Map WhatsApp message IDs to appointment IDs
     // Remove old mapping system - now handled by MessageSessionManager
     // this.messageIdToAppointmentId = new Map();
+
+    // MEMORY LEAK FIX: Store event handler references for proper cleanup
+    this.eventHandlers = {
+      onQR: this.handleQR.bind(this),
+      onReady: this.handleReady.bind(this),
+      onAuthenticated: this.handleAuthenticated.bind(this),
+      onMessageAck: this.handleMessageAck.bind(this),
+      onDisconnected: this.handleDisconnected.bind(this),
+      onAuthFailure: this.handleAuthFailure.bind(this),
+      onLoadingScreen: this.handleLoadingScreen.bind(this)
+    };
 
     this.setupCleanupHandlers();
     this.setupEventListeners();
@@ -636,225 +649,306 @@ class WhatsAppService extends EventEmitter {
     return initPromise;
   }
 
+  /**
+   * MEMORY LEAK FIX: Set up event handlers using bound method references
+   * This allows proper cleanup via removeClientEventHandlers
+   */
   async setupClientEventHandlers(client) {
     logger.whatsapp.debug('Setting up event handlers');
 
-    client.on('qr', async (qr) => {
-      logger.whatsapp.debug('QR code received - checking if session restoration is still possible');
+    // Use bound method references instead of inline functions
+    client.on('qr', this.eventHandlers.onQR);
+    client.on('ready', this.eventHandlers.onReady);
+    client.on('authenticated', this.eventHandlers.onAuthenticated);
+    client.on('message_ack', this.eventHandlers.onMessageAck);
+    client.on('disconnected', this.eventHandlers.onDisconnected);
+    client.on('auth_failure', this.eventHandlers.onAuthFailure);
+    client.on('loading_screen', this.eventHandlers.onLoadingScreen);
 
-      // Check if we have existing session files
-      const hasSession = await this.checkExistingSession();
-      if (hasSession) {
-        logger.whatsapp.info('QR received but session files exist - monitoring for session restoration');
-        
-        // Create a promise that resolves when we know the session restoration outcome
-        const sessionRestoreOutcome = new Promise((resolve) => {
-          let resolved = false;
-          
-          // Listen for successful session restoration
-          const onReady = () => {
-            if (!resolved) {
-              resolved = true;
-              cleanup();
-              logger.whatsapp.info('Session restored successfully - ignoring QR code');
-              resolve('restored');
-            }
-          };
-          
-          // Listen for authentication failure (session invalid)
-          const onAuthFailure = () => {
-            if (!resolved) {
-              resolved = true;
-              cleanup();
-              logger.whatsapp.warn('Session authentication failed - session is invalid');
-              resolve('failed');
-            }
-          };
-          
-          // Safety timeout (much shorter since we're listening for events)
-          const timeout = setTimeout(() => {
-            if (!resolved) {
-              resolved = true;
-              cleanup();
-              logger.whatsapp.warn('Session restoration timeout - proceeding with QR');
-              resolve('timeout');
-            }
-          }, 5000); // 5 seconds is enough for session validation
-          
-          const cleanup = () => {
-            client.removeListener('ready', onReady);
-            client.removeListener('auth_failure', onAuthFailure);
-            clearTimeout(timeout);
-          };
-          
-          // Add one-time listeners
-          client.once('ready', onReady);
-          client.once('auth_failure', onAuthFailure);
-        });
-        
-        const outcome = await sessionRestoreOutcome;
-        
-        // If session was restored, don't show QR
-        if (outcome === 'restored') {
-          return;
-        }
-        
-        // Session restoration failed or timed out, proceed with QR
-        logger.whatsapp.info(`Session restoration ${outcome} - showing QR code`);
-        
-        // Clean up invalid session files to prevent future restoration attempts
-        if (outcome === 'failed') {
-          logger.whatsapp.info('Cleaning up invalid session files');
-          await this.cleanupInvalidSession();
-        }
-      }
+    logger.whatsapp.debug('Event handlers registered successfully');
+  }
 
-      // Client is definitely not ready when QR is received
-      if (this.messageState.clientReady) {
-        await this.messageState.setClientReady(false);
-      }
+  /**
+   * MEMORY LEAK FIX: Remove all event handlers to prevent accumulation
+   */
+  removeClientEventHandlers(client) {
+    if (!client || !this.eventHandlers) {
+      logger.whatsapp.debug('No client or handlers to remove');
+      return;
+    }
 
-      await this.messageState.setQR(qr);
-      this.emit('qr', qr);
+    try {
+      client.removeListener('qr', this.eventHandlers.onQR);
+      client.removeListener('ready', this.eventHandlers.onReady);
+      client.removeListener('authenticated', this.eventHandlers.onAuthenticated);
+      client.removeListener('message_ack', this.eventHandlers.onMessageAck);
+      client.removeListener('disconnected', this.eventHandlers.onDisconnected);
+      client.removeListener('auth_failure', this.eventHandlers.onAuthFailure);
+      client.removeListener('loading_screen', this.eventHandlers.onLoadingScreen);
 
-      if (this.wsEmitter) {
-        // Convert QR string to data URL for client display
-        try {
-          const qrImageUrl = await qrcode.toDataURL(qr, {
-            margin: 4,
-            scale: 6,
-            errorCorrectionLevel: 'M'
-          });
+      logger.whatsapp.debug('Event handlers removed successfully');
+    } catch (error) {
+      logger.whatsapp.error('Error removing event handlers', error);
+    }
+  }
 
-          const message = createWebSocketMessage(
-            MessageSchemas.WebSocketMessage.QR_UPDATE,
-            { qr: qrImageUrl, clientReady: false }
-          );
-          this.broadcastToClients(message);
-        } catch (error) {
-          logger.whatsapp.error('Failed to convert QR code to data URL:', error);
-          // Fallback: send raw QR string
-          const message = createWebSocketMessage(
-            MessageSchemas.WebSocketMessage.QR_UPDATE,
-            { qr, clientReady: false }
-          );
-          this.broadcastToClients(message);
-        }
-      }
-    });
+  /**
+   * Handle QR code generation
+   */
+  async handleQR(qr) {
+    logger.whatsapp.debug('QR code received');
 
-    client.on('ready', async () => {
-      logger.whatsapp.info('Client ready - broadcasting to frontend');
-      // IMPORTANT: Update client state to CONNECTED when ready event fires
-      this.clientState.setState('CONNECTED');
-      await this.messageState.setClientReady(true);
-      await this.messageState.setQR(null);
+    // Check if we have existing session files
+    const hasSession = await this.checkExistingSession();
+    if (hasSession) {
+      logger.whatsapp.info('QR received but session files exist - monitoring for session restoration');
 
-      this.emit('ClientIsReady');
-      if (this.wsEmitter) {
-        const message = createWebSocketMessage(
-          MessageSchemas.WebSocketMessage.CLIENT_READY,
-          {
-            clientReady: true,
-            state: 'ready',
-            message: 'WhatsApp client is ready!'
+      // Create a promise that resolves when we know the session restoration outcome
+      const sessionRestoreOutcome = new Promise((resolve) => {
+        let resolved = false;
+
+        // Listen for successful session restoration
+        const onReady = () => {
+          if (!resolved) {
+            resolved = true;
+            cleanup();
+            logger.whatsapp.info('Session restored successfully - ignoring QR code');
+            resolve('restored');
           }
-        );
-        this.broadcastToClients(message);
-        logger.whatsapp.debug('Broadcasted client ready state');
-      }
-    });
+        };
 
-    client.on('message_ack', async (msg, ack) => {
-      const messageId = msg.id.id;
-      
-      // Use MessageSessionManager to get appointment ID with date validation
-      const messageInfo = messageSessionManager.getAppointmentIdForMessage(messageId);
+        // Listen for authentication failure (session invalid)
+        const onAuthFailure = () => {
+          if (!resolved) {
+            resolved = true;
+            cleanup();
+            logger.whatsapp.warn('Session authentication failed - session is invalid');
+            resolve('failed');
+          }
+        };
 
-      logger.whatsapp.debug(`Message status updated`, { 
-        messageId, 
-        ack, 
-        messageInfo
+        // Safety timeout (much shorter since we're listening for events)
+        const timeout = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            cleanup();
+            logger.whatsapp.warn('Session restoration timeout - proceeding with QR');
+            resolve('timeout');
+          }
+        }, 5000); // 5 seconds is enough for session validation
+
+        const cleanup = () => {
+          if (this.clientState.client) {
+            this.clientState.client.removeListener('ready', onReady);
+            this.clientState.client.removeListener('auth_failure', onAuthFailure);
+          }
+          clearTimeout(timeout);
+        };
+
+        // Add one-time listeners
+        if (this.clientState.client) {
+          this.clientState.client.once('ready', onReady);
+          this.clientState.client.once('auth_failure', onAuthFailure);
+        }
       });
 
-      if (!messageInfo) {
-        logger.whatsapp.debug('Message not found in any active session - may be from previous session or external message', { 
-          messageId,
-          ackStatus: ack
-        });
+      const outcome = await sessionRestoreOutcome;
+
+      // If session was restored, don't show QR
+      if (outcome === 'restored') {
         return;
       }
 
-      const { appointmentId, sessionDate, sessionId } = messageInfo;
+      // Session restoration failed or timed out, proceed with QR
+      logger.whatsapp.info(`Session restoration ${outcome} - showing QR code`);
 
+      // Clean up invalid session files to prevent future restoration attempts
+      if (outcome === 'failed') {
+        logger.whatsapp.info('Cleaning up invalid session files');
+        await this.cleanupInvalidSession();
+      }
+    }
+
+    // Client is definitely not ready when QR is received
+    if (this.messageState.clientReady) {
+      await this.messageState.setClientReady(false);
+    }
+
+    await this.messageState.setQR(qr);
+    this.emit('qr', qr);
+
+    if (this.wsEmitter) {
+      // Convert QR string to data URL for client display
       try {
-        // Record the delivery status update in the session
-        messageSessionManager.recordDeliveryStatusUpdate(messageId, ack);
-
-        await this.messageState.updateMessageStatus(messageId, ack, async () => {
-          // Use the optimized single message update function
-          logger.whatsapp.debug('Updating database status', {
-            messageId,
-            appointmentId,
-            sessionDate,
-            sessionId,
-            ackStatus: ack
-          });
-          
-          return await messagingQueries.updateSingleMessageStatus(messageId, ack);
+        const qrImageUrl = await qrcode.toDataURL(qr, {
+          margin: 4,
+          scale: 6,
+          errorCorrectionLevel: 'M'
         });
 
-        if (this.wsEmitter) {
-          const message = createWebSocketMessage(
-            MessageSchemas.WebSocketMessage.MESSAGE_STATUS,
-            { 
-              messageId, 
-              appointmentId,
-              sessionDate,
-              status: ack 
-            }
-          );
-          this.broadcastToClients(message);
-        }
-
+        const message = createWebSocketMessage(
+          MessageSchemas.WebSocketMessage.QR_UPDATE,
+          { qr: qrImageUrl, clientReady: false }
+        );
+        this.broadcastToClients(message);
       } catch (error) {
-        logger.whatsapp.error('Error updating message status', {
+        logger.whatsapp.error('Failed to convert QR code to data URL:', error);
+        // Fallback: send raw QR string
+        const message = createWebSocketMessage(
+          MessageSchemas.WebSocketMessage.QR_UPDATE,
+          { qr, clientReady: false }
+        );
+        this.broadcastToClients(message);
+      }
+    }
+  }
+
+  /**
+   * Handle authenticated event
+   */
+  async handleAuthenticated() {
+    logger.whatsapp.info('Client authenticated successfully');
+    // Clear QR code since we're authenticated
+    await this.messageState.setQR(null);
+  }
+
+  /**
+   * Handle ready event
+   */
+  async handleReady() {
+    logger.whatsapp.info('Client ready - broadcasting to frontend');
+
+    // MEMORY LEAK FIX: Store browser references for cleanup
+    if (this.clientState.client) {
+      try {
+        this.clientState.browser = this.clientState.client.pupBrowser;
+        this.clientState.page = this.clientState.client.pupPage;
+        logger.whatsapp.debug('Browser references stored for cleanup');
+      } catch (error) {
+        logger.whatsapp.warn('Could not store browser references', error);
+      }
+    }
+
+    // IMPORTANT: Update client state to CONNECTED when ready event fires
+    this.clientState.setState('CONNECTED');
+    await this.messageState.setClientReady(true);
+    await this.messageState.setQR(null);
+
+    this.emit('ClientIsReady');
+    if (this.wsEmitter) {
+      const message = createWebSocketMessage(
+        MessageSchemas.WebSocketMessage.CLIENT_READY,
+        {
+          clientReady: true,
+          state: 'ready',
+          message: 'WhatsApp client is ready!'
+        }
+      );
+      this.broadcastToClients(message);
+      logger.whatsapp.debug('Broadcasted client ready state');
+    }
+  }
+
+  /**
+   * Handle message acknowledgment
+   */
+  async handleMessageAck(msg, ack) {
+    const messageId = msg.id.id;
+
+    // Use MessageSessionManager to get appointment ID with date validation
+    const messageInfo = messageSessionManager.getAppointmentIdForMessage(messageId);
+
+    logger.whatsapp.debug(`Message status updated`, {
+      messageId,
+      ack,
+      messageInfo
+    });
+
+    if (!messageInfo) {
+      logger.whatsapp.debug('Message not found in any active session - may be from previous session or external message', {
+        messageId,
+        ackStatus: ack
+      });
+      return;
+    }
+
+    const { appointmentId, sessionDate, sessionId } = messageInfo;
+
+    try {
+      // Record the delivery status update in the session
+      messageSessionManager.recordDeliveryStatusUpdate(messageId, ack);
+
+      await this.messageState.updateMessageStatus(messageId, ack, async () => {
+        // Use the optimized single message update function
+        logger.whatsapp.debug('Updating database status', {
           messageId,
           appointmentId,
           sessionDate,
           sessionId,
-          error: error.message
+          ackStatus: ack
         });
+
+        return await messagingQueries.updateSingleMessageStatus(messageId, ack);
+      });
+
+      if (this.wsEmitter) {
+        const message = createWebSocketMessage(
+          MessageSchemas.WebSocketMessage.MESSAGE_STATUS,
+          {
+            messageId,
+            appointmentId,
+            sessionDate,
+            status: ack
+          }
+        );
+        this.broadcastToClients(message);
       }
-    });
 
-    client.on('disconnected', async (reason) => {
-      logger.whatsapp.warn(`Client disconnected`, { reason });
-      this.clientState.setState('DISCONNECTED');
-      await this.messageState.setClientReady(false);
+    } catch (error) {
+      logger.whatsapp.error('Error updating message status', {
+        messageId,
+        appointmentId,
+        sessionDate,
+        sessionId,
+        error: error.message
+      });
+    }
+  }
 
-      // Don't set client to null immediately, let cleanup handle it
-      stateEvents.emit('client_disconnected', reason);
+  /**
+   * Handle disconnected event
+   */
+  async handleDisconnected(reason) {
+    logger.whatsapp.warn(`Client disconnected`, { reason });
+    this.clientState.setState('DISCONNECTED');
+    await this.messageState.setClientReady(false);
 
-      if (!this.messageState.manualDisconnect && !this.clientState.destroyInProgress) {
-        this.scheduleReconnect(new Error(`Disconnected: ${reason}`));
-      }
-    });
+    // Don't set client to null immediately, let cleanup handle it
+    stateEvents.emit('client_disconnected', reason);
 
-    client.on('auth_failure', async (error) => {
-      logger.whatsapp.error('WhatsApp authentication failed', error);
-      this.clientState.setState('ERROR', error);
-      await this.messageState.setClientReady(false);
+    if (!this.messageState.manualDisconnect && !this.clientState.destroyInProgress) {
+      this.scheduleReconnect(new Error(`Disconnected: ${reason}`));
+    }
+  }
 
-      if (!this.messageState.manualDisconnect && !this.clientState.destroyInProgress) {
-        this.scheduleReconnect(error);
-      }
-    });
+  /**
+   * Handle authentication failure
+   */
+  async handleAuthFailure(error) {
+    logger.whatsapp.error('WhatsApp authentication failed', error);
+    this.clientState.setState('ERROR', error);
+    await this.messageState.setClientReady(false);
 
-    // Handle loading screen
-    client.on('loading_screen', (percent, message) => {
-      logger.whatsapp.debug(`WhatsApp loading: ${percent}% - ${message}`);
-    });
+    if (!this.messageState.manualDisconnect && !this.clientState.destroyInProgress) {
+      this.scheduleReconnect(error);
+    }
+  }
+
+  /**
+   * Handle loading screen
+   */
+  handleLoadingScreen(percent, message) {
+    logger.whatsapp.debug(`WhatsApp loading: ${percent}% - ${message}`);
   }
 
   scheduleReconnect(error) {
@@ -962,42 +1056,106 @@ class WhatsAppService extends EventEmitter {
     }
   }
 
+  /**
+   * MEMORY LEAK FIX: Force close browser instance
+   */
+  async forceCloseBrowser() {
+    if (!this.clientState.browser) {
+      logger.whatsapp.debug('No browser reference to close');
+      return;
+    }
+
+    try {
+      logger.whatsapp.warn('Force closing Puppeteer browser');
+
+      // Get all pages and close them
+      const pages = await this.clientState.browser.pages();
+      await Promise.all(pages.map(page =>
+        page.close().catch(err =>
+          logger.whatsapp.error('Error closing page', err)
+        )
+      ));
+
+      // Close the browser with timeout
+      await Promise.race([
+        this.clientState.browser.close(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Browser close timeout')), 10000)
+        )
+      ]);
+
+      logger.whatsapp.info('Browser force closed successfully');
+    } catch (error) {
+      logger.whatsapp.error('Error force closing browser', error);
+
+      // Last resort: kill the process
+      try {
+        const browserProcess = this.clientState.browser.process();
+        if (browserProcess) {
+          browserProcess.kill('SIGKILL');
+          logger.whatsapp.warn('Browser process killed with SIGKILL');
+        }
+      } catch (killError) {
+        logger.whatsapp.error('Could not kill browser process', killError);
+      }
+    } finally {
+      this.clientState.browser = null;
+      this.clientState.page = null;
+    }
+  }
+
   async destroyClient(reason = 'manual') {
     logger.whatsapp.info(`Destroying WhatsApp client (reason: ${reason})`);
 
     this.clientState.destroyInProgress = true;
 
     try {
+      // MEMORY LEAK FIX: Remove event listeners FIRST
+      if (this.clientState.client) {
+        this.removeClientEventHandlers(this.clientState.client);
+      }
+
+      // Try graceful destroy with timeout
       if (this.clientState.client) {
         try {
-          // Only logout if explicitly requested, not during restart
-          if (reason !== 'restart') {
-            await this.clientState.client.logout();
-            logger.whatsapp.info('WhatsApp client logged out successfully');
-          } else {
-            // For restart, just destroy without logout to preserve session
-            await this.clientState.client.destroy();
-            logger.whatsapp.info('WhatsApp client destroyed for restart (session preserved)');
-          }
-        } catch (error) {
-          logger.whatsapp.error(`Error during ${reason !== 'restart' ? 'logout' : 'destroy'}`, error);
-          // Try to destroy anyway
-          try {
-            await this.clientState.client.destroy();
-          } catch (destroyError) {
-            logger.whatsapp.error('Error during destroy', destroyError);
-          }
+          await Promise.race([
+            // Graceful destroy
+            (async () => {
+              if (reason !== 'restart') {
+                await this.clientState.client.logout();
+                logger.whatsapp.info('WhatsApp client logged out successfully');
+              } else {
+                await this.clientState.client.destroy();
+                logger.whatsapp.info('WhatsApp client destroyed for restart (session preserved)');
+              }
+            })(),
+            // Timeout after 30 seconds
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Client destroy timeout')), 30000)
+            )
+          ]);
+
+        } catch (destroyError) {
+          logger.whatsapp.error('Graceful destroy failed, attempting force close', destroyError);
+
+          // MEMORY LEAK FIX: Force close browser if graceful destroy fails
+          await this.forceCloseBrowser();
         }
 
         this.clientState.client = null;
       }
 
+      // Final cleanup
       this.clientState.setState('DISCONNECTED');
       await this.messageState.setClientReady(false);
 
     } catch (error) {
       logger.whatsapp.error('Error destroying client', error);
+      // Ensure browser is closed even on error
+      await this.forceCloseBrowser();
     } finally {
+      this.clientState.browser = null;
+      this.clientState.page = null;
       this.clientState.destroyInProgress = false;
     }
   }
@@ -1334,6 +1492,11 @@ class WhatsAppService extends EventEmitter {
     this.clientState.destroyInProgress = true;
 
     try {
+      // MEMORY LEAK FIX: Remove event listeners first
+      if (this.clientState.client) {
+        this.removeClientEventHandlers(this.clientState.client);
+      }
+
       // Clear all timers
       this.clientState.cleanup();
 
@@ -1347,12 +1510,17 @@ class WhatsAppService extends EventEmitter {
         this.clientState.client = null;
       }
 
+      // Force close browser
+      await this.forceCloseBrowser();
+
       // Reset states
       this.clientState.setState('DISCONNECTED');
       await this.messageState.setClientReady(false);
       this.circuitBreaker.reset();
 
     } finally {
+      this.clientState.browser = null;
+      this.clientState.page = null;
       this.clientState.destroyInProgress = false;
     }
   }
@@ -1365,12 +1533,17 @@ class WhatsAppService extends EventEmitter {
     this.messageState.manualDisconnect = true;
 
     try {
+      // MEMORY LEAK FIX: Remove event listeners first
       if (this.clientState.client) {
+        this.removeClientEventHandlers(this.clientState.client);
+
         try {
           await this.clientState.client.destroy();
           logger.whatsapp.info('WhatsApp client destroyed successfully - authentication preserved');
         } catch (error) {
           logger.whatsapp.error('Error during destroy', error);
+          // Force close browser on error
+          await this.forceCloseBrowser();
         }
         this.clientState.client = null;
       }
@@ -1380,7 +1553,7 @@ class WhatsAppService extends EventEmitter {
       this.clientState.setState('DISCONNECTED');
       await this.messageState.setClientReady(false);
       await this.messageState.setQR(null);
-      
+
       // Complete all active message sessions
       messageSessionManager.completeAllSessions();
       this.circuitBreaker.reset();
@@ -1389,8 +1562,11 @@ class WhatsAppService extends EventEmitter {
 
     } catch (error) {
       logger.whatsapp.error('Error during simple destruction', error);
+      await this.forceCloseBrowser();
       return { success: false, error: "Destroy failed: " + error.message };
     } finally {
+      this.clientState.browser = null;
+      this.clientState.page = null;
       this.clientState.destroyInProgress = false;
       this.messageState.manualDisconnect = false;
     }
@@ -1404,7 +1580,10 @@ class WhatsAppService extends EventEmitter {
     this.messageState.manualDisconnect = true;
 
     try {
+      // MEMORY LEAK FIX: Remove event listeners first
       if (this.clientState.client) {
+        this.removeClientEventHandlers(this.clientState.client);
+
         try {
           await this.clientState.client.logout();
           logger.whatsapp.info('WhatsApp client logged out successfully - authentication cleared by logout()');
@@ -1415,6 +1594,8 @@ class WhatsAppService extends EventEmitter {
             await this.clientState.client.destroy();
           } catch (destroyError) {
             logger.whatsapp.error('Error during destroy', destroyError);
+            // Force close browser on error
+            await this.forceCloseBrowser();
           }
         }
         this.clientState.client = null;
@@ -1425,7 +1606,7 @@ class WhatsAppService extends EventEmitter {
       this.clientState.setState('DISCONNECTED');
       await this.messageState.setClientReady(false);
       await this.messageState.setQR(null);
-      
+
       // Complete all active message sessions
       messageSessionManager.completeAllSessions();
       this.circuitBreaker.reset();
@@ -1435,8 +1616,11 @@ class WhatsAppService extends EventEmitter {
 
     } catch (error) {
       logger.whatsapp.error('Error during complete logout', error);
+      await this.forceCloseBrowser();
       return { success: false, error: "Logout failed: " + error.message };
     } finally {
+      this.clientState.browser = null;
+      this.clientState.page = null;
       this.clientState.destroyInProgress = false;
       this.messageState.manualDisconnect = false;
     }
@@ -1468,53 +1652,186 @@ class WhatsAppService extends EventEmitter {
     return status;
   }
 
-  // Check for existing WhatsApp session files
+  /**
+   * SESSION VALIDATION FIX: Comprehensive session validation with integrity checks
+   * Returns: boolean (simple) for backward compatibility
+   * Logs detailed validation info
+   */
   async checkExistingSession() {
     try {
       const fs = await import('fs');
       const path = await import('path');
-      
-      // Check for session directory and key files
+
       const sessionPath = '.wwebjs_auth/session-client/Default';
       const localStoragePath = path.default.join(sessionPath, 'Local Storage/leveldb');
       const indexedDBPath = path.default.join(sessionPath, 'IndexedDB');
-      
-      // Check if critical session files exist
-      if (fs.default.existsSync(localStoragePath) && fs.default.existsSync(indexedDBPath)) {
-        const localStorageFiles = fs.default.readdirSync(localStoragePath);
-        const hasValidLocalStorage = localStorageFiles.some(file => file.endsWith('.log') || file.endsWith('.ldb'));
-        
-        if (hasValidLocalStorage) {
-          logger.whatsapp.debug('Valid session files found');
-          return true;
+
+      // Check 1: Directories exist
+      if (!fs.default.existsSync(localStoragePath)) {
+        logger.whatsapp.debug('Session validation failed: local storage missing');
+        return false;
+      }
+
+      if (!fs.default.existsSync(indexedDBPath)) {
+        logger.whatsapp.debug('Session validation failed: indexed DB missing');
+        return false;
+      }
+
+      // Check 2: Has data files
+      const localStorageFiles = fs.default.readdirSync(localStoragePath);
+      const dataFiles = localStorageFiles.filter(f =>
+        f.endsWith('.ldb') || f.endsWith('.log')
+      );
+
+      if (dataFiles.length === 0) {
+        logger.whatsapp.debug('Session validation failed: no data files found');
+        return false;
+      }
+
+      // Check 3: Files are not too old (30 days)
+      const maxAge = 30 * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      let newestFile = null;
+
+      for (const file of dataFiles) {
+        const filePath = path.default.join(localStoragePath, file);
+        const stats = fs.default.statSync(filePath);
+        const age = now - stats.mtimeMs;
+
+        if (!newestFile || age < (now - newestFile.mtime)) {
+          newestFile = { name: file, mtime: stats.mtimeMs, age };
+        }
+
+        if (age > maxAge) {
+          logger.whatsapp.warn('Session validation failed: files too old', {
+            file,
+            ageDays: Math.round(age / 1000 / 60 / 60 / 24)
+          });
+          return false;
         }
       }
-      
-      logger.whatsapp.debug('No valid session files found');
-      return false;
+
+      // Check 4: Files are not empty
+      let totalSize = 0;
+      for (const file of dataFiles) {
+        const filePath = path.default.join(localStoragePath, file);
+        const stats = fs.default.statSync(filePath);
+
+        if (stats.size === 0) {
+          logger.whatsapp.warn('Session validation failed: empty file detected', { file });
+          return false;
+        }
+
+        // Check if file is readable
+        try {
+          fs.default.accessSync(filePath, fs.constants.R_OK);
+          totalSize += stats.size;
+        } catch (accessError) {
+          logger.whatsapp.warn('Session validation failed: file not readable', { file });
+          return false;
+        }
+      }
+
+      // Check 5: Reasonable total size (at least 1KB)
+      if (totalSize < 1024) {
+        logger.whatsapp.warn('Session validation failed: total size too small', {
+          totalSize,
+          totalSizeKB: Math.round(totalSize / 1024)
+        });
+        return false;
+      }
+
+      // All checks passed
+      logger.whatsapp.debug('Session validation passed', {
+        fileCount: dataFiles.length,
+        totalSizeKB: Math.round(totalSize / 1024),
+        ageMinutes: newestFile ? Math.round((now - newestFile.mtime) / 1000 / 60) : 0
+      });
+
+      return true;
+
     } catch (error) {
-      logger.whatsapp.warn('Error checking session files', error);
+      logger.whatsapp.error('Error validating session', error);
       return false;
     }
   }
 
-  // Clean up invalid session files
-  async cleanupInvalidSession() {
-    try {
-      const fs = await import('fs');
-      
-      const sessionPath = '.wwebjs_auth/session-client';
-      
-      if (fs.default.existsSync(sessionPath)) {
-        // Remove the entire session directory to ensure clean state
-        fs.default.rmSync(sessionPath, { recursive: true, force: true });
-        logger.whatsapp.info('Invalid session files cleaned up successfully');
-      } else {
-        logger.whatsapp.debug('No session directory to clean up');
-      }
-    } catch (error) {
-      logger.whatsapp.error('Error cleaning up session files', error);
+  /**
+   * SESSION CLEANUP FIX: Clean up invalid session with retry logic for Windows
+   * Handles locked files by retrying with exponential backoff
+   */
+  async cleanupInvalidSession(maxRetries = 3) {
+    const fs = await import('fs');
+    const sessionPath = '.wwebjs_auth/session-client';
+
+    if (!fs.default.existsSync(sessionPath)) {
+      logger.whatsapp.debug('No session directory to clean up');
+      return { success: true, reason: 'no_session' };
     }
+
+    // Try to backup session before deletion (for debugging)
+    try {
+      const backupPath = `.wwebjs_auth/session-client-backup-${Date.now()}`;
+      await fs.promises.rename(sessionPath, backupPath);
+      logger.whatsapp.info('Session backed up before cleanup', { backupPath });
+
+      // Delete backup after a delay (keep for 1 hour)
+      setTimeout(() => {
+        try {
+          fs.default.rmSync(backupPath, { recursive: true, force: true });
+          logger.whatsapp.debug('Session backup deleted', { backupPath });
+        } catch (err) {
+          logger.whatsapp.debug('Could not delete backup', { error: err.message });
+        }
+      }, 60 * 60 * 1000);
+
+      return { success: true, reason: 'backed_up_and_removed' };
+
+    } catch (renameError) {
+      // Backup failed, try direct deletion with retry
+      logger.whatsapp.warn('Could not backup session, attempting direct deletion', {
+        error: renameError.message
+      });
+    }
+
+    // Retry deletion with exponential backoff
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        logger.whatsapp.info(`Attempting session cleanup (attempt ${attempt}/${maxRetries})`);
+
+        // Use force option to handle permissions issues
+        fs.default.rmSync(sessionPath, {
+          recursive: true,
+          force: true,
+          maxRetries: 5,
+          retryDelay: 1000
+        });
+
+        logger.whatsapp.info('Session cleaned up successfully', { attempt });
+        return { success: true, reason: 'deleted', attempt };
+
+      } catch (error) {
+        logger.whatsapp.error(`Session cleanup attempt ${attempt} failed`, {
+          error: error.message,
+          code: error.code
+        });
+
+        if (attempt < maxRetries) {
+          // Wait before retry (exponential backoff)
+          const delay = 1000 * Math.pow(2, attempt - 1);
+          logger.whatsapp.info(`Waiting ${delay}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          logger.whatsapp.error('Session cleanup failed after all retries', {
+            maxRetries,
+            error: error.message
+          });
+          return { success: false, reason: 'cleanup_failed', error: error.message };
+        }
+      }
+    }
+
+    return { success: false, reason: 'max_retries_exceeded' };
   }
 }
 
