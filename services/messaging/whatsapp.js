@@ -1492,6 +1492,11 @@ class WhatsAppService extends EventEmitter {
     this.clientState.destroyInProgress = true;
 
     try {
+      // MEMORY LEAK FIX: Remove event listeners first
+      if (this.clientState.client) {
+        this.removeClientEventHandlers(this.clientState.client);
+      }
+
       // Clear all timers
       this.clientState.cleanup();
 
@@ -1505,12 +1510,17 @@ class WhatsAppService extends EventEmitter {
         this.clientState.client = null;
       }
 
+      // Force close browser
+      await this.forceCloseBrowser();
+
       // Reset states
       this.clientState.setState('DISCONNECTED');
       await this.messageState.setClientReady(false);
       this.circuitBreaker.reset();
 
     } finally {
+      this.clientState.browser = null;
+      this.clientState.page = null;
       this.clientState.destroyInProgress = false;
     }
   }
@@ -1523,12 +1533,17 @@ class WhatsAppService extends EventEmitter {
     this.messageState.manualDisconnect = true;
 
     try {
+      // MEMORY LEAK FIX: Remove event listeners first
       if (this.clientState.client) {
+        this.removeClientEventHandlers(this.clientState.client);
+
         try {
           await this.clientState.client.destroy();
           logger.whatsapp.info('WhatsApp client destroyed successfully - authentication preserved');
         } catch (error) {
           logger.whatsapp.error('Error during destroy', error);
+          // Force close browser on error
+          await this.forceCloseBrowser();
         }
         this.clientState.client = null;
       }
@@ -1538,7 +1553,7 @@ class WhatsAppService extends EventEmitter {
       this.clientState.setState('DISCONNECTED');
       await this.messageState.setClientReady(false);
       await this.messageState.setQR(null);
-      
+
       // Complete all active message sessions
       messageSessionManager.completeAllSessions();
       this.circuitBreaker.reset();
@@ -1547,8 +1562,11 @@ class WhatsAppService extends EventEmitter {
 
     } catch (error) {
       logger.whatsapp.error('Error during simple destruction', error);
+      await this.forceCloseBrowser();
       return { success: false, error: "Destroy failed: " + error.message };
     } finally {
+      this.clientState.browser = null;
+      this.clientState.page = null;
       this.clientState.destroyInProgress = false;
       this.messageState.manualDisconnect = false;
     }
@@ -1562,7 +1580,10 @@ class WhatsAppService extends EventEmitter {
     this.messageState.manualDisconnect = true;
 
     try {
+      // MEMORY LEAK FIX: Remove event listeners first
       if (this.clientState.client) {
+        this.removeClientEventHandlers(this.clientState.client);
+
         try {
           await this.clientState.client.logout();
           logger.whatsapp.info('WhatsApp client logged out successfully - authentication cleared by logout()');
@@ -1573,6 +1594,8 @@ class WhatsAppService extends EventEmitter {
             await this.clientState.client.destroy();
           } catch (destroyError) {
             logger.whatsapp.error('Error during destroy', destroyError);
+            // Force close browser on error
+            await this.forceCloseBrowser();
           }
         }
         this.clientState.client = null;
@@ -1583,7 +1606,7 @@ class WhatsAppService extends EventEmitter {
       this.clientState.setState('DISCONNECTED');
       await this.messageState.setClientReady(false);
       await this.messageState.setQR(null);
-      
+
       // Complete all active message sessions
       messageSessionManager.completeAllSessions();
       this.circuitBreaker.reset();
@@ -1593,8 +1616,11 @@ class WhatsAppService extends EventEmitter {
 
     } catch (error) {
       logger.whatsapp.error('Error during complete logout', error);
+      await this.forceCloseBrowser();
       return { success: false, error: "Logout failed: " + error.message };
     } finally {
+      this.clientState.browser = null;
+      this.clientState.page = null;
       this.clientState.destroyInProgress = false;
       this.messageState.manualDisconnect = false;
     }
