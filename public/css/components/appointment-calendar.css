@@ -54,19 +54,29 @@
     --success-color: #2ecc71;
 }
 
+/* Prevent body scrolling when calendar is active */
+body:has(.appointment-calendar) {
+    overflow: hidden;
+    height: 100vh;
+}
+
 /* Main Calendar Container - Full Page Design */
 .appointment-calendar {
     display: flex;
     flex-direction: column;
     width: 100%;
-    height: calc(100vh - 50px);
-    margin-top: 50px;
+    height: 100vh;
     background: var(--calendar-background);
     overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 
-/* Calendar Header - Modern Gradient Design */
+/* Calendar Header - Sticky Design (sticks below universal header) */
 .calendar-header {
     display: flex;
     justify-content: space-between;
@@ -77,8 +87,9 @@
     flex-shrink: 0;
     min-height: 90px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    position: relative;
-    z-index: 10;
+    position: sticky;
+    top: 50px;
+    z-index: 100;
 }
 
 .calendar-navigation {
@@ -898,12 +909,13 @@
 @media (max-width: 768px) {
     /* Container adjustments */
     .appointment-calendar {
-        height: calc(100vh - 50px);
-        margin-top: 50px;
+        height: 100vh;
     }
 
-    /* Header: Stack vertically, touch-friendly */
+    /* Calendar header stays sticky on mobile */
     .calendar-header {
+        position: sticky;
+        top: 50px;
         flex-direction: column;
         gap: 12px;
         padding: 16px;
