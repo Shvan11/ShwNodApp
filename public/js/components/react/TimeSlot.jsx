@@ -54,7 +54,7 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view',
     }, [slotStatus, isSelected, appointments, mode]);
     
     // Click handler
-    const handleClick = useCallback(() => {
+    const handleClick = useCallback((event) => {
         // Don't allow clicks on full slots
         if (slotStatus === 'full') return;
 
@@ -63,7 +63,7 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view',
             return;
         }
 
-        onClick(slotData);
+        onClick(slotData, event);
     }, [onClick, slotData, slotStatus, mode]);
     
     // Render appointment content - SUPPORTS MULTIPLE APPOINTMENTS

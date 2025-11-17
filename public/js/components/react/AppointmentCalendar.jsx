@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import CalendarGrid from './CalendarGrid.jsx'
 import CalendarHeader from './CalendarHeader.jsx'
 import MonthlyCalendarGrid from './MonthlyCalendarGrid.jsx'
+import CalendarContextMenu from './CalendarContextMenu.jsx'
 
 /**
  * AppointmentCalendar Main Component
@@ -29,6 +30,10 @@ const AppointmentCalendar = ({
     const [selectedDoctorId, setSelectedDoctorId] = useState(null);
     const [showEarlySlots, setShowEarlySlots] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
+
+    // Context menu and delete confirmation state
+    const [contextMenu, setContextMenu] = useState(null); // { position: {x, y}, appointment }
+    const [deleteConfirmation, setDeleteConfirmation] = useState(null); // appointment to delete
 
     // Use external selected slot if provided (for controlled mode)
     const selectedSlot = externalSelectedSlot || internalSelectedSlot;
@@ -231,7 +236,7 @@ const AppointmentCalendar = ({
         setShowEarlySlots(prev => !prev);
     }, []);
 
-    const handleSlotClick = useCallback((slot) => {
+    const handleSlotClick = useCallback((slot, event) => {
         if (mode === 'selection') {
             // In selection mode, only allow selecting available slots (not past, full, or booked)
             if (slot.slotStatus !== 'available') {
@@ -248,7 +253,20 @@ const AppointmentCalendar = ({
                 onSlotSelect(slot);
             }
         } else {
-            // Normal view mode behavior
+            // Normal view mode - show context menu for slots with appointments
+            const validAppointments = slot.appointments?.filter(apt =>
+                apt && (apt.patientName || apt.appointmentID)
+            ) || [];
+
+            if (validAppointments.length > 0) {
+                // Show context menu with all appointments
+                setContextMenu({
+                    position: { x: event.clientX, y: event.clientY },
+                    appointments: validAppointments
+                });
+            }
+
+            // Update selected slot for highlighting
             setInternalSelectedSlot(slot);
         }
     }, [mode, externalSelectedSlot, onSlotSelect]);
@@ -258,6 +276,40 @@ const AppointmentCalendar = ({
         // Switch to day view for the selected day
         setCurrentDate(new Date(day.date));
         setViewMode('day');
+    }, []);
+
+    // Handler for delete action from context menu
+    const handleDeleteRequest = useCallback((appointment) => {
+        setDeleteConfirmation(appointment);
+    }, []);
+
+    // Handler for confirmed delete
+    const handleDeleteConfirm = useCallback(async () => {
+        if (!deleteConfirmation?.appointmentID) return;
+
+        try {
+            const response = await fetch(`/api/appointments/${deleteConfirmation.appointmentID}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete appointment');
+            }
+
+            // Refresh calendar data after successful delete
+            await fetchCalendarData(currentDate, selectedDoctorId);
+
+            // Close delete confirmation modal
+            setDeleteConfirmation(null);
+        } catch (error) {
+            console.error('Error deleting appointment:', error);
+            alert('Failed to delete appointment: ' + error.message);
+        }
+    }, [deleteConfirmation, currentDate, selectedDoctorId, fetchCalendarData]);
+
+    // Handler to close context menu
+    const handleCloseContextMenu = useCallback(() => {
+        setContextMenu(null);
     }, []);
     
     // Effects
@@ -369,6 +421,46 @@ const AppointmentCalendar = ({
                     showOnlyAvailable={showOnlyAvailable}
                     showEarlySlots={showEarlySlots}
                 />
+            )}
+
+            {/* Context Menu */}
+            {contextMenu && (
+                <CalendarContextMenu
+                    position={contextMenu.position}
+                    appointments={contextMenu.appointments}
+                    onClose={handleCloseContextMenu}
+                    onDelete={handleDeleteRequest}
+                />
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirmation && (
+                <div className="modal-overlay" onClick={() => setDeleteConfirmation(null)}>
+                    <div className="modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
+                        <h3>
+                            <i className="fas fa-exclamation-triangle"></i> Confirm Delete
+                        </h3>
+                        <p>
+                            Are you sure you want to delete the appointment for{' '}
+                            <strong>{deleteConfirmation.patientName || 'this patient'}</strong>
+                            {deleteConfirmation.appDetail && ` (${deleteConfirmation.appDetail})`}?
+                        </p>
+                        <div className="modal-actions">
+                            <button
+                                className="btn btn-cancel"
+                                onClick={() => setDeleteConfirmation(null)}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-delete"
+                                onClick={handleDeleteConfirm}
+                            >
+                                <i className="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
