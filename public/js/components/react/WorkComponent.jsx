@@ -353,24 +353,39 @@ const WorkComponent = ({ patientId }) => {
     };
 
     const handlePrintReceipt = (work) => {
+        console.log('🖨️ [PRINT RECEIPT] Button clicked for work:', work.workid);
+
         // Open receipt in new window - template has auto-print on load
         window.open(`/api/templates/receipt/work/${work.workid}`, '_blank');
+        console.log('🖨️ [PRINT RECEIPT] Receipt window opened');
 
-        // Auto-send WhatsApp receipt (non-blocking, silent on errors)
+        // Auto-send WhatsApp receipt (non-blocking, show errors for debugging)
+        console.log('📱 [WHATSAPP] Starting WhatsApp send for work:', work.workid);
         fetch('/api/wa/send-receipt', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ workId: work.workid })
         })
-        .then(res => res.json())
+        .then(res => {
+            console.log('📱 [WHATSAPP] Response status:', res.status);
+            return res.json();
+        })
         .then(result => {
+            console.log('📱 [WHATSAPP] Response data:', result);
             if (result.success) {
                 success('Receipt sent via WhatsApp!', 3000);
+                console.log('✅ [WHATSAPP] Success toast shown');
+            } else {
+                // Show error message to user
+                const errorMsg = result.message || 'Failed to send WhatsApp receipt';
+                toastError(errorMsg, 5000);
+                console.error('❌ [WHATSAPP] Error:', errorMsg);
             }
-            // Silent fail for errors - don't interrupt workflow
         })
-        .catch(() => {
-            // Silent fail - don't show error toast
+        .catch((err) => {
+            // Show network/server error
+            toastError('Network error: Could not send WhatsApp receipt', 5000);
+            console.error('❌ [WHATSAPP] Network error:', err);
         });
     };
 

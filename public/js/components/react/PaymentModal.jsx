@@ -526,21 +526,29 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
             };
 
             // Auto-send WhatsApp receipt (non-blocking)
+            console.log('📱 [PAYMENT MODAL] Starting WhatsApp send for work:', workData.workid);
             fetch('/api/wa/send-receipt', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ workId: workData.workid })
             })
-            .then(res => res.json())
+            .then(res => {
+                console.log('📱 [PAYMENT MODAL] Response status:', res.status);
+                return res.json();
+            })
             .then(result => {
+                console.log('📱 [PAYMENT MODAL] Response data:', result);
                 if (result.success) {
                     success('Receipt sent via WhatsApp!', 3000);
+                    console.log('✅ [PAYMENT MODAL] Success toast shown');
                 } else {
                     warning(result.message || 'Failed to send WhatsApp', 3000);
+                    console.warn('⚠️ [PAYMENT MODAL] Warning:', result.message);
                 }
             })
             .catch(err => {
                 error('WhatsApp error: ' + err.message, 3000);
+                console.error('❌ [PAYMENT MODAL] Network error:', err);
             });
         } catch (err) {
             console.error('Error printing receipt:', err);
