@@ -52,28 +52,31 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
         if (maxValidAppointments <= 1) {
             return baseHeight;
         }
-        
-        // FINE-TUNED calculation matching NEW CSS values:
-        // .time-slot padding: 10px (top/bottom = 20px total)
-        // .appointment-content.multiple: gap 8px, padding 2px (top/bottom = 4px)
-        // .appointment-count: height ~32px (font 12px + padding 12px + margin 2px + box 8px)
-        // .appointments-list: gap 6px between items, padding 0
-        // .appointment-item: min-height 28px + padding 16px (8px * 2) + box-shadow = ~48px per item
-        // gap between items in list: 6px * (count-1)
-        // extra safety margin: 25px
 
-        const timeSlotPadding = 20; // 10px top + 10px bottom
-        const contentPadding = 4; // appointment-content.multiple padding: 2px top + 2px bottom
-        const countHeaderHeight = 32; // font + padding + margin + border-radius
-        const contentGap = 8; // gap between count and list
-        const itemHeight = 48; // 28px min + 16px padding + shadow/spacing
-        const itemGap = 6; // gap between appointment items
-        const gapBetweenItems = Math.max(0, (maxValidAppointments - 1) * itemGap);
-        const safetyMargin = 25; // Extra space to prevent truncation
+        // EXACT calculation matching CSS values (appointment-calendar.css):
+        // - .time-slot padding: 10px (top/bottom = 20px total) [line 525]
+        // - .appointment-content.multiple padding: 2px (top/bottom = 4px total) [line 632]
+        // - .appointment-count: font 12px + padding 6px top/bottom = ~26px [lines 635-647]
+        // - Content gap: 8px (gap between count header and list) [line 630]
+        // - .appointment-item: FIXED height 32px (no wrapping, truncated text) [line 666]
+        // - .appointments-list gap: 4px between items [line 652]
+        // - .appointments-list bottom padding: 8px [line 654]
+        //
+        // Formula: height = 62 + (n × 36)
+        // Where: 62 = timeSlotPadding(20) + contentPadding(4) + countHeader(26) + contentGap(8) + listBottomPadding(8) - itemGap(4)
+        //        36 = itemHeight(32) + itemGap(4)
+
+        const timeSlotPadding = 20;
+        const contentPadding = 4;
+        const countHeaderHeight = 26;
+        const contentGap = 8;
+        const itemHeight = 32; // FIXED HEIGHT - matches CSS line 666
+        const itemGap = 4;
+        const listBottomPadding = 8;
 
         const calculatedHeight = timeSlotPadding + contentPadding + countHeaderHeight +
                                 contentGap + (maxValidAppointments * itemHeight) +
-                                gapBetweenItems + safetyMargin;
+                                ((maxValidAppointments - 1) * itemGap) + listBottomPadding;
 
         return calculatedHeight;
     };
