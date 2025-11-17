@@ -329,7 +329,6 @@ router.post('/send-receipt', async (req, res) => {
         // Compose WhatsApp message
         const message = `Receipt - Shwan Orthodontics
 ━━━━━━━━━━━━━━━━━━━━━
-
 Patient: ${receiptData.patient.PatientName}
 Date: ${new Date().toLocaleDateString('en-GB')}
 
