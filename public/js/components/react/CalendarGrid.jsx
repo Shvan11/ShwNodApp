@@ -83,10 +83,7 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
 
     // Helper function to get slot status
     const getSlotStatus = (date, time) => {
-        const now = new Date();
-        const slotDateTime = new Date(`${date}T${time}:00`);
-        
-        if (slotDateTime < now) return 'past';
+        // All slots are available regardless of date/time
         return 'available';
     };
 

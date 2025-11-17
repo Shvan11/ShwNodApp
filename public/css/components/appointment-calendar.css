@@ -560,17 +560,7 @@ body:has(.appointment-calendar) {
     transform: translateX(2px);
 }
 
-.time-slot.past {
-    /* No background color - clean neutral design */
-    opacity: 0.5;
-    border-left: 3px solid var(--border);
-    /* Keep cursor pointer - all slots are clickable */
-}
-
-.time-slot.past:hover {
-    box-shadow: var(--hover-shadow);
-    transform: translateX(2px);
-}
+/* Past slots styling removed - all slots are now equally accessible */
 
 .time-slot.selected {
     background: var(--slot-selected);
