@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import WorkCard from './WorkCard.jsx';
 import PaymentModal from './PaymentModal.jsx';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters.js';
+import { useToast } from '../expenses/Toast.jsx';
 import '../../../css/components/work-card.css';
 
 /**
@@ -12,6 +13,7 @@ import '../../../css/components/work-card.css';
  */
 const WorkComponent = ({ patientId }) => {
     const navigate = useNavigate();
+    const { success, error: toastError, warning } = useToast();
     const [works, setWorks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -353,6 +355,23 @@ const WorkComponent = ({ patientId }) => {
     const handlePrintReceipt = (work) => {
         // Open receipt in new window - template has auto-print on load
         window.open(`/api/templates/receipt/work/${work.workid}`, '_blank');
+
+        // Auto-send WhatsApp receipt (non-blocking, silent on errors)
+        fetch('/api/wa/send-receipt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ workId: work.workid })
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                success('Receipt sent via WhatsApp!', 3000);
+            }
+            // Silent fail for errors - don't interrupt workflow
+        })
+        .catch(() => {
+            // Silent fail - don't show error toast
+        });
     };
 
     const toggleWorkExpanded = (workId) => {

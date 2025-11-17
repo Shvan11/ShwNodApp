@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import '../../../css/components/invoice-form.css'
 import { formatNumber, parseFormattedNumber, formatCurrency as formatCurrencyUtil } from '../../utils/formatters.js'
+import { useToast } from '../expenses/Toast.jsx'
 
 /**
  * Payment Modal Component
@@ -9,6 +10,7 @@ import { formatNumber, parseFormattedNumber, formatCurrency as formatCurrencyUti
  * Uses useCallback for event handlers to prevent breaking memoization
  */
 const PaymentModal = ({ workData, onClose, onSuccess }) => {
+    const { success, error, warning } = useToast();
     const [loading, setLoading] = useState(false);
     const [exchangeRate, setExchangeRate] = useState(null);
     const [exchangeRateError, setExchangeRateError] = useState(false);
@@ -522,6 +524,24 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                 printWindow.focus();
                 printWindow.print();
             };
+
+            // Auto-send WhatsApp receipt (non-blocking)
+            fetch('/api/wa/send-receipt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ workId: workData.workid })
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.success) {
+                    success('Receipt sent via WhatsApp!', 3000);
+                } else {
+                    warning(result.message || 'Failed to send WhatsApp', 3000);
+                }
+            })
+            .catch(err => {
+                error('WhatsApp error: ' + err.message, 3000);
+            });
         } catch (err) {
             console.error('Error printing receipt:', err);
             alert(`Failed to print receipt: ${err.message}`);

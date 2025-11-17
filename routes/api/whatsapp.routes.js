@@ -23,6 +23,7 @@ import { sendImg_, sendXray_ } from '../../services/messaging/whatsapp-api.js';
 import { sendgramfile } from '../../services/messaging/telegram.js';
 import messageState from '../../services/state/messageState.js';
 import { WebSocketEvents, createStandardMessage } from '../../services/messaging/websocket-events.js';
+import { getReceiptData } from '../../services/templates/receipt-service.js';
 
 // Utilities
 import config from '../../config/config.js';
@@ -243,6 +244,133 @@ router.get('/send', timeouts.whatsappSend, async (req, res) => {
         return sendError(res, ErrorResponses.INTERNAL_ERROR, {
             details: 'Failed to start sending process',
             error: error.message
+        });
+    }
+});
+
+/**
+ * Send receipt via WhatsApp to patient
+ * POST /send-receipt (mounted at /api/wa)
+ * Body: { workId: number }
+ * Sends receipt details including amount paid, balance, and next appointment
+ */
+router.post('/send-receipt', async (req, res) => {
+    try {
+        const { workId } = req.body;
+
+        // Validate required parameter
+        if (!workId) {
+            return sendError(res, ErrorResponses.MISSING_PARAMETERS, {
+                required: ['workId']
+            });
+        }
+
+        // Validate workId is numeric
+        if (isNaN(parseInt(workId))) {
+            return sendError(res, ErrorResponses.INVALID_INPUT, {
+                details: 'workId must be a valid number'
+            });
+        }
+
+        log.info(`WhatsApp receipt send request - WorkID: ${workId}`);
+
+        // Check if WhatsApp client is ready
+        if (!whatsapp.isReady()) {
+            const status = whatsapp.getStatus();
+            return res.json({
+                success: false,
+                message: 'WhatsApp not connected'
+            });
+        }
+
+        // Get receipt data (includes patient phone, amounts, appointment)
+        let receiptData;
+        try {
+            receiptData = await getReceiptData(parseInt(workId));
+        } catch (error) {
+            log.error(`Failed to get receipt data for work ${workId}:`, error);
+            return res.json({
+                success: false,
+                message: 'Work not found'
+            });
+        }
+
+        // Extract patient phone
+        const patientPhone = receiptData.patient.Phone;
+        if (!patientPhone || patientPhone.trim() === '') {
+            log.warn(`No phone number for patient ${receiptData.patient.PersonID}`);
+            return res.json({
+                success: false,
+                message: 'No phone number for patient'
+            });
+        }
+
+        // Format phone number for WhatsApp
+        const phoneNumber = PhoneFormatter.forWhatsApp(patientPhone, '964');
+
+        // Validate phone format
+        if (!PhoneFormatter.isValid(phoneNumber, '964')) {
+            log.warn(`Invalid phone format: ${patientPhone}`);
+            return res.json({
+                success: false,
+                message: 'Invalid phone number'
+            });
+        }
+
+        // Format date for appointment
+        const appointmentText = receiptData.patient.AppDate
+            ? new Date(receiptData.patient.AppDate).toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            })
+            : 'Not scheduled';
+
+        // Compose WhatsApp message
+        const message = `Receipt - Shwan Orthodontics
+━━━━━━━━━━━━━━━━━━━━━
+
+Patient: ${receiptData.patient.PatientName}
+Date: ${new Date().toLocaleDateString('en-GB')}
+
+Amount Paid: ${Math.round(receiptData.payment.AmountPaidToday).toLocaleString('en-US')} ${receiptData.payment.Currency}
+Remaining Balance: ${Math.round(receiptData.payment.RemainingBalance).toLocaleString('en-US')} ${receiptData.payment.Currency}
+
+Appointment: ${appointmentText}
+
+Thank you for your payment!`;
+
+        log.info(`Sending receipt to ${phoneNumber} for patient ${receiptData.patient.PatientName}`);
+
+        // Send message via WhatsApp
+        const result = await whatsapp.sendSingleMessage(
+            phoneNumber,
+            message,
+            receiptData.patient.PatientName,
+            null, // appointmentId (not applicable for receipts)
+            null, // appointmentDate
+            null  // session
+        );
+
+        if (result.success) {
+            log.info(`Receipt sent successfully to ${phoneNumber} - MessageID: ${result.messageId}`);
+            res.json({
+                success: true,
+                messageId: result.messageId
+            });
+        } else {
+            log.error(`Failed to send receipt: ${result.error}`);
+            res.json({
+                success: false,
+                message: 'Failed to send message'
+            });
+        }
+
+    } catch (error) {
+        log.error(`Error sending receipt via WhatsApp: ${error.message}`);
+        return res.json({
+            success: false,
+            message: 'Internal error'
         });
     }
 });
