@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import WorkCard from './WorkCard.jsx';
 import PaymentModal from './PaymentModal.jsx';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters.js';
-import { useToast } from '../expenses/Toast.jsx';
+import { useToast, ToastContainer } from '../expenses/Toast.jsx';
 import '../../../css/components/work-card.css';
 
 /**
@@ -13,7 +13,7 @@ import '../../../css/components/work-card.css';
  */
 const WorkComponent = ({ patientId }) => {
     const navigate = useNavigate();
-    const { success, error: toastError, warning } = useToast();
+    const toast = useToast();
     const [works, setWorks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -373,18 +373,18 @@ const WorkComponent = ({ patientId }) => {
         .then(result => {
             console.log('📱 [WHATSAPP] Response data:', result);
             if (result.success) {
-                success('Receipt sent via WhatsApp!', 3000);
+                toast.success('Receipt sent via WhatsApp!', 3000);
                 console.log('✅ [WHATSAPP] Success toast shown');
             } else {
                 // Show error message to user
                 const errorMsg = result.message || 'Failed to send WhatsApp receipt';
-                toastError(errorMsg, 5000);
+                toast.error(errorMsg, 5000);
                 console.error('❌ [WHATSAPP] Error:', errorMsg);
             }
         })
         .catch((err) => {
             // Show network/server error
-            toastError('Network error: Could not send WhatsApp receipt', 5000);
+            toast.error('Network error: Could not send WhatsApp receipt', 5000);
             console.error('❌ [WHATSAPP] Network error:', err);
         });
     };
@@ -1013,6 +1013,9 @@ const WorkComponent = ({ patientId }) => {
                     </div>
                 </div>
             )}
+
+            {/* Toast Notifications */}
+            <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
         </div>
     );
 };
