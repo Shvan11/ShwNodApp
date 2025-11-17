@@ -81,12 +81,12 @@ body:has(.appointment-calendar) {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px 32px;
-    background: var(--calendar-header-bg);
-    border-bottom: none;
+    padding: 12px 24px;
+    background: linear-gradient(to right, #ffffff 0%, #f8f9fa 100%);
+    border-bottom: 2px solid #e0e7ed;
     flex-shrink: 0;
-    min-height: 90px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    min-height: 65px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     position: sticky;
     top: 50px;
     z-index: 100;
@@ -95,118 +95,115 @@ body:has(.appointment-calendar) {
 .calendar-navigation {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
 }
 
 .nav-button {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
-    height: 44px;
-    border: 2px solid rgba(255,255,255,0.3);
-    background: rgba(255,255,255,0.15);
-    backdrop-filter: blur(10px);
-    border-radius: 10px;
+    width: 36px;
+    height: 36px;
+    border: 1px solid #dee2e6;
+    background: #ffffff;
+    border-radius: 6px;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    color: var(--calendar-header-text);
-    font-size: 18px;
+    transition: all 0.2s ease;
+    color: #495057;
+    font-size: 14px;
 }
 
 .nav-button:hover:not(:disabled) {
-    background: rgba(255,255,255,0.25);
-    border-color: rgba(255,255,255,0.5);
-    transform: translateY(-2px) scale(1.05);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    background: #f8f9fa;
+    border-color: #20c997;
+    color: #20c997;
+    box-shadow: 0 2px 6px rgba(32, 201, 151, 0.15);
 }
 
 .nav-button:disabled {
-    opacity: 0.4;
+    opacity: 0.3;
     cursor: not-allowed;
-    transform: none;
+    background: #f8f9fa;
 }
 
 .week-display {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    min-width: 300px;
+    gap: 4px;
+    min-width: 250px;
 }
 
 .week-text {
     margin: 0;
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--calendar-header-text);
+    font-size: 15px;
+    font-weight: 600;
+    color: #2c3e50;
     text-align: center;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
 }
 
 .today-button {
-    padding: 6px 16px;
-    border: 2px solid rgba(255,255,255,0.4);
-    background: rgba(255,255,255,0.2);
-    backdrop-filter: blur(10px);
-    color: var(--calendar-header-text);
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
+    padding: 4px 12px;
+    border: 1px solid #dee2e6;
+    background: #ffffff;
+    color: #495057;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .today-button:hover:not(:disabled) {
-    background: rgba(255,255,255,0.3);
-    border-color: rgba(255,255,255,0.6);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    background: #20c997;
+    border-color: #20c997;
+    color: #ffffff;
+    box-shadow: 0 2px 4px rgba(32, 201, 151, 0.2);
 }
 
-/* View Controls - Modern Toggle Design */
+/* View Controls - Clean Toggle Design */
 .view-controls {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 12px;
 }
 
 .view-mode-toggle {
     display: flex;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-radius: 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
     overflow: hidden;
-    background: rgba(255,255,255,0.1);
-    backdrop-filter: blur(10px);
-    padding: 4px;
-    gap: 4px;
+    background: #f8f9fa;
+    padding: 2px;
+    gap: 2px;
 }
 
 .view-mode-btn {
-    padding: 10px 20px;
+    padding: 6px 14px;
     border: none;
     background: transparent;
-    color: var(--calendar-header-text);
+    color: #6c757d;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    font-size: 14px;
-    font-weight: 600;
-    border-radius: 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    transition: all 0.2s ease;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 4px;
+    text-transform: capitalize;
+    letter-spacing: 0.3px;
 }
 
 .view-mode-btn.active {
-    background: rgba(255,255,255,0.3);
-    color: var(--calendar-header-text);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    background: #20c997;
+    color: #ffffff;
+    box-shadow: 0 1px 3px rgba(32, 201, 151, 0.3);
 }
 
 .view-mode-btn:hover:not(.active):not(:disabled) {
-    background: rgba(255,255,255,0.15);
+    background: #e9ecef;
+    color: #495057;
 }
 
 /* Early Slots Toggle Button */
@@ -298,62 +295,143 @@ body:has(.appointment-calendar) {
     background: var(--calendar-header-bg);
 }
 
-/* Calendar Statistics - Modern Card Design */
+/* Calendar Statistics - Clean Card Design */
 .calendar-stats {
     display: flex;
-    gap: 12px;
+    gap: 8px;
 }
 
 .stat-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 12px 16px;
-    background: rgba(255,255,255,0.15);
-    backdrop-filter: blur(10px);
-    border: 2px solid rgba(255,255,255,0.2);
-    border-radius: 10px;
-    min-width: 85px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 8px 12px;
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    min-width: 70px;
+    transition: all 0.2s ease;
 }
 
 .stat-item:hover {
-    transform: translateY(-2px);
-    background: rgba(255,255,255,0.25);
-    border-color: rgba(255,255,255,0.4);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    border-color: #20c997;
+    box-shadow: 0 2px 6px rgba(32, 201, 151, 0.1);
 }
 
 .stat-label {
-    font-size: 11px;
-    color: rgba(255,255,255,0.9);
-    margin-bottom: 4px;
+    font-size: 10px;
+    color: #6c757d;
+    margin-bottom: 2px;
     text-transform: uppercase;
-    font-weight: 700;
-    letter-spacing: 0.8px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
 }
 
 .stat-value {
-    font-size: 22px;
-    font-weight: 800;
-    color: var(--calendar-header-text);
-    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    font-size: 16px;
+    font-weight: 700;
+    color: #2c3e50;
 }
 
 .stat-item.utilization .stat-value {
-    color: var(--calendar-header-text);
+    color: #20c997;
 }
 
 .stat-item.available .stat-value {
-    color: var(--calendar-header-text);
+    color: #28a745;
 }
 
 .stat-item.booked .stat-value {
-    color: var(--calendar-header-text);
+    color: #007bff;
 }
 
 .stat-item.total .stat-value {
-    color: var(--calendar-header-text);
+    color: #6c757d;
+}
+
+/* Day Headers Row - Sticky below calendar header */
+.calendar-day-headers {
+    display: grid;
+    grid-template-columns: var(--calendar-time-width) repeat(6, var(--calendar-day-width));
+    gap: var(--calendar-gap);
+    background: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    padding: 0 var(--calendar-gap);
+    position: sticky;
+    top: 115px; /* 50px universal header + 65px calendar header */
+    z-index: 90;
+    flex-shrink: 0;
+}
+
+.day-headers-time-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 8px;
+    background: #20c997;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.day-header-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 8px;
+    background: #ffffff;
+    border-left: 3px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.day-header-cell.today {
+    background: #fff9e6;
+    border-left-color: #ffc107;
+}
+
+.day-header-cell.weekend {
+    background: #f0f3f5;
+}
+
+.day-header-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.day-header-date {
+    font-size: 20px;
+    font-weight: 700;
+    color: #2c3e50;
+    line-height: 1;
+}
+
+.day-header-cell.today .day-header-name {
+    color: #f39c12;
+}
+
+.day-header-cell.today .day-header-date {
+    color: #e67e22;
+}
+
+.day-header-count {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #20c997;
+    color: white;
+    margin-top: 4px;
+}
+
+.day-header-cell.today .day-header-count {
+    background: #f39c12;
 }
 
 /* Calendar Grid - Modern Layout with Perfect Alignment */
@@ -373,34 +451,19 @@ body:has(.appointment-calendar) {
     grid-template-columns: var(--calendar-time-width) var(--calendar-day-width);
 }
 
+.calendar-day-headers.view-day {
+    grid-template-columns: var(--calendar-time-width) var(--calendar-day-width);
+}
+
 /* Time Column - Perfect Alignment with Time Slots */
 .time-column {
     display: flex;
     flex-direction: column;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #20c997;
     position: sticky;
     left: 0;
     z-index: 10;
-    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
-}
-
-.time-header {
-    height: 90px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 800;
-    color: var(--calendar-header-text);
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-bottom: 2px solid rgba(255,255,255,0.2);
-    font-size: 15px;
-    position: sticky;
-    top: 0;
-    z-index: 11;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    box-sizing: border-box;
+    box-shadow: 2px 0 6px rgba(0,0,0,0.06);
 }
 
 /* CRITICAL: Time Slot Label - Dynamic Height (JS calculates based on max appointments) */
@@ -410,16 +473,15 @@ body:has(.appointment-calendar) {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--calendar-header-text);
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
-    border-bottom: 2px solid var(--calendar-border);
+    font-size: 13px;
+    font-weight: 600;
+    color: #ffffff;
+    background: rgba(32, 201, 151, 0.95);
+    border-bottom: 1px solid rgba(255,255,255,0.2);
     user-select: none;
     white-space: nowrap;
     padding: 0;
     box-sizing: border-box;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
 
 /* Day Columns - Modern Card Design */
@@ -428,81 +490,34 @@ body:has(.appointment-calendar) {
     flex-direction: column;
     background: var(--calendar-card-bg);
     position: relative;
-    border-radius: 4px;
+    border-radius: 0;
     overflow: hidden;
 }
 
 .day-column.today {
     background: var(--calendar-today-bg);
-    box-shadow: inset 0 0 0 2px var(--calendar-today-border);
+    border-left: 3px solid var(--calendar-today-border);
 }
 
 .day-column.weekend {
     background: var(--slot-weekend);
 }
 
-/* CRITICAL: Day Header - Match Time Header Height Exactly */
-.day-header {
-    height: 90px; /* MUST match .time-header exactly */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: var(--calendar-card-bg);
-    border-bottom: 2px solid var(--calendar-border);
-    gap: 4px;
-    padding: 8px;
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    box-sizing: border-box;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+/* OLD Day Header - Hidden (now using separate calendar-day-headers) */
+.day-column .day-header {
+    display: none;
 }
 
 .day-name {
-    font-size: 13px;
-    font-weight: 700;
-    color: #6c757d;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    display: none;
 }
 
 .day-date {
-    font-size: 28px;
-    font-weight: 800;
-    color: #2c3e50;
-    line-height: 1;
+    display: none;
 }
 
 .day-appointment-count {
-    font-size: 11px;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    margin-top: 4px;
-    line-height: 1;
-    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
-}
-
-.day-column.today .day-header {
-    background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 193, 7, 0.15) 100%);
-    border-bottom-color: var(--calendar-today-border);
-}
-
-.day-column.today .day-name {
-    color: #f39c12;
-}
-
-.day-column.today .day-date {
-    color: #e67e22;
-    font-weight: 900;
-}
-
-.day-column.today .day-appointment-count {
-    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
-    color: white;
+    display: none;
 }
 
 /* CRITICAL: Time Slots - Dynamic Height (JS sets height based on max appointments per time) */
@@ -917,9 +932,22 @@ body:has(.appointment-calendar) {
         position: sticky;
         top: 50px;
         flex-direction: column;
-        gap: 12px;
-        padding: 16px;
+        gap: 8px;
+        padding: 12px;
         min-height: auto;
+    }
+
+    /* Day headers on mobile */
+    .calendar-day-headers {
+        top: 110px; /* Adjusted for mobile header height */
+    }
+
+    .day-header-date {
+        font-size: 18px;
+    }
+
+    .day-header-name {
+        font-size: 10px;
     }
 
     /* Navigation: Larger touch targets */
