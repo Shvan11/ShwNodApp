@@ -200,15 +200,15 @@ function formatDate(dateValue, pattern) {
     const monthsFull = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
     const replacements = {
-        'YYYY': date.getFullYear(),
-        'YY': String(date.getFullYear()).slice(-2),
-        'MMMM': monthsFull[date.getMonth()],
-        'MMM': months[date.getMonth()],
-        'MM': String(date.getMonth() + 1).padStart(2, '0'),
-        'DD': String(date.getDate()).padStart(2, '0'),
-        'HH': String(date.getHours()).padStart(2, '0'),
-        'mm': String(date.getMinutes()).padStart(2, '0'),
-        'ss': String(date.getSeconds()).padStart(2, '0')
+        'YYYY': date.getUTCFullYear(),
+        'YY': String(date.getUTCFullYear()).slice(-2),
+        'MMMM': monthsFull[date.getUTCMonth()],
+        'MMM': months[date.getUTCMonth()],
+        'MM': String(date.getUTCMonth() + 1).padStart(2, '0'),
+        'DD': String(date.getUTCDate()).padStart(2, '0'),
+        'HH': String(date.getUTCHours()).padStart(2, '0'),
+        'mm': String(date.getUTCMinutes()).padStart(2, '0'),
+        'ss': String(date.getUTCSeconds()).padStart(2, '0')
     };
 
     let formatted = pattern;
