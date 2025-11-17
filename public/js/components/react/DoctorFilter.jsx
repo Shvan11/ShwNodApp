@@ -55,7 +55,7 @@ const DoctorFilter = ({ selectedDoctorId, onDoctorChange, className = '' }) => {
         return (
             <div className={`doctor-filter ${className}`}>
                 <select className="doctor-filter-select" disabled>
-                    <option>Loading doctors...</option>
+                    <option>Loading...</option>
                 </select>
             </div>
         );
@@ -65,7 +65,7 @@ const DoctorFilter = ({ selectedDoctorId, onDoctorChange, className = '' }) => {
         return (
             <div className={`doctor-filter ${className}`}>
                 <select className="doctor-filter-select" disabled>
-                    <option>Error loading doctors</option>
+                    <option>Error</option>
                 </select>
             </div>
         );
@@ -73,16 +73,13 @@ const DoctorFilter = ({ selectedDoctorId, onDoctorChange, className = '' }) => {
 
     return (
         <div className={`doctor-filter ${className}`}>
-            <label htmlFor="doctor-select" className="doctor-filter-label">
-                Doctor:
-            </label>
             <select
                 id="doctor-select"
                 className="doctor-filter-select"
                 value={selectedDoctorId || ''}
                 onChange={handleChange}
             >
-                <option value="">All Doctors</option>
+                <option value="">Filter by Doctor...</option>
                 {doctors.map((doctor) => (
                     <option key={doctor.ID} value={doctor.ID}>
                         {doctor.employeeName}

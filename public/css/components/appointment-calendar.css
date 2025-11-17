@@ -81,11 +81,11 @@ body:has(.appointment-calendar) {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 20px;
+    padding: 6px 16px;
     background: linear-gradient(to right, #ffffff 0%, #f8f9fa 100%);
     border-bottom: 2px solid #e0e7ed;
     flex-shrink: 0;
-    min-height: 50px;
+    height: 44px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     position: sticky;
     top: 50px;
@@ -246,19 +246,10 @@ body:has(.appointment-calendar) {
 .doctor-filter {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 0;
-    background: transparent;
-    border: none;
-    transition: all 0.2s ease;
 }
 
 .doctor-filter-label {
-    font-size: 12px;
-    font-weight: 500;
-    color: #6c757d;
-    white-space: nowrap;
-    margin: 0;
+    display: none;
 }
 
 .doctor-filter-select {
@@ -267,11 +258,11 @@ body:has(.appointment-calendar) {
     border-radius: 4px;
     background: white;
     color: #495057;
-    font-size: 12px;
+    font-size: 11px;
     cursor: pointer;
     transition: all 0.2s ease;
-    min-width: 120px;
-    height: 28px;
+    min-width: 110px;
+    height: 26px;
     outline: none;
 }
 
@@ -353,8 +344,8 @@ body:has(.appointment-calendar) {
     border-bottom: 2px solid #dee2e6;
     padding: 0 var(--calendar-gap);
     position: sticky;
-    top: 100px; /* 50px universal header + 50px calendar header */
-    z-index: 90;
+    top: 94px; /* 50px universal header + 44px calendar header */
+    z-index: 95;
     flex-shrink: 0;
 }
 
@@ -934,7 +925,7 @@ body:has(.appointment-calendar) {
 
     /* Day headers on mobile */
     .calendar-day-headers {
-        top: 95px; /* 50px universal header + ~45px mobile calendar header */
+        top: 90px; /* 50px universal header + ~40px mobile calendar header */
     }
 
     .day-header-date {
@@ -947,6 +938,12 @@ body:has(.appointment-calendar) {
 
     .day-header-cell {
         padding: 6px 4px;
+    }
+
+    /* Calendar header on mobile */
+    .calendar-header {
+        height: 40px;
+        padding: 6px 12px;
     }
 
     /* Navigation: Larger touch targets */
