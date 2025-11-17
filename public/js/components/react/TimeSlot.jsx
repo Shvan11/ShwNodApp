@@ -55,14 +55,12 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view',
     
     // Click handler
     const handleClick = useCallback((event) => {
-        // Don't allow clicks on full slots
-        if (slotStatus === 'full') return;
-
         // In selection mode, only allow clicking on available slots
         if (mode === 'selection' && slotStatus !== 'available') {
             return;
         }
 
+        // In view mode, always allow clicks (for context menu)
         onClick(slotData, event);
     }, [onClick, slotData, slotStatus, mode]);
     

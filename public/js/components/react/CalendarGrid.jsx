@@ -55,22 +55,22 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
 
         // EXACT calculation matching CSS values (appointment-calendar.css):
         // - .time-slot padding: 10px (top/bottom = 20px total) [line 525]
-        // - .appointment-content.multiple padding: 2px (top/bottom = 4px total) [line 632]
-        // - .appointment-count: font 12px + padding 6px top/bottom = ~26px [lines 635-647]
-        // - Content gap: 8px (gap between count header and list) [line 630]
-        // - .appointment-item: FIXED height 32px (no wrapping, truncated text) [line 666]
-        // - .appointments-list gap: 4px between items [line 652]
-        // - .appointments-list bottom padding: 8px [line 654]
+        // - .appointment-content.multiple padding: 2px (top/bottom = 4px total) [line 622]
+        // - .appointment-count: font 12px + padding 6px top/bottom = ~26px [lines 625-636]
+        // - Content gap: 8px (gap between count header and list) [line 620]
+        // - .appointment-item: FIXED height 40px (4px padding + 16px name + 16px detail + 4px padding) [line 656]
+        // - .appointments-list gap: 4px between items [line 642]
+        // - .appointments-list bottom padding: 8px [line 644]
         //
-        // Formula: height = 62 + (n × 36)
+        // Formula: height = 62 + (n × 44)
         // Where: 62 = timeSlotPadding(20) + contentPadding(4) + countHeader(26) + contentGap(8) + listBottomPadding(8) - itemGap(4)
-        //        36 = itemHeight(32) + itemGap(4)
+        //        44 = itemHeight(40) + itemGap(4)
 
         const timeSlotPadding = 20;
         const contentPadding = 4;
         const countHeaderHeight = 26;
         const contentGap = 8;
-        const itemHeight = 32; // FIXED HEIGHT - matches CSS line 666
+        const itemHeight = 40; // FIXED HEIGHT - matches CSS line 656 (4+16+16+4=40px)
         const itemGap = 4;
         const listBottomPadding = 8;
 
