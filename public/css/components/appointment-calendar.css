@@ -87,9 +87,11 @@ body:has(.appointment-calendar) {
     flex-shrink: 0;
     height: 44px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    position: sticky;
+    position: fixed;
     top: 50px;
-    z-index: 100;
+    left: 0;
+    right: 0;
+    z-index: 99;
 }
 
 .calendar-navigation {
@@ -266,6 +268,11 @@ body:has(.appointment-calendar) {
     outline: none;
 }
 
+.doctor-filter-select option:first-child {
+    color: #adb5bd;
+    font-style: italic;
+}
+
 .doctor-filter-select:hover:not(:disabled) {
     border-color: #20c997;
 }
@@ -353,7 +360,7 @@ body:has(.appointment-calendar) {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 8px 6px;
+    padding: 6px 4px;
     background: #20c997;
     color: #ffffff;
     font-size: 11px;
@@ -367,10 +374,11 @@ body:has(.appointment-calendar) {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 8px 6px;
+    padding: 6px 4px;
     background: #ffffff;
     border-left: 3px solid transparent;
     transition: all 0.2s ease;
+    gap: 3px;
 }
 
 .day-header-cell.today {
@@ -382,27 +390,15 @@ body:has(.appointment-calendar) {
     background: #f0f3f5;
 }
 
-.day-header-name {
-    font-size: 11px;
+.day-header-date-line {
+    font-size: 12px;
     font-weight: 600;
-    color: #6c757d;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 4px;
-}
-
-.day-header-date {
-    font-size: 20px;
-    font-weight: 700;
     color: #2c3e50;
     line-height: 1;
+    white-space: nowrap;
 }
 
-.day-header-cell.today .day-header-name {
-    color: #f39c12;
-}
-
-.day-header-cell.today .day-header-date {
+.day-header-cell.today .day-header-date-line {
     color: #e67e22;
 }
 
@@ -413,11 +409,20 @@ body:has(.appointment-calendar) {
     border-radius: 10px;
     background: #20c997;
     color: white;
-    margin-top: 4px;
+    line-height: 1;
 }
 
 .day-header-cell.today .day-header-count {
     background: #f39c12;
+}
+
+/* Hide old day header elements */
+.day-header-name {
+    display: none;
+}
+
+.day-header-date {
+    display: none;
 }
 
 /* Calendar Grid - Modern Layout with Perfect Alignment */
@@ -913,37 +918,27 @@ body:has(.appointment-calendar) {
         height: 100vh;
     }
 
-    /* Calendar header stays sticky on mobile */
+    /* Calendar header on mobile */
     .calendar-header {
-        position: sticky;
+        position: fixed;
         top: 50px;
+        height: 40px;
+        padding: 6px 12px;
         flex-direction: column;
-        gap: 8px;
-        padding: 12px;
-        min-height: auto;
+        gap: 6px;
     }
 
     /* Day headers on mobile */
     .calendar-day-headers {
-        top: 90px; /* 50px universal header + ~40px mobile calendar header */
+        top: 90px; /* 50px universal header + 40px mobile calendar header */
     }
 
-    .day-header-date {
-        font-size: 16px;
-    }
-
-    .day-header-name {
-        font-size: 9px;
+    .day-header-date-line {
+        font-size: 11px;
     }
 
     .day-header-cell {
-        padding: 6px 4px;
-    }
-
-    /* Calendar header on mobile */
-    .calendar-header {
-        height: 40px;
-        padding: 6px 12px;
+        padding: 5px 3px;
     }
 
     /* Navigation: Larger touch targets */
