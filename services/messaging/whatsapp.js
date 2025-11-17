@@ -1626,53 +1626,186 @@ class WhatsAppService extends EventEmitter {
     return status;
   }
 
-  // Check for existing WhatsApp session files
+  /**
+   * SESSION VALIDATION FIX: Comprehensive session validation with integrity checks
+   * Returns: boolean (simple) for backward compatibility
+   * Logs detailed validation info
+   */
   async checkExistingSession() {
     try {
       const fs = await import('fs');
       const path = await import('path');
-      
-      // Check for session directory and key files
+
       const sessionPath = '.wwebjs_auth/session-client/Default';
       const localStoragePath = path.default.join(sessionPath, 'Local Storage/leveldb');
       const indexedDBPath = path.default.join(sessionPath, 'IndexedDB');
-      
-      // Check if critical session files exist
-      if (fs.default.existsSync(localStoragePath) && fs.default.existsSync(indexedDBPath)) {
-        const localStorageFiles = fs.default.readdirSync(localStoragePath);
-        const hasValidLocalStorage = localStorageFiles.some(file => file.endsWith('.log') || file.endsWith('.ldb'));
-        
-        if (hasValidLocalStorage) {
-          logger.whatsapp.debug('Valid session files found');
-          return true;
+
+      // Check 1: Directories exist
+      if (!fs.default.existsSync(localStoragePath)) {
+        logger.whatsapp.debug('Session validation failed: local storage missing');
+        return false;
+      }
+
+      if (!fs.default.existsSync(indexedDBPath)) {
+        logger.whatsapp.debug('Session validation failed: indexed DB missing');
+        return false;
+      }
+
+      // Check 2: Has data files
+      const localStorageFiles = fs.default.readdirSync(localStoragePath);
+      const dataFiles = localStorageFiles.filter(f =>
+        f.endsWith('.ldb') || f.endsWith('.log')
+      );
+
+      if (dataFiles.length === 0) {
+        logger.whatsapp.debug('Session validation failed: no data files found');
+        return false;
+      }
+
+      // Check 3: Files are not too old (30 days)
+      const maxAge = 30 * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      let newestFile = null;
+
+      for (const file of dataFiles) {
+        const filePath = path.default.join(localStoragePath, file);
+        const stats = fs.default.statSync(filePath);
+        const age = now - stats.mtimeMs;
+
+        if (!newestFile || age < (now - newestFile.mtime)) {
+          newestFile = { name: file, mtime: stats.mtimeMs, age };
+        }
+
+        if (age > maxAge) {
+          logger.whatsapp.warn('Session validation failed: files too old', {
+            file,
+            ageDays: Math.round(age / 1000 / 60 / 60 / 24)
+          });
+          return false;
         }
       }
-      
-      logger.whatsapp.debug('No valid session files found');
-      return false;
+
+      // Check 4: Files are not empty
+      let totalSize = 0;
+      for (const file of dataFiles) {
+        const filePath = path.default.join(localStoragePath, file);
+        const stats = fs.default.statSync(filePath);
+
+        if (stats.size === 0) {
+          logger.whatsapp.warn('Session validation failed: empty file detected', { file });
+          return false;
+        }
+
+        // Check if file is readable
+        try {
+          fs.default.accessSync(filePath, fs.constants.R_OK);
+          totalSize += stats.size;
+        } catch (accessError) {
+          logger.whatsapp.warn('Session validation failed: file not readable', { file });
+          return false;
+        }
+      }
+
+      // Check 5: Reasonable total size (at least 1KB)
+      if (totalSize < 1024) {
+        logger.whatsapp.warn('Session validation failed: total size too small', {
+          totalSize,
+          totalSizeKB: Math.round(totalSize / 1024)
+        });
+        return false;
+      }
+
+      // All checks passed
+      logger.whatsapp.debug('Session validation passed', {
+        fileCount: dataFiles.length,
+        totalSizeKB: Math.round(totalSize / 1024),
+        ageMinutes: newestFile ? Math.round((now - newestFile.mtime) / 1000 / 60) : 0
+      });
+
+      return true;
+
     } catch (error) {
-      logger.whatsapp.warn('Error checking session files', error);
+      logger.whatsapp.error('Error validating session', error);
       return false;
     }
   }
 
-  // Clean up invalid session files
-  async cleanupInvalidSession() {
-    try {
-      const fs = await import('fs');
-      
-      const sessionPath = '.wwebjs_auth/session-client';
-      
-      if (fs.default.existsSync(sessionPath)) {
-        // Remove the entire session directory to ensure clean state
-        fs.default.rmSync(sessionPath, { recursive: true, force: true });
-        logger.whatsapp.info('Invalid session files cleaned up successfully');
-      } else {
-        logger.whatsapp.debug('No session directory to clean up');
-      }
-    } catch (error) {
-      logger.whatsapp.error('Error cleaning up session files', error);
+  /**
+   * SESSION CLEANUP FIX: Clean up invalid session with retry logic for Windows
+   * Handles locked files by retrying with exponential backoff
+   */
+  async cleanupInvalidSession(maxRetries = 3) {
+    const fs = await import('fs');
+    const sessionPath = '.wwebjs_auth/session-client';
+
+    if (!fs.default.existsSync(sessionPath)) {
+      logger.whatsapp.debug('No session directory to clean up');
+      return { success: true, reason: 'no_session' };
     }
+
+    // Try to backup session before deletion (for debugging)
+    try {
+      const backupPath = `.wwebjs_auth/session-client-backup-${Date.now()}`;
+      await fs.promises.rename(sessionPath, backupPath);
+      logger.whatsapp.info('Session backed up before cleanup', { backupPath });
+
+      // Delete backup after a delay (keep for 1 hour)
+      setTimeout(() => {
+        try {
+          fs.default.rmSync(backupPath, { recursive: true, force: true });
+          logger.whatsapp.debug('Session backup deleted', { backupPath });
+        } catch (err) {
+          logger.whatsapp.debug('Could not delete backup', { error: err.message });
+        }
+      }, 60 * 60 * 1000);
+
+      return { success: true, reason: 'backed_up_and_removed' };
+
+    } catch (renameError) {
+      // Backup failed, try direct deletion with retry
+      logger.whatsapp.warn('Could not backup session, attempting direct deletion', {
+        error: renameError.message
+      });
+    }
+
+    // Retry deletion with exponential backoff
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        logger.whatsapp.info(`Attempting session cleanup (attempt ${attempt}/${maxRetries})`);
+
+        // Use force option to handle permissions issues
+        fs.default.rmSync(sessionPath, {
+          recursive: true,
+          force: true,
+          maxRetries: 5,
+          retryDelay: 1000
+        });
+
+        logger.whatsapp.info('Session cleaned up successfully', { attempt });
+        return { success: true, reason: 'deleted', attempt };
+
+      } catch (error) {
+        logger.whatsapp.error(`Session cleanup attempt ${attempt} failed`, {
+          error: error.message,
+          code: error.code
+        });
+
+        if (attempt < maxRetries) {
+          // Wait before retry (exponential backoff)
+          const delay = 1000 * Math.pow(2, attempt - 1);
+          logger.whatsapp.info(`Waiting ${delay}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          logger.whatsapp.error('Session cleanup failed after all retries', {
+            maxRetries,
+            error: error.message
+          });
+          return { success: false, reason: 'cleanup_failed', error: error.message };
+        }
+      }
+    }
+
+    return { success: false, reason: 'max_retries_exceeded' };
   }
 }
 
