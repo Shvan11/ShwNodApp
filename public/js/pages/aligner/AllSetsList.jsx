@@ -229,26 +229,52 @@ const AllSetsList = () => {
                                     </td>
                                     <td style={cellStyle}>{set.DoctorName === 'Admin' ? set.DoctorName : `Dr. ${set.DoctorName}`}</td>
                                     <td style={cellStyle}>
-                                        <span style={{
-                                            backgroundColor: '#e0e7ff',
-                                            color: '#3730a3',
-                                            padding: '0.25rem 0.5rem',
-                                            borderRadius: '4px',
-                                            fontWeight: '600'
-                                        }}>
-                                            Set {set.SetSequence}
-                                        </span>
+                                        {set.SetSequence != null ? (
+                                            <span style={{
+                                                backgroundColor: '#e0e7ff',
+                                                color: '#3730a3',
+                                                padding: '0.25rem 0.5rem',
+                                                borderRadius: '4px',
+                                                fontWeight: '600'
+                                            }}>
+                                                Set {set.SetSequence}
+                                            </span>
+                                        ) : (
+                                            <span style={{
+                                                backgroundColor: '#f3f4f6',
+                                                color: '#6b7280',
+                                                padding: '0.25rem 0.5rem',
+                                                borderRadius: '4px',
+                                                fontWeight: '500',
+                                                fontStyle: 'italic'
+                                            }}>
+                                                No active set
+                                            </span>
+                                        )}
                                     </td>
                                     <td style={cellStyle}>
-                                        <span style={{
-                                            backgroundColor: '#ddd6fe',
-                                            color: '#5b21b6',
-                                            padding: '0.25rem 0.5rem',
-                                            borderRadius: '4px',
-                                            fontWeight: '600'
-                                        }}>
-                                            Batch {set.BatchSequence}
-                                        </span>
+                                        {set.BatchSequence != null ? (
+                                            <span style={{
+                                                backgroundColor: '#ddd6fe',
+                                                color: '#5b21b6',
+                                                padding: '0.25rem 0.5rem',
+                                                borderRadius: '4px',
+                                                fontWeight: '600'
+                                            }}>
+                                                Batch {set.BatchSequence}
+                                            </span>
+                                        ) : (
+                                            <span style={{
+                                                backgroundColor: '#f3f4f6',
+                                                color: '#6b7280',
+                                                padding: '0.25rem 0.5rem',
+                                                borderRadius: '4px',
+                                                fontWeight: '500',
+                                                fontStyle: 'italic'
+                                            }}>
+                                                No active batch
+                                            </span>
+                                        )}
                                     </td>
                                     <td style={cellStyle}>{formatDate(set.DeliveredToPatientDate)}</td>
                                     <td style={cellStyle}>{formatDate(set.NextBatchReadyDate)}</td>
