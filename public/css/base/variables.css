@@ -73,6 +73,9 @@
     --color-yellow: #FFBC00;
     --color-yellow-border: #FFCB00;
     --color-yellow-hover: #F0B200;
+    --color-teal: #20c997;
+    --color-dark-slate: #2c3e50;
+    --color-light-slate: #495057;
 
     /* Surface colors */
     --surface: #ffffff;
@@ -87,6 +90,7 @@
     /* Extended border colors */
     --border: #dee2e6;
     --border-light: #e9ecef;
+    --border-accent: #e0e7ed;
 
     /* Extended shadow system */
     --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
@@ -105,6 +109,11 @@
 
     --info-dark: #138496;
     --info-light: #d1ecf1;
+
+    /* Calendar-specific colors */
+    --calendar-today-highlight: #fff9e6;
+    --calendar-weekend-bg: #f0f3f5;
+    --calendar-header-gradient: linear-gradient(to right, #ffffff 0%, #f8f9fa 100%);
 
     /* Breakpoints for responsive design */
     --breakpoint-xs: 375px;

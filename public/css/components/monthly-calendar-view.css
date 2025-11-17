@@ -12,16 +12,16 @@
     height: 100%;
     background: var(--calendar-background, #ffffff);
     overflow: auto;
-    padding: 16px;
+    padding: var(--spacing-md);
 }
 
 /* Month Grid Header - Day Names */
 .month-grid-header {
     display: grid;
     grid-template-columns: repeat(6, 1fr); /* 6 days: Sat-Thu */
-    gap: 8px;
-    margin-bottom: 8px;
-    padding: 12px 0;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+    padding: var(--spacing-md) 0;
     border-bottom: 2px solid var(--calendar-border, #e0e0e0);
 }
 
@@ -29,7 +29,7 @@
     text-align: center;
     font-weight: 700;
     font-size: 14px;
-    color: var(--text-dark, #333);
+    color: var(--text-primary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     padding: 8px;
@@ -39,7 +39,7 @@
 .month-grid-body {
     display: grid;
     grid-template-columns: repeat(6, 1fr); /* 6 days: Sat-Thu */
-    gap: 8px;
+    gap: var(--spacing-sm);
     flex: 1;
     align-content: start;
 }
@@ -48,10 +48,10 @@
 .month-day-cell {
     position: relative;
     min-height: 100px;
-    border: 1px solid var(--calendar-border, #e0e0e0);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 8px;
-    background: white;
+    background: var(--color-white);
     cursor: pointer;
     transition: all 0.2s ease;
     overflow: visible;
@@ -67,8 +67,8 @@
 
 /* Today Highlight with Pulsing Animation */
 .month-day-cell.today {
-    background: linear-gradient(135deg, #fff8e1 0%, #ffffff 100%);
-    border: 2px solid var(--primary-color, #2196f3);
+    background: linear-gradient(135deg, var(--calendar-today-highlight) 0%, var(--color-white) 100%);
+    border: 2px solid var(--primary-color);
     box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.1);
 }
 
@@ -87,7 +87,7 @@
 
 /* Weekend Styling */
 .month-day-cell.weekend {
-    background: linear-gradient(135deg, #fafafa 0%, #ffffff 100%);
+    background: linear-gradient(135deg, var(--surface-elevated) 0%, var(--color-white) 100%);
 }
 
 /* Other Month Days (Dimmed) */
@@ -105,17 +105,17 @@
 .month-day-number {
     font-size: 18px;
     font-weight: 700;
-    color: var(--text-dark, #333);
+    color: var(--text-primary);
     margin-bottom: 6px;
     min-height: 24px;
 }
 
 .month-day-cell.today .month-day-number {
-    color: var(--primary-color, #2196f3);
+    color: var(--primary-color);
     font-size: 20px;
 }
 
-/* Appointment Badge - Creative Circular Design */
+/* Appointment Badge - Clean Neutral Design */
 .appointment-badge {
     position: absolute;
     top: 8px;
@@ -128,7 +128,9 @@
     justify-content: center;
     font-size: 13px;
     font-weight: 700;
-    border: 2px solid;
+    background: var(--primary-color);
+    color: var(--color-white);
+    border: 2px solid var(--primary-color);
     transition: all 0.3s ease;
     animation: fadeIn 0.5s ease-out;
 }
@@ -146,25 +148,7 @@
 
 .appointment-badge:hover {
     transform: scale(1.15);
-}
-
-/* Utilization Bar at Bottom */
-.utilization-bar {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: rgba(0, 0, 0, 0.05);
-    border-bottom-left-radius: 8px;
-    border-bottom-right-radius: 8px;
-    overflow: hidden;
-}
-
-.utilization-fill {
-    height: 100%;
-    transition: width 0.5s ease-out;
-    background: linear-gradient(90deg, #4caf50 0%, #ff9800 50%, #f44336 100%);
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
 }
 
 /* Hover Tooltip */
@@ -174,14 +158,14 @@
     left: 50%;
     transform: translateX(-50%);
     margin-top: 8px;
-    background: white;
-    border: 1px solid var(--calendar-border, #e0e0e0);
+    background: var(--color-white);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 12px;
     min-width: 250px;
     max-width: 300px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-    z-index: 1000;
+    z-index: var(--z-index-tooltip);
     animation: tooltipSlideIn 0.2s ease-out;
 }
 
@@ -213,10 +197,10 @@
 .tooltip-header {
     font-weight: 700;
     font-size: 14px;
-    color: var(--text-dark, #333);
+    color: var(--text-primary);
     margin-bottom: 8px;
     padding-bottom: 8px;
-    border-bottom: 1px solid var(--calendar-border, #e0e0e0);
+    border-bottom: 1px solid var(--border);
 }
 
 .tooltip-stats {
@@ -233,20 +217,20 @@
 
 .tooltip-stat .stat-label {
     font-size: 11px;
-    color: var(--text-medium, #666);
+    color: var(--text-secondary);
     text-transform: uppercase;
 }
 
 .tooltip-stat .stat-value {
     font-size: 16px;
     font-weight: 700;
-    color: var(--primary-color, #2196f3);
+    color: var(--primary-color);
 }
 
 .tooltip-section-title {
     font-size: 12px;
     font-weight: 600;
-    color: var(--text-medium, #666);
+    color: var(--text-secondary);
     margin-bottom: 6px;
     text-transform: uppercase;
 }
@@ -271,17 +255,17 @@
 
 .apt-time {
     font-weight: 600;
-    color: var(--text-dark, #333);
+    color: var(--text-primary);
     min-width: 45px;
 }
 
 .apt-name {
-    color: var(--text-medium, #666);
+    color: var(--text-secondary);
 }
 
 .tooltip-more {
     font-size: 12px;
-    color: var(--text-medium, #666);
+    color: var(--text-secondary);
     font-style: italic;
     text-align: center;
     padding: 4px 0;
@@ -289,10 +273,10 @@
 
 .tooltip-action {
     font-size: 11px;
-    color: var(--primary-color, #2196f3);
+    color: var(--primary-color);
     text-align: center;
     padding-top: 8px;
-    border-top: 1px solid var(--calendar-border, #e0e0e0);
+    border-top: 1px solid var(--border);
     font-weight: 600;
 }
 
@@ -303,7 +287,7 @@
     justify-content: center;
     min-height: 400px;
     font-size: 16px;
-    color: var(--text-medium, #666);
+    color: var(--text-secondary);
 }
 
 /* Responsive Design */
