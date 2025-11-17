@@ -117,7 +117,7 @@
             left: 0;
             right: 0;
             z-index: 1000;
-            height: 50px;
+            min-height: 50px;
         }
 
         /* App container - offset for fixed header */
@@ -125,6 +125,37 @@
             padding: 0;
             margin: 0;
             padding-top: 50px;
+        }
+
+        /* Mobile responsive padding to prevent header overlap */
+        @media (max-width: 1024px) {
+            #app-container {
+                padding-top: 80px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            #app-container {
+                padding-top: 110px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            #app-container {
+                padding-top: 100px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #app-container {
+                padding-top: 95px;
+            }
+        }
+
+        @media (max-width: 375px) {
+            #app-container {
+                padding-top: 90px;
+            }
         }
 
         /* Smooth transitions between routes */
