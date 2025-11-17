@@ -162,3 +162,12 @@ public/photoswipe
 
 # MCP Configuration (may contain sensitive connection strings)
 .mcp.json
+
+# Database files (SQLite, session storage, runtime state)
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+data/*.json
+data/sessions.db
+data/reverse-sync-state.json
