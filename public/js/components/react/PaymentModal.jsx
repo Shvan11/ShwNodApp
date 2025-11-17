@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import '../../../css/components/invoice-form.css'
 import { formatNumber, parseFormattedNumber, formatCurrency as formatCurrencyUtil } from '../../utils/formatters.js'
-import { useToast } from '../expenses/Toast.jsx'
+import { useToast, ToastContainer } from '../expenses/Toast.jsx'
 
 /**
  * Payment Modal Component
@@ -10,7 +10,7 @@ import { useToast } from '../expenses/Toast.jsx'
  * Uses useCallback for event handlers to prevent breaking memoization
  */
 const PaymentModal = ({ workData, onClose, onSuccess }) => {
-    const { success, error, warning } = useToast();
+    const toast = useToast();
     const [loading, setLoading] = useState(false);
     const [exchangeRate, setExchangeRate] = useState(null);
     const [exchangeRateError, setExchangeRateError] = useState(false);
@@ -539,15 +539,15 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
             .then(result => {
                 console.log('📱 [PAYMENT MODAL] Response data:', result);
                 if (result.success) {
-                    success('Receipt sent via WhatsApp!', 3000);
+                    toast.success('Receipt sent via WhatsApp!', 3000);
                     console.log('✅ [PAYMENT MODAL] Success toast shown');
                 } else {
-                    warning(result.message || 'Failed to send WhatsApp', 3000);
+                    toast.warning(result.message || 'Failed to send WhatsApp', 3000);
                     console.warn('⚠️ [PAYMENT MODAL] Warning:', result.message);
                 }
             })
             .catch(err => {
-                error('WhatsApp error: ' + err.message, 3000);
+                toast.error('WhatsApp error: ' + err.message, 3000);
                 console.error('❌ [PAYMENT MODAL] Network error:', err);
             });
         } catch (err) {
@@ -1187,6 +1187,8 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
             </div>
         </div>
 
+            {/* Toast Notifications */}
+            <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
         </>
     );
 };
