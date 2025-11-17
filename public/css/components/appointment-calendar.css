@@ -76,19 +76,19 @@ body:has(.appointment-calendar) {
     bottom: 0;
 }
 
-/* Calendar Header - Sticky Design (sticks below universal header) */
+/* Calendar Header - Fixed below universal header */
 .calendar-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 6px 16px;
+    padding: 4px 16px;
     background: linear-gradient(to right, #ffffff 0%, #f8f9fa 100%);
     border-bottom: 2px solid #e0e7ed;
     flex-shrink: 0;
-    height: 44px;
+    height: 40px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     position: fixed;
-    top: 50px;
+    top: 52px;
     left: 0;
     right: 0;
     z-index: 99;
@@ -104,15 +104,15 @@ body:has(.appointment-calendar) {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     border: 1px solid #dee2e6;
     background: #ffffff;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s ease;
     color: #495057;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .nav-button:hover:not(:disabled) {
@@ -138,7 +138,7 @@ body:has(.appointment-calendar) {
 
 .week-text {
     margin: 0;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     color: #2c3e50;
     text-align: center;
@@ -184,13 +184,13 @@ body:has(.appointment-calendar) {
 }
 
 .view-mode-btn {
-    padding: 6px 14px;
+    padding: 5px 12px;
     border: none;
     background: transparent;
     color: #6c757d;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
     border-radius: 4px;
     text-transform: capitalize;
@@ -351,7 +351,7 @@ body:has(.appointment-calendar) {
     border-bottom: 2px solid #dee2e6;
     padding: 0 var(--calendar-gap);
     position: sticky;
-    top: 94px; /* 50px universal header + 44px calendar header */
+    top: 92px; /* 52px calendar header top + 40px calendar header height */
     z-index: 95;
     flex-shrink: 0;
 }
@@ -921,16 +921,16 @@ body:has(.appointment-calendar) {
     /* Calendar header on mobile */
     .calendar-header {
         position: fixed;
-        top: 50px;
-        height: 40px;
-        padding: 6px 12px;
+        top: 52px;
+        height: 38px;
+        padding: 4px 10px;
         flex-direction: column;
-        gap: 6px;
+        gap: 4px;
     }
 
     /* Day headers on mobile */
     .calendar-day-headers {
-        top: 90px; /* 50px universal header + 40px mobile calendar header */
+        top: 90px; /* 52px + 38px mobile calendar header */
     }
 
     .day-header-date-line {
