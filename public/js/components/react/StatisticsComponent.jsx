@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Chart from 'chart.js/auto';
-import UniversalHeader from './UniversalHeader.jsx';
 import DailyInvoicesModal from './DailyInvoicesModal.jsx';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters.js';
 
@@ -243,7 +242,6 @@ const StatisticsComponent = () => {
 
     return (
         <>
-            <UniversalHeader />
             <div className="statistics-container">
                 {/* Page Title */}
                 <div className="page-title">
