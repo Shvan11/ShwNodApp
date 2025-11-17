@@ -58,10 +58,7 @@ const AllSetsList = () => {
             filtered = filtered.filter(s => {
                 const name = (s.PatientName || '').toLowerCase();
                 const doctor = (s.DoctorName || '').toLowerCase();
-                const phone = (s.Phone || '').toLowerCase();
-                const id = (s.patientID || '').toLowerCase();
-                return name.includes(query) || doctor.includes(query) ||
-                       phone.includes(query) || id.includes(query);
+                return name.includes(query) || doctor.includes(query);
             });
         }
 
@@ -120,7 +117,7 @@ const AllSetsList = () => {
                     <i className="fas fa-filter filter-icon"></i>
                     <input
                         type="text"
-                        placeholder="Filter by patient name, doctor, phone, or ID..."
+                        placeholder="Filter by patient name or doctor..."
                         value={filter}
                         onChange={(e) => setFilter(e.target.value)}
                     />
@@ -229,11 +226,6 @@ const AllSetsList = () => {
                                         <div style={{ fontWeight: '600', color: '#1f2937' }}>
                                             {set.PatientName}
                                         </div>
-                                        {set.patientID && (
-                                            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                                                ID: {set.patientID}
-                                            </div>
-                                        )}
                                     </td>
                                     <td style={cellStyle}>{set.DoctorName === 'Admin' ? set.DoctorName : `Dr. ${set.DoctorName}`}</td>
                                     <td style={cellStyle}>

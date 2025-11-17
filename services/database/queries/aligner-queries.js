@@ -208,12 +208,9 @@ export async function getAllAlignerSets() {
             v.NextBatchReadyDate,
             v.Notes,
             v.NextBatchPresent,
-            ad.DoctorName,
-            p.patientID,
-            p.Phone
+            ad.DoctorName
         FROM dbo.v_allsets v
         INNER JOIN AlignerDoctors ad ON v.AlignerDrID = ad.DrID
-        LEFT JOIN tblpatients p ON v.PersonID = p.PersonID
         ORDER BY
             CASE WHEN v.NextBatchPresent = 'False' THEN 0 ELSE 1 END,
             v.NextBatchReadyDate ASC,
@@ -237,9 +234,7 @@ export async function getAllAlignerSets() {
             NextBatchReadyDate: columns[10].value,
             Notes: columns[11].value,
             NextBatchPresent: columns[12].value,
-            DoctorName: columns[13].value,
-            patientID: columns[14].value,
-            Phone: columns[15].value
+            DoctorName: columns[13].value
         })
     );
 }
