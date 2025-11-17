@@ -120,10 +120,16 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
                         return total + validAppointments.length;
                     }, 0);
 
+                    // Format date as "Monday 17/11"
+                    const dateObj = new Date(day.date);
+                    const dayName = day.dayName;
+                    const dayNumber = dateObj.getDate();
+                    const month = dateObj.getMonth() + 1;
+                    const dateText = `${dayName} ${dayNumber}/${month}`;
+
                     return (
                         <div key={day.date} className={dayClasses}>
-                            <div className="day-header-name">{day.dayName}</div>
-                            <div className="day-header-date">{new Date(day.date).getDate()}</div>
+                            <div className="day-header-date-line">{dateText}</div>
                             {totalAppointments > 0 && (
                                 <div className="day-header-count" title={`${totalAppointments} appointment${totalAppointments !== 1 ? 's' : ''}`}>
                                     {totalAppointments}
