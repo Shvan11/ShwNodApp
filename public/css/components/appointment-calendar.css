@@ -529,53 +529,47 @@ body:has(.appointment-calendar) {
 }
 
 .time-slot.available {
-    background: var(--slot-available);
-    border-left: 4px solid var(--slot-available-border);
+    /* No background color - clean neutral design */
+    border-left: 3px solid var(--success-color);
 }
 
 .time-slot.available:hover {
-    background: var(--slot-available-hover);
     box-shadow: var(--hover-shadow);
-    transform: translateX(4px);
-    border-left-width: 6px;
+    transform: translateX(2px);
 }
 
 .time-slot.booked {
-    background: var(--slot-booked);
-    border-left: 4px solid var(--slot-booked-border);
+    /* No background color - clean neutral design */
+    border-left: 3px solid var(--primary-color);
 }
 
 .time-slot.booked:hover {
-    background: var(--slot-booked-hover);
     box-shadow: var(--hover-shadow);
     transform: translateX(2px);
 }
 
 /* Full slots - Maximum capacity reached */
 .time-slot.full {
-    background: var(--slot-full);
-    border-left: 4px solid var(--slot-full-border);
-    border-right: 4px solid var(--slot-full-border);
-    cursor: not-allowed;
-    opacity: 0.9;
+    /* No background color - clean neutral design */
+    border-left: 3px solid var(--warning-color);
+    /* Keep cursor pointer - all slots are clickable */
 }
 
 .time-slot.full:hover {
-    transform: none;
-    box-shadow: none;
-    background: var(--slot-full);
+    box-shadow: var(--hover-shadow);
+    transform: translateX(2px);
 }
 
 .time-slot.past {
-    background: var(--slot-past);
-    cursor: not-allowed;
+    /* No background color - clean neutral design */
     opacity: 0.5;
-    border-left: 4px solid var(--calendar-border-light);
+    border-left: 3px solid var(--border);
+    /* Keep cursor pointer - all slots are clickable */
 }
 
 .time-slot.past:hover {
-    transform: none;
-    box-shadow: none;
+    box-shadow: var(--hover-shadow);
+    transform: translateX(2px);
 }
 
 .time-slot.selected {
