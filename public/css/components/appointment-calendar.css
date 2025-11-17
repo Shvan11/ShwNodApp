@@ -30,10 +30,6 @@
     --slot-booked: #ebf5fb;
     --slot-booked-hover: #d6eaf8;
     --slot-booked-border: #5dade2;
-    --slot-full: #fef5e7;
-    --slot-full-border: #f39c12;
-    --slot-past: #f8f9fa;
-    --slot-past-text: #adb5bd;
     --slot-selected: #fff3cd;
     --slot-selected-border: #ffc107;
     --slot-weekend: #f0f3f5;
@@ -548,19 +544,7 @@ body:has(.appointment-calendar) {
     transform: translateX(2px);
 }
 
-/* Full slots - Maximum capacity reached */
-.time-slot.full {
-    /* No background color - clean neutral design */
-    border-left: 3px solid var(--warning-color);
-    /* Keep cursor pointer - all slots are clickable */
-}
-
-.time-slot.full:hover {
-    box-shadow: var(--hover-shadow);
-    transform: translateX(2px);
-}
-
-/* Past slots styling removed - all slots are now equally accessible */
+/* Past slots and full slots styling removed - all slots are now equally accessible */
 
 .time-slot.selected {
     background: var(--slot-selected);
@@ -653,7 +637,7 @@ body:has(.appointment-calendar) {
     margin-bottom: 0;
     border-left: none;
     min-height: auto;
-    height: 32px; /* FIXED HEIGHT - DO NOT CHANGE without updating CalendarGrid.jsx calculation */
+    height: 40px; /* FIXED HEIGHT: 4px(top) + 16px(name) + 16px(detail) + 4px(bottom) = 40px */
     box-shadow: none;
     transition: none;
     overflow: hidden;
@@ -1164,7 +1148,6 @@ body:has(.appointment-calendar) {
         --calendar-background: #ffffff;
         --slot-available: #f0f0f0;
         --slot-booked: #e0e0e0;
-        --slot-past: #d0d0d0;
     }
 }
 

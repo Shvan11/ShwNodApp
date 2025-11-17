@@ -259,7 +259,17 @@ const AppointmentCalendar = ({
             ) || [];
 
             if (validAppointments.length > 0) {
-                // Show context menu with all appointments
+                // Check if the appointment is in the past
+                const slotDateTime = new Date(`${slot.date}T${slot.time}:00`);
+                const now = new Date();
+
+                if (slotDateTime < now) {
+                    // Show message for past appointments
+                    alert('You cannot perform this action on old appointments');
+                    return;
+                }
+
+                // Show context menu for future appointments only
                 setContextMenu({
                     position: { x: event.clientX, y: event.clientY },
                     appointments: validAppointments
