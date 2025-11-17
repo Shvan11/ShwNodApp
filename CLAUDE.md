@@ -4,7 +4,46 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Node.js/Express web application for **Shwan Orthodontics** - a dental practice management system with multi-channel messaging capabilities (WhatsApp, SMS, Telegram). The application manages patient records, appointments, treatment photos, payments, and provides automated messaging for appointment reminders.
+**Shwan Orthodontics Management System** is a comprehensive, enterprise-grade orthodontic practice management platform built with Node.js, Express, and React 19. This application handles the complete patient lifecycle from registration through treatment completion, with advanced features for aligner management, multi-channel patient communication, and financial tracking.
+
+### Core Capabilities
+
+**Patient Management**: Complete patient lifecycle including registration, demographic data, contact management, treatment history, photo/x-ray imaging with time-point organization, and WebCeph integration for cephalometric analysis.
+
+**Orthodontic Treatment**: Interactive dental chart (Palmer notation), wire tracking (upper/lower arch), visit recording with treatment notes, appliance/bracket tracking, treatment planning, and progress monitoring with photo milestones.
+
+**Aligner Management**: Comprehensive aligner case management including doctor/partner registration, aligner set lifecycle tracking, batch management, payment tracking, activity logging, doctor communication with notes, and PDF case plan storage via Google Drive integration.
+
+**Appointment System**: Monthly/weekly calendar views, daily appointment dashboard, real-time check-in workflow (Scheduled → Present → Seated → Dismissed), appointment types/categories, and WebSocket-powered live updates.
+
+**Multi-Channel Messaging**: WhatsApp integration (Web.js) with QR authentication, SMS via Twilio, Telegram bot integration, bulk appointment reminders, message status tracking (sent/delivered/read), media sending (photos/x-rays/receipts), and circuit breaker pattern for resilience.
+
+**Financial Management**: Multi-currency payment processing with exchange rates, invoice generation, receipt printing, payment history tracking, outstanding balance calculations, treatment cost management, and daily financial reports.
+
+**Expense Tracking**: Expense recording with categories/subcategories, multi-currency support, date range filtering, category-based analysis, and expense totals reporting.
+
+**Document Templates**: Visual template designer powered by GrapesJS, custom receipt/invoice/prescription templates, drag-and-drop editor, HTML/CSS editing, and template preview.
+
+**Real-Time Features**: WebSocket-based live updates for appointments, messaging status, patient data sync, connection health monitoring, and progress indicators for batch operations.
+
+**System Administration**: Role-based access control (Admin/Secretary/Doctor/Staff), employee management, database configuration and backup, system health monitoring, and application lifecycle control.
+
+### Technology Stack
+
+- **Backend**: Node.js, Express, SQL Server (Tedious), WebSocket, Multer (file uploads)
+- **Frontend**: React 19, React Router v7, Vite, GrapesJS, Chart libraries
+- **External Services**: WhatsApp Web.js, Twilio SMS, Telegram Bot API, Google OAuth/Drive, WebCeph
+- **Architecture**: Single-page application (SPA), RESTful API, real-time WebSocket communication, connection pooling, circuit breaker pattern
+
+### Application Scale
+
+- **150+ Features** across 18 major categories
+- **100+ API Endpoints** for comprehensive data operations
+- **40+ React Components** for modular UI
+- **45 CSS Files** (~25,576 lines) with custom design system
+- **12 Frontend Routes** with nested routing
+- **18+ Backend API Routes** with organized query modules
+- **20+ Database Tables** for complete data modeling
 
 ## MCP Servers
 
@@ -245,3 +284,373 @@ export PORT=8080  # Add to .env or set in environment
 - Circuit breaker pattern for messaging resilience
 - Connection pooling for database operations
 - Cross-platform file system integration with automatic path conversion
+
+---
+
+## CSS Styling Guidelines
+
+**CRITICAL**: This project uses a custom CSS architecture with strict guidelines. See `css-styling-guidelines.skill.md` for comprehensive documentation.
+
+### Absolute Rules - NEVER VIOLATE
+
+#### ❌ NO Inline Styles
+
+**NEVER use inline styles in JSX/HTML** except for these rare exceptions:
+
+**✅ ONLY Allowed Exceptions:**
+1. **Dynamic runtime values** that cannot be predetermined:
+   ```javascript
+   // ✅ ALLOWED: Value calculated at runtime
+   style={{ height: `${calculatedHeight}px`, top: `${position.y}px` }}
+   ```
+
+2. **Dynamic positioning** for tooltips, popovers, drag-drop:
+   ```javascript
+   // ✅ ALLOWED: Mouse-based positioning
+   style={{ position: 'absolute', left: mouseX, top: mouseY }}
+   ```
+
+**❌ FORBIDDEN: Static styles**
+```javascript
+// ❌ WRONG: This should be a CSS class
+style={{ padding: '20px', background: '#f8f9fa', borderRadius: '8px' }}
+
+// ✅ CORRECT: Use CSS class from appropriate file
+className="card-container"
+```
+
+#### ❌ NO !important Declarations
+
+**NEVER use `!important` in CSS** except for these specific cases:
+
+**✅ ONLY Allowed Exceptions:**
+1. **Print styles** (forcing layouts for printing)
+   ```css
+   @media print {
+     .no-print { display: none !important; }
+   }
+   ```
+
+2. **Accessibility overrides** (user preferences must take precedence)
+   ```css
+   @media (prefers-reduced-motion: reduce) {
+     * { animation: none !important; }
+   }
+   ```
+
+3. **Third-party library overrides** (only when no alternative exists - must be documented)
+   ```css
+   /* Document why !important is needed */
+   .photoswipe-override {
+     z-index: var(--z-index-modal) !important; /* Override PhotoSwipe default */
+   }
+   ```
+
+**❌ FORBIDDEN: Using !important for convenience**
+```css
+/* ❌ WRONG: Lazy override */
+.text-red { color: red !important; }
+
+/* ✅ CORRECT: Increase specificity properly */
+.error-message .text-red { color: var(--error-color); }
+```
+
+### CSS Architecture
+
+**File Structure** (`/public/css/`):
+```
+├── main.css                    # Entry point - imports all modules
+├── base/
+│   ├── variables.css           # Design tokens (ALWAYS use these)
+│   ├── reset.css               # CSS reset/normalize
+│   ├── typography.css          # Font styles
+│   └── rtl-support.css         # RTL language support (Kurdish/Arabic)
+├── components/                 # Reusable component styles (18 files)
+│   ├── buttons.css
+│   ├── universal-header.css
+│   ├── sidebar-navigation.css
+│   └── [15 more files...]
+└── pages/                      # Page-specific styles (22 files)
+    ├── dashboard.css
+    ├── patient-shell.css
+    └── [20 more files...]
+```
+
+**Where to Add New Styles:**
+
+1. **Reusable component** → `/css/components/{component-name}.css`
+2. **Page-specific** → `/css/pages/{page-name}.css`
+3. **Base styles** (typography, button variants) → `/css/base/{category}.css`
+4. **Utility classes** → `/css/main.css`
+
+### Design System - ALWAYS Use These Variables
+
+**From `/public/css/base/variables.css`:**
+
+**Colors** (NEVER hardcode colors):
+```css
+--primary-color: #007bff
+--secondary-color: #4CAF50
+--accent-color: #55608f
+--success-color: #28a745
+--error-color: #dc3545
+--warning-color: #ffc107
+--info-color: #17a2b8
+--background-primary: #ffffff
+--background-secondary: #f8f9fa
+--text-primary: #212529
+--text-secondary: #6c757d
+--border-color: #dee2e6
+
+/* ❌ WRONG */
+.card { background: #f8f9fa; }
+
+/* ✅ CORRECT */
+.card { background: var(--background-secondary); }
+```
+
+**Spacing** (NEVER hardcode pixel values):
+```css
+--spacing-xs: 0.25rem   /* 4px */
+--spacing-sm: 0.5rem    /* 8px */
+--spacing-md: 1rem      /* 16px */
+--spacing-lg: 1.5rem    /* 24px */
+--spacing-xl: 2rem      /* 32px */
+--spacing-xxl: 3rem     /* 48px */
+
+/* ❌ WRONG */
+.card { padding: 20px; margin-bottom: 16px; }
+
+/* ✅ CORRECT */
+.card {
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+}
+```
+
+**Border Radius**:
+```css
+--radius-sm: 0.125rem   /* 2px */
+--radius-md: 0.25rem    /* 4px */
+--radius-lg: 0.5rem     /* 8px */
+--radius-xl: 1rem       /* 16px */
+--radius-full: 9999px   /* Fully rounded */
+```
+
+**Shadows**:
+```css
+--shadow-sm, --shadow-md, --shadow-lg, --shadow-xl
+```
+
+**Typography**:
+```css
+--font-primary: system-ui, -apple-system, BlinkMacSystemFont...
+--font-size-xs: 0.75rem    /* 12px */
+--font-size-sm: 0.875rem   /* 14px */
+--font-size-base: 1rem     /* 16px */
+--font-size-lg: 1.125rem   /* 18px */
+--font-size-xl: 1.25rem    /* 20px */
+--font-size-2xl: 1.5rem    /* 24px */
+--font-size-3xl: 1.875rem  /* 30px */
+```
+
+**Z-Index Layers** (prevents z-index conflicts):
+```css
+--z-index-dropdown: 1000
+--z-index-sticky: 1020
+--z-index-fixed: 1030
+--z-index-modal: 1040
+--z-index-popover: 1050
+--z-index-tooltip: 1060
+
+/* ❌ WRONG */
+.modal { z-index: 9999; }
+
+/* ✅ CORRECT */
+.modal { z-index: var(--z-index-modal); }
+```
+
+### Naming Conventions
+
+**Use BEM-like methodology:**
+
+```css
+/* Component block */
+.patient-card { }
+
+/* Element within block */
+.patient-card__header { }
+.patient-card__body { }
+.patient-card__footer { }
+
+/* Modifier for state/variant */
+.patient-card--highlighted { }
+.patient-card--disabled { }
+```
+
+**State classes:**
+- `.active` - Currently active item
+- `.disabled` - Disabled state
+- `.loading` - Loading state
+- `.error` - Error state
+- `.success` - Success state
+- `.hidden` - Hidden state
+
+### Responsive Design - Mobile-First
+
+**ALWAYS write mobile-first styles:**
+
+```css
+/* ✅ CORRECT: Mobile-first */
+.container {
+  padding: var(--spacing-sm);  /* Mobile: small padding */
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding: var(--spacing-lg);  /* Tablet+: larger padding */
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    padding: var(--spacing-xl);  /* Desktop: extra padding */
+  }
+}
+```
+
+**Breakpoints** (from variables.css):
+```css
+--breakpoint-xs: 375px   /* Small phones */
+--breakpoint-sm: 480px   /* Phones */
+--breakpoint-md: 768px   /* Tablets */
+--breakpoint-lg: 1024px  /* Desktops */
+--breakpoint-xl: 1400px  /* Large screens */
+```
+
+**Common media queries:**
+```css
+@media (max-width: 1024px) { /* Tablet and below */ }
+@media (max-width: 768px) { /* Phone and below */ }
+@media (max-width: 480px) { /* Small phones */ }
+@media (orientation: landscape) { /* Landscape mode */ }
+@media (hover: none) and (pointer: coarse) { /* Touch devices */ }
+```
+
+### RTL (Right-to-Left) Support
+
+**The project has full RTL support for Kurdish/Arabic languages.**
+
+**Use logical properties:**
+
+```css
+/* ❌ AVOID: Directional properties */
+.card {
+  margin-left: var(--spacing-md);
+  text-align: left;
+}
+
+/* ✅ PREFER: Logical properties */
+.card {
+  margin-inline-start: var(--spacing-md);
+  text-align: start;
+}
+
+/* OR use RTL selector: */
+.card {
+  margin-left: var(--spacing-md);
+}
+
+[dir="rtl"] .card {
+  margin-left: 0;
+  margin-right: var(--spacing-md);
+}
+```
+
+### Best Practices Checklist
+
+**Before writing any styles:**
+
+- [ ] Check if a class already exists (search CSS files first)
+- [ ] Use CSS variables for colors, spacing, typography
+- [ ] Add styles to the appropriate file (component/page/base)
+- [ ] Follow BEM-like naming conventions
+- [ ] NO inline styles (except dynamic runtime values)
+- [ ] NO !important (except print/accessibility)
+- [ ] Write mobile-first responsive CSS
+- [ ] Consider RTL support for text-heavy components
+- [ ] Test on multiple screen sizes (375px, 768px, 1024px+)
+
+### Common Patterns
+
+**Button:**
+```css
+/* In /css/components/buttons.css */
+.btn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: var(--primary-color);
+  color: white;
+}
+```
+
+**Card:**
+```css
+/* In /css/components/ or /css/pages/ */
+.card {
+  background: var(--background-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.card__header {
+  margin-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: var(--spacing-md);
+}
+```
+
+**Modal:**
+```css
+/* In /css/components/modal.css */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: var(--z-index-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: var(--background-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  max-width: 600px;
+  width: 90%;
+  box-shadow: var(--shadow-xl);
+}
+```
+
+### Quick Reference
+
+**For comprehensive CSS guidelines**, see `css-styling-guidelines.skill.md`.
+
+**Key design system file**: `/public/css/base/variables.css`
+
+**Key rules:**
+1. ✅ CSS classes only - No inline styles except dynamic values
+2. ✅ No !important - Except print/accessibility
+3. ✅ CSS variables always - From variables.css
+4. ✅ Mobile-first responsive - Start small, scale up
+5. ✅ BEM-like naming - Consistent, semantic class names
+6. ✅ Appropriate file location - Components, pages, or base
+7. ✅ RTL support - Use logical properties or RTL selectors
