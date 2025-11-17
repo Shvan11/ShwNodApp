@@ -8,7 +8,7 @@
 import React from 'react'
 import TimeSlot from './TimeSlot.jsx'
 
-const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', showOnlyAvailable = false, showEarlySlots = false }) => {
+const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', viewMode = 'week', showOnlyAvailable = false, showEarlySlots = false }) => {
     if (!calendarData || !calendarData.days || !calendarData.timeSlots) {
         return (
             <div className="calendar-grid loading">
@@ -100,27 +100,61 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
     };
 
     return (
-        <div className="calendar-grid">
-            {/* Time column */}
-            <div className="time-column">
-                <div className="time-header">Time</div>
-                {filteredTimeSlots.map(timeSlot => {
-                    const dynamicHeight = getTimeSlotHeight(timeSlot);
+        <>
+            {/* Day Headers Row - Sticky below calendar header */}
+            <div className={`calendar-day-headers ${viewMode === 'day' ? 'view-day' : ''}`}>
+                <div className="day-headers-time-label">Time</div>
+                {days.map(day => {
+                    const dayClasses = [
+                        'day-header-cell',
+                        isToday(day.date) ? 'today' : '',
+                        isWeekend(day.dayOfWeek) ? 'weekend' : ''
+                    ].filter(Boolean).join(' ');
+
+                    // Calculate total appointments for this day
+                    const totalAppointments = Object.values(day.appointments).reduce((total, slotInfo) => {
+                        const appointments = Array.isArray(slotInfo) ? slotInfo : (slotInfo.appointments || []);
+                        const validAppointments = appointments.filter(apt =>
+                            apt && (apt.patientName || apt.appointmentID)
+                        );
+                        return total + validAppointments.length;
+                    }, 0);
 
                     return (
-                        <div
-                            key={timeSlot}
-                            className="time-slot-label"
-                            style={{
-                                minHeight: `${dynamicHeight}px`,
-                                height: `${dynamicHeight}px`
-                            }}
-                        >
-                            {timeSlot}
+                        <div key={day.date} className={dayClasses}>
+                            <div className="day-header-name">{day.dayName}</div>
+                            <div className="day-header-date">{new Date(day.date).getDate()}</div>
+                            {totalAppointments > 0 && (
+                                <div className="day-header-count" title={`${totalAppointments} appointment${totalAppointments !== 1 ? 's' : ''}`}>
+                                    {totalAppointments}
+                                </div>
+                            )}
                         </div>
                     );
                 })}
             </div>
+
+            {/* Calendar Grid - Scrolling content */}
+            <div className={`calendar-grid ${viewMode === 'day' ? 'view-day' : ''}`}>
+                {/* Time column */}
+                <div className="time-column">
+                    {filteredTimeSlots.map(timeSlot => {
+                        const dynamicHeight = getTimeSlotHeight(timeSlot);
+
+                        return (
+                            <div
+                                key={timeSlot}
+                                className="time-slot-label"
+                                style={{
+                                    minHeight: `${dynamicHeight}px`,
+                                    height: `${dynamicHeight}px`
+                                }}
+                            >
+                                {timeSlot}
+                            </div>
+                        );
+                    })}
+                </div>
 
             {/* Day columns */}
             {days.map(day => {
@@ -187,7 +221,8 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
                     </div>
                 );
             })}
-        </div>
+            </div>
+        </>
     );
 };
 

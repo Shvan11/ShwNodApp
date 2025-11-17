@@ -365,6 +365,7 @@ const AppointmentCalendar = ({
                     selectedSlot={selectedSlot}
                     onSlotClick={handleSlotClick}
                     mode={mode}
+                    viewMode={viewMode}
                     showOnlyAvailable={showOnlyAvailable}
                     showEarlySlots={showEarlySlots}
                 />
