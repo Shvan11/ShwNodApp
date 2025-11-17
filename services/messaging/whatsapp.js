@@ -1271,20 +1271,22 @@ class WhatsAppService extends EventEmitter {
 
       logger.whatsapp.debug(`Message sent to ${number}`);
 
-      // Register message in session with date validation
-      const registered = session.registerMessage(sentMessage.id.id, appointmentId, appointmentDate);
-      
-      if (!registered) {
-        logger.whatsapp.warn('Failed to register message in session', {
-          messageId: sentMessage.id.id,
-          appointmentId,
-          appointmentDate,
-          sessionId: session.sessionId
-        });
+      // Register message in session with date validation (only if session is provided)
+      if (session) {
+        const registered = session.registerMessage(sentMessage.id.id, appointmentId, appointmentDate);
+
+        if (!registered) {
+          logger.whatsapp.warn('Failed to register message in session', {
+            messageId: sentMessage.id.id,
+            appointmentId,
+            appointmentDate,
+            sessionId: session.sessionId
+          });
+        }
+
+        // Record successful send in session
+        session.recordMessageSent(sentMessage.id.id);
       }
-      
-      // Record successful send in session
-      session.recordMessageSent(sentMessage.id.id);
 
       const person = {
         messageId: sentMessage.id.id,
@@ -1294,13 +1296,15 @@ class WhatsAppService extends EventEmitter {
         success: '&#10004;'
       };
 
-      // Mark message as sent in database to prevent duplicates
-      try {
-        await messagingQueries.updateWhatsAppStatus([appointmentId], [sentMessage.id.id]);
-        logger.whatsapp.debug(`Marked appointment ${appointmentId} as sent in database`);
-      } catch (dbError) {
-        logger.whatsapp.error(`Failed to mark appointment ${appointmentId} as sent`, dbError);
-        // Continue anyway - don't fail the send because of database update issue
+      // Mark message as sent in database to prevent duplicates (only for appointment messages)
+      if (appointmentId) {
+        try {
+          await messagingQueries.updateWhatsAppStatus([appointmentId], [sentMessage.id.id]);
+          logger.whatsapp.debug(`Marked appointment ${appointmentId} as sent in database`);
+        } catch (dbError) {
+          logger.whatsapp.error(`Failed to mark appointment ${appointmentId} as sent`, dbError);
+          // Continue anyway - don't fail the send because of database update issue
+        }
       }
 
       this.emit('MessageSent', person);
