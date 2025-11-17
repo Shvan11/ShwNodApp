@@ -54,19 +54,16 @@
     --success-color: #2ecc71;
 }
 
-/* Main Calendar Container - Modern Card Design */
+/* Main Calendar Container - Full Page Design */
 .appointment-calendar {
     display: flex;
     flex-direction: column;
     width: 100%;
-    height: 100vh;
-    max-height: calc(100vh - 120px);
+    height: calc(100vh - 50px);
+    margin-top: 50px;
     background: var(--calendar-background);
-    border-radius: 12px;
-    box-shadow: var(--card-shadow);
     overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
-    border: 1px solid var(--calendar-border-light);
 }
 
 /* Calendar Header - Modern Gradient Design */
@@ -901,10 +898,8 @@
 @media (max-width: 768px) {
     /* Container adjustments */
     .appointment-calendar {
-        height: 100vh;
-        max-height: 100vh;
-        border-radius: 0;
-        margin: 0;
+        height: calc(100vh - 50px);
+        margin-top: 50px;
     }
 
     /* Header: Stack vertically, touch-friendly */
