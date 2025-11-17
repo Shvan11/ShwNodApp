@@ -54,16 +54,16 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view',
     }, [slotStatus, isSelected, appointments, mode]);
     
     // Click handler
-    const handleClick = useCallback(() => {
-        // Don't allow clicks on past or full slots
-        if (slotStatus === 'past' || slotStatus === 'full') return;
+    const handleClick = useCallback((event) => {
+        // Don't allow clicks on full slots
+        if (slotStatus === 'full') return;
 
         // In selection mode, only allow clicking on available slots
         if (mode === 'selection' && slotStatus !== 'available') {
             return;
         }
 
-        onClick(slotData);
+        onClick(slotData, event);
     }, [onClick, slotData, slotStatus, mode]);
     
     // Render appointment content - SUPPORTS MULTIPLE APPOINTMENTS
@@ -134,21 +134,17 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view',
     
     // Generate tooltip text - SUPPORTS MULTIPLE APPOINTMENTS
     const getTooltipText = () => {
-        if (slotStatus === 'past') {
-            return `${time} - Past time slot`;
-        }
-        
         if (appointments.length === 0) {
             return `${time} - Available for scheduling`;
         }
-        
+
         if (appointments.length === 1) {
             const appointment = appointments[0];
             let tooltip = `${time} - ${appointment.patientName || 'Patient'}`;
             if (appointment.appDetail) tooltip += ` (${appointment.appDetail})`;
             return tooltip;
         }
-        
+
         // Multiple appointments
         let tooltip = `${time} - ${appointments.length} appointments:\n`;
         appointments.forEach((appointment, index) => {
@@ -156,7 +152,7 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view',
             if (appointment.appDetail) tooltip += ` (${appointment.appDetail})`;
             if (index < appointments.length - 1) tooltip += '\n';
         });
-        
+
         return tooltip;
     };
     
@@ -171,7 +167,7 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view',
     return (
         <div
             className={slotClass}
-            onClick={slotStatus !== 'past' ? handleClick : undefined}
+            onClick={handleClick}
             title={getTooltipText()}
             style={{
                 minHeight: `${calculatedHeight}px`,
