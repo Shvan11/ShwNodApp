@@ -30,7 +30,7 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view',
         ).length;
         
         // Add status classes for scheduling decisions
-        classes.push(slotStatus); // available, booked, past
+        classes.push(slotStatus); // available, booked (all slots are clickable regardless of status)
         
         if (isSelected) classes.push('selected');
         if (validAppointmentsCount > 0) classes.push('scheduled');
