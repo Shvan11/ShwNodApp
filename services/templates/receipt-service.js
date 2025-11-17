@@ -199,6 +199,10 @@ function formatDate(dateValue, pattern) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const monthsFull = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
+    const hours24 = date.getUTCHours();
+    const hours12 = hours24 % 12 || 12; // Convert to 12-hour format (0 becomes 12)
+    const ampm = hours24 >= 12 ? 'PM' : 'AM';
+
     const replacements = {
         'YYYY': date.getUTCFullYear(),
         'YY': String(date.getUTCFullYear()).slice(-2),
@@ -206,9 +210,13 @@ function formatDate(dateValue, pattern) {
         'MMM': months[date.getUTCMonth()],
         'MM': String(date.getUTCMonth() + 1).padStart(2, '0'),
         'DD': String(date.getUTCDate()).padStart(2, '0'),
-        'HH': String(date.getUTCHours()).padStart(2, '0'),
+        'HH': String(hours24).padStart(2, '0'),
+        'hh': String(hours12).padStart(2, '0'),
+        'h': String(hours12),
         'mm': String(date.getUTCMinutes()).padStart(2, '0'),
-        'ss': String(date.getUTCSeconds()).padStart(2, '0')
+        'ss': String(date.getUTCSeconds()).padStart(2, '0'),
+        'A': ampm,
+        'a': ampm.toLowerCase()
     };
 
     let formatted = pattern;
