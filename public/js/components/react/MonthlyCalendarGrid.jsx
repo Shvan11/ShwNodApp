@@ -25,23 +25,6 @@ const MonthlyCalendarGrid = ({
 
     const { days } = calendarData;
 
-    // Helper function to get utilization color
-    const getUtilizationColor = (utilizationPercent) => {
-        if (utilizationPercent === 0) return '#f5f5f5';
-        if (utilizationPercent < 30) return '#e8f5e9';
-        if (utilizationPercent < 60) return '#fff3e0';
-        if (utilizationPercent < 80) return '#ffe0b2';
-        return '#ffccbc';
-    };
-
-    // Helper function to get appointment badge color
-    const getAppointmentBadgeColor = (count) => {
-        if (count === 0) return { bg: '#f5f5f5', text: '#9e9e9e', border: '#e0e0e0' };
-        if (count <= 3) return { bg: '#e3f2fd', text: '#1976d2', border: '#2196f3' };
-        if (count <= 6) return { bg: '#fff3e0', text: '#e65100', border: '#ff9800' };
-        return { bg: '#ffebee', text: '#c62828', border: '#f44336' };
-    };
-
     // Helper to check if date is today
     const isToday = (date) => {
         const today = new Date();
@@ -82,8 +65,6 @@ const MonthlyCalendarGrid = ({
                 {days.map(day => {
                     const appointmentCount = day.appointmentCount || 0;
                     const utilizationPercent = day.utilizationPercent || 0;
-                    const badgeColor = getAppointmentBadgeColor(appointmentCount);
-                    const bgColor = getUtilizationColor(utilizationPercent);
                     const currentMonth = isCurrentMonth(day.date);
                     const todayClass = isToday(day.date);
                     const weekendClass = isWeekend(day.date);
@@ -100,7 +81,6 @@ const MonthlyCalendarGrid = ({
                         <div
                             key={day.date}
                             className={cellClasses}
-                            style={{ backgroundColor: currentMonth ? bgColor : '#fafafa' }}
                             onClick={() => currentMonth && onDayClick && onDayClick(day)}
                             onMouseEnter={() => setHoveredDay(day.date)}
                             onMouseLeave={() => setHoveredDay(null)}
@@ -110,30 +90,10 @@ const MonthlyCalendarGrid = ({
                                 {new Date(day.date).getDate()}
                             </div>
 
-                            {/* Appointment badge */}
+                            {/* Appointment badge - Clean neutral styling via CSS */}
                             {currentMonth && appointmentCount > 0 && (
-                                <div
-                                    className="appointment-badge"
-                                    style={{
-                                        backgroundColor: badgeColor.bg,
-                                        color: badgeColor.text,
-                                        borderColor: badgeColor.border
-                                    }}
-                                >
+                                <div className="appointment-badge">
                                     {appointmentCount}
-                                </div>
-                            )}
-
-                            {/* Utilization bar */}
-                            {currentMonth && appointmentCount > 0 && (
-                                <div className="utilization-bar">
-                                    <div
-                                        className="utilization-fill"
-                                        style={{
-                                            width: `${utilizationPercent}%`,
-                                            backgroundColor: badgeColor.border
-                                        }}
-                                    />
                                 </div>
                             )}
 
