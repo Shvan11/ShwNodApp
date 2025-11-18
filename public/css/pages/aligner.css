@@ -2722,10 +2722,12 @@
 
 .bg-success {
     background: #059669;
+    color: white;
 }
 
 .bg-error {
     background: #dc2626;
+    color: white;
 }
 
 .text-success {
@@ -2845,4 +2847,53 @@
 .btn-sm-icon {
     padding: 0.5rem var(--spacing-md);
     font-size: var(--font-size-sm);
+}
+
+/* URL Input Field (for inline editing) */
+.url-input-inline {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    fontSize: 0.875rem;
+    min-width: 350px;
+}
+
+/* Note Textarea (for adding/editing notes) */
+.note-textarea-input {
+    width: 100%;
+    min-height: 100px;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    resize: vertical;
+    margin-bottom: 0.75rem;
+}
+
+/* Edit Note Textarea (slightly shorter) */
+.note-textarea-edit {
+    width: 100%;
+    min-height: 80px;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    resize: vertical;
+    margin-bottom: 0.5rem;
+}
+
+/* Batch Notes Input */
+.batch-notes-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    min-height: 60px;
+}
+
+/* Purple Button (for print labels) */
+.bg-purple {
+    background-color: #8b5cf6;
+    color: white;
 }

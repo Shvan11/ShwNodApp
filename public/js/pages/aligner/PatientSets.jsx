@@ -1160,7 +1160,6 @@ const PatientSets = () => {
                                     <button
                                         onClick={requestBaseDirectoryAccess}
                                         className="btn btn-sm bg-error"
-                                        style={{ color: 'white' }}
                                     >
                                         Grant Access
                                     </button>
@@ -1267,13 +1266,12 @@ const PatientSets = () => {
                                             )}
                                             {set.SetVideo && (
                                                 <button
-                                                    className="video-btn"
+                                                    className="video-btn bg-error"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         window.open(set.SetVideo, '_blank');
                                                     }}
                                                     title="Watch case explanation video"
-                                                    style={{ background: '#dc2626' }}
                                                 >
                                                     <i className="fab fa-youtube"></i>
                                                     <span>Case Video</span>
@@ -1364,23 +1362,17 @@ const PatientSets = () => {
                                                 </div>
                                             </>
                                         )}
-                                        <div className="set-info-item" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                        <div className="set-info-item grid-col-full-flex">
                                             <i className="fas fa-external-link-alt"></i>
                                             <span className="flex-1">
                                                 Set URL: {editingUrlForSet === set.AlignerSetID ? (
-                                                    <div style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center', marginLeft: '0.5rem' }}>
+                                                    <div className="inline-buttons-container">
                                                         <input
                                                             type="url"
                                                             value={quickUrlValue}
                                                             onChange={(e) => setQuickUrlValue(e.target.value)}
                                                             placeholder="https://..."
-                                                            style={{
-                                                                padding: '0.4rem 0.6rem',
-                                                                border: '1px solid #d1d5db',
-                                                                borderRadius: '4px',
-                                                                fontSize: '0.875rem',
-                                                                minWidth: '350px'
-                                                            }}
+                                                            className="url-input-inline"
                                                             autoFocus
                                                             onClick={(e) => e.stopPropagation()}
                                                         />
@@ -1430,23 +1422,17 @@ const PatientSets = () => {
                                                 </button>
                                             )}
                                         </div>
-                                        <div className="set-info-item" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                        <div className="set-info-item grid-col-full-flex">
                                             <i className="fas fa-file-pdf"></i>
                                             <span className="flex-1">
                                                 PDF URL: {editingPdfUrlForSet === set.AlignerSetID ? (
-                                                    <div style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center', marginLeft: '0.5rem' }}>
+                                                    <div className="inline-buttons-container">
                                                         <input
                                                             type="url"
                                                             value={quickPdfUrlValue}
                                                             onChange={(e) => setQuickPdfUrlValue(e.target.value)}
                                                             placeholder="https://..."
-                                                            style={{
-                                                                padding: '0.4rem 0.6rem',
-                                                                border: '1px solid #d1d5db',
-                                                                borderRadius: '4px',
-                                                                fontSize: '0.875rem',
-                                                                minWidth: '350px'
-                                                            }}
+                                                            className="url-input-inline"
                                                             autoFocus
                                                             onClick={(e) => e.stopPropagation()}
                                                         />
@@ -1501,30 +1487,24 @@ const PatientSets = () => {
                                                 </button>
                                             )}
                                         </div>
-                                        <div className="set-info-item" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                        <div className="set-info-item grid-col-full-flex">
                                             <i className="fas fa-video"></i>
                                             <span className="flex-1">
                                                 Case Video: {editingVideoForSet === set.AlignerSetID ? (
-                                                    <div style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center', marginLeft: '0.5rem' }}>
+                                                    <div className="inline-buttons-container">
                                                         <input
                                                             type="url"
                                                             value={quickVideoValue}
                                                             onChange={(e) => setQuickVideoValue(e.target.value)}
                                                             placeholder="https://youtube.com/watch?v=..."
-                                                            style={{
-                                                                padding: '0.4rem 0.6rem',
-                                                                border: '1px solid #d1d5db',
-                                                                borderRadius: '4px',
-                                                                fontSize: '0.875rem',
-                                                                minWidth: '350px'
-                                                            }}
+                                                            className="url-input-inline"
                                                             autoFocus
                                                             onClick={(e) => e.stopPropagation()}
                                                         />
                                                     </div>
                                                 ) : set.SetVideo ? (
-                                                    <a href={set.SetVideo} target="_blank" rel="noopener noreferrer" style={{ color: '#dc2626', textDecoration: 'underline' }}>
-                                                        <i className="fab fa-youtube" style={{ marginRight: '0.25rem' }}></i>
+                                                    <a href={set.SetVideo} target="_blank" rel="noopener noreferrer" className="video-link-youtube">
+                                                        <i className="fab fa-youtube icon-gap-xs"></i>
                                                         Watch Case Video
                                                     </a>
                                                 ) : (
@@ -1629,13 +1609,9 @@ const PatientSets = () => {
                                                                         </button>
                                                                     )}
                                                                     <button
-                                                                        className="action-icon-btn print-labels"
+                                                                        className="action-icon-btn print-labels bg-purple"
                                                                         onClick={(e) => handlePrintLabels(batch, set, e)}
                                                                         title="Print Labels in MS Access"
-                                                                        style={{
-                                                                            backgroundColor: '#8b5cf6',
-                                                                            color: 'white'
-                                                                        }}
                                                                     >
                                                                         <i className="fas fa-print"></i>
                                                                     </button>
@@ -1689,7 +1665,7 @@ const PatientSets = () => {
                                                                     </div>
                                                                 )}
                                                                 {batch.Notes && (
-                                                                    <div className="batch-detail" style={{ gridColumn: '1 / -1' }}>
+                                                                    <div className="batch-detail batch-detail-full">
                                                                         <i className="fas fa-sticky-note"></i>
                                                                         <span>Notes: {batch.Notes}</span>
                                                                     </div>
@@ -1723,48 +1699,35 @@ const PatientSets = () => {
                                                 ) : (
                                                     <>
                                                         {/* Add Note Form */}
-                                                        <div className="add-note-section" style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+                                                        <div className="add-note-section">
                                                             {!showAddLabNote[set.AlignerSetID] ? (
                                                                 <button
-                                                                    className="add-batch-btn"
+                                                                    className="add-batch-btn btn-auto-width"
                                                                     onClick={() => setShowAddLabNote(prev => ({ ...prev, [set.AlignerSetID]: true }))}
-                                                                    style={{ width: 'auto' }}
                                                                 >
                                                                     <i className="fas fa-plus"></i> Send Note to Doctor
                                                                 </button>
                                                             ) : (
                                                                 <div className="note-form">
                                                                     <textarea
-                                                                        className="note-textarea"
+                                                                        className="note-textarea note-textarea-input"
                                                                         placeholder="Type your message to the doctor..."
                                                                         value={labNoteText}
                                                                         onChange={(e) => setLabNoteText(e.target.value)}
-                                                                        style={{
-                                                                            width: '100%',
-                                                                            minHeight: '100px',
-                                                                            padding: '0.75rem',
-                                                                            border: '1px solid #d1d5db',
-                                                                            borderRadius: '6px',
-                                                                            fontSize: '0.875rem',
-                                                                            resize: 'vertical',
-                                                                            marginBottom: '0.75rem'
-                                                                        }}
                                                                     />
-                                                                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                                                    <div className="flex-justify-end">
                                                                         <button
-                                                                            className="btn-cancel"
+                                                                            className="btn-cancel btn-sm-icon"
                                                                             onClick={() => {
                                                                                 setShowAddLabNote(prev => ({ ...prev, [set.AlignerSetID]: false }));
                                                                                 setLabNoteText('');
                                                                             }}
-                                                                            style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
                                                                         >
                                                                             Cancel
                                                                         </button>
                                                                         <button
-                                                                            className="add-batch-btn"
+                                                                            className="add-batch-btn btn-auto-width"
                                                                             onClick={() => handleAddLabNote(set.AlignerSetID)}
-                                                                            style={{ width: 'auto' }}
                                                                         >
                                                                             <i className="fas fa-paper-plane"></i> Send Note
                                                                         </button>
@@ -1788,32 +1751,20 @@ const PatientSets = () => {
                                                                             /* Editing Mode */
                                                                             <div className="note-edit-form">
                                                                                 <textarea
-                                                                                    className="note-textarea"
+                                                                                    className="note-textarea note-textarea-edit"
                                                                                     value={editNoteText}
                                                                                     onChange={(e) => setEditNoteText(e.target.value)}
-                                                                                    style={{
-                                                                                        width: '100%',
-                                                                                        minHeight: '80px',
-                                                                                        padding: '0.75rem',
-                                                                                        border: '1px solid #d1d5db',
-                                                                                        borderRadius: '6px',
-                                                                                        fontSize: '0.875rem',
-                                                                                        resize: 'vertical',
-                                                                                        marginBottom: '0.5rem'
-                                                                                    }}
                                                                                 />
-                                                                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                                                                <div className="flex-justify-end">
                                                                                     <button
-                                                                                        className="btn-cancel"
+                                                                                        className="btn-cancel btn-small"
                                                                                         onClick={handleCancelEditNote}
-                                                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
                                                                                     >
                                                                                         Cancel
                                                                                     </button>
                                                                                     <button
-                                                                                        className="days-save-btn"
+                                                                                        className="days-save-btn btn-small"
                                                                                         onClick={() => saveEditNote(note.NoteID, set.AlignerSetID)}
-                                                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
                                                                                     >
                                                                                         Save
                                                                                     </button>
@@ -1822,19 +1773,19 @@ const PatientSets = () => {
                                                                         ) : (
                                                                             /* View Mode */
                                                                             <>
-                                                                                <div className="note-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                                                <div className="note-header-row">
+                                                                                    <div className="note-author-container">
                                                                                         {/* Read/Unread Checkbox */}
-                                                                                        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '0.95rem' }}>
+                                                                                        <label className="note-checkbox-label">
                                                                                             <input
                                                                                                 type="checkbox"
                                                                                                 checked={note.IsRead !== false}
                                                                                                 onChange={() => handleToggleNoteRead(note.NoteID, set.AlignerSetID)}
-                                                                                                style={{ marginRight: '0.5rem', cursor: 'pointer', width: '16px', height: '16px' }}
+                                                                                                className="note-checkbox"
                                                                                                 title={note.IsRead !== false ? 'Mark as unread' : 'Mark as read'}
                                                                                             />
                                                                                         </label>
-                                                                                        <div className={`note-author ${note.NoteType === 'Lab' ? 'lab' : 'doctor'}`} style={{ fontWeight: note.IsRead === false ? 'bold' : 'normal' }}>
+                                                                                        <div className={`note-author ${note.NoteType === 'Lab' ? 'lab' : 'doctor'} ${note.IsRead === false ? 'font-bold' : 'font-normal'}`}>
                                                                                             <i className={note.NoteType === 'Lab' ? 'fas fa-flask' : 'fas fa-user-md'}></i>
                                                                                             {note.NoteType === 'Lab' ? 'Shwan Lab' : `Dr. ${note.DoctorName}`}
                                                                                         </div>
@@ -1848,26 +1799,24 @@ const PatientSets = () => {
                                                                                         {/* Only Lab notes can be edited */}
                                                                                         {note.NoteType === 'Lab' && (
                                                                                             <button
-                                                                                                className="action-icon-btn edit"
+                                                                                                className="action-icon-btn edit btn-compact"
                                                                                                 onClick={() => handleStartEditNote(note)}
                                                                                                 title="Edit Note"
-                                                                                                style={{ padding: '0.25rem 0.5rem' }}
                                                                                             >
                                                                                                 <i className="fas fa-edit"></i>
                                                                                             </button>
                                                                                         )}
                                                                                         {/* All notes can be deleted */}
                                                                                         <button
-                                                                                            className="action-icon-btn delete"
+                                                                                            className="action-icon-btn delete btn-compact"
                                                                                             onClick={() => handleDeleteNote(note.NoteID, set.AlignerSetID)}
                                                                                             title="Delete Note"
-                                                                                            style={{ padding: '0.25rem 0.5rem' }}
                                                                                         >
                                                                                             <i className="fas fa-trash"></i>
                                                                                         </button>
                                                                                     </div>
                                                                                 </div>
-                                                                                <p className="note-text" style={{ fontWeight: note.IsRead === false ? 'bold' : 'normal' }}>{note.NoteText}</p>
+                                                                                <p className={`note-text ${note.IsRead === false ? 'font-bold' : 'font-normal'}`}>{note.NoteText}</p>
                                                                             </>
                                                                         )}
                                                                     </div>
