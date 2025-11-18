@@ -10,7 +10,7 @@
     /* Calendar Layout - Optimized for readability */
     --calendar-slot-min-height: 85px;  /* Consistent minimum height */
     --calendar-day-width: 210px;       /* Wider columns for better readability */
-    --calendar-time-width: 130px;      /* Wider time column for alignment */
+    --calendar-time-width: 90px;       /* Compact time column width */
     --calendar-gap: 2px;               /* Increased gap for better separation */
 
     /* Modern Color Palette - Professional & Clean */
@@ -357,9 +357,9 @@ body:has(.appointment-calendar) {
     align-items: center;
     justify-content: center;
     padding: 6px 4px;
-    background: var(--color-teal);
-    color: var(--color-white);
-    font-size: 11px;
+    background: var(--background-secondary);
+    color: var(--text-primary);
+    font-size: 13px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -372,18 +372,17 @@ body:has(.appointment-calendar) {
     justify-content: center;
     padding: 6px 4px;
     background: var(--color-white);
-    border-left: 3px solid transparent;
+    border-left: 1px solid var(--calendar-border);
     transition: all 0.2s ease;
     gap: 3px;
 }
 
 .day-header-cell.today {
-    background: var(--calendar-today-highlight);
-    border-left-color: var(--warning-color);
+    /* Clean neutral design - no colored borders or backgrounds */
 }
 
 .day-header-cell.weekend {
-    background: var(--calendar-weekend-bg);
+    /* Clean neutral design - no special background */
 }
 
 .day-header-date-line {
@@ -395,7 +394,7 @@ body:has(.appointment-calendar) {
 }
 
 .day-header-cell.today .day-header-date-line {
-    color: var(--warning-color);
+    /* Clean neutral design - same color as other days */
 }
 
 .day-header-count {
@@ -409,7 +408,7 @@ body:has(.appointment-calendar) {
 }
 
 .day-header-cell.today .day-header-count {
-    background: var(--warning-color);
+    /* Clean neutral design - same color as other days */
 }
 
 /* Hide old day header elements */
@@ -435,18 +434,30 @@ body:has(.appointment-calendar) {
 }
 
 .calendar-grid.view-day {
-    grid-template-columns: var(--calendar-time-width) var(--calendar-day-width);
+    grid-template-columns: var(--calendar-time-width) 1fr;
+    min-width: auto;
+    max-width: 100%;
+    overflow-x: hidden;
 }
 
 .calendar-day-headers.view-day {
-    grid-template-columns: var(--calendar-time-width) var(--calendar-day-width);
+    grid-template-columns: var(--calendar-time-width) 1fr;
+}
+
+/* Day view improvements - wider appointment slots */
+.calendar-grid.view-day .day-column {
+    min-width: 300px;
+}
+
+.calendar-grid.view-day .time-slot {
+    padding: 12px;
 }
 
 /* Time Column - Perfect Alignment with Time Slots */
 .time-column {
     display: flex;
     flex-direction: column;
-    background: var(--color-teal);
+    background: var(--background-secondary);
     position: sticky;
     left: 0;
     z-index: 10;
@@ -460,11 +471,12 @@ body:has(.appointment-calendar) {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--color-white);
-    background: rgba(32, 201, 151, 0.95);
-    border-bottom: 1px solid rgba(255,255,255,0.2);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    background: var(--background-secondary);
+    border-bottom: 2px solid #ccc;
+    border-right: 2px solid #ccc;
     user-select: none;
     white-space: nowrap;
     padding: 0;
@@ -482,12 +494,11 @@ body:has(.appointment-calendar) {
 }
 
 .day-column.today {
-    background: var(--calendar-today-bg);
-    border-left: 3px solid var(--calendar-today-border);
+    /* Clean neutral design - no colored borders or backgrounds */
 }
 
 .day-column.weekend {
-    background: var(--slot-weekend);
+    /* Clean neutral design - no special background */
 }
 
 /* OLD Day Header - Hidden (now using separate calendar-day-headers) */
@@ -522,11 +533,12 @@ body:has(.appointment-calendar) {
     position: relative;
     overflow: visible;
     box-sizing: border-box;
+    /* Clean neutral design - no colored borders */
+    border-left: 1px solid var(--calendar-border);
 }
 
 .time-slot.available {
     /* No background color - clean neutral design */
-    border-left: 3px solid var(--success-color);
 }
 
 .time-slot.available:hover {
@@ -536,7 +548,6 @@ body:has(.appointment-calendar) {
 
 .time-slot.booked {
     /* No background color - clean neutral design */
-    border-left: 3px solid var(--primary-color);
 }
 
 .time-slot.booked:hover {
@@ -552,31 +563,40 @@ body:has(.appointment-calendar) {
     border: 3px solid var(--slot-selected-border);
 }
 
-/* Appointment Content - Modern Typography */
+/* Appointment Content - Unified Consistent Typography */
 .appointment-content {
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     padding: 2px;
 }
 
-.patient-name {
+/* Unified patient name styling for ALL appointments (single and multiple) */
+.patient-name,
+.patient-name-compact {
     font-weight: 700;
-    font-size: 14px;
+    font-size: 13px;
     color: var(--status-scheduled);
-    line-height: 1.4;
+    line-height: 16px;
+    margin-bottom: 0;
+    text-align: right;
+    direction: rtl;
     word-wrap: break-word;
-    white-space: normal;
+    overflow-wrap: break-word;
 }
 
-.appointment-detail {
-    font-size: 13px;
-    color: #6c757d;
-    line-height: 1.4;
-    word-wrap: break-word;
-    white-space: normal;
+/* Unified appointment detail styling for ALL appointments (single and multiple) */
+.appointment-detail,
+.appointment-detail-compact {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 16px;
     font-weight: 500;
+    text-align: right;
+    direction: rtl;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 /* Multiple Appointments Support - Clean Design */
@@ -587,22 +607,21 @@ body:has(.appointment-calendar) {
 
 /* Dynamic height is now handled by content, not fixed CSS */
 
-/* Single Appointment Content - Modern Design */
+/* Single Appointment Content - Unified with multiple */
 .appointment-content.single {
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     padding: 2px;
 }
 
-/* Multiple Appointments Content - Card Style */
+/* Multiple Appointments Content - Unified with single */
 .appointment-content.multiple {
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    font-size: 13px;
+    gap: 4px;
     padding: 2px;
 }
 
@@ -623,9 +642,9 @@ body:has(.appointment-calendar) {
 .appointments-list {
     display: flex;
     flex-direction: column;
-    gap: 4px; /* Reduced gap for cleaner stacking */
+    gap: 4px;
     overflow: visible;
-    padding: 0 0 8px 0; /* Bottom padding ensures last appointment has space */
+    padding: 0 0 8px 0;
 }
 
 .appointment-item {
@@ -637,38 +656,13 @@ body:has(.appointment-calendar) {
     margin-bottom: 0;
     border-left: none;
     min-height: auto;
-    height: 40px; /* FIXED HEIGHT: 4px(top) + 16px(name) + 16px(detail) + 4px(bottom) = 40px */
     box-shadow: none;
     transition: none;
-    overflow: hidden;
 }
 
 .appointment-item:hover {
     box-shadow: none;
     transform: none;
-}
-
-.patient-name-compact {
-    font-weight: 700;
-    font-size: 13px;
-    color: var(--status-scheduled);
-    line-height: 16px; /* Fixed line height */
-    margin-bottom: 0;
-    /* Text truncation for fixed height */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.appointment-detail-compact {
-    font-size: 12px;
-    color: var(--text-secondary);
-    line-height: 16px; /* Fixed line height */
-    font-weight: 500;
-    /* Text truncation for fixed height */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 /* No scrollbar needed - dynamic height shows all appointments */
@@ -707,7 +701,7 @@ body:has(.appointment-calendar) {
 
 /* Calendar-Focused Appointment Status */
 .time-slot.scheduled {
-    border-left: 4px solid var(--status-scheduled);
+    /* Clean neutral design - no colored borders */
 }
 
 /* Loading States */
@@ -984,16 +978,16 @@ body:has(.appointment-calendar) {
 
     /* CRITICAL: Calendar Grid - Single Column (Day View Only) */
     .appointment-calendar .calendar-grid {
-        grid-template-columns: 80px 1fr;
+        grid-template-columns: 70px 1fr;
         min-width: 100%;
         overflow-x: hidden;
-        gap: 1px;
+        gap: 2px;
     }
 
     /* Time column - narrower on mobile */
     :root {
-        --calendar-time-width: 80px;
-        --calendar-slot-min-height: 75px;
+        --calendar-time-width: 70px;
+        --calendar-slot-min-height: 80px;
     }
 
     .time-header {
@@ -1002,8 +996,21 @@ body:has(.appointment-calendar) {
     }
 
     .time-slot-label {
-        font-size: 13px;
-        min-height: 75px;
+        font-size: 15px;
+        min-height: 80px;
+        font-weight: 700;
+    }
+
+    /* Day column - full width and spacious on mobile */
+    .appointment-calendar .day-column {
+        min-width: auto;
+        width: 100%;
+    }
+
+    /* Time slots - more padding on mobile */
+    .appointment-calendar .time-slot {
+        min-height: 80px;
+        padding: 12px;
     }
 
     /* Day header - larger for touch */

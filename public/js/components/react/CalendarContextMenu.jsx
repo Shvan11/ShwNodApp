@@ -26,11 +26,12 @@ const CalendarContextMenu = ({ position, appointments, onClose, onDelete }) => {
         };
 
         // Add a small delay to prevent immediate closing
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
             document.addEventListener('click', handleClickOutside);
         }, 100);
 
         return () => {
+            clearTimeout(timeoutId);
             document.removeEventListener('click', handleClickOutside);
         };
     }, [onClose]);
@@ -69,7 +70,8 @@ const CalendarContextMenu = ({ position, appointments, onClose, onDelete }) => {
         onClose();
     };
 
-    const handleSelectAppointment = (apt) => {
+    const handleSelectAppointment = (apt, event) => {
+        event.stopPropagation(); // Prevent click from bubbling up
         setSelectedAppointment(apt);
     };
 
@@ -83,6 +85,7 @@ const CalendarContextMenu = ({ position, appointments, onClose, onDelete }) => {
             <div
                 ref={menuRef}
                 className="calendar-context-menu appointment-list-menu"
+                key="appointment-list"
                 style={{
                     left: `${position.x}px`,
                     top: `${position.y}px`
@@ -95,7 +98,7 @@ const CalendarContextMenu = ({ position, appointments, onClose, onDelete }) => {
                     <div
                         key={apt.appointmentID || index}
                         className="context-menu-item appointment-item"
-                        onClick={() => handleSelectAppointment(apt)}
+                        onClick={(e) => handleSelectAppointment(apt, e)}
                     >
                         <div className="appointment-info">
                             <div className="appointment-name">
@@ -119,6 +122,7 @@ const CalendarContextMenu = ({ position, appointments, onClose, onDelete }) => {
         <div
             ref={menuRef}
             className="calendar-context-menu"
+            key="edit-delete-menu"
             style={{
                 left: `${position.x}px`,
                 top: `${position.y}px`

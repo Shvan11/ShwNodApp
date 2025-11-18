@@ -19,6 +19,9 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
 
     const { days, timeSlots } = calendarData;
 
+    // Filter days for day view - show only the first day (or current day)
+    const filteredDays = viewMode === 'day' ? [days[0]] : days;
+
     // Filter out early time slots if showEarlySlots is false
     const earlySlotTimes = ['12:00', '12:30', '13:00', '13:30'];
     const filteredTimeSlots = showEarlySlots
@@ -28,7 +31,7 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
     // Calculate maximum valid appointments per time slot across all days
     const getMaxValidAppointmentsForTimeSlot = (timeSlot) => {
         let maxValidAppointments = 0;
-        days.forEach(day => {
+        filteredDays.forEach(day => {
             const slotData = day.appointments[timeSlot] || { appointments: [], appointmentCount: 0 };
             const appointments = slotData.appointments || slotData; // Handle both old and new format
             const appointmentArray = Array.isArray(appointments) ? appointments : [];
@@ -104,7 +107,7 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
             {/* Day Headers Row - Sticky below calendar header */}
             <div className={`calendar-day-headers ${viewMode === 'day' ? 'view-day' : ''}`}>
                 <div className="day-headers-time-label">Time</div>
-                {days.map(day => {
+                {filteredDays.map(day => {
                     const dayClasses = [
                         'day-header-cell',
                         isToday(day.date) ? 'today' : '',
@@ -163,7 +166,7 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
                 </div>
 
             {/* Day columns */}
-            {days.map(day => {
+            {filteredDays.map(day => {
                 const dayClasses = [
                     'day-column',
                     isToday(day.date) ? 'today' : '',

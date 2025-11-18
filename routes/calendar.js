@@ -526,7 +526,9 @@ function transformToCalendarStructure(flatData, maxAppointmentsPerSlot = 3) {
                 patientName: item.patientName,
                 personID: item.personID,
                 slotStatus: item.slotStatus,
-                slotDateTime: item.slotDateTime
+                slotDateTime: item.slotDateTime,
+                AppDate: item.slotDateTime, // Add AppDate for compatibility with EditAppointmentForm
+                PersonID: item.personID // Add PersonID (capitalized) for compatibility
             });
         }
 

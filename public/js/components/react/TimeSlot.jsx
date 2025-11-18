@@ -76,24 +76,24 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view',
             return null;
         }
         
-        // Handle single appointment (show full details)
+        // Single appointment - Simple display without count badge
         if (validAppointments.length === 1) {
             const appointment = validAppointments[0];
             return (
                 <div className="appointment-content single">
-                    <div className="patient-name">
+                    <div className="patient-name-compact">
                         {appointment.patientName || 'Scheduled'}
                     </div>
                     {appointment.appDetail && (
-                        <div className="appointment-detail">
+                        <div className="appointment-detail-compact">
                             {appointment.appDetail}
                         </div>
                     )}
                 </div>
             );
         }
-        
-        // Handle multiple appointments (compact view)
+
+        // Multiple appointments - Show count badge
         const appointmentElements = validAppointments.map((appointment, index) => {
             return (
                 <div
@@ -111,7 +111,7 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view',
                 </div>
             );
         });
-        
+
         return (
             <div className="appointment-content multiple">
                 <div className="appointment-count">
