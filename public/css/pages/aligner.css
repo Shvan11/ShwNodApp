@@ -2351,3 +2351,183 @@
         grid-column: span 1;
     }
 }
+
+/* ===================================
+   ALL SETS LIST STYLES
+   =================================== */
+
+/* Section Header Warning Badge */
+.section-info-warning {
+    margin-left: var(--spacing-md);
+    color: #f59e0b;
+    font-weight: var(--font-weight-bold);
+}
+
+/* Filter Controls Container */
+.allsets-filter-container {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    align-items: center;
+}
+
+.allsets-filter-container .patient-filter-box {
+    flex: 1;
+}
+
+/* No Next Batch Toggle Label */
+.no-batch-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    background-color: #f3f4f6;
+    padding: 0.75rem var(--spacing-md);
+    border-radius: var(--radius-lg);
+    border: 2px solid transparent;
+    transition: var(--transition-base);
+    white-space: nowrap;
+}
+
+.no-batch-toggle.active {
+    background-color: #fef3c7;
+    border-color: #f59e0b;
+}
+
+.no-batch-toggle input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.no-batch-toggle .fa-exclamation-triangle {
+    color: #f59e0b;
+}
+
+/* Table Container */
+.allsets-table-container {
+    background-color: var(--color-white);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.allsets-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+
+.allsets-table thead {
+    background-color: #f9fafb;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.allsets-table th {
+    padding: 0.75rem var(--spacing-md);
+    text-align: left;
+    font-weight: var(--font-weight-semibold);
+    color: #374151;
+    text-transform: uppercase;
+    font-size: var(--font-size-xs);
+    letter-spacing: var(--letter-spacing-wide);
+}
+
+.allsets-table td {
+    padding: 0.75rem var(--spacing-md);
+    color: #1f2937;
+}
+
+/* Table Row States */
+.allsets-table tbody tr {
+    cursor: pointer;
+    border-bottom: 1px solid #e5e7eb;
+    transition: background-color 0.15s;
+}
+
+.allsets-table tbody tr:nth-child(even) {
+    background-color: #f9fafb;
+}
+
+.allsets-table tbody tr:nth-child(odd) {
+    background-color: var(--color-white);
+}
+
+.allsets-table tbody tr.warning-row {
+    background-color: #fef3c7;
+}
+
+.allsets-table tbody tr:hover {
+    background-color: #eff6ff;
+}
+
+.allsets-table tbody tr.warning-row:hover {
+    background-color: #fde68a;
+}
+
+/* Patient Name Cell */
+.allsets-patient-name {
+    font-weight: var(--font-weight-semibold);
+    color: #1f2937;
+}
+
+/* Badge Variants */
+.allsets-badge {
+    padding: 0.25rem var(--spacing-sm);
+    border-radius: var(--radius-md);
+    font-weight: var(--font-weight-semibold);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: var(--font-size-sm);
+}
+
+/* Set Badge */
+.allsets-badge-set {
+    background-color: #e0e7ff;
+    color: #3730a3;
+}
+
+.allsets-badge-no-set {
+    background-color: #f3f4f6;
+    color: #6b7280;
+    font-weight: var(--font-weight-medium);
+    font-style: italic;
+}
+
+/* Batch Badge */
+.allsets-badge-batch {
+    background-color: #ddd6fe;
+    color: #5b21b6;
+}
+
+.allsets-badge-no-batch {
+    background-color: #f3f4f6;
+    color: #6b7280;
+    font-weight: var(--font-weight-medium);
+    font-style: italic;
+}
+
+/* Status Badge */
+.allsets-badge-no-next {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.allsets-badge-ready {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+/* Notes Text */
+.allsets-notes {
+    color: #6b7280;
+    font-size: 0.8125rem;
+}
+
+.allsets-notes-empty {
+    color: #9ca3af;
+}
+
+/* Clear Filter Button Margin */
+.btn-clear-filters {
+    margin-top: var(--spacing-md);
+}
