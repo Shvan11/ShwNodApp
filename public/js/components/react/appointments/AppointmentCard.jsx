@@ -159,9 +159,8 @@ const AppointmentCard = ({
                                 onMarkSeated(appointment.appointmentID);
                             }}
                             title="Seat Patient"
-                            style={{ padding: 5, width: '72px', height: '48px' }}
                         >
-                            <img src="/images/dental_chair.svg" alt="Seat Patient" style={{ width: '100%', height: '100%', display: 'block' }} />
+                            <img src="/images/dental_chair.svg" alt="Seat Patient" />
                         </button>
                         <button
                             type="button"

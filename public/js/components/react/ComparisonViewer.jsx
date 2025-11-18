@@ -32,28 +32,12 @@ const ComparisonViewer = ({ patientCode, patientName, initialImages = [] }) => {
     }, [containerRef.current, initialImages]);
 
     return (
-        <div 
-            className="comparison-viewer-container"
-            style={{
-                position: 'relative',
-                width: '100%',
-                height: '100%',
-                minHeight: '500px'
-            }}
-        >
+        <div className="comparison-viewer-container">
             {/* Main comparison container */}
             <div
                 ref={containerRef}
                 className="comparison-container"
                 id="comparison-container"
-                style={{
-                    width: '100%',
-                    height: '100%',
-                    position: 'relative',
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '4px'
-                }}
             />
 
             {/* Control buttons overlay */}
