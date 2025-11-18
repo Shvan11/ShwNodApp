@@ -17,12 +17,14 @@
 @import 'components/sidebar-navigation.css';
 @import 'components/toast.css';
 @import 'components/modal.css';
+@import 'components/payment-modal.css';
 @import 'components/whatsapp-auth.css';
 @import 'components/appointment-calendar.css';
 @import 'components/appointment-form.css';
 @import 'components/aligner-drawer-form.css';
 @import 'components/aligner-set-card.css';
 @import 'components/calendar-picker-modal.css';
+@import 'components/comparison-viewer.css';
 @import 'components/dental-chart.css';
 @import 'components/invoice-form.css';
 @import 'components/new-visit-component.css';

@@ -405,8 +405,7 @@ const PatientManagement = () => {
                 <div className="patient-management-header-actions">
                     <button
                         onClick={() => setShowQuickSearch(!showQuickSearch)}
-                        className="btn btn-secondary"
-                        style={{ whiteSpace: 'nowrap' }}
+                        className="btn btn-secondary whitespace-nowrap"
                     >
                         <i className={`fas fa-${showQuickSearch ? 'chevron-up' : 'chevron-down'} pm-icon-gap`}></i>
                         {showQuickSearch ? 'Hide' : 'Show'} Quick Search
@@ -510,8 +509,7 @@ const PatientManagement = () => {
                         placeholder="e.g., احمد محمد"
                         value={searchPatientName}
                         onChange={(e) => setSearchPatientName(e.target.value)}
-                        className="search-input"
-                        style={{ direction: 'rtl', textAlign: 'right' }}
+                        className="search-input text-rtl"
                         lang="ar"
                         dir="rtl"
                     />

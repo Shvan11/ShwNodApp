@@ -258,3 +258,92 @@
         padding: 0.625rem 0;
     }
 }
+
+/* ===================================
+   COST EDITING INLINE FORM
+   =================================== */
+
+/* Edit button icon */
+.info-label .btn-edit-inline {
+    margin-left: var(--spacing-sm);
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: var(--spacing-xs);
+}
+
+.btn-edit-inline:hover {
+    color: var(--primary-blue-dark);
+}
+
+/* Editing container */
+.cost-edit-container {
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+}
+
+/* Cost input field */
+.cost-edit-input {
+    width: 150px;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+}
+
+/* Currency select dropdown */
+.cost-edit-select {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+}
+
+/* Save button (green success) */
+.cost-edit-save {
+    padding: var(--spacing-xs) 0.75rem;
+    background-color: var(--success-color);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.cost-edit-save:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.cost-edit-save:hover:not(:disabled) {
+    background-color: var(--success-green-dark);
+}
+
+/* Cancel button (gray) */
+.cost-edit-cancel {
+    padding: var(--spacing-xs) 0.75rem;
+    background-color: var(--neutral-gray);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.cost-edit-cancel:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.cost-edit-cancel:hover:not(:disabled) {
+    background-color: var(--neutral-gray-dark);
+}
+
+/* Displayed cost value (when not editing) */
+.cost-value-display {
+    font-weight: 600;
+    color: var(--success-color);
+}

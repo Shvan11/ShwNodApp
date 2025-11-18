@@ -180,7 +180,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }) => {
                                         {invoices.map((invoice) => (
                                             <tr key={invoice.invoiceID}>
                                                 <td className="invoice-id">{invoice.invoiceID}</td>
-                                                <td className="patient-name" style={{ direction: 'rtl', textAlign: 'right' }}>
+                                                <td className="patient-name text-rtl">
                                                     {invoice.PatientName}
                                                 </td>
                                                 <td className="time">{formatTime(invoice.SysStartTime)}</td>

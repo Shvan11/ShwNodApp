@@ -1,0 +1,372 @@
+/* payment-modal.css - Payment Modal Specific Styles */
+
+/* ===================================
+   MODAL DESCRIPTION
+   =================================== */
+.payment-modal-description {
+    padding: 0 var(--spacing-lg) var(--spacing-lg);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+/* ===================================
+   TOP ACTIONS
+   =================================== */
+.payment-top-actions {
+    margin: 0 var(--spacing-lg) var(--spacing-lg);
+    padding-top: 0;
+}
+
+/* ===================================
+   EXCHANGE RATE ERROR BOX
+   =================================== */
+.exchange-rate-error-box {
+    background: #fef2f2;
+    border: 2px solid #ef4444;
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    margin: 0 var(--spacing-lg) var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.exchange-rate-error-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #dc2626;
+}
+
+.exchange-rate-error-icon {
+    font-size: var(--font-size-xl);
+}
+
+.exchange-rate-set-button {
+    padding: 10px var(--spacing-lg);
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-sm);
+    transition: var(--transition-base);
+}
+
+.exchange-rate-set-button:hover {
+    background: #dc2626;
+}
+
+.exchange-rate-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.exchange-rate-input {
+    flex: 1;
+    padding: 10px;
+    border: 2px solid #dc2626;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+}
+
+.exchange-rate-save-button {
+    padding: 10px var(--spacing-lg);
+    background: #16a34a;
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-sm);
+    transition: var(--transition-base);
+}
+
+.exchange-rate-save-button:hover:not(:disabled) {
+    background: #15803d;
+}
+
+.exchange-rate-cancel-button {
+    padding: 10px var(--spacing-lg);
+    background: #6b7280;
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    transition: var(--transition-base);
+}
+
+.exchange-rate-cancel-button:hover {
+    background: #4b5563;
+}
+
+.exchange-rate-error-note {
+    font-size: 13px;
+    color: #dc2626;
+    margin: 0;
+}
+
+/* ===================================
+   REQUIRED ASTERISK
+   =================================== */
+.payment-required-asterisk {
+    color: #dc2626;
+}
+
+/* ===================================
+   FORM HELPERS
+   =================================== */
+.payment-form-helper {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.payment-form-helper-success {
+    color: #10b981;
+    font-size: var(--font-size-xs);
+}
+
+.payment-form-helper-info {
+    color: #3b82f6;
+    font-size: var(--font-size-xs);
+}
+
+.payment-form-helper-warning {
+    color: #f59e0b;
+    font-size: var(--font-size-xs);
+}
+
+.payment-form-helper-block {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    display: block;
+    margin-top: 4px;
+}
+
+/* ===================================
+   MIXED PAYMENT TARGET BOX
+   =================================== */
+.mixed-payment-target-box {
+    background: #eff6ff;
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-md);
+    border: 1px solid #3b82f6;
+}
+
+/* ===================================
+   REAL-TIME TOTAL DISPLAY
+   =================================== */
+.realtime-total-box {
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+}
+
+.realtime-total-box.short {
+    background: #fef2f2;
+    border: 2px solid #ef4444;
+}
+
+.realtime-total-box.exact {
+    background: #f0fdf4;
+    border: 2px solid #10b981;
+}
+
+.realtime-total-box.over {
+    background: #fff7ed;
+    border: 2px solid #f59e0b;
+}
+
+.realtime-total-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-xs);
+}
+
+.realtime-total-message {
+    font-size: var(--font-size-sm);
+}
+
+.realtime-total-message.short {
+    color: #dc2626;
+}
+
+.realtime-total-message.exact {
+    color: #10b981;
+}
+
+.realtime-total-message.over {
+    color: #f59e0b;
+}
+
+/* ===================================
+   SAME CURRENCY INFO BOX
+   =================================== */
+.same-currency-info-box {
+    padding: var(--spacing-md);
+    background: #f3f4f6;
+    border-radius: var(--radius-lg);
+    border: 2px solid #9ca3af;
+}
+
+.same-currency-info-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-xs);
+}
+
+.same-currency-info-header i {
+    color: #6b7280;
+}
+
+.same-currency-info-header strong {
+    color: #374151;
+}
+
+.same-currency-info-text {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin: 0 0 var(--spacing-sm) 0;
+    line-height: 1.5;
+}
+
+.same-currency-disabled-input {
+    width: 100%;
+    padding: 10px;
+    background: #e5e7eb;
+    border: 1px solid #d1d5db;
+    border-radius: var(--radius-md);
+    color: #9ca3af;
+    cursor: not-allowed;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    text-align: center;
+}
+
+/* ===================================
+   PAYMENT SUMMARY BOX
+   =================================== */
+.payment-summary-box {
+    background: #f9fafb;
+    border: 2px solid #e5e7eb;
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    margin: 0 var(--spacing-lg) var(--spacing-lg);
+}
+
+.payment-summary-title {
+    margin: 0 0 var(--spacing-sm) 0;
+    color: #374151;
+    font-size: var(--font-size-md);
+}
+
+.payment-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+}
+
+.payment-summary-total {
+    margin-top: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid #e5e7eb;
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-bold);
+    color: #111827;
+}
+
+/* ===================================
+   PAYMENT SUCCESS STATE
+   =================================== */
+.payment-success-container {
+    padding: 40px;
+    text-align: center;
+}
+
+.payment-success-icon {
+    font-size: 64px;
+    color: #16a34a;
+    margin-bottom: var(--spacing-lg);
+}
+
+.payment-success-title {
+    margin: 0 0 10px 0;
+    font-size: var(--font-size-2xl);
+    color: #111827;
+}
+
+.payment-success-amount-container {
+    font-size: var(--font-size-md);
+    color: var(--text-secondary);
+    margin-bottom: 30px;
+}
+
+.payment-success-amount {
+    color: #16a34a;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+}
+
+.payment-success-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    justify-content: center;
+}
+
+/* ===================================
+   RESPONSIVE DESIGN
+   =================================== */
+@media (max-width: 768px) {
+    .payment-modal-description {
+        padding: 0 var(--spacing-md) var(--spacing-md);
+    }
+
+    .payment-top-actions {
+        margin: 0 var(--spacing-md) var(--spacing-md);
+    }
+
+    .exchange-rate-error-box {
+        margin: 0 var(--spacing-md) var(--spacing-md);
+    }
+
+    .exchange-rate-input-group {
+        flex-direction: column;
+    }
+
+    .exchange-rate-save-button,
+    .exchange-rate-cancel-button {
+        width: 100%;
+    }
+
+    .payment-summary-box {
+        margin: 0 var(--spacing-md) var(--spacing-md);
+    }
+
+    .payment-summary-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+
+    .payment-success-container {
+        padding: var(--spacing-lg);
+    }
+
+    .payment-success-icon {
+        font-size: 48px;
+    }
+
+    .payment-success-actions {
+        flex-direction: column;
+    }
+
+    .payment-success-actions .btn {
+        width: 100%;
+    }
+}

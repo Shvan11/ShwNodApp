@@ -609,17 +609,13 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                             Add Payment - {workData.TypeName || `Work #${workData.workid}`}
                         </h2>
 
-                <div className="modal-description" style={{
-                    padding: '0 24px 20px',
-                    fontSize: '14px',
-                    color: '#6b7280'
-                }}>
+                <div className="modal-description payment-modal-description">
                     <strong>Account Currency:</strong> {calculations.accountCurrency} |
                     <strong> Balance:</strong> {formatCurrency(calculations.remainingBalance, calculations.accountCurrency)}
                 </div>
 
                 {/* Top Actions - Redundant buttons for convenience */}
-                <div className="form-actions" style={{ margin: '0 24px 20px', paddingTop: '0' }}>
+                <div className="form-actions payment-top-actions">
                     <button
                         type="button"
                         className="btn btn-secondary"
@@ -656,39 +652,21 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
 
                 {/* Exchange Rate Status */}
                 {exchangeRateError && !exchangeRate ? (
-                    <div style={{
-                        background: '#fef2f2',
-                        border: '2px solid #ef4444',
-                        borderRadius: '8px',
-                        padding: '16px',
-                        margin: '0 24px 24px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px'
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#dc2626' }}>
-                            <i className="fas fa-exclamation-triangle" style={{ fontSize: '20px' }}></i>
+                    <div className="exchange-rate-error-box">
+                        <div className="exchange-rate-error-header">
+                            <i className="fas fa-exclamation-triangle exchange-rate-error-icon"></i>
                             <strong>Exchange rate not set for {formData.paymentDate}</strong>
                         </div>
                         {!showRateInput ? (
                             <button
                                 type="button"
                                 onClick={() => setShowRateInput(true)}
-                                style={{
-                                    padding: '10px 20px',
-                                    background: '#ef4444',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    fontWeight: '600',
-                                    fontSize: '14px'
-                                }}
+                                className="exchange-rate-set-button"
                             >
                                 <i className="fas fa-plus"></i> Set Exchange Rate
                             </button>
                         ) : (
-                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                            <div className="exchange-rate-input-group">
                                 <input
                                     type="text"
                                     value={displayValues.newRateValue}
@@ -701,28 +679,13 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                         setDisplayValues(prev => ({ ...prev, newRateValue: formatted }));
                                     }}
                                     placeholder="Enter rate (e.g., 1,406)"
-                                    style={{
-                                        flex: 1,
-                                        padding: '10px',
-                                        border: '2px solid #dc2626',
-                                        borderRadius: '6px',
-                                        fontSize: '14px'
-                                    }}
+                                    className="exchange-rate-input"
                                 />
                                 <button
                                     type="button"
                                     onClick={handleSetExchangeRate}
                                     disabled={loading}
-                                    style={{
-                                        padding: '10px 20px',
-                                        background: '#16a34a',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        cursor: 'pointer',
-                                        fontWeight: '600',
-                                        fontSize: '14px'
-                                    }}
+                                    className="exchange-rate-save-button"
                                 >
                                     {loading ? 'Setting...' : 'Save'}
                                 </button>
@@ -732,21 +695,13 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                         setShowRateInput(false);
                                         setNewRateValue('');
                                     }}
-                                    style={{
-                                        padding: '10px 20px',
-                                        background: '#6b7280',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        cursor: 'pointer',
-                                        fontSize: '14px'
-                                    }}
+                                    className="exchange-rate-cancel-button"
                                 >
                                     Cancel
                                 </button>
                             </div>
                         )}
-                        <p style={{ fontSize: '13px', color: '#dc2626', margin: 0 }}>
+                        <p className="exchange-rate-error-note">
                             Exchange rate is required for currency conversion on {formData.paymentDate}. Enter: 1 USD = ? IQD
                         </p>
                     </div>
@@ -792,7 +747,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
 
                         <div className="form-group">
                             <label htmlFor="amountToRegister">
-                                Amount to Register ({calculations.accountCurrency}): <span style={{ color: '#dc2626' }}>*</span>
+                                Amount to Register ({calculations.accountCurrency}): <span className="payment-required-asterisk">*</span>
                             </label>
                             <input
                                 id="amountToRegister"
@@ -806,13 +761,13 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                 placeholder={`Amount to deduct from balance`}
                                 className="large-input"
                             />
-                            <small style={{ color: '#6b7280' }}>
+                            <small className="payment-form-helper">
                                 This amount will be registered to patient's account in {calculations.accountCurrency}
                             </small>
                         </div>
 
                         <div className="form-group">
-                            <label htmlFor="paymentDate">Payment Date: <span style={{ color: '#dc2626' }}>*</span></label>
+                            <label htmlFor="paymentDate">Payment Date: <span className="payment-required-asterisk">*</span></label>
                             <input
                                 id="paymentDate"
                                 type="date"
@@ -853,7 +808,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                 {formData.paymentCurrency === 'USD' && (
                                     <div className="form-group">
                                         <label htmlFor="actualUSD">
-                                            USD Received: <span style={{ color: '#dc2626' }}>*</span>
+                                            USD Received: <span className="payment-required-asterisk">*</span>
                                         </label>
                                         <input
                                             id="actualUSD"
@@ -873,7 +828,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                 {formData.paymentCurrency === 'IQD' && (
                                     <div className="form-group">
                                         <label htmlFor="actualIQD">
-                                            IQD Received: <span style={{ color: '#dc2626' }}>*</span>
+                                            IQD Received: <span className="payment-required-asterisk">*</span>
                                         </label>
                                         <input
                                             id="actualIQD"
@@ -893,16 +848,10 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                         ) : (
                             // Mixed Payment
                             <div className="mixed-payment-section">
-                                <div style={{
-                                    background: '#eff6ff',
-                                    padding: '12px',
-                                    borderRadius: '6px',
-                                    marginBottom: '16px',
-                                    border: '1px solid #3b82f6'
-                                }}>
+                                <div className="mixed-payment-target-box">
                                     <strong>Target:</strong> {formatCurrency(formData.amountToRegister || 0, calculations.accountCurrency)}
                                     <br/>
-                                    <small style={{ color: '#6b7280' }}>
+                                    <small className="payment-form-helper">
                                         Ask patient: "How much USD and IQD do you have?"
                                     </small>
                                 </div>
@@ -919,7 +868,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                         placeholder="Enter USD amount"
                                     />
                                     {formData.actualUSD && (
-                                        <small style={{ color: '#10b981' }}>
+                                        <small className="payment-form-helper-success">
                                             = {formatCurrency(
                                                 calculations.accountCurrency === 'USD'
                                                     ? parseFloat(formData.actualUSD)
@@ -929,7 +878,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                         </small>
                                     )}
                                     {calculations.suggestedIQD > 0 && !formData.actualIQD && (
-                                        <small style={{ color: '#3b82f6' }}>
+                                        <small className="payment-form-helper-info">
                                             💡 Still need: {formatCurrency(calculations.suggestedIQD, 'IQD')}
                                         </small>
                                     )}
@@ -947,7 +896,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                         placeholder={calculations.suggestedIQD > 0 ? `Suggested: ${formatNumber(calculations.suggestedIQD)}` : "Enter IQD amount"}
                                     />
                                     {formData.actualIQD && (
-                                        <small style={{ color: '#10b981' }}>
+                                        <small className="payment-form-helper-success">
                                             = {formatCurrency(
                                                 calculations.accountCurrency === 'IQD'
                                                     ? parseFloat(formData.actualIQD)
@@ -957,7 +906,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                         </small>
                                     )}
                                     {calculations.suggestedUSD > 0 && !formData.actualUSD && (
-                                        <small style={{ color: '#3b82f6' }}>
+                                        <small className="payment-form-helper-info">
                                             💡 Still need: {formatCurrency(calculations.suggestedUSD, 'USD')}
                                         </small>
                                     )}
@@ -965,30 +914,23 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
 
                                 {/* Real-time Total Display */}
                                 {(formData.actualUSD || formData.actualIQD) && (
-                                    <div style={{
-                                        background: calculations.isShort ? '#fef2f2' : calculations.isExact ? '#f0fdf4' : '#fff7ed',
-                                        border: `2px solid ${calculations.isShort ? '#ef4444' : calculations.isExact ? '#10b981' : '#f59e0b'}`,
-                                        borderRadius: '8px',
-                                        padding: '12px',
-                                        marginTop: '12px'
-                                    }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                            <i className={`fas ${calculations.isShort ? 'fa-exclamation-triangle' : calculations.isExact ? 'fa-check-circle' : 'fa-info-circle'}`}
-                                               style={{ color: calculations.isShort ? '#ef4444' : calculations.isExact ? '#10b981' : '#f59e0b' }}></i>
+                                    <div className={`realtime-total-box ${calculations.isShort ? 'short' : calculations.isExact ? 'exact' : 'over'}`}>
+                                        <div className="realtime-total-header">
+                                            <i className={`fas ${calculations.isShort ? 'fa-exclamation-triangle' : calculations.isExact ? 'fa-check-circle' : 'fa-info-circle'}`}></i>
                                             <strong>Total Received: {formatCurrency(calculations.totalReceived, calculations.accountCurrency)}</strong>
                                         </div>
                                         {calculations.isShort && (
-                                            <div style={{ color: '#dc2626', fontSize: '14px' }}>
+                                            <div className="realtime-total-message short">
                                                 ⚠️ Short by {formatCurrency((formData.amountToRegister || 0) - calculations.totalReceived, calculations.accountCurrency)}
                                             </div>
                                         )}
                                         {calculations.isExact && (
-                                            <div style={{ color: '#10b981', fontSize: '14px' }}>
+                                            <div className="realtime-total-message exact">
                                                 ✅ Exact amount
                                             </div>
                                         )}
                                         {calculations.isOver && (
-                                            <div style={{ color: '#f59e0b', fontSize: '14px' }}>
+                                            <div className="realtime-total-message over">
                                                 ✅ Overpaid by {formatCurrency(calculations.totalReceived - (formData.amountToRegister || 0), calculations.accountCurrency)}
                                             </div>
                                         )}
@@ -1014,17 +956,12 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                             if (isSameCurrencyPayment) {
                                 // Same currency - Hide change field, show explanation
                                 return (
-                                    <div style={{
-                                        padding: '16px',
-                                        background: '#f3f4f6',
-                                        borderRadius: '8px',
-                                        border: '2px solid #9ca3af'
-                                    }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                            <i className="fas fa-info-circle" style={{ color: '#6b7280' }}></i>
-                                            <strong style={{ color: '#374151' }}>No Change Tracking Needed</strong>
+                                    <div className="same-currency-info-box">
+                                        <div className="same-currency-info-header">
+                                            <i className="fas fa-info-circle"></i>
+                                            <strong>No Change Tracking Needed</strong>
                                         </div>
-                                        <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 12px 0', lineHeight: '1.5' }}>
+                                        <p className="same-currency-info-text">
                                             Patient is paying in <strong>{calculations.accountCurrency}</strong> and account is in <strong>{calculations.accountCurrency}</strong>.
                                             <br/>
                                             Any cash change given is standard cash handling and doesn't need to be registered in the system.
@@ -1033,18 +970,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                             type="text"
                                             value="Not Applicable"
                                             disabled
-                                            style={{
-                                                width: '100%',
-                                                padding: '10px',
-                                                background: '#e5e7eb',
-                                                border: '1px solid #d1d5db',
-                                                borderRadius: '6px',
-                                                color: '#9ca3af',
-                                                cursor: 'not-allowed',
-                                                fontSize: '14px',
-                                                fontWeight: '500',
-                                                textAlign: 'center'
-                                            }}
+                                            className="same-currency-disabled-input"
                                         />
                                     </div>
                                 );
@@ -1065,16 +991,16 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                             onFocus={() => handleMoneyInputFocus('change')}
                                             placeholder="0"
                                         />
-                                        <small style={{ color: '#6b7280', display: 'block', marginTop: '4px' }}>
+                                        <small className="payment-form-helper-block">
                                             Track IQD change given back during currency conversion
                                         </small>
                                         {calculations.calculatedChange > 0 && !formData.changeManualOverride && (
-                                            <small style={{ color: '#10b981' }}>
+                                            <small className="payment-form-helper-success">
                                                 ✓ Auto-calculated based on overpayment
                                             </small>
                                         )}
                                         {formData.changeManualOverride && (
-                                            <small style={{ color: '#f59e0b' }}>
+                                            <small className="payment-form-helper-warning">
                                                 ✏️ Manually overridden
                                             </small>
                                         )}
@@ -1087,16 +1013,10 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
 
                     {/* Final Summary - Full Width */}
                     {(formData.actualUSD || formData.actualIQD) && (
-                        <div style={{
-                            background: '#f9fafb',
-                            border: '2px solid #e5e7eb',
-                            borderRadius: '8px',
-                            padding: '16px',
-                            margin: '0 24px 24px'
-                        }}>
-                            <h4 style={{ margin: '0 0 12px 0', color: '#374151' }}>✅ Payment Summary</h4>
+                        <div className="payment-summary-box">
+                            <h4 className="payment-summary-title">✅ Payment Summary</h4>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '14px' }}>
+                            <div className="payment-summary-grid">
                                 <div>
                                     <strong>Cash IN:</strong>
                                     <br/>
@@ -1111,14 +1031,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                 </div>
                             </div>
 
-                            <div style={{
-                                marginTop: '12px',
-                                paddingTop: '12px',
-                                borderTop: '1px solid #e5e7eb',
-                                fontSize: '16px',
-                                fontWeight: 'bold',
-                                color: '#111827'
-                            }}>
+                            <div className="payment-summary-total">
                                 Registered to Account: {formatCurrency(formData.amountToRegister || 0, calculations.accountCurrency)}
                             </div>
                         </div>
@@ -1155,19 +1068,19 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                     </>
                 ) : (
                     /* Payment Success State with Print Button */
-                    <div style={{ padding: '40px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '64px', color: '#16a34a', marginBottom: '20px' }}>
+                    <div className="payment-success-container">
+                        <div className="payment-success-icon">
                             <i className="fas fa-check-circle"></i>
                         </div>
-                        <h2 style={{ margin: '0 0 10px 0', fontSize: '24px', color: '#111827' }}>
+                        <h2 className="payment-success-title">
                             Payment Recorded Successfully!
                         </h2>
-                        <p style={{ fontSize: '16px', color: '#6b7280', marginBottom: '30px' }}>
-                            Amount: <strong style={{ color: '#16a34a', fontSize: '20px' }}>
+                        <p className="payment-success-amount-container">
+                            Amount: <strong className="payment-success-amount">
                                 {formatCurrency(receiptData?.amountPaidToday || 0, receiptData?.Currency || 'IQD')}
                             </strong>
                         </p>
-                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                        <div className="payment-success-actions">
                             <button
                                 onClick={handlePrint}
                                 className="btn btn-primary btn-lg"

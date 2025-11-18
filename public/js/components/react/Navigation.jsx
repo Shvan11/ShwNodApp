@@ -214,7 +214,7 @@ const Navigation = ({ patientId, currentPage }) => {
                 onClick={() => setPhotosExpanded(false)}
             >
                 <div className="nav-item-icon">
-                    <i className="fas fa-circle" style={{ fontSize: '0.5rem' }} />
+                    <i className="fas fa-circle icon-xs" />
                 </div>
                 <div className="timepoint-content">
                     <span className="timepoint-description">{timepoint.tpDescription}</span>

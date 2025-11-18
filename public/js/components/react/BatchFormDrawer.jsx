@@ -219,9 +219,9 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                 </div>
 
                 <div className="drawer-body">
-                    <form onSubmit={handleSubmit} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <form onSubmit={handleSubmit} className="drawer-form-flex">
                         {/* Action Buttons - Top */}
-                        <div className="drawer-footer" style={{ borderTop: 'none', borderBottom: '1px solid #e0e0e0', marginTop: 0 }}>
+                        <div className="drawer-footer drawer-footer-top">
                             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
                                 Cancel
                             </button>
@@ -239,8 +239,8 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                         </div>
 
                         {/* Basic Info Section - Full Width */}
-                        <div className="form-section" style={{ padding: '0 1.5rem', paddingBottom: '0.5rem' }}>
-                            <h3 style={{ marginTop: '0.5rem', marginBottom: '0.75rem' }}>Basic Information</h3>
+                        <div className="form-section form-section-compact">
+                            <h3 className="section-heading-tight">Basic Information</h3>
                             <div className="form-field">
                                 <label htmlFor="BatchSequence">
                                     Batch Sequence <span className="required">*</span>
@@ -261,14 +261,14 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                         </div>
 
                         {/* Two-Column Layout Container - Upper and Lower Aligners */}
-                        <div className="form-two-column-container" style={{ marginTop: '0' }}>
+                        <div className="form-two-column-container">
                             {/* Left Column - Upper Aligners */}
                             <div className="form-column">
-                                <div className="form-section" style={{ paddingTop: '0.75rem' }}>
-                                    <h3 style={{ marginTop: '0', marginBottom: '0.75rem' }}>Upper Aligners
+                                <div className="form-section form-section-compact-top">
+                                    <h3 className="section-heading-no-top">Upper Aligners
                                         {set && (
-                                            <span style={{ marginLeft: '1rem', fontSize: '0.9rem', fontWeight: 'normal', color: '#6b7280' }}>
-                                                (Remaining: <strong style={{ color: set.RemainingUpperAligners > 0 ? '#059669' : '#dc2626' }}>{set.RemainingUpperAligners}</strong>)
+                                            <span className="remaining-count">
+                                                (Remaining: <strong className={set.RemainingUpperAligners > 0 ? 'positive' : 'negative'}>{set.RemainingUpperAligners}</strong>)
                                             </span>
                                         )}
                                     </h3>
@@ -317,11 +317,11 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
 
                             {/* Right Column - Lower Aligners */}
                             <div className="form-column">
-                                <div className="form-section" style={{ paddingTop: '0.75rem' }}>
-                                    <h3 style={{ marginTop: '0', marginBottom: '0.75rem' }}>Lower Aligners
+                                <div className="form-section form-section-compact-top">
+                                    <h3 className="section-heading-no-top">Lower Aligners
                                         {set && (
-                                            <span style={{ marginLeft: '1rem', fontSize: '0.9rem', fontWeight: 'normal', color: '#6b7280' }}>
-                                                (Remaining: <strong style={{ color: set.RemainingLowerAligners > 0 ? '#059669' : '#dc2626' }}>{set.RemainingLowerAligners}</strong>)
+                                            <span className="remaining-count">
+                                                (Remaining: <strong className={set.RemainingLowerAligners > 0 ? 'positive' : 'negative'}>{set.RemainingLowerAligners}</strong>)
                                             </span>
                                         )}
                                     </h3>
@@ -370,9 +370,9 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                         </div>
 
                         {/* Dates Section - Full Width */}
-                        <div className="form-section" style={{ padding: '0 1.5rem', paddingTop: '0.5rem' }}>
-                            <h3 style={{ marginTop: '0', marginBottom: '0.75rem' }}>Dates & Timing</h3>
-                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                        <div className="form-section form-section-dates">
+                            <h3 className="section-heading-no-top">Dates & Timing</h3>
+                            <div className="form-row form-row-three-col">
                                 <div className="form-field">
                                     <label htmlFor="ManufactureDate">Manufacture Date</label>
                                     <input
@@ -386,7 +386,7 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
 
                                 <div className="form-field">
                                     <label htmlFor="DeliveredToPatientDate">
-                                        Delivered Date <span style={{ fontSize: '0.85rem', fontWeight: 'normal', color: '#6b7280' }}>(optional - usually set later)</span>
+                                        Delivered Date <span className="field-optional-text">(optional - usually set later)</span>
                                     </label>
                                     <input
                                         type="date"
@@ -418,7 +418,7 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                         </div>
 
                         {/* Notes Section - Full Width */}
-                        <div className="form-section" style={{ padding: '0 1.5rem', paddingTop: '0.5rem' }}>
+                        <div className="form-section form-section-dates">
                             <div className="form-field">
                                 <label htmlFor="Notes">Notes</label>
                                 <textarea
@@ -441,7 +441,7 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                 />
                                 <label htmlFor="IsActive">Active (Being used by patient)</label>
                                 {errors.IsActive && (
-                                    <span className="error-message" style={{ display: 'block', marginTop: '0.25rem' }}>{errors.IsActive}</span>
+                                    <span className="error-message">{errors.IsActive}</span>
                                 )}
                             </div>
                         </div>

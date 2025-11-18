@@ -715,7 +715,7 @@ const EditPatientComponent = ({ patientId }) => {
                     )}
                 </div>
 
-                <div className="modal-actions flex-end-actions" style={{ marginTop: '2rem' }}>
+                <div className="modal-actions flex-end-actions mt-4">
                     <button
                         type="button"
                         onClick={handleCancel}
