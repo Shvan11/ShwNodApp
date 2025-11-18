@@ -96,24 +96,15 @@ const AllSetsList = () => {
                 </h2>
                 <div className="section-info">
                     <span>{sets.length} total sets</span>
-                    <span style={{
-                        marginLeft: '1rem',
-                        color: '#f59e0b',
-                        fontWeight: 'bold'
-                    }}>
+                    <span className="section-info-warning">
                         <i className="fas fa-exclamation-triangle"></i> {noNextBatchCount} without next batch
                     </span>
                 </div>
             </div>
 
             {/* Filter Controls */}
-            <div style={{
-                display: 'flex',
-                gap: '1rem',
-                marginBottom: '1.5rem',
-                alignItems: 'center'
-            }}>
-                <div className="patient-filter-box" style={{ flex: 1 }}>
+            <div className="allsets-filter-container">
+                <div className="patient-filter-box">
                     <i className="fas fa-filter filter-icon"></i>
                     <input
                         type="text"
@@ -130,25 +121,13 @@ const AllSetsList = () => {
                         </button>
                     )}
                 </div>
-                <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    cursor: 'pointer',
-                    backgroundColor: showOnlyNoNextBatch ? '#fef3c7' : '#f3f4f6',
-                    padding: '0.75rem 1rem',
-                    borderRadius: '8px',
-                    border: showOnlyNoNextBatch ? '2px solid #f59e0b' : '2px solid transparent',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap'
-                }}>
+                <label className={`no-batch-toggle ${showOnlyNoNextBatch ? 'active' : ''}`}>
                     <input
                         type="checkbox"
                         checked={showOnlyNoNextBatch}
                         onChange={(e) => setShowOnlyNoNextBatch(e.target.checked)}
-                        style={{ cursor: 'pointer' }}
                     />
-                    <i className="fas fa-exclamation-triangle" style={{ color: '#f59e0b' }}></i>
+                    <i className="fas fa-exclamation-triangle"></i>
                     <span>Only show without next batch</span>
                 </label>
             </div>
@@ -160,42 +139,29 @@ const AllSetsList = () => {
                     <h3>{filter || showOnlyNoNextBatch ? 'No matching sets found' : 'No aligner sets'}</h3>
                     {(filter || showOnlyNoNextBatch) && (
                         <button
-                            className="btn-clear"
+                            className="btn-clear btn-clear-filters"
                             onClick={() => {
                                 setFilter('');
                                 setShowOnlyNoNextBatch(false);
                             }}
-                            style={{ marginTop: '1rem' }}
                         >
                             Clear Filters
                         </button>
                     )}
                 </div>
             ) : (
-                <div style={{
-                    backgroundColor: 'white',
-                    borderRadius: '8px',
-                    overflow: 'hidden',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                }}>
-                    <table style={{
-                        width: '100%',
-                        borderCollapse: 'collapse',
-                        fontSize: '0.875rem'
-                    }}>
-                        <thead style={{
-                            backgroundColor: '#f9fafb',
-                            borderBottom: '2px solid #e5e7eb'
-                        }}>
+                <div className="allsets-table-container">
+                    <table className="allsets-table">
+                        <thead>
                             <tr>
-                                <th style={headerStyle}>Patient</th>
-                                <th style={headerStyle}>Doctor</th>
-                                <th style={headerStyle}>Set</th>
-                                <th style={headerStyle}>Batch</th>
-                                <th style={headerStyle}>Delivered</th>
-                                <th style={headerStyle}>Next Batch Ready</th>
-                                <th style={headerStyle}>Status</th>
-                                <th style={headerStyle}>Notes</th>
+                                <th>Patient</th>
+                                <th>Doctor</th>
+                                <th>Set</th>
+                                <th>Batch</th>
+                                <th>Delivered</th>
+                                <th>Next Batch Ready</th>
+                                <th>Status</th>
+                                <th>Notes</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -203,122 +169,58 @@ const AllSetsList = () => {
                                 <tr
                                     key={`${set.PersonID}-${set.AlignerSetID}`}
                                     onClick={() => handlePatientClick(set)}
-                                    style={{
-                                        backgroundColor: set.NextBatchPresent === 'False'
-                                            ? '#fef3c7'
-                                            : index % 2 === 0 ? 'white' : '#f9fafb',
-                                        cursor: 'pointer',
-                                        borderBottom: '1px solid #e5e7eb',
-                                        transition: 'background-color 0.15s'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.backgroundColor = set.NextBatchPresent === 'False'
-                                            ? '#fde68a'
-                                            : '#eff6ff';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.backgroundColor = set.NextBatchPresent === 'False'
-                                            ? '#fef3c7'
-                                            : index % 2 === 0 ? 'white' : '#f9fafb';
-                                    }}
+                                    className={set.NextBatchPresent === 'False' ? 'warning-row' : ''}
                                 >
-                                    <td style={cellStyle}>
-                                        <div style={{ fontWeight: '600', color: '#1f2937' }}>
+                                    <td>
+                                        <div className="allsets-patient-name">
                                             {set.PatientName}
                                         </div>
                                     </td>
-                                    <td style={cellStyle}>{set.DoctorName === 'Admin' ? set.DoctorName : `Dr. ${set.DoctorName}`}</td>
-                                    <td style={cellStyle}>
+                                    <td>{set.DoctorName === 'Admin' ? set.DoctorName : `Dr. ${set.DoctorName}`}</td>
+                                    <td>
                                         {set.SetSequence != null ? (
-                                            <span style={{
-                                                backgroundColor: '#e0e7ff',
-                                                color: '#3730a3',
-                                                padding: '0.25rem 0.5rem',
-                                                borderRadius: '4px',
-                                                fontWeight: '600'
-                                            }}>
+                                            <span className="allsets-badge allsets-badge-set">
                                                 Set {set.SetSequence}
                                             </span>
                                         ) : (
-                                            <span style={{
-                                                backgroundColor: '#f3f4f6',
-                                                color: '#6b7280',
-                                                padding: '0.25rem 0.5rem',
-                                                borderRadius: '4px',
-                                                fontWeight: '500',
-                                                fontStyle: 'italic'
-                                            }}>
+                                            <span className="allsets-badge allsets-badge-no-set">
                                                 No active set
                                             </span>
                                         )}
                                     </td>
-                                    <td style={cellStyle}>
+                                    <td>
                                         {set.BatchSequence != null ? (
-                                            <span style={{
-                                                backgroundColor: '#ddd6fe',
-                                                color: '#5b21b6',
-                                                padding: '0.25rem 0.5rem',
-                                                borderRadius: '4px',
-                                                fontWeight: '600'
-                                            }}>
+                                            <span className="allsets-badge allsets-badge-batch">
                                                 Batch {set.BatchSequence}
                                             </span>
                                         ) : (
-                                            <span style={{
-                                                backgroundColor: '#f3f4f6',
-                                                color: '#6b7280',
-                                                padding: '0.25rem 0.5rem',
-                                                borderRadius: '4px',
-                                                fontWeight: '500',
-                                                fontStyle: 'italic'
-                                            }}>
+                                            <span className="allsets-badge allsets-badge-no-batch">
                                                 No active batch
                                             </span>
                                         )}
                                     </td>
-                                    <td style={cellStyle}>{formatDate(set.DeliveredToPatientDate)}</td>
-                                    <td style={cellStyle}>{formatDate(set.NextBatchReadyDate)}</td>
-                                    <td style={cellStyle}>
+                                    <td>{formatDate(set.DeliveredToPatientDate)}</td>
+                                    <td>{formatDate(set.NextBatchReadyDate)}</td>
+                                    <td>
                                         {set.NextBatchPresent === 'False' ? (
-                                            <span style={{
-                                                backgroundColor: '#fee2e2',
-                                                color: '#991b1b',
-                                                padding: '0.25rem 0.5rem',
-                                                borderRadius: '4px',
-                                                fontWeight: '600',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '0.25rem'
-                                            }}>
+                                            <span className="allsets-badge allsets-badge-no-next">
                                                 <i className="fas fa-exclamation-circle"></i>
                                                 No Next Batch
                                             </span>
                                         ) : (
-                                            <span style={{
-                                                backgroundColor: '#d1fae5',
-                                                color: '#065f46',
-                                                padding: '0.25rem 0.5rem',
-                                                borderRadius: '4px',
-                                                fontWeight: '600',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '0.25rem'
-                                            }}>
+                                            <span className="allsets-badge allsets-badge-ready">
                                                 <i className="fas fa-check-circle"></i>
                                                 Ready
                                             </span>
                                         )}
                                     </td>
-                                    <td style={cellStyle}>
+                                    <td>
                                         {set.Notes ? (
-                                            <span style={{
-                                                color: '#6b7280',
-                                                fontSize: '0.8125rem'
-                                            }}>
+                                            <span className="allsets-notes">
                                                 {set.Notes}
                                             </span>
                                         ) : (
-                                            <span style={{ color: '#9ca3af' }}>—</span>
+                                            <span className="allsets-notes-empty">—</span>
                                         )}
                                     </td>
                                 </tr>
@@ -329,21 +231,6 @@ const AllSetsList = () => {
             )}
         </>
     );
-};
-
-const headerStyle = {
-    padding: '0.75rem 1rem',
-    textAlign: 'left',
-    fontWeight: '600',
-    color: '#374151',
-    textTransform: 'uppercase',
-    fontSize: '0.75rem',
-    letterSpacing: '0.05em'
-};
-
-const cellStyle = {
-    padding: '0.75rem 1rem',
-    color: '#1f2937'
 };
 
 export default AllSetsList;

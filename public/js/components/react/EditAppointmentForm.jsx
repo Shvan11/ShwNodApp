@@ -195,15 +195,8 @@ const EditAppointmentForm = ({ patientId, appointmentId, onClose, onSuccess }) =
     if (loadingData) {
         return (
             <div className="appointment-form-page">
-                <div className="loading-state" style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    minHeight: '400px',
-                    flexDirection: 'column',
-                    gap: '1rem'
-                }}>
-                    <i className="fas fa-spinner fa-spin" style={{ fontSize: '3rem', color: '#3b82f6' }}></i>
+                <div className="loading-state">
+                    <i className="fas fa-spinner fa-spin"></i>
                     <p>Loading appointment data...</p>
                 </div>
             </div>

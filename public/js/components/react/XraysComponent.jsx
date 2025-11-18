@@ -118,12 +118,9 @@ const XraysComponent = ({ patientId }) => {
                                         }}
                                     />
                                 ) : null}
-                                
-                                <div 
-                                    className="xray-placeholder"
-                                    style={{ 
-                                        display: xray.previewImagePartialPath ? 'none' : 'flex' 
-                                    }}
+
+                                <div
+                                    className={`xray-placeholder ${xray.previewImagePartialPath ? 'hidden' : ''}`}
                                 >
                                     <i className="fas fa-x-ray"></i>
                                     <span>View X-ray</span>

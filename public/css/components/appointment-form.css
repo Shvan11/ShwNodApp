@@ -314,3 +314,20 @@
         padding: 0;
     }
 }
+
+/* ===================================
+   LOADING STATE
+   =================================== */
+.appointment-form-page .loading-state {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.appointment-form-page .loading-state i {
+    font-size: 3rem;
+    color: var(--primary-color);
+}

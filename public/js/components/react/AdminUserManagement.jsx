@@ -223,11 +223,11 @@ export default function AdminUserManagement() {
 
       <div className="users-table">
         {loading ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+          <div className="empty-state-message">
             Loading users...
           </div>
         ) : users.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+          <div className="empty-state-message">
             No users found
           </div>
         ) : (

@@ -452,7 +452,7 @@ const DatabaseSettings = ({ onChangesUpdate }) => {
                             </button>
                         </div>
                         <div className="modal-body">
-                            <pre style={{whiteSpace: 'pre-wrap'}}>{modal.message}</pre>
+                            <pre className="whitespace-pre-wrap">{modal.message}</pre>
                         </div>
                         <div className="modal-footer">
                             <button className="btn btn-primary" onClick={hideModal}>OK</button>
