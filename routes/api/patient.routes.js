@@ -144,10 +144,17 @@ router.get("/getqrcode", async (req, res) => {
  * Get gallery images for a patient
  * GET /getgal?code={patientId}&tp={timepoint}
  */
-router.get("/getgal", (req, res) => {
-    const { code: pid, tp } = req.query;
-    const images = imaging.getImageSizes(pid, tp);
-    res.json(images);
+router.get("/getgal", async (req, res) => {
+    try {
+        const { code: pid, tp } = req.query;
+        const images = await imaging.getImageSizes(pid, tp);
+        res.json(images);
+    } catch (error) {
+        log.error('Error getting gallery images:', error);
+        return ErrorResponses.internalError(res, 'Failed to load gallery images', {
+            message: error.message
+        });
+    }
 });
 
 /**

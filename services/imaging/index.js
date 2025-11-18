@@ -4,16 +4,16 @@ import fs from 'fs';
 import { exec } from 'child_process';
 import config from '../../config/config.js';
 import { QRCodetoFile } from './qrcode.js';
-import sizeOf from "image-size";
+import { imageSizeFromFile } from "image-size/fromFile";
 import { createPathResolver } from '../../utils/path-resolver.js';
 
 /**
- * Get image sizes
+ * Get image sizes (async version using image-size v2 API)
  * @param {string} pid - Patient ID
  * @param {string} tp - Time point
- * @returns {Array} Array of image dimensions
+ * @returns {Promise<Array>} Promise resolving to array of image dimensions
  */
-function getImageSizes(pid, tp) {
+async function getImageSizes(pid, tp) {
     const imegs = [
         pid + "0" + tp + ".i10",
         pid + "0" + tp + ".i12",
@@ -27,26 +27,29 @@ function getImageSizes(pid, tp) {
     ];
 
     const pathResolver = createPathResolver(config.fileSystem.machinePath);
-    const imegsdims = [];
 
+    // Use Promise.all to read all images concurrently (non-blocking)
+    const results = await Promise.all(
+        imegs.map(async (fileName) => {
+            try {
+                const filePath = pathResolver(`working/${fileName}`);
 
-    for (let i = 0; i < imegs.length; i++) {
-        try {
-            const filePath = pathResolver(`working/${imegs[i]}`);
-            const dimensions = sizeOf(filePath); // Get image dimensions
-            
-            // Implement logic to get dimensions (you might need a library like image-size)
-            imegsdims[i] = {
-                name: imegs[i],
-                width : dimensions.width,
-                height: dimensions.height,
-            };
-        } catch (err) {
-            imegsdims[i] = null;
-        }
-    }
+                // imageSizeFromFile is truly async and non-blocking
+                const dimensions = await imageSizeFromFile(filePath);
 
-    return imegsdims;
+                return {
+                    name: fileName,
+                    width: dimensions.width,
+                    height: dimensions.height,
+                };
+            } catch (err) {
+                // Return null for missing or invalid images
+                return null;
+            }
+        })
+    );
+
+    return results;
 }
 
 /**
