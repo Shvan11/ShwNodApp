@@ -88,6 +88,12 @@
 .text-justify { text-align: justify; }
 
 /* ===================================
+   TEXT DIRECTION UTILITIES
+   =================================== */
+.text-ltr { direction: ltr; text-align: left; }
+.text-rtl { direction: rtl; text-align: right; }
+
+/* ===================================
    FONT WEIGHT UTILITIES
    =================================== */
 .font-weight-light { font-weight: var(--font-weight-light); }
@@ -102,11 +108,30 @@
 .text-decoration-none { text-decoration: none; }
 
 /* ===================================
+   ICON SIZE UTILITIES
+   =================================== */
+.icon-xs { font-size: 0.5rem; }
+.icon-sm { font-size: 0.75rem; }
+.icon-md { font-size: 1rem; }
+.icon-lg { font-size: 1.5rem; }
+.icon-xl { font-size: 2rem; }
+.icon-2xl { font-size: 3rem; }
+
+/* ===================================
    TEXT TRANSFORM UTILITIES
    =================================== */
 .text-uppercase { text-transform: uppercase; }
 .text-lowercase { text-transform: lowercase; }
 .text-capitalize { text-transform: capitalize; }
+
+/* ===================================
+   TEXT WHITESPACE UTILITIES
+   =================================== */
+.whitespace-normal { white-space: normal; }
+.whitespace-nowrap { white-space: nowrap; }
+.whitespace-pre { white-space: pre; }
+.whitespace-pre-wrap { white-space: pre-wrap; }
+.whitespace-pre-line { white-space: pre-line; }
 
 /* ===================================
    MARGIN UTILITIES

@@ -1,15 +1,119 @@
 /* pages/xrays.css - Styles specific to the X-rays page */
 
-body { 
+body {
     background-color: #cce6ff;
   }
-  
+
+/* ===================================
+   MODERN XRAY COMPONENT STYLES
+   =================================== */
+.xrays-component {
+    width: 100%;
+    padding: var(--spacing-lg);
+}
+
+.xrays-header {
+    margin-bottom: var(--spacing-lg);
+}
+
+.xrays-header h2 {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: var(--text-primary);
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-bold);
+}
+
+.xrays-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.xray-card {
+    background: var(--background-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition-base);
+}
+
+.xray-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.xray-preview {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--background-secondary);
+}
+
+.xray-view-btn {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    position: relative;
+}
+
+.xray-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.xray-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+    height: 100%;
+    color: var(--text-secondary);
+    font-size: var(--font-size-md);
+}
+
+.xray-placeholder i {
+    font-size: var(--font-size-3xl);
+    color: var(--text-secondary);
+}
+
+.xray-info {
+    padding: var(--spacing-md);
+    border-top: 1px solid var(--border-color);
+}
+
+.xray-date {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.xray-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+/* ===================================
+   LEGACY XRAY STYLES (OLD COMPONENT)
+   =================================== */
+
   .xrays-container {
     display: flex;
     flex-direction: column;
     align-items: center;
   }
-  
+
   .xrays {
     display: flex;
     flex-wrap: wrap; /* Allow items to wrap to multiple lines */
