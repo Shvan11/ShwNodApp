@@ -232,7 +232,7 @@ const GrapesJSEditor = forwardRef(({ template }, ref) => {
     };
 
     return (
-        <div ref={containerRef} id="gjs" style={{ height: 'calc(100vh - 71px)', overflow: 'hidden' }} />
+        <div ref={containerRef} id="gjs" className="grapesjs-editor-container" />
     );
 });
 

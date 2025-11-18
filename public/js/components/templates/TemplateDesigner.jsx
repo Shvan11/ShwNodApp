@@ -227,7 +227,7 @@ const TemplateDesigner = () => {
                 <div className="loading-overlay active">
                     <div className="loading-content">
                         <i className="fas fa-spinner loading-spinner"></i>
-                        <p style={{ marginTop: '15px', fontSize: '16px' }}>Saving template...</p>
+                        <p className="loading-message">Saving template...</p>
                     </div>
                 </div>
             )}

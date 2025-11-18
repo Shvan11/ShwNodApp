@@ -89,6 +89,24 @@
     overflow-x: hidden;
 }
 
+/* Padding-only class for pswp-gallery (works with dynamic inline grid styles) */
+.pswp-gallery-padded {
+    padding: 0 var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
+}
+
+/* Responsive padding adjustments */
+@media (max-width: 1024px) {
+    .pswp-gallery-padded {
+        padding: 0 var(--spacing-md) var(--spacing-md) var(--spacing-md);
+    }
+}
+
+@media (max-width: 768px) {
+    .pswp-gallery-padded {
+        padding: 0 var(--spacing-sm) var(--spacing-sm) var(--spacing-sm);
+    }
+}
+
 /* ===================================
    GALLERY IMAGE STYLING
    =================================== */
