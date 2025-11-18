@@ -2351,3 +2351,549 @@
         grid-column: span 1;
     }
 }
+
+/* ===================================
+   ALL SETS LIST STYLES
+   =================================== */
+
+/* Section Header Warning Badge */
+.section-info-warning {
+    margin-left: var(--spacing-md);
+    color: #f59e0b;
+    font-weight: var(--font-weight-bold);
+}
+
+/* Filter Controls Container */
+.allsets-filter-container {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    align-items: center;
+}
+
+.allsets-filter-container .patient-filter-box {
+    flex: 1;
+}
+
+/* No Next Batch Toggle Label */
+.no-batch-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    background-color: #f3f4f6;
+    padding: 0.75rem var(--spacing-md);
+    border-radius: var(--radius-lg);
+    border: 2px solid transparent;
+    transition: var(--transition-base);
+    white-space: nowrap;
+}
+
+.no-batch-toggle.active {
+    background-color: #fef3c7;
+    border-color: #f59e0b;
+}
+
+.no-batch-toggle input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.no-batch-toggle .fa-exclamation-triangle {
+    color: #f59e0b;
+}
+
+/* Table Container */
+.allsets-table-container {
+    background-color: var(--color-white);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.allsets-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+
+.allsets-table thead {
+    background-color: #f9fafb;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.allsets-table th {
+    padding: 0.75rem var(--spacing-md);
+    text-align: left;
+    font-weight: var(--font-weight-semibold);
+    color: #374151;
+    text-transform: uppercase;
+    font-size: var(--font-size-xs);
+    letter-spacing: var(--letter-spacing-wide);
+}
+
+.allsets-table td {
+    padding: 0.75rem var(--spacing-md);
+    color: #1f2937;
+}
+
+/* Table Row States */
+.allsets-table tbody tr {
+    cursor: pointer;
+    border-bottom: 1px solid #e5e7eb;
+    transition: background-color 0.15s;
+}
+
+.allsets-table tbody tr:nth-child(even) {
+    background-color: #f9fafb;
+}
+
+.allsets-table tbody tr:nth-child(odd) {
+    background-color: var(--color-white);
+}
+
+.allsets-table tbody tr.warning-row {
+    background-color: #fef3c7;
+}
+
+.allsets-table tbody tr:hover {
+    background-color: #eff6ff;
+}
+
+.allsets-table tbody tr.warning-row:hover {
+    background-color: #fde68a;
+}
+
+/* Patient Name Cell */
+.allsets-patient-name {
+    font-weight: var(--font-weight-semibold);
+    color: #1f2937;
+}
+
+/* Badge Variants */
+.allsets-badge {
+    padding: 0.25rem var(--spacing-sm);
+    border-radius: var(--radius-md);
+    font-weight: var(--font-weight-semibold);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: var(--font-size-sm);
+}
+
+/* Set Badge */
+.allsets-badge-set {
+    background-color: #e0e7ff;
+    color: #3730a3;
+}
+
+.allsets-badge-no-set {
+    background-color: #f3f4f6;
+    color: #6b7280;
+    font-weight: var(--font-weight-medium);
+    font-style: italic;
+}
+
+/* Batch Badge */
+.allsets-badge-batch {
+    background-color: #ddd6fe;
+    color: #5b21b6;
+}
+
+.allsets-badge-no-batch {
+    background-color: #f3f4f6;
+    color: #6b7280;
+    font-weight: var(--font-weight-medium);
+    font-style: italic;
+}
+
+/* Status Badge */
+.allsets-badge-no-next {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.allsets-badge-ready {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+/* Notes Text */
+.allsets-notes {
+    color: #6b7280;
+    font-size: 0.8125rem;
+}
+
+.allsets-notes-empty {
+    color: #9ca3af;
+}
+
+/* Clear Filter Button Margin */
+.btn-clear-filters {
+    margin-top: var(--spacing-md);
+}
+
+/* ===================================
+   PATIENT SETS STYLES  
+   =================================== */
+
+/* Hidden file input */
+.hidden-file-input {
+    display: none;
+}
+
+/* Upload Progress Overlay */
+.upload-progress-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    backdrop-filter: blur(4px);
+}
+
+.upload-progress-modal {
+    background: var(--color-white);
+    padding: 2rem 3rem;
+    border-radius: 12px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-lg);
+}
+
+.upload-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid #e5e7eb;
+    border-top: 4px solid #2563eb;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.upload-title {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    color: #1f2937;
+}
+
+.upload-subtitle {
+    font-size: var(--font-size-sm);
+    color: #6b7280;
+}
+
+/* File System Access Badge */
+.fs-access-container {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.fs-access-badge {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 6px;
+    font-size: var(--font-size-sm);
+}
+
+.fs-access-badge.success {
+    background: #d1fae5;
+}
+
+.fs-access-badge.error {
+    background: #fee2e2;
+}
+
+.fs-access-badge.success i {
+    color: #059669;
+}
+
+.fs-access-badge.error i {
+    color: #dc2626;
+}
+
+.fs-access-badge.success span {
+    color: #065f46;
+}
+
+.fs-access-badge.error span {
+    color: #991b1b;
+}
+
+.fs-access-button {
+    background: #059669;
+}
+
+.fs-access-button-error {
+    background: #dc2626;
+}
+
+/* Set Info Item Full Width */
+.set-info-item-full {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.set-info-item-full .label-with-buttons {
+    flex: 1;
+}
+
+.inline-buttons-container {
+    display: inline-flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+    margin-left: var(--spacing-sm);
+}
+
+/* URL Link Styles */
+.url-link {
+    color: #2563eb;
+    text-decoration: underline;
+}
+
+.url-not-set {
+    color: #6b7280;
+    font-style: italic;
+}
+
+/* Button Group */
+.button-group {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+/* Small Button Variant */
+.btn-small {
+    padding: 0.4rem 0.8rem;
+    font-size: var(--font-size-sm);
+}
+
+/* Medium Button Variant */
+.btn-medium {
+    padding: 0.5rem var(--spacing-md);
+    font-size: 1.1rem;
+}
+
+/* Utility: Flex with gap */
+.flex-gap-sm {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.flex-gap-md {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.flex-gap-lg {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.flex-center {
+    display: flex;
+    align-items: center;
+}
+
+.flex-1 {
+    flex: 1;
+}
+/* ===================================
+   PATIENT SETS - ADDITIONAL STYLES
+   =================================== */
+
+/* Dynamic Status Colors */
+.status-success {
+    color: #059669;
+}
+
+.status-error {
+    color: #dc2626;
+}
+
+.bg-success {
+    background: #059669;
+    color: white;
+}
+
+.bg-error {
+    background: #dc2626;
+    color: white;
+}
+
+.text-success {
+    color: #065f46;
+}
+
+.text-error {
+    color: #991b1b;
+}
+
+/* Grid Utilities */
+.grid-col-full {
+    grid-column: 1 / -1;
+}
+
+.grid-col-full-flex {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Flex Utilities - Extended */
+.flex-justify-end {
+    display: flex;
+    gap: var(--spacing-sm);
+    justify-content: flex-end;
+}
+
+.flex-space-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Font Weight Utilities */
+.font-bold {
+    font-weight: var(--font-weight-bold);
+}
+
+.font-normal {
+    font-weight: var(--font-weight-normal);
+}
+
+/* Note Section Styles */
+.add-note-section {
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    background-color: #f8f9fa;
+    border-radius: 6px;
+}
+
+.note-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.note-author-container {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.note-checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+.note-checkbox {
+    margin-right: var(--spacing-sm);
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+/* Button Sizing Variants */
+.btn-compact {
+    padding: 0.25rem 0.5rem;
+}
+
+.btn-auto-width {
+    width: auto;
+}
+
+/* Video Link Styles */
+.video-link-youtube {
+    color: #dc2626;
+    text-decoration: underline;
+}
+
+.video-link-youtube i {
+    margin-right: 0.25rem;
+}
+
+/* Batch Detail Full Width */
+.batch-detail-full {
+    grid-column: 1 / -1;
+}
+
+/* Icon Spacing Utility */
+.icon-gap-xs {
+    margin-right: 0.25rem;
+}
+
+/* Progress Bar (container only - width is dynamic) */
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #2563eb);
+    border-radius: var(--radius-md);
+    transition: width 0.3s ease;
+}
+
+/* Small Button with Icon and Text */
+.btn-sm-icon {
+    padding: 0.5rem var(--spacing-md);
+    font-size: var(--font-size-sm);
+}
+
+/* URL Input Field (for inline editing) */
+.url-input-inline {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    fontSize: 0.875rem;
+    min-width: 350px;
+}
+
+/* Note Textarea (for adding/editing notes) */
+.note-textarea-input {
+    width: 100%;
+    min-height: 100px;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    resize: vertical;
+    margin-bottom: 0.75rem;
+}
+
+/* Edit Note Textarea (slightly shorter) */
+.note-textarea-edit {
+    width: 100%;
+    min-height: 80px;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    resize: vertical;
+    margin-bottom: 0.5rem;
+}
+
+/* Batch Notes Input */
+.batch-notes-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    min-height: 60px;
+}
+
+/* Purple Button (for print labels) */
+.bg-purple {
+    background-color: #8b5cf6;
+    color: white;
+}

@@ -308,68 +308,40 @@ const EditPatientComponent = ({ patientId }) => {
 
     if (loading) {
         return (
-            <div className="work-loading" style={{ padding: '3rem', textAlign: 'center' }}>
-                <i className="fas fa-spinner fa-spin" style={{ fontSize: '2rem', color: '#3b82f6', marginBottom: '1rem' }}></i>
+            <div className="edit-patient-loading">
+                <i className="fas fa-spinner fa-spin edit-patient-loading-spinner"></i>
                 <p>Loading patient data...</p>
             </div>
         );
     }
 
     return (
-        <div className="patient-management" style={{ maxWidth: '900px', margin: '0 auto' }}>
-            <div className="work-header" style={{ marginBottom: '2rem' }}>
-                <h2 style={{
-                    fontSize: '1.5rem',
-                    fontWeight: 'bold',
-                    color: '#1f2937',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem'
-                }}>
-                    <i className="fas fa-user-edit" style={{ color: '#059669' }}></i>
+        <div className="edit-patient-container">
+            <div className="edit-patient-header">
+                <h2 className="edit-patient-title">
+                    <i className="fas fa-user-edit edit-patient-title-icon"></i>
                     Edit Patient
                 </h2>
                 {patientData && (
-                    <p style={{ color: '#6b7280', marginTop: '0.5rem' }}>
+                    <p className="edit-patient-description">
                         Editing: <strong>{patientData.PatientName}</strong> (ID: {patientData.patientID || patientData.PersonID})
                     </p>
                 )}
             </div>
 
             {error && (
-                <div style={{
-                    backgroundColor: '#fee2e2',
-                    color: '#991b1b',
-                    padding: '1rem',
-                    borderRadius: '8px',
-                    marginBottom: '1rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                }}>
+                <div className="edit-patient-error">
                     <div>
-                        <i className="fas fa-exclamation-circle" style={{ marginRight: '0.5rem' }}></i>
+                        <i className="fas fa-exclamation-circle pm-icon-gap"></i>
                         {error}
                     </div>
-                    <button onClick={() => setError(null)} style={{
-                        background: 'transparent',
-                        border: 'none',
-                        fontSize: '1.5rem',
-                        cursor: 'pointer',
-                        color: '#991b1b'
-                    }}>×</button>
+                    <button onClick={() => setError(null)} className="edit-patient-error-close">×</button>
                 </div>
             )}
 
             {successMessage && (
-                <div style={{
-                    backgroundColor: '#d1fae5',
-                    color: '#065f46',
-                    padding: '1rem',
-                    borderRadius: '8px',
-                    marginBottom: '1rem'
-                }}>
-                    <i className="fas fa-check-circle" style={{ marginRight: '0.5rem' }}></i>
+                <div className="edit-patient-success">
+                    <i className="fas fa-check-circle"></i>
                     {successMessage}
                 </div>
             )}
@@ -385,13 +357,13 @@ const EditPatientComponent = ({ patientId }) => {
                         />
                     </div>
                     <div className="form-group">
-                        <label>Patient Name (Arabic) <span style={{ color: '#dc2626' }}>*</span></label>
+                        <label>Patient Name (Arabic) <span className="required-asterisk">*</span></label>
                         <input
                             type="text"
                             value={formData.PatientName}
                             onChange={(e) => setFormData({...formData, PatientName: e.target.value})}
                             required
-                            style={{ height: '42px', lineHeight: '1.5' }}
+                            className="input-height-consistent"
                         />
                     </div>
                 </div>
@@ -586,128 +558,73 @@ const EditPatientComponent = ({ patientId }) => {
                 </div>
 
                 {/* WebCeph AI X-Ray Analysis Section */}
-                <div style={{
-                    marginTop: '3rem',
-                    padding: '2rem',
-                    backgroundColor: '#f8fafc',
-                    borderRadius: '12px',
-                    border: '2px solid #e2e8f0'
-                }}>
-                    <h3 style={{
-                        fontSize: '1.25rem',
-                        fontWeight: 'bold',
-                        color: '#1f2937',
-                        marginBottom: '1.5rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem'
-                    }}>
-                        <i className="fas fa-brain" style={{ color: '#8b5cf6' }}></i>
+                <div className="webceph-integration-section">
+                    <h3 className="webceph-section-header">
+                        <i className="fas fa-brain webceph-header-icon"></i>
                         WebCeph AI X-Ray Analysis
                     </h3>
 
                     {webcephError && (
-                        <div style={{
-                            backgroundColor: '#fee2e2',
-                            color: '#991b1b',
-                            padding: '1rem',
-                            borderRadius: '8px',
-                            marginBottom: '1rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between'
-                        }}>
+                        <div className="webceph-error">
                             <div>
-                                <i className="fas fa-exclamation-circle" style={{ marginRight: '0.5rem' }}></i>
+                                <i className="fas fa-exclamation-circle pm-icon-gap"></i>
                                 {webcephError}
                             </div>
-                            <button onClick={() => setWebcephError(null)} style={{
-                                background: 'transparent',
-                                border: 'none',
-                                fontSize: '1.5rem',
-                                cursor: 'pointer',
-                                color: '#991b1b'
-                            }}>×</button>
+                            <button onClick={() => setWebcephError(null)} className="webceph-error-close">×</button>
                         </div>
                     )}
 
                     {webcephSuccess && (
-                        <div style={{
-                            backgroundColor: '#d1fae5',
-                            color: '#065f46',
-                            padding: '1rem',
-                            borderRadius: '8px',
-                            marginBottom: '1rem'
-                        }}>
-                            <i className="fas fa-check-circle" style={{ marginRight: '0.5rem' }}></i>
+                        <div className="edit-patient-success">
+                            <i className="fas fa-check-circle"></i>
                             {webcephSuccess}
                         </div>
                     )}
 
                     {!webcephData ? (
-                        <div style={{
-                            backgroundColor: 'white',
-                            padding: '2rem',
-                            borderRadius: '8px',
-                            textAlign: 'center'
-                        }}>
-                            <i className="fas fa-user-plus" style={{ fontSize: '3rem', color: '#8b5cf6', marginBottom: '1rem' }}></i>
-                            <h4 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                        <div className="webceph-create-card">
+                            <i className="fas fa-user-plus webceph-create-icon"></i>
+                            <h4 className="webceph-create-title">
                                 Create Patient in WebCeph
                             </h4>
-                            <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+                            <p className="webceph-create-description">
                                 Get AI-powered cephalometric analysis by creating this patient in WebCeph
                             </p>
                             <button
                                 type="button"
                                 onClick={handleCreateWebcephPatient}
                                 disabled={webcephLoading}
-                                style={{
-                                    backgroundColor: '#8b5cf6',
-                                    color: 'white',
-                                    padding: '0.75rem 2rem',
-                                    borderRadius: '8px',
-                                    border: 'none',
-                                    fontSize: '1rem',
-                                    fontWeight: '600',
-                                    cursor: webcephLoading ? 'not-allowed' : 'pointer',
-                                    opacity: webcephLoading ? 0.6 : 1
-                                }}
+                                className="webceph-btn-send"
                             >
                                 {webcephLoading ? (
                                     <>
-                                        <i className="fas fa-spinner fa-spin" style={{ marginRight: '0.5rem' }}></i>
+                                        <i className="fas fa-spinner fa-spin"></i>
                                         Creating...
                                     </>
                                 ) : (
                                     <>
-                                        <i className="fas fa-plus-circle" style={{ marginRight: '0.5rem' }}></i>
+                                        <i className="fas fa-plus-circle"></i>
                                         Create in WebCeph
                                     </>
                                 )}
                             </button>
                         </div>
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                        <div className="webceph-status-container">
                             {/* Patient Link Card */}
-                            <div style={{
-                                backgroundColor: 'white',
-                                padding: '1.5rem',
-                                borderRadius: '8px',
-                                border: '1px solid #e2e8f0'
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        <i className="fas fa-check-circle" style={{ color: '#10b981' }}></i>
-                                        <span style={{ fontWeight: '600', color: '#1f2937' }}>Patient Created in WebCeph</span>
+                            <div className="webceph-patient-created-card">
+                                <div className="webceph-card-header">
+                                    <div className="webceph-card-title-group">
+                                        <i className="fas fa-check-circle webceph-success-icon"></i>
+                                        <span className="webceph-card-title">Patient Created in WebCeph</span>
                                     </div>
-                                    <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                    <span className="webceph-card-subtitle">
                                         {webcephData.createdAt ? new Date(webcephData.createdAt).toLocaleDateString() : ''}
                                     </span>
                                 </div>
-                                <div style={{ marginBottom: '1rem' }}>
-                                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>WebCeph Patient ID</div>
-                                    <div style={{ fontFamily: 'monospace', fontSize: '0.9rem', color: '#1f2937' }}>
+                                <div className="webceph-info-section">
+                                    <div className="webceph-info-label">WebCeph Patient ID</div>
+                                    <div className="webceph-info-value">
                                         {webcephData.webcephPatientId}
                                     </div>
                                 </div>
@@ -715,18 +632,7 @@ const EditPatientComponent = ({ patientId }) => {
                                     href={webcephData.link}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '0.5rem',
-                                        backgroundColor: '#8b5cf6',
-                                        color: 'white',
-                                        padding: '0.5rem 1.5rem',
-                                        borderRadius: '6px',
-                                        textDecoration: 'none',
-                                        fontSize: '0.9rem',
-                                        fontWeight: '600'
-                                    }}
+                                    className="webceph-btn-send inline-flex-link"
                                 >
                                     <i className="fas fa-external-link-alt"></i>
                                     Open in WebCeph
@@ -734,37 +640,34 @@ const EditPatientComponent = ({ patientId }) => {
                             </div>
 
                             {/* Upload X-Ray Card */}
-                            <div style={{
-                                backgroundColor: 'white',
-                                padding: '1.5rem',
-                                borderRadius: '8px',
-                                border: '1px solid #e2e8f0'
-                            }}>
-                                <h4 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937' }}>
-                                    <i className="fas fa-upload" style={{ marginRight: '0.5rem', color: '#8b5cf6' }}></i>
+                            <div className="webceph-analysis-card">
+                                <h4 className="webceph-analysis-title">
+                                    <i className="fas fa-upload webceph-header-icon"></i>
                                     Upload X-Ray Image
                                 </h4>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                                <div className="webceph-form-row">
                                     <div>
-                                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
+                                        <label className="whatsapp-form-label">
                                             Record Date
                                         </label>
                                         <input
                                             type="date"
                                             value={uploadData.recordDate}
                                             onChange={(e) => setUploadData({...uploadData, recordDate: e.target.value})}
-                                            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #d1d5db' }}
+                                            className="input-height-consistent"
+                                            className="w-full"
                                         />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
+                                        <label className="whatsapp-form-label">
                                             Photo Type
                                         </label>
                                         <select
                                             value={uploadData.targetClass}
                                             onChange={(e) => setUploadData({...uploadData, targetClass: e.target.value})}
-                                            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #d1d5db' }}
+                                            className="input-height-consistent"
+                                            className="w-full"
                                         >
                                             {photoTypes.map(type => (
                                                 <option key={type.class} value={type.class}>{type.name}</option>
@@ -773,8 +676,8 @@ const EditPatientComponent = ({ patientId }) => {
                                     </div>
                                 </div>
 
-                                <div style={{ marginBottom: '1rem' }}>
-                                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
+                                <div className="webceph-upload-section">
+                                    <label className="webceph-upload-label">
                                         X-Ray Image
                                     </label>
                                     <input
@@ -782,15 +685,9 @@ const EditPatientComponent = ({ patientId }) => {
                                         type="file"
                                         accept="image/jpeg,image/png,image/jpg"
                                         onChange={(e) => setUploadData({...uploadData, imageFile: e.target.files[0]})}
-                                        style={{
-                                            width: '100%',
-                                            padding: '0.5rem',
-                                            borderRadius: '6px',
-                                            border: '1px solid #d1d5db',
-                                            fontSize: '0.9rem'
-                                        }}
+                                        className="webceph-file-input-styled"
                                     />
-                                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                    <div className="webceph-help-text">
                                         Accepted formats: JPEG, PNG (Max 10MB)
                                     </div>
                                 </div>
@@ -799,26 +696,16 @@ const EditPatientComponent = ({ patientId }) => {
                                     type="button"
                                     onClick={handleUploadImage}
                                     disabled={webcephLoading || !uploadData.imageFile}
-                                    style={{
-                                        backgroundColor: '#059669',
-                                        color: 'white',
-                                        padding: '0.75rem 1.5rem',
-                                        borderRadius: '6px',
-                                        border: 'none',
-                                        fontSize: '0.9rem',
-                                        fontWeight: '600',
-                                        cursor: (webcephLoading || !uploadData.imageFile) ? 'not-allowed' : 'pointer',
-                                        opacity: (webcephLoading || !uploadData.imageFile) ? 0.6 : 1
-                                    }}
+                                    className="webceph-btn-upload"
                                 >
                                     {webcephLoading ? (
                                         <>
-                                            <i className="fas fa-spinner fa-spin" style={{ marginRight: '0.5rem' }}></i>
+                                            <i className="fas fa-spinner fa-spin"></i>
                                             Uploading...
                                         </>
                                     ) : (
                                         <>
-                                            <i className="fas fa-cloud-upload-alt" style={{ marginRight: '0.5rem' }}></i>
+                                            <i className="fas fa-cloud-upload-alt"></i>
                                             Upload to WebCeph
                                         </>
                                     )}
@@ -828,12 +715,7 @@ const EditPatientComponent = ({ patientId }) => {
                     )}
                 </div>
 
-                <div className="modal-actions" style={{
-                    display: 'flex',
-                    gap: '1rem',
-                    marginTop: '2rem',
-                    justifyContent: 'flex-end'
-                }}>
+                <div className="modal-actions flex-end-actions" style={{ marginTop: '2rem' }}>
                     <button
                         type="button"
                         onClick={handleCancel}
@@ -844,11 +726,7 @@ const EditPatientComponent = ({ patientId }) => {
                     </button>
                     <button
                         type="submit"
-                        className="btn"
-                        style={{
-                            backgroundColor: '#059669',
-                            color: 'white'
-                        }}
+                        className="btn bg-success"
                         disabled={saving}
                     >
                         {saving ? (

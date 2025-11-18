@@ -44,11 +44,11 @@
     --card-shadow: 0 2px 8px rgba(0,0,0,0.08);
     --selected-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3);
 
-    /* Loading and Error States */
+    /* Loading States */
     --loading-overlay-bg: rgba(255,255,255,0.95);
-    --error-color: #e74c3c;
-    --success-color: #2ecc71;
 }
+
+/* Note: Uses global --error-color and --success-color from variables.css */
 
 /* Prevent body scrolling when calendar is active */
 body:has(.appointment-calendar) {

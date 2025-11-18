@@ -862,25 +862,7 @@
    MODERN CSS ENHANCEMENTS
    ========================================== */
 
-/* CSS Custom Properties for consistent theming */
-:root {
-    --primary-color: #007bff;
-    --success-color: #28a745;
-    --warning-color: #ffc107;
-    --danger-color: #dc3545;
-    --secondary-color: #6c757d;
-    --whatsapp-green: #25D366;
-    --whatsapp-dark: #128C7E;
-    
-    --border-radius: 8px;
-    --border-radius-lg: 12px;
-    --box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    --box-shadow-lg: 0 4px 12px rgba(0,0,0,0.15);
-    
-    --transition-fast: 0.2s ease;
-    --transition-normal: 0.3s ease;
-    --transition-slow: 0.5s ease;
-}
+/* Using global CSS variables from /public/css/base/variables.css */
 
 /* Enhanced Container with CSS Grid for main layout - REMOVED DUPLICATE */
 /* This duplicate .main-layout definition has been removed to fix padding issues.

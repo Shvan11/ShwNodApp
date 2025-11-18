@@ -1,23 +1,5 @@
 /* Template Management Page Styles */
-
-:root {
-    --primary-color: #4f46e5;
-    --primary-hover: #4338ca;
-    --success-color: #10b981;
-    --danger-color: #ef4444;
-    --warning-color: #f59e0b;
-    --info-color: #3b82f6;
-    --border-color: #e5e7eb;
-    --bg-light: #f9fafb;
-    --text-dark: #111827;
-    --text-muted: #6b7280;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    --radius-sm: 6px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
-}
+/* Using global CSS variables from /public/css/base/variables.css */
 
 .main-content {
     padding: 2rem 0;

@@ -435,12 +435,7 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
     return (
         <div
             ref={componentRef}
-            style={{
-                padding: '0',
-                height: '100%',
-                overflowY: 'auto',
-                overflowX: 'hidden'
-            }}
+            className="grid-component-container"
         >
             {/* Timepoints Selector */}
             {!loadingTimepoints && timepoints.length > 0 && (
@@ -490,17 +485,7 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                                 id={element.id}
                                 src={imageSrc}
                                 alt={element.alt}
-                                style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    objectFit: 'contain',
-                                    objectPosition: 'center',
-                                    backgroundColor: '#f8f9fa',
-                                    borderRadius: '8px',
-                                    cursor: 'pointer',
-                                    transition: 'transform 0.2s ease',
-                                    border: element.isLogo ? '2px solid #ddd' : 'none'
-                                }}
+                                className={`gallery-image ${element.isLogo ? 'logo-border' : ''}`}
                                 onMouseEnter={(e) => {
                                     e.target.style.transform = 'scale(1.05)';
                                 }}

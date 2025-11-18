@@ -255,3 +255,450 @@
     max-width: 900px;
     margin: 0 auto;
 }
+
+/* ===================================
+   EDIT PATIENT COMPONENT
+   =================================== */
+
+/* Container */
+.edit-patient-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+/* Header Section */
+.edit-patient-header {
+    margin-bottom: var(--spacing-xl);
+}
+
+.edit-patient-title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin: 0 0 var(--spacing-sm) 0;
+    font-size: 1.75rem;
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+}
+
+.edit-patient-title-icon {
+    color: #059669;
+}
+
+.edit-patient-description {
+    color: #6b7280;
+    margin-top: var(--spacing-sm);
+    margin-bottom: 0;
+}
+
+/* Loading State */
+.edit-patient-loading {
+    padding: 3rem;
+    text-align: center;
+}
+
+.edit-patient-loading-spinner {
+    font-size: var(--font-size-2xl);
+    color: #3b82f6;
+    margin-bottom: var(--spacing-md);
+}
+
+/* Messages */
+.edit-patient-error {
+    background-color: #fee2e2;
+    border: 1px solid #fca5a5;
+    color: #991b1b;
+    padding: var(--spacing-md);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-md);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.edit-patient-error-close {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #991b1b;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.edit-patient-success {
+    background-color: #d1fae5;
+    border: 1px solid #6ee7b7;
+    color: #065f46;
+    padding: var(--spacing-md);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+/* Required Field Indicator */
+.required-asterisk {
+    color: #dc2626;
+}
+
+/* Input Height Consistency */
+.input-height-consistent {
+    height: 42px;
+    line-height: 1.5;
+}
+
+/* WebCeph Integration Section */
+.webceph-integration-section {
+    background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+    border: 2px solid #c084fc;
+    border-radius: 12px;
+    padding: var(--spacing-xl);
+    margin-top: var(--spacing-xl);
+    box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.1);
+}
+
+.webceph-section-header {
+    margin: 0 0 var(--spacing-md) 0;
+    font-size: 1.25rem;
+    font-weight: var(--font-weight-bold);
+    color: #7c3aed;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.webceph-header-icon {
+    color: #8b5cf6;
+}
+
+.webceph-description {
+    color: #6d28d9;
+    margin-bottom: var(--spacing-lg);
+    line-height: 1.6;
+}
+
+.webceph-error {
+    background-color: #fee2e2;
+    border: 1px solid #fca5a5;
+    color: #991b1b;
+    padding: var(--spacing-md);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-md);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.webceph-error-close {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #991b1b;
+    padding: 0;
+}
+
+.webceph-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.webceph-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+}
+
+.webceph-btn-send {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: var(--radius-lg);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    transition: var(--transition-base);
+}
+
+.webceph-btn-send:hover:not(:disabled) {
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.webceph-btn-send:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.webceph-btn-cancel {
+    background: #f3f4f6;
+    color: #374151;
+    padding: 0.75rem 1.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: var(--radius-lg);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.webceph-btn-cancel:hover {
+    background: #e5e7eb;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .edit-patient-container {
+        padding: var(--spacing-md);
+    }
+
+    .edit-patient-title {
+        font-size: 1.5rem;
+    }
+
+    .webceph-form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .webceph-actions {
+        flex-direction: column;
+    }
+
+    .webceph-btn-send,
+    .webceph-btn-cancel {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ===================================
+   WEBCEPH CREATE PATIENT CARD
+   =================================== */
+.webceph-create-card {
+    background-color: white;
+    padding: var(--spacing-xl);
+    border-radius: var(--radius-lg);
+    text-align: center;
+}
+
+.webceph-create-icon {
+    font-size: 3rem;
+    color: #8b5cf6;
+    margin-bottom: var(--spacing-md);
+}
+
+.webceph-create-title {
+    font-size: 1.1rem;
+    font-weight: var(--font-weight-semibold);
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-primary);
+}
+
+.webceph-create-description {
+    color: #6b7280;
+    margin-bottom: var(--spacing-lg);
+}
+
+/* ===================================
+   WEBCEPH STATUS SECTION
+   =================================== */
+.webceph-status-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.webceph-patient-created-card {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    border: 2px solid #10b981;
+    border-radius: 12px;
+    padding: var(--spacing-xl);
+}
+
+.webceph-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-md);
+}
+
+.webceph-card-title-group {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.webceph-success-icon {
+    color: #10b981;
+}
+
+.webceph-card-title {
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.webceph-card-subtitle {
+    font-size: var(--font-size-sm);
+    color: #6b7280;
+}
+
+.webceph-info-section {
+    margin-bottom: var(--spacing-md);
+}
+
+.webceph-info-label {
+    font-size: var(--font-size-sm);
+    color: #6b7280;
+    margin-bottom: 0.25rem;
+}
+
+.webceph-info-value {
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+/* ===================================
+   WEBCEPH ANALYSIS CARD
+   =================================== */
+.webceph-analysis-card {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 2px solid #f59e0b;
+    border-radius: 12px;
+    padding: var(--spacing-xl);
+}
+
+.webceph-analysis-title {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    margin-bottom: var(--spacing-md);
+    color: var(--text-primary);
+}
+
+.webceph-analysis-description {
+    color: #92400e;
+    margin-bottom: var(--spacing-lg);
+    line-height: 1.6;
+}
+
+.webceph-upload-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.webceph-upload-section h5 {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    margin-bottom: var(--spacing-sm);
+    color: #78350f;
+}
+
+.webceph-file-input {
+    display: block;
+    width: 100%;
+    padding: var(--spacing-sm);
+    border: 2px dashed #f59e0b;
+    border-radius: var(--radius-md);
+    background: white;
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    transition: var(--transition-base);
+}
+
+.webceph-file-input:hover {
+    border-color: #d97706;
+    background: #fffbeb;
+}
+
+.webceph-btn-upload {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: var(--radius-lg);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    transition: var(--transition-base);
+}
+
+.webceph-btn-upload:hover:not(:disabled) {
+    background: linear-gradient(135deg, #d97706, #b45309);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.webceph-btn-upload:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.webceph-help-text {
+    font-size: 0.75rem;
+    color: #92400e;
+    margin-top: var(--spacing-sm);
+}
+
+/* Mobile Responsive - WebCeph Sections */
+@media (max-width: 768px) {
+    .webceph-upload-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .webceph-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+    }
+}
+
+/* WebCeph upload form section */
+.webceph-upload-section {
+    margin-bottom: var(--spacing-md);
+}
+
+.webceph-upload-label {
+    display: block;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    margin-bottom: var(--spacing-sm);
+    color: #374151;
+}
+
+.webceph-file-input-styled {
+    width: 100%;
+    padding: var(--spacing-sm);
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    font-size: 0.9rem;
+}
+
+/* Inline flex link */
+.inline-flex-link {
+    display: inline-flex;
+    text-decoration: none;
+}
+
+/* Flex end actions */
+.flex-end-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: flex-end;
+}
