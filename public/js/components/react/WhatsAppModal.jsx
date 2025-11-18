@@ -47,121 +47,55 @@ const WhatsAppModal = ({ show, onClose, patientCode, patientName }) => {
     if (!show) return null;
 
     return (
-        <div 
+        <div
             className="whatsapp-modal-overlay"
-            style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 10000
-            }}
             onClick={(e) => {
                 if (e.target === e.currentTarget) onClose();
             }}
         >
-            <div 
-                className="whatsapp-modal"
-                style={{
-                    backgroundColor: 'white',
-                    borderRadius: '8px',
-                    padding: '20px',
-                    minWidth: '400px',
-                    maxWidth: '500px',
-                    maxHeight: '80vh',
-                    overflow: 'auto'
-                }}
-            >
+            <div className="whatsapp-modal">
                 {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '20px',
-                    borderBottom: '1px solid #eee',
-                    paddingBottom: '10px'
-                }}>
-                    <h3 style={{ margin: 0, color: '#25d366' }}>
+                <div className="whatsapp-modal-header">
+                    <h3 className="whatsapp-modal-title">
                         Send to {patientName || patientCode}
                     </h3>
-                    
+
                     <button
                         onClick={onClose}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            fontSize: '20px',
-                            cursor: 'pointer',
-                            padding: '5px'
-                        }}
+                        className="whatsapp-modal-close"
                     >
                         ×
                     </button>
                 </div>
 
                 {/* Message Input */}
-                <div style={{ marginBottom: '20px' }}>
-                    <label style={{
-                        display: 'block',
-                        marginBottom: '8px',
-                        fontWeight: 'bold'
-                    }}>
+                <div className="whatsapp-form-group">
+                    <label className="whatsapp-form-label">
                         Message:
                     </label>
-                    
+
                     <textarea
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         placeholder="Enter your message..."
                         rows={4}
-                        style={{
-                            width: '100%',
-                            padding: '10px',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
-                            fontSize: '14px',
-                            resize: 'vertical',
-                            boxSizing: 'border-box'
-                        }}
+                        className="whatsapp-textarea"
                     />
                 </div>
 
                 {/* Action Buttons */}
-                <div style={{
-                    display: 'flex',
-                    gap: '10px',
-                    justifyContent: 'flex-end'
-                }}>
+                <div className="whatsapp-actions">
                     <button
                         onClick={onClose}
-                        style={{
-                            padding: '10px 20px',
-                            backgroundColor: '#6c757d',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                        }}
+                        className="whatsapp-btn-cancel"
                     >
                         Cancel
                     </button>
-                    
+
                     <button
                         onClick={handleSend}
                         disabled={isSending || !message.trim()}
-                        style={{
-                            padding: '10px 20px',
-                            backgroundColor: isSending || !message.trim() ? '#ccc' : '#25d366',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: isSending || !message.trim() ? 'not-allowed' : 'pointer'
-                        }}
+                        className="whatsapp-btn-send"
                     >
                         {isSending ? 'Sending...' : 'Send'}
                     </button>
