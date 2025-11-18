@@ -1152,24 +1152,15 @@ const PatientSets = () => {
                                 borderRadius: '6px',
                                 fontSize: '0.875rem'
                             }}>
-                                <i className={`fas ${hasBaseDirectoryAccess ? 'fa-check-circle' : 'fa-exclamation-circle'}`}
-                                   style={{ color: hasBaseDirectoryAccess ? '#059669' : '#dc2626' }}></i>
-                                <span style={{ color: hasBaseDirectoryAccess ? '#065f46' : '#991b1b' }}>
+                                <i className={`fas ${hasBaseDirectoryAccess ? 'fa-check-circle status-success' : 'fa-exclamation-circle status-error'}`}></i>
+                                <span className={hasBaseDirectoryAccess ? 'text-success' : 'text-error'}>
                                     {hasBaseDirectoryAccess ? 'Folder Access: Active' : 'Folder Access: Not Set'}
                                 </span>
                                 {!hasBaseDirectoryAccess && (
                                     <button
                                         onClick={requestBaseDirectoryAccess}
-                                        style={{
-                                            background: '#dc2626',
-                                            color: 'white',
-                                            border: 'none',
-                                            padding: '0.25rem 0.75rem',
-                                            borderRadius: '4px',
-                                            fontSize: '0.75rem',
-                                            cursor: 'pointer',
-                                            fontWeight: '500'
-                                        }}
+                                        className="btn btn-sm bg-error"
+                                        style={{ color: 'white' }}
                                     >
                                         Grant Access
                                     </button>
@@ -1178,9 +1169,8 @@ const PatientSets = () => {
                         )}
 
                         <button
-                            className="btn-add-set"
+                            className="btn-add-set bg-success"
                             onClick={() => window.location.href = `/patient/${patient.PersonID}/edit-patient`}
-                            style={{ background: '#059669' }}
                         >
                             <i className="fas fa-edit"></i>
                             Edit Patient
