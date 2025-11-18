@@ -119,15 +119,7 @@ export default function UserManagement() {
         </p>
 
         {userInfo ? (
-          <div style={{
-            background: '#f8f9fa',
-            padding: '16px',
-            borderRadius: '6px',
-            display: 'grid',
-            gridTemplateColumns: 'auto 1fr',
-            gap: '12px 16px',
-            fontSize: '14px'
-          }}>
+          <div className="user-account-info">
             <strong>Username:</strong>
             <span>{userInfo.username}</span>
 
@@ -135,21 +127,12 @@ export default function UserManagement() {
             <span>{userInfo.fullName || 'Not set'}</span>
 
             <strong>Role:</strong>
-            <span style={{
-              display: 'inline-block',
-              padding: '4px 8px',
-              background: userInfo.role === 'admin' ? '#4CAF50' : '#2196F3',
-              color: 'white',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: '600',
-              textTransform: 'capitalize'
-            }}>
+            <span className={`user-role-badge ${userInfo.role}`}>
               {userInfo.role}
             </span>
           </div>
         ) : (
-          <div style={{ color: '#666', fontSize: '14px' }}>Loading user information...</div>
+          <div className="user-loading-text">Loading user information...</div>
         )}
       </div>
 
@@ -225,7 +208,7 @@ export default function UserManagement() {
 
         {/* Logout Section */}
         <div className="logout-section">
-          <h3 className="section-title" style={{ fontSize: '16px' }}>
+          <h3 className="section-title section-title-small">
             <i className="fas fa-sign-out-alt"></i>
             Session Management
           </h3>

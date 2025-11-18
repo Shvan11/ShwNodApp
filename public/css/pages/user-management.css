@@ -1,0 +1,245 @@
+/* user-management.css - User Management & Settings Styles */
+
+/* ===================================
+   USER MANAGEMENT CONTAINER
+   =================================== */
+.user-management-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: var(--spacing-lg);
+}
+
+/* ===================================
+   ACCOUNT INFO SECTION
+   =================================== */
+.user-account-info {
+    background: #f8f9fa;
+    padding: var(--spacing-md);
+    border-radius: 6px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 12px var(--spacing-md);
+    font-size: var(--font-size-sm);
+}
+
+.user-loading-text {
+    color: #666;
+    font-size: var(--font-size-sm);
+}
+
+/* ===================================
+   USER ROLE BADGE
+   =================================== */
+.user-role-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    color: white;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-semibold);
+    text-transform: capitalize;
+}
+
+.user-role-badge.admin {
+    background: #4CAF50;
+}
+
+.user-role-badge.user,
+.user-role-badge.secretary,
+.user-role-badge.doctor,
+.user-role-badge.staff {
+    background: #2196F3;
+}
+
+/* ===================================
+   SECTION TITLE VARIANTS
+   =================================== */
+.section-title-small {
+    font-size: var(--font-size-md);
+}
+
+/* ===================================
+   LOGOUT SECTION
+   =================================== */
+.logout-section {
+    margin-top: var(--spacing-xl);
+    padding-top: var(--spacing-xl);
+    border-top: 1px solid var(--border-color);
+}
+
+/* ===================================
+   PASSWORD REQUIREMENTS
+   =================================== */
+.password-requirements {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.password-requirements strong {
+    color: #0369a1;
+    display: block;
+    margin-bottom: var(--spacing-sm);
+}
+
+.password-requirements ul {
+    margin: 0;
+    padding-left: var(--spacing-lg);
+    color: #0c4a6e;
+}
+
+.password-requirements li {
+    margin-bottom: var(--spacing-xs);
+}
+
+/* ===================================
+   USER MANAGEMENT BUTTONS
+   =================================== */
+.user-mgmt-btn {
+    padding: var(--spacing-md) var(--spacing-xl);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    transition: var(--transition-base);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.user-mgmt-btn.primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.user-mgmt-btn.primary:hover:not(:disabled) {
+    background: #0056b3;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.user-mgmt-btn.danger {
+    background: var(--error-color);
+    color: white;
+}
+
+.user-mgmt-btn.danger:hover:not(:disabled) {
+    background: #c82333;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.user-mgmt-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ===================================
+   FORM SECTIONS
+   =================================== */
+.section-card {
+    background: var(--background-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.section-title {
+    font-size: var(--font-size-xl);
+    color: var(--text-primary);
+    margin: 0 0 var(--spacing-sm) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.section-description {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    margin: 0 0 var(--spacing-lg) 0;
+}
+
+/* ===================================
+   FORM ELEMENTS
+   =================================== */
+.form-group {
+    margin-bottom: var(--spacing-lg);
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: var(--spacing-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-primary);
+}
+
+.form-group input {
+    width: 100%;
+    padding: var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+    transition: var(--transition-fast);
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-group input:disabled {
+    background: #f3f4f6;
+    cursor: not-allowed;
+}
+
+/* ===================================
+   MESSAGES
+   =================================== */
+.message {
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-lg);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.message.success {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #6ee7b7;
+}
+
+.message.error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+}
+
+/* ===================================
+   RESPONSIVE DESIGN
+   =================================== */
+@media (max-width: 768px) {
+    .user-management-container {
+        padding: var(--spacing-md);
+    }
+
+    .section-card {
+        padding: var(--spacing-md);
+    }
+
+    .user-account-info {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-sm);
+    }
+
+    .user-mgmt-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
