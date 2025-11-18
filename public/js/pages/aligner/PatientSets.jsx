@@ -1073,25 +1073,13 @@ const PatientSets = () => {
                 type="file"
                 accept=".pdf,application/pdf"
                 onChange={handlePdfFileChange}
-                style={{ display: 'none' }}
+                className="hidden-file-input"
             />
 
             {/* Upload Progress Overlay */}
             {uploadingPdf && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.7)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 9999,
-                    backdropFilter: 'blur(4px)'
-                }}>
-                    <div style={{
+                <!-- UPLOAD_OVERLAY_START -->
+                    <!-- UPLOAD_OVERLAY_START -->
                         background: 'white',
                         padding: '2rem 3rem',
                         borderRadius: '12px',
@@ -1101,7 +1089,7 @@ const PatientSets = () => {
                         alignItems: 'center',
                         gap: '1.5rem'
                     }}>
-                        <div style={{
+                        <!-- UPLOAD_OVERLAY_START -->
                             width: '60px',
                             height: '60px',
                             border: '4px solid #e5e7eb',
@@ -1109,14 +1097,14 @@ const PatientSets = () => {
                             borderRadius: '50%',
                             animation: 'spin 1s linear infinite'
                         }}></div>
-                        <div style={{
+                        <!-- UPLOAD_OVERLAY_START -->
                             fontSize: '1.25rem',
                             fontWeight: '600',
                             color: '#1f2937'
                         }}>
                             Uploading PDF...
                         </div>
-                        <div style={{
+                        <!-- UPLOAD_OVERLAY_START -->
                             fontSize: '0.875rem',
                             color: '#6b7280'
                         }}>
@@ -1152,10 +1140,10 @@ const PatientSets = () => {
                             <span><i className="fas fa-tooth"></i> {patient.WorkType}</span>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                    <div className="fs-access-container">
                         {/* File System Access Status */}
                         {'showDirectoryPicker' in window && (
-                            <div style={{
+                            <!-- UPLOAD_OVERLAY_START -->
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '0.5rem',
@@ -1388,7 +1376,7 @@ const PatientSets = () => {
                                         )}
                                         <div className="set-info-item" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                             <i className="fas fa-external-link-alt"></i>
-                                            <span style={{ flex: 1 }}>
+                                            <span className="flex-1">
                                                 Set URL: {editingUrlForSet === set.AlignerSetID ? (
                                                     <div style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center', marginLeft: '0.5rem' }}>
                                                         <input
@@ -1408,15 +1396,15 @@ const PatientSets = () => {
                                                         />
                                                     </div>
                                                 ) : set.SetUrl ? (
-                                                    <a href={set.SetUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'underline' }}>
+                                                    <a href={set.SetUrl} target="_blank" rel="noopener noreferrer" className="url-link">
                                                         {set.SetUrl}
                                                     </a>
                                                 ) : (
-                                                    <em style={{ color: '#6b7280' }}>Not set</em>
+                                                    <em className="url-not-set">Not set</em>
                                                 )}
                                             </span>
                                             {editingUrlForSet === set.AlignerSetID ? (
-                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <div className="flex-gap-sm">
                                                     <button
                                                         className="action-icon-btn edit"
                                                         onClick={(e) => {
@@ -1425,7 +1413,7 @@ const PatientSets = () => {
                                                         }}
                                                         disabled={savingUrl}
                                                         title="Save URL"
-                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}
+                                                        className="btn-small"
                                                     >
                                                         {savingUrl ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
                                                     </button>
@@ -1436,7 +1424,7 @@ const PatientSets = () => {
                                                             handleCancelEditUrl();
                                                         }}
                                                         title="Cancel"
-                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}
+                                                        className="btn-small"
                                                     >
                                                         <i className="fas fa-times"></i>
                                                     </button>
@@ -1446,7 +1434,7 @@ const PatientSets = () => {
                                                     className="action-icon-btn edit"
                                                     onClick={(e) => handleStartEditUrl(set, e)}
                                                     title={set.SetUrl ? "Edit URL" : "Add URL"}
-                                                    style={{ padding: '0.5rem 1rem', fontSize: '1.1rem' }}
+                                                    className="btn-medium"
                                                 >
                                                     <i className={set.SetUrl ? "fas fa-edit" : "fas fa-plus"}></i>
                                                 </button>
@@ -1454,7 +1442,7 @@ const PatientSets = () => {
                                         </div>
                                         <div className="set-info-item" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                             <i className="fas fa-file-pdf"></i>
-                                            <span style={{ flex: 1 }}>
+                                            <span className="flex-1">
                                                 PDF URL: {editingPdfUrlForSet === set.AlignerSetID ? (
                                                     <div style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center', marginLeft: '0.5rem' }}>
                                                         <input
@@ -1474,15 +1462,15 @@ const PatientSets = () => {
                                                         />
                                                     </div>
                                                 ) : set.SetPdfUrl ? (
-                                                    <a href={set.SetPdfUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'underline' }}>
+                                                    <a href={set.SetPdfUrl} target="_blank" rel="noopener noreferrer" className="url-link">
                                                         {set.SetPdfUrl}
                                                     </a>
                                                 ) : (
-                                                    <em style={{ color: '#6b7280' }}>Not set</em>
+                                                    <em className="url-not-set">Not set</em>
                                                 )}
                                             </span>
                                             {editingPdfUrlForSet === set.AlignerSetID ? (
-                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <div className="flex-gap-sm">
                                                     <button
                                                         className="action-icon-btn edit"
                                                         onClick={(e) => {
@@ -1491,7 +1479,7 @@ const PatientSets = () => {
                                                         }}
                                                         disabled={savingPdfUrl}
                                                         title="Save PDF URL"
-                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}
+                                                        className="btn-small"
                                                     >
                                                         {savingPdfUrl ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
                                                     </button>
@@ -1502,7 +1490,7 @@ const PatientSets = () => {
                                                             handleCancelEditPdfUrl();
                                                         }}
                                                         title="Cancel"
-                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}
+                                                        className="btn-small"
                                                     >
                                                         <i className="fas fa-times"></i>
                                                     </button>
@@ -1512,7 +1500,7 @@ const PatientSets = () => {
                                                     className="action-icon-btn edit"
                                                     onClick={(e) => handleStartEditPdfUrl(set, e)}
                                                     title={set.SetPdfUrl ? "Edit PDF URL" : "Add PDF URL"}
-                                                    style={{ padding: '0.5rem 1rem', fontSize: '1.1rem' }}
+                                                    className="btn-medium"
                                                     disabled={uploadingPdf}
                                                 >
                                                     {uploadingPdf ? (
@@ -1525,7 +1513,7 @@ const PatientSets = () => {
                                         </div>
                                         <div className="set-info-item" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                             <i className="fas fa-video"></i>
-                                            <span style={{ flex: 1 }}>
+                                            <span className="flex-1">
                                                 Case Video: {editingVideoForSet === set.AlignerSetID ? (
                                                     <div style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center', marginLeft: '0.5rem' }}>
                                                         <input
@@ -1550,11 +1538,11 @@ const PatientSets = () => {
                                                         Watch Case Video
                                                     </a>
                                                 ) : (
-                                                    <em style={{ color: '#6b7280' }}>Not set</em>
+                                                    <em className="url-not-set">Not set</em>
                                                 )}
                                             </span>
                                             {editingVideoForSet === set.AlignerSetID ? (
-                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <div className="flex-gap-sm">
                                                     <button
                                                         className="action-icon-btn edit"
                                                         onClick={(e) => {
@@ -1563,7 +1551,7 @@ const PatientSets = () => {
                                                         }}
                                                         disabled={savingVideo}
                                                         title="Save Video URL"
-                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}
+                                                        className="btn-small"
                                                     >
                                                         {savingVideo ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
                                                     </button>
@@ -1574,7 +1562,7 @@ const PatientSets = () => {
                                                             handleCancelEditVideo();
                                                         }}
                                                         title="Cancel"
-                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}
+                                                        className="btn-small"
                                                     >
                                                         <i className="fas fa-times"></i>
                                                     </button>
@@ -1584,7 +1572,7 @@ const PatientSets = () => {
                                                     className="action-icon-btn edit"
                                                     onClick={(e) => handleStartEditVideo(set, e)}
                                                     title={set.SetVideo ? "Edit Video URL" : "Add Video URL"}
-                                                    style={{ padding: '0.5rem 1rem', fontSize: '1.1rem' }}
+                                                    className="btn-medium"
                                                 >
                                                     <i className={set.SetVideo ? "fas fa-edit" : "fas fa-plus"}></i>
                                                 </button>
@@ -1866,7 +1854,7 @@ const PatientSets = () => {
                                                                                         </div>
                                                                                     </div>
                                                                                     {/* Show edit/delete buttons */}
-                                                                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                                                    <div className="flex-gap-sm">
                                                                                         {/* Only Lab notes can be edited */}
                                                                                         {note.NoteType === 'Lab' && (
                                                                                             <button
