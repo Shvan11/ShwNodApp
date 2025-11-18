@@ -69,8 +69,9 @@ const CalendarHeader = ({
                     aria-label="Calendar view mode"
                 >
                     {[
-                        ['month', 'Month View'],
-                        ['week', 'Week View']
+                        ['day', 'Day View'],
+                        ['week', 'Week View'],
+                        ['month', 'Month View']
                     ].map(([mode, label]) => (
                         <button
                             key={mode}

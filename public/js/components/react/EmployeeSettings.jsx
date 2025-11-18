@@ -373,6 +373,7 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
                                     <th>Position</th>
                                     <th>Email</th>
                                     <th>Phone</th>
+                                    <th>Commission</th>
                                     <th>Email Notifications</th>
                                     <th>Appointments</th>
                                     <th>Actions</th>
@@ -403,6 +404,19 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
                                         </td>
                                         <td>
                                             {employee.Phone || <span className="text-muted">—</span>}
+                                        </td>
+                                        <td>
+                                            {employee.Percentage ? (
+                                                <span className="badge badge-success">
+                                                    <i className="fas fa-percent"></i>
+                                                    Yes
+                                                </span>
+                                            ) : (
+                                                <span className="badge badge-muted">
+                                                    <i className="fas fa-minus"></i>
+                                                    No
+                                                </span>
+                                            )}
                                         </td>
                                         <td>
                                             {employee.receiveEmail ? (
