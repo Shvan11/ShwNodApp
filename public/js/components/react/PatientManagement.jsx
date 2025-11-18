@@ -400,29 +400,22 @@ const PatientManagement = () => {
 
     return (
         <div className="patient-management">
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '1.5rem',
-                flexWrap: 'wrap',
-                gap: '1rem'
-            }}>
-                <h2 style={{ margin: 0 }}>Patient Management</h2>
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <div className="patient-management-header">
+                <h2>Patient Management</h2>
+                <div className="patient-management-header-actions">
                     <button
                         onClick={() => setShowQuickSearch(!showQuickSearch)}
                         className="btn btn-secondary"
                         style={{ whiteSpace: 'nowrap' }}
                     >
-                        <i className={`fas fa-${showQuickSearch ? 'chevron-up' : 'chevron-down'}`} style={{ marginRight: '0.5rem' }}></i>
+                        <i className={`fas fa-${showQuickSearch ? 'chevron-up' : 'chevron-down'} pm-icon-gap`}></i>
                         {showQuickSearch ? 'Hide' : 'Show'} Quick Search
                     </button>
                     <button
                         onClick={() => window.location.href = '/views/patient/add-patient.html'}
                         className="btn btn-primary"
                     >
-                        <i className="fas fa-plus" style={{ marginRight: '0.5rem' }}></i>
+                        <i className="fas fa-plus pm-icon-gap"></i>
                         Add New Patient
                     </button>
                 </div>
@@ -430,33 +423,18 @@ const PatientManagement = () => {
 
             {/* Quick Search Dropdowns */}
             {showQuickSearch && (
-                <div style={{
-                    marginBottom: '1.5rem',
-                    padding: '1.5rem',
-                    backgroundColor: '#eff6ff',
-                    borderRadius: '12px',
-                    border: '2px solid #3b82f6'
-                }}>
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        marginBottom: '1rem',
-                        gap: '0.5rem'
-                    }}>
-                        <i className="fas fa-bolt" style={{ color: '#3b82f6', fontSize: '1.25rem' }}></i>
-                        <h3 style={{ margin: 0, color: '#1e40af', fontSize: '1.1rem' }}>Quick Search - Select & Go</h3>
+                <div className="pm-quick-search-container">
+                    <div className="pm-quick-search-header">
+                        <i className="fas fa-bolt"></i>
+                        <h3>Quick Search - Select & Go</h3>
                     </div>
-                    <p style={{ margin: '0 0 1rem 0', color: '#1e40af', fontSize: '0.9rem' }}>
+                    <p className="pm-quick-search-description">
                         Start typing in any dropdown below to quickly find and open a patient's page
                     </p>
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                        gap: '1rem'
-                    }}>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem', color: '#1e3a8a' }}>
-                                <i className="fas fa-user" style={{ marginRight: '0.5rem' }}></i>
+                    <div className="pm-quick-search-grid">
+                        <div className="pm-quick-search-field">
+                            <label>
+                                <i className="fas fa-user pm-icon-gap"></i>
                                 Search by Name (Arabic)
                             </label>
                             <AsyncSelect
@@ -471,9 +449,9 @@ const PatientManagement = () => {
                                 loadingMessage={() => "جاري البحث..."}
                             />
                         </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem', color: '#1e3a8a' }}>
-                                <i className="fas fa-phone" style={{ marginRight: '0.5rem' }}></i>
+                        <div className="pm-quick-search-field">
+                            <label>
+                                <i className="fas fa-phone pm-icon-gap"></i>
                                 Search by Phone
                             </label>
                             <AsyncSelect
@@ -488,9 +466,9 @@ const PatientManagement = () => {
                                 loadingMessage={() => "Searching..."}
                             />
                         </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem', color: '#1e3a8a' }}>
-                                <i className="fas fa-id-card" style={{ marginRight: '0.5rem' }}></i>
+                        <div className="pm-quick-search-field">
+                            <label>
+                                <i className="fas fa-id-card pm-icon-gap"></i>
                                 Search by ID
                             </label>
                             <AsyncSelect
@@ -509,31 +487,22 @@ const PatientManagement = () => {
                 </div>
             )}
 
-            <hr style={{ margin: '2rem 0', border: 'none', borderTop: '2px solid #e5e7eb' }} />
+            <hr className="pm-section-divider" />
 
-            <div style={{ marginBottom: '1rem' }}>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#374151' }}>
-                    <i className="fas fa-search" style={{ marginRight: '0.5rem', color: '#6b7280' }}></i>
+            <div className="pm-search-section-header">
+                <h3>
+                    <i className="fas fa-search"></i>
                     Advanced Search & Management
                 </h3>
-                <p style={{ margin: '0.5rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
+                <p>
                     Search by name fields with auto-complete, or use phone/ID search. Edit and manage patient records.
                 </p>
             </div>
 
             {/* Search Form - 3 separate name fields */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                gap: '0.75rem',
-                marginBottom: '1.5rem',
-                padding: '1.5rem',
-                backgroundColor: '#f9fafb',
-                borderRadius: '8px',
-                border: '1px solid #e5e7eb'
-            }}>
+            <div className="pm-name-search-grid">
                 <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', fontSize: '0.875rem', color: '#374151' }}>
+                    <label>
                         Patient Name (Arabic)
                     </label>
                     <input
@@ -542,13 +511,13 @@ const PatientManagement = () => {
                         value={searchPatientName}
                         onChange={(e) => setSearchPatientName(e.target.value)}
                         className="search-input"
-                        style={{ width: '100%', direction: 'rtl', textAlign: 'right', height: '2.75rem', lineHeight: '1.5', padding: '0.5rem 0.75rem' }}
+                        style={{ direction: 'rtl', textAlign: 'right' }}
                         lang="ar"
                         dir="rtl"
                     />
                 </div>
                 <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', fontSize: '0.875rem', color: '#374151' }}>
+                    <label>
                         First Name (English)
                     </label>
                     <input
@@ -557,11 +526,10 @@ const PatientManagement = () => {
                         value={searchFirstName}
                         onChange={(e) => setSearchFirstName(e.target.value)}
                         className="search-input"
-                        style={{ width: '100%', height: '2.75rem', lineHeight: '1.5', padding: '0.5rem 0.75rem' }}
                     />
                 </div>
                 <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', fontSize: '0.875rem', color: '#374151' }}>
+                    <label>
                         Last Name (English)
                     </label>
                     <input
@@ -570,33 +538,25 @@ const PatientManagement = () => {
                         value={searchLastName}
                         onChange={(e) => setSearchLastName(e.target.value)}
                         className="search-input"
-                        style={{ width: '100%', height: '2.75rem', lineHeight: '1.5', padding: '0.5rem 0.75rem' }}
                     />
                 </div>
             </div>
 
             {/* Additional search options */}
-            <form onSubmit={handleSearch} style={{
-                display: 'flex',
-                gap: '0.75rem',
-                marginBottom: '1.5rem',
-                alignItems: 'center',
-                flexWrap: 'wrap'
-            }}>
+            <form onSubmit={handleSearch} className="pm-search-form">
                 <input
                     type="text"
                     placeholder="Or search by phone or ID..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="search-input"
-                    style={{ flex: '1 1 300px', minWidth: '250px' }}
+                    className="search-input pm-search-input"
                 />
                 <button
                     type="submit"
                     className="btn btn-primary"
                     disabled={loading}
                 >
-                    <i className="fas fa-search" style={{ marginRight: '0.5rem' }}></i>
+                    <i className="fas fa-search pm-icon-gap"></i>
                     {loading ? 'Searching...' : 'Search'}
                 </button>
                 <button
@@ -605,48 +565,29 @@ const PatientManagement = () => {
                     className="btn btn-secondary"
                     disabled={loading}
                 >
-                    <i className="fas fa-list" style={{ marginRight: '0.5rem' }}></i>
+                    <i className="fas fa-list pm-icon-gap"></i>
                     Show All
                 </button>
             </form>
 
             {error && (
-                <div className="work-error" style={{
-                    backgroundColor: '#fee2e2',
-                    color: '#991b1b',
-                    padding: '1rem',
-                    borderRadius: '8px',
-                    marginBottom: '1rem',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                }}>
+                <div className="pm-error-message">
                     {error}
-                    <button onClick={() => setError(null)} style={{
-                        background: 'transparent',
-                        border: 'none',
-                        fontSize: '1.5rem',
-                        cursor: 'pointer',
-                        color: '#991b1b'
-                    }}>×</button>
+                    <button onClick={() => setError(null)} className="pm-error-close">
+                        ×
+                    </button>
                 </div>
             )}
 
             {successMessage && (
-                <div style={{
-                    backgroundColor: '#d1fae5',
-                    color: '#065f46',
-                    padding: '1rem',
-                    borderRadius: '8px',
-                    marginBottom: '1rem'
-                }}>
-                    <i className="fas fa-check-circle" style={{ marginRight: '0.5rem' }}></i>
+                <div className="pm-success-message">
+                    <i className="fas fa-check-circle pm-icon-gap"></i>
                     {successMessage}
                 </div>
             )}
 
             {hasSearched && (
-                <div className="work-summary" style={{ marginBottom: '1.5rem' }}>
+                <div className="pm-results-summary">
                     <div className="summary-card">
                         <h3>Results Found</h3>
                         <span className="summary-value">{patients.length}</span>
@@ -655,26 +596,20 @@ const PatientManagement = () => {
             )}
 
             {loading && (
-                <div className="work-loading" style={{ padding: '3rem', textAlign: 'center' }}>
-                    <i className="fas fa-spinner fa-spin" style={{ fontSize: '2rem', color: '#3b82f6', marginBottom: '1rem' }}></i>
+                <div className="pm-loading-container">
+                    <i className="fas fa-spinner fa-spin pm-loading-spinner"></i>
                     <p>Searching patients...</p>
                 </div>
             )}
 
             {!loading && !hasSearched && (
-                <div style={{
-                    padding: '3rem',
-                    textAlign: 'center',
-                    backgroundColor: '#f9fafb',
-                    borderRadius: '8px',
-                    border: '2px dashed #d1d5db'
-                }}>
-                    <i className="fas fa-search" style={{ fontSize: '3rem', color: '#9ca3af', marginBottom: '1rem' }}></i>
-                    <h3 style={{ color: '#6b7280', marginBottom: '0.5rem' }}>Start Typing to Search</h3>
-                    <p style={{ color: '#9ca3af', margin: 0 }}>
+                <div className="pm-empty-state">
+                    <i className="fas fa-search"></i>
+                    <h3>Start Typing to Search</h3>
+                    <p>
                         Type at least 2 characters in any name field above. Results will appear automatically as you type.
                     </p>
-                    <p style={{ color: '#9ca3af', margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>
+                    <p>
                         Or use the phone/ID search below, or click "Show All" to view first 100 patients.
                     </p>
                 </div>
@@ -701,7 +636,7 @@ const PatientManagement = () => {
                                 <td>
                                     <strong>{patient.PatientName}</strong>
                                     {patient.FirstName && (
-                                        <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                                        <div className="pm-patient-name-secondary">
                                             {patient.FirstName} {patient.LastName}
                                         </div>
                                     )}
@@ -711,15 +646,10 @@ const PatientManagement = () => {
                                 <td>{formatDate(patient.DateofBirth)}</td>
                                 <td>{patient.GenderName || 'N/A'}</td>
                                 <td>
-                                    <div className="action-buttons" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                    <div className="pm-action-buttons">
                                         <button
                                             onClick={() => handleQuickCheckin(patient)}
-                                            className="btn btn-sm"
-                                            style={{
-                                                backgroundColor: '#10b981',
-                                                color: 'white',
-                                                border: 'none'
-                                            }}
+                                            className="btn btn-sm pm-btn-checkin"
                                             title="Add to today's appointments and check in"
                                             disabled={loading}
                                         >
@@ -727,12 +657,7 @@ const PatientManagement = () => {
                                         </button>
                                         <button
                                             onClick={() => window.location.href = `/patient/${patient.PersonID}/works`}
-                                            className="btn btn-sm"
-                                            style={{
-                                                backgroundColor: '#3b82f6',
-                                                color: 'white',
-                                                border: 'none'
-                                            }}
+                                            className="btn btn-sm pm-btn-view"
                                             title="View patient details"
                                         >
                                             <i className="fas fa-eye"></i> View
@@ -746,12 +671,7 @@ const PatientManagement = () => {
                                         </button>
                                         <button
                                             onClick={() => handleDeleteClick(patient)}
-                                            className="btn btn-sm"
-                                            style={{
-                                                backgroundColor: '#dc2626',
-                                                color: 'white',
-                                                border: 'none'
-                                            }}
+                                            className="btn btn-sm pm-btn-delete"
                                             title="Delete patient"
                                         >
                                             <i className="fas fa-trash"></i> Delete
@@ -775,7 +695,7 @@ const PatientManagement = () => {
             {/* Edit Patient Modal */}
             {showEditModal && selectedPatient && (
                 <div className="modal-overlay">
-                    <div className="work-modal" style={{ maxWidth: '800px', maxHeight: '90vh', overflow: 'auto' }}>
+                    <div className="work-modal pm-modal-wide">
                         <div className="modal-header">
                             <h3>Edit Patient - {selectedPatient.PatientName}</h3>
                             <button
@@ -797,7 +717,7 @@ const PatientManagement = () => {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label>Patient Name <span style={{ color: '#dc2626' }}>*</span></label>
+                                    <label>Patient Name <span className="pm-required-asterisk">*</span></label>
                                     <input
                                         type="text"
                                         value={editFormData.PatientName}
@@ -964,7 +884,7 @@ const PatientManagement = () => {
             {/* Delete Confirmation Modal */}
             {showDeleteConfirm && selectedPatient && (
                 <div className="modal-overlay">
-                    <div className="work-modal" style={{ maxWidth: '500px' }}>
+                    <div className="work-modal pm-modal-narrow">
                         <div className="modal-header">
                             <h3>Confirm Delete</h3>
                             <button
@@ -975,32 +895,20 @@ const PatientManagement = () => {
                             </button>
                         </div>
 
-                        <div style={{ padding: '1.5rem' }}>
-                            <div style={{
-                                backgroundColor: '#fef2f2',
-                                border: '2px solid #dc2626',
-                                borderRadius: '8px',
-                                padding: '1.5rem',
-                                marginBottom: '1.5rem'
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                                    <i className="fas fa-exclamation-triangle" style={{ color: '#dc2626', fontSize: '2rem' }}></i>
-                                    <strong style={{ color: '#991b1b', fontSize: '1.1rem' }}>PERMANENT DELETION WARNING</strong>
+                        <div className="pm-delete-modal-content">
+                            <div className="pm-delete-warning-box">
+                                <div className="pm-delete-warning-header">
+                                    <i className="fas fa-exclamation-triangle"></i>
+                                    <strong>PERMANENT DELETION WARNING</strong>
                                 </div>
-                                <p style={{ margin: '0 0 1rem 0', color: '#7f1d1d', fontSize: '1rem', fontWeight: '600' }}>
+                                <p>
                                     Are you sure you want to permanently delete patient <strong>{selectedPatient.PatientName}</strong>?
                                 </p>
-                                <div style={{
-                                    backgroundColor: '#ffffff',
-                                    padding: '1rem',
-                                    borderRadius: '6px',
-                                    border: '1px solid #fca5a5',
-                                    marginBottom: '1rem'
-                                }}>
-                                    <p style={{ margin: '0 0 0.5rem 0', color: '#991b1b', fontWeight: '600' }}>
+                                <div className="pm-delete-warning-list-container">
+                                    <p>
                                         The following data will be PERMANENTLY DELETED:
                                     </p>
-                                    <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem', color: '#7f1d1d' }}>
+                                    <ul>
                                         <li>All treatment works and procedures</li>
                                         <li>All payment records</li>
                                         <li>All appointments (past and future)</li>
@@ -1010,7 +918,7 @@ const PatientManagement = () => {
                                         <li>All other patient data</li>
                                     </ul>
                                 </div>
-                                <p style={{ margin: 0, color: '#991b1b', fontWeight: '700', fontSize: '0.95rem' }}>
+                                <p className="pm-delete-final-warning">
                                     ⚠️ THIS ACTION CANNOT BE UNDONE! ⚠️
                                 </p>
                             </div>
@@ -1024,13 +932,9 @@ const PatientManagement = () => {
                                 </button>
                                 <button
                                     onClick={handleDeleteConfirm}
-                                    className="btn"
-                                    style={{
-                                        backgroundColor: '#dc2626',
-                                        color: 'white'
-                                    }}
+                                    className="btn pm-btn-delete"
                                 >
-                                    <i className="fas fa-trash" style={{ marginRight: '0.5rem' }}></i>
+                                    <i className="fas fa-trash pm-icon-gap"></i>
                                     Delete Patient
                                 </button>
                             </div>

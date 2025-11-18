@@ -173,3 +173,36 @@
 .pr-2 { padding-right: var(--spacing-md); }
 .pr-3 { padding-right: var(--spacing-lg); }
 .pr-4 { padding-right: var(--spacing-xl); }
+
+/* ===================================
+   LOADING FALLBACK STYLES
+   =================================== */
+
+.loading-fallback {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+    font-size: var(--font-size-xl);
+    color: #64748b;
+}
+
+.loading-fallback-content {
+    text-align: center;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e2e8f0;
+    border-top: 4px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto var(--spacing-md);
+}
+
+/* Spin animation */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

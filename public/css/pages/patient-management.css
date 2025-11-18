@@ -1,0 +1,378 @@
+/* patient-management.css - Patient Management Page Styles */
+
+/* ===================================
+   PAGE HEADER
+   =================================== */
+.patient-management-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+}
+
+.patient-management-header h2 {
+    margin: 0;
+}
+
+.patient-management-header-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    align-items: center;
+}
+
+/* Icon spacing throughout the page */
+.pm-icon-gap {
+    margin-right: var(--spacing-sm);
+}
+
+/* ===================================
+   QUICK SEARCH SECTION
+   =================================== */
+.pm-quick-search-container {
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-lg);
+    background-color: #eff6ff;
+    border-radius: 12px;
+    border: 2px solid #3b82f6;
+}
+
+.pm-quick-search-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+    gap: var(--spacing-sm);
+}
+
+.pm-quick-search-header i {
+    color: #3b82f6;
+    font-size: var(--font-size-xl);
+}
+
+.pm-quick-search-header h3 {
+    margin: 0;
+    color: #1e40af;
+    font-size: 1.1rem;
+}
+
+.pm-quick-search-description {
+    margin: 0 0 var(--spacing-md) 0;
+    color: #1e40af;
+    font-size: var(--font-size-sm);
+}
+
+.pm-quick-search-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.pm-quick-search-field label {
+    display: block;
+    margin-bottom: var(--spacing-sm);
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-sm);
+    color: #1e3a8a;
+}
+
+/* ===================================
+   SECTION DIVIDER
+   =================================== */
+.pm-section-divider {
+    margin: 2rem 0;
+    border: none;
+    border-top: 2px solid #e5e7eb;
+}
+
+/* ===================================
+   ADVANCED SEARCH SECTION
+   =================================== */
+.pm-search-section-header {
+    margin-bottom: var(--spacing-md);
+}
+
+.pm-search-section-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #374151;
+}
+
+.pm-search-section-header h3 i {
+    margin-right: var(--spacing-sm);
+    color: #6b7280;
+}
+
+.pm-search-section-header p {
+    margin: var(--spacing-sm) 0 0 0;
+    color: #6b7280;
+    font-size: var(--font-size-sm);
+}
+
+/* ===================================
+   SEARCH FORM
+   =================================== */
+.pm-name-search-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-lg);
+    background-color: #f9fafb;
+    border-radius: var(--radius-lg);
+    border: 1px solid #e5e7eb;
+}
+
+.pm-name-search-grid label {
+    display: block;
+    margin-bottom: var(--spacing-sm);
+    font-weight: var(--font-weight-medium);
+    font-size: var(--font-size-sm);
+    color: #374151;
+}
+
+.pm-name-search-grid input {
+    width: 100%;
+    height: 2.75rem;
+    line-height: 1.5;
+    padding: var(--spacing-sm) 0.75rem;
+}
+
+.pm-search-form {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: var(--spacing-lg);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.pm-search-input {
+    flex: 1 1 300px;
+    min-width: 250px;
+}
+
+/* ===================================
+   MESSAGES (Error & Success)
+   =================================== */
+.pm-error-message {
+    background-color: #fee2e2;
+    color: #991b1b;
+    padding: var(--spacing-md);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-md);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pm-error-close {
+    background: transparent;
+    border: none;
+    font-size: var(--font-size-2xl);
+    cursor: pointer;
+    color: #991b1b;
+}
+
+.pm-success-message {
+    background-color: #d1fae5;
+    color: #065f46;
+    padding: var(--spacing-md);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-md);
+}
+
+/* ===================================
+   LOADING & EMPTY STATES
+   =================================== */
+.pm-loading-container {
+    padding: 3rem;
+    text-align: center;
+}
+
+.pm-loading-spinner {
+    font-size: 2rem;
+    color: #3b82f6;
+    margin-bottom: var(--spacing-md);
+}
+
+.pm-empty-state {
+    padding: 3rem;
+    text-align: center;
+    background-color: #f9fafb;
+    border-radius: var(--radius-lg);
+    border: 2px dashed #d1d5db;
+}
+
+.pm-empty-state i {
+    font-size: 3rem;
+    color: #9ca3af;
+    margin-bottom: var(--spacing-md);
+}
+
+.pm-empty-state h3 {
+    color: #6b7280;
+    margin-bottom: var(--spacing-sm);
+}
+
+.pm-empty-state p {
+    color: #9ca3af;
+    margin: 0;
+}
+
+.pm-empty-state p + p {
+    margin: var(--spacing-sm) 0 0 0;
+    font-size: var(--font-size-sm);
+}
+
+/* ===================================
+   RESULTS SUMMARY
+   =================================== */
+.pm-results-summary {
+    margin-bottom: var(--spacing-lg);
+}
+
+/* ===================================
+   TABLE - PATIENT NAME CELL
+   =================================== */
+.pm-patient-name-secondary {
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+/* ===================================
+   ACTION BUTTONS
+   =================================== */
+.pm-action-buttons {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.pm-btn-checkin {
+    background-color: #10b981;
+    color: white;
+    border: none;
+}
+
+.pm-btn-view {
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+}
+
+.pm-btn-delete {
+    background-color: #dc2626;
+    color: white;
+    border: none;
+}
+
+/* ===================================
+   MODALS
+   =================================== */
+.pm-modal-wide {
+    max-width: 800px;
+    max-height: 90vh;
+    overflow: auto;
+}
+
+.pm-modal-narrow {
+    max-width: 500px;
+}
+
+.pm-required-asterisk {
+    color: #dc2626;
+}
+
+/* ===================================
+   DELETE CONFIRMATION MODAL
+   =================================== */
+.pm-delete-modal-content {
+    padding: var(--spacing-lg);
+}
+
+.pm-delete-warning-box {
+    background-color: #fef2f2;
+    border: 2px solid #dc2626;
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.pm-delete-warning-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: var(--spacing-md);
+}
+
+.pm-delete-warning-header i {
+    color: #dc2626;
+    font-size: 2rem;
+}
+
+.pm-delete-warning-header strong {
+    color: #991b1b;
+    font-size: 1.1rem;
+}
+
+.pm-delete-warning-box > p {
+    margin: 0 0 var(--spacing-md) 0;
+    color: #7f1d1d;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+}
+
+.pm-delete-warning-list-container {
+    background-color: #ffffff;
+    padding: var(--spacing-md);
+    border-radius: 6px;
+    border: 1px solid #fca5a5;
+    margin-bottom: var(--spacing-md);
+}
+
+.pm-delete-warning-list-container p {
+    margin: 0 0 var(--spacing-sm) 0;
+    color: #991b1b;
+    font-weight: var(--font-weight-semibold);
+}
+
+.pm-delete-warning-list-container ul {
+    margin: var(--spacing-sm) 0;
+    padding-left: var(--spacing-lg);
+    color: #7f1d1d;
+}
+
+.pm-delete-final-warning {
+    margin: 0;
+    color: #991b1b;
+    font-weight: var(--font-weight-bold);
+    font-size: 0.95rem;
+}
+
+/* ===================================
+   RESPONSIVE DESIGN
+   =================================== */
+@media (max-width: 768px) {
+    .pm-quick-search-grid,
+    .pm-name-search-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .pm-search-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .pm-search-input {
+        width: 100%;
+    }
+
+    .patient-management-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .patient-management-header-actions {
+        width: 100%;
+    }
+}
