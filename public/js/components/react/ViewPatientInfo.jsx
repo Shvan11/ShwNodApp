@@ -315,15 +315,7 @@ const ViewPatientInfo = ({ patientId }) => {
                                 {!editingCost && (
                                     <button
                                         onClick={handleEditCost}
-                                        style={{
-                                            marginLeft: '0.5rem',
-                                            background: 'none',
-                                            border: 'none',
-                                            color: '#3b82f6',
-                                            cursor: 'pointer',
-                                            fontSize: '0.9rem',
-                                            padding: '0.25rem'
-                                        }}
+                                        className="btn-edit-inline"
                                         title="Edit estimated cost"
                                     >
                                         <i className="fas fa-pen"></i>
@@ -331,29 +323,18 @@ const ViewPatientInfo = ({ patientId }) => {
                                 )}
                             </span>
                             {editingCost ? (
-                                <span className="info-value" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                <span className="info-value cost-edit-container">
                                     <input
                                         type="text"
                                         value={formatNumberWithCommas(costValue)}
                                         onChange={handleCostInputChange}
                                         placeholder="Enter cost"
-                                        style={{
-                                            width: '150px',
-                                            padding: '0.25rem 0.5rem',
-                                            border: '1px solid #d1d5db',
-                                            borderRadius: '4px',
-                                            fontSize: '0.9rem'
-                                        }}
+                                        className="cost-edit-input"
                                     />
                                     <select
                                         value={currencyValue}
                                         onChange={(e) => setCurrencyValue(e.target.value)}
-                                        style={{
-                                            padding: '0.25rem 0.5rem',
-                                            border: '1px solid #d1d5db',
-                                            borderRadius: '4px',
-                                            fontSize: '0.9rem'
-                                        }}
+                                        className="cost-edit-select"
                                     >
                                         <option value="IQD">IQD</option>
                                         <option value="USD">USD</option>
@@ -362,36 +343,20 @@ const ViewPatientInfo = ({ patientId }) => {
                                     <button
                                         onClick={handleSaveCost}
                                         disabled={savingCost}
-                                        style={{
-                                            padding: '0.25rem 0.75rem',
-                                            backgroundColor: '#059669',
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            cursor: savingCost ? 'not-allowed' : 'pointer',
-                                            fontSize: '0.85rem'
-                                        }}
+                                        className="cost-edit-save"
                                     >
                                         {savingCost ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-check"></i>}
                                     </button>
                                     <button
                                         onClick={handleCancelCost}
                                         disabled={savingCost}
-                                        style={{
-                                            padding: '0.25rem 0.75rem',
-                                            backgroundColor: '#6b7280',
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            cursor: savingCost ? 'not-allowed' : 'pointer',
-                                            fontSize: '0.85rem'
-                                        }}
+                                        className="cost-edit-cancel"
                                     >
                                         <i className="fas fa-times"></i>
                                     </button>
                                 </span>
                             ) : (
-                                <span className="info-value" style={{ fontWeight: '600', color: '#059669' }}>
+                                <span className="info-value cost-value-display">
                                     {patientData.EstimatedCost
                                         ? `${formatNumberWithCommas(patientData.EstimatedCost)} ${patientData.Currency || 'IQD'}`
                                         : 'Not set'}

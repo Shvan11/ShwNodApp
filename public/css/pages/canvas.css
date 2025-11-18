@@ -154,6 +154,56 @@ body {
     opacity: 1;
   }
 
+/* ===================================
+   CANVAS CONTROL BUTTONS (OVERLAY)
+   =================================== */
+
+.canvas-controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    gap: var(--spacing-sm);
+    z-index: var(--z-index-sticky);
+    flex-wrap: wrap;
+}
+
+.canvas-controls button {
+    padding: var(--spacing-sm) 12px;
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.canvas-controls button:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+/* Button color variants */
+.canvas-controls .btn-zoom-in {
+    background-color: var(--success-color);
+}
+
+.canvas-controls .btn-zoom-out {
+    background-color: var(--info-color);
+}
+
+.canvas-controls .btn-rotate {
+    background-color: var(--warning-orange);
+}
+
+.canvas-controls .btn-reset {
+    background-color: var(--neutral-gray);
+}
+
+.canvas-controls .btn-whatsapp {
+    background-color: #25d366; /* WhatsApp brand color */
+}
+
 /* ===== MOBILE RESPONSIVE DESIGN ===== */
 
 /* Tablets and medium screens */
