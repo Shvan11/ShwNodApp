@@ -14,14 +14,48 @@
    =================================== */
 @import 'components/buttons.css';
 @import 'components/universal-header.css';
-@import 'components/whatsapp-auth.css';
-@import 'components/appointment-calendar.css';
 @import 'components/sidebar-navigation.css';
 @import 'components/toast.css';
+@import 'components/whatsapp-auth.css';
+@import 'components/appointment-calendar.css';
+@import 'components/appointment-form.css';
+@import 'components/aligner-drawer-form.css';
+@import 'components/aligner-set-card.css';
+@import 'components/calendar-picker-modal.css';
+@import 'components/dental-chart.css';
+@import 'components/invoice-form.css';
+@import 'components/new-visit-component.css';
+@import 'components/new-work-component.css';
+@import 'components/simplified-calendar-picker.css';
+@import 'components/timepoints-selector.css';
+@import 'components/visits-component.css';
+@import 'components/work-card.css';
 
 /* ===================================
    PAGE-SPECIFIC STYLES
    =================================== */
-@import 'pages/work-management.css';
-@import 'pages/patient-info.css';
+@import 'pages/dashboard.css';
 @import 'pages/patient-shell.css';
+@import 'pages/patient-info.css';
+@import 'pages/add-patient.css';
+@import 'pages/edit-patient.css';
+@import 'pages/grid.css';
+@import 'pages/xrays.css';
+@import 'pages/canvas.css';
+@import 'pages/visits-summary.css';
+@import 'pages/visits-spacing.css';
+@import 'pages/work-management.css';
+@import 'pages/work-payments.css';
+@import 'pages/aligner.css';
+@import 'pages/appointments.css';
+@import 'pages/expenses.css';
+@import 'pages/statistics.css';
+@import 'pages/send.css';
+@import 'pages/settings.css';
+@import 'pages/template-designer.css';
+@import 'pages/template-management.css';
+
+/* Excluded Files (unused/superseded):
+   - send-message.css (440 lines) - Legacy HTML, removed
+   - aligner-refactored.css (321 lines) - Superseded by aligner.css
+*/
