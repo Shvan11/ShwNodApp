@@ -53,22 +53,7 @@ const DoctorsList = () => {
                     <span>{doctors.length} doctor{doctors.length !== 1 ? 's' : ''}</span>
                     <a
                         href="/settings?tab=alignerDoctors"
-                        className="btn-link"
-                        style={{
-                            marginLeft: '1rem',
-                            padding: '0.5rem 1rem',
-                            backgroundColor: '#2563eb',
-                            color: 'white',
-                            borderRadius: '6px',
-                            textDecoration: 'none',
-                            fontSize: '0.875rem',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            transition: 'background-color 0.2s'
-                        }}
-                        onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}
-                        onMouseLeave={(e) => e.target.style.backgroundColor = '#2563eb'}
+                        className="btn-link btn-manage-doctors"
                         title="Manage aligner doctors and portal access"
                     >
                         <i className="fas fa-cog"></i>

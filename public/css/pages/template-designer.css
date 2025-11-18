@@ -114,6 +114,11 @@
     overflow: hidden;
 }
 
+.grapesjs-editor-container {
+    height: calc(100vh - 71px);
+    overflow: hidden;
+}
+
 /* Override some GrapesJS default styles for better integration */
 .gjs-one-bg {
     background-color: #f8f9fa;
@@ -163,6 +168,12 @@
     font-size: 2.5rem;
     color: var(--primary-color);
     animation: spin 1s linear infinite;
+}
+
+.loading-message {
+    margin-top: var(--spacing-md);
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
 }
 
 @keyframes spin {

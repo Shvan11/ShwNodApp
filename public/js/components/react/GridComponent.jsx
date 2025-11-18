@@ -460,11 +460,8 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
 
             <div
                 id="dolph_gallery"
-                className="pswp-gallery"
-                style={{
-                    ...calculateGridStyle(),
-                    padding: '0 20px 20px 20px'
-                }}
+                className="pswp-gallery pswp-gallery-padded"
+                style={calculateGridStyle()}
             >
                 {imageElements.map(element => {
                     const imageSrc = getImageSrc(element);

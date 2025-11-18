@@ -137,9 +137,8 @@ const PatientsList = () => {
                     <h3>{patientFilter ? 'No matching patients found' : 'No patients with aligner sets'}</h3>
                     {patientFilter && (
                         <button
-                            className="btn-clear"
+                            className="btn-clear btn-clear-spaced"
                             onClick={() => setPatientFilter('')}
-                            style={{ marginTop: '1rem' }}
                         >
                             Clear Filter
                         </button>
@@ -169,7 +168,7 @@ const PatientsList = () => {
                                             e.target.nextElementSibling.style.display = 'flex';
                                         }}
                                     />
-                                    <div className="patient-photo-placeholder" style={{ display: 'none' }}>
+                                    <div className="patient-photo-placeholder patient-photo-placeholder-hidden">
                                         <i className="fas fa-user"></i>
                                     </div>
                                 </div>
