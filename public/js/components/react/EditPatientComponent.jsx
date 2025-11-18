@@ -308,68 +308,40 @@ const EditPatientComponent = ({ patientId }) => {
 
     if (loading) {
         return (
-            <div className="work-loading" style={{ padding: '3rem', textAlign: 'center' }}>
-                <i className="fas fa-spinner fa-spin" style={{ fontSize: '2rem', color: '#3b82f6', marginBottom: '1rem' }}></i>
+            <div className="edit-patient-loading">
+                <i className="fas fa-spinner fa-spin edit-patient-loading-spinner"></i>
                 <p>Loading patient data...</p>
             </div>
         );
     }
 
     return (
-        <div className="patient-management" style={{ maxWidth: '900px', margin: '0 auto' }}>
-            <div className="work-header" style={{ marginBottom: '2rem' }}>
-                <h2 style={{
-                    fontSize: '1.5rem',
-                    fontWeight: 'bold',
-                    color: '#1f2937',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem'
-                }}>
-                    <i className="fas fa-user-edit" style={{ color: '#059669' }}></i>
+        <div className="edit-patient-container">
+            <div className="edit-patient-header">
+                <h2 className="edit-patient-title">
+                    <i className="fas fa-user-edit edit-patient-title-icon"></i>
                     Edit Patient
                 </h2>
                 {patientData && (
-                    <p style={{ color: '#6b7280', marginTop: '0.5rem' }}>
+                    <p className="edit-patient-description">
                         Editing: <strong>{patientData.PatientName}</strong> (ID: {patientData.patientID || patientData.PersonID})
                     </p>
                 )}
             </div>
 
             {error && (
-                <div style={{
-                    backgroundColor: '#fee2e2',
-                    color: '#991b1b',
-                    padding: '1rem',
-                    borderRadius: '8px',
-                    marginBottom: '1rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                }}>
+                <div className="edit-patient-error">
                     <div>
-                        <i className="fas fa-exclamation-circle" style={{ marginRight: '0.5rem' }}></i>
+                        <i className="fas fa-exclamation-circle pm-icon-gap"></i>
                         {error}
                     </div>
-                    <button onClick={() => setError(null)} style={{
-                        background: 'transparent',
-                        border: 'none',
-                        fontSize: '1.5rem',
-                        cursor: 'pointer',
-                        color: '#991b1b'
-                    }}>×</button>
+                    <button onClick={() => setError(null)} className="edit-patient-error-close">×</button>
                 </div>
             )}
 
             {successMessage && (
-                <div style={{
-                    backgroundColor: '#d1fae5',
-                    color: '#065f46',
-                    padding: '1rem',
-                    borderRadius: '8px',
-                    marginBottom: '1rem'
-                }}>
-                    <i className="fas fa-check-circle" style={{ marginRight: '0.5rem' }}></i>
+                <div className="edit-patient-success">
+                    <i className="fas fa-check-circle"></i>
                     {successMessage}
                 </div>
             )}
@@ -385,13 +357,13 @@ const EditPatientComponent = ({ patientId }) => {
                         />
                     </div>
                     <div className="form-group">
-                        <label>Patient Name (Arabic) <span style={{ color: '#dc2626' }}>*</span></label>
+                        <label>Patient Name (Arabic) <span className="required-asterisk">*</span></label>
                         <input
                             type="text"
                             value={formData.PatientName}
                             onChange={(e) => setFormData({...formData, PatientName: e.target.value})}
                             required
-                            style={{ height: '42px', lineHeight: '1.5' }}
+                            className="input-height-consistent"
                         />
                     </div>
                 </div>
@@ -586,60 +558,25 @@ const EditPatientComponent = ({ patientId }) => {
                 </div>
 
                 {/* WebCeph AI X-Ray Analysis Section */}
-                <div style={{
-                    marginTop: '3rem',
-                    padding: '2rem',
-                    backgroundColor: '#f8fafc',
-                    borderRadius: '12px',
-                    border: '2px solid #e2e8f0'
-                }}>
-                    <h3 style={{
-                        fontSize: '1.25rem',
-                        fontWeight: 'bold',
-                        color: '#1f2937',
-                        marginBottom: '1.5rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem'
-                    }}>
-                        <i className="fas fa-brain" style={{ color: '#8b5cf6' }}></i>
+                <div className="webceph-integration-section">
+                    <h3 className="webceph-section-header">
+                        <i className="fas fa-brain webceph-header-icon"></i>
                         WebCeph AI X-Ray Analysis
                     </h3>
 
                     {webcephError && (
-                        <div style={{
-                            backgroundColor: '#fee2e2',
-                            color: '#991b1b',
-                            padding: '1rem',
-                            borderRadius: '8px',
-                            marginBottom: '1rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between'
-                        }}>
+                        <div className="webceph-error">
                             <div>
-                                <i className="fas fa-exclamation-circle" style={{ marginRight: '0.5rem' }}></i>
+                                <i className="fas fa-exclamation-circle pm-icon-gap"></i>
                                 {webcephError}
                             </div>
-                            <button onClick={() => setWebcephError(null)} style={{
-                                background: 'transparent',
-                                border: 'none',
-                                fontSize: '1.5rem',
-                                cursor: 'pointer',
-                                color: '#991b1b'
-                            }}>×</button>
+                            <button onClick={() => setWebcephError(null)} className="webceph-error-close">×</button>
                         </div>
                     )}
 
                     {webcephSuccess && (
-                        <div style={{
-                            backgroundColor: '#d1fae5',
-                            color: '#065f46',
-                            padding: '1rem',
-                            borderRadius: '8px',
-                            marginBottom: '1rem'
-                        }}>
-                            <i className="fas fa-check-circle" style={{ marginRight: '0.5rem' }}></i>
+                        <div className="edit-patient-success">
+                            <i className="fas fa-check-circle"></i>
                             {webcephSuccess}
                         </div>
                     )}
