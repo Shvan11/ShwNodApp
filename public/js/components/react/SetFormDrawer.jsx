@@ -335,12 +335,12 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
 
                 <div className="drawer-body">
                     {!doctorsLoaded && !set ? (
-                        <div style={{ padding: '2rem', textAlign: 'center' }}>
-                            <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
+                        <div className="drawer-loading-container">
+                            <div className="spinner"></div>
                             <p>Loading doctors list...</p>
                         </div>
                     ) : (
-                        <form onSubmit={handleSubmit} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        <form onSubmit={handleSubmit} className="drawer-form-flex">
                             {/* Tab Navigation */}
                             <div className="form-tabs">
                                 <button
@@ -370,7 +370,7 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                             </div>
 
                             {/* Action Buttons - Top */}
-                            <div className="drawer-footer" style={{ borderTop: 'none', borderBottom: '1px solid #e0e0e0', marginTop: 0 }}>
+                            <div className="drawer-footer drawer-footer-top">
                                 <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
                                     Cancel
                                 </button>
@@ -526,7 +526,7 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                                                 onChange={handleChange}
                                                 placeholder="https://www.youtube.com/watch?v=..."
                                             />
-                                            <small style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '0.25rem', display: 'block' }}>
+                                            <small className="pdf-upload-info">
                                                 Add YouTube unlisted video URL for case explanation
                                             </small>
                                         </div>
@@ -535,30 +535,22 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                                         <div className="form-field">
                                             <label>PDF File</label>
                                             {formData.SetPdfUrl ? (
-                                                <div style={{
-                                                    background: '#f0f9ff',
-                                                    border: '1px solid #bae6fd',
-                                                    borderRadius: '6px',
-                                                    padding: '0.75rem',
-                                                    marginBottom: '0.5rem'
-                                                }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                                                        <i className="fas fa-file-pdf" style={{ color: '#0284c7' }}></i>
-                                                        <span style={{ color: '#0c4a6e', fontWeight: '500' }}>PDF Uploaded</span>
+                                                <div className="pdf-uploaded-status">
+                                                    <div className="pdf-status-header">
+                                                        <i className="fas fa-file-pdf"></i>
+                                                        <span>PDF Uploaded</span>
                                                     </div>
-                                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <div className="pdf-status-actions">
                                                         <button
                                                             type="button"
-                                                            className="btn btn-secondary"
-                                                            style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
+                                                            className="btn btn-secondary btn-sm"
                                                             onClick={() => window.open(formData.SetPdfUrl, '_blank')}
                                                         >
                                                             <i className="fas fa-external-link-alt"></i> View PDF
                                                         </button>
                                                         <button
                                                             type="button"
-                                                            className="btn btn-danger"
-                                                            style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
+                                                            className="btn btn-danger btn-sm"
                                                             onClick={handlePdfDelete}
                                                             disabled={deletingPdf}
                                                         >
@@ -579,8 +571,7 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                                                     {folderPath && (
                                                         <button
                                                             type="button"
-                                                            className="btn btn-secondary"
-                                                            style={{ fontSize: '0.9rem', padding: '0.6rem 1rem', width: '100%', marginBottom: '0.75rem' }}
+                                                            className="btn btn-secondary pdf-upload-btn-full"
                                                             onClick={openFolder}
                                                         >
                                                             <i className="fas fa-folder-open"></i> Open Patient Folder
@@ -589,6 +580,7 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                                                     <input
                                                         type="file"
                                                         accept=".pdf,application/pdf"
+                                                        className="pdf-file-input"
                                                         onClick={() => {
                                                             // Automatically copy folder path to clipboard when file input is clicked
                                                             copyFolderPathToClipboard();
@@ -609,33 +601,13 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                                                                 setPdfFile(file);
                                                             }
                                                         }}
-                                                        style={{
-                                                            width: '100%',
-                                                            padding: '0.55rem 0.7rem',
-                                                            border: '1px solid #d1d5db',
-                                                            borderRadius: '4px',
-                                                            fontSize: '0.9rem',
-                                                            cursor: 'pointer'
-                                                        }}
                                                     />
                                                     {pdfFile && (
-                                                        <div style={{
-                                                            marginTop: '0.5rem',
-                                                            padding: '0.5rem',
-                                                            background: '#f0fdf4',
-                                                            border: '1px solid #bbf7d0',
-                                                            borderRadius: '4px',
-                                                            fontSize: '0.85rem',
-                                                            color: '#166534'
-                                                        }}>
+                                                        <div className="pdf-file-selected">
                                                             <i className="fas fa-check-circle"></i> {pdfFile.name} selected
                                                         </div>
                                                     )}
-                                                    <div style={{
-                                                        marginTop: '0.5rem',
-                                                        fontSize: '0.8rem',
-                                                        color: '#666'
-                                                    }}>
+                                                    <div className="pdf-file-hint">
                                                         <i className="fas fa-info-circle"></i> The folder path is automatically copied to your clipboard when you click "Choose File". Paste it in the file dialog address bar to navigate to the set folder.
                                                     </div>
                                                 </div>
@@ -691,14 +663,8 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
 
                                 <div className="form-field-checkbox">
                                     {cannotReactivate() ? (
-                                        <div style={{
-                                            padding: '0.75rem',
-                                            background: '#fff3cd',
-                                            border: '1px solid #ffc107',
-                                            borderRadius: '6px',
-                                            color: '#856404'
-                                        }}>
-                                            <i className="fas fa-info-circle" style={{ marginRight: '0.5rem' }}></i>
+                                        <div className="warning-message-box">
+                                            <i className="fas fa-info-circle"></i>
                                             <strong>Old Inactive Set:</strong> This set cannot be reactivated because there are newer sets with batches.
                                         </div>
                                     ) : (
