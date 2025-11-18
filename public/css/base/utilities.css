@@ -206,3 +206,12 @@
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+/* ===================================
+   EMPTY/LOADING STATE
+   =================================== */
+.empty-state-message {
+    padding: 40px;
+    text-align: center;
+    color: #666;
+}
