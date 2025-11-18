@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches = [] }) => {
+    const toast = useToast();
     const [formData, setFormData] = useState({
         BatchSequence: '',
         UpperAlignerCount: '',
@@ -194,11 +196,11 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                 onSave();
                 onClose();
             } else {
-                alert('Error: ' + (result.error || 'Failed to save batch'));
+                toast.error('Error: ' + (result.error || 'Failed to save batch'));
             }
         } catch (error) {
             console.error('Error saving batch:', error);
-            alert('Error saving batch: ' + error.message);
+            toast.error('Error saving batch: ' + error.message);
         } finally {
             setSaving(false);
         }

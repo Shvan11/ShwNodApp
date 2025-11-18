@@ -7,11 +7,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import GrapesJSEditor from './GrapesJSEditor.jsx';
 import DesignerToolbar from './DesignerToolbar.jsx';
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 const TemplateDesigner = () => {
     const { templateId } = useParams();
     const navigate = useNavigate();
     const editorRef = useRef(null);
+    const toast = useToast();
 
     const [template, setTemplate] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -49,7 +51,7 @@ const TemplateDesigner = () => {
 
     const handleSave = async () => {
         if (!editorRef.current || !templateId) {
-            alert('Editor not ready or no template ID');
+            toast.error('Editor not ready or no template ID');
             return;
         }
 
@@ -78,13 +80,13 @@ const TemplateDesigner = () => {
             const result = await response.json();
 
             if (result.status === 'success') {
-                alert('Template saved successfully!');
+                toast.success('Template saved successfully!');
             } else {
                 throw new Error(result.message || 'Failed to save template');
             }
         } catch (err) {
             console.error('Error saving template:', err);
-            alert('Failed to save template: ' + err.message);
+            toast.error('Failed to save template: ' + err.message);
         } finally {
             setIsSaving(false);
         }
@@ -92,7 +94,7 @@ const TemplateDesigner = () => {
 
     const handlePreview = () => {
         if (!editorRef.current) {
-            alert('Editor not ready');
+            toast.error('Editor not ready');
             return;
         }
 

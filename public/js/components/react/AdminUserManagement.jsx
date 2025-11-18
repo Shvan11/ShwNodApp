@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 /**
  * Admin User Management Component
  * Only accessible to admin users
  */
 export default function AdminUserManagement() {
+  const toast = useToast();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -96,7 +98,7 @@ export default function AdminUserManagement() {
     if (!newPassword) return;
 
     if (newPassword.length < 6) {
-      alert('Password must be at least 6 characters');
+      toast.error('Password must be at least 6 characters');
       return;
     }
 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 const AlignerDoctorsSettings = ({ onChangesUpdate }) => {
+    const toast = useToast();
     const [doctors, setDoctors] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -86,10 +88,10 @@ const AlignerDoctorsSettings = ({ onChangesUpdate }) => {
             handleCancel();
 
             // Show success message
-            alert(editingId ? 'Doctor updated successfully!' : 'Doctor added successfully!');
+            toast.success(editingId ? 'Doctor updated successfully!' : 'Doctor added successfully!');
         } catch (err) {
             console.error('Error saving doctor:', err);
-            alert(err.message);
+            toast.error(err.message);
         }
     };
 
@@ -109,10 +111,10 @@ const AlignerDoctorsSettings = ({ onChangesUpdate }) => {
             }
 
             await loadDoctors();
-            alert('Doctor deleted successfully!');
+            toast.success('Doctor deleted successfully!');
         } catch (err) {
             console.error('Error deleting doctor:', err);
-            alert(err.message);
+            toast.error(err.message);
         }
     };
 

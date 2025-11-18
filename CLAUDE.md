@@ -136,6 +136,72 @@ Configuration is in `.mcp.json`. See `docs/mcp-mssql-setup.md` for MSSQL MCP ser
 
 - **Hooks** (`/public/js/hooks/`): Custom hooks for shared logic (WebSocket sync, message status, etc.)
 
+- **Context Providers** (`/public/js/contexts/`):
+  - `GlobalStateContext.jsx` - Global state for WebSocket, patient data, appointments
+  - `ToastContext.jsx` - **Unified toast notification system** (replaces all alert() calls)
+
+### Toast Notification System
+
+The application uses a **unified toast notification system** to provide modern, non-blocking user feedback throughout the entire application. This system completely replaces traditional `alert()` dialogs.
+
+**Implementation:**
+- **Context Provider**: `ToastContext.jsx` - Global toast management
+- **CSS Styles**: `public/css/components/toast.css` - Modern, responsive toast styles
+- **Global Integration**: Wrapped in `App.jsx` via `<ToastProvider>` for app-wide access
+- **Non-React Support**: Global `window.toast` object for use in non-React code
+
+**Usage in React Components:**
+```javascript
+import { useToast } from '../contexts/ToastContext.jsx';
+
+function MyComponent() {
+  const toast = useToast();
+
+  // Success notification (green, 3s duration)
+  toast.success('Operation completed successfully!');
+
+  // Error notification (red, 4s duration)
+  toast.error('Something went wrong!');
+
+  // Warning notification (orange, 3.5s duration)
+  toast.warning('Please check your input');
+
+  // Info notification (blue, 3s duration)
+  toast.info('Here is some information');
+
+  // Custom duration
+  toast.success('Custom message', 5000); // 5 seconds
+}
+```
+
+**Usage in Non-React JavaScript:**
+```javascript
+// Available globally after ToastProvider mounts
+window.toast?.success('Operation completed!');
+window.toast?.error('Error occurred!');
+window.toast?.warning('Warning message!');
+window.toast?.info('Info message!');
+```
+
+**Toast Types:**
+- **Success** (✓) - Green, for successful operations (saves, deletes, updates)
+- **Error** (✕) - Red, for errors and failures
+- **Warning** (⚠) - Orange, for validation warnings and user constraints
+- **Info** (ℹ) - Blue, for informational messages
+
+**Features:**
+- ✅ Auto-dismiss with configurable duration
+- ✅ Manual close button
+- ✅ Smooth slide-in/slide-out animations
+- ✅ Stacked notifications (multiple toasts simultaneously)
+- ✅ Non-blocking (doesn't interrupt user workflow)
+- ✅ Fully responsive (mobile, tablet, desktop)
+- ✅ RTL support for Kurdish/Arabic languages
+- ✅ Accessible (ARIA labels, keyboard support)
+
+**Migration from alert():**
+All `alert()` calls have been replaced with appropriate toast notifications throughout the application. The global `window.toast` object ensures backward compatibility for non-React code.
+
 **Key Features:**
 - ✅ No page reloads - instant navigation between routes
 - ✅ Persistent WebSocket connection for real-time updates

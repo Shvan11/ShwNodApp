@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 const Navigation = ({ patientId, currentPage }) => {
     const navigate = useNavigate();
+    const toast = useToast();
     const { tpCode } = useParams();
     const [timepoints, setTimepoints] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -149,7 +151,7 @@ const Navigation = ({ patientId, currentPage }) => {
             console.log('Opening CS Imaging for patient:', patientId, formattedName);
         } catch (err) {
             console.error('Error opening CS Imaging:', err);
-            alert('Failed to open CS Imaging: ' + err.message);
+            toast.error('Failed to open CS Imaging: ' + err.message);
         }
     };
 
@@ -354,7 +356,7 @@ const Navigation = ({ patientId, currentPage }) => {
                             e.preventDefault();
                             if (isNewPatient) return;
                             if (!patientsFolder) {
-                                alert('Patients folder path is not configured. Please check settings.');
+                                toast.error('Patients folder path is not configured. Please check settings.');
                                 return;
                             }
                             // Construct full path: PatientsFolder + PatientID

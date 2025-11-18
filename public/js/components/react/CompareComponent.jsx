@@ -6,8 +6,10 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react'
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 const CompareComponent = ({ patientId, phone }) => {
+    const toast = useToast();
     const [timepoints, setTimepoints] = useState([]);
     const [selectedTimepoints, setSelectedTimepoints] = useState([]);
     const [selectedPhotoType, setSelectedPhotoType] = useState('');
@@ -561,7 +563,7 @@ const CompareComponent = ({ patientId, phone }) => {
     const handleTimepointSelection = async (tpCode, checked) => {
         if (checked) {
             if (selectedTimepoints.length >= 2) {
-                alert('You can only select two timepoints for comparison');
+                toast.warning('You can only select two timepoints for comparison');
                 return;
             }
             
@@ -636,16 +638,16 @@ const CompareComponent = ({ patientId, phone }) => {
                 method: 'POST',
                 body: formData
             });
-            
+
             if (response.ok) {
-                alert('Image sent successfully!');
+                toast.success('Image sent successfully!');
                 setShowWhatsAppModal(false);
             } else {
                 throw new Error('Failed to send image');
             }
         } catch (err) {
             console.error('Error sending WhatsApp message:', err);
-            alert('Failed to send image: ' + err.message);
+            toast.error('Failed to send image: ' + err.message);
         } finally {
             setSendingMessage(false);
         }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import '../../../css/components/invoice-form.css'
 import { formatNumber, parseFormattedNumber, formatCurrency as formatCurrencyUtil } from '../../utils/formatters.js'
-import { useToast, ToastContainer } from '../expenses/Toast.jsx'
+import { useToast } from '../../contexts/ToastContext.jsx'
 
 /**
  * Payment Modal Component
@@ -140,7 +140,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
     const handleSetExchangeRate = async () => {
         const rate = parseFormattedNumber(newRateValue);
         if (!rate || rate <= 0) {
-            alert('Please enter a valid exchange rate');
+            toast.warning('Please enter a valid exchange rate');
             return;
         }
 
@@ -163,11 +163,11 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                 setShowRateInput(false);
                 setNewRateValue('');
             } else {
-                alert('Error setting exchange rate: ' + result.message);
+                toast.error('Error setting exchange rate: ' + result.message);
             }
         } catch (error) {
             console.error('Error setting exchange rate:', error);
-            alert('Error setting exchange rate: ' + error.message);
+            toast.error('Error setting exchange rate: ' + error.message);
         } finally {
             setLoading(false);
         }
@@ -416,12 +416,12 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         const amountPaid = parseInt(formData.amountToRegister) || 0;
 
         if (!amountPaid) {
-            alert('Please enter the amount to register');
+            toast.warning('Please enter the amount to register');
             return;
         }
 
         if (actualUSD === 0 && actualIQD === 0) {
-            alert('Please enter at least one currency amount received');
+            toast.warning('Please enter at least one currency amount received');
             return;
         }
 
@@ -443,7 +443,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         if (!isSameCurrencyPayment && changeToSubmit > 0) {
             // Simple case: IQD only payment
             if (actualUSD === 0 && changeToSubmit > actualIQD) {
-                alert(`⚠️ Invalid Change\n\nChange (${changeToSubmit} IQD) cannot exceed IQD received (${actualIQD} IQD)`);
+                toast.error(`Invalid Change: ${changeToSubmit} IQD cannot exceed IQD received (${actualIQD} IQD)`);
                 return;
             }
         }
@@ -490,11 +490,11 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                     onSuccess(result);
                 }
             } else {
-                alert('Error adding payment: ' + result.message);
+                toast.error('Error adding payment: ' + result.message);
             }
         } catch (error) {
             console.error('Error adding payment:', error);
-            alert('Error adding payment: ' + error.message);
+            toast.error('Error adding payment: ' + error.message);
         } finally {
             setLoading(false);
         }
@@ -552,7 +552,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
             });
         } catch (err) {
             console.error('Error printing receipt:', err);
-            alert(`Failed to print receipt: ${err.message}`);
+            toast.error(`Failed to print receipt: ${err.message}`);
         }
     };
 
@@ -1187,8 +1187,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
             </div>
         </div>
 
-            {/* Toast Notifications */}
-            <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
+            {/* Toast Notifications now handled globally by ToastProvider in App.jsx */}
         </>
     );
 };

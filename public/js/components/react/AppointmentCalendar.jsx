@@ -4,6 +4,7 @@ import CalendarHeader from './CalendarHeader.jsx'
 import MonthlyCalendarGrid from './MonthlyCalendarGrid.jsx'
 import CalendarContextMenu from './CalendarContextMenu.jsx'
 import Notification from './appointments/Notification.jsx'
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 /**
  * AppointmentCalendar Main Component
@@ -20,6 +21,7 @@ const AppointmentCalendar = ({
     selectedSlot: externalSelectedSlot,
     showOnlyAvailable = false
 }) => {
+    const toast = useToast();
     // State management
     const [currentDate, setCurrentDate] = useState(initialDate ? new Date(initialDate) : new Date());
     const [calendarData, setCalendarData] = useState(null);
@@ -35,7 +37,6 @@ const AppointmentCalendar = ({
     // Context menu and delete confirmation state
     const [contextMenu, setContextMenu] = useState(null); // { position: {x, y}, appointment }
     const [deleteConfirmation, setDeleteConfirmation] = useState(null); // appointment to delete
-    const [notification, setNotification] = useState(null); // { message, type }
 
     // Use external selected slot if provided (for controlled mode)
     const selectedSlot = externalSelectedSlot || internalSelectedSlot;
@@ -267,10 +268,7 @@ const AppointmentCalendar = ({
 
                 if (slotDateTime < now) {
                     // Show toast notification for past appointments
-                    setNotification({
-                        message: 'You cannot edit or delete past appointments',
-                        type: 'error'
-                    });
+                    toast.error('You cannot edit or delete past appointments');
                     return;
                 }
 
@@ -318,7 +316,7 @@ const AppointmentCalendar = ({
             setDeleteConfirmation(null);
         } catch (error) {
             console.error('Error deleting appointment:', error);
-            alert('Failed to delete appointment: ' + error.message);
+            toast.error('Failed to delete appointment: ' + error.message);
         }
     }, [deleteConfirmation, currentDate, selectedDoctorId, fetchCalendarData]);
 
@@ -478,14 +476,7 @@ const AppointmentCalendar = ({
                 </div>
             )}
 
-            {/* Toast Notification */}
-            {notification && (
-                <Notification
-                    message={notification.message}
-                    type={notification.type}
-                    onClose={() => setNotification(null)}
-                />
-            )}
+            {/* Toast Notifications now handled globally by ToastProvider in App.jsx */}
         </div>
     );
 };

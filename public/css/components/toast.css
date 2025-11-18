@@ -1,0 +1,221 @@
+/**
+ * Toast Notification System Styles
+ * Modern, non-blocking notifications to replace alert() dialogs
+ */
+
+/* Toast Container - Fixed position, top-right corner */
+.toast-container {
+  position: fixed;
+  top: 80px; /* Below header */
+  right: 20px;
+  z-index: var(--z-index-tooltip);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  max-width: 400px;
+  pointer-events: none; /* Allow clicks through container */
+}
+
+/* Individual Toast */
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background-color: var(--background-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  border-left: 4px solid;
+  transition: all 0.3s ease;
+  min-width: 300px;
+  pointer-events: auto; /* Toast itself is clickable */
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Toast Visibility States */
+.toast-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.toast-hidden {
+  opacity: 0;
+  transform: translateX(400px);
+}
+
+/* Toast Types */
+.toast-success {
+  border-left-color: var(--success-color);
+  background-color: #f1f8f4;
+}
+
+.toast-error {
+  border-left-color: var(--error-color);
+  background-color: #fef1f0;
+}
+
+.toast-warning {
+  border-left-color: var(--warning-color);
+  background-color: #fff8e1;
+}
+
+.toast-info {
+  border-left-color: var(--info-color);
+  background-color: #e3f2fd;
+}
+
+/* Toast Icon */
+.toast-icon {
+  font-size: 20px;
+  font-weight: bold;
+  min-width: 24px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toast-success .toast-icon {
+  color: var(--success-color);
+}
+
+.toast-error .toast-icon {
+  color: var(--error-color);
+}
+
+.toast-warning .toast-icon {
+  color: var(--warning-color);
+}
+
+.toast-info .toast-icon {
+  color: var(--info-color);
+}
+
+/* Toast Message */
+.toast-message {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* Toast Close Button */
+.toast-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+  flex-shrink: 0;
+}
+
+.toast-close:hover {
+  color: var(--text-primary);
+}
+
+/* Slide-in Animation */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(400px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .toast-container {
+    left: var(--spacing-sm);
+    right: var(--spacing-sm);
+    max-width: none;
+    top: 70px; /* Adjust for smaller screens */
+  }
+
+  .toast {
+    min-width: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .toast-container {
+    top: 60px;
+    left: var(--spacing-xs);
+    right: var(--spacing-xs);
+  }
+
+  .toast {
+    padding: var(--spacing-sm);
+    gap: var(--spacing-sm);
+  }
+
+  .toast-message {
+    font-size: var(--font-size-xs);
+  }
+}
+
+/* RTL Support */
+[dir="rtl"] .toast-container {
+  right: auto;
+  left: 20px;
+}
+
+[dir="rtl"] .toast {
+  border-left: none;
+  border-right: 4px solid;
+}
+
+[dir="rtl"] .toast-success {
+  border-right-color: var(--success-color);
+}
+
+[dir="rtl"] .toast-error {
+  border-right-color: var(--error-color);
+}
+
+[dir="rtl"] .toast-warning {
+  border-right-color: var(--warning-color);
+}
+
+[dir="rtl"] .toast-info {
+  border-right-color: var(--info-color);
+}
+
+[dir="rtl"] .toast-hidden {
+  transform: translateX(-400px);
+}
+
+[dir="rtl"] @keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-400px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 768px) {
+  [dir="rtl"] .toast-container {
+    left: var(--spacing-sm);
+    right: var(--spacing-sm);
+  }
+}
+
+@media (max-width: 480px) {
+  [dir="rtl"] .toast-container {
+    left: var(--spacing-xs);
+    right: var(--spacing-xs);
+  }
+}

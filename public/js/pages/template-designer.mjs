@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch (error) {
         console.error('Error during initialization:', error);
-        alert('Error initializing designer: ' + error.message);
+        window.toast?.error('Error initializing designer: ' + error.message);
     }
 });
 
@@ -105,7 +105,7 @@ function initializeEditor(templateHtml = null, templateCss = null) {
         editor.setComponents(templateHtml);
     } else {
         console.warn('No template HTML provided - cannot initialize editor');
-        alert('Error: Template file not found. Please ensure the template has a valid file path.');
+        window.toast?.error('Error: Template file not found. Please ensure the template has a valid file path.');
         return;
     }
 
@@ -120,7 +120,7 @@ function initializeEditor(templateHtml = null, templateCss = null) {
 
     } catch (error) {
         console.error('Error initializing GrapesJS editor:', error);
-        alert('Failed to initialize template designer: ' + error.message);
+        window.toast?.error('Failed to initialize template designer: ' + error.message);
     }
 }
 
@@ -259,15 +259,15 @@ async function loadTemplate(templateId) {
                 initializeEditor(bodyContent, extractedCss);
             } else {
                 console.error('Template has no file path');
-                alert('Error: Template file not found. Please contact support.');
+                window.toast?.error('Error: Template file not found. Please contact support.');
             }
         } else {
             console.error('Failed to load template:', result.message);
-            alert('Failed to load template: ' + result.message);
+            window.toast?.error('Failed to load template: ' + result.message);
         }
     } catch (error) {
         console.error('Error loading template:', error);
-        alert('Failed to load template: ' + error.message);
+        window.toast?.error('Failed to load template: ' + error.message);
     }
 }
 
@@ -276,7 +276,7 @@ async function loadTemplate(templateId) {
  */
 async function saveTemplate() {
     if (!currentTemplateId) {
-        alert('No template ID found. Please create a template first.');
+        window.toast?.error('No template ID found. Please create a template first.');
         return;
     }
 
@@ -306,13 +306,13 @@ async function saveTemplate() {
         const result = await response.json();
 
         if (result.status === 'success') {
-            alert('Template saved successfully!');
+            window.toast?.success('Template saved successfully!');
         } else {
             throw new Error(result.message || 'Failed to save template');
         }
     } catch (error) {
         console.error('Error saving template:', error);
-        alert('Failed to save template: ' + error.message);
+        window.toast?.error('Failed to save template: ' + error.message);
     } finally {
         loadingOverlay.classList.remove('active');
     }

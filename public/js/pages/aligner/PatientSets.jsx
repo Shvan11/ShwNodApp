@@ -11,10 +11,12 @@ import BatchFormDrawer from '../../components/react/BatchFormDrawer.jsx';
 import PaymentFormDrawer from '../../components/react/PaymentFormDrawer.jsx';
 import { copyToClipboard } from '../../core/utils.js';
 import UniversalLauncher from '../../services/UniversalLauncher.js';
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 const PatientSets = () => {
     const { doctorId, workId } = useParams();
     const navigate = useNavigate();
+    const toast = useToast();
 
     // Determine if we came from doctor browse or direct search
     const isFromDoctorBrowse = doctorId !== undefined;
@@ -146,7 +148,7 @@ const PatientSets = () => {
             }
         } catch (error) {
             console.error('Error loading aligner sets:', error);
-            alert('Failed to load aligner sets: ' + error.message);
+            toast.error('Failed to load aligner sets: ' + error.message);
         }
     };
 
@@ -274,7 +276,7 @@ const PatientSets = () => {
     const openSetFolder = async (set) => {
         const folderPath = generateFolderPath(set);
         if (!folderPath) {
-            alert('Unable to generate folder path');
+            toast.error('Unable to generate folder path');
             return;
         }
 
@@ -334,9 +336,9 @@ const PatientSets = () => {
             const success = await copyToClipboard(folderPath);
 
             if (success) {
-                alert(`Folder path copied to clipboard:\n${folderPath}\n\nNote: Please ensure the explorer: protocol handler is installed.`);
+                toast.info(`Folder path copied to clipboard. Note: Please ensure the explorer: protocol handler is installed.`);
             } else {
-                alert(`Folder path:\n${folderPath}\n\nNote: Please ensure the explorer: protocol handler is installed.`);
+                toast.info(`Folder path: ${folderPath}. Note: Please ensure the explorer: protocol handler is installed.`);
             }
         }
     };
@@ -415,11 +417,11 @@ const PatientSets = () => {
                         throw new Error(data.error || 'Failed to delete set');
                     }
 
-                    alert('Set deleted successfully');
+                    toast.success('Set deleted successfully');
                     loadAlignerSets(patient.workid);
                 } catch (error) {
                     console.error('Error deleting set:', error);
-                    alert('Failed to delete set: ' + error.message);
+                    toast.error('Failed to delete set: ' + error.message);
                 }
                 setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
             }
@@ -438,12 +440,12 @@ const PatientSets = () => {
                 throw new Error(data.error || 'Failed to mark as delivered');
             }
 
-            alert('Batch marked as delivered');
+            toast.success('Batch marked as delivered');
             await loadBatches(batch.AlignerSetID);
             await loadAlignerSets(patient.workid);
         } catch (error) {
             console.error('Error marking as delivered:', error);
-            alert('Failed to mark as delivered: ' + error.message);
+            toast.error('Failed to mark as delivered: ' + error.message);
         }
     };
 
@@ -464,12 +466,12 @@ const PatientSets = () => {
                         throw new Error(data.error || 'Failed to delete batch');
                     }
 
-                    alert('Batch deleted successfully');
+                    toast.success('Batch deleted successfully');
                     await loadBatches(batch.AlignerSetID);
                     await loadAlignerSets(patient.workid);
                 } catch (error) {
                     console.error('Error deleting batch:', error);
-                    alert('Failed to delete batch: ' + error.message);
+                    toast.error('Failed to delete batch: ' + error.message);
                 }
                 setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
             }
@@ -481,7 +483,7 @@ const PatientSets = () => {
         e.stopPropagation();
 
         if (!patient || !batch.AlignerBatchID) {
-            alert('Missing required information for printing labels');
+            toast.error('Missing required information for printing labels');
             return;
         }
 
@@ -543,7 +545,7 @@ const PatientSets = () => {
 
         } catch (error) {
             console.error('Error saving URL:', error);
-            alert('Failed to save URL: ' + error.message);
+            toast.error('Failed to save URL: ' + error.message);
         } finally {
             setSavingUrl(false);
         }
@@ -571,7 +573,7 @@ const PatientSets = () => {
 
     const requestBaseDirectoryAccess = async () => {
         if (!('showDirectoryPicker' in window)) {
-            alert('Your browser does not support the File System Access API. Please use Chrome or Edge.');
+            toast.warning('Your browser does not support the File System Access API. Please use Chrome or Edge.');
             return false;
         }
 
@@ -595,12 +597,12 @@ const PatientSets = () => {
             await saveBaseDirectoryHandle(dirHandle);
             setHasBaseDirectoryAccess(true);
 
-            alert('Base folder access granted! You can now open PDFs directly in the correct folders.');
+            toast.success('Base folder access granted! You can now open PDFs directly in the correct folders.');
             return true;
         } catch (error) {
             if (error.name !== 'AbortError') {
                 console.error('Error requesting directory access:', error);
-                alert('Failed to get directory access: ' + error.message);
+                toast.error('Failed to get directory access: ' + error.message);
             }
             return false;
         }
@@ -723,12 +725,12 @@ const PatientSets = () => {
 
             // Validate and upload
             if (file.type !== 'application/pdf') {
-                alert('Please select a PDF file');
+                toast.warning('Please select a PDF file');
                 return;
             }
 
             if (file.size > 100 * 1024 * 1024) {
-                alert('File is too large. Maximum size is 100MB.');
+                toast.warning('File is too large. Maximum size is 100MB.');
                 return;
             }
 
@@ -761,13 +763,13 @@ const PatientSets = () => {
         if (!file) return;
 
         if (file.type !== 'application/pdf') {
-            alert('Please select a PDF file');
+            toast.warning('Please select a PDF file');
             e.target.value = '';
             return;
         }
 
         if (file.size > 100 * 1024 * 1024) {
-            alert('File is too large. Maximum size is 100MB.');
+            toast.warning('File is too large. Maximum size is 100MB.');
             e.target.value = '';
             return;
         }
@@ -799,14 +801,14 @@ const PatientSets = () => {
             }
 
             // Show success message
-            alert('PDF uploaded successfully!');
+            toast.success('PDF uploaded successfully!');
 
             // Reload aligner sets to show updated PDF
             await loadAlignerSets(patient.workid);
 
         } catch (error) {
             console.error('Error uploading PDF:', error);
-            alert('Failed to upload PDF: ' + error.message);
+            toast.error('Failed to upload PDF: ' + error.message);
         } finally {
             setUploadingPdf(false);
         }
@@ -849,7 +851,7 @@ const PatientSets = () => {
 
         } catch (error) {
             console.error('Error saving PDF URL:', error);
-            alert('Failed to save PDF URL: ' + error.message);
+            toast.error('Failed to save PDF URL: ' + error.message);
         } finally {
             setSavingPdfUrl(false);
         }
@@ -883,7 +885,7 @@ const PatientSets = () => {
 
             // Validate YouTube URL
             if (quickVideoValue.trim() && !isValidYouTubeUrl(quickVideoValue)) {
-                alert('Please enter a valid YouTube URL\n\nAccepted formats:\n- https://www.youtube.com/watch?v=VIDEO_ID\n- https://youtu.be/VIDEO_ID\n- https://www.youtube.com/embed/VIDEO_ID');
+                toast.warning('Please enter a valid YouTube URL. Accepted formats: youtube.com/watch, youtu.be, or youtube.com/embed');
                 return;
             }
 
@@ -913,7 +915,7 @@ const PatientSets = () => {
 
         } catch (error) {
             console.error('Error saving video URL:', error);
-            alert('Failed to save video URL: ' + error.message);
+            toast.error('Failed to save video URL: ' + error.message);
         } finally {
             setSavingVideo(false);
         }
@@ -922,7 +924,7 @@ const PatientSets = () => {
     // Notes Operations
     const handleAddLabNote = async (setId) => {
         if (!labNoteText.trim()) {
-            alert('Please enter a note');
+            toast.warning('Please enter a note');
             return;
         }
 
@@ -949,7 +951,7 @@ const PatientSets = () => {
 
         } catch (error) {
             console.error('Error adding note:', error);
-            alert('Failed to add note: ' + error.message);
+            toast.error('Failed to add note: ' + error.message);
         }
     };
 
@@ -965,7 +967,7 @@ const PatientSets = () => {
 
     const saveEditNote = async (noteId, setId) => {
         if (!editNoteText.trim()) {
-            alert('Please enter a note');
+            toast.warning('Please enter a note');
             return;
         }
 
@@ -990,7 +992,7 @@ const PatientSets = () => {
 
         } catch (error) {
             console.error('Error updating note:', error);
-            alert('Failed to update note: ' + error.message);
+            toast.error('Failed to update note: ' + error.message);
         }
     };
 
@@ -1031,7 +1033,7 @@ const PatientSets = () => {
 
                 } catch (error) {
                     console.error('Error deleting note:', error);
-                    alert('Failed to delete note: ' + error.message);
+                    toast.error('Failed to delete note: ' + error.message);
                 }
                 setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
             }

@@ -1,12 +1,14 @@
 /**
  * WhatsAppModal - WhatsApp messaging interface component
- * 
+ *
  * Provides a modal interface for sending messages and images via WhatsApp
  */
 
 import React, { useState } from 'react'
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 const WhatsAppModal = ({ show, onClose, patientCode, patientName }) => {
+    const toast = useToast();
     const [message, setMessage] = useState('');
     const [isSending, setIsSending] = useState(false);
 
@@ -28,15 +30,15 @@ const WhatsAppModal = ({ show, onClose, patientCode, patientName }) => {
             });
             
             if (response.ok) {
-                alert('Message sent successfully!');
+                toast.success('Message sent successfully!');
                 onClose();
                 setMessage('');
             } else {
-                alert('Failed to send message');
+                toast.error('Failed to send message');
             }
         } catch (error) {
             console.error('Error sending WhatsApp message:', error);
-            alert('Error sending message');
+            toast.error('Error sending message');
         } finally {
             setIsSending(false);
         }

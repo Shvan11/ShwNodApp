@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 /**
  * PatientAppointments Component
@@ -7,6 +8,7 @@ import { useNavigate } from 'react-router-dom'
  */
 const PatientAppointments = ({ patientId }) => {
     const navigate = useNavigate()
+    const toast = useToast();
     const [appointments, setAppointments] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -58,7 +60,7 @@ const PatientAppointments = ({ patientId }) => {
             setDeleteConfirm(null)
         } catch (err) {
             console.error('Error deleting appointment:', err)
-            alert('Failed to delete appointment: ' + err.message)
+            toast.error('Failed to delete appointment: ' + err.message)
         }
     }
 

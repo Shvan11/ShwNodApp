@@ -13,7 +13,11 @@ const workId = urlParams.get('workId');
 const patientId = urlParams.get('patient');
 
 if (!workId) {
-    alert('Work ID is required');
+    // Note: Toast may not be available yet at module load time
+    // Use setTimeout to ensure toast is initialized
+    setTimeout(() => {
+        window.toast?.error('Work ID is required');
+    }, 100);
     window.location.href = '/dashboard';
 }
 

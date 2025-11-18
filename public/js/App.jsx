@@ -12,6 +12,7 @@
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { GlobalStateProvider } from './contexts/GlobalStateContext.jsx';
+import { ToastProvider } from './contexts/ToastContext.jsx';
 import UniversalHeader from './components/react/UniversalHeader.jsx';
 import { GlobalErrorBoundary } from './components/error-boundaries/GlobalErrorBoundary.jsx';
 import { RouteErrorBoundary } from './components/error-boundaries/RouteErrorBoundary.jsx';
@@ -86,11 +87,12 @@ const LoadingFallback = () => (
 export default function App() {
   return (
     <GlobalErrorBoundary>
-      <GlobalStateProvider>
-        {/* Persistent header - always mounted, not lazy-loaded */}
-        <div id="universal-header-root">
-          <UniversalHeader />
-        </div>
+      <ToastProvider>
+        <GlobalStateProvider>
+          {/* Persistent header - always mounted, not lazy-loaded */}
+          <div id="universal-header-root">
+            <UniversalHeader />
+          </div>
 
         {/* Main application content - wrapped in Suspense for lazy loading */}
         <div id="app-container">
@@ -234,7 +236,8 @@ export default function App() {
             </Routes>
           </Suspense>
         </div>
-      </GlobalStateProvider>
+        </GlobalStateProvider>
+      </ToastProvider>
     </GlobalErrorBoundary>
   );
 }
