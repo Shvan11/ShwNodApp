@@ -215,3 +215,13 @@
     text-align: center;
     color: #666;
 }
+
+/* Full width utility */
+.w-full {
+    width: 100%;
+}
+
+/* Margin bottom utilities */
+.mb-4 {
+    margin-bottom: var(--spacing-md);
+}
