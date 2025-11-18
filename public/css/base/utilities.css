@@ -1,0 +1,175 @@
+/* Utility Classes - Reusable helper classes */
+/* Using proper CSS cascade without !important */
+
+/* ===================================
+   DISPLAY UTILITIES
+   =================================== */
+.d-none { display: none; }
+.d-inline { display: inline; }
+.d-inline-block { display: inline-block; }
+.d-block { display: block; }
+.d-flex { display: flex; }
+.hidden { display: none; }
+
+/* ===================================
+   GRADIENT UTILITIES
+   =================================== */
+.gradient-purple { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.border-left-purple { border-left: 4px solid #4f46e5; }
+
+/* ===================================
+   POSITION UTILITIES
+   =================================== */
+.position-relative { position: relative; }
+.position-absolute { position: absolute; }
+.position-fixed { position: fixed; }
+.position-sticky { position: sticky; }
+
+/* ===================================
+   BORDER UTILITIES
+   =================================== */
+.border { border: 1px solid var(--border-color); }
+.border-0 { border: 0; }
+.rounded { border-radius: var(--radius-md); }
+.rounded-circle { border-radius: 50%; }
+
+/* ===================================
+   SHADOW UTILITIES
+   =================================== */
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+.shadow-none { box-shadow: none; }
+
+/* ===================================
+   WIDTH & HEIGHT UTILITIES
+   =================================== */
+.w-25 { width: 25%; }
+.w-50 { width: 50%; }
+.w-75 { width: 75%; }
+.w-100 { width: 100%; }
+.h-25 { height: 25%; }
+.h-50 { height: 50%; }
+.h-75 { height: 75%; }
+.h-100 { height: 100%; }
+
+/* ===================================
+   VISIBILITY UTILITIES
+   =================================== */
+.visible { visibility: visible; }
+.invisible { visibility: hidden; }
+
+/* ===================================
+   BACKGROUND COLOR UTILITIES
+   =================================== */
+.bg-primary { background-color: var(--primary-color); color: #fff; }
+.bg-secondary { background-color: var(--secondary-color); color: #fff; }
+.bg-light { background-color: var(--background-light); }
+.bg-dark { background-color: var(--text-color); color: #fff; }
+
+/* ===================================
+   TEXT COLOR UTILITIES
+   =================================== */
+.text-primary { color: var(--primary-color); }
+.text-secondary { color: var(--secondary-color); }
+.text-success { color: var(--success-color); }
+.text-danger { color: var(--error-color); }
+.text-warning { color: var(--warning-color); }
+.text-info { color: var(--info-color); }
+.text-light { color: var(--background-light); }
+.text-dark { color: var(--text-color); }
+
+/* ===================================
+   TEXT ALIGNMENT UTILITIES
+   =================================== */
+.text-left { text-align: left; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-justify { text-align: justify; }
+
+/* ===================================
+   FONT WEIGHT UTILITIES
+   =================================== */
+.font-weight-light { font-weight: var(--font-weight-light); }
+.font-weight-normal { font-weight: var(--font-weight-normal); }
+.font-weight-medium { font-weight: var(--font-weight-medium); }
+.font-weight-semibold { font-weight: var(--font-weight-semibold); }
+.font-weight-bold { font-weight: var(--font-weight-bold); }
+
+/* ===================================
+   TEXT DECORATION UTILITIES
+   =================================== */
+.text-decoration-none { text-decoration: none; }
+
+/* ===================================
+   TEXT TRANSFORM UTILITIES
+   =================================== */
+.text-uppercase { text-transform: uppercase; }
+.text-lowercase { text-transform: lowercase; }
+.text-capitalize { text-transform: capitalize; }
+
+/* ===================================
+   MARGIN UTILITIES
+   =================================== */
+.m-0 { margin: 0; }
+.m-1 { margin: var(--spacing-sm); }
+.m-2 { margin: var(--spacing-md); }
+.m-3 { margin: var(--spacing-lg); }
+.m-4 { margin: var(--spacing-xl); }
+
+.mt-0 { margin-top: 0; }
+.mt-1 { margin-top: var(--spacing-sm); }
+.mt-2 { margin-top: var(--spacing-md); }
+.mt-3 { margin-top: var(--spacing-lg); }
+.mt-4 { margin-top: var(--spacing-xl); }
+
+.mb-0 { margin-bottom: 0; }
+.mb-1 { margin-bottom: var(--spacing-sm); }
+.mb-2 { margin-bottom: var(--spacing-md); }
+.mb-3 { margin-bottom: var(--spacing-lg); }
+.mb-4 { margin-bottom: var(--spacing-xl); }
+
+.ml-0 { margin-left: 0; }
+.ml-1 { margin-left: var(--spacing-sm); }
+.ml-2 { margin-left: var(--spacing-md); }
+.ml-3 { margin-left: var(--spacing-lg); }
+.ml-4 { margin-left: var(--spacing-xl); }
+
+.mr-0 { margin-right: 0; }
+.mr-1 { margin-right: var(--spacing-sm); }
+.mr-2 { margin-right: var(--spacing-md); }
+.mr-3 { margin-right: var(--spacing-lg); }
+.mr-4 { margin-right: var(--spacing-xl); }
+
+/* ===================================
+   PADDING UTILITIES
+   =================================== */
+.p-0 { padding: 0; }
+.p-1 { padding: var(--spacing-sm); }
+.p-2 { padding: var(--spacing-md); }
+.p-3 { padding: var(--spacing-lg); }
+.p-4 { padding: var(--spacing-xl); }
+
+.pt-0 { padding-top: 0; }
+.pt-1 { padding-top: var(--spacing-sm); }
+.pt-2 { padding-top: var(--spacing-md); }
+.pt-3 { padding-top: var(--spacing-lg); }
+.pt-4 { padding-top: var(--spacing-xl); }
+
+.pb-0 { padding-bottom: 0; }
+.pb-1 { padding-bottom: var(--spacing-sm); }
+.pb-2 { padding-bottom: var(--spacing-md); }
+.pb-3 { padding-bottom: var(--spacing-lg); }
+.pb-4 { padding-bottom: var(--spacing-xl); }
+
+.pl-0 { padding-left: 0; }
+.pl-1 { padding-left: var(--spacing-sm); }
+.pl-2 { padding-left: var(--spacing-md); }
+.pl-3 { padding-left: var(--spacing-lg); }
+.pl-4 { padding-left: var(--spacing-xl); }
+
+.pr-0 { padding-right: 0; }
+.pr-1 { padding-right: var(--spacing-sm); }
+.pr-2 { padding-right: var(--spacing-md); }
+.pr-3 { padding-right: var(--spacing-lg); }
+.pr-4 { padding-right: var(--spacing-xl); }

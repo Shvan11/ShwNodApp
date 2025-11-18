@@ -717,11 +717,11 @@ select.form-control:hover {
 /* Mobile Breakpoint (768px and below) - Switch to Accordion */
 @media (max-width: 768px) {
     .desktop-only {
-        display: none !important;
+        display: none;
     }
 
     .mobile-only {
-        display: block !important;
+        display: block;
     }
 
     .add-patient-form-container {

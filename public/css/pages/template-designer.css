@@ -1,17 +1,5 @@
 /* Template Designer Page Styles */
-
-:root {
-    --primary-color: #4f46e5;
-    --primary-hover: #4338ca;
-    --danger-color: #ef4444;
-    --border-color: #e5e7eb;
-    --bg-light: #f9fafb;
-    --text-dark: #111827;
-    --text-muted: #6b7280;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    --radius-md: 8px;
-}
+/* Using global CSS variables from /public/css/base/variables.css */
 
 /* Template Designer Container */
 .template-designer {
