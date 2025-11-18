@@ -156,7 +156,7 @@ const WorkComponent = ({ patientId }) => {
 
                     detailMessage += '\nPlease delete these records first before deleting the work.';
 
-                    alert(detailMessage);
+                    toast.error(detailMessage, 6000); // Longer duration for detailed message
                     return;
                 }
 
@@ -943,7 +943,7 @@ const WorkComponent = ({ patientId }) => {
                                                     <div className="payment-actions">
                                                         <button
                                                             onClick={() => {
-                                                                alert(`Edit payment functionality coming soon!\n\nPayment ID: ${payment.InvoiceID}\nAmount: ${formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}`);
+                                                                toast.info(`Edit payment functionality coming soon!\n\nPayment ID: ${payment.InvoiceID}\nAmount: ${formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}`);
                                                             }}
                                                             className="btn-action-edit"
                                                             title="Edit Payment"
@@ -959,7 +959,7 @@ const WorkComponent = ({ patientId }) => {
                                                                         });
                                                                         const result = await response.json();
                                                                         if (result.status === 'success') {
-                                                                            alert('Payment deleted successfully!');
+                                                                            toast.success('Payment deleted successfully!');
                                                                             loadPaymentHistory(selectedWorkForPayment.workid);
                                                                             loadWorks();
                                                                         } else {
@@ -967,7 +967,7 @@ const WorkComponent = ({ patientId }) => {
                                                                         }
                                                                     } catch (error) {
                                                                         console.error('Error deleting payment:', error);
-                                                                        alert(`Error deleting payment: ${error.message}`);
+                                                                        toast.error(`Error deleting payment: ${error.message}`);
                                                                     }
                                                                 }
                                                             }}

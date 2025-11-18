@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 /**
  * User Management Component
@@ -6,6 +7,7 @@ import React, { useState } from 'react';
  * - (Future: Admin can manage users)
  */
 export default function UserManagement() {
+  const toast = useToast();
   const [userInfo, setUserInfo] = useState(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -95,11 +97,11 @@ export default function UserManagement() {
         // Logout successful - redirect to login
         window.location.href = '/login.html';
       } else {
-        alert('Logout failed: ' + (data.error || 'Unknown error'));
+        toast.error('Logout failed: ' + (data.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Logout failed:', error);
-      alert('Logout failed. Please try again.');
+      toast.error('Logout failed. Please try again.');
     }
   };
 

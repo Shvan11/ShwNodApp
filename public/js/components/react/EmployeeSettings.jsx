@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 const EmployeeSettings = ({ onChangesUpdate }) => {
+    const toast = useToast();
     const [employees, setEmployees] = useState([]);
     const [positions, setPositions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -123,10 +125,10 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
             await loadEmployees();
             handleCancel();
 
-            alert(editingId ? 'Employee updated successfully!' : 'Employee added successfully!');
+            toast.success(editingId ? 'Employee updated successfully!' : 'Employee added successfully!');
         } catch (err) {
             console.error('Error saving employee:', err);
-            alert(err.message);
+            toast.error(err.message);
         }
     };
 
@@ -146,10 +148,10 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
             }
 
             await loadEmployees();
-            alert('Employee deleted successfully!');
+            toast.success('Employee deleted successfully!');
         } catch (err) {
             console.error('Error deleting employee:', err);
-            alert(err.message);
+            toast.error(err.message);
         }
     };
 

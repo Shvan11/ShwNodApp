@@ -6,10 +6,12 @@
 import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import grapesjs from 'grapesjs';
 import 'grapesjs/dist/css/grapes.min.css';
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 const GrapesJSEditor = forwardRef(({ template }, ref) => {
     const containerRef = useRef(null);
     const editorRef = useRef(null);
+    const toast = useToast();
 
     useImperativeHandle(ref, () => editorRef.current);
 
@@ -98,7 +100,7 @@ const GrapesJSEditor = forwardRef(({ template }, ref) => {
             }
         } catch (error) {
             console.error('Error initializing GrapesJS editor:', error);
-            alert('Failed to initialize template designer: ' + error.message);
+            toast.error('Failed to initialize template designer: ' + error.message);
         }
     };
 
@@ -128,7 +130,7 @@ const GrapesJSEditor = forwardRef(({ template }, ref) => {
             editorRef.current.setStyle(extractedCss);
         } catch (error) {
             console.error('Error loading template content:', error);
-            alert('Failed to load template content: ' + error.message);
+            toast.error('Failed to load template content: ' + error.message);
         }
     };
 

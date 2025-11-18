@@ -11,6 +11,7 @@
 @import 'components/whatsapp-auth.css';
 @import 'components/appointment-calendar.css';
 @import 'components/sidebar-navigation.css';
+@import 'components/toast.css';
 
 /* Page-specific styles */
 @import 'pages/work-management.css';

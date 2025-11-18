@@ -8,9 +8,11 @@ import { useNavigate } from 'react-router-dom';
 import TemplateCard from './TemplateCard.jsx';
 import CreateTemplateModal from './CreateTemplateModal.jsx';
 import TemplateStats from './TemplateStats.jsx';
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 const TemplateManagement = () => {
     const navigate = useNavigate();
+    const toast = useToast();
 
     const [documentTypes, setDocumentTypes] = useState([]);
     const [allTemplates, setAllTemplates] = useState([]);
@@ -112,7 +114,7 @@ const TemplateManagement = () => {
             }
         } catch (err) {
             console.error('Error creating template:', err);
-            alert(err.message);
+            toast.error(err.message);
         }
     };
 
@@ -139,13 +141,13 @@ const TemplateManagement = () => {
 
             if (result.status === 'success') {
                 await loadAllTemplates();
-                alert('Template set as default!');
+                toast.success('Template set as default!');
             } else {
                 throw new Error(result.message || 'Failed to set as default');
             }
         } catch (err) {
             console.error('Error setting default:', err);
-            alert(err.message);
+            toast.error(err.message);
         }
     };
 
@@ -163,13 +165,13 @@ const TemplateManagement = () => {
 
             if (result.status === 'success') {
                 await loadAllTemplates();
-                alert('Template deleted successfully!');
+                toast.success('Template deleted successfully!');
             } else {
                 throw new Error(result.message || 'Failed to delete template');
             }
         } catch (err) {
             console.error('Error deleting template:', err);
-            alert(err.message);
+            toast.error(err.message);
         }
     };
 

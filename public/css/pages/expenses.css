@@ -673,108 +673,7 @@ textarea {
   font-size: 14px;
 }
 
-/* Toast Notifications */
-.toast-container {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: var(--z-index-tooltip);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 400px;
-}
-
-.toast {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border-left: 4px solid;
-  transition: all 0.3s ease;
-  min-width: 300px;
-}
-
-.toast-visible {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-.toast-hidden {
-  opacity: 0;
-  transform: translateX(400px);
-}
-
-.toast-success {
-  border-left-color: #4CAF50;
-  background-color: #f1f8f4;
-}
-
-.toast-error {
-  border-left-color: #f44336;
-  background-color: #fef1f0;
-}
-
-.toast-warning {
-  border-left-color: #ff9800;
-  background-color: #fff8e1;
-}
-
-.toast-info {
-  border-left-color: #2196F3;
-  background-color: #e3f2fd;
-}
-
-.toast-icon {
-  font-size: 20px;
-  font-weight: bold;
-  min-width: 24px;
-  text-align: center;
-}
-
-.toast-success .toast-icon {
-  color: #4CAF50;
-}
-
-.toast-error .toast-icon {
-  color: #f44336;
-}
-
-.toast-warning .toast-icon {
-  color: #ff9800;
-}
-
-.toast-info .toast-icon {
-  color: #2196F3;
-}
-
-.toast-message {
-  flex: 1;
-  font-size: 14px;
-  color: var(--text-primary, #333);
-}
-
-.toast-close {
-  background: none;
-  border: none;
-  font-size: 20px;
-  color: #999;
-  cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.2s;
-}
-
-.toast-close:hover {
-  color: #333;
-}
+/* Toast Notifications - Now handled globally in components/toast.css */
 
 /* Responsive Design */
 @media (max-width: 768px) {
@@ -875,15 +774,7 @@ textarea {
     margin: 10px;
   }
 
-  .toast-container {
-    left: 10px;
-    right: 10px;
-    max-width: none;
-  }
-
-  .toast {
-    min-width: auto;
-  }
+  /* Toast responsive styles now handled globally in components/toast.css */
 }
 
 @media (max-width: 480px) {

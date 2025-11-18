@@ -4,6 +4,7 @@ import CalendarHeader from './CalendarHeader.jsx'
 import MonthlyCalendarGrid from './MonthlyCalendarGrid.jsx'
 import CalendarContextMenu from './CalendarContextMenu.jsx'
 import Notification from './appointments/Notification.jsx'
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 /**
  * AppointmentCalendar Main Component
@@ -20,6 +21,7 @@ const AppointmentCalendar = ({
     selectedSlot: externalSelectedSlot,
     showOnlyAvailable = false
 }) => {
+    const toast = useToast();
     // State management
     const [currentDate, setCurrentDate] = useState(initialDate ? new Date(initialDate) : new Date());
     const [calendarData, setCalendarData] = useState(null);
@@ -318,7 +320,7 @@ const AppointmentCalendar = ({
             setDeleteConfirmation(null);
         } catch (error) {
             console.error('Error deleting appointment:', error);
-            alert('Failed to delete appointment: ' + error.message);
+            toast.error('Failed to delete appointment: ' + error.message);
         }
     }, [deleteConfirmation, currentDate, selectedDoctorId, fetchCalendarData]);
 

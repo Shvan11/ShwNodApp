@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 const ViewPatientInfo = ({ patientId }) => {
     const navigate = useNavigate();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [patientData, setPatientData] = useState(null);
@@ -139,7 +141,7 @@ const ViewPatientInfo = ({ patientId }) => {
             setEditingCost(false);
         } catch (err) {
             console.error('Error saving cost:', err);
-            alert('Failed to save estimated cost');
+            toast.error('Failed to save estimated cost');
         } finally {
             setSavingCost(false);
         }

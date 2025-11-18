@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { copyToClipboard } from '../../core/utils.js';
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets = [], defaultDoctorId, folderPath }) => {
+    const toast = useToast();
     const [formData, setFormData] = useState({
         SetSequence: '',
         Type: '',
@@ -188,11 +190,11 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                 onSave();
                 onClose();
             } else {
-                alert('Error: ' + (result.error || 'Failed to save set'));
+                toast.error('Error: ' + (result.error || 'Failed to save set'));
             }
         } catch (error) {
             console.error('Error saving set:', error);
-            alert('Error saving set: ' + error.message);
+            toast.error('Error saving set: ' + error.message);
         } finally {
             setSaving(false);
         }
@@ -202,12 +204,12 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
         if (!pdfFile) return;
 
         if (pdfFile.type !== 'application/pdf') {
-            alert('Please select a PDF file');
+            toast.error('Please select a PDF file');
             return;
         }
 
         if (pdfFile.size > 100 * 1024 * 1024) {
-            alert('File is too large. Maximum size is 100MB.');
+            toast.error('File is too large. Maximum size is 100MB.');
             return;
         }
 
@@ -230,7 +232,7 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
 
         } catch (error) {
             console.error('Error uploading PDF:', error);
-            alert('Failed to upload PDF: ' + error.message);
+            toast.error('Failed to upload PDF: ' + error.message);
         } finally {
             setUploadingPdf(false);
         }
@@ -258,11 +260,11 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
 
             // Update form data to reflect deletion
             setFormData(prev => ({ ...prev, SetPdfUrl: '' }));
-            alert('PDF deleted successfully');
+            toast.success('PDF deleted successfully');
 
         } catch (error) {
             console.error('Error deleting PDF:', error);
-            alert('Failed to delete PDF: ' + error.message);
+            toast.error('Failed to delete PDF: ' + error.message);
         } finally {
             setDeletingPdf(false);
         }
@@ -595,12 +597,12 @@ const SetFormDrawer = ({ isOpen, onClose, onSave, set, workId, doctors, allSets 
                                                             const file = e.target.files?.[0];
                                                             if (file) {
                                                                 if (file.type !== 'application/pdf') {
-                                                                    alert('Please select a PDF file');
+                                                                    toast.error('Please select a PDF file');
                                                                     e.target.value = '';
                                                                     return;
                                                                 }
                                                                 if (file.size > 100 * 1024 * 1024) {
-                                                                    alert('File is too large. Maximum size is 100MB.');
+                                                                    toast.error('File is too large. Maximum size is 100MB.');
                                                                     e.target.value = '';
                                                                     return;
                                                                 }

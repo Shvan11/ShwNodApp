@@ -5,10 +5,10 @@ import ExpenseTable from '../components/expenses/ExpenseTable.jsx';
 import ExpenseSummary from '../components/expenses/ExpenseSummary.jsx';
 import ExpenseModal from '../components/expenses/ExpenseModal.jsx';
 import DeleteConfirmModal from '../components/expenses/DeleteConfirmModal.jsx';
-import { ToastContainer, useToast } from '../components/expenses/Toast.jsx';
+import { useToast } from '../contexts/ToastContext.jsx';
 
 export default function Expenses() {
-  // Toast notifications
+  // Toast notifications (now using unified global toast system)
   const toast = useToast();
 
   // Initialize default date range (current month)
@@ -223,8 +223,7 @@ export default function Expenses() {
         }}
       />
 
-      {/* Toast Notifications */}
-      <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
+      {/* Toast Notifications now handled globally by ToastProvider in App.jsx */}
     </div>
   );
 }

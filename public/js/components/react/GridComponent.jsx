@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 const GridComponent = ({ patientId, tpCode = '0' }) => {
     const navigate = useNavigate();
+    const toast = useToast();
     const [images, setImages] = useState([]);
     const [timepoints, setTimepoints] = useState([]);
     const [loadingTimepoints, setLoadingTimepoints] = useState(true);
@@ -264,10 +266,10 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                                         
                                         const sendMessageUrl = `/send-message?file=${encodeURIComponent(convertedPath)}`;
                                         window.open(sendMessageUrl, '_blank');
-                                        
+
                                     } catch (error) {
                                         console.error('Error converting path for send message:', error);
-                                        alert('Failed to convert file path for messaging. Please check the console for details.');
+                                        toast.error('Failed to convert file path for messaging. Please check the console for details.');
                                     }
                                 });
                             }
