@@ -191,6 +191,15 @@ const WorkCard = ({
                         </button>
                         <button
                             type="button"
+                            className="btn-card-action btn-diagnosis"
+                            onClick={() => window.location.href = `/patient/${patientId}/diagnosis?workId=${work.workid}`}
+                            title="View diagnosis and treatment plan"
+                        >
+                            <i className="fas fa-stethoscope"></i>
+                            <span>Diagnosis</span>
+                        </button>
+                        <button
+                            type="button"
                             className="btn-card-action btn-payments"
                             onClick={() => onViewPaymentHistory(work)}
                             title="View payment history"

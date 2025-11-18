@@ -336,7 +336,7 @@
 /* Primary Actions */
 .work-card-primary-actions {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 0.5rem;
     margin-bottom: 0.75rem;
 }
@@ -378,6 +378,10 @@
 
 .btn-card-action.btn-payments i {
     color: #0891b2;
+}
+
+.btn-card-action.btn-diagnosis i {
+    color: #ec4899;
 }
 
 .btn-card-action.btn-details i {
@@ -458,7 +462,7 @@
     }
 
     .work-card-primary-actions {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
     }
 
     .work-card-secondary-actions {

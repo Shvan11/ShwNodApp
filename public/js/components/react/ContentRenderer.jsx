@@ -13,6 +13,7 @@ import EditPatientComponent from './EditPatientComponent.jsx'
 import ViewPatientInfo from './ViewPatientInfo.jsx'
 import PatientAppointments from './PatientAppointments.jsx'
 import AddPatientForm from './AddPatientForm.jsx'
+import Diagnosis from '../../pages/Diagnosis.jsx'
 import '../../../css/components/new-work-component.css'
 
 const ContentRenderer = ({ patientId, page = 'photos', params = {} }) => {
@@ -96,6 +97,12 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }) => {
                             navigate(`/patient/${patientId}/works`);
                         }}
                     />
+                );
+
+            case 'diagnosis':
+                // Diagnosis and treatment planning page
+                return (
+                    <Diagnosis />
                 );
 
             case 'compare':

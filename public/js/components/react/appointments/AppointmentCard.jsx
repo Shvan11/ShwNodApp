@@ -117,114 +117,90 @@ const AppointmentCard = ({
     // Render action buttons based on status
     const renderActions = () => {
         if (!showStatus) {
-            // All appointments table - show check-in button
+            // All appointments table - show only check-in button (gray/dim - not checked in yet)
             const isCheckedIn = status === 'Checked In';
 
-            if (isCheckedIn) {
-                return (
-                    <span className="checked-in-indicator">
-                        <i className="fas fa-check-circle"></i>
-                        Checked In
-                    </span>
-                );
-            } else {
-                return (
-                    <button
-                        type="button"
-                        className="btn-action btn-success"
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
+            return (
+                <button
+                    type="button"
+                    className={`status-icon-btn ${isCheckedIn ? 'status-icon-active' : 'status-icon-inactive-clickable'}`}
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!isCheckedIn) {
                             onCheckIn(appointment.appointmentID);
-                        }}
-                        title="Check In"
-                    >
-                        <i className="fas fa-sign-in-alt"></i>
-                    </button>
-                );
-            }
+                        }
+                    }}
+                    title={isCheckedIn ? "Checked In" : "Click to Check In"}
+                >
+                    <i className="fas fa-user-check"></i>
+                </button>
+            );
         } else {
-            // Checked-in patients - Sequential workflow: Present → Seat → Dismiss
-            const currentStatus = status.toLowerCase();
+            // Checked-in patients - Fixed icon workflow: Present → Seat → Dismiss
+            const isPresent = appointment.Present;
+            const isSeated = appointment.Seated;
+            const isDismissed = appointment.Dismissed;
 
-            if (currentStatus === 'present') {
-                return (
-                    <>
-                        <button
-                            type="button"
-                            className="btn-action btn-info"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onMarkSeated(appointment.appointmentID);
-                            }}
-                            title="Seat Patient"
-                            style={{ padding: 5, width: '72px', height: '48px' }}
-                        >
-                            <img src="/images/dental_chair.svg" alt="Seat Patient" style={{ width: '100%', height: '100%', display: 'block' }} />
-                        </button>
-                        <button
-                            type="button"
-                            className="btn-action btn-undo"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onUndoState(appointment.appointmentID, 'Present');
-                            }}
-                            title="Undo Check-in"
-                        >
-                            <i className="fas fa-undo"></i>
-                        </button>
-                    </>
-                );
-            } else if (currentStatus === 'seated') {
-                return (
-                    <>
-                        <button
-                            type="button"
-                            className="btn-action btn-success"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onMarkDismissed(appointment.appointmentID);
-                            }}
-                            title="Complete Visit"
-                        >
-                            <i className="fas fa-check-circle"></i>
-                        </button>
-                        <button
-                            type="button"
-                            className="btn-action btn-undo"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onUndoState(appointment.appointmentID, 'Seated');
-                            }}
-                            title="Undo Seating"
-                        >
-                            <i className="fas fa-undo"></i>
-                        </button>
-                    </>
-                );
-            } else if (currentStatus === 'dismissed') {
-                return (
+            return (
+                <div className="status-workflow-icons">
+                    {/* Check-in icon - Always colored (green) since they're checked in */}
                     <button
                         type="button"
-                        className="btn-action btn-undo btn-undo-only"
+                        className="status-icon-btn status-icon-active"
                         onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            onUndoState(appointment.appointmentID, 'Dismissed');
+                            onUndoState(appointment.appointmentID, 'Present');
                         }}
-                        title="Undo Dismiss"
+                        title="Checked In - Click to undo"
                     >
-                        <i className="fas fa-undo"></i>
+                        <i className="fas fa-user-check"></i>
                     </button>
-                );
-            }
-        }
 
-        return null;
+                    {/* Seated icon - Green when seated, gray when not seated yet */}
+                    <button
+                        type="button"
+                        className={`status-icon-btn status-icon-chair ${isSeated ? 'status-icon-active' : 'status-icon-inactive-clickable'}`}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (isSeated) {
+                                onUndoState(appointment.appointmentID, 'Seated');
+                            } else {
+                                onMarkSeated(appointment.appointmentID);
+                            }
+                        }}
+                        title={isSeated ? "Seated - Click to undo" : "Click to Seat Patient"}
+                    >
+                        <img
+                            src={isSeated ? "/images/dental_chair.svg" : "/images/dental_chair_grey.svg"}
+                            alt="Seat"
+                            className="chair-icon"
+                        />
+                    </button>
+
+                    {/* Complete icon - Green when dismissed, gray/clickable when seated, gray/disabled when not seated */}
+                    <button
+                        type="button"
+                        className={`status-icon-btn ${isDismissed ? 'status-icon-active' : (isSeated ? 'status-icon-inactive-clickable' : 'status-icon-inactive')}`}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (isDismissed) {
+                                onUndoState(appointment.appointmentID, 'Dismissed');
+                            } else if (isSeated) {
+                                onMarkDismissed(appointment.appointmentID);
+                            }
+                        }}
+                        title={isDismissed ? "Completed - Click to undo" : (isSeated ? "Click to Complete Visit" : "Not seated yet")}
+                        disabled={!isSeated && !isDismissed}
+                    >
+                        <i className="fas fa-check-circle"></i>
+                    </button>
+                </div>
+            );
+        }
     };
 
     // Get state times
