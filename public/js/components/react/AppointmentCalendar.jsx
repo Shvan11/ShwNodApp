@@ -37,7 +37,6 @@ const AppointmentCalendar = ({
     // Context menu and delete confirmation state
     const [contextMenu, setContextMenu] = useState(null); // { position: {x, y}, appointment }
     const [deleteConfirmation, setDeleteConfirmation] = useState(null); // appointment to delete
-    const [notification, setNotification] = useState(null); // { message, type }
 
     // Use external selected slot if provided (for controlled mode)
     const selectedSlot = externalSelectedSlot || internalSelectedSlot;
@@ -269,10 +268,7 @@ const AppointmentCalendar = ({
 
                 if (slotDateTime < now) {
                     // Show toast notification for past appointments
-                    setNotification({
-                        message: 'You cannot edit or delete past appointments',
-                        type: 'error'
-                    });
+                    toast.error('You cannot edit or delete past appointments');
                     return;
                 }
 
@@ -480,14 +476,7 @@ const AppointmentCalendar = ({
                 </div>
             )}
 
-            {/* Toast Notification */}
-            {notification && (
-                <Notification
-                    message={notification.message}
-                    type={notification.type}
-                    onClose={() => setNotification(null)}
-                />
-            )}
+            {/* Toast Notifications now handled globally by ToastProvider in App.jsx */}
         </div>
     );
 };

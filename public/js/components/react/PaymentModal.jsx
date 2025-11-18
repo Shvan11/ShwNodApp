@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import '../../../css/components/invoice-form.css'
 import { formatNumber, parseFormattedNumber, formatCurrency as formatCurrencyUtil } from '../../utils/formatters.js'
-import { useToast, ToastContainer } from '../expenses/Toast.jsx'
+import { useToast } from '../../contexts/ToastContext.jsx'
 
 /**
  * Payment Modal Component
@@ -1187,8 +1187,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
             </div>
         </div>
 
-            {/* Toast Notifications */}
-            <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
+            {/* Toast Notifications now handled globally by ToastProvider in App.jsx */}
         </>
     );
 };

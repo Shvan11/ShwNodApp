@@ -3,6 +3,7 @@ import { useDateManager } from '../hooks/useDateManager.js';
 import { useWhatsAppWebSocket } from '../hooks/useWhatsAppWebSocket.js';
 import { useMessageCount } from '../hooks/useMessageCount.js';
 import { useMessageStatus } from '../hooks/useMessageStatus.js';
+import { useToast } from '../contexts/ToastContext.jsx';
 import DateSelector from '../components/whatsapp-send/DateSelector.jsx';
 import ConnectionStatus from '../components/whatsapp-send/ConnectionStatus.jsx';
 import ProgressBar from '../components/whatsapp-send/ProgressBar.jsx';
@@ -14,6 +15,9 @@ import { APIClient } from '../utils/whatsapp-api-client.js';
 const apiClient = new APIClient();
 
 export default function WhatsAppSend() {
+  // Toast notifications (unified global system)
+  const toast = useToast();
+
   // Date management
   const { currentDate, dateOptions, setCurrentDate } = useDateManager();
 
@@ -47,15 +51,8 @@ export default function WhatsAppSend() {
   } = useMessageStatus(currentDate, messageStatusUpdate);
 
   // UI state
-  const [toastMessage, setToastMessage] = useState(null);
   const [resetConfirm, setResetConfirm] = useState(false);
   const [emailConfirm, setEmailConfirm] = useState(false);
-
-  // Show toast notification
-  const showToast = useCallback((message, type = 'success') => {
-    setToastMessage({ message, type });
-    setTimeout(() => setToastMessage(null), 5000);
-  }, []);
 
   // Handle date change
   const handleDateChange = useCallback((newDate) => {
@@ -79,20 +76,19 @@ export default function WhatsAppSend() {
       const result = await apiClient.post(API_ENDPOINTS.MESSAGE_RESET(currentDate));
 
       if (result.success) {
-        showToast(
-          `Reset completed: ${result.data?.appointmentsReset || 0} appointments reset`,
-          'success'
+        toast.success(
+          `Reset completed: ${result.data?.appointmentsReset || 0} appointments reset`
         );
         await refreshMessageCount();
       } else {
         throw new Error(result.error || 'Reset failed');
       }
     } catch (error) {
-      showToast(`Failed to reset: ${error.message}`, 'error');
+      toast.error(`Failed to reset: ${error.message}`);
     } finally {
       setResetConfirm(false);
     }
-  }, [resetConfirm, currentDate, showToast, refreshMessageCount]);
+  }, [resetConfirm, currentDate, toast, refreshMessageCount]);
 
   // Handle send email
   const handleSendEmail = useCallback(async () => {
@@ -110,34 +106,33 @@ export default function WhatsAppSend() {
       );
 
       if (result.success) {
-        showToast(
-          `Email sent successfully! ${result.appointmentCount} appointments`,
-          'success'
+        toast.success(
+          `Email sent successfully! ${result.appointmentCount} appointments`
         );
       } else {
         throw new Error(result.error || 'Email sending failed');
       }
     } catch (error) {
-      showToast(`Failed to send email: ${error.message}`, 'error');
+      toast.error(`Failed to send email: ${error.message}`);
     } finally {
       setEmailConfirm(false);
     }
-  }, [emailConfirm, currentDate, showToast]);
+  }, [emailConfirm, currentDate, toast]);
 
   // Handle start sending
   const handleStartSending = useCallback(async () => {
     if (!clientReady) {
-      showToast('WhatsApp client is not ready', 'error');
+      toast.error('WhatsApp client is not ready');
       return;
     }
 
     try {
       await apiClient.get(API_ENDPOINTS.WA_SEND(currentDate));
-      showToast('Messages sending started', 'success');
+      toast.success('Messages sending started');
     } catch (error) {
-      showToast(`Failed to start sending: ${error.message}`, 'error');
+      toast.error(`Failed to start sending: ${error.message}`);
     }
-  }, [clientReady, currentDate, showToast]);
+  }, [clientReady, currentDate, toast]);
 
   // Check for auth completion redirect
   useEffect(() => {
@@ -223,26 +218,7 @@ export default function WhatsAppSend() {
         </section>
       </main>
 
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div
-          id="toastContainer"
-          className={`toast-container toast-${toastMessage.type}`}
-          role="alert"
-          aria-live="assertive"
-        >
-          <div className="toast-message">
-            <span>{toastMessage.message}</span>
-            <button
-              className="toast-close"
-              onClick={() => setToastMessage(null)}
-              aria-label="Close notification"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Toast Notifications now handled globally by ToastProvider in App.jsx */}
     </div>
   );
 }

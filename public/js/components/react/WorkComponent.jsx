@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import WorkCard from './WorkCard.jsx';
 import PaymentModal from './PaymentModal.jsx';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters.js';
-import { useToast, ToastContainer } from '../expenses/Toast.jsx';
+import { useToast } from '../../contexts/ToastContext.jsx';
 import '../../../css/components/work-card.css';
 
 /**
@@ -1014,8 +1014,7 @@ const WorkComponent = ({ patientId }) => {
                 </div>
             )}
 
-            {/* Toast Notifications */}
-            <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
+            {/* Toast Notifications now handled globally by ToastProvider in App.jsx */}
         </div>
     );
 };
