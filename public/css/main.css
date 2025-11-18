@@ -17,6 +17,7 @@
 @import 'components/sidebar-navigation.css';
 @import 'components/toast.css';
 @import 'components/modal.css';
+@import 'components/payment-modal.css';
 @import 'components/whatsapp-auth.css';
 @import 'components/appointment-calendar.css';
 @import 'components/appointment-form.css';
