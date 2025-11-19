@@ -33,9 +33,9 @@
 .pm-quick-search-container {
     margin-bottom: var(--spacing-lg);
     padding: var(--spacing-lg);
-    background-color: #eff6ff;
+    background-color: var(--blue-50);
     border-radius: 12px;
-    border: 2px solid #3b82f6;
+    border: 2px solid var(--blue-300);
 }
 
 .pm-quick-search-header {
@@ -46,19 +46,19 @@
 }
 
 .pm-quick-search-header i {
-    color: #3b82f6;
+    color: var(--blue-300);
     font-size: var(--font-size-xl);
 }
 
 .pm-quick-search-header h3 {
     margin: 0;
-    color: #1e40af;
+    color: var(--info-700);
     font-size: 1.1rem;
 }
 
 .pm-quick-search-description {
     margin: 0 0 var(--spacing-md) 0;
-    color: #1e40af;
+    color: var(--info-700);
     font-size: var(--font-size-sm);
 }
 
@@ -73,7 +73,7 @@
     margin-bottom: var(--spacing-sm);
     font-weight: var(--font-weight-semibold);
     font-size: var(--font-size-sm);
-    color: #1e3a8a;
+    color: var(--info-800);
 }
 
 /* ===================================
@@ -82,7 +82,7 @@
 .pm-section-divider {
     margin: 2rem 0;
     border: none;
-    border-top: 2px solid #e5e7eb;
+    border-top: 2px solid var(--gray-200);
 }
 
 /* ===================================
@@ -95,17 +95,17 @@
 .pm-search-section-header h3 {
     margin: 0;
     font-size: 1.1rem;
-    color: #374151;
+    color: var(--gray-700);
 }
 
 .pm-search-section-header h3 i {
     margin-right: var(--spacing-sm);
-    color: #6b7280;
+    color: var(--gray-500);
 }
 
 .pm-search-section-header p {
     margin: var(--spacing-sm) 0 0 0;
-    color: #6b7280;
+    color: var(--gray-500);
     font-size: var(--font-size-sm);
 }
 
@@ -118,9 +118,9 @@
     gap: 0.75rem;
     margin-bottom: var(--spacing-lg);
     padding: var(--spacing-lg);
-    background-color: #f9fafb;
+    background-color: var(--gray-50);
     border-radius: var(--radius-lg);
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--gray-200);
 }
 
 .pm-name-search-grid label {
@@ -128,7 +128,7 @@
     margin-bottom: var(--spacing-sm);
     font-weight: var(--font-weight-medium);
     font-size: var(--font-size-sm);
-    color: #374151;
+    color: var(--gray-700);
 }
 
 .pm-name-search-grid input {
@@ -155,8 +155,8 @@
    MESSAGES (Error & Success)
    =================================== */
 .pm-error-message {
-    background-color: #fee2e2;
-    color: #991b1b;
+    background-color: var(--error-50);
+    color: var(--error-600);
     padding: var(--spacing-md);
     border-radius: var(--radius-lg);
     margin-bottom: var(--spacing-md);
@@ -170,12 +170,12 @@
     border: none;
     font-size: var(--font-size-2xl);
     cursor: pointer;
-    color: #991b1b;
+    color: var(--error-600);
 }
 
 .pm-success-message {
-    background-color: #d1fae5;
-    color: #065f46;
+    background-color: var(--success-100);
+    color: var(--success-800);
     padding: var(--spacing-md);
     border-radius: var(--radius-lg);
     margin-bottom: var(--spacing-md);
@@ -191,31 +191,31 @@
 
 .pm-loading-spinner {
     font-size: 2rem;
-    color: #3b82f6;
+    color: var(--blue-300);
     margin-bottom: var(--spacing-md);
 }
 
 .pm-empty-state {
     padding: 3rem;
     text-align: center;
-    background-color: #f9fafb;
+    background-color: var(--gray-50);
     border-radius: var(--radius-lg);
-    border: 2px dashed #d1d5db;
+    border: 2px dashed var(--gray-300);
 }
 
 .pm-empty-state i {
     font-size: 3rem;
-    color: #9ca3af;
+    color: var(--gray-400);
     margin-bottom: var(--spacing-md);
 }
 
 .pm-empty-state h3 {
-    color: #6b7280;
+    color: var(--gray-500);
     margin-bottom: var(--spacing-sm);
 }
 
 .pm-empty-state p {
-    color: #9ca3af;
+    color: var(--gray-400);
     margin: 0;
 }
 
@@ -236,7 +236,7 @@
    =================================== */
 .pm-patient-name-secondary {
     font-size: 0.85rem;
-    color: #6b7280;
+    color: var(--gray-500);
 }
 
 /* ===================================
@@ -249,19 +249,19 @@
 }
 
 .pm-btn-checkin {
-    background-color: #10b981;
+    background-color: var(--success-300);
     color: white;
     border: none;
 }
 
 .pm-btn-view {
-    background-color: #3b82f6;
+    background-color: var(--blue-300);
     color: white;
     border: none;
 }
 
 .pm-btn-delete {
-    background-color: #dc2626;
+    background-color: var(--error-500);
     color: white;
     border: none;
 }
@@ -280,7 +280,7 @@
 }
 
 .pm-required-asterisk {
-    color: #dc2626;
+    color: var(--error-500);
 }
 
 /* ===================================
@@ -291,8 +291,8 @@
 }
 
 .pm-delete-warning-box {
-    background-color: #fef2f2;
-    border: 2px solid #dc2626;
+    background-color: var(--error-50);
+    border: 2px solid var(--error-500);
     border-radius: var(--radius-lg);
     padding: var(--spacing-lg);
     margin-bottom: var(--spacing-lg);
@@ -306,45 +306,45 @@
 }
 
 .pm-delete-warning-header i {
-    color: #dc2626;
+    color: var(--error-500);
     font-size: 2rem;
 }
 
 .pm-delete-warning-header strong {
-    color: #991b1b;
+    color: var(--error-600);
     font-size: 1.1rem;
 }
 
 .pm-delete-warning-box > p {
     margin: 0 0 var(--spacing-md) 0;
-    color: #7f1d1d;
+    color: var(--error-700);
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-semibold);
 }
 
 .pm-delete-warning-list-container {
-    background-color: #ffffff;
+    background-color: white;
     padding: var(--spacing-md);
     border-radius: 6px;
-    border: 1px solid #fca5a5;
+    border: 1px solid var(--error-200);
     margin-bottom: var(--spacing-md);
 }
 
 .pm-delete-warning-list-container p {
     margin: 0 0 var(--spacing-sm) 0;
-    color: #991b1b;
+    color: var(--error-600);
     font-weight: var(--font-weight-semibold);
 }
 
 .pm-delete-warning-list-container ul {
     margin: var(--spacing-sm) 0;
     padding-left: var(--spacing-lg);
-    color: #7f1d1d;
+    color: var(--error-700);
 }
 
 .pm-delete-final-warning {
     margin: 0;
-    color: #991b1b;
+    color: var(--error-600);
     font-weight: var(--font-weight-bold);
     font-size: 0.95rem;
 }
