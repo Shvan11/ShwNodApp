@@ -31,11 +31,11 @@
 }
 
 .work-card-active {
-    border-left-color: #059669;
+    border-left-color: var(--success-500);
 }
 
 .work-card-completed {
-    border-left-color: #6b7280;
+    border-left-color: var(--gray-500);
     opacity: 0.85;
 }
 
@@ -54,12 +54,12 @@
 
 .chevron-icon {
     font-size: 0.875rem;
-    color: #6b7280;
+    color: var(--gray-500);
     margin-right: 0.5rem;
 }
 
 .balance-indicator {
-    color: #dc2626;
+    color: var(--error-500);
     font-weight: 600;
 }
 
@@ -75,7 +75,7 @@
 }
 
 .work-card-title i.fa-tooth {
-    color: #059669;
+    color: var(--success-500);
     font-size: 1rem;
 }
 
@@ -83,7 +83,7 @@
     margin: 0;
     font-size: 1rem;
     font-weight: 600;
-    color: #1f2937;
+    color: var(--gray-800);
 }
 
 .work-status-badge {
@@ -96,13 +96,13 @@
 }
 
 .work-status-badge.active {
-    background: #d1fae5;
-    color: #065f46;
+    background: var(--success-100);
+    color: var(--success-800);
 }
 
 .work-status-badge.completed {
-    background: #e5e7eb;
-    color: #4b5563;
+    background: var(--gray-200);
+    color: var(--gray-600);
 }
 
 .work-card-meta-minimal {
@@ -110,7 +110,7 @@
     flex-wrap: wrap;
     gap: 1rem;
     font-size: 0.8rem;
-    color: #6b7280;
+    color: var(--gray-500);
     margin-left: 1.375rem;
 }
 
@@ -122,7 +122,7 @@
 
 .work-card-meta-minimal i {
     font-size: 0.7rem;
-    color: #9ca3af;
+    color: var(--gray-400);
 }
 
 /* Full Content - Only When Expanded */
@@ -130,7 +130,7 @@
     position: relative;
     margin-top: 1rem;
     padding-top: 1rem;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid var(--gray-200);
     animation: slideDown 0.3s ease;
 }
 
@@ -156,7 +156,7 @@
 .btn-icon {
     background: transparent;
     border: none;
-    color: #6b7280;
+    color: var(--gray-500);
     cursor: pointer;
     padding: 0.5rem;
     border-radius: 6px;
@@ -164,8 +164,8 @@
 }
 
 .btn-icon:hover {
-    background: #f3f4f6;
-    color: #1f2937;
+    background: var(--gray-100);
+    color: var(--gray-800);
 }
 
 .work-card-dropdown {
@@ -189,7 +189,7 @@
     padding: 0.75rem 1rem;
     border: none;
     background: white;
-    color: #374151;
+    color: var(--gray-700);
     cursor: pointer;
     font-size: 0.875rem;
     text-align: left;
@@ -197,31 +197,31 @@
 }
 
 .work-card-dropdown button:hover {
-    background: #f3f4f6;
+    background: var(--gray-100);
 }
 
 .work-card-dropdown button i {
     width: 16px;
-    color: #6b7280;
+    color: var(--gray-500);
 }
 
 /* Delete button styling */
 .work-card-dropdown .dropdown-delete-btn {
-    color: #dc2626;
-    border-top: 1px solid #f3f4f6;
+    color: var(--error-500);
+    border-top: 1px solid var(--gray-100);
 }
 
 .work-card-dropdown .dropdown-delete-btn:hover {
-    background: #fee2e2;
-    color: #991b1b;
+    background: var(--error-50);
+    color: var(--error-600);
 }
 
 .work-card-dropdown .dropdown-delete-btn i {
-    color: #dc2626;
+    color: var(--error-500);
 }
 
 .work-card-dropdown .dropdown-delete-btn:hover i {
-    color: #991b1b;
+    color: var(--error-600);
 }
 
 /* Progress Section */
@@ -238,26 +238,26 @@
 
 .progress-label {
     font-size: 0.875rem;
-    color: #6b7280;
+    color: var(--gray-500);
     font-weight: 500;
 }
 
 .progress-percentage {
     font-size: 0.875rem;
     font-weight: 600;
-    color: #059669;
+    color: var(--success-500);
 }
 
 .progress-bar-container {
     height: 8px;
-    background: #e5e7eb;
+    background: var(--gray-200);
     border-radius: 4px;
     overflow: hidden;
 }
 
 .progress-bar-fill {
     height: 100%;
-    background: linear-gradient(90deg, #059669 0%, #10b981 100%);
+    background: linear-gradient(90deg, var(--success-500) 0%, var(--success-300) 100%);
     border-radius: 4px;
     transition: width 0.5s ease;
 }
@@ -268,7 +268,7 @@
     grid-template-columns: repeat(3, 1fr);
     gap: 0.75rem;
     padding: 0.5rem 0.75rem;
-    background: #f9fafb;
+    background: var(--gray-50);
     border-radius: 8px;
     margin-bottom: 1rem;
 }
@@ -281,7 +281,7 @@
 
 .financial-label {
     font-size: 0.75rem;
-    color: #6b7280;
+    color: var(--gray-500);
     text-transform: uppercase;
     font-weight: 600;
     letter-spacing: 0.5px;
@@ -290,19 +290,19 @@
 .financial-value {
     font-size: 1rem;
     font-weight: 700;
-    color: #1f2937;
+    color: var(--gray-800);
 }
 
 .financial-value.paid {
-    color: #059669;
+    color: var(--success-500);
 }
 
 .financial-value.remaining {
-    color: #dc2626;
+    color: var(--error-500);
 }
 
 .financial-value.paid-full {
-    color: #059669;
+    color: var(--success-500);
 }
 
 /* Additional Info Section */
@@ -311,7 +311,7 @@
     flex-wrap: wrap;
     gap: 0.75rem;
     padding: 0.75rem;
-    background: #f9fafb;
+    background: var(--gray-50);
     border-radius: 8px;
     margin-bottom: 1rem;
     font-size: 0.875rem;
@@ -321,7 +321,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: #374151;
+    color: var(--gray-700);
 }
 
 .work-card-additional-info .info-item.full-width {
@@ -329,7 +329,7 @@
 }
 
 .work-card-additional-info .info-item i {
-    color: #6b7280;
+    color: var(--gray-500);
     font-size: 0.75rem;
 }
 
@@ -347,19 +347,19 @@
     align-items: center;
     gap: 0.25rem;
     padding: 0.5rem 0.375rem;
-    border: 2px solid #e5e7eb;
+    border: 2px solid var(--gray-200);
     background: white;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s;
     font-size: 0.75rem;
     font-weight: 600;
-    color: #374151;
+    color: var(--gray-700);
 }
 
 .btn-card-action:hover {
-    border-color: #d1d5db;
-    background: #f9fafb;
+    border-color: var(--gray-300);
+    background: var(--gray-50);
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
 }
@@ -369,19 +369,19 @@
 }
 
 .btn-card-action.btn-new-visit i {
-    color: #8b5cf6;
+    color: var(--color-purple-medium);
 }
 
 .btn-card-action.btn-visits i {
-    color: #059669;
+    color: var(--success-500);
 }
 
 .btn-card-action.btn-payments i {
-    color: #0891b2;
+    color: var(--info-600);
 }
 
 .btn-card-action.btn-details i {
-    color: #3b82f6;
+    color: var(--blue-300);
 }
 
 /* Secondary Actions */
@@ -407,33 +407,33 @@
 }
 
 .btn-card-secondary.btn-add-payment {
-    background: #10b981;
+    background: var(--success-300);
 }
 
 .btn-card-secondary.btn-add-payment:hover:not(.disabled) {
-    background: #059669;
+    background: var(--success-500);
 }
 
 .btn-card-secondary.btn-add-payment.disabled {
-    background: #9ca3af;
+    background: var(--gray-400);
     cursor: not-allowed;
     opacity: 0.6;
 }
 
 .btn-card-secondary.btn-print-receipt {
-    background: #3b82f6;
+    background: var(--blue-300);
 }
 
 .btn-card-secondary.btn-print-receipt:hover {
-    background: #2563eb;
+    background: var(--blue-300);
 }
 
 .btn-card-secondary.btn-add-set {
-    background: #8b5cf6;
+    background: var(--color-purple-medium);
 }
 
 .btn-card-secondary.btn-add-set:hover {
-    background: #7c3aed;
+    background: var(--indigo-500);
 }
 
 /* No Works Message */
@@ -514,10 +514,10 @@
     align-items: center;
     gap: 1.5rem;
     padding: 1.5rem;
-    background-color: #f9fafb;
+    background-color: var(--gray-50);
     border-radius: 12px;
     margin-bottom: 0.5rem;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--gray-200);
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
 
@@ -527,7 +527,7 @@
     border-radius: 8px;
     overflow: hidden;
     flex-shrink: 0;
-    background-color: #e5e7eb;
+    background-color: var(--gray-200);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -562,7 +562,7 @@
     margin: 0;
     font-size: 1rem;
     font-weight: 600;
-    color: #111827;
+    color: var(--gray-900);
 }
 
 .patient-meta-info {
@@ -570,7 +570,7 @@
     gap: 2rem;
     margin-top: 0.5rem;
     font-size: 0.95rem;
-    color: #6b7280;
+    color: var(--gray-500);
 }
 
 .patient-meta-info i {
@@ -593,21 +593,21 @@
     padding: 0.75rem 1rem;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--gray-200);
     min-width: 70px;
 }
 
 .summary-value-inline {
     font-size: 1.75rem;
     font-weight: 700;
-    color: #111827;
+    color: var(--gray-900);
     line-height: 1;
 }
 
 .summary-label-inline {
     font-size: 0.75rem;
     font-weight: 500;
-    color: #6b7280;
+    color: var(--gray-500);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-top: 0.25rem;
@@ -624,21 +624,21 @@
     flex: 1 1 250px;
     min-width: 200px;
     padding: 0.5rem 0.75rem;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--gray-300);
     border-radius: 6px;
     font-size: 0.875rem;
 }
 
 .search-input:focus {
     outline: none;
-    border-color: #4f46e5;
+    border-color: var(--indigo-600);
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 .filter-select {
     flex: 0 1 auto;
     padding: 0.5rem 0.75rem;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--gray-300);
     border-radius: 6px;
     font-size: 0.875rem;
     background-color: white;
@@ -646,7 +646,7 @@
 
 .filter-select:focus {
     outline: none;
-    border-color: #4f46e5;
+    border-color: var(--indigo-600);
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
@@ -654,7 +654,7 @@
     flex: 0 1 auto;
     white-space: nowrap;
     padding: 0.5rem 1rem;
-    background-color: #3b82f6;
+    background-color: var(--blue-300);
     color: white;
     border: none;
     border-radius: 6px;
@@ -668,12 +668,12 @@
 }
 
 .btn-checkin:hover:not(:disabled) {
-    background-color: #2563eb;
+    background-color: var(--blue-300);
     box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
 }
 
 .btn-checkin.checked-in {
-    background-color: #10b981;
+    background-color: var(--success-300);
     cursor: not-allowed;
     opacity: 0.7;
 }
@@ -691,7 +691,7 @@
     flex: 0 1 auto;
     white-space: nowrap;
     padding: 0.5rem 1rem;
-    background-color: #4f46e5;
+    background-color: var(--indigo-600);
     color: white;
     border: none;
     border-radius: 6px;
@@ -702,7 +702,7 @@
 }
 
 .btn-primary:hover {
-    background-color: #4338ca;
+    background-color: var(--indigo-600);
     box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3);
 }
 
@@ -712,11 +712,11 @@
 
 /* Work Error */
 .work-error {
-    background-color: #fef2f2;
-    color: #991b1b;
+    background-color: var(--error-50);
+    color: var(--error-600);
     padding: 0.75rem 1rem;
     border-radius: 6px;
-    border-left: 3px solid #dc2626;
+    border-left: 3px solid var(--error-500);
     margin-bottom: 1rem;
     display: flex;
     justify-content: space-between;
@@ -726,7 +726,7 @@
 .error-close {
     background: none;
     border: none;
-    color: #991b1b;
+    color: var(--error-600);
     font-size: 1.5rem;
     cursor: pointer;
     padding: 0;
@@ -734,12 +734,12 @@
 }
 
 .error-close:hover {
-    color: #7f1d1d;
+    color: var(--error-700);
 }
 
 /* Work Success Message */
 .work-success {
-    background-color: #10b981;
+    background-color: var(--success-300);
     color: white;
     padding: 1rem;
     border-radius: 8px;
@@ -761,7 +761,7 @@
 
 .btn-success-action {
     background-color: white;
-    color: #10b981;
+    color: var(--success-300);
     font-weight: bold;
     border: none;
     padding: 0.5rem 1rem;
@@ -771,7 +771,7 @@
 }
 
 .btn-success-action:hover {
-    background-color: #f0fdf4;
+    background-color: var(--success-50);
 }
 
 .btn-success-close {
@@ -800,7 +800,7 @@
     padding: 1.5rem;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--gray-200);
     text-align: center;
 }
 
@@ -808,7 +808,7 @@
     margin: 0 0 0.5rem 0;
     font-size: 0.875rem;
     font-weight: 500;
-    color: #6b7280;
+    color: var(--gray-500);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -816,14 +816,14 @@
 .summary-value {
     font-size: 2rem;
     font-weight: 700;
-    color: #111827;
+    color: var(--gray-900);
 }
 
 /* Work Loading */
 .work-loading {
     padding: 2rem;
     text-align: center;
-    color: #6b7280;
+    color: var(--gray-500);
     font-size: 1rem;
 }
 
@@ -864,7 +864,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 1.5rem;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--gray-200);
     position: sticky;
     top: 0;
     z-index: 100;
@@ -875,11 +875,11 @@
     margin: 0;
     font-size: 1.25rem;
     font-weight: 600;
-    color: #111827;
+    color: var(--gray-900);
 }
 
 .modal-close {
-    background: #ef4444;
+    background: var(--error-400);
     border: none;
     font-size: 2rem;
     color: white;
@@ -897,7 +897,7 @@
 }
 
 .modal-close:hover {
-    background: #dc2626;
+    background: var(--error-500);
 }
 
 .modal-content-scroll {
@@ -908,10 +908,10 @@
 
 .payment-summary-box {
     padding: 1rem;
-    background-color: #f0fdf4;
+    background-color: var(--success-50);
     border-radius: 8px;
     margin-bottom: 1rem;
-    border: 1px solid #86efac;
+    border: 1px solid var(--success-200);
 }
 
 .payment-summary-grid {
@@ -928,7 +928,7 @@
 
 .payment-summary-label {
     font-weight: 600;
-    color: #374151;
+    color: var(--gray-700);
     margin-bottom: 0.25rem;
 }
 
@@ -938,15 +938,15 @@
 }
 
 .payment-summary-value.total {
-    color: #059669;
+    color: var(--success-500);
 }
 
 .payment-summary-value.paid {
-    color: #0891b2;
+    color: var(--info-600);
 }
 
 .payment-summary-value.balance {
-    color: #dc2626;
+    color: var(--error-500);
 }
 
 .details-table-container {
@@ -962,19 +962,19 @@
 .details-table td {
     padding: 0.75rem;
     text-align: left;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--gray-200);
 }
 
 .details-table th {
-    background-color: #f9fafb;
+    background-color: var(--gray-50);
     font-weight: 600;
-    color: #374151;
+    color: var(--gray-700);
     font-size: 0.875rem;
 }
 
 .details-table td {
     font-size: 0.875rem;
-    color: #111827;
+    color: var(--gray-900);
 }
 
 .payment-actions {
@@ -993,28 +993,28 @@
 }
 
 .btn-action-edit {
-    background: #eff6ff;
-    color: #3b82f6;
+    background: var(--blue-50);
+    color: var(--blue-300);
 }
 
 .btn-action-edit:hover {
-    background: #3b82f6;
+    background: var(--blue-300);
     color: white;
 }
 
 .btn-action-delete {
-    background: #fef2f2;
-    color: #ef4444;
+    background: var(--error-50);
+    color: var(--error-400);
 }
 
 .btn-action-delete:hover {
-    background: #ef4444;
+    background: var(--error-400);
     color: white;
 }
 
 .no-data {
     text-align: center;
-    color: #9ca3af;
+    color: var(--gray-400);
     padding: 2rem;
     font-style: italic;
 }
@@ -1022,28 +1022,28 @@
 .payment-history-footer {
     margin-top: 1.5rem;
     padding-top: 1rem;
-    border-top: 2px solid #e5e7eb;
+    border-top: 2px solid var(--gray-200);
 }
 
 .payment-fully-paid {
     padding: 1rem;
-    background-color: #f0fdf4;
+    background-color: var(--success-50);
     border-radius: 8px;
-    border: 1px solid #86efac;
+    border: 1px solid var(--success-200);
     text-align: center;
-    color: #059669;
+    color: var(--success-500);
     font-weight: 600;
 }
 
 /* No Works Icon */
 .no-works-icon {
     font-size: 3rem;
-    color: #d1d5db;
+    color: var(--gray-300);
     margin-bottom: 1rem;
 }
 
 .no-works-text {
-    color: #6b7280;
+    color: var(--gray-500);
     font-size: 1rem;
 }
 
@@ -1058,18 +1058,18 @@
 }
 
 .work-summary-info h4.reference-section {
-    color: #4f46e5;
-    border-bottom: 2px solid #e0e7ff;
+    color: var(--indigo-600);
+    border-bottom: 2px solid var(--indigo-100);
 }
 
 .work-summary-info h4.photo-dates-section {
-    color: #7c3aed;
-    border-bottom: 2px solid #ede9fe;
+    color: var(--indigo-500);
+    border-bottom: 2px solid var(--indigo-100);
 }
 
 .work-summary-info h4.keywords-section {
-    color: #ea580c;
-    border-bottom: 2px solid #fed7aa;
+    color: var(--warning-600);
+    border-bottom: 2px solid var(--warning-200);
 }
 
 .info-grid {
@@ -1081,7 +1081,7 @@
 
 .info-item label {
     font-weight: 600;
-    color: #6b7280;
+    color: var(--gray-500);
     display: block;
     margin-bottom: 0.25rem;
 }
@@ -1110,39 +1110,39 @@
 }
 
 .keyword-badge-1 {
-    background-color: #e0e7ff;
-    color: #4f46e5;
+    background-color: var(--indigo-100);
+    color: var(--indigo-600);
 }
 
 .keyword-badge-2 {
-    background-color: #dbeafe;
-    color: #1e40af;
+    background-color: var(--info-100);
+    color: var(--info-700);
 }
 
 .keyword-badge-3 {
-    background-color: #d1fae5;
-    color: #065f46;
+    background-color: var(--success-100);
+    color: var(--success-800);
 }
 
 .keyword-badge-4 {
-    background-color: #fef3c7;
-    color: #92400e;
+    background-color: var(--warning-100);
+    color: var(--warning-900);
 }
 
 .keyword-badge-5 {
-    background-color: #fce7f3;
-    color: #9f1239;
+    background-color: var(--pink-100);
+    color: var(--error-pink);
 }
 
 /* Payment Amount Cell */
 .payment-amount {
     font-weight: 600;
-    color: #059669;
+    color: var(--success-500);
 }
 
 /* Add Payment Button */
 .btn-add-payment {
-    background-color: #10b981;
+    background-color: var(--success-300);
     display: flex;
     align-items: center;
     gap: 0.5rem;
