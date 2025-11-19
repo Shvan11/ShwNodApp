@@ -1,6 +1,6 @@
 /* Dashboard Styles */
 .header {
-    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    background: linear-gradient(135deg, var(--color-dark-blue) 0%, var(--color-dark-blue) 100%);
     color: white;
     padding: 1rem 0;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
@@ -41,7 +41,7 @@
     min-height: calc(100vh - 120px);
     padding: 2rem 0;
     padding-top: calc(50px + 2rem); /* UniversalHeader height (50px) + original padding */
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-200) 100%);
 }
 
 .container {
@@ -75,7 +75,7 @@
     padding: 1.5rem;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
     transition: all 0.3s ease;
-    border: 1px solid #e9ecef;
+    border: 1px solid var(--gray-200);
     position: relative;
     overflow: hidden;
 }
@@ -87,7 +87,7 @@
     left: 0;
     right: 0;
     height: 4px;
-    background: linear-gradient(90deg, #3498db, #2ecc71);
+    background: linear-gradient(90deg, var(--info-color), var(--success-color));
     transition: all 0.3s ease;
 }
 
@@ -104,7 +104,7 @@
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #3498db, #2ecc71);
+    background: linear-gradient(135deg, var(--info-color), var(--success-color));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -125,12 +125,12 @@
     margin: 0 0 0.5rem 0;
     font-size: 1.25rem;
     font-weight: 600;
-    color: #2c3e50;
+    color: var(--color-dark-blue);
 }
 
 .dashboard-card p {
     margin: 0 0 1.5rem 0;
-    color: #6c757d;
+    color: var(--text-secondary);
     font-size: 0.9rem;
     line-height: 1.5;
 }
@@ -140,15 +140,15 @@
     align-items: center;
     justify-content: space-between;
     text-decoration: none;
-    color: #3498db;
+    color: var(--info-color);
     font-weight: 500;
     padding: 0.5rem 0;
-    border-top: 1px solid #e9ecef;
+    border-top: 1px solid var(--gray-200);
     transition: all 0.3s ease;
 }
 
 .card-link:hover {
-    color: #2980b9;
+    color: var(--info-600);
 }
 
 .card-link i {
@@ -162,27 +162,27 @@
 /* Coming Soon Cards */
 .dashboard-card.coming-soon {
     opacity: 0.7;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-200) 100%);
 }
 
 .dashboard-card.coming-soon .card-icon {
-    background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+    background: linear-gradient(135deg, var(--gray-400), var(--gray-500));
 }
 
 .card-link.disabled {
-    color: #6c757d;
+    color: var(--text-secondary);
     cursor: not-allowed;
     opacity: 0.6;
 }
 
 .card-link.disabled:hover {
-    color: #6c757d;
+    color: var(--text-secondary);
     transform: none;
 }
 
 /* Quick Actions Card */
 .dashboard-card.quick-actions {
-    background: linear-gradient(135deg, #fff 0%, #f1f3f4 100%);
+    background: linear-gradient(135deg, white 0%, var(--gray-100) 100%);
 }
 
 .quick-actions-list {
@@ -199,13 +199,13 @@
     background: white;
     border-radius: 8px;
     text-decoration: none;
-    color: #2c3e50;
+    color: var(--color-dark-blue);
     transition: all 0.3s ease;
-    border: 1px solid #e9ecef;
+    border: 1px solid var(--gray-200);
 }
 
 .quick-action:hover {
-    background: #3498db;
+    background: var(--info-color);
     color: white;
     transform: translateX(3px);
 }
@@ -218,7 +218,7 @@
 
 /* Footer */
 .footer {
-    background: #2c3e50;
+    background: var(--color-dark-blue);
     color: white;
     text-align: center;
     padding: 1rem 0;

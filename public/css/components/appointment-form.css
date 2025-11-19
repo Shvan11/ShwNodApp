@@ -42,14 +42,14 @@
     align-items: center;
     justify-content: space-between;
     padding: 24px 24px 16px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--gray-200);
 }
 
 .appointment-form-header h2 {
     margin: 0;
     font-size: 24px;
     font-weight: 600;
-    color: #333;
+    color: var(--text-color);
     display: flex;
     align-items: center;
     gap: 12px;
@@ -59,14 +59,14 @@
     content: '\f067';
     font-family: 'Font Awesome 6 Free';
     font-weight: 900;
-    color: #007bff;
+    color: var(--primary-color);
 }
 
 .close-btn {
     background: none;
     border: none;
     font-size: 20px;
-    color: #666;
+    color: var(--text-light);
     cursor: pointer;
     padding: 8px;
     border-radius: 6px;
@@ -77,8 +77,8 @@
 }
 
 .close-btn:hover {
-    background: #f5f5f5;
-    color: #333;
+    background: var(--gray-100);
+    color: var(--text-color);
 }
 
 .appointment-form {
@@ -93,14 +93,14 @@
     display: block;
     margin-bottom: 8px;
     font-weight: 500;
-    color: #333;
+    color: var(--text-color);
     font-size: 14px;
 }
 
 .form-input {
     width: 100%;
     padding: 12px 16px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid var(--gray-200);
     border-radius: 8px;
     font-size: 16px;
     transition: all 0.2s ease;
@@ -110,18 +110,18 @@
 
 .form-input:focus {
     outline: none;
-    border-color: #007bff;
+    border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
 .form-input.disabled {
-    background: #f8f9fa;
-    color: #666;
+    background: var(--gray-50);
+    color: var(--text-light);
     cursor: not-allowed;
 }
 
 .form-input.error {
-    border-color: #dc3545;
+    border-color: var(--error-color);
     box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
 }
 
@@ -141,7 +141,7 @@
     right: 12px;
     background: none;
     border: none;
-    color: #007bff;
+    color: var(--primary-color);
     font-size: 16px;
     cursor: pointer;
     padding: 4px;
@@ -155,15 +155,15 @@
 
 .validation-error {
     display: block;
-    color: #dc3545;
+    color: var(--error-color);
     font-size: 14px;
     margin-top: 6px;
     font-weight: 500;
 }
 
 .error-message {
-    background: #f8d7da;
-    color: #721c24;
+    background: var(--error-50);
+    color: var(--error-700);
     padding: 12px 16px;
     border-radius: 8px;
     margin-bottom: 20px;
@@ -179,7 +179,7 @@
     justify-content: flex-end;
     margin-top: 32px;
     padding-top: 20px;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--gray-200);
 }
 
 /* Modal Form Buttons - Scoped to Modal Only */
@@ -204,23 +204,23 @@
 }
 
 .appointment-form-modal .btn-primary {
-    background: #007bff;
+    background: var(--primary-color);
     color: white;
 }
 
 .appointment-form-modal .btn-primary:hover:not(:disabled) {
-    background: #0056b3;
+    background: var(--blue-700);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
 }
 
 .appointment-form-modal .btn-secondary {
-    background: #6c757d;
+    background: var(--text-secondary);
     color: white;
 }
 
 .appointment-form-modal .btn-secondary:hover:not(:disabled) {
-    background: #545b62;
+    background: var(--gray-600);
 }
 
 /* Calendar Picker Modal */
@@ -252,14 +252,14 @@
     align-items: center;
     justify-content: space-between;
     padding: 20px 24px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--gray-200);
 }
 
 .calendar-picker-header h3 {
     margin: 0;
     font-size: 20px;
     font-weight: 600;
-    color: #333;
+    color: var(--text-color);
 }
 
 .calendar-picker-content {
