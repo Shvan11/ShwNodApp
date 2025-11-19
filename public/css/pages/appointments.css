@@ -19,7 +19,7 @@ html {
   font-family: var(--font-family);
   font-weight: 400;
   line-height: 1.5;
-  color: #1f2937;
+  color: var(--gray-800);
   background-color: var(--page-bg);
   width: 100%;
   overflow-x: hidden;
@@ -29,7 +29,7 @@ html {
 /* ===== HEADER SECTION ===== */
 .header-section {
   width: 100%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
   padding: 0.5rem var(--spacing-lg);
   box-shadow: var(--shadow-sm);
   margin-bottom: var(--spacing-md);
@@ -43,7 +43,7 @@ html {
   margin: 0;
   font-size: var(--font-size-lg);
   font-weight: 600;
-  color: #ffffff;
+  color: white;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   letter-spacing: -0.025em;
   white-space: nowrap;
@@ -70,7 +70,7 @@ html {
 
 .date-picker-left label {
   font-weight: 500;
-  color: #ffffff;
+  color: white;
   font-size: var(--font-size-xs);
   white-space: nowrap;
 }
@@ -107,7 +107,7 @@ html {
 .date-picker-left .btn-primary:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
-  background: linear-gradient(135deg, var(--primary-blue-dark) 0%, #1e40af 100%);
+  background: linear-gradient(135deg, var(--primary-blue-dark) 0%, var(--info-700) 100%);
 }
 
 .date-picker-left .btn-primary:active {
@@ -255,7 +255,7 @@ html {
 .stat-value {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--gray-800);
   line-height: 1;
   order: 1;
 }
@@ -283,7 +283,7 @@ html {
   margin: 0 0 var(--spacing-sm) 0;
   font-size: var(--font-size-base);
   font-weight: 600;
-  color: #1f2937;
+  color: var(--gray-800);
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
@@ -325,13 +325,13 @@ html {
 
 /* Waiting patients (checked-in but not seated) - Red border */
 .appointment-card.waiting-patient {
-  border: 3px solid #ef4444;
-  border-left: 6px solid #dc2626;
+  border: 3px solid var(--error-400);
+  border-left: 6px solid var(--error-500);
   background: linear-gradient(to right, rgba(239, 68, 68, 0.05) 0%, var(--card-bg) 10%);
 }
 
 .appointment-card.waiting-patient:hover {
-  border-color: #dc2626;
+  border-color: var(--error-500);
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
 }
 
@@ -341,10 +341,10 @@ html {
   min-width: 65px;
   text-align: left;
   padding: 0.25rem 0.5rem;
-  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  background: linear-gradient(135deg, var(--gray-100) 0%, var(--gray-200) 100%);
   border-radius: var(--radius-sm);
   font-weight: 600;
-  color: #374151;
+  color: var(--gray-700);
   font-size: var(--font-size-sm);
   display: flex;
   align-items: center;
@@ -383,7 +383,7 @@ html {
 .patient-name {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--gray-800);
   display: flex;
   align-items: center;
   gap: 0.375rem;
@@ -410,7 +410,7 @@ html {
 
 .appointment-type {
   font-size: var(--font-size-xs);
-  color: #6b7280;
+  color: var(--gray-500);
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
@@ -441,7 +441,7 @@ html {
   font-size: var(--font-size-xs);
   font-weight: 500;
   background-color: rgba(139, 92, 246, 0.1);
-  color: #7c3aed;
+  color: var(--indigo-500);
   border: 1px solid rgba(139, 92, 246, 0.2);
   transition: all var(--transition-fast);
   line-height: 1;
@@ -462,7 +462,7 @@ html {
   font-size: var(--font-size-xs);
   font-weight: 500;
   background-color: rgba(139, 92, 246, 0.1);
-  color: #7c3aed;
+  color: var(--indigo-500);
   border: 1px solid rgba(139, 92, 246, 0.2);
   transition: all var(--transition-fast);
   line-height: 1;
@@ -474,7 +474,7 @@ html {
   align-items: center;
   gap: 0.25rem;
   font-size: var(--font-size-sm);
-  color: #6b7280;
+  color: var(--gray-500);
   line-height: 1;
 }
 
@@ -533,26 +533,26 @@ html {
 }
 
 .visit-notes-icon.visit-notes-registered {
-  background-color: #d1fae5;
-  color: #065f46;
-  border: 1.5px solid #86efac;
+  background-color: var(--success-100);
+  color: var(--success-800);
+  border: 1.5px solid var(--success-200);
 }
 
 .visit-notes-icon.visit-notes-registered:hover {
-  background-color: #a7f3d0;
-  border-color: #4ade80;
+  background-color: var(--success-100);
+  border-color: var(--success-200);
   transform: scale(1.05);
 }
 
 .visit-notes-icon.visit-notes-missing {
-  background-color: #fef3c7;
-  color: #92400e;
-  border: 1.5px solid #fcd34d;
+  background-color: var(--warning-100);
+  color: var(--warning-900);
+  border: 1.5px solid var(--warning-400);
 }
 
 .visit-notes-icon.visit-notes-missing:hover {
-  background-color: #fde68a;
-  border-color: #fbbf24;
+  background-color: var(--warning-200);
+  border-color: var(--warning-400);
   transform: scale(1.05);
 }
 
@@ -592,7 +592,7 @@ html {
   gap: 0.25rem;
   padding: 0.25rem 0.5rem;
   background-color: rgba(107, 114, 128, 0.08);
-  color: #4b5563;
+  color: var(--gray-600);
   border-radius: var(--radius-sm);
   font-size: 0.75rem;
   font-weight: 500;
@@ -629,7 +629,7 @@ html {
   gap: 0.25rem;
   padding: 0.125rem 0.375rem;
   background-color: rgba(107, 114, 128, 0.08);
-  color: #4b5563;
+  color: var(--gray-600);
   border-radius: var(--radius-sm);
   font-size: 0.7rem;
   font-weight: 500;
@@ -740,7 +740,7 @@ html {
 }
 
 .btn-action.btn-info {
-  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+  background: linear-gradient(135deg, var(--info-500) 0%, var(--info-600) 100%);
   color: white;
   padding: 5px;
   width: 72px;
@@ -797,15 +797,15 @@ html {
   padding: var(--spacing-xl);
   color: var(--error-red);
   font-size: var(--font-size-lg);
-  background: #fef2f2;
+  background: var(--error-50);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  border: 2px solid #fecaca;
+  border: 2px solid var(--error-100);
 }
 
 /* ===== SKELETON LOADERS ===== */
 .skeleton {
-  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background: linear-gradient(90deg, var(--gray-100) 25%, var(--gray-200) 50%, var(--gray-100) 75%);
   background-size: 200% 100%;
   animation: loading 1.5s ease-in-out infinite;
   border-radius: var(--radius-md);
@@ -904,7 +904,7 @@ html {
   flex: 1;
   font-size: var(--font-size-sm);
   font-weight: 500;
-  color: #374151;
+  color: var(--gray-700);
 }
 
 .notification-undo {
@@ -949,7 +949,7 @@ html {
 
 .notification-close:hover {
   background-color: var(--hover-bg);
-  color: #1f2937;
+  color: var(--gray-800);
 }
 
 /* Small button variant */
@@ -1037,7 +1037,7 @@ html {
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
   font-weight: 500;
-  color: #374151;
+  color: var(--gray-700);
 }
 
 .context-menu-item:hover {
@@ -1255,7 +1255,7 @@ footer {
 
   .appointment-card {
     box-shadow: none;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--gray-200);
     page-break-inside: avoid;
   }
 }
@@ -1278,9 +1278,9 @@ table.appointments-table td {
 }
 
 table.appointments-table th {
-  background-color: #f9fafb;
+  background-color: var(--gray-50);
   font-weight: 600;
-  color: #374151;
+  color: var(--gray-700);
   font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1330,7 +1330,7 @@ table.appointments-table tr:last-child td {
 /* Connected State - Green with pulse animation */
 .ws-status-indicator.ws-connected {
   border-color: var(--success-green);
-  background-color: #ecfdf5;
+  background-color: var(--success-50);
 }
 
 .ws-status-indicator.ws-connected .ws-status-dot {
@@ -1369,7 +1369,7 @@ table.appointments-table tr:last-child td {
 /* Reconnecting State - Orange with pulse animation */
 .ws-status-indicator.ws-reconnecting {
   border-color: var(--warning-orange);
-  background-color: #fffbeb;
+  background-color: var(--warning-50);
 }
 
 .ws-status-indicator.ws-reconnecting .ws-status-dot {
@@ -1393,7 +1393,7 @@ table.appointments-table tr:last-child td {
 /* Error State - Red */
 .ws-status-indicator.ws-error {
   border-color: var(--error-red);
-  background-color: #fef2f2;
+  background-color: var(--error-50);
 }
 
 .ws-status-indicator.ws-error .ws-status-dot {

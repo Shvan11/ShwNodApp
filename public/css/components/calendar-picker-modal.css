@@ -61,8 +61,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 24px 32px;
-    border-bottom: 2px solid #f0f0f0;
-    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border-bottom: 2px solid var(--gray-100);
+    background: linear-gradient(135deg, var(--gray-50) 0%, white 100%);
 }
 
 .header-content {
@@ -73,20 +73,20 @@
     margin: 0 0 8px 0;
     font-size: 28px;
     font-weight: 700;
-    color: #333;
+    color: var(--text-color);
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
 .modal-title i {
-    color: #007bff;
+    color: var(--primary-color);
     font-size: 24px;
 }
 
 .modal-subtitle {
     margin: 0;
-    color: #666;
+    color: var(--text-light);
     font-size: 16px;
     font-weight: 400;
 }
@@ -95,7 +95,7 @@
     background: none;
     border: none;
     font-size: 24px;
-    color: #666;
+    color: var(--text-light);
     cursor: pointer;
     padding: 12px;
     border-radius: 8px;
@@ -107,8 +107,8 @@
 }
 
 .close-btn:hover {
-    background: #f5f5f5;
-    color: #333;
+    background: var(--gray-100);
+    color: var(--text-color);
     transform: scale(1.1);
 }
 
@@ -118,8 +118,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 32px;
-    background: linear-gradient(135deg, #e3f2fd 0%, #f0f8ff 100%);
-    border-bottom: 1px solid #bbdefb;
+    background: linear-gradient(135deg, var(--info-50) 0%, var(--info-50) 100%);
+    border-bottom: 1px solid var(--info-200);
     animation: selectionSlideDown 0.3s ease-out;
 }
 
@@ -138,20 +138,20 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    color: #1565c0;
+    color: var(--info-700);
     font-weight: 600;
     font-size: 16px;
 }
 
 .selected-info i {
-    color: #4caf50;
+    color: var(--success-color);
     font-size: 18px;
 }
 
 .clear-selection-btn {
     background: none;
     border: none;
-    color: #666;
+    color: var(--text-light);
     cursor: pointer;
     padding: 8px;
     border-radius: 6px;
@@ -161,7 +161,7 @@
 
 .clear-selection-btn:hover {
     background: rgba(0, 0, 0, 0.1);
-    color: #333;
+    color: var(--text-color);
 }
 
 /* Calendar Content */
@@ -169,7 +169,7 @@
     flex: 1;
     overflow: auto;
     padding: 24px 32px;
-    background: #fafafa;
+    background: var(--gray-50);
 }
 
 /* Override calendar styles for modal context */
@@ -181,7 +181,7 @@
 }
 
 .calendar-picker-content .calendar-header {
-    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--blue-700) 100%);
     color: white;
     padding: 20px 24px;
     border-radius: 12px 12px 0 0;
@@ -212,13 +212,13 @@
 .time-slot.selection-mode.selectable:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0, 123, 255, 0.3);
-    border-color: #007bff;
+    border-color: var(--primary-color);
 }
 
 .time-slot.selection-mode.selected {
-    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--blue-700) 100%);
     color: white;
-    border-color: #004085;
+    border-color: var(--info-800);
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(0, 123, 255, 0.4);
 }
@@ -242,7 +242,7 @@
     justify-content: center;
     height: 100%;
     gap: 8px;
-    color: #007bff;
+    color: var(--primary-color);
     font-weight: 500;
 }
 
@@ -258,8 +258,8 @@
 
 /* Unavailable Slot Styling */
 .time-slot.unavailable-hidden {
-    background: #f8f9fa;
-    border: 2px dashed #dee2e6;
+    background: var(--gray-50);
+    border: 2px dashed var(--border-color);
     opacity: 0.6;
     cursor: not-allowed;
 }
@@ -269,7 +269,7 @@
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: #6c757d;
+    color: var(--text-secondary);
     font-size: 12px;
     font-style: italic;
 }
@@ -280,21 +280,21 @@
     align-items: center;
     justify-content: space-between;
     padding: 24px 32px;
-    border-top: 2px solid #f0f0f0;
-    background: #f8f9fa;
+    border-top: 2px solid var(--gray-100);
+    background: var(--gray-50);
 }
 
 .action-info {
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #666;
+    color: var(--text-light);
     font-size: 14px;
     font-style: italic;
 }
 
 .action-info i {
-    color: #007bff;
+    color: var(--primary-color);
 }
 
 .action-buttons {
@@ -324,31 +324,31 @@
 }
 
 .action-buttons .btn-primary {
-    background: #007bff;
+    background: var(--primary-color);
     color: white;
 }
 
 .action-buttons .btn-primary:hover:not(:disabled) {
-    background: #0056b3;
+    background: var(--blue-700);
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0, 123, 255, 0.3);
 }
 
 .action-buttons .btn-secondary {
-    background: #6c757d;
+    background: var(--text-secondary);
     color: white;
 }
 
 .action-buttons .btn-secondary:hover:not(:disabled) {
-    background: #545b62;
+    background: var(--gray-600);
     transform: translateY(-1px);
 }
 
 /* Help Legend */
 .calendar-picker-help {
     padding: 16px 32px;
-    background: #f8f9fa;
-    border-top: 1px solid #e9ecef;
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-200);
 }
 
 .help-legend {
@@ -363,40 +363,40 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #666;
+    color: var(--text-light);
 }
 
 .legend-color {
     width: 16px;
     height: 16px;
     border-radius: 4px;
-    border: 2px solid #ddd;
+    border: 2px solid var(--gray-300);
     display: inline-block;
 }
 
 .legend-color.available {
-    background: #e8f5e8;
-    border-color: #28a745;
+    background: var(--success-50);
+    border-color: var(--success-color);
 }
 
 .legend-color.booked {
-    background: #e3f2fd;
-    border-color: #2196f3;
+    background: var(--info-50);
+    border-color: var(--info-color);
 }
 
 .legend-color.full {
-    background: #fff3cd;
-    border-color: #ffc107;
+    background: var(--warning-100);
+    border-color: var(--warning-color);
 }
 
 .legend-color.past {
-    background: #f8d7da;
-    border-color: #dc3545;
+    background: var(--error-50);
+    border-color: var(--error-color);
 }
 
 .legend-color.selected {
-    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-    border-color: #004085;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--blue-700) 100%);
+    border-color: var(--info-800);
 }
 
 /* Responsive Design */
