@@ -21,8 +21,8 @@
    EXCHANGE RATE ERROR BOX
    =================================== */
 .exchange-rate-error-box {
-    background: #fef2f2;
-    border: 2px solid #ef4444;
+    background: var(--error-50);
+    border: 2px solid var(--error-400);
     border-radius: var(--radius-lg);
     padding: var(--spacing-md);
     margin: 0 var(--spacing-lg) var(--spacing-lg);
@@ -35,7 +35,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    color: #dc2626;
+    color: var(--error-500);
 }
 
 .exchange-rate-error-icon {
@@ -44,7 +44,7 @@
 
 .exchange-rate-set-button {
     padding: 10px var(--spacing-lg);
-    background: #ef4444;
+    background: var(--error-400);
     color: white;
     border: none;
     border-radius: var(--radius-md);
@@ -55,7 +55,7 @@
 }
 
 .exchange-rate-set-button:hover {
-    background: #dc2626;
+    background: var(--error-500);
 }
 
 .exchange-rate-input-group {
@@ -67,14 +67,14 @@
 .exchange-rate-input {
     flex: 1;
     padding: 10px;
-    border: 2px solid #dc2626;
+    border: 2px solid var(--error-500);
     border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
 }
 
 .exchange-rate-save-button {
     padding: 10px var(--spacing-lg);
-    background: #16a34a;
+    background: var(--success-500);
     color: white;
     border: none;
     border-radius: var(--radius-md);
@@ -85,12 +85,12 @@
 }
 
 .exchange-rate-save-button:hover:not(:disabled) {
-    background: #15803d;
+    background: var(--success-600);
 }
 
 .exchange-rate-cancel-button {
     padding: 10px var(--spacing-lg);
-    background: #6b7280;
+    background: var(--gray-500);
     color: white;
     border: none;
     border-radius: var(--radius-md);
@@ -100,12 +100,12 @@
 }
 
 .exchange-rate-cancel-button:hover {
-    background: #4b5563;
+    background: var(--gray-600);
 }
 
 .exchange-rate-error-note {
     font-size: 13px;
-    color: #dc2626;
+    color: var(--error-500);
     margin: 0;
 }
 
@@ -113,7 +113,7 @@
    REQUIRED ASTERISK
    =================================== */
 .payment-required-asterisk {
-    color: #dc2626;
+    color: var(--error-500);
 }
 
 /* ===================================
@@ -125,17 +125,17 @@
 }
 
 .payment-form-helper-success {
-    color: #10b981;
+    color: var(--success-300);
     font-size: var(--font-size-xs);
 }
 
 .payment-form-helper-info {
-    color: #3b82f6;
+    color: var(--blue-300);
     font-size: var(--font-size-xs);
 }
 
 .payment-form-helper-warning {
-    color: #f59e0b;
+    color: var(--warning-300);
     font-size: var(--font-size-xs);
 }
 
@@ -150,11 +150,11 @@
    MIXED PAYMENT TARGET BOX
    =================================== */
 .mixed-payment-target-box {
-    background: #eff6ff;
+    background: var(--blue-50);
     padding: var(--spacing-sm);
     border-radius: var(--radius-md);
     margin-bottom: var(--spacing-md);
-    border: 1px solid #3b82f6;
+    border: 1px solid var(--blue-300);
 }
 
 /* ===================================
@@ -167,18 +167,18 @@
 }
 
 .realtime-total-box.short {
-    background: #fef2f2;
-    border: 2px solid #ef4444;
+    background: var(--error-50);
+    border: 2px solid var(--error-400);
 }
 
 .realtime-total-box.exact {
-    background: #f0fdf4;
-    border: 2px solid #10b981;
+    background: var(--success-50);
+    border: 2px solid var(--success-300);
 }
 
 .realtime-total-box.over {
-    background: #fff7ed;
-    border: 2px solid #f59e0b;
+    background: var(--warning-50);
+    border: 2px solid var(--warning-300);
 }
 
 .realtime-total-header {
@@ -193,15 +193,15 @@
 }
 
 .realtime-total-message.short {
-    color: #dc2626;
+    color: var(--error-500);
 }
 
 .realtime-total-message.exact {
-    color: #10b981;
+    color: var(--success-300);
 }
 
 .realtime-total-message.over {
-    color: #f59e0b;
+    color: var(--warning-300);
 }
 
 /* ===================================
@@ -209,9 +209,9 @@
    =================================== */
 .same-currency-info-box {
     padding: var(--spacing-md);
-    background: #f3f4f6;
+    background: var(--gray-100);
     border-radius: var(--radius-lg);
-    border: 2px solid #9ca3af;
+    border: 2px solid var(--gray-400);
 }
 
 .same-currency-info-header {
@@ -222,11 +222,11 @@
 }
 
 .same-currency-info-header i {
-    color: #6b7280;
+    color: var(--gray-500);
 }
 
 .same-currency-info-header strong {
-    color: #374151;
+    color: var(--gray-700);
 }
 
 .same-currency-info-text {
@@ -239,10 +239,10 @@
 .same-currency-disabled-input {
     width: 100%;
     padding: 10px;
-    background: #e5e7eb;
-    border: 1px solid #d1d5db;
+    background: var(--gray-200);
+    border: 1px solid var(--gray-300);
     border-radius: var(--radius-md);
-    color: #9ca3af;
+    color: var(--gray-400);
     cursor: not-allowed;
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-medium);
@@ -253,8 +253,8 @@
    PAYMENT SUMMARY BOX
    =================================== */
 .payment-summary-box {
-    background: #f9fafb;
-    border: 2px solid #e5e7eb;
+    background: var(--gray-50);
+    border: 2px solid var(--gray-200);
     border-radius: var(--radius-lg);
     padding: var(--spacing-md);
     margin: 0 var(--spacing-lg) var(--spacing-lg);
@@ -262,7 +262,7 @@
 
 .payment-summary-title {
     margin: 0 0 var(--spacing-sm) 0;
-    color: #374151;
+    color: var(--gray-700);
     font-size: var(--font-size-md);
 }
 
@@ -276,10 +276,10 @@
 .payment-summary-total {
     margin-top: var(--spacing-sm);
     padding-top: var(--spacing-sm);
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid var(--gray-200);
     font-size: var(--font-size-md);
     font-weight: var(--font-weight-bold);
-    color: #111827;
+    color: var(--gray-900);
 }
 
 /* ===================================
@@ -292,14 +292,14 @@
 
 .payment-success-icon {
     font-size: 64px;
-    color: #16a34a;
+    color: var(--success-500);
     margin-bottom: var(--spacing-lg);
 }
 
 .payment-success-title {
     margin: 0 0 10px 0;
     font-size: var(--font-size-2xl);
-    color: #111827;
+    color: var(--gray-900);
 }
 
 .payment-success-amount-container {
@@ -309,7 +309,7 @@
 }
 
 .payment-success-amount {
-    color: #16a34a;
+    color: var(--success-500);
     font-size: var(--font-size-xl);
     font-weight: var(--font-weight-bold);
 }

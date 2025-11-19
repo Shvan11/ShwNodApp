@@ -6,8 +6,8 @@
 /* Base container styles */
 .auth-container {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: #f8f9fa;
-    color: #333;
+    background: var(--gray-50);
+    color: var(--text-color);
     line-height: 1.6;
     min-height: 100vh;
     display: flex;
@@ -18,7 +18,7 @@
 .auth-header {
     text-align: center;
     padding: 2rem 1rem;
-    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+    background: linear-gradient(135deg, var(--success-color) 0%, var(--success-darker) 100%);
     color: white;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -79,14 +79,14 @@
     margin: 0 0 0.5rem;
     font-size: 1.4rem;
     font-weight: 600;
-    color: #333;
+    color: var(--text-color);
 }
 
 .status-text p,
 .success-content p,
 .error-content p {
     margin: 0;
-    color: #666;
+    color: var(--text-light);
     font-size: 0.95rem;
 }
 
@@ -102,12 +102,12 @@
 .qr-header h2 {
     margin: 0 0 0.5rem;
     font-size: 1.4rem;
-    color: #333;
+    color: var(--text-color);
 }
 
 .qr-header p {
     margin: 0;
-    color: #666;
+    color: var(--text-light);
     font-size: 0.9rem;
 }
 
@@ -137,9 +137,9 @@
     width: 280px;
     height: 280px;
     background: white;
-    border: 2px dashed #ddd;
+    border: 2px dashed var(--gray-300);
     border-radius: 12px;
-    color: #666;
+    color: var(--text-light);
 }
 
 .qr-loading {
@@ -157,10 +157,10 @@
 .qr-instructions {
     margin-top: 1.5rem;
     text-align: left;
-    background: #f8f9fa;
+    background: var(--gray-50);
     padding: 1.5rem;
     border-radius: 8px;
-    border-left: 4px solid #25D366;
+    border-left: 4px solid var(--success-color);
 }
 
 .qr-instructions ol {
@@ -170,7 +170,7 @@
 
 .qr-instructions li {
     margin-bottom: 0.5rem;
-    color: #555;
+    color: var(--text-light);
 }
 
 /* Success section */
@@ -179,11 +179,11 @@
 }
 
 .success-icon-container {
-    color: #28a745;
+    color: var(--success-color);
 }
 
 .success-content h2 {
-    color: #28a745;
+    color: var(--success-color);
 }
 
 /* Error section */
@@ -192,11 +192,11 @@
 }
 
 .error-icon-container {
-    color: #dc3545;
+    color: var(--error-color);
 }
 
 .error-content h2 {
-    color: #dc3545;
+    color: var(--error-color);
 }
 
 /* Action buttons */
@@ -226,32 +226,32 @@
 
 /* Button variants */
 .btn-primary {
-    background: #25D366;
+    background: var(--success-color);
     color: white;
 }
 
 .btn-primary:hover {
-    background: #1ea653;
+    background: var(--success-green);
     transform: translateY(-1px);
 }
 
 .btn-secondary {
-    background: #6c757d;
+    background: var(--text-secondary);
     color: white;
 }
 
 .btn-secondary:hover {
-    background: #5a6268;
+    background: var(--gray-600);
     transform: translateY(-1px);
 }
 
 .btn-danger {
-    background: #dc3545;
+    background: var(--error-color);
     color: white;
 }
 
 .btn-danger:hover {
-    background: #c82333;
+    background: var(--error-600);
     transform: translateY(-1px);
 }
 
@@ -269,7 +269,7 @@
 .auth-footer {
     padding: 1rem;
     background: white;
-    border-top: 1px solid #dee2e6;
+    border-top: 1px solid var(--border-color);
     margin-top: auto;
 }
 
@@ -279,19 +279,19 @@
     justify-content: center;
     gap: 0.5rem;
     font-size: 0.85rem;
-    color: #666;
+    color: var(--text-light);
 }
 
 .connection-indicator {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #dc3545;
+    background: var(--error-color);
     transition: background-color 0.3s ease;
 }
 
 .connection-indicator.connected {
-    background: #28a745;
+    background: var(--success-color);
 }
 
 /* Loading animations */
@@ -299,8 +299,8 @@
     display: inline-block;
     width: 20px;
     height: 20px;
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #25D366;
+    border: 3px solid var(--gray-100);
+    border-top: 3px solid var(--success-color);
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -330,21 +330,21 @@
 }
 
 .status-message.success {
-    background: #d4edda;
-    border: 1px solid #c3e6cb;
-    color: #155724;
+    background: var(--success-100);
+    border: 1px solid var(--success-200);
+    color: var(--success-700);
 }
 
 .status-message.error {
-    background: #f8d7da;
-    border: 1px solid #f1b0b7;
-    color: #721c24;
+    background: var(--error-50);
+    border: 1px solid var(--error-200);
+    color: var(--error-700);
 }
 
 .status-message.warning {
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
-    color: #856404;
+    background: var(--warning-100);
+    border: 1px solid var(--warning-100);
+    color: var(--warning-800);
 }
 
 .status-message h3 {
@@ -447,8 +447,8 @@
     }
     
     .qr-placeholder {
-        border-color: #000;
-        background: #fff;
+        border-color: var(--black);
+        background: white;
     }
     
     .connection-indicator {
