@@ -121,7 +121,7 @@
 
 /* Override some GrapesJS default styles for better integration */
 .gjs-one-bg {
-    background-color: #f8f9fa;
+    background-color: var(--gray-50);
 }
 
 .gjs-two-color {
