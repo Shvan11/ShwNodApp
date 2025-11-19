@@ -32,7 +32,7 @@
 
 .edit-patient-form .form-group label {
     font-weight: 600;
-    color: #374151;
+    color: var(--gray-700);
     margin-bottom: 0.375rem;
     font-size: 0.875rem;
 }
@@ -41,7 +41,7 @@
 .edit-patient-form .form-group select,
 .edit-patient-form .form-group textarea {
     padding: 0.5rem 0.75rem;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--gray-300);
     border-radius: 6px;
     font-size: 0.9375rem;
     transition: all 0.2s ease;
@@ -52,7 +52,7 @@
 .edit-patient-form .form-group select:focus,
 .edit-patient-form .form-group textarea:focus {
     outline: none;
-    border-color: #6366f1;
+    border-color: var(--indigo-500);
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
@@ -68,7 +68,7 @@
     gap: 0.75rem;
     margin-top: 1.5rem;
     padding-top: 1.5rem;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid var(--gray-200);
     justify-content: flex-end;
 }
 
@@ -91,13 +91,13 @@
 }
 
 .edit-patient-form .btn.btn-secondary {
-    background: #f3f4f6;
-    color: #374151;
-    border: 1px solid #d1d5db;
+    background: var(--gray-100);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-300);
 }
 
 .edit-patient-form .btn.btn-secondary:hover:not(:disabled) {
-    background: #e5e7eb;
+    background: var(--gray-200);
 }
 
 .edit-patient-form .btn:not(.btn-secondary) {
@@ -282,11 +282,11 @@
 }
 
 .edit-patient-title-icon {
-    color: #059669;
+    color: var(--success-500);
 }
 
 .edit-patient-description {
-    color: #6b7280;
+    color: var(--gray-500);
     margin-top: var(--spacing-sm);
     margin-bottom: 0;
 }
@@ -299,15 +299,15 @@
 
 .edit-patient-loading-spinner {
     font-size: var(--font-size-2xl);
-    color: #3b82f6;
+    color: var(--blue-300);
     margin-bottom: var(--spacing-md);
 }
 
 /* Messages */
 .edit-patient-error {
-    background-color: #fee2e2;
-    border: 1px solid #fca5a5;
-    color: #991b1b;
+    background-color: var(--error-50);
+    border: 1px solid var(--error-200);
+    color: var(--error-600);
     padding: var(--spacing-md);
     border-radius: var(--radius-lg);
     margin-bottom: var(--spacing-md);
@@ -321,7 +321,7 @@
     border: none;
     font-size: 1.5rem;
     cursor: pointer;
-    color: #991b1b;
+    color: var(--error-600);
     padding: 0;
     width: 24px;
     height: 24px;
@@ -331,9 +331,9 @@
 }
 
 .edit-patient-success {
-    background-color: #d1fae5;
-    border: 1px solid #6ee7b7;
-    color: #065f46;
+    background-color: var(--success-100);
+    border: 1px solid var(--success-200);
+    color: var(--success-800);
     padding: var(--spacing-md);
     border-radius: var(--radius-lg);
     margin-bottom: var(--spacing-md);
@@ -344,7 +344,7 @@
 
 /* Required Field Indicator */
 .required-asterisk {
-    color: #dc2626;
+    color: var(--error-500);
 }
 
 /* Input Height Consistency */
@@ -355,8 +355,8 @@
 
 /* WebCeph Integration Section */
 .webceph-integration-section {
-    background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
-    border: 2px solid #c084fc;
+    background: linear-gradient(135deg, var(--indigo-100) 0%, var(--indigo-100) 100%);
+    border: 2px solid var(--indigo-300);
     border-radius: 12px;
     padding: var(--spacing-xl);
     margin-top: var(--spacing-xl);
@@ -367,26 +367,26 @@
     margin: 0 0 var(--spacing-md) 0;
     font-size: 1.25rem;
     font-weight: var(--font-weight-bold);
-    color: #7c3aed;
+    color: var(--indigo-500);
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
 }
 
 .webceph-header-icon {
-    color: #8b5cf6;
+    color: var(--color-purple-medium);
 }
 
 .webceph-description {
-    color: #6d28d9;
+    color: var(--indigo-600);
     margin-bottom: var(--spacing-lg);
     line-height: 1.6;
 }
 
 .webceph-error {
-    background-color: #fee2e2;
-    border: 1px solid #fca5a5;
-    color: #991b1b;
+    background-color: var(--error-50);
+    border: 1px solid var(--error-200);
+    color: var(--error-600);
     padding: var(--spacing-md);
     border-radius: var(--radius-lg);
     margin-bottom: var(--spacing-md);
@@ -400,7 +400,7 @@
     border: none;
     font-size: 1.5rem;
     cursor: pointer;
-    color: #991b1b;
+    color: var(--error-600);
     padding: 0;
 }
 
@@ -418,7 +418,7 @@
 }
 
 .webceph-btn-send {
-    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    background: linear-gradient(135deg, var(--color-purple-medium), var(--indigo-500));
     color: white;
     padding: 0.75rem 1.5rem;
     border: none;
@@ -432,22 +432,22 @@
 }
 
 .webceph-btn-send:hover:not(:disabled) {
-    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    background: linear-gradient(135deg, var(--indigo-500), var(--indigo-600));
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
 }
 
 .webceph-btn-send:disabled {
-    background: #9ca3af;
+    background: var(--gray-400);
     cursor: not-allowed;
     transform: none;
 }
 
 .webceph-btn-cancel {
-    background: #f3f4f6;
-    color: #374151;
+    background: var(--gray-100);
+    color: var(--gray-700);
     padding: 0.75rem 1.5rem;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--gray-300);
     border-radius: var(--radius-lg);
     font-weight: var(--font-weight-medium);
     cursor: pointer;
@@ -455,7 +455,7 @@
 }
 
 .webceph-btn-cancel:hover {
-    background: #e5e7eb;
+    background: var(--gray-200);
 }
 
 /* Mobile Responsive */
@@ -495,7 +495,7 @@
 
 .webceph-create-icon {
     font-size: 3rem;
-    color: #8b5cf6;
+    color: var(--color-purple-medium);
     margin-bottom: var(--spacing-md);
 }
 
@@ -507,7 +507,7 @@
 }
 
 .webceph-create-description {
-    color: #6b7280;
+    color: var(--gray-500);
     margin-bottom: var(--spacing-lg);
 }
 
@@ -521,8 +521,8 @@
 }
 
 .webceph-patient-created-card {
-    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-    border: 2px solid #10b981;
+    background: linear-gradient(135deg, var(--success-50) 0%, var(--success-100) 100%);
+    border: 2px solid var(--success-300);
     border-radius: 12px;
     padding: var(--spacing-xl);
 }
@@ -541,7 +541,7 @@
 }
 
 .webceph-success-icon {
-    color: #10b981;
+    color: var(--success-300);
 }
 
 .webceph-card-title {
@@ -551,7 +551,7 @@
 
 .webceph-card-subtitle {
     font-size: var(--font-size-sm);
-    color: #6b7280;
+    color: var(--gray-500);
 }
 
 .webceph-info-section {
@@ -560,7 +560,7 @@
 
 .webceph-info-label {
     font-size: var(--font-size-sm);
-    color: #6b7280;
+    color: var(--gray-500);
     margin-bottom: 0.25rem;
 }
 
@@ -574,8 +574,8 @@
    WEBCEPH ANALYSIS CARD
    =================================== */
 .webceph-analysis-card {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    border: 2px solid #f59e0b;
+    background: linear-gradient(135deg, var(--warning-100) 0%, var(--warning-200) 100%);
+    border: 2px solid var(--warning-300);
     border-radius: 12px;
     padding: var(--spacing-xl);
 }
@@ -588,7 +588,7 @@
 }
 
 .webceph-analysis-description {
-    color: #92400e;
+    color: var(--warning-900);
     margin-bottom: var(--spacing-lg);
     line-height: 1.6;
 }
@@ -604,14 +604,14 @@
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold);
     margin-bottom: var(--spacing-sm);
-    color: #78350f;
+    color: var(--warning-900);
 }
 
 .webceph-file-input {
     display: block;
     width: 100%;
     padding: var(--spacing-sm);
-    border: 2px dashed #f59e0b;
+    border: 2px dashed var(--warning-300);
     border-radius: var(--radius-md);
     background: white;
     cursor: pointer;
@@ -620,12 +620,12 @@
 }
 
 .webceph-file-input:hover {
-    border-color: #d97706;
-    background: #fffbeb;
+    border-color: var(--warning-600);
+    background: var(--warning-50);
 }
 
 .webceph-btn-upload {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
+    background: linear-gradient(135deg, var(--warning-300), var(--warning-600));
     color: white;
     padding: 0.75rem 1.5rem;
     border: none;
@@ -639,20 +639,20 @@
 }
 
 .webceph-btn-upload:hover:not(:disabled) {
-    background: linear-gradient(135deg, #d97706, #b45309);
+    background: linear-gradient(135deg, var(--warning-600), var(--warning-700));
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
 }
 
 .webceph-btn-upload:disabled {
-    background: #9ca3af;
+    background: var(--gray-400);
     cursor: not-allowed;
     transform: none;
 }
 
 .webceph-help-text {
     font-size: 0.75rem;
-    color: #92400e;
+    color: var(--warning-900);
     margin-top: var(--spacing-sm);
 }
 
@@ -679,14 +679,14 @@
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-medium);
     margin-bottom: var(--spacing-sm);
-    color: #374151;
+    color: var(--gray-700);
 }
 
 .webceph-file-input-styled {
     width: 100%;
     padding: var(--spacing-sm);
     border-radius: 6px;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--gray-300);
     font-size: 0.9rem;
 }
 
