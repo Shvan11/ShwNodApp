@@ -46,22 +46,22 @@
 /* Toast Types */
 .toast-success {
   border-left-color: var(--success-color);
-  background-color: #f1f8f4;
+  background-color: var(--success-50);
 }
 
 .toast-error {
   border-left-color: var(--error-color);
-  background-color: #fef1f0;
+  background-color: var(--error-50);
 }
 
 .toast-warning {
   border-left-color: var(--warning-color);
-  background-color: #fff8e1;
+  background-color: var(--warning-50);
 }
 
 .toast-info {
   border-left-color: var(--info-color);
-  background-color: #e3f2fd;
+  background-color: var(--info-50);
 }
 
 /* Toast Icon */
@@ -105,7 +105,7 @@
   background: none;
   border: none;
   font-size: 20px;
-  color: #999;
+  color: var(--gray-400);
   cursor: pointer;
   padding: 0;
   width: 24px;

@@ -1,7 +1,7 @@
 /* pages/xrays.css - Styles specific to the X-rays page */
 
 body {
-    background-color: #cce6ff;
+    background-color: var(--info-100);
   }
 
 /* ===================================
@@ -144,7 +144,7 @@ body {
   }
   
   .x_item p {
-    color: #ffffff;
+    color: white;
     margin-right: 10px;
   }
 

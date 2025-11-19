@@ -112,7 +112,7 @@
 /* Border Adjustments for RTL */
 [dir="rtl"] .border-left-purple {
     border-left: none;
-    border-right: 4px solid #4f46e5;
+    border-right: 4px solid var(--indigo-600);
 }
 
 /* Toast/Notification RTL */

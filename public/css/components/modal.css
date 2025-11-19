@@ -48,13 +48,13 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: var(--spacing-lg);
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--gray-100);
     padding-bottom: var(--spacing-sm);
 }
 
 .whatsapp-modal-title {
     margin: 0;
-    color: #25d366;
+    color: var(--success-color);
     font-size: var(--font-size-xl);
 }
 
@@ -89,7 +89,7 @@
 .whatsapp-textarea {
     width: 100%;
     padding: var(--spacing-md);
-    border: 1px solid #ddd;
+    border: 1px solid var(--gray-300);
     border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
     resize: vertical;
@@ -100,7 +100,7 @@
 
 .whatsapp-textarea:focus {
     outline: none;
-    border-color: #25d366;
+    border-color: var(--success-color);
     box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.1);
 }
 
@@ -115,7 +115,7 @@
 
 .whatsapp-btn-cancel {
     padding: var(--spacing-md) var(--spacing-lg);
-    background-color: #6c757d;
+    background-color: var(--text-secondary);
     color: white;
     border: none;
     border-radius: var(--radius-md);
@@ -125,12 +125,12 @@
 }
 
 .whatsapp-btn-cancel:hover {
-    background-color: #5a6268;
+    background-color: var(--gray-600);
 }
 
 .whatsapp-btn-send {
     padding: var(--spacing-md) var(--spacing-lg);
-    background-color: #25d366;
+    background-color: var(--success-color);
     color: white;
     border: none;
     border-radius: var(--radius-md);
@@ -140,11 +140,11 @@
 }
 
 .whatsapp-btn-send:hover:not(:disabled) {
-    background-color: #20bd5a;
+    background-color: var(--success-color);
 }
 
 .whatsapp-btn-send:disabled {
-    background-color: #ccc;
+    background-color: var(--gray-300);
     cursor: not-allowed;
 }
 

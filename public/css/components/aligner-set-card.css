@@ -9,24 +9,24 @@
     align-items: center;
     margin-bottom: 1.5rem;
     padding-bottom: 1rem;
-    border-bottom: 2px solid #e0e0e0;
+    border-bottom: 2px solid var(--gray-200);
 }
 
 .section-header h3 {
     margin: 0;
     font-size: 1.5rem;
-    color: #333;
+    color: var(--text-color);
 }
 
 .section-info {
     font-size: 0.95rem;
-    color: #666;
+    color: var(--text-light);
 }
 
 /* Aligner Set Card */
 .aligner-set-card {
     background: white;
-    border: 2px solid #e0e0e0;
+    border: 2px solid var(--gray-200);
     border-radius: 12px;
     padding: 1.5rem;
     margin-bottom: 1.5rem;
@@ -38,20 +38,20 @@
 }
 
 .aligner-set-card.active {
-    border-color: #4caf50;
-    background: #f9fff9;
+    border-color: var(--success-color);
+    background: var(--success-50);
 }
 
 .aligner-set-card.inactive {
     opacity: 0.7;
-    border-color: #ccc;
+    border-color: var(--gray-300);
 }
 
 /* Highlight card when there are unread activities */
 .aligner-set-card.has-activity {
-    border-color: #ff9800;
+    border-color: var(--warning-orange);
     border-width: 3px;
-    background: #fff8f0;
+    background: var(--warning-50);
     box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.1);
 }
 
@@ -61,7 +61,7 @@
 
 /* Activity Banner at top of card */
 .activity-banner {
-    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+    background: linear-gradient(135deg, var(--warning-orange) 0%, var(--warning-600) 100%);
     color: white;
     padding: 0.75rem 1rem;
     border-radius: 8px;
@@ -119,7 +119,7 @@
 .set-title h4 {
     margin: 0 0 0.5rem 0;
     font-size: 1.3rem;
-    color: #333;
+    color: var(--text-color);
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -132,7 +132,7 @@
 }
 
 .folder-btn {
-    background: #ff9800;
+    background: var(--warning-orange);
     color: white;
     border: none;
     padding: 0.5rem 1rem;
@@ -147,7 +147,7 @@
 }
 
 .folder-btn:hover {
-    background: #f57c00;
+    background: var(--warning-600);
     transform: translateY(-2px);
     box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
 }
@@ -157,7 +157,7 @@
 }
 
 .url-btn {
-    background: #2196F3;
+    background: var(--info-color);
     color: white;
     border: none;
     padding: 0.5rem 1rem;
@@ -172,7 +172,7 @@
 }
 
 .url-btn:hover {
-    background: #1976D2;
+    background: var(--blue-700);
     transform: translateY(-2px);
     box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
 }
@@ -182,7 +182,7 @@
 }
 
 .pdf-btn {
-    background: #E91E63;
+    background: var(--error-pink);
     color: white;
     border: none;
     padding: 0.5rem 1rem;
@@ -197,7 +197,7 @@
 }
 
 .pdf-btn:hover {
-    background: #C2185B;
+    background: var(--error-500);
     transform: translateY(-2px);
     box-shadow: 0 2px 8px rgba(233, 30, 99, 0.3);
 }
@@ -215,17 +215,17 @@
 }
 
 .set-badge.active {
-    background: #4caf50;
+    background: var(--success-color);
     color: white;
 }
 
 .set-badge.inactive {
-    background: #999;
+    background: var(--gray-400);
     color: white;
 }
 
 .set-type {
-    background: #0073e6;
+    background: var(--blue-300);
     color: white;
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
@@ -243,16 +243,16 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: #666;
+    color: var(--text-light);
 }
 
 .set-info-item i {
-    color: #0073e6;
+    color: var(--blue-300);
     width: 20px;
 }
 
 .set-info-item strong {
-    color: #333;
+    color: var(--text-color);
     font-weight: 600;
 }
 
@@ -261,7 +261,7 @@
 }
 
 .progress-bar-container {
-    background: #f0f0f0;
+    background: var(--gray-100);
     height: 8px;
     border-radius: 4px;
     overflow: hidden;
@@ -269,20 +269,20 @@
 }
 
 .progress-bar {
-    background: linear-gradient(90deg, #4caf50 0%, #8bc34a 100%);
+    background: linear-gradient(90deg, var(--success-color) 0%, var(--success-200) 100%);
     height: 100%;
     transition: width 0.3s ease;
 }
 
 .progress-text {
     font-size: 0.9rem;
-    color: #666;
+    color: var(--text-light);
     display: flex;
     justify-content: space-between;
 }
 
 .toggle-batches-btn {
-    background: #0073e6;
+    background: var(--blue-300);
     color: white;
     border: none;
     padding: 0.5rem 1rem;
@@ -296,7 +296,7 @@
 }
 
 .toggle-batches-btn:hover {
-    background: #005bb5;
+    background: var(--blue-800);
 }
 
 .toggle-batches-btn i {

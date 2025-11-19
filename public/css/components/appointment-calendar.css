@@ -14,30 +14,30 @@
     --calendar-gap: 2px;               /* Increased gap for better separation */
 
     /* Modern Color Palette - Professional & Clean */
-    --calendar-border: #dee2e6;
-    --calendar-border-light: #e9ecef;
-    --calendar-background: #f8f9fa;
-    --calendar-card-bg: #ffffff;
-    --calendar-header-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --calendar-header-text: #ffffff;
-    --calendar-today-bg: #fff9e6;
-    --calendar-today-border: #ffd700;
+    --calendar-border: var(--border-color);
+    --calendar-border-light: var(--gray-200);
+    --calendar-background: var(--gray-50);
+    --calendar-card-bg: white;
+    --calendar-header-bg: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
+    --calendar-header-text: white;
+    --calendar-today-bg: var(--warning-50);
+    --calendar-today-border: var(--warning-color);
 
     /* Slot Status Colors - Enhanced Contrast */
-    --slot-available: #e8f8f5;
-    --slot-available-hover: #d1f2eb;
-    --slot-available-border: #7dcea0;
-    --slot-booked: #ebf5fb;
-    --slot-booked-hover: #d6eaf8;
-    --slot-booked-border: #5dade2;
-    --slot-selected: #fff3cd;
-    --slot-selected-border: #ffc107;
-    --slot-weekend: #f0f3f5;
+    --slot-available: var(--success-50);
+    --slot-available-hover: var(--success-100);
+    --slot-available-border: var(--success-200);
+    --slot-booked: var(--info-50);
+    --slot-booked-hover: var(--info-100);
+    --slot-booked-border: var(--info-300);
+    --slot-selected: var(--warning-100);
+    --slot-selected-border: var(--warning-color);
+    --slot-weekend: var(--gray-50);
 
     /* Calendar Status Colors - Modern Blue Palette */
-    --status-scheduled: #3498db;
-    --status-confirmed: #2ecc71;
-    --status-cancelled: #e74c3c;
+    --status-scheduled: var(--info-color);
+    --status-confirmed: var(--success-color);
+    --status-cancelled: var(--error-color);
 
     /* Interactive States - Smooth Shadows */
     --hover-shadow: 0 4px 12px rgba(0,0,0,0.12);
@@ -475,8 +475,8 @@ body:has(.appointment-calendar) {
     font-weight: 700;
     color: var(--text-primary);
     background: var(--background-secondary);
-    border-bottom: 2px solid #ccc;
-    border-right: 2px solid #ccc;
+    border-bottom: 2px solid var(--gray-300);
+    border-right: 2px solid var(--gray-300);
     user-select: none;
     white-space: nowrap;
     padding: 0;
@@ -1151,10 +1151,10 @@ body:has(.appointment-calendar) {
 /* High Contrast Mode Support */
 @media (prefers-contrast: high) {
     :root {
-        --calendar-border: #000000;
-        --calendar-background: #ffffff;
-        --slot-available: #f0f0f0;
-        --slot-booked: #e0e0e0;
+        --calendar-border: var(--black);
+        --calendar-background: white;
+        --slot-available: var(--gray-100);
+        --slot-booked: var(--gray-200);
     }
 }
 
@@ -1225,7 +1225,7 @@ body:has(.appointment-calendar) {
     border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
     font-weight: 500;
-    color: #374151;
+    color: var(--gray-700);
 }
 
 .context-menu-item:hover {

@@ -31,11 +31,11 @@
 
 .drawer-header {
     padding: 0.9rem 1.5rem;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--gray-200);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
     color: white;
     flex-shrink: 0;
     flex-grow: 0;
@@ -94,11 +94,11 @@
 
 .drawer-footer {
     padding: 0.9rem 1.5rem;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--gray-200);
     display: flex;
     gap: 0.75rem;
     justify-content: flex-end;
-    background: #f8f9fa;
+    background: var(--gray-50);
     flex-shrink: 0;
     flex-grow: 0;
     margin-top: auto;
@@ -108,7 +108,7 @@
 .form-section {
     margin-bottom: 1.1rem;
     padding-bottom: 1.1rem;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--gray-200);
 }
 
 .form-section:last-child {
@@ -120,7 +120,7 @@
 .form-section h3 {
     margin: 0 0 0.7rem 0;
     font-size: 1rem;
-    color: #333;
+    color: var(--text-color);
     font-weight: 600;
 }
 
@@ -132,7 +132,7 @@
     display: block;
     margin-bottom: 0.35rem;
     font-weight: 500;
-    color: #333;
+    color: var(--text-color);
     font-size: 0.875rem;
 }
 
@@ -141,7 +141,7 @@
 .form-field textarea {
     width: 100%;
     padding: 0.5rem 0.65rem;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--gray-300);
     border-radius: 4px;
     font-size: 0.9rem;
     transition: all 0.2s;
@@ -152,17 +152,17 @@
 .form-field select:focus,
 .form-field textarea:focus {
     outline: none;
-    border-color: #0073e6;
+    border-color: var(--blue-300);
     box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.1);
 }
 
 .form-field input.error,
 .form-field select.error {
-    border-color: #f44336;
+    border-color: var(--error-color);
 }
 
 .form-field input.readonly {
-    background: #f5f5f5;
+    background: var(--gray-100);
     cursor: not-allowed;
 }
 
@@ -198,13 +198,13 @@
 
 .error-message {
     display: block;
-    color: #f44336;
+    color: var(--error-color);
     font-size: 0.85rem;
     margin-top: 0.25rem;
 }
 
 .required {
-    color: #f44336;
+    color: var(--error-color);
 }
 
 /* ===================================
@@ -221,7 +221,7 @@
 /* Footer variations */
 .drawer-footer.drawer-footer-top {
     border-top: none;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--gray-200);
     margin-top: 0;
 }
 
@@ -271,22 +271,22 @@
     margin-left: 1rem;
     font-size: 0.9rem;
     font-weight: normal;
-    color: #6b7280;
+    color: var(--gray-500);
 }
 
 .remaining-count strong.positive {
-    color: #059669;
+    color: var(--success-500);
 }
 
 .remaining-count strong.negative {
-    color: #dc2626;
+    color: var(--error-500);
 }
 
 /* Optional field helper text */
 .field-optional-text {
     font-size: 0.85rem;
     font-weight: normal;
-    color: #6b7280;
+    color: var(--gray-500);
 }
 
 /* Loading spinner container */
@@ -301,17 +301,17 @@
 
 /* PDF case plan section */
 .pdf-upload-info {
-    color: #6b7280;
+    color: var(--gray-500);
     font-size: 0.875rem;
     margin-top: 0.25rem;
     display: block;
 }
 
 .pdf-uploaded-status {
-    background: #e0f2fe;
+    background: var(--info-50);
     padding: 0.75rem 1rem;
     border-radius: var(--radius-md);
-    border: 1px solid #bae6fd;
+    border: 1px solid var(--info-100);
 }
 
 .pdf-status-header {
@@ -322,11 +322,11 @@
 }
 
 .pdf-status-header i {
-    color: #0284c7;
+    color: var(--info-600);
 }
 
 .pdf-status-header span {
-    color: #0c4a6e;
+    color: var(--info-800);
     font-weight: 500;
 }
 
@@ -352,7 +352,7 @@
 .pdf-file-input {
     width: 100%;
     padding: 0.55rem 0.7rem;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--gray-300);
     border-radius: var(--radius-md);
     font-size: 0.9rem;
     cursor: pointer;
@@ -362,43 +362,43 @@
 .pdf-file-selected {
     margin-top: 0.5rem;
     padding: 0.5rem;
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
+    background: var(--success-50);
+    border: 1px solid var(--success-200);
     border-radius: var(--radius-md);
     font-size: 0.85rem;
-    color: #166534;
+    color: var(--success-700);
 }
 
 /* PDF file hint text */
 .pdf-file-hint {
     margin-top: 0.5rem;
     font-size: 0.8rem;
-    color: #666;
+    color: var(--text-light);
 }
 
 /* PDF preview */
 .pdf-preview-container {
-    background: #f8f9fa;
+    background: var(--gray-50);
     padding: 1rem;
     border-radius: var(--radius-md);
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--gray-200);
 }
 
 .pdf-preview-embed {
     width: 100%;
     height: 600px;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--gray-300);
     border-radius: var(--radius-md);
 }
 
 /* Info message box */
 .info-message-box {
-    background: #fffbeb;
+    background: var(--warning-50);
     padding: 1rem;
     border-radius: var(--radius-md);
-    border-left: 4px solid #f59e0b;
+    border-left: 4px solid var(--warning-300);
     margin-top: 1rem;
-    color: #92400e;
+    color: var(--warning-900);
     font-size: 0.9rem;
     display: flex;
     align-items: flex-start;
@@ -412,10 +412,10 @@
 /* Warning message box */
 .warning-message-box {
     padding: 0.75rem;
-    background: #fff3cd;
-    border: 1px solid #ffc107;
+    background: var(--warning-100);
+    border: 1px solid var(--warning-color);
     border-radius: var(--radius-md);
-    color: #856404;
+    color: var(--warning-800);
 }
 
 .warning-message-box i {

@@ -13,7 +13,7 @@
    ACCOUNT INFO SECTION
    =================================== */
 .user-account-info {
-    background: #f8f9fa;
+    background: var(--gray-50);
     padding: var(--spacing-md);
     border-radius: 6px;
     display: grid;
@@ -23,7 +23,7 @@
 }
 
 .user-loading-text {
-    color: #666;
+    color: var(--text-light);
     font-size: var(--font-size-sm);
 }
 
@@ -41,14 +41,14 @@
 }
 
 .user-role-badge.admin {
-    background: #4CAF50;
+    background: var(--success-color);
 }
 
 .user-role-badge.user,
 .user-role-badge.secretary,
 .user-role-badge.doctor,
 .user-role-badge.staff {
-    background: #2196F3;
+    background: var(--info-color);
 }
 
 /* ===================================
@@ -71,15 +71,15 @@
    PASSWORD REQUIREMENTS
    =================================== */
 .password-requirements {
-    background: #f0f9ff;
-    border: 1px solid #bae6fd;
+    background: var(--info-50);
+    border: 1px solid var(--info-100);
     border-radius: var(--radius-md);
     padding: var(--spacing-md);
     margin-bottom: var(--spacing-lg);
 }
 
 .password-requirements strong {
-    color: #0369a1;
+    color: var(--info-700);
     display: block;
     margin-bottom: var(--spacing-sm);
 }
@@ -87,7 +87,7 @@
 .password-requirements ul {
     margin: 0;
     padding-left: var(--spacing-lg);
-    color: #0c4a6e;
+    color: var(--info-800);
 }
 
 .password-requirements li {
@@ -116,7 +116,7 @@
 }
 
 .user-mgmt-btn.primary:hover:not(:disabled) {
-    background: #0056b3;
+    background: var(--blue-700);
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
@@ -127,7 +127,7 @@
 }
 
 .user-mgmt-btn.danger:hover:not(:disabled) {
-    background: #c82333;
+    background: var(--error-600);
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
@@ -194,7 +194,7 @@
 }
 
 .form-group input:disabled {
-    background: #f3f4f6;
+    background: var(--gray-100);
     cursor: not-allowed;
 }
 
@@ -210,15 +210,15 @@
 }
 
 .message.success {
-    background: #d1fae5;
-    color: #065f46;
-    border: 1px solid #6ee7b7;
+    background: var(--success-100);
+    color: var(--success-800);
+    border: 1px solid var(--success-200);
 }
 
 .message.error {
-    background: #fee2e2;
-    color: #991b1b;
-    border: 1px solid #fca5a5;
+    background: var(--error-50);
+    color: var(--error-600);
+    border: 1px solid var(--error-200);
 }
 
 /* ===================================

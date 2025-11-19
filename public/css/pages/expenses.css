@@ -11,7 +11,7 @@
 
 /* Modern Filter Card */
 .modern-filter-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
   border-radius: 16px;
   padding: 24px;
   margin-bottom: 30px;
@@ -116,7 +116,7 @@
   border-radius: 10px;
   padding: 12px 16px;
   font-size: 14px;
-  color: #333;
+  color: var(--text-color);
   transition: all 0.3s ease;
   font-family: inherit;
 }
@@ -124,7 +124,7 @@
 .modern-input:focus {
   outline: none;
   background: white;
-  border-color: #4CAF50;
+  border-color: var(--success-color);
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
   transform: translateY(-2px);
 }
@@ -140,7 +140,7 @@
   border-radius: 10px;
   padding: 12px 40px 12px 16px;
   font-size: 14px;
-  color: #333;
+  color: var(--text-color);
   cursor: pointer;
   transition: all 0.3s ease;
   appearance: none;
@@ -150,7 +150,7 @@
 .modern-select:focus {
   outline: none;
   background: white;
-  border-color: #4CAF50;
+  border-color: var(--success-color);
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
   transform: translateY(-2px);
 }
@@ -166,7 +166,7 @@
   right: 14px;
   top: 50%;
   transform: translateY(-50%);
-  color: #666;
+  color: var(--text-light);
   pointer-events: none;
   font-size: 12px;
 }
@@ -197,7 +197,7 @@
 }
 
 .btn-modern-primary {
-  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  background: linear-gradient(135deg, var(--success-color) 0%, var(--success-darker) 100%);
   color: white;
   box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
 }
@@ -217,15 +217,15 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px;
-  background-color: var(--background-primary, #fff);
-  border-bottom: 2px solid var(--border-color, #e0e0e0);
+  background-color: var(--background-primary, white);
+  border-bottom: 2px solid var(--border-color, var(--gray-200));
   margin-bottom: 20px;
 }
 
 .expenses-page-header h1 {
   margin: 0;
   font-size: 28px;
-  color: var(--text-primary, #333);
+  color: var(--text-primary, var(--text-color));
 }
 
 /* Summary Section */
@@ -240,7 +240,7 @@
 }
 
 .summary-card {
-  background: linear-gradient(135deg, var(--primary-color, #4CAF50) 0%, var(--primary-dark, #45a049) 100%);
+  background: linear-gradient(135deg, var(--primary-color, var(--success-color)) 0%, var(--primary-dark, var(--success-darker)) 100%);
   color: white;
   padding: 20px;
   border-radius: 8px;
@@ -254,15 +254,15 @@
 }
 
 .summary-card.total-count {
-  background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
+  background: linear-gradient(135deg, var(--color-purple-medium) 0%, var(--color-purple-dark) 100%);
 }
 
 .summary-card.currency-iqd {
-  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+  background: linear-gradient(135deg, var(--info-color) 0%, var(--blue-700) 100%);
 }
 
 .summary-card.currency-usd {
-  background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
+  background: linear-gradient(135deg, var(--success-color) 0%, var(--success-600) 100%);
 }
 
 .summary-label {
@@ -287,7 +287,7 @@
 
 /* Table Container */
 .table-container {
-  background: var(--background-primary, #fff);
+  background: var(--background-primary, white);
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   padding: 20px;
@@ -304,15 +304,15 @@
 }
 
 .expenses-table thead {
-  background-color: var(--table-header-bg, #f5f5f5);
-  border-bottom: 2px solid var(--border-color, #e0e0e0);
+  background-color: var(--table-header-bg, var(--gray-100));
+  border-bottom: 2px solid var(--border-color, var(--gray-200));
 }
 
 .expenses-table th {
   padding: 12px;
   text-align: left;
   font-weight: 600;
-  color: var(--text-primary, #333);
+  color: var(--text-primary, var(--text-color));
   text-transform: uppercase;
   font-size: 12px;
   letter-spacing: 0.5px;
@@ -320,31 +320,31 @@
 }
 
 .expenses-table tbody tr {
-  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  border-bottom: 1px solid var(--border-color, var(--gray-200));
   transition: background-color 0.2s;
 }
 
 .expenses-table tbody tr:hover {
-  background-color: var(--hover-bg, #f9f9f9);
+  background-color: var(--hover-bg, var(--gray-50));
 }
 
 .expenses-table td {
   padding: 12px;
-  color: var(--text-secondary, #666);
+  color: var(--text-secondary, var(--text-light));
   white-space: nowrap;
 }
 
 .expenses-table .amount-cell {
   font-weight: 600;
-  color: var(--text-primary, #333);
+  color: var(--text-primary, var(--text-color));
 }
 
 .expenses-table .currency-iqd {
-  color: #2196F3;
+  color: var(--info-color);
 }
 
 .expenses-table .currency-usd {
-  color: #4CAF50;
+  color: var(--success-color);
 }
 
 .expenses-table .note-cell {
@@ -374,22 +374,22 @@
 }
 
 .btn-edit {
-  color: #2196F3;
-  border: 1px solid #2196F3;
+  color: var(--info-color);
+  border: 1px solid var(--info-color);
 }
 
 .btn-edit:hover {
-  background-color: #2196F3;
+  background-color: var(--info-color);
   color: white;
 }
 
 .btn-delete {
-  color: #f44336;
-  border: 1px solid #f44336;
+  color: var(--error-color);
+  border: 1px solid var(--error-color);
 }
 
 .btn-delete:hover {
-  background-color: #f44336;
+  background-color: var(--error-color);
   color: white;
 }
 
@@ -397,14 +397,14 @@
 .loading-state {
   text-align: center;
   padding: 60px 20px;
-  color: var(--text-muted, #999);
+  color: var(--text-muted, var(--gray-400));
 }
 
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid var(--border-color, #e0e0e0);
-  border-top-color: var(--primary-color, #4CAF50);
+  border: 3px solid var(--border-color, var(--gray-200));
+  border-top-color: var(--primary-color, var(--success-color));
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 20px;
@@ -418,14 +418,14 @@
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: var(--text-muted, #999);
+  color: var(--text-muted, var(--gray-400));
   font-size: 16px;
 }
 
 /* Error Banner */
 .error-banner {
-  background-color: #ffebee;
-  border: 1px solid #f44336;
+  background-color: var(--error-50);
+  border: 1px solid var(--error-color);
   border-radius: 4px;
   padding: 15px;
   margin-bottom: 20px;
@@ -436,7 +436,7 @@
 
 .error-banner p {
   margin: 0;
-  color: #c62828;
+  color: var(--error-600);
   font-weight: 500;
 }
 
@@ -466,7 +466,7 @@
 }
 
 .modal-content {
-  background-color: var(--background-primary, #fff);
+  background-color: var(--background-primary, white);
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   width: 90%;
@@ -496,17 +496,17 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px;
-  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  border-bottom: 1px solid var(--border-color, var(--gray-200));
 }
 
 .modal-header h2 {
   margin: 0;
   font-size: 20px;
-  color: var(--text-primary, #333);
+  color: var(--text-primary, var(--text-color));
 }
 
 .close {
-  color: #aaa;
+  color: var(--gray-400);
   font-size: 28px;
   font-weight: bold;
   cursor: pointer;
@@ -517,7 +517,7 @@
 
 .close:hover,
 .close:focus {
-  color: #000;
+  color: var(--black);
 }
 
 .modal-body {
@@ -526,7 +526,7 @@
 
 .modal-footer {
   padding: 20px;
-  border-top: 1px solid var(--border-color, #e0e0e0);
+  border-top: 1px solid var(--border-color, var(--gray-200));
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -541,12 +541,12 @@
   display: block;
   margin-bottom: 5px;
   font-weight: 500;
-  color: var(--text-secondary, #666);
+  color: var(--text-secondary, var(--text-light));
   font-size: 14px;
 }
 
 .required {
-  color: #f44336;
+  color: var(--error-color);
 }
 
 .form-row {
@@ -560,7 +560,7 @@ select,
 textarea {
   width: 100%;
   padding: 10px;
-  border: 1px solid var(--border-color, #ddd);
+  border: 1px solid var(--border-color, var(--gray-300));
   border-radius: 4px;
   font-size: 14px;
   transition: border-color 0.2s;
@@ -572,27 +572,27 @@ input:focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: var(--primary-color, #4CAF50);
+  border-color: var(--primary-color, var(--success-color));
   box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
 }
 
 input:disabled,
 select:disabled,
 textarea:disabled {
-  background-color: #f5f5f5;
+  background-color: var(--gray-100);
   cursor: not-allowed;
 }
 
 input.error,
 select.error,
 textarea.error {
-  border-color: #f44336;
-  background-color: #ffebee;
+  border-color: var(--error-color);
+  background-color: var(--error-50);
 }
 
 .error-message {
   display: block;
-  color: #f44336;
+  color: var(--error-color);
   font-size: 12px;
   margin-top: 4px;
   font-weight: 500;
@@ -617,31 +617,31 @@ textarea {
 }
 
 .btn-primary {
-  background-color: var(--primary-color, #4CAF50);
+  background-color: var(--primary-color, var(--success-color));
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: var(--primary-dark, #45a049);
+  background-color: var(--primary-dark, var(--success-darker));
   box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
 }
 
 .btn-secondary {
-  background-color: #757575;
+  background-color: var(--gray-500);
   color: white;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: #616161;
+  background-color: var(--gray-600);
 }
 
 .btn-danger {
-  background-color: #f44336;
+  background-color: var(--error-color);
   color: white;
 }
 
 .btn-danger:hover:not(:disabled) {
-  background-color: #d32f2f;
+  background-color: var(--error-500);
 }
 
 .btn-action:disabled {
@@ -651,18 +651,18 @@ textarea {
 
 /* Warning Text */
 .warning-text {
-  color: #f57c00;
+  color: var(--warning-600);
   font-weight: 500;
   margin-bottom: 15px;
   padding: 12px;
-  background-color: #fff3e0;
-  border-left: 4px solid #ff9800;
+  background-color: var(--warning-50);
+  border-left: 4px solid var(--warning-orange);
   border-radius: 4px;
 }
 
 /* Expense Details */
 .expense-details {
-  background-color: #f5f5f5;
+  background-color: var(--gray-100);
   padding: 15px;
   border-radius: 4px;
   margin-top: 15px;
@@ -746,11 +746,11 @@ textarea {
   }
 
   .expenses-table thead th:first-child {
-    background-color: var(--table-header-bg, #f5f5f5);
+    background-color: var(--table-header-bg, var(--gray-100));
   }
 
   .expenses-table tbody tr:hover td:first-child {
-    background-color: var(--hover-bg, #f9f9f9);
+    background-color: var(--hover-bg, var(--gray-50));
   }
 
   .expenses-table .note-cell {
