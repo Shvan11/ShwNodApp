@@ -90,6 +90,35 @@
     font-size: 0.95rem;
 }
 
+/* Session Restoration Progress */
+.session-restoration-progress {
+    margin-top: var(--spacing-lg);
+    width: 100%;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--background-secondary);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    margin-bottom: var(--spacing-sm);
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--success-color), var(--success-darker));
+    border-radius: var(--radius-full);
+    transition: width 0.5s ease-in-out;
+}
+
+.progress-note {
+    margin-top: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
 /* QR Code Section */
 .qr-section {
     animation: fadeIn 0.3s ease-in;

@@ -158,10 +158,19 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
 
             if (workId) {
                 // Update existing work
+                // Prepare payload - exclude money fields (TotalRequired, Paid, Discount)
+                // to allow secretaries to edit non-money fields on old works
+                const { TotalRequired, Paid, Discount, ...nonMoneyFields } = formData;
+
+                const updatePayload = {
+                    workId,
+                    ...nonMoneyFields
+                };
+
                 response = await fetch('/api/updatework', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ workId, ...formData })
+                    body: JSON.stringify(updatePayload)
                 });
             } else {
                 // Add new work - use special endpoint if createAsFinished is true

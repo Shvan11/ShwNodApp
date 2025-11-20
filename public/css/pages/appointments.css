@@ -16,7 +16,7 @@ html {
 .daily-appointments-container {
   margin: 0;
   padding: 0;
-  font-family: var(--font-family);
+  font-family: var(--font-primary);
   font-weight: 400;
   line-height: 1.5;
   color: var(--gray-800);
@@ -42,7 +42,7 @@ html {
 #title {
   margin: 0;
   font-size: var(--font-size-lg);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: white;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   letter-spacing: -0.025em;
@@ -63,43 +63,43 @@ html {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
-  background-color: rgba(255, 255, 255, 0.15);
-  padding: 0.375rem 0.625rem;
+  background-color: var(--surface-elevated);
+  padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--radius-md);
 }
 
 .date-picker-left label {
-  font-weight: 500;
-  color: white;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-white);
   font-size: var(--font-size-xs);
   white-space: nowrap;
 }
 
 .date-picker-left input[type="date"] {
-  padding: 0.375rem 0.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-xs);
-  font-family: var(--font-family);
+  font-family: var(--font-primary);
   transition: all var(--transition-base);
-  background-color: rgba(255, 255, 255, 0.95);
+  background-color: var(--surface);
 }
 
 .date-picker-left input[type="date"]:focus {
   outline: none;
-  border-color: white;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+  border-color: var(--color-white);
+  box-shadow: var(--shadow-sm);
 }
 
 .date-picker-left .btn-primary {
-  padding: 0.375rem 0.75rem;
+  padding: var(--spacing-xs) 0.75rem;
   background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
   color: white;
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: var(--font-size-xs);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   transition: all var(--transition-base);
   box-shadow: var(--shadow-sm);
 }
@@ -129,13 +129,13 @@ html {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.375rem;
+  gap: var(--spacing-xs);
   padding: 0.5rem 1rem;
   background-color: var(--card-bg);
   border: 2px solid var(--border-color);
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--neutral-gray);
   cursor: pointer;
   transition: all var(--transition-base);
@@ -162,7 +162,7 @@ html {
 .stats-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 0.375rem;
+  gap: var(--spacing-xs);
   padding: 0 var(--spacing-lg) var(--spacing-md) var(--spacing-lg);
   max-width: 1400px;
   margin: 0 auto;
@@ -210,28 +210,28 @@ html {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
+  font-size: var(--font-size-xs);
   flex-shrink: 0;
 }
 
 .stat-card.stat-total .stat-icon {
-  background-color: rgba(59, 130, 246, 0.1);
-  color: var(--primary-blue);
+  background-color: var(--blue-50);
+  color: var(--blue-500);
 }
 
 .stat-card.stat-present .stat-icon {
-  background-color: rgba(16, 185, 129, 0.1);
-  color: var(--success-green);
+  background-color: var(--success-50);
+  color: var(--success-600);
 }
 
 .stat-card.stat-waiting .stat-icon {
-  background-color: rgba(245, 158, 11, 0.1);
-  color: var(--warning-orange);
+  background-color: var(--warning-50);
+  color: var(--warning-color);
 }
 
 .stat-card.stat-completed .stat-icon {
-  background-color: rgba(107, 114, 128, 0.1);
-  color: var(--neutral-gray);
+  background-color: var(--gray-100);
+  color: var(--gray-500);
 }
 
 .stat-content {
@@ -244,9 +244,9 @@ html {
 }
 
 .stat-label {
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   color: var(--neutral-gray);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   line-height: 1;
   white-space: nowrap;
   order: 2;
@@ -254,7 +254,7 @@ html {
 
 .stat-value {
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--gray-800);
   line-height: 1;
   order: 1;
@@ -282,7 +282,7 @@ html {
 .appointments-section h3 {
   margin: 0 0 var(--spacing-sm) 0;
   font-size: var(--font-size-base);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--gray-800);
   display: flex;
   align-items: center;
@@ -314,7 +314,7 @@ html {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  min-height: 48px;
+  min-height: 3rem;
 }
 
 .appointment-card:hover {
@@ -327,23 +327,23 @@ html {
 .appointment-card.waiting-patient {
   border: 3px solid var(--error-400);
   border-left: 6px solid var(--error-500);
-  background: linear-gradient(to right, rgba(239, 68, 68, 0.05) 0%, var(--card-bg) 10%);
+  background: linear-gradient(to right, var(--error-50) 0%, var(--card-bg) 10%);
 }
 
 .appointment-card.waiting-patient:hover {
   border-color: var(--error-500);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+  box-shadow: 0 4px 12px var(--error-200);
 }
 
 .appointment-time {
   flex-shrink: 0;
   width: auto;
-  min-width: 65px;
+  min-width: 4rem;
   text-align: left;
   padding: 0.25rem 0.5rem;
   background: linear-gradient(135deg, var(--gray-100) 0%, var(--gray-200) 100%);
   border-radius: var(--radius-sm);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--gray-700);
   font-size: var(--font-size-sm);
   display: flex;
@@ -352,7 +352,7 @@ html {
 }
 
 .appointment-time-icon {
-  font-size: 0.7rem;
+  font-size: var(--font-size-xs);
   opacity: 0.6;
 }
 
@@ -382,11 +382,11 @@ html {
 
 .patient-name {
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--gray-800);
   display: flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: var(--spacing-xs);
   line-height: 1;
 }
 
@@ -414,15 +414,15 @@ html {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   padding: 0.125rem 0.5rem;
-  background-color: rgba(107, 114, 128, 0.08);
+  background-color: var(--gray-100);
   border-radius: var(--radius-full);
 }
 
 .appointment-type-icon {
   opacity: 0.6;
-  font-size: 0.7rem;
+  font-size: var(--font-size-xs);
 }
 
 .appointment-meta {
@@ -439,17 +439,17 @@ html {
   padding: 0.125rem 0.5rem;
   border-radius: var(--radius-full);
   font-size: var(--font-size-xs);
-  font-weight: 500;
-  background-color: rgba(139, 92, 246, 0.1);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--indigo-50);
   color: var(--indigo-500);
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  border: 1px solid var(--indigo-200);
   transition: all var(--transition-fast);
   line-height: 1;
 }
 
 .patient-type-badge:hover {
-  background-color: rgba(139, 92, 246, 0.15);
-  border-color: rgba(139, 92, 246, 0.3);
+  background-color: var(--indigo-100);
+  border-color: var(--indigo-300);
 }
 
 /* Inline patient type badge (beside name) */
@@ -460,10 +460,10 @@ html {
   padding: 0.125rem 0.5rem;
   border-radius: var(--radius-full);
   font-size: var(--font-size-xs);
-  font-weight: 500;
-  background-color: rgba(139, 92, 246, 0.1);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--indigo-50);
   color: var(--indigo-500);
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  border: 1px solid var(--indigo-200);
   transition: all var(--transition-fast);
   line-height: 1;
 }
@@ -490,7 +490,7 @@ html {
   padding: 0.125rem 0.5rem;
   border-radius: var(--radius-full);
   font-size: var(--font-size-xs);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   text-transform: uppercase;
   letter-spacing: 0.025em;
   transition: all var(--transition-fast);
@@ -581,7 +581,7 @@ html {
 .state-times-compact {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: var(--spacing-xs);
   flex-wrap: wrap;
 }
 
@@ -591,36 +591,36 @@ html {
   align-items: center;
   gap: 0.25rem;
   padding: 0.25rem 0.5rem;
-  background-color: rgba(107, 114, 128, 0.08);
+  background-color: var(--gray-100);
   color: var(--gray-600);
   border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  font-weight: 500;
-  border: 1px solid rgba(107, 114, 128, 0.15);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  border: 1px solid var(--gray-200);
   transition: all var(--transition-fast);
   line-height: 1;
 }
 
 .status-time-icon i {
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
 }
 
 .status-time-icon.status-time-present {
   background-color: var(--status-present-bg);
   color: var(--status-present-text);
-  border-color: rgba(30, 64, 175, 0.2);
+  border-color: var(--blue-800);
 }
 
 .status-time-icon.status-time-seated {
   background-color: var(--status-seated-bg);
   color: var(--status-seated-text);
-  border-color: rgba(180, 83, 9, 0.2);
+  border-color: var(--warning-700);
 }
 
 .status-time-icon.status-time-dismissed {
   background-color: var(--status-dismissed-bg);
   color: var(--status-dismissed-text);
-  border-color: rgba(6, 95, 70, 0.2);
+  border-color: var(--success-700);
 }
 
 .status-time {
@@ -628,12 +628,12 @@ html {
   align-items: center;
   gap: 0.25rem;
   padding: 0.125rem 0.375rem;
-  background-color: rgba(107, 114, 128, 0.08);
+  background-color: var(--gray-100);
   color: var(--gray-600);
   border-radius: var(--radius-sm);
-  font-size: 0.7rem;
-  font-weight: 500;
-  border: 1px solid rgba(107, 114, 128, 0.15);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  border: 1px solid var(--gray-200);
   transition: all var(--transition-fast);
   line-height: 1;
 }
@@ -644,42 +644,42 @@ html {
 }
 
 .status-time:hover {
-  background-color: rgba(107, 114, 128, 0.12);
-  border-color: rgba(107, 114, 128, 0.25);
+  background-color: var(--gray-200);
+  border-color: var(--gray-300);
 }
 
 /* Different colors for different state times */
 .status-time-present {
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: var(--blue-50);
   color: var(--primary-blue);
-  border-color: rgba(59, 130, 246, 0.2);
+  border-color: var(--blue-300);
 }
 
 .status-time-present:hover {
-  background-color: rgba(59, 130, 246, 0.15);
-  border-color: rgba(59, 130, 246, 0.3);
+  background-color: var(--blue-50);
+  border-color: var(--blue-300);
 }
 
 .status-time-seated {
-  background-color: rgba(245, 158, 11, 0.1);
+  background-color: var(--warning-50);
   color: var(--warning-orange);
-  border-color: rgba(245, 158, 11, 0.2);
+  border-color: var(--warning-200);
 }
 
 .status-time-seated:hover {
-  background-color: rgba(245, 158, 11, 0.15);
-  border-color: rgba(245, 158, 11, 0.3);
+  background-color: var(--warning-100);
+  border-color: var(--warning-300);
 }
 
 .status-time-dismissed {
-  background-color: rgba(16, 185, 129, 0.1);
+  background-color: var(--success-50);
   color: var(--success-green);
-  border-color: rgba(16, 185, 129, 0.2);
+  border-color: var(--success-200);
 }
 
 .status-time-dismissed:hover {
-  background-color: rgba(16, 185, 129, 0.15);
-  border-color: rgba(16, 185, 129, 0.3);
+  background-color: var(--success-100);
+  border-color: var(--success-300);
 }
 
 /* ===== ACTION BUTTONS ===== */
@@ -701,28 +701,53 @@ html {
 
 .status-icon-btn {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
+  justify-content: space-between;
+  width: 3rem;
+  height: 3rem;
   border: 2px solid var(--border-color);
   border-radius: var(--radius-md);
   background-color: var(--background-secondary);
   cursor: pointer;
   transition: all var(--transition-base);
   position: relative;
+  padding: 0.25rem 0.25rem 0.1875rem 0.25rem;
 }
 
 .status-icon-btn i {
-  font-size: 1.5rem;
+  font-size: 1.125rem;
   transition: all var(--transition-base);
+  flex-shrink: 0;
+}
+
+/* Status icon button without time - center icon and use larger size */
+.status-icon-btn:not(:has(.status-icon-time)) {
+  justify-content: center;
+  padding: 0.25rem;
+}
+
+.status-icon-btn:not(:has(.status-icon-time)) i {
+  font-size: 1.5rem;
+}
+
+/* Time stamp displayed below the icon - anchored to bottom */
+.status-icon-time {
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--color-white);
+  flex-shrink: 0;
+  align-self: center;
 }
 
 .status-icon-btn .chair-icon {
-  width: 32px;
-  height: 32px;
+  width: 22px;
+  height: 22px;
   opacity: 1;
   transition: all var(--transition-base);
+  flex-shrink: 0;
 }
 
 /* Inactive state - Colorless/Gray (not yet done) */
@@ -759,51 +784,65 @@ html {
 }
 
 .status-icon-btn.status-icon-inactive-clickable:hover {
-  opacity: 0.8;
+  opacity: 1;
   transform: translateY(-2px) scale(1.05);
-  box-shadow: var(--shadow-md);
-  border-color: var(--success-green);
+  box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.3), 0 2px 4px -1px rgba(34, 197, 94, 0.2);
+  border-color: var(--success-600);
+  background: linear-gradient(135deg, var(--success-500) 0%, var(--success-700) 100%);
 }
 
 .status-icon-btn.status-icon-inactive-clickable:hover i {
-  color: var(--success-green);
+  color: var(--color-white);
 }
 
 .status-icon-btn.status-icon-inactive-clickable:hover .chair-icon {
   opacity: 1;
+  filter: brightness(0) invert(1);
 }
 
 /* Clickable OR Active state - Colored/Green (done or ready) */
 .status-icon-btn.status-icon-clickable,
 .status-icon-btn.status-icon-active {
-  background: linear-gradient(135deg, var(--success-green) 0%, var(--success-green-dark) 100%);
-  border-color: var(--success-green);
+  background: linear-gradient(135deg, var(--success-500) 0%, var(--success-700) 100%);
+  border-color: var(--success-600);
   cursor: pointer;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.3), 0 2px 4px -1px rgba(34, 197, 94, 0.2);
   opacity: 1;
 }
 
 .status-icon-btn.status-icon-clickable i,
 .status-icon-btn.status-icon-active i {
-  color: white;
+  color: var(--color-white);
 }
 
 .status-icon-btn.status-icon-clickable .chair-icon,
 .status-icon-btn.status-icon-active .chair-icon {
   opacity: 1;
+  filter: brightness(0) invert(1);
 }
 
 .status-icon-btn.status-icon-clickable:hover,
 .status-icon-btn.status-icon-active:hover {
   transform: translateY(-2px) scale(1.05);
-  box-shadow: var(--shadow-lg);
-  background: linear-gradient(135deg, var(--success-green-dark) 0%, #047857 100%);
+  box-shadow: 0 10px 15px -3px rgba(34, 197, 94, 0.4), 0 4px 6px -2px rgba(34, 197, 94, 0.3);
+  background: linear-gradient(135deg, var(--success-600) 0%, var(--success-800) 100%);
 }
 
-/* Disabled state */
+/* Waiting state - Light red background (checked in but not seated) */
+.status-icon-btn.status-icon-waiting {
+  background: linear-gradient(135deg, var(--error-400) 0%, var(--error-500) 100%);
+  border-color: var(--error-500);
+  box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3), 0 2px 4px -1px rgba(239, 68, 68, 0.2);
+}
+
+.status-icon-btn.status-icon-waiting:hover {
+  background: linear-gradient(135deg, var(--error-500) 0%, var(--error-600) 100%);
+  box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.4), 0 4px 6px -2px rgba(239, 68, 68, 0.3);
+}
+
+/* Disabled state - prevent interaction but keep visual appearance */
 .status-icon-btn:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
 }
 
 .status-icon-btn:disabled:hover {
@@ -820,7 +859,7 @@ html {
   border: none;
   border-radius: var(--radius-md);
   font-size: var(--font-size-xs);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
   transition: all var(--transition-base);
   box-shadow: var(--shadow-sm);
@@ -864,7 +903,7 @@ html {
   color: white;
   padding: 5px;
   width: 72px;
-  height: 48px;
+  height: 3rem;
 }
 
 /* Image inside action buttons */
@@ -888,7 +927,7 @@ html {
   color: var(--status-dismissed-text);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-xs);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   line-height: 1;
 }
 
@@ -1023,19 +1062,19 @@ html {
 .notification span {
   flex: 1;
   font-size: var(--font-size-sm);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   color: var(--gray-700);
 }
 
 .notification-undo {
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: var(--blue-50);
   border: 1px solid var(--primary-blue);
   color: var(--primary-blue);
-  padding: 0.375rem 0.75rem;
+  padding: var(--spacing-xs) 0.75rem;
   border-radius: var(--radius-md);
   cursor: pointer;
   font-size: var(--font-size-xs);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
@@ -1074,7 +1113,7 @@ html {
 
 /* Small button variant */
 .btn-small {
-  padding: 0.375rem 0.75rem;
+  padding: var(--spacing-xs) 0.75rem;
   font-size: var(--font-size-xs);
   min-height: 32px;
 }
@@ -1156,7 +1195,7 @@ html {
   transition: all var(--transition-fast);
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   color: var(--gray-700);
 }
 
@@ -1180,7 +1219,7 @@ html {
 }
 
 .context-menu-item-danger:hover {
-  background-color: rgba(239, 68, 68, 0.1);
+  background-color: var(--error-50);
   color: var(--error-red-dark);
 }
 
@@ -1303,12 +1342,12 @@ footer {
 
   .appointment-card {
     flex-wrap: wrap;
-    padding: 0.375rem 0.5rem;
+    padding: var(--spacing-xs) 0.5rem;
   }
 
   .appointment-time {
     min-width: 55px;
-    font-size: 0.7rem;
+    font-size: var(--font-size-xs);
   }
 
   .appointment-info {
@@ -1329,7 +1368,7 @@ footer {
 
   /* Responsive status workflow icons */
   .status-workflow-icons {
-    gap: 0.375rem;
+    gap: var(--spacing-xs);
   }
 
   .status-icon-btn {
@@ -1338,12 +1377,16 @@ footer {
   }
 
   .status-icon-btn i {
-    font-size: 1.25rem;
+    font-size: 1rem;
   }
 
   .status-icon-btn .chair-icon {
-    width: 28px;
-    height: 28px;
+    width: 18px;
+    height: 18px;
+  }
+
+  .status-icon-time {
+    font-size: 0.5rem;
   }
 
   .notification {
@@ -1363,7 +1406,7 @@ footer {
   .stat-icon {
     width: 22px;
     height: 22px;
-    font-size: 0.7rem;
+    font-size: var(--font-size-xs);
   }
 
   .stat-value {
@@ -1371,7 +1414,7 @@ footer {
   }
 
   .stat-label {
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
   }
 
   .stats-container {
@@ -1393,12 +1436,16 @@ footer {
   }
 
   .status-icon-btn i {
-    font-size: 1.1rem;
+    font-size: 0.875rem;
   }
 
   .status-icon-btn .chair-icon {
-    width: 24px;
-    height: 24px;
+    width: 16px;
+    height: 16px;
+  }
+
+  .status-icon-time {
+    font-size: 0.45rem;
   }
 }
 
@@ -1437,7 +1484,7 @@ table.appointments-table td {
 
 table.appointments-table th {
   background-color: var(--gray-50);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--gray-700);
   font-size: var(--font-size-sm);
   text-transform: uppercase;
@@ -1465,15 +1512,15 @@ table.appointments-table tr:last-child td {
   border: 1px solid var(--border-color);
   border-radius: 9999px;
   font-size: var(--font-size-sm);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   transition: all 0.3s ease;
   position: relative;
   margin-left: auto;
 }
 
 .ws-status-dot {
-  width: 0.625rem;
-  height: 0.625rem;
+  width: var(--spacing-sm);
+  height: var(--spacing-sm);
   border-radius: 50%;
   background-color: var(--neutral-gray);
   transition: all 0.3s ease;
@@ -1493,7 +1540,7 @@ table.appointments-table tr:last-child td {
 
 .ws-status-indicator.ws-connected .ws-status-dot {
   background-color: var(--success-green);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+  box-shadow: 0 0 0 3px var(--success-200);
   animation: pulse-green 2s ease-in-out infinite;
 }
 
@@ -1503,10 +1550,10 @@ table.appointments-table tr:last-child td {
 
 @keyframes pulse-green {
   0%, 100% {
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+    box-shadow: 0 0 0 3px var(--success-200);
   }
   50% {
-    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.1);
+    box-shadow: 0 0 0 6px var(--success-50);
   }
 }
 
@@ -1541,10 +1588,10 @@ table.appointments-table tr:last-child td {
 
 @keyframes pulse-orange {
   0%, 100% {
-    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+    box-shadow: 0 0 0 3px var(--warning-200);
   }
   50% {
-    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.1);
+    box-shadow: 0 0 0 6px var(--warning-50);
   }
 }
 
@@ -1574,7 +1621,7 @@ table.appointments-table tr:last-child td {
   }
   50% {
     transform: scale(1.05);
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+    box-shadow: 0 0 20px var(--blue-300);
   }
 }
 
@@ -1582,8 +1629,8 @@ table.appointments-table tr:last-child td {
 @media (max-width: 768px) {
   .ws-status-indicator {
     font-size: var(--font-size-xs);
-    padding: 0.375rem 0.75rem;
-    gap: 0.375rem;
+    padding: var(--spacing-xs) 0.75rem;
+    gap: var(--spacing-xs);
   }
 
   .ws-status-dot {
@@ -1609,5 +1656,22 @@ table.appointments-table tr:last-child td {
   .header-section #ws-status-indicator {
     order: 2;
     margin-left: 0;
+  }
+}
+
+/* ===== PATIENT ALERT ICON ===== */
+.patient-alert-icon {
+  color: var(--error-red-light);
+  margin-left: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  animation: pulse-alert 2s infinite;
+}
+
+@keyframes pulse-alert {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
   }
 }

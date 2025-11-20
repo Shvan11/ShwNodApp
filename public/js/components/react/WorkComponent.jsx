@@ -41,6 +41,10 @@ const WorkComponent = ({ patientId }) => {
     const [checkingIn, setCheckingIn] = useState(false);
     const [checkedIn, setCheckedIn] = useState(false);
 
+    // Appointment state for no-work receipt button
+    const [hasNextAppointment, setHasNextAppointment] = useState(false);
+    const [loadingAppointment, setLoadingAppointment] = useState(true);
+
     // Expanded works state - track which work IDs are expanded
     const [expandedWorks, setExpandedWorks] = useState(new Set());
 
@@ -58,6 +62,7 @@ const WorkComponent = ({ patientId }) => {
         if (patientId && patientId !== 'new') {
             loadWorks();
             loadPatientInfo();
+            checkAppointmentStatus();
         }
     }, [patientId]);
 
@@ -79,6 +84,43 @@ const WorkComponent = ({ patientId }) => {
             setPatientInfo(data);
         } catch (err) {
             console.error('Error loading patient info:', err);
+        }
+    };
+
+    const checkAppointmentStatus = async () => {
+        try {
+            setLoadingAppointment(true);
+            const response = await fetch(`/api/patients/${patientId}/has-appointment`);
+            if (!response.ok) throw new Error('Failed to check appointment status');
+            const data = await response.json();
+            setHasNextAppointment(data.hasAppointment);
+            console.log(`[WORK-COMPONENT] Patient ${patientId} has next appointment:`, data.hasAppointment);
+        } catch (err) {
+            console.error('[WORK-COMPONENT] Error checking appointment status:', err);
+            setHasNextAppointment(false);
+        } finally {
+            setLoadingAppointment(false);
+        }
+    };
+
+    const handlePrintNoWorkReceipt = () => {
+        console.log(`[WORK-COMPONENT] Print no-work receipt clicked for patient ${patientId}`);
+
+        if (!hasNextAppointment) {
+            toast.warning('Patient has no scheduled appointment');
+            return;
+        }
+
+        // Open receipt in new window
+        const receiptUrl = `/api/templates/receipt/no-work/${patientId}`;
+        console.log(`[WORK-COMPONENT] Opening receipt window: ${receiptUrl}`);
+
+        const receiptWindow = window.open(receiptUrl, '_blank');
+
+        if (!receiptWindow) {
+            toast.error('Failed to open receipt window. Please check your popup blocker settings.');
+        } else {
+            toast.success('Opening appointment receipt...');
         }
     };
 
@@ -469,6 +511,18 @@ const WorkComponent = ({ patientId }) => {
                                     {patientInfo.Phone && (
                                         <span><i className="fas fa-phone"></i>{patientInfo.Phone}</span>
                                     )}
+                                    {patientInfo.estimatedCost && (
+                                        <span className="patient-cost-badge">
+                                            <i className="fas fa-dollar-sign"></i>
+                                            {patientInfo.estimatedCost.toLocaleString()} {patientInfo.currency || 'IQD'}
+                                        </span>
+                                    )}
+                                    {patientInfo.activeAlert && (
+                                        <span className={`patient-alert-badge patient-alert-badge--severity-${patientInfo.activeAlert.alertSeverity}`}>
+                                            <i className="fas fa-exclamation-triangle"></i>
+                                            {patientInfo.activeAlert.alertType}: {patientInfo.activeAlert.alertDetails}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                             <div className="work-summary-inline">
@@ -511,6 +565,15 @@ const WorkComponent = ({ patientId }) => {
                             >
                                 <i className={`fas ${checkedIn ? 'fa-check-circle' : 'fa-calendar-check'}`}></i>
                                 {checkingIn ? 'Checking In...' : checkedIn ? 'Checked In' : 'Check In'}
+                            </button>
+                            <button
+                                onClick={handlePrintNoWorkReceipt}
+                                className="btn-secondary"
+                                disabled={loadingAppointment || !hasNextAppointment}
+                                title={!hasNextAppointment ? 'No future appointment scheduled' : 'Print appointment confirmation receipt'}
+                            >
+                                <i className="fas fa-print"></i>
+                                {loadingAppointment ? 'Loading...' : 'Print Appointment Receipt'}
                             </button>
                             <button onClick={handleAddWork} className="btn-primary">
                                 <i className="fas fa-plus"></i>

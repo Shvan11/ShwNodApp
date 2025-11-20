@@ -14,6 +14,7 @@
 
 import { log } from '../../utils/logger.js';
 import * as database from '../database/index.js';
+import { getDailyAppointmentsOptimized } from '../database/queries/appointment-queries.js';
 
 /**
  * Validation error class for appointment business logic
@@ -220,6 +221,10 @@ export async function quickCheckIn(checkInData) {
     // Get formatted current date/time
     const { dateTime, dateOnly, timeObject } = formatCurrentDateTime();
 
+    // Generate present time string (avoids UTC conversion issue with Date objects)
+    const now = new Date();
+    const presentTimeString = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
     // Check if patient already has an appointment today
     const existingAppointment = await database.executeQuery(`
         SELECT appointmentID, Present, Seated, Dismissed
@@ -258,7 +263,7 @@ export async function quickCheckIn(checkInData) {
                 LastUpdated = GETDATE()
             WHERE appointmentID = @appointmentID
         `, [
-            ['presentTime', database.TYPES.Time, timeObject],
+            ['presentTime', database.TYPES.VarChar, presentTimeString],
             ['appointmentID', database.TYPES.Int, apt.appointmentID]
         ]);
 
@@ -311,7 +316,7 @@ export async function quickCheckIn(checkInData) {
         ['appDate', database.TYPES.NVarChar, dateTime],
         ['appDetail', database.TYPES.NVarChar, detail],
         ['drID', database.TYPES.Int, doctorId || null],
-        ['presentTime', database.TYPES.Time, timeObject]
+        ['presentTime', database.TYPES.VarChar, presentTimeString]
     ], (columns) => ({
         appointmentID: columns[0].value
     }));
@@ -337,10 +342,78 @@ export async function quickCheckIn(checkInData) {
     };
 }
 
+/**
+ * Get daily appointments with business logic (OPTIMIZED - Phase 2)
+ * Fetches all appointment data in single call and structures response
+ * @param {string} AppsDate - The date for which to retrieve appointments
+ * @returns {Promise<Object>} Structured appointment data with stats
+ */
+export async function getDailyAppointments(AppsDate) {
+    // Validate date parameter
+    if (!AppsDate) {
+        throw new AppointmentValidationError(
+            'AppsDate is required',
+            'MISSING_DATE'
+        );
+    }
+
+    // Validate date format
+    const appointmentDate = new Date(AppsDate);
+    if (isNaN(appointmentDate.getTime())) {
+        throw new AppointmentValidationError(
+            'Invalid date format for AppsDate',
+            'INVALID_DATE_FORMAT'
+        );
+    }
+
+    // Get data from database layer
+    const resultSets = await getDailyAppointmentsOptimized(AppsDate);
+
+    // Extract and structure result sets
+    let allAppointments = [];
+    let checkedInAppointments = [];
+    let stats = { total: 0, checkedIn: 0, waiting: 0, completed: 0 };
+
+    if (resultSets.length >= 3) {
+        // All 3 result sets present
+        allAppointments = resultSets[0] || [];
+        checkedInAppointments = resultSets[1] || [];
+        stats = resultSets[2] && resultSets[2][0] ? resultSets[2][0] : stats;
+    } else if (resultSets.length === 2) {
+        // One result set might be empty
+        if (resultSets[0].length > 0 && resultSets[0][0].hasOwnProperty('appointmentID')) {
+            allAppointments = resultSets[0];
+            if (resultSets[1].length > 0) {
+                if (resultSets[1][0].hasOwnProperty('appointmentID')) {
+                    checkedInAppointments = resultSets[1];
+                } else if (resultSets[1][0].hasOwnProperty('total')) {
+                    stats = resultSets[1][0];
+                }
+            }
+        } else if (resultSets[0].length > 0 && resultSets[0][0].hasOwnProperty('total')) {
+            stats = resultSets[0][0];
+        }
+    } else if (resultSets.length === 1) {
+        // Only stats result set
+        if (resultSets[0].length > 0 && resultSets[0][0].hasOwnProperty('total')) {
+            stats = resultSets[0][0];
+        }
+    }
+
+    log.info(`Retrieved daily appointments for ${AppsDate}: ${stats.total} total, ${stats.checkedIn} checked in`);
+
+    return {
+        allAppointments,
+        checkedInAppointments,
+        stats
+    };
+}
+
 export default {
     validateAndCreateAppointment,
     verifyDoctor,
     checkAppointmentConflict,
     quickCheckIn,
+    getDailyAppointments,
     AppointmentValidationError
 };

@@ -11,6 +11,7 @@ import express from 'express';
 import { log } from '../../utils/logger.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
 import { getReferralSources, getPatientTypes, getAddresses, getGenders } from '../../services/database/queries/patient-queries.js';
+import { getAlertTypes } from '../../services/database/queries/alert-queries.js';
 
 const router = express.Router();
 
@@ -67,6 +68,20 @@ router.get('/genders', async (req, res) => {
     } catch (error) {
         log.error('Error fetching genders:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch genders', error);
+    }
+});
+
+/**
+ * GET /alert-types
+ * Fetch all available alert types for dropdown population
+ */
+router.get('/alert-types', async (req, res) => {
+    try {
+        const alertTypes = await getAlertTypes();
+        res.json(alertTypes);
+    } catch (error) {
+        log.error('Error fetching alert types:', error);
+        return ErrorResponses.internalError(res, 'Failed to fetch alert types', error);
     }
 });
 

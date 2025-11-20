@@ -1,9 +1,11 @@
-import React from 'react';
 import AppointmentCard from './AppointmentCard.jsx';
 
 /**
  * AppointmentsList Component
  * Renders a grid of appointment cards with loading and empty states
+ *
+ * Performance: Automatically optimized by React Compiler (React 19).
+ * No manual memoization needed - the compiler handles it automatically.
  */
 const AppointmentsList = ({
     title,
@@ -14,25 +16,11 @@ const AppointmentsList = ({
     onMarkSeated,
     onMarkDismissed,
     onUndoState,
-    onContextMenu,
     emptyMessage = 'No appointments found.',
     className = ''
 }) => {
-    // Sort checked-in appointments by check-in time (earliest first)
-    const sortedAppointments = showStatus && appointments
-        ? [...appointments].sort((a, b) => {
-            const timeA = a.PresentTime || '99:99';
-            const timeB = b.PresentTime || '99:99';
-
-            const [hoursA, minutesA] = timeA.split(':').map(Number);
-            const [hoursB, minutesB] = timeB.split(':').map(Number);
-
-            const totalMinutesA = (hoursA || 0) * 60 + (minutesA || 0);
-            const totalMinutesB = (hoursB || 0) * 60 + (minutesB || 0);
-
-            return totalMinutesA - totalMinutesB;
-        })
-        : appointments;
+    // Trust database ordering - stored procedure already sorts by PresentTime
+    const sortedAppointments = appointments;
 
     // Render loading skeleton
     if (loading) {
@@ -75,7 +63,6 @@ const AppointmentsList = ({
                         onMarkSeated={onMarkSeated}
                         onMarkDismissed={onMarkDismissed}
                         onUndoState={onUndoState}
-                        onContextMenu={onContextMenu}
                     />
                 ))}
             </div>

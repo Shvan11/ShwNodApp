@@ -1,9 +1,12 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 /**
  * AppointmentCard Component
  * Individual appointment card with actions and context menu support
+ *
+ * Performance: Automatically optimized by React Compiler (React 19).
+ * No manual memoization needed - the compiler handles it automatically.
  */
 const AppointmentCard = ({
     appointment,
@@ -11,12 +14,14 @@ const AppointmentCard = ({
     onCheckIn,
     onMarkSeated,
     onMarkDismissed,
-    onUndoState,
-    onContextMenu
+    onUndoState
 }) => {
-    const [touchStartTime, setTouchStartTime] = useState(null);
-    const [touchMoved, setTouchMoved] = useState(false);
-    const touchTimerRef = useRef(null);
+    const [hasAnimated, setHasAnimated] = useState(false);
+
+    // Set animation flag on mount only (prevents re-animation on re-renders)
+    useEffect(() => {
+        setHasAnimated(true);
+    }, []); // Empty deps = run once on mount
 
     // Format SQL Server TIME value (HH:MM:SS) to 12-hour format
     const formatTime = (timeString) => {
@@ -64,56 +69,6 @@ const AppointmentCard = ({
         }
     };
 
-    // Handle context menu (right-click)
-    const handleContextMenu = (e) => {
-        if (showStatus) {
-            e.preventDefault();
-            onContextMenu(e, appointment.appointmentID, status);
-        }
-    };
-
-    // Touch event handlers for long-press on mobile
-    const handleTouchStart = (e) => {
-        setTouchMoved(false);
-        setTouchStartTime(Date.now());
-
-        if (showStatus) {
-            touchTimerRef.current = setTimeout(() => {
-                if (!touchMoved) {
-                    const touch = e.touches[0];
-                    const syntheticEvent = {
-                        preventDefault: () => e.preventDefault(),
-                        clientX: touch.clientX,
-                        clientY: touch.clientY,
-                        pageX: touch.pageX,
-                        pageY: touch.pageY
-                    };
-                    onContextMenu(syntheticEvent, appointment.appointmentID, status);
-
-                    // Haptic feedback if available
-                    if (navigator.vibrate) {
-                        navigator.vibrate(50);
-                    }
-                }
-            }, 500);
-        }
-    };
-
-    const handleTouchMove = () => {
-        setTouchMoved(true);
-        if (touchTimerRef.current) {
-            clearTimeout(touchTimerRef.current);
-            touchTimerRef.current = null;
-        }
-    };
-
-    const handleTouchEnd = () => {
-        if (touchTimerRef.current) {
-            clearTimeout(touchTimerRef.current);
-            touchTimerRef.current = null;
-        }
-    };
-
     // Render action buttons based on status
     const renderActions = () => {
         if (!showStatus) {
@@ -138,49 +93,63 @@ const AppointmentCard = ({
             );
         } else {
             // Checked-in patients - Fixed icon workflow: Present → Seat → Dismiss
-            const isPresent = appointment.Present;
-            const isSeated = appointment.Seated;
-            const isDismissed = appointment.Dismissed;
+            // Use the *Time fields because the API returns PresentTime/SeatedTime/DismissedTime
+            const isPresent = appointment.PresentTime;
+            const isSeated = appointment.SeatedTime;
+            const isDismissed = appointment.DismissedTime;
+
+            // Validation rules for undo operations
+            const canUndoPresent = !isSeated && !isDismissed; // Can only undo check-in if not seated/dismissed
+            const canUndoSeated = !isDismissed; // Can only undo seated if not dismissed
+
+            // Check if patient is waiting (checked in but not seated)
+            const isWaitingForSeat = isPresent && !isSeated && !isDismissed;
 
             return (
                 <div className="status-workflow-icons">
-                    {/* Check-in icon - Always colored (green) since they're checked in */}
+                    {/* Check-in icon with time - Can undo only if not seated/dismissed */}
                     <button
                         type="button"
-                        className="status-icon-btn status-icon-active"
+                        className={`status-icon-btn status-icon-active ${isWaitingForSeat ? 'status-icon-waiting' : ''}`}
                         onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            onUndoState(appointment.appointmentID, 'Present');
+                            if (canUndoPresent) {
+                                onUndoState(appointment.appointmentID, 'Present');
+                            }
                         }}
-                        title="Checked In - Click to undo"
+                        title={canUndoPresent ? `Checked In: ${presentTime} - Click to undo` : (isSeated ? "Cannot undo: Patient is already seated" : "Cannot undo: Visit is completed")}
+                        disabled={!canUndoPresent}
                     >
                         <i className="fas fa-user-check"></i>
+                        {presentTime && <span className="status-icon-time">{presentTime}</span>}
                     </button>
 
-                    {/* Seated icon - Green when seated, gray when not seated yet */}
+                    {/* Seated icon with time - Green when seated, gray when not seated yet */}
                     <button
                         type="button"
                         className={`status-icon-btn status-icon-chair ${isSeated ? 'status-icon-active' : 'status-icon-inactive-clickable'}`}
                         onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            if (isSeated) {
+                            if (isSeated && canUndoSeated) {
                                 onUndoState(appointment.appointmentID, 'Seated');
-                            } else {
+                            } else if (!isSeated) {
                                 onMarkSeated(appointment.appointmentID);
                             }
                         }}
-                        title={isSeated ? "Seated - Click to undo" : "Click to Seat Patient"}
+                        title={isSeated ? (canUndoSeated ? `Seated: ${seatedTime} - Click to undo` : "Cannot undo: Visit is completed") : "Click to Seat Patient"}
+                        disabled={isSeated && !canUndoSeated}
                     >
                         <img
                             src={isSeated ? "/images/dental_chair.svg" : "/images/dental_chair_grey.svg"}
                             alt="Seat"
                             className="chair-icon"
                         />
+                        {seatedTime && <span className="status-icon-time">{seatedTime}</span>}
                     </button>
 
-                    {/* Complete icon - Green when dismissed, gray/clickable when seated, gray/disabled when not seated */}
+                    {/* Complete icon with time - Green when dismissed, gray/clickable when seated, gray/disabled when not seated */}
                     <button
                         type="button"
                         className={`status-icon-btn ${isDismissed ? 'status-icon-active' : (isSeated ? 'status-icon-inactive-clickable' : 'status-icon-inactive')}`}
@@ -193,10 +162,11 @@ const AppointmentCard = ({
                                 onMarkDismissed(appointment.appointmentID);
                             }
                         }}
-                        title={isDismissed ? "Completed - Click to undo" : (isSeated ? "Click to Complete Visit" : "Not seated yet")}
+                        title={isDismissed ? `Completed: ${dismissedTime} - Click to undo` : (isSeated ? "Click to Complete Visit" : "Not seated yet")}
                         disabled={!isSeated && !isDismissed}
                     >
                         <i className="fas fa-check-circle"></i>
+                        {dismissedTime && <span className="status-icon-time">{dismissedTime}</span>}
                     </button>
                 </div>
             );
@@ -210,13 +180,9 @@ const AppointmentCard = ({
 
     return (
         <div
-            className={`appointment-card fade-in-up ${statusClass}${isWaiting ? ' waiting-patient' : ''}`}
+            className={`appointment-card ${!hasAnimated ? 'fade-in-up' : ''} ${statusClass}${isWaiting ? ' waiting-patient' : ''}`}
             data-appointment-id={appointment.appointmentID}
             data-status={statusClass}
-            onContextMenu={handleContextMenu}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
         >
             <div className="appointment-time">
                 <i className="fas fa-clock appointment-time-icon"></i>
@@ -234,6 +200,9 @@ const AppointmentCard = ({
                             <i className="fas fa-user-circle patient-link-icon"></i>
                             {appointment.PatientName || 'Unknown'}
                         </a>
+                        {appointment.hasActiveAlert && (
+                            <i className="fas fa-bell patient-alert-icon" title="Patient has an active alert"></i>
+                        )}
                         {appointment.PatientType && (
                             <span className="patient-type-badge-inline">
                                 <i className="fas fa-tag"></i>
@@ -249,36 +218,14 @@ const AppointmentCard = ({
                     )}
                 </div>
 
-                {showStatus && (
+                {showStatus && appointment.PatientType === 'Active' && (
                     <div className="appointment-info-line-2">
-                        <div className="state-times-compact">
-                            {presentTime && (
-                                <span className="status-time-icon status-time-present" title={`Checked in: ${presentTime}`}>
-                                    <i className="fas fa-user-check"></i>
-                                    {presentTime}
-                                </span>
-                            )}
-                            {seatedTime && (
-                                <span className="status-time-icon status-time-seated" title={`Seated: ${seatedTime}`}>
-                                    <i className="fas fa-tooth"></i>
-                                    {seatedTime}
-                                </span>
-                            )}
-                            {dismissedTime && (
-                                <span className="status-time-icon status-time-dismissed" title={`Dismissed: ${dismissedTime}`}>
-                                    <i className="fas fa-check-circle"></i>
-                                    {dismissedTime}
-                                </span>
-                            )}
-                        </div>
-                        {appointment.PatientType === 'Active' && (
-                            <span
-                                className={`visit-notes-icon ${appointment.HasVisit ? 'visit-notes-registered' : 'visit-notes-missing'}`}
-                                title={appointment.HasVisit ? 'Visit notes registered ✓' : 'No visit notes yet'}
-                            >
-                                <i className={`fas fa-${appointment.HasVisit ? 'clipboard-check' : 'clipboard'}`}></i>
-                            </span>
-                        )}
+                        <span
+                            className={`visit-notes-icon ${appointment.HasVisit ? 'visit-notes-registered' : 'visit-notes-missing'}`}
+                            title={appointment.HasVisit ? 'Visit notes registered ✓' : 'No visit notes yet'}
+                        >
+                            <i className={`fas fa-${appointment.HasVisit ? 'clipboard-check' : 'clipboard'}`}></i>
+                        </span>
                     </div>
                 )}
             </div>

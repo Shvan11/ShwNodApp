@@ -30,19 +30,35 @@ async function pathExists(path) {
  */
 export function getInfos(PID) {
     return executeQuery(
-        `SELECT p.PatientName, p.Phone, w.StartDate
+        `SELECT p.PatientName, p.Phone, w.StartDate, p.EstimatedCost, p.Currency,
+                a.AlertID, at.TypeName as AlertType, a.AlertDetails, a.AlertSeverity
          FROM dbo.tblpatients p
          LEFT OUTER JOIN (
            SELECT PersonID, StartDate
            FROM dbo.tblwork
            WHERE Finished = 0
          ) w ON p.PersonID = w.PersonID
+         LEFT OUTER JOIN (
+           SELECT TOP 1 AlertID, PersonID, AlertTypeID, AlertDetails, AlertSeverity
+           FROM dbo.tblAlerts
+           WHERE PersonID = @PID AND IsActive = 1
+           ORDER BY AlertSeverity DESC, CreationDate DESC
+         ) a ON p.PersonID = a.PersonID
+         LEFT OUTER JOIN dbo.tblAlertTypes at ON a.AlertTypeID = at.AlertTypeID
          WHERE p.PersonID = @PID`,
         [['PID', TYPES.Int, PID]],
         (columns) => ({
             name: columns[0].value,
             phone: columns[1].value,
             StartDate: columns[2].value,
+            estimatedCost: columns[3].value,
+            currency: columns[4].value,
+            activeAlert: columns[5].value ? {
+                alertId: columns[5].value,
+                alertType: columns[6].value,
+                alertDetails: columns[7].value,
+                alertSeverity: columns[8].value
+            } : null
         }),
         async (infos) => ({ ...infos[0] || {}, ...await getAssets(PID) })
     );
@@ -218,13 +234,13 @@ export async function createPatient(patientData) {
         INSERT INTO dbo.tblpatients (
             patientID, PatientName, Phone, FirstName, LastName,
             DateofBirth, Gender, Phone2, Email, AddressID,
-            ReferralSourceID, PatientTypeID, Notes, Alerts,
+            ReferralSourceID, PatientTypeID, Notes,
             Language, CountryCode, EstimatedCost, Currency
         )
         VALUES (
             @patientID, @patientName, @phone, @firstName, @lastName,
             @dateOfBirth, @gender, @phone2, @email, @addressID,
-            @referralSourceID, @patientTypeID, @notes, @alerts,
+            @referralSourceID, @patientTypeID, @notes,
             @language, @countryCode, @estimatedCost, @currency
         );
         SELECT SCOPE_IDENTITY() AS PersonID;
@@ -244,7 +260,6 @@ export async function createPatient(patientData) {
         ['referralSourceID', TYPES.Int, patientData.referralSourceID ? parseInt(patientData.referralSourceID) : null],
         ['patientTypeID', TYPES.Int, patientData.patientTypeID ? parseInt(patientData.patientTypeID) : null],
         ['notes', TYPES.NVarChar, patientData.notes || null],
-        ['alerts', TYPES.NVarChar, patientData.alerts || null],
         ['language', TYPES.TinyInt, patientData.language ? parseInt(patientData.language) : 0],
         ['countryCode', TYPES.NVarChar, patientData.countryCode || null],
         ['estimatedCost', TYPES.Int, patientData.estimatedCost ? parseInt(patientData.estimatedCost) : null],
@@ -332,7 +347,7 @@ export async function getPatientById(personId) {
         `SELECT p.PersonID, p.patientID, p.PatientName, p.FirstName, p.LastName,
                 p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
                 p.AddressID, p.ReferralSourceID, p.PatientTypeID,
-                p.Notes, p.Alerts, p.Language, p.CountryCode,
+                p.Notes, p.Language, p.CountryCode,
                 p.EstimatedCost, p.Currency
          FROM dbo.tblpatients p
          WHERE p.PersonID = @personId`,
@@ -352,11 +367,10 @@ export async function getPatientById(personId) {
             ReferralSourceID: columns[11].value,
             PatientTypeID: columns[12].value,
             Notes: columns[13].value,
-            Alerts: columns[14].value,
-            Language: columns[15].value,
-            CountryCode: columns[16].value,
-            EstimatedCost: columns[17].value,
-            Currency: columns[18].value
+            Language: columns[14].value,
+            CountryCode: columns[15].value,
+            EstimatedCost: columns[16].value,
+            Currency: columns[17].value
         })
     );
     return result[0] || null;
@@ -371,7 +385,7 @@ export function getAllPatients() {
         `SELECT p.PersonID, p.patientID, p.PatientName, p.FirstName, p.LastName,
                 p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
                 p.AddressID, p.ReferralSourceID, p.PatientTypeID,
-                p.Notes, p.Alerts, p.Language, p.CountryCode,
+                p.Notes, p.Language, p.CountryCode,
                 g.Gender as GenderName, a.Zone as AddressName,
                 r.Referral as ReferralSource, pt.PatientType as PatientTypeName
          FROM dbo.tblpatients p
@@ -396,13 +410,12 @@ export function getAllPatients() {
             ReferralSourceID: columns[11].value,
             PatientTypeID: columns[12].value,
             Notes: columns[13].value,
-            Alerts: columns[14].value,
-            Language: columns[15].value,
-            CountryCode: columns[16].value,
-            GenderName: columns[17].value,
-            AddressName: columns[18].value,
-            ReferralSource: columns[19].value,
-            PatientTypeName: columns[20].value
+            Language: columns[14].value,
+            CountryCode: columns[15].value,
+            GenderName: columns[16].value,
+            AddressName: columns[17].value,
+            ReferralSource: columns[18].value,
+            PatientTypeName: columns[19].value
         })
     );
 }
@@ -429,7 +442,6 @@ export async function updatePatient(personId, patientData) {
             ReferralSourceID = @referralSourceID,
             PatientTypeID = @patientTypeID,
             Notes = @notes,
-            Alerts = @alerts,
             Language = @language,
             CountryCode = @countryCode,
             EstimatedCost = @estimatedCost,
@@ -452,7 +464,6 @@ export async function updatePatient(personId, patientData) {
         ['referralSourceID', TYPES.Int, patientData.ReferralSourceID ? parseInt(patientData.ReferralSourceID) : null],
         ['patientTypeID', TYPES.Int, patientData.PatientTypeID ? parseInt(patientData.PatientTypeID) : null],
         ['notes', TYPES.NVarChar, patientData.Notes || null],
-        ['alerts', TYPES.NVarChar, patientData.Alerts || null],
         ['language', TYPES.TinyInt, patientData.Language ? parseInt(patientData.Language) : 0],
         ['countryCode', TYPES.NVarChar, patientData.CountryCode || null],
         ['estimatedCost', TYPES.Int, patientData.EstimatedCost ? parseInt(patientData.EstimatedCost) : null],
@@ -461,6 +472,7 @@ export async function updatePatient(personId, patientData) {
 
     await executeQuery(query, parameters);
     return { success: true };
+
 }
 
 /**
@@ -499,5 +511,54 @@ export async function deletePatient(personId) {
     } catch (error) {
         console.error('Error in deletePatient cascade:', error);
         throw new Error(`Failed to delete patient and related records: ${error.message}`);
+    }
+}
+
+/**
+ * Retrieves patient data for no-work receipt from V_rptNoWork view
+ * @param {number} patientId - The patient ID
+ * @returns {Promise<Object|null>} - Patient data with next appointment or null if not found
+ */
+export async function getPatientNoWorkReceiptData(patientId) {
+    try {
+        const result = await executeQuery(
+            `SELECT PersonID, PatientName, Phone, AppDate
+             FROM dbo.V_rptNoWork
+             WHERE PersonID = @patientId`,
+            [['patientId', TYPES.Int, patientId]],
+            (columns) => ({
+                PersonID: columns[0].value,
+                PatientName: columns[1].value,
+                Phone: columns[2].value,
+                AppDate: columns[3].value
+            })
+        );
+
+        return result && result.length > 0 ? result[0] : null;
+    } catch (error) {
+        console.error(`[PATIENT-QUERIES] Error getting no-work receipt data for patient ${patientId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Checks if a patient has a future appointment scheduled
+ * @param {number} patientId - The patient ID
+ * @returns {Promise<boolean>} - True if patient has future appointment, false otherwise
+ */
+export async function hasNextAppointment(patientId) {
+    try {
+        const result = await executeQuery(
+            `SELECT COUNT(*) as count
+             FROM dbo.V_rptNoWork
+             WHERE PersonID = @patientId AND AppDate IS NOT NULL`,
+            [['patientId', TYPES.Int, patientId]],
+            (columns) => ({ count: columns[0].value })
+        );
+
+        return result && result.length > 0 && result[0].count > 0;
+    } catch (error) {
+        console.error(`[PATIENT-QUERIES] Error checking appointment for patient ${patientId}:`, error);
+        throw error;
     }
 }

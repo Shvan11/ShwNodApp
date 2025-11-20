@@ -13,6 +13,7 @@ export default function WhatsAppAuth() {
     clientReady,
     qrCode,
     error,
+    sessionRestorationProgress,
     actions
   } = useWhatsAppAuth();
 
@@ -22,7 +23,7 @@ export default function WhatsAppAuth() {
       case AUTH_STATES.CONNECTING:
       case AUTH_STATES.CHECKING_SESSION:
       case AUTH_STATES.DISCONNECTED:
-        return <StatusDisplay authState={authState} />;
+        return <StatusDisplay authState={authState} sessionRestorationProgress={sessionRestorationProgress} />;
 
       case AUTH_STATES.QR_REQUIRED:
         return <QRCodeDisplay qrCode={qrCode} />;

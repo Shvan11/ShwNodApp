@@ -6,7 +6,7 @@
 import React from 'react';
 import { AUTH_STATES } from '../../hooks/useWhatsAppAuth.js';
 
-export const StatusDisplay = ({ authState }) => {
+export const StatusDisplay = ({ authState, sessionRestorationProgress }) => {
   const getStatusContent = () => {
     switch (authState) {
       case AUTH_STATES.INITIALIZING:
@@ -24,6 +24,18 @@ export const StatusDisplay = ({ authState }) => {
         };
 
       case AUTH_STATES.CHECKING_SESSION:
+        // Show progress if available
+        if (sessionRestorationProgress) {
+          const { elapsed, maxWait } = sessionRestorationProgress;
+          return {
+            icon: '🔍',
+            title: 'Restoring WhatsApp Session...',
+            message: `Attempting to restore existing session... ${elapsed}s / ${maxWait}s`,
+            progress: true,
+            elapsed,
+            maxWait
+          };
+        }
         return {
           icon: '🔍',
           title: 'Checking for Existing Session...',
@@ -54,6 +66,19 @@ export const StatusDisplay = ({ authState }) => {
       <div className="status-text">
         <h2>{content.title}</h2>
         <p>{content.message}</p>
+        {content.progress && (
+          <div className="session-restoration-progress">
+            <div className="progress-bar">
+              <div
+                className="progress-bar-fill"
+                style={{ width: `${(content.elapsed / content.maxWait) * 100}%` }}
+              />
+            </div>
+            <p className="progress-note">
+              If session restoration fails, a QR code will be displayed for re-authentication.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

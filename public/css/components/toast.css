@@ -195,7 +195,7 @@
   transform: translateX(-400px);
 }
 
-[dir="rtl"] @keyframes slideIn {
+@keyframes slideInRTL {
   from {
     opacity: 0;
     transform: translateX(-400px);
@@ -204,6 +204,10 @@
     opacity: 1;
     transform: translateX(0);
   }
+}
+
+[dir="rtl"] .toast {
+  animation: slideInRTL 0.3s ease-out;
 }
 
 @media (max-width: 768px) {

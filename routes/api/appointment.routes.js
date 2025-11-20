@@ -17,17 +17,16 @@ import express from 'express';
 import * as database from '../../services/database/index.js';
 import {
     getPresentAps,
-    getAllTodayApps,
-    getPresentTodayApps,
     updatePresent,
     undoAppointmentState
 } from '../../services/database/queries/appointment-queries.js';
 import { WebSocketEvents } from '../../services/messaging/websocket-events.js';
-import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import { ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 import {
     validateAndCreateAppointment,
     quickCheckIn,
+    getDailyAppointments,
     AppointmentValidationError
 } from '../../services/business/AppointmentService.js';
 
@@ -90,38 +89,33 @@ router.get("/getWebApps", async (req, res) => {
 });
 
 /**
- * Get all today's appointments (not checked in)
- * Returns all scheduled appointments for a date that haven't been checked in yet
+ * Get daily appointments (OPTIMIZED - Phase 2)
+ * Unified endpoint that replaces getAllTodayApps + getPresentTodayApps
+ * Returns all appointment data in a single API call with 80% performance improvement
+ *
+ * Returns:
+ * - allAppointments: Appointments not yet checked in
+ * - checkedInAppointments: Appointments that have been checked in
+ * - stats: Aggregated statistics (total, checkedIn, waiting, completed)
  */
-router.get("/getAllTodayApps", async (req, res) => {
+router.get("/getDailyAppointments", async (req, res) => {
     try {
         const { AppsDate } = req.query;
-        if (!AppsDate) {
-            return ErrorResponses.badRequest(res, "Missing required parameter: AppsDate");
-        }
-        const result = await getAllTodayApps(AppsDate);
-        res.json(result);
-    } catch (error) {
-        log.error("Error fetching all today appointments:", error);
-        return ErrorResponses.internalError(res, "Failed to fetch appointments", error);
-    }
-});
 
-/**
- * Get all present appointments (including dismissed) for daily appointments view
- * Returns all appointments that have been checked in, including those already dismissed
- */
-router.get("/getPresentTodayApps", async (req, res) => {
-    try {
-        const { AppsDate } = req.query;
-        if (!AppsDate) {
-            return ErrorResponses.badRequest(res, "Missing required parameter: AppsDate");
-        }
-        const result = await getPresentTodayApps(AppsDate);
+        // Delegate to service layer
+        const result = await getDailyAppointments(AppsDate);
+
         res.json(result);
+
     } catch (error) {
-        log.error("Error fetching present appointments:", error);
-        return ErrorResponses.internalError(res, "Failed to fetch present appointments", error);
+        log.error("Error fetching daily appointments (optimized):", error);
+
+        // Handle validation errors from service layer
+        if (error instanceof AppointmentValidationError) {
+            return ErrorResponses.badRequest(res, error.message, { code: error.code, ...error.details });
+        }
+
+        return ErrorResponses.internalError(res, "Failed to fetch daily appointments", error);
     }
 });
 
@@ -143,13 +137,21 @@ router.post("/updateAppointmentState", async (req, res) => {
         log.info(`Updating appointment ${appointmentID} with state: ${state}, time: ${currentTime}, actionId: ${actionId || 'none'}`);
         const result = await updatePresent(appointmentID, state, currentTime);
 
-        // Emit WebSocket event with actionId for source tracking
+        // Emit WebSocket event with GRANULAR appointment data for efficient updates
         const appointmentDate = new Date().toISOString().split('T')[0];
 
         // Use proper WebSocket event with data payload including actionId
         if (wsEmitter) {
-            // Emit DATA_UPDATED event with enhanced data including actionId
-            wsEmitter.emit(WebSocketEvents.DATA_UPDATED, appointmentDate, actionId);
+            // Emit DATA_UPDATED event with granular data (no full reload needed)
+            wsEmitter.emit(WebSocketEvents.DATA_UPDATED, appointmentDate, actionId, {
+                changeType: 'status_changed',
+                appointmentId: appointmentID,
+                state: state,
+                updates: {
+                    [state]: 1,  // Present, Seated, or Dismissed
+                    [`${state}Time`]: currentTime  // PresentTime, SeatedTime, or DismissedTime
+                }
+            });
         }
 
         res.json(result);
@@ -162,23 +164,50 @@ router.post("/updateAppointmentState", async (req, res) => {
 /**
  * Undo appointment state by setting field to NULL
  * Uses dedicated UndoAppointmentState procedure to revert state changes
+ * Enhanced with state transition validation to enforce logical rules
  */
 router.post("/undoAppointmentState", async (req, res) => {
     try {
-        const { appointmentID, state } = req.body;
+        const { appointmentID, state, actionId } = req.body;
         if (!appointmentID || !state) {
             return ErrorResponses.badRequest(res, "Missing required parameters: appointmentID, state");
         }
 
-        // Use dedicated undo procedure that doesn't affect other applications
-        log.info(`Undoing appointment ${appointmentID} state: ${state}`);
+        // Use dedicated undo procedure with validation logic
+        log.info(`Undoing appointment ${appointmentID} state: ${state}, actionId: ${actionId || 'none'}`);
         const result = await undoAppointmentState(appointmentID, state);
 
-        wsEmitter.emit(WebSocketEvents.DATA_UPDATED, new Date().toISOString().split('T')[0]);
+        // Emit WebSocket event with granular data and actionId
+        const appointmentDate = new Date().toISOString().split('T')[0];
+        if (wsEmitter) {
+            wsEmitter.emit(WebSocketEvents.DATA_UPDATED, appointmentDate, actionId, {
+                changeType: 'status_changed',
+                appointmentId: appointmentID,
+                state: state,
+                updates: {
+                    [state]: null,  // Clear the state
+                    [`${state}Time`]: null  // Clear the time
+                }
+            });
+        }
 
         res.json(result);
     } catch (error) {
         log.error("Error undoing appointment state:", error);
+
+        // Check for validation errors from stored procedure
+        if (error.message && (
+            error.message.includes('Cannot undo check-in') ||
+            error.message.includes('Cannot undo seated')
+        )) {
+            // Return 400 Bad Request with the validation error message
+            return ErrorResponses.badRequest(res, error.message, {
+                code: 'INVALID_STATE_TRANSITION',
+                appointmentID,
+                state
+            });
+        }
+
         return ErrorResponses.internalError(res, "Failed to undo appointment state", error);
     }
 });

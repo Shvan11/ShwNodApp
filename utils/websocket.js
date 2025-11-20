@@ -823,27 +823,50 @@ function setupWebSocketServer(server) {
  * @param {ConnectionManager} connectionManager - Connection manager
  */
 function setupGlobalEventHandlers(emitter, connectionManager) {
-  // Handle appointment updates with action ID tracking
-  const handleAppointmentUpdate = async (dateParam, actionId = null) => {
-    logger.websocket.info('Received appointment update event', { date: dateParam, actionId });
+  // Handle appointment updates with action ID tracking and GRANULAR data support
+  const handleAppointmentUpdate = async (dateParam, actionId = null, granularData = null) => {
+    logger.websocket.info('Received appointment update event', { date: dateParam, actionId, hasGranularData: !!granularData });
 
     try {
-      const appointmentData = await getPresentAps(dateParam);
-      logger.websocket.debug('Fetched appointment data', {
-        date: dateParam,
-        appointmentCount: appointmentData.appointments ? appointmentData.appointments.length : 0,
-        actionId
-      });
+      // Create message with BOTH granular data (for efficient updates) and full data (for legacy screens)
+      let message;
 
-      // Include actionId in the message for event source detection
-      const message = createStandardMessage(
-        WebSocketEvents.APPOINTMENTS_UPDATED,
-        {
-          tableData: appointmentData,
+      if (granularData) {
+        // OPTIMIZED PATH: Send granular data for efficient updates (no database query needed!)
+        logger.websocket.debug('Using granular data for efficient update', granularData);
+
+        message = createStandardMessage(
+          WebSocketEvents.APPOINTMENTS_UPDATED,
+          {
+            date: dateParam,
+            actionId: actionId || null,
+            // Granular update data (for modern clients)
+            changeType: granularData.changeType,
+            appointmentId: granularData.appointmentId,
+            state: granularData.state,
+            updates: granularData.updates,
+            // Legacy support: also fetch full data for older screens
+            tableData: await getPresentAps(dateParam)  // Still needed for legacy screens
+          }
+        );
+      } else {
+        // LEGACY PATH: Fetch full appointment data (used by older endpoints)
+        const appointmentData = await getPresentAps(dateParam);
+        logger.websocket.debug('Fetched full appointment data (legacy mode)', {
           date: dateParam,
-          actionId: actionId || null  // Include actionId for tracking
-        }
-      );
+          appointmentCount: appointmentData.appointments ? appointmentData.appointments.length : 0,
+          actionId
+        });
+
+        message = createStandardMessage(
+          WebSocketEvents.APPOINTMENTS_UPDATED,
+          {
+            tableData: appointmentData,
+            date: dateParam,
+            actionId: actionId || null
+          }
+        );
+      }
 
       // Broadcast to screens and daily appointments clients specifically
       const screenUpdates = connectionManager.broadcastToScreens(message);
@@ -851,7 +874,8 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
       logger.websocket.info('Broadcast appointment updates', {
         screenUpdates,
         dailyAppointmentsUpdates,
-        actionId
+        actionId,
+        granular: !!granularData
       });
     } catch (error) {
       logger.websocket.error('Error fetching appointment data', error, { date: dateParam });

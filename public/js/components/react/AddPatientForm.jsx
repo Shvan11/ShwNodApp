@@ -6,7 +6,7 @@
  * - Mobile: Accordion/stacked layout for easy mobile access
  */
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react';
 
 const AddPatientForm = ({ onSuccess, onCancel }) => {
     const [formData, setFormData] = useState({
@@ -17,7 +17,7 @@ const AddPatientForm = ({ onSuccess, onCancel }) => {
         phone: '',
         phone2: '',
         email: '',
-        countryCode: '',
+        countryCode: '964',
         dateOfBirth: '',
         gender: '',
         addressID: '',
@@ -86,12 +86,31 @@ const AddPatientForm = ({ onSuccess, onCancel }) => {
         }
     }, [formData.firstName, formData.lastName]);
 
+    const formatPhoneNumber = (value) => {
+        if (!value) return value;
+        const phoneNumber = value.replace(/[^\d]/g, '');
+        const phoneNumberLength = phoneNumber.length;
+        if (phoneNumberLength < 4) return phoneNumber;
+        if (phoneNumberLength < 7) {
+            return `${phoneNumber.slice(0, 3)} ${phoneNumber.slice(3)}`;
+        }
+        return `${phoneNumber.slice(0, 3)} ${phoneNumber.slice(3, 6)} ${phoneNumber.slice(6, 10)}`;
+    };
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+        if (name === 'phone') {
+            const formattedPhoneNumber = formatPhoneNumber(value);
+            setFormData(prev => ({
+                ...prev,
+                [name]: formattedPhoneNumber
+            }));
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                [name]: value
+            }));
+        }
     };
 
     const showAlert = (message, type = 'danger', personId = null) => {
@@ -226,27 +245,19 @@ const AddPatientForm = ({ onSuccess, onCancel }) => {
             <div className="form-row">
                 <div className="form-group">
                     <label className="form-label">
-                        <i className="fas fa-id-card"></i>
-                        Patient ID
+                        <i className="fas fa-globe"></i>
+                        Country Code
                     </label>
                     <input
                         type="text"
-                        name="patientID"
-                        value={formData.patientID}
+                        name="countryCode"
+                        value={formData.countryCode}
                         onChange={handleInputChange}
                         className="form-control"
-                        placeholder="Auto-generated if empty"
-                        maxLength="6"
+                        placeholder="e.g., +1, +44"
+                        maxLength="5"
                     />
                 </div>
-            </div>
-        </div>
-    );
-
-    // Render Contact Information Fields
-    const renderContactInfo = () => (
-        <div className="tab-content-section">
-            <div className="form-row">
                 <div className="form-group">
                     <label className="form-label">
                         <i className="fas fa-phone"></i>
@@ -258,9 +269,18 @@ const AddPatientForm = ({ onSuccess, onCancel }) => {
                         value={formData.phone}
                         onChange={handleInputChange}
                         className="form-control"
-                        placeholder="Primary phone number"
+                        placeholder="### ### ####"
+                        maxLength="12"
                     />
                 </div>
+            </div>
+        </div>
+    );
+
+    // Render Contact Information Fields
+    const renderContactInfo = () => (
+        <div className="tab-content-section">
+            <div className="form-row">
                 <div className="form-group">
                     <label className="form-label">
                         <i className="fas fa-phone-alt"></i>
@@ -275,9 +295,6 @@ const AddPatientForm = ({ onSuccess, onCancel }) => {
                         placeholder="Secondary phone number"
                     />
                 </div>
-            </div>
-
-            <div className="form-row">
                 <div className="form-group">
                     <label className="form-label">
                         <i className="fas fa-envelope"></i>
@@ -292,19 +309,22 @@ const AddPatientForm = ({ onSuccess, onCancel }) => {
                         placeholder="patient@example.com"
                     />
                 </div>
+            </div>
+
+            <div className="form-row">
                 <div className="form-group">
                     <label className="form-label">
-                        <i className="fas fa-globe"></i>
-                        Country Code
+                        <i className="fas fa-id-card"></i>
+                        Patient ID
                     </label>
                     <input
                         type="text"
-                        name="countryCode"
-                        value={formData.countryCode}
+                        name="patientID"
+                        value={formData.patientID}
                         onChange={handleInputChange}
                         className="form-control"
-                        placeholder="e.g., +1, +44"
-                        maxLength="5"
+                        placeholder="Auto-generated if empty"
+                        maxLength="6"
                     />
                 </div>
             </div>

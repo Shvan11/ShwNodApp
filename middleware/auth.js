@@ -11,8 +11,8 @@ import { log } from '../utils/logger.js';
  * Redirects to login page if not authenticated
  */
 export function authenticate(req, res, next) {
-  // Skip authentication for auth routes
-  if (req.path.startsWith('/api/auth')) {
+  // Skip authentication for public routes
+  if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/settings/cost-presets')) {
     return next();
   }
 

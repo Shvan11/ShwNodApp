@@ -37,6 +37,7 @@ export const useWhatsAppAuth = () => {
   const [authState, setAuthState] = useState(AUTH_STATES.INITIALIZING);
   const [error, setError] = useState(null);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const [sessionRestorationProgress, setSessionRestorationProgress] = useState(null);
 
   const wsRef = useRef(null);
   const qrRefreshTimerRef = useRef(null);
@@ -84,6 +85,17 @@ export const useWhatsAppAuth = () => {
 
   // NOTE: handleQRUpdate and handleClientReady removed - now managed by GlobalStateContext
   // QR code and client ready state are automatically synced from GlobalStateContext
+
+  // Handle session restoration progress
+  const handleSessionRestorationProgress = useCallback((data) => {
+    console.log('Session restoration progress:', data);
+    setSessionRestorationProgress(data);
+
+    // Update auth state to show we're checking session
+    if (authState !== AUTH_STATES.CHECKING_SESSION) {
+      setAuthState(AUTH_STATES.CHECKING_SESSION);
+    }
+  }, [authState]);
 
   // Handle initial state - now only manages authState, not qrCode/clientReady
   const handleInitialState = useCallback((data) => {
@@ -177,6 +189,7 @@ export const useWhatsAppAuth = () => {
       websocketService.on('disconnected', handleDisconnected);
       websocketService.on('error', handleError);
       websocketService.on('whatsapp_initial_state_response', handleInitialState);
+      websocketService.on('whatsapp_session_restoring', handleSessionRestorationProgress);
 
       // Set initial state based on current connection
       if (websocketService.isConnected) {
@@ -192,13 +205,14 @@ export const useWhatsAppAuth = () => {
         websocketService.off('disconnected', handleDisconnected);
         websocketService.off('error', handleError);
         websocketService.off('whatsapp_initial_state_response', handleInitialState);
+        websocketService.off('whatsapp_session_restoring', handleSessionRestorationProgress);
       };
     } catch (error) {
       console.error('Failed to setup WebSocket listeners:', error);
       setAuthState(AUTH_STATES.ERROR);
       setError('Failed to setup WebSocket');
     }
-  }, [requestInitialState, handleInitialState]);
+  }, [requestInitialState, handleInitialState, handleSessionRestorationProgress]);
 
   // Start QR refresh timer
   const startQRRefreshTimer = useCallback(() => {
@@ -352,9 +366,15 @@ export const useWhatsAppAuth = () => {
     if (clientReady && authState !== AUTH_STATES.AUTHENTICATED) {
       console.log('Global clientReady changed to true, setting AUTHENTICATED');
       setAuthState(AUTH_STATES.AUTHENTICATED);
+      setSessionRestorationProgress(null); // Clear progress
     } else if (!clientReady && qrCode && authState === AUTH_STATES.AUTHENTICATED) {
       console.log('Global clientReady changed to false with QR, setting QR_REQUIRED');
       setAuthState(AUTH_STATES.QR_REQUIRED);
+      setSessionRestorationProgress(null); // Clear progress
+    } else if (qrCode && authState === AUTH_STATES.CHECKING_SESSION) {
+      console.log('QR code received while checking session, showing QR');
+      setAuthState(AUTH_STATES.QR_REQUIRED);
+      setSessionRestorationProgress(null); // Clear progress
     }
   }, [clientReady, qrCode, authState]);
 
@@ -410,6 +430,7 @@ export const useWhatsAppAuth = () => {
     qrCode,
     error,
     connectionAttempts,
+    sessionRestorationProgress,
     actions: {
       handleRetry,
       handleRefreshQR,

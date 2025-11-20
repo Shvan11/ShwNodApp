@@ -15,6 +15,8 @@ import syncWebhookRoutes from './routes/sync-webhook.js';
 import emailApiRoutes from './routes/email-api.js';
 import authRoutes from './routes/auth.js';
 import userManagementRoutes from './routes/user-management.js';
+import costPresetRoutes from './routes/api/cost-preset.routes.js';
+import lookupRoutes from './routes/api/lookup.routes.js';
 import whatsappService from './services/messaging/whatsapp.js';
 import session from 'express-session';
 import SQLiteStore from 'connect-sqlite3';
@@ -128,6 +130,8 @@ async function initializeApplication() {
     // ===== AUTHENTICATION MIDDLEWARE (MUST BE BEFORE ROUTES) =====
     // Public routes - NO authentication required
     app.use('/api/auth', authRoutes);
+    app.use('/api', costPresetRoutes); // Cost preset routes (public - no auth needed)
+    app.use('/api', lookupRoutes); // Lookup routes (public - no auth needed)
 
     // Serve login page BEFORE auth check (public access)
     app.get('/login.html', (req, res) => {

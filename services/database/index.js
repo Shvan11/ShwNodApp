@@ -419,6 +419,84 @@ async function healthCheck() {
 }
 
 /**
+ * Execute a stored procedure that returns multiple result sets
+ * Useful for procedures that return more than one SELECT statement
+ * @param {string} procedureName - The name of the stored procedure
+ * @param {Array} params - An array of parameter arrays [name, type, value]
+ * @returns {Promise<Array>} - Array of result sets (each result set is an array of rows)
+ */
+function executeMultipleResultSets(procedureName, params = []) {
+  return ConnectionPool.withConnection(async (connection) => {
+    return new Promise((resolve, reject) => {
+      const request = new Request(procedureName, (err) => {
+        if (err) {
+          console.error('Stored procedure execution error:', {
+            error: err.message,
+            procedure: procedureName,
+            code: err.code
+          });
+          reject(err);
+          return;
+        }
+      });
+
+      // Add parameters with validation
+      try {
+        params.forEach((param, index) => {
+          if (!Array.isArray(param) || param.length < 3) {
+            throw new Error(`Invalid parameter at index ${index}: expected [name, type, value]`);
+          }
+          const [name, type, value] = param;
+          const options = value === null ? { nullable: true } : undefined;
+          request.addParameter(name, type, value, options);
+        });
+      } catch (paramError) {
+        reject(paramError);
+        return;
+      }
+
+      const resultSets = [];
+      let currentSet = [];
+
+      // Handle row data
+      request.on('row', (columns) => {
+        const row = {};
+        columns.forEach(col => {
+          row[col.metadata.colName] = col.value;
+        });
+        currentSet.push(row);
+      });
+
+      // Handle result set completion (doneInProc fires after each SELECT)
+      request.on('doneInProc', (rowCount, more) => {
+        // Always push current set to maintain result set order
+        resultSets.push([...currentSet]);
+        currentSet = [];
+      });
+
+      // Handle final completion
+      request.on('requestCompleted', () => {
+        console.log(`Stored procedure '${procedureName}' completed: ${resultSets.length} result sets returned`);
+        resolve(resultSets);
+      });
+
+      // Handle errors
+      request.on('error', (error) => {
+        console.error('Request error:', {
+          error: error.message,
+          procedure: procedureName,
+          code: error.code
+        });
+        reject(error);
+      });
+
+      // Execute the stored procedure
+      connection.callProcedure(request);
+    });
+  });
+}
+
+/**
  * Graceful shutdown of database service
  * @returns {Promise<void>}
  */
@@ -434,9 +512,10 @@ async function shutdown() {
 }
 
 // Export all functions and types
-export { 
-  executeQuery, 
-  executeStoredProcedure, 
+export {
+  executeQuery,
+  executeStoredProcedure,
+  executeMultipleResultSets,
   withConnection,
   executeRawQuery,
   testConnection,
@@ -444,5 +523,5 @@ export {
   getDatabaseStats,
   healthCheck,
   shutdown,
-  TYPES 
+  TYPES
 };

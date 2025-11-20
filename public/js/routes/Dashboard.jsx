@@ -84,24 +84,6 @@ export default function Dashboard() {
     }
   ];
 
-  const quickActions = [
-    {
-      title: 'Connect WhatsApp',
-      icon: 'fab fa-whatsapp',
-      link: '/auth'
-    },
-    {
-      title: 'View Patients',
-      icon: 'fas fa-th',
-      link: '/patient-management'
-    },
-    {
-      title: 'Add New Patient',
-      icon: 'fas fa-user-plus',
-      link: '/patient/new/add'
-    }
-  ];
-
   return (
     <div id="app">
       <main className="main-content">
@@ -127,27 +109,6 @@ export default function Dashboard() {
                 </div>
               </a>
             ))}
-
-            {/* Quick Actions Card */}
-            <div className="dashboard-card quick-actions">
-              <div className="card-icon">
-                <i className="fas fa-bolt"></i>
-              </div>
-              <h3>Quick Actions</h3>
-              <div className="quick-actions-list">
-                {quickActions.map((action, index) => (
-                  <a
-                    key={index}
-                    href={action.link}
-                    className="quick-action"
-                    onClick={(e) => handleCardClick(e, action.link)}
-                  >
-                    <i className={action.icon}></i>
-                    <span>{action.title}</span>
-                  </a>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       </main>

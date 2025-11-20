@@ -1,38 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
-import { readFileSync } from 'fs'
-import { transformSync } from 'esbuild'
-
-// Custom plugin to handle template-designer specifically
-function templateDesignerPlugin() {
-  return {
-    name: 'template-designer-handler',
-    enforce: 'pre',
-
-    async load(id) {
-      // Only process the specific template-designer file
-      if (id.endsWith('template-designer.mjs') || id.endsWith('pages/template-designer.js')) {
-        const code = readFileSync(id, 'utf-8')
-
-        // Pre-transform to prevent JSX detection
-        const result = transformSync(code, {
-          loader: 'js',
-          format: 'esm',
-          target: 'es2020',
-          jsx: 'preserve', // Don't transform JSX-like syntax
-        })
-
-        return {
-          code: result.code,
-          map: null
-        }
-      }
-      // Return null to let other plugins handle other files normally
-      return null
-    }
-  }
-}
 
 export default defineConfig(({ mode }) => {
   // Load env file based on mode (development, production, etc.)
@@ -45,10 +13,18 @@ export default defineConfig(({ mode }) => {
     'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL),
   },
   plugins: [
-    templateDesignerPlugin(), // Handle template-designer specifically
     react({
       // Include all typical React file extensions
       include: /\.(jsx|tsx|js|ts)$/,
+      babel: {
+        plugins: [
+          ['babel-plugin-react-compiler', {
+            // React Compiler configuration
+            // Enables automatic memoization for all React components and hooks
+            runtimeModule: 'react/compiler-runtime'
+          }]
+        ]
+      }
     })
   ],
   root: 'public',
@@ -63,11 +39,37 @@ export default defineConfig(({ mode }) => {
       },
       output: {
         // Optimal code splitting strategy for production
-        manualChunks: {
-          // Vendor chunk: React and core libraries (cached separately)
-          'vendor-react': ['react', 'react-dom', 'react-dom/client', 'react-router-dom'],
-          // Utils chunk: Utility libraries
-          'vendor-utils': ['date-fns', 'axios']
+        manualChunks(id) {
+          // React and core libraries (cached separately)
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+              return 'vendor-react';
+            }
+
+            // GrapesJS - DO NOT bundle, let it stay as dynamic import chunk
+            // This allows it to be loaded only when TemplateDesigner component mounts
+            if (id.includes('grapesjs')) {
+              return; // Return undefined to let Rollup handle it as dynamic chunk
+            }
+
+            // Chart libraries (used in Statistics route)
+            if (id.includes('chart.js') || id.includes('recharts')) {
+              return 'vendor-charts';
+            }
+
+            // Date/time utilities
+            if (id.includes('date-fns')) {
+              return 'vendor-utils';
+            }
+
+            // HTTP clients
+            if (id.includes('axios')) {
+              return 'vendor-utils';
+            }
+
+            // All other node_modules
+            return 'vendor-other';
+          }
         }
       }
     }

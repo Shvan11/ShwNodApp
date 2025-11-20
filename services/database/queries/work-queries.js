@@ -231,49 +231,52 @@ export const addWork = async (workData) => {
 };
 
 export const updateWork = async (workId, workData) => {
+    // Build dynamic UPDATE query - only update fields that are provided
+    const fieldMappings = {
+        TotalRequired: { param: 'TotalRequired', type: TYPES.Int, value: workData.TotalRequired || null },
+        Currency: { param: 'Currency', type: TYPES.NVarChar, value: workData.Currency || null },
+        Typeofwork: { param: 'Typeofwork', type: TYPES.Int, value: workData.Typeofwork || null },
+        Notes: { param: 'Notes', type: TYPES.NVarChar, value: workData.Notes || null },
+        Finished: { param: 'Finished', type: TYPES.Bit, value: workData.Finished || 0 },
+        StartDate: { param: 'StartDate', type: TYPES.Date, value: workData.StartDate || null },
+        DebondDate: { param: 'DebondDate', type: TYPES.Date, value: workData.DebondDate || null },
+        FPhotoDate: { param: 'FPhotoDate', type: TYPES.Date, value: workData.FPhotoDate || null },
+        IPhotoDate: { param: 'IPhotoDate', type: TYPES.Date, value: workData.IPhotoDate || null },
+        EstimatedDuration: { param: 'EstimatedDuration', type: TYPES.TinyInt, value: workData.EstimatedDuration || null },
+        DrID: { param: 'DrID', type: TYPES.Int, value: workData.DrID },
+        NotesDate: { param: 'NotesDate', type: TYPES.Date, value: workData.NotesDate || null },
+        KeyWordID1: { param: 'KeyWordID1', type: TYPES.Int, value: workData.KeyWordID1 || null },
+        KeyWordID2: { param: 'KeyWordID2', type: TYPES.Int, value: workData.KeyWordID2 || null },
+        KeywordID3: { param: 'KeywordID3', type: TYPES.Int, value: workData.KeywordID3 || null },
+        KeywordID4: { param: 'KeywordID4', type: TYPES.Int, value: workData.KeywordID4 || null },
+        KeywordID5: { param: 'KeywordID5', type: TYPES.Int, value: workData.KeywordID5 || null }
+    };
+
+    // Only include fields that are present in workData
+    const setClause = [];
+    const parameters = [['WorkID', TYPES.Int, workId]];
+
+    Object.keys(fieldMappings).forEach(field => {
+        if (workData.hasOwnProperty(field)) {
+            const mapping = fieldMappings[field];
+            setClause.push(`${field} = @${mapping.param}`);
+            parameters.push([mapping.param, mapping.type, mapping.value]);
+        }
+    });
+
+    // If no fields to update, return early
+    if (setClause.length === 0) {
+        return { success: true, rowCount: 0 };
+    }
+
+    const query = `UPDATE tblwork SET ${setClause.join(', ')} WHERE workid = @WorkID`;
+
     return executeQuery(
-        `UPDATE tblwork SET
-            TotalRequired = @TotalRequired,
-            Currency = @Currency,
-            Typeofwork = @Typeofwork,
-            Notes = @Notes,
-            Finished = @Finished,
-            StartDate = @StartDate,
-            DebondDate = @DebondDate,
-            FPhotoDate = @FPhotoDate,
-            IPhotoDate = @IPhotoDate,
-            EstimatedDuration = @EstimatedDuration,
-            DrID = @DrID,
-            NotesDate = @NotesDate,
-            KeyWordID1 = @KeyWordID1,
-            KeyWordID2 = @KeyWordID2,
-            KeywordID3 = @KeywordID3,
-            KeywordID4 = @KeywordID4,
-            KeywordID5 = @KeywordID5
-        WHERE workid = @WorkID`,
-        [
-            ['WorkID', TYPES.Int, workId],
-            ['TotalRequired', TYPES.Int, workData.TotalRequired || null],
-            ['Currency', TYPES.NVarChar, workData.Currency || null],
-            ['Typeofwork', TYPES.Int, workData.Typeofwork || null],
-            ['Notes', TYPES.NVarChar, workData.Notes || null],
-            ['Finished', TYPES.Bit, workData.Finished || 0],
-            ['StartDate', TYPES.Date, workData.StartDate || null],
-            ['DebondDate', TYPES.Date, workData.DebondDate || null],
-            ['FPhotoDate', TYPES.Date, workData.FPhotoDate || null],
-            ['IPhotoDate', TYPES.Date, workData.IPhotoDate || null],
-            ['EstimatedDuration', TYPES.TinyInt, workData.EstimatedDuration || null],
-            ['DrID', TYPES.Int, workData.DrID],
-            ['NotesDate', TYPES.Date, workData.NotesDate || null],
-            ['KeyWordID1', TYPES.Int, workData.KeyWordID1 || null],
-            ['KeyWordID2', TYPES.Int, workData.KeyWordID2 || null],
-            ['KeywordID3', TYPES.Int, workData.KeywordID3 || null],
-            ['KeywordID4', TYPES.Int, workData.KeywordID4 || null],
-            ['KeywordID5', TYPES.Int, workData.KeywordID5 || null]
-        ],
+        query,
+        parameters,
         null,
-        (results) => ({ 
-            success: true, 
+        (results) => ({
+            success: true,
             rowCount: results.length || 0
         })
     );

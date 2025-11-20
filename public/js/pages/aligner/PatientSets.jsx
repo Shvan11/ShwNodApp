@@ -1078,8 +1078,19 @@ const PatientSets = () => {
 
             {/* Upload Progress Overlay */}
             {uploadingPdf && (
-                <!-- UPLOAD_OVERLAY_START -->
-                    <!-- UPLOAD_OVERLAY_START -->
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 9999
+                }}>
+                    <div style={{
                         background: 'white',
                         padding: '2rem 3rem',
                         borderRadius: '12px',
@@ -1089,7 +1100,7 @@ const PatientSets = () => {
                         alignItems: 'center',
                         gap: '1.5rem'
                     }}>
-                        <!-- UPLOAD_OVERLAY_START -->
+                        <div style={{
                             width: '60px',
                             height: '60px',
                             border: '4px solid #e5e7eb',
@@ -1097,14 +1108,14 @@ const PatientSets = () => {
                             borderRadius: '50%',
                             animation: 'spin 1s linear infinite'
                         }}></div>
-                        <!-- UPLOAD_OVERLAY_START -->
+                        <div style={{
                             fontSize: '1.25rem',
                             fontWeight: '600',
                             color: '#1f2937'
                         }}>
                             Uploading PDF...
                         </div>
-                        <!-- UPLOAD_OVERLAY_START -->
+                        <div style={{
                             fontSize: '0.875rem',
                             color: '#6b7280'
                         }}>
@@ -1143,7 +1154,7 @@ const PatientSets = () => {
                     <div className="fs-access-container">
                         {/* File System Access Status */}
                         {'showDirectoryPicker' in window && (
-                            <!-- UPLOAD_OVERLAY_START -->
+                            <div style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '0.5rem',
@@ -1388,35 +1399,32 @@ const PatientSets = () => {
                                             {editingUrlForSet === set.AlignerSetID ? (
                                                 <div className="flex-gap-sm">
                                                     <button
-                                                        className="action-icon-btn edit"
+                                                        className="action-icon-btn edit btn-small"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleSaveUrl(set.AlignerSetID);
                                                         }}
                                                         disabled={savingUrl}
                                                         title="Save URL"
-                                                        className="btn-small"
                                                     >
                                                         {savingUrl ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
                                                     </button>
                                                     <button
-                                                        className="action-icon-btn delete"
+                                                        className="action-icon-btn delete btn-small"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleCancelEditUrl();
                                                         }}
                                                         title="Cancel"
-                                                        className="btn-small"
                                                     >
                                                         <i className="fas fa-times"></i>
                                                     </button>
                                                 </div>
                                             ) : (
                                                 <button
-                                                    className="action-icon-btn edit"
+                                                    className="action-icon-btn edit btn-medium"
                                                     onClick={(e) => handleStartEditUrl(set, e)}
                                                     title={set.SetUrl ? "Edit URL" : "Add URL"}
-                                                    className="btn-medium"
                                                 >
                                                     <i className={set.SetUrl ? "fas fa-edit" : "fas fa-plus"}></i>
                                                 </button>
@@ -1448,35 +1456,32 @@ const PatientSets = () => {
                                             {editingPdfUrlForSet === set.AlignerSetID ? (
                                                 <div className="flex-gap-sm">
                                                     <button
-                                                        className="action-icon-btn edit"
+                                                        className="action-icon-btn edit btn-small"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleSavePdfUrl(set.AlignerSetID);
                                                         }}
                                                         disabled={savingPdfUrl}
                                                         title="Save PDF URL"
-                                                        className="btn-small"
                                                     >
                                                         {savingPdfUrl ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
                                                     </button>
                                                     <button
-                                                        className="action-icon-btn delete"
+                                                        className="action-icon-btn delete btn-small"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleCancelEditPdfUrl();
                                                         }}
                                                         title="Cancel"
-                                                        className="btn-small"
                                                     >
                                                         <i className="fas fa-times"></i>
                                                     </button>
                                                 </div>
                                             ) : (
                                                 <button
-                                                    className="action-icon-btn edit"
+                                                    className="action-icon-btn edit btn-medium"
                                                     onClick={(e) => handleStartEditPdfUrl(set, e)}
                                                     title={set.SetPdfUrl ? "Edit PDF URL" : "Add PDF URL"}
-                                                    className="btn-medium"
                                                     disabled={uploadingPdf}
                                                 >
                                                     {uploadingPdf ? (
@@ -1514,35 +1519,32 @@ const PatientSets = () => {
                                             {editingVideoForSet === set.AlignerSetID ? (
                                                 <div className="flex-gap-sm">
                                                     <button
-                                                        className="action-icon-btn edit"
+                                                        className="action-icon-btn edit btn-small"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleSaveVideo(set.AlignerSetID);
                                                         }}
                                                         disabled={savingVideo}
                                                         title="Save Video URL"
-                                                        className="btn-small"
                                                     >
                                                         {savingVideo ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
                                                     </button>
                                                     <button
-                                                        className="action-icon-btn delete"
+                                                        className="action-icon-btn delete btn-small"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleCancelEditVideo();
                                                         }}
                                                         title="Cancel"
-                                                        className="btn-small"
                                                     >
                                                         <i className="fas fa-times"></i>
                                                     </button>
                                                 </div>
                                             ) : (
                                                 <button
-                                                    className="action-icon-btn edit"
+                                                    className="action-icon-btn edit btn-medium"
                                                     onClick={(e) => handleStartEditVideo(set, e)}
                                                     title={set.SetVideo ? "Edit Video URL" : "Add Video URL"}
-                                                    className="btn-medium"
                                                 >
                                                     <i className={set.SetVideo ? "fas fa-edit" : "fas fa-plus"}></i>
                                                 </button>

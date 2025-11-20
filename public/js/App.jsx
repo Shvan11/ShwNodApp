@@ -32,6 +32,7 @@ const DailyAppointments = React.lazy(() => import('./routes/DailyAppointments.js
 const PatientManagement = React.lazy(() => import('./routes/PatientManagement.jsx'));
 const Calendar = React.lazy(() => import('./routes/Calendar.jsx'));
 const Statistics = React.lazy(() => import('./routes/Statistics.jsx'));
+const CompilerTest = React.lazy(() => import('./test-compiler.jsx'));
 
 /**
  * Loading Fallback Component
@@ -116,6 +117,16 @@ export default function App() {
                 element={
                   <RouteErrorBoundary routeName="Patient Management">
                     <PatientManagement />
+                  </RouteErrorBoundary>
+                }
+              />
+
+              {/* React Compiler Test */}
+              <Route
+                path="/test-compiler"
+                element={
+                  <RouteErrorBoundary routeName="Compiler Test">
+                    <CompilerTest />
                   </RouteErrorBoundary>
                 }
               />

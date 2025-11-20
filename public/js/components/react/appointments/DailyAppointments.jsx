@@ -4,7 +4,6 @@ import StatsCards from './StatsCards.jsx';
 import MobileViewToggle from './MobileViewToggle.jsx';
 import AppointmentsList from './AppointmentsList.jsx';
 import Notification from './Notification.jsx';
-import ContextMenu from './ContextMenu.jsx';
 import { useAppointments } from '../../../hooks/useAppointments.js';
 import { useWebSocketSync } from '../../../hooks/useWebSocketSync.js';
 import { actionIdManager } from '../../../utils/action-id.js';
@@ -28,7 +27,6 @@ const DailyAppointments = () => {
     const [selectedDate, setSelectedDate] = useState(getTodayDate());
     const [mobileView, setMobileView] = useState('all');
     const [notification, setNotification] = useState(null);
-    const [contextMenu, setContextMenu] = useState(null);
     const [showFlash, setShowFlash] = useState(false);
 
     // Use custom hooks
@@ -43,22 +41,38 @@ const DailyAppointments = () => {
         markDismissed,
         undoState,
         undoAction,
-        calculateStats
+        applyGranularUpdate,  // NEW: Efficient granular updates
+        getStats
     } = useAppointments();
 
-    // WebSocket integration - Robust action ID based update handling
+    // WebSocket integration - GRANULAR updates with action ID tracking
     const { connectionStatus } = useWebSocketSync(selectedDate, (data) => {
         // Check if this update is from our own action using action ID
         const isOwnAction = data?.actionId && actionIdManager.isOwnAction(data.actionId);
 
         if (isOwnAction) {
             // Our own action - optimistic update already handled it
-            console.log('📡 [DailyAppointments] WebSocket update from own action - skipping reload');
+            console.log('📡 [DailyAppointments] WebSocket update from own action - skipping');
             flashUpdateIndicator();
         } else {
-            // Update from another client - need to reload
-            console.log('📡 [DailyAppointments] WebSocket update from another client - reloading');
-            loadAppointments(selectedDate);
+            // Update from another client - use GRANULAR update if available
+            console.log('📡 [DailyAppointments] WebSocket update from another client');
+
+            // Check if we have granular data (efficient update)
+            if (data?.changeType && data?.appointmentId) {
+                console.log('✨ Using granular update - NO API call needed!', data);
+                applyGranularUpdate({
+                    changeType: data.changeType,
+                    appointmentId: data.appointmentId,
+                    state: data.state,
+                    updates: data.updates
+                });
+            } else {
+                // Fallback to full reload (legacy mode or unknown change type)
+                console.log('⚠️ No granular data, falling back to full reload');
+                loadAppointments(selectedDate);
+            }
+
             flashUpdateIndicator();
         }
     });
@@ -154,7 +168,11 @@ const DailyAppointments = () => {
     // Handle undo state (OPTIMISTIC UPDATE - no reload needed!)
     const handleUndoState = async (appointmentId, stateToUndo) => {
         try {
-            await undoState(appointmentId, stateToUndo);
+            const result = await undoState(appointmentId, stateToUndo);
+            if (result.success && result.actionId) {
+                // Register action ID for tracking
+                actionIdManager.registerAction(result.actionId);
+            }
             // No loadAppointments() needed! Hook updates state optimistically
             showNotification(`${stateToUndo} status cleared`, 'info');
         } catch (err) {
@@ -173,24 +191,8 @@ const DailyAppointments = () => {
         }
     };
 
-    // Handle context menu
-    const handleContextMenu = useCallback((e, appointmentId, status) => {
-        e.preventDefault();
-
-        setContextMenu({
-            position: { x: e.pageX || e.clientX, y: e.pageY || e.clientY },
-            appointmentId,
-            status
-        });
-    }, []);
-
-    // Close context menu
-    const closeContextMenu = () => {
-        setContextMenu(null);
-    };
-
-    // Calculate statistics
-    const stats = calculateStats();
+    // Get statistics (from API or calculated)
+    const stats = getStats();
 
     // Error state
     if (error) {
@@ -248,7 +250,6 @@ const DailyAppointments = () => {
                     onMarkSeated={handleMarkSeated}
                     onMarkDismissed={handleMarkDismissed}
                     onUndoState={handleUndoState}
-                    onContextMenu={handleContextMenu}
                     emptyMessage="No patients checked in yet."
                     className={mobileView === 'checked-in' ? 'active-view' : ''}
                 />
@@ -267,18 +268,6 @@ const DailyAppointments = () => {
                     onClose={closeNotification}
                     onUndo={notification.undoData ? handleUndoAction : null}
                     undoData={notification.undoData}
-                />
-            )}
-
-            {/* Context menu */}
-            {contextMenu && (
-                <ContextMenu
-                    position={contextMenu.position}
-                    status={contextMenu.status}
-                    onClose={closeContextMenu}
-                    onMarkSeated={() => handleMarkSeated(contextMenu.appointmentId)}
-                    onMarkDismissed={() => handleMarkDismissed(contextMenu.appointmentId)}
-                    onUndoState={(state) => handleUndoState(contextMenu.appointmentId, state)}
                 />
             )}
         </div>

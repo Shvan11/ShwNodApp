@@ -1,8 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * StatsCards Component
  * Displays statistics with animated count-up effect
+ *
+ * Performance: Automatically optimized by React Compiler (React 19).
+ * No manual memoization needed - the compiler handles it automatically.
  */
 const StatsCards = ({ total, checkedIn, waiting, completed }) => {
     const [animatedTotal, setAnimatedTotal] = useState(0);

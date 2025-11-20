@@ -111,12 +111,20 @@
     --color-purple-medium: #6d67c6;
     --whatsapp-green: #25D366;
     --neutral-gray: #6c757d;
+    --neutral-gray-dark: #495057; /* Dark neutral gray */
     --warning-orange: #ff9800;
+    --warning-orange-dark: #e68900; /* Dark warning orange */
     --error-pink: #E91E63;
+    --error-red: #dc3545; /* Primary error red */
+    --error-red-dark: #bd2130; /* Dark error red */
+    --error-red-light: #ff6b6b; /* Light red for alerts/notifications */
     --success-darker: #1e7e34;
     --danger-color: #dc3545; /* Alias for error-color */
     --bg-color: #f4f4f9; /* Alias for background-color */
     --pink-100: #fce7f3;
+    --primary-blue: #3b82f6; /* Primary blue (alias for blue-500) */
+    --primary-blue-dark: #1d4ed8; /* Dark primary blue (alias for blue-700) */
+    --primary-blue-light: #93c5fd; /* Light primary blue (alias for blue-300) */
 
     /* Extended Color Scales - Tailwind-inspired palette */
 
@@ -158,6 +166,8 @@
     --success-600: #16a34a;
     --success-700: #15803d;
     --success-800: #166534;
+    --success-green: #22c55e; /* Primary success green (alias for success-500) */
+    --success-green-dark: #15803d; /* Dark success green (alias for success-700) */
 
     /* Error/Red Scale */
     --error-50: #fef2f2;
@@ -195,6 +205,9 @@
     --surface-elevated: #f8f9fa;
     --surface-hover: #f5f5f5;
     --surface-muted: #e9ecef;
+    --page-bg: #f4f4f9; /* Page background (alias for bg-color) */
+    --card-bg: #ffffff; /* Card background (alias for surface) */
+    --hover-bg: #f5f5f5; /* Hover background (alias for surface-hover) */
 
     /* Extended text colors */
     --text-primary: #212529;
@@ -227,6 +240,16 @@
     --calendar-today-highlight: #fff9e6;
     --calendar-weekend-bg: #f0f3f5;
     --calendar-header-gradient: linear-gradient(to right, #ffffff 0%, #f8f9fa 100%);
+
+    /* Appointment status colors */
+    --status-scheduled-bg: #f3f4f6; /* gray-100 */
+    --status-scheduled-text: #6b7280; /* gray-500 */
+    --status-present-bg: #eff6ff; /* blue-50 */
+    --status-present-text: #1d4ed8; /* blue-700 */
+    --status-seated-bg: #fff7ed; /* warning-50 */
+    --status-seated-text: #c2410c; /* warning-700 */
+    --status-dismissed-bg: #f0fdf4; /* success-50 */
+    --status-dismissed-text: #15803d; /* success-700 */
 
     /* Breakpoints for responsive design */
     --breakpoint-xs: 375px;

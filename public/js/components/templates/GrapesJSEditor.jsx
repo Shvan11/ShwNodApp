@@ -1,16 +1,17 @@
 /**
  * GrapesJS Editor Component
  * React wrapper for GrapesJS visual editor
+ * Uses dynamic import() to load GrapesJS only when needed
  */
 
-import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import grapesjs from 'grapesjs';
-import 'grapesjs/dist/css/grapes.min.css';
+import React, { useEffect, useRef, forwardRef, useImperativeHandle, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
 
 const GrapesJSEditor = forwardRef(({ template }, ref) => {
     const containerRef = useRef(null);
     const editorRef = useRef(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
     const toast = useToast();
 
     useImperativeHandle(ref, () => editorRef.current);
@@ -18,7 +19,8 @@ const GrapesJSEditor = forwardRef(({ template }, ref) => {
     useEffect(() => {
         if (!containerRef.current || editorRef.current) return;
 
-        initializeEditor();
+        // Dynamically import GrapesJS only when component mounts
+        loadGrapesJS();
 
         // Cleanup on unmount
         return () => {
@@ -29,13 +31,35 @@ const GrapesJSEditor = forwardRef(({ template }, ref) => {
         };
     }, []);
 
+    const loadGrapesJS = async () => {
+        try {
+            setIsLoading(true);
+
+            // Dynamic import - GrapesJS is only loaded when this component mounts
+            const [grapesJSModule] = await Promise.all([
+                import('grapesjs'),
+                import('grapesjs/dist/css/grapes.min.css')
+            ]);
+
+            const grapesjs = grapesJSModule.default;
+
+            setIsLoading(false);
+            initializeEditor(grapesjs);
+        } catch (error) {
+            console.error('Failed to load GrapesJS:', error);
+            setLoadError(error.message);
+            setIsLoading(false);
+            toast.error('Failed to load template designer: ' + error.message);
+        }
+    };
+
     useEffect(() => {
         if (editorRef.current && template) {
             loadTemplateContent();
         }
     }, [template]);
 
-    const initializeEditor = () => {
+    const initializeEditor = (grapesjs) => {
         try {
             const editor = grapesjs.init({
                 container: containerRef.current,
@@ -230,6 +254,24 @@ const GrapesJSEditor = forwardRef(({ template }, ref) => {
             attributes: { class: 'fa fa-minus' }
         });
     };
+
+    if (loadError) {
+        return (
+            <div style={{ padding: '40px', textAlign: 'center' }}>
+                <h2 style={{ color: 'var(--error-color)' }}>Failed to Load Editor</h2>
+                <p>{loadError}</p>
+            </div>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <div style={{ padding: '40px', textAlign: 'center' }}>
+                <div className="loading-spinner"></div>
+                <p>Loading template designer...</p>
+            </div>
+        );
+    }
 
     return (
         <div ref={containerRef} id="gjs" className="grapesjs-editor-container" />

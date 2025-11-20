@@ -5,7 +5,7 @@
 
 import express from 'express';
 import * as templateQueries from '../services/database/queries/template-queries.js';
-import { generateReceiptHTML } from '../services/templates/receipt-service.js';
+import { generateReceiptHTML, generateNoWorkReceiptHTML } from '../services/templates/receipt-service.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -361,6 +361,40 @@ router.get('/receipt/work/:workId', async (req, res) => {
         res.status(500).json({
             status: 'error',
             message: 'Failed to generate receipt',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/templates/receipt/no-work/:patientId
+ * Generate appointment confirmation receipt for patients with no works
+ */
+router.get('/receipt/no-work/:patientId', async (req, res) => {
+    try {
+        const { patientId } = req.params;
+        console.log(`[TEMPLATE-API] Generating no-work receipt for patient ${patientId}`);
+
+        const html = await generateNoWorkReceiptHTML(parseInt(patientId));
+
+        // Prevent caching
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+
+        console.log(`[TEMPLATE-API] No-work receipt generated successfully`);
+        res.send(html);
+    } catch (error) {
+        console.error('[TEMPLATE-API] Error generating no-work receipt:', error);
+
+        // Determine appropriate status code based on error message
+        const statusCode = error.message.includes('not found') ? 404
+                         : error.message.includes('no scheduled appointment') ? 400
+                         : 500;
+
+        res.status(statusCode).json({
+            status: 'error',
+            message: 'Failed to generate appointment receipt',
             error: error.message
         });
     }

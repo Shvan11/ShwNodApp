@@ -320,14 +320,6 @@
     letter-spacing: 0.5px;
 }
 
-.data-table tbody tr {
-    transition: background-color 0.2s ease;
-}
-
-.data-table tbody tr:hover {
-    background-color: rgba(52, 152, 219, 0.05);
-}
-
 .data-table tfoot {
     background-color: rgba(52, 152, 219, 0.1);
     font-weight: bold;
@@ -337,10 +329,13 @@
     border-top: 2px solid var(--primary-color, var(--info-color));
 }
 
-.amount-cell {
+.data-table .amount-cell {
     text-align: right;
     font-family: 'Courier New', monospace;
     font-weight: 500;
+    white-space: normal;
+    word-break: break-word;
+    vertical-align: middle;
 }
 
 .amount-cell.negative {
@@ -766,6 +761,10 @@ th.qasa-column {
 
     .data-table thead th:first-child {
         background-color: var(--primary-color, var(--info-color));
+    }
+
+    .data-table tfoot td:first-child {
+        background-color: rgba(52, 152, 219, 0.1); /* Match tfoot background */
     }
 
     .data-table th {

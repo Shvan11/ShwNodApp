@@ -8,6 +8,7 @@ import EmailSettings from './EmailSettings.jsx';
 import EmployeeSettings from './EmployeeSettings.jsx';
 import UserManagement from './UserManagement.jsx';
 import AdminUserManagement from './AdminUserManagement.jsx';
+import CostPresetsSettings from './CostPresetsSettings.jsx';
 
 const SettingsComponent = () => {
     const { tab } = useParams();
@@ -20,6 +21,7 @@ const SettingsComponent = () => {
         alignerDoctors: { hasChanges: false },
         email: { hasChanges: false },
         employees: { hasChanges: false },
+        costPresets: { hasChanges: false },
         messaging: { hasChanges: false },
         system: { hasChanges: false },
         security: { hasChanges: false },
@@ -78,6 +80,13 @@ const SettingsComponent = () => {
             icon: 'fas fa-users',
             component: EmployeeSettings,
             description: 'Manage staff members and email notification settings'
+        },
+        {
+            id: 'costPresets',
+            label: 'Cost Presets',
+            icon: 'fas fa-dollar-sign',
+            component: CostPresetsSettings,
+            description: 'Manage estimated cost preset values'
         },
         {
             id: 'messaging',

@@ -27,6 +27,10 @@ class ClientStateManager {
     this.destroyInProgress = false;
     this.initializationTimeout = null;
 
+    // Session stabilization flag - tracks if session data has been persisted to disk
+    // Based on whatsapp-web.js RemoteAuth best practice (60s delay for session stability)
+    this.sessionStabilized = false;
+
     // Initialization lock to prevent concurrent attempts
     this.initializationLock = false;
     this.lockWaiters = [];
@@ -34,7 +38,9 @@ class ClientStateManager {
     // Constants
     this.MAX_RECONNECT_ATTEMPTS = 10;
     this.RECONNECT_BASE_DELAY = 5000;
-    this.INITIALIZATION_TIMEOUT = 300000; // 5 minutes (longer for QR scanning)
+    this.SESSION_RESTORATION_TIMEOUT = 120000; // 120 seconds (2 minutes) for valid session restoration
+    this.FRESH_AUTH_TIMEOUT = 90000; // 90 seconds for fresh QR authentication
+    this.INITIALIZATION_TIMEOUT = 60000; // 60 seconds - fallback/default
     this.MAX_LOCK_WAIT_TIME = 30000; // 30 seconds
   }
 
@@ -453,11 +459,21 @@ class WhatsAppService extends EventEmitter {
         await this.destroyClient('restart');
       }
 
-      // Check for existing sessions before creating new client
+      // Pre-flight validation: Check session quality before initialization
+      // SESSION PERSISTENCE FIX: Only cleanup if session is truly corrupted, not just empty
       if (!forceRestart && !this.clientState.client) {
-        const hasExistingSession = await this.checkExistingSession();
-        if (hasExistingSession) {
+        const sessionQuality = await this.validateSessionQuality();
+
+        if (sessionQuality === 'valid') {
           logger.whatsapp.info('Found existing session - proceeding with client creation');
+        } else if (sessionQuality === 'corrupted') {
+          // Only cleanup truly corrupted sessions (read errors, permission issues)
+          logger.whatsapp.warn(`Session quality: ${sessionQuality} - cleaning up corrupted session`);
+          await this.cleanupInvalidSession();
+          logger.whatsapp.info('Corrupted session cleaned up - will create fresh client and show QR');
+        } else if (sessionQuality === 'empty') {
+          // Empty session can be from fresh auth - don't cleanup, let Puppeteer write to it
+          logger.whatsapp.info('Session is empty - will create client and let Puppeteer initialize storage');
         } else {
           logger.whatsapp.info('No existing session found - will create new client');
         }
@@ -518,7 +534,7 @@ class WhatsAppService extends EventEmitter {
   }
 
   async createAndInitializeClient() {
-    logger.whatsapp.debug('Creating client instance');
+    logger.whatsapp.info('Creating WhatsApp client');
 
     // Check if aborted
     if (this.clientState.initializationAbortController?.signal.aborted) {
@@ -530,6 +546,8 @@ class WhatsAppService extends EventEmitter {
       puppeteer: {
         headless: true,
         //headless: false,
+        timeout: 30000, // 30 second browser launch timeout
+        protocolTimeout: 30000, // 30 second protocol timeout
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -544,26 +562,59 @@ class WhatsAppService extends EventEmitter {
       }
     });
 
-    // Store client reference
+    // Store client reference and reset session stabilization flag
     this.clientState.client = client;
+    this.clientState.sessionStabilized = false; // Reset for new client - will be set to true after 60s delay
 
     // Set up event handlers before initialization
     await this.setupClientEventHandlers(client);
 
     // Check for existing session to adjust timeout
     const hasSession = await this.checkExistingSession();
-    const timeoutDuration = hasSession ? 
-      this.clientState.INITIALIZATION_TIMEOUT : // Full timeout for session restoration
-      this.clientState.INITIALIZATION_TIMEOUT - 10000; // Shorter timeout for new sessions
+
+    // Use different timeouts based on authentication scenario
+    const timeoutDuration = hasSession ?
+      this.clientState.SESSION_RESTORATION_TIMEOUT : // 120 seconds for session restoration
+      this.clientState.FRESH_AUTH_TIMEOUT;           // 90 seconds for fresh QR auth
+
+    // Start progress tracker OUTSIDE promise to ensure it runs
+    const startTime = Date.now();
+    let resolved = false;
+
+    const progressInterval = setInterval(() => {
+      if (!resolved) {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        logger.whatsapp.debug(`Waiting for authentication... ${elapsed}s elapsed`);
+      }
+    }, 5000);
 
     // Create initialization promise
     const initPromise = new Promise((resolve, reject) => {
-      let resolved = false;
-      
-      const timeout = setTimeout(() => {
+
+      const timeout = setTimeout(async () => {
         if (!resolved) {
           resolved = true;
-          reject(new Error('Client initialization timeout'));
+          clearInterval(progressInterval);
+          const elapsed = Math.floor((Date.now() - startTime) / 1000);
+          logger.whatsapp.error('❌ Initialization timeout - no events fired', {
+            elapsed: elapsed + 's',
+            timeout: Math.floor(timeoutDuration / 1000) + 's',
+            hasSession,
+            clientState: this.clientState.state
+          });
+
+          // If session exists, it's likely corrupted - cleanup and retry
+          if (hasSession) {
+            logger.whatsapp.info('Cleaning up corrupted session files');
+            try {
+              await this.cleanupInvalidSession();
+              logger.whatsapp.info('Session cleanup complete - will retry on next attempt');
+            } catch (cleanupError) {
+              logger.whatsapp.error('Failed to cleanup session', { error: cleanupError.message });
+            }
+          }
+
+          reject(new Error('Client initialization timeout - no events'));
         }
       }, timeoutDuration);
 
@@ -571,6 +622,9 @@ class WhatsAppService extends EventEmitter {
         if (!resolved) {
           resolved = true;
           clearTimeout(timeout);
+          clearInterval(progressInterval);
+          const elapsed = Math.floor((Date.now() - startTime) / 1000);
+          logger.whatsapp.info(`Client authenticated (${elapsed}s)`);
           client.removeListener('qr', onQR);
           client.removeListener('auth_failure', onAuthFailure);
           client.removeListener('disconnected', onDisconnected);
@@ -581,13 +635,14 @@ class WhatsAppService extends EventEmitter {
 
       const onQR = (qr) => {
         // QR received is normal, extend timeout for user to scan
-        logger.whatsapp.debug('QR code received - extending timeout');
+        logger.whatsapp.info('QR code generated - waiting for scan');
         clearTimeout(timeout);
+        clearInterval(progressInterval);
         // Give user more time to scan QR code
         setTimeout(() => {
           if (!resolved) {
             resolved = true;
-            logger.whatsapp.warn('QR scan timeout - keeping client alive for future scans');
+            logger.whatsapp.info('QR scan timeout - client waiting for future scan');
             // IMPORTANT: Do NOT remove the ready listener!
             // The client is still alive and the ready event will fire when user scans QR
             // Remove QR, auth_failure and disconnected listeners to clean up
@@ -597,13 +652,15 @@ class WhatsAppService extends EventEmitter {
             // Don't reject here - let the client stay in QR mode
             resolve(false); // Return false to indicate not ready but not failed
           }
-        }, this.clientState.INITIALIZATION_TIMEOUT);
+        }, this.clientState.FRESH_AUTH_TIMEOUT); // 90 seconds for user to scan QR
       };
 
       const onAuthFailure = (error) => {
         if (!resolved) {
           resolved = true;
           clearTimeout(timeout);
+          clearInterval(progressInterval);
+          logger.whatsapp.error('Authentication failed', { error: error?.toString() });
           client.removeListener('ready', onReady);
           client.removeListener('qr', onQR);
           client.removeListener('disconnected', onDisconnected);
@@ -615,6 +672,9 @@ class WhatsAppService extends EventEmitter {
         if (!resolved) {
           resolved = true;
           clearTimeout(timeout);
+          clearInterval(progressInterval);
+          const elapsed = Math.floor((Date.now() - startTime) / 1000);
+          logger.whatsapp.warn(`❌ onDisconnected event fired (${elapsed}s)`, { reason: reason?.toString() });
           client.removeListener('ready', onReady);
           client.removeListener('qr', onQR);
           client.removeListener('auth_failure', onAuthFailure);
@@ -632,15 +692,25 @@ class WhatsAppService extends EventEmitter {
       if (this.clientState.initializationAbortController?.signal.aborted) {
         resolved = true;
         clearTimeout(timeout);
+        clearInterval(progressInterval);
         reject(new Error('Initialization aborted'));
         return;
       }
 
       // Start initialization
-      client.initialize().catch(error => {
+      const initializeCall = client.initialize();
+
+      initializeCall.then(() => {
+        logger.whatsapp.debug('client.initialize() promise resolved');
+      }).catch(error => {
         if (!resolved) {
           resolved = true;
           clearTimeout(timeout);
+          clearInterval(progressInterval);
+          logger.whatsapp.error('❌ client.initialize() promise rejected', {
+            error: error.message,
+            stack: error.stack
+          });
           reject(error);
         }
       });
@@ -696,23 +766,50 @@ class WhatsAppService extends EventEmitter {
    * Handle QR code generation
    */
   async handleQR(qr) {
-    logger.whatsapp.debug('QR code received');
+    // Check session quality to determine if restoration is possible
+    const sessionQuality = await this.validateSessionQuality();
 
-    // Check if we have existing session files
-    const hasSession = await this.checkExistingSession();
-    if (hasSession) {
-      logger.whatsapp.info('QR received but session files exist - monitoring for session restoration');
+    if (sessionQuality === 'valid') {
+      logger.whatsapp.info('Attempting session restoration...');
+
+      // Emit initial progress to frontend
+      const maxWaitSeconds = Math.floor(this.clientState.SESSION_RESTORATION_TIMEOUT / 1000);
+      if (this.wsEmitter) {
+        const message = createWebSocketMessage(
+          'whatsapp_session_restoring',
+          { elapsed: 0, maxWait: maxWaitSeconds }
+        );
+        this.broadcastToClients(message);
+      }
 
       // Create a promise that resolves when we know the session restoration outcome
       const sessionRestoreOutcome = new Promise((resolve) => {
         let resolved = false;
+        const startTime = Date.now();
+        const MAX_WAIT_MS = this.clientState.SESSION_RESTORATION_TIMEOUT; // 120 seconds
+        const PROGRESS_INTERVAL_MS = 10000; // 10 seconds
+
+        // Send progress updates every 10 seconds (silent logging)
+        const progressInterval = setInterval(() => {
+          if (!resolved) {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+
+            if (this.wsEmitter) {
+              const message = createWebSocketMessage(
+                'whatsapp_session_restoring',
+                { elapsed, maxWait: maxWaitSeconds }
+              );
+              this.broadcastToClients(message);
+            }
+          }
+        }, PROGRESS_INTERVAL_MS);
 
         // Listen for successful session restoration
         const onReady = () => {
           if (!resolved) {
             resolved = true;
             cleanup();
-            logger.whatsapp.info('Session restored successfully - ignoring QR code');
+            logger.whatsapp.info('Session restored successfully');
             resolve('restored');
           }
         };
@@ -722,27 +819,28 @@ class WhatsAppService extends EventEmitter {
           if (!resolved) {
             resolved = true;
             cleanup();
-            logger.whatsapp.warn('Session authentication failed - session is invalid');
+            logger.whatsapp.warn('Session authentication failed - will show QR');
             resolve('failed');
           }
         };
 
-        // Safety timeout (much shorter since we're listening for events)
+        // Maximum wait timeout: 60 seconds
         const timeout = setTimeout(() => {
           if (!resolved) {
             resolved = true;
             cleanup();
-            logger.whatsapp.warn('Session restoration timeout - proceeding with QR');
+            logger.whatsapp.info('Session restoration timeout - showing QR');
             resolve('timeout');
           }
-        }, 5000); // 5 seconds is enough for session validation
+        }, MAX_WAIT_MS);
 
         const cleanup = () => {
+          clearInterval(progressInterval);
+          clearTimeout(timeout);
           if (this.clientState.client) {
             this.clientState.client.removeListener('ready', onReady);
             this.clientState.client.removeListener('auth_failure', onAuthFailure);
           }
-          clearTimeout(timeout);
         };
 
         // Add one-time listeners
@@ -760,13 +858,19 @@ class WhatsAppService extends EventEmitter {
       }
 
       // Session restoration failed or timed out, proceed with QR
-      logger.whatsapp.info(`Session restoration ${outcome} - showing QR code`);
-
-      // Clean up invalid session files to prevent future restoration attempts
-      if (outcome === 'failed') {
-        logger.whatsapp.info('Cleaning up invalid session files');
+      if (outcome === 'failed' || outcome === 'timeout') {
+        logger.whatsapp.info('Cleaning up invalid session');
         await this.cleanupInvalidSession();
       }
+    } else if (sessionQuality === 'empty' || sessionQuality === 'corrupted') {
+      // SESSION PERSISTENCE FIX: Do NOT cleanup here during QR flow!
+      // Empty session is NORMAL during fresh authentication - Puppeteer needs time to write IndexedDB
+      // Cleanup will happen on auth_failure event or on next restart if session remains invalid
+      logger.whatsapp.info('Empty session detected - proceeding with QR authentication');
+      // Fall through to show QR code - DO NOT call cleanupInvalidSession() here!
+    } else {
+      // No session exists - this is normal for fresh authentication
+      logger.whatsapp.info('No existing session - proceeding with QR authentication');
     }
 
     // Client is definitely not ready when QR is received
@@ -805,28 +909,51 @@ class WhatsAppService extends EventEmitter {
 
   /**
    * Handle authenticated event
+   * CRITICAL: Implements 60-second stabilization delay for session persistence
+   * Based on whatsapp-web.js RemoteAuth best practice - session data needs time to flush to disk
    */
   async handleAuthenticated() {
     logger.whatsapp.info('Client authenticated successfully');
+
     // Clear QR code since we're authenticated
     await this.messageState.setQR(null);
+
+    // CRITICAL: Wait 60 seconds for Puppeteer to flush session data to disk
+    // Without this delay, session files (IndexedDB, leveldb) will be empty on quick restarts
+    // See: whatsapp-web.js RemoteAuth implementation - "Initial delay sync required for session to be stable enough to recover"
+    logger.whatsapp.info('Waiting 60s for session to stabilize...');
+
+    const SESSION_STABILIZATION_DELAY = 60000; // 60 seconds
+
+    // Wait for full stabilization period (silent)
+    await new Promise(resolve => setTimeout(resolve, SESSION_STABILIZATION_DELAY));
+
+    // Mark session as stabilized - safe to restart now
+    this.clientState.sessionStabilized = true;
+    logger.whatsapp.info('Session stabilized - safe to restart');
   }
 
   /**
    * Handle ready event
    */
   async handleReady() {
-    logger.whatsapp.info('Client ready - broadcasting to frontend');
+    logger.whatsapp.info('Client ready');
 
     // MEMORY LEAK FIX: Store browser references for cleanup
     if (this.clientState.client) {
       try {
         this.clientState.browser = this.clientState.client.pupBrowser;
         this.clientState.page = this.clientState.client.pupPage;
-        logger.whatsapp.debug('Browser references stored for cleanup');
       } catch (error) {
         logger.whatsapp.warn('Could not store browser references', error);
       }
+    }
+
+    // If ready event fires without authenticated event, session was restored from disk
+    // In this case, session is already stable (no need to wait 60 seconds)
+    if (!this.clientState.sessionStabilized) {
+      logger.whatsapp.info('Session restored from existing files');
+      this.clientState.sessionStabilized = true;
     }
 
     // IMPORTANT: Update client state to CONNECTED when ready event fires
@@ -845,7 +972,6 @@ class WhatsAppService extends EventEmitter {
         }
       );
       this.broadcastToClients(message);
-      logger.whatsapp.debug('Broadcasted client ready state');
     }
   }
 
@@ -1106,6 +1232,13 @@ class WhatsAppService extends EventEmitter {
 
   async destroyClient(reason = 'manual') {
     logger.whatsapp.info(`Destroying WhatsApp client (reason: ${reason})`);
+
+    // CRITICAL: Warn if session has not stabilized yet
+    if (this.clientState.client && !this.clientState.sessionStabilized && reason === 'restart') {
+      logger.whatsapp.warn('⚠️  WARNING: Session has NOT stabilized yet - session data may be incomplete!');
+      logger.whatsapp.warn('⚠️  Restarting before 60-second stabilization delay completes may result in session loss');
+      logger.whatsapp.warn('⚠️  QR code will be required on next startup if session data is incomplete');
+    }
 
     this.clientState.destroyInProgress = true;
 
@@ -1657,11 +1790,129 @@ class WhatsAppService extends EventEmitter {
   }
 
   /**
+   * Validate session quality - detect empty/corrupted sessions
+   * Returns: 'valid', 'empty', 'corrupted', or 'none'
+   */
+  async validateSessionQuality() {
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+
+      const sessionPath = '.wwebjs_auth/session-client/Default';
+
+      // Check 1: Session path exists
+      if (!fs.default.existsSync(sessionPath)) {
+        logger.whatsapp.debug('Session quality: none (path does not exist)');
+        return 'none';
+      }
+
+      // Check 2: IndexedDB directory exists (CRITICAL for WhatsApp authentication)
+      const indexedDBPath = path.default.join(sessionPath, 'IndexedDB');
+      if (!fs.default.existsSync(indexedDBPath)) {
+        logger.whatsapp.warn('Session quality: empty (IndexedDB directory missing)');
+        return 'empty';
+      }
+
+      // Check 3: IndexedDB has actual data files
+      try {
+        const indexedDBFiles = fs.default.readdirSync(indexedDBPath, { recursive: true });
+        const indexedDBDataFiles = indexedDBFiles.filter(f =>
+          typeof f === 'string' && f.endsWith('.ldb')
+        );
+
+        if (indexedDBDataFiles.length === 0) {
+          logger.whatsapp.warn('Session quality: empty (IndexedDB has no data files)');
+          return 'empty';
+        }
+
+        logger.whatsapp.debug(`IndexedDB contains ${indexedDBDataFiles.length} data files`);
+      } catch (error) {
+        logger.whatsapp.warn('Session quality: corrupted (IndexedDB read error)', { error: error.message });
+        return 'corrupted';
+      }
+
+      // Check 4: leveldb log files have actual data (not 0 bytes)
+      const leveldbPath = path.default.join(sessionPath, 'Local Storage/leveldb');
+      if (!fs.default.existsSync(leveldbPath)) {
+        logger.whatsapp.warn('Session quality: empty (leveldb directory missing)');
+        return 'empty';
+      }
+
+      try {
+        const leveldbFiles = fs.default.readdirSync(leveldbPath);
+        const logFiles = leveldbFiles.filter(f => f.endsWith('.log'));
+
+        let hasEmptyLogs = false;
+        let totalLogSize = 0;
+
+        for (const logFile of logFiles) {
+          const logPath = path.default.join(leveldbPath, logFile);
+          const stats = fs.default.statSync(logPath);
+          totalLogSize += stats.size;
+
+          if (stats.size === 0) {
+            logger.whatsapp.warn(`Session quality check: ${logFile} is empty (0 bytes)`);
+            hasEmptyLogs = true;
+          }
+        }
+
+        if (hasEmptyLogs || totalLogSize < 1024) {
+          logger.whatsapp.warn(`Session quality: empty (log files size ${totalLogSize} bytes)`);
+          return 'empty';
+        }
+
+        logger.whatsapp.debug(`leveldb log files: ${totalLogSize} bytes`);
+      } catch (error) {
+        logger.whatsapp.warn('Session quality: corrupted (leveldb read error)', { error: error.message });
+        return 'corrupted';
+      }
+
+      // Check 5: Calculate total session size
+      let totalSize = 0;
+      const calculateDirSize = (dirPath) => {
+        const files = fs.default.readdirSync(dirPath, { withFileTypes: true });
+        for (const file of files) {
+          const filePath = path.default.join(dirPath, file.name);
+          if (file.isDirectory()) {
+            calculateDirSize(filePath);
+          } else {
+            const stats = fs.default.statSync(filePath);
+            totalSize += stats.size;
+          }
+        }
+      };
+
+      calculateDirSize(sessionPath);
+
+      if (totalSize < 10240) { // Less than 10KB
+        logger.whatsapp.warn(`Session quality: empty (total size ${totalSize} bytes < 10KB)`);
+        return 'empty';
+      }
+
+      logger.whatsapp.info(`Session quality: valid (total size ${Math.floor(totalSize / 1024)}KB)`);
+      return 'valid';
+
+    } catch (error) {
+      logger.whatsapp.error('Error validating session quality', { error: error.message });
+      return 'corrupted';
+    }
+  }
+
+  /**
    * SESSION VALIDATION FIX: Comprehensive session validation with integrity checks
    * Returns: boolean (simple) for backward compatibility
-   * Logs detailed validation info
+   * Uses validateSessionQuality() internally for detailed validation
    */
   async checkExistingSession() {
+    const quality = await this.validateSessionQuality();
+    return quality === 'valid';  // Only return true for truly valid sessions
+  }
+
+  /**
+   * LEGACY: Old comprehensive validation (kept for reference)
+   * Now replaced by validateSessionQuality()
+   */
+  async checkExistingSession_LEGACY() {
     try {
       const fs = await import('fs');
       const path = await import('path');

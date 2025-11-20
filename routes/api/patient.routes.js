@@ -14,7 +14,8 @@
 import express from 'express';
 import { log } from '../../utils/logger.js';
 import * as database from '../../services/database/index.js';
-import { getPatientsPhones, createPatient, getPatientById, updatePatient, deletePatient } from '../../services/database/queries/patient-queries.js';
+import { getPatientsPhones, createPatient, getPatientById, updatePatient, deletePatient, hasNextAppointment } from '../../services/database/queries/patient-queries.js';
+import { getAlertsByPersonId, createAlert, setAlertStatus } from '../../services/database/queries/alert-queries.js';
 import * as imaging from '../../services/imaging/index.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { requireRecordAge, getPatientCreationDate } from '../../middleware/time-based-auth.js';
@@ -275,7 +276,7 @@ router.get('/patients/search', async (req, res) => {
             SELECT TOP 100 p.PersonID, p.patientID, p.PatientName, p.FirstName, p.LastName,
                     p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
                     p.AddressID, p.ReferralSourceID, p.PatientTypeID,
-                    p.Notes, p.Alerts, p.Language, p.CountryCode,
+                    p.Notes, p.Language, p.CountryCode,
                     p.EstimatedCost, p.Currency,
                     g.Gender as GenderName, a.Zone as AddressName,
                     r.Referral as ReferralSource, pt.PatientType as PatientTypeName
@@ -306,15 +307,14 @@ router.get('/patients/search', async (req, res) => {
                 ReferralSourceID: columns[11].value,
                 PatientTypeID: columns[12].value,
                 Notes: columns[13].value,
-                Alerts: columns[14].value,
-                Language: columns[15].value,
-                CountryCode: columns[16].value,
-                EstimatedCost: columns[17].value,
-                Currency: columns[18].value,
-                GenderName: columns[19].value,
-                AddressName: columns[20].value,
-                ReferralSource: columns[21].value,
-                PatientTypeName: columns[22].value
+                Language: columns[14].value,
+                CountryCode: columns[15].value,
+                EstimatedCost: columns[16].value,
+                Currency: columns[17].value,
+                GenderName: columns[18].value,
+                AddressName: columns[19].value,
+                ReferralSource: columns[20].value,
+                PatientTypeName: columns[21].value
             })
         );
 
@@ -343,6 +343,10 @@ router.get('/getpatient/:personId', async (req, res) => {
         if (!patient) {
             return ErrorResponses.notFound(res, 'Patient');
         }
+
+        // Fetch and attach alerts
+        const alerts = await getAlertsByPersonId(patient.PersonID);
+        patient.alerts = alerts;
 
         res.json(patient);
     } catch (error) {
@@ -447,5 +451,86 @@ router.delete('/patients/:personId',
         }
     }
 );
+
+// ===== ALERT MANAGEMENT =====
+
+/**
+ * Create a new alert for a patient
+ * POST /patients/:personId/alerts
+ */
+router.post('/patients/:personId/alerts', authenticate, authorize(['admin', 'secretary', 'doctor']), async (req, res) => {
+    try {
+        const personId = parseInt(req.params.personId, 10);
+        const {
+            alertTypeId,
+            alertSeverity,
+            alertDetails
+        } = req.body;
+
+        if (!alertTypeId || !alertSeverity || !alertDetails) {
+            return ErrorResponses.badRequest(res, 'Missing required fields: alertTypeId, alertSeverity, alertDetails');
+        }
+
+        await createAlert({
+            PersonID: personId,
+            AlertTypeID: parseInt(alertTypeId, 10),
+            AlertSeverity: parseInt(alertSeverity, 10),
+            AlertDetails: alertDetails
+        });
+
+        res.status(201).json({ success: true, message: 'Alert created successfully' });
+    } catch (error) {
+        log.error('Error creating alert:', error);
+        return ErrorResponses.internalError(res, 'Failed to create alert', error);
+    }
+});
+
+/**
+ * Activate or deactivate an alert
+ * PUT /alerts/:alertId/status
+ */
+router.put('/alerts/:alertId/status', authenticate, authorize(['admin', 'secretary', 'doctor']), async (req, res) => {
+    try {
+        const alertId = parseInt(req.params.alertId, 10);
+        const { isActive } = req.body;
+
+        if (typeof isActive !== 'boolean') {
+            return ErrorResponses.badRequest(res, 'isActive must be a boolean value');
+        }
+
+        await setAlertStatus(alertId, isActive);
+
+        res.json({ success: true, message: `Alert status updated to ${isActive}` });
+    } catch (error) {
+        log.error('Error updating alert status:', error);
+        return ErrorResponses.internalError(res, 'Failed to update alert status', error);
+    }
+});
+
+// ===== APPOINTMENT CHECK ROUTE =====
+
+/**
+ * Check if patient has a future appointment
+ * GET /patients/:patientId/has-appointment
+ */
+router.get('/patients/:patientId/has-appointment', async (req, res) => {
+    try {
+        const patientId = parseInt(req.params.patientId, 10);
+
+        if (isNaN(patientId)) {
+            return ErrorResponses.badRequest(res, 'Invalid patient ID');
+        }
+
+        const hasAppointment = await hasNextAppointment(patientId);
+
+        res.json({
+            success: true,
+            hasAppointment
+        });
+    } catch (error) {
+        log.error(`Error checking appointment for patient ${req.params.patientId}:`, error);
+        return ErrorResponses.internalError(res, 'Failed to check appointment status', error);
+    }
+});
 
 export default router;

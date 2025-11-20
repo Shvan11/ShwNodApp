@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
+import AlertModal from './AlertModal.jsx';
 
 const ViewPatientInfo = ({ patientId }) => {
     const navigate = useNavigate();
@@ -18,6 +19,11 @@ const ViewPatientInfo = ({ patientId }) => {
     const [costValue, setCostValue] = useState('');
     const [currencyValue, setCurrencyValue] = useState('IQD');
     const [savingCost, setSavingCost] = useState(false);
+    const [costPresets, setCostPresets] = useState([]);
+    const [isCustomCost, setIsCustomCost] = useState(false);
+    const [customCostValue, setCustomCostValue] = useState('');
+    const [alertTypes, setAlertTypes] = useState([]);
+    const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
 
     const loadPatientData = useCallback(async () => {
         if (!patientId) {
@@ -32,6 +38,8 @@ const ViewPatientInfo = ({ patientId }) => {
             if (!response.ok) throw new Error('Failed to load patient data');
 
             const data = await response.json();
+            console.log('Patient data loaded:', data);
+            console.log('Alerts:', data.alerts);
             setPatientData(data);
             setError(null);
         } catch (err) {
@@ -44,11 +52,12 @@ const ViewPatientInfo = ({ patientId }) => {
 
     const loadLookupData = useCallback(async () => {
         try {
-            const [gendersRes, addressesRes, referralsRes, typesRes] = await Promise.all([
+            const [gendersRes, addressesRes, referralsRes, typesRes, alertTypesRes] = await Promise.all([
                 fetch('/api/genders'),
                 fetch('/api/addresses'),
                 fetch('/api/referral-sources'),
-                fetch('/api/patient-types')
+                fetch('/api/patient-types'),
+                fetch('/api/alert-types')
             ]);
 
             const lookups = {
@@ -59,15 +68,34 @@ const ViewPatientInfo = ({ patientId }) => {
             };
 
             setLookupData(lookups);
+
+            // Set alert types separately
+            if (alertTypesRes.ok) {
+                const types = await alertTypesRes.json();
+                setAlertTypes(types);
+            }
         } catch (err) {
             console.error('Error loading lookup data:', err);
+        }
+    }, []);
+
+    const loadCostPresets = useCallback(async () => {
+        try {
+            const response = await fetch('/api/settings/cost-presets');
+            if (response.ok) {
+                const presets = await response.json();
+                setCostPresets(presets);
+            }
+        } catch (err) {
+            console.error('Error loading cost presets:', err);
         }
     }, []);
 
     useEffect(() => {
         loadPatientData();
         loadLookupData();
-    }, [loadPatientData, loadLookupData]);
+        loadCostPresets();
+    }, [loadPatientData, loadLookupData, loadCostPresets]);
 
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
@@ -108,22 +136,52 @@ const ViewPatientInfo = ({ patientId }) => {
     };
 
     const handleEditCost = () => {
-        setCostValue(patientData.EstimatedCost || '');
-        setCurrencyValue(patientData.Currency || 'IQD');
+        const currentCost = patientData.EstimatedCost;
+        const currentCurrency = patientData.Currency || 'IQD';
+
+        setCurrencyValue(currentCurrency);
+
+        // Check if current cost matches a preset
+        const matchingPreset = costPresets.find(
+            p => p.Amount === parseFloat(currentCost) && p.Currency === currentCurrency
+        );
+
+        if (matchingPreset) {
+            // Use preset value
+            setCostValue(currentCost);
+            setIsCustomCost(false);
+            setCustomCostValue('');
+        } else {
+            // Use custom value
+            setCostValue('custom');
+            setIsCustomCost(true);
+            setCustomCostValue(currentCost || '');
+        }
+
         setEditingCost(true);
     };
 
     const handleSaveCost = async () => {
         try {
             setSavingCost(true);
-            const response = await fetch(`/api/patients/${patientId}`, {
+
+            // Determine the final cost value to save
+            const finalCost = isCustomCost ? customCostValue : costValue;
+
+            if (!finalCost) {
+                toast.warning('Please enter a cost value');
+                setSavingCost(false);
+                return;
+            }
+
+            const response = await fetch(`/api/patients/${patientData.PersonID}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     ...patientData,
-                    EstimatedCost: costValue || null,
+                    EstimatedCost: finalCost || null,
                     Currency: currencyValue
                 }),
             });
@@ -135,10 +193,13 @@ const ViewPatientInfo = ({ patientId }) => {
             // Update local state
             setPatientData({
                 ...patientData,
-                EstimatedCost: costValue || null,
+                EstimatedCost: finalCost || null,
                 Currency: currencyValue
             });
             setEditingCost(false);
+            setIsCustomCost(false);
+            setCustomCostValue('');
+            toast.success('Estimated cost updated successfully');
         } catch (err) {
             console.error('Error saving cost:', err);
             toast.error('Failed to save estimated cost');
@@ -151,6 +212,8 @@ const ViewPatientInfo = ({ patientId }) => {
         setEditingCost(false);
         setCostValue('');
         setCurrencyValue('IQD');
+        setIsCustomCost(false);
+        setCustomCostValue('');
     };
 
     const formatNumberWithCommas = (value) => {
@@ -158,11 +221,61 @@ const ViewPatientInfo = ({ patientId }) => {
         return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     };
 
-    const handleCostInputChange = (e) => {
+    const handlePresetSelectChange = (e) => {
+        const selectedValue = e.target.value;
+        if (selectedValue === 'custom') {
+            setIsCustomCost(true);
+            setCostValue('custom');
+            setCustomCostValue('');
+        } else {
+            setIsCustomCost(false);
+            setCostValue(selectedValue);
+            setCustomCostValue('');
+        }
+    };
+
+    const handleCustomCostInputChange = (e) => {
         // Remove non-numeric characters except for the value itself
         const rawValue = e.target.value.replace(/,/g, '');
         if (rawValue === '' || /^\d+$/.test(rawValue)) {
-            setCostValue(rawValue);
+            setCustomCostValue(rawValue);
+        }
+    };
+
+    const handleCurrencyChange = (e) => {
+        setCurrencyValue(e.target.value);
+    };
+
+    // Alert handlers
+    const handleAddAlert = () => {
+        setIsAlertModalOpen(true);
+    };
+
+    const handleAlertSaved = async () => {
+        // Refresh patient data to get updated alerts
+        await loadPatientData();
+    };
+
+    const handleToggleAlert = async (alert) => {
+        try {
+            const newStatus = !alert.IsActive;
+            const response = await fetch(`/api/alerts/${alert.AlertID}/status`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ isActive: newStatus })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update alert status');
+            }
+
+            toast.success(`Alert ${newStatus ? 'activated' : 'deactivated'} successfully`);
+            await loadPatientData(); // Refresh data
+        } catch (error) {
+            console.error('Error toggling alert:', error);
+            toast.error('Failed to update alert status');
         }
     };
 
@@ -324,22 +437,40 @@ const ViewPatientInfo = ({ patientId }) => {
                             </span>
                             {editingCost ? (
                                 <span className="info-value cost-edit-container">
-                                    <input
-                                        type="text"
-                                        value={formatNumberWithCommas(costValue)}
-                                        onChange={handleCostInputChange}
-                                        placeholder="Enter cost"
-                                        className="cost-edit-input"
-                                    />
                                     <select
                                         value={currencyValue}
-                                        onChange={(e) => setCurrencyValue(e.target.value)}
+                                        onChange={handleCurrencyChange}
                                         className="cost-edit-select"
                                     >
                                         <option value="IQD">IQD</option>
                                         <option value="USD">USD</option>
                                         <option value="EUR">EUR</option>
                                     </select>
+                                    <select
+                                        value={costValue}
+                                        onChange={handlePresetSelectChange}
+                                        className="cost-edit-select-preset"
+                                        disabled={isCustomCost && costValue !== 'custom'}
+                                    >
+                                        <option value="">Select amount...</option>
+                                        {costPresets
+                                            .filter(p => p.Currency === currencyValue)
+                                            .map(preset => (
+                                                <option key={preset.PresetID} value={preset.Amount}>
+                                                    {formatNumberWithCommas(preset.Amount)}
+                                                </option>
+                                            ))}
+                                        <option value="custom">Custom Amount...</option>
+                                    </select>
+                                    {isCustomCost && (
+                                        <input
+                                            type="text"
+                                            value={formatNumberWithCommas(customCostValue)}
+                                            onChange={handleCustomCostInputChange}
+                                            placeholder="Enter custom amount"
+                                            className="cost-edit-input-custom"
+                                        />
+                                    )}
                                     <button
                                         onClick={handleSaveCost}
                                         disabled={savingCost}
@@ -363,12 +494,67 @@ const ViewPatientInfo = ({ patientId }) => {
                                 </span>
                             )}
                         </div>
-                        {patientData.Alerts && (
-                            <div className="info-row alert-row">
-                                <span className="info-label">
-                                    <i className="fas fa-exclamation-triangle"></i> Alerts:
-                                </span>
-                                <span className="info-value alert-value">{patientData.Alerts}</span>
+                    </div>
+                </div>
+
+                {/* Alerts Card */}
+                <div className="info-card alerts-card">
+                    <div className="card-header">
+                        <div className="card-header-title">
+                            <i className="fas fa-exclamation-triangle"></i>
+                            <h3>Alerts</h3>
+                        </div>
+                        <button
+                            onClick={handleAddAlert}
+                            className="btn-add-alert"
+                            title="Add new alert"
+                        >
+                            <i className="fas fa-plus"></i>
+                            Add Alert
+                        </button>
+                    </div>
+                    <div className="card-body">
+                        {!patientData.alerts || patientData.alerts.length === 0 ? (
+                            <p className="no-alerts">No alerts for this patient</p>
+                        ) : (
+                            <div className="alert-list">
+                                {patientData.alerts
+                                    .sort((a, b) => {
+                                        // Sort by IsActive (active first), then by severity (high to low), then by date (newest first)
+                                        if (a.IsActive !== b.IsActive) return b.IsActive - a.IsActive;
+                                        if (a.AlertSeverity !== b.AlertSeverity) return b.AlertSeverity - a.AlertSeverity;
+                                        return new Date(b.CreationDate) - new Date(a.CreationDate);
+                                    })
+                                    .map(alert => (
+                                        <div
+                                            key={alert.AlertID}
+                                            className={`alert-item ${alert.IsActive ? 'active' : 'inactive'} severity-${alert.AlertSeverity}`}
+                                        >
+                                            <div className="alert-header">
+                                                <span className={`alert-severity-badge severity-${alert.AlertSeverity}`}>
+                                                    {alert.AlertSeverity === 1 ? 'Mild' : alert.AlertSeverity === 2 ? 'Moderate' : 'Severe'}
+                                                </span>
+                                                <span className={`alert-type-badge type-${alert.AlertTypeName.toLowerCase()}`}>
+                                                    {alert.AlertTypeName}
+                                                </span>
+                                            </div>
+                                            <p className="alert-details">{alert.AlertDetails}</p>
+                                            <div className="alert-footer">
+                                                <span className="alert-date">
+                                                    <i className="fas fa-calendar"></i>
+                                                    {new Date(alert.CreationDate).toLocaleDateString()}
+                                                </span>
+                                                <button
+                                                    onClick={() => handleToggleAlert(alert)}
+                                                    className={`btn-toggle-alert ${alert.IsActive ? 'btn-deactivate' : 'btn-activate'}`}
+                                                    title={alert.IsActive ? 'Deactivate alert' : 'Activate alert'}
+                                                >
+                                                    <i className={`fas ${alert.IsActive ? 'fa-times-circle' : 'fa-check-circle'}`}></i>
+                                                    {alert.IsActive ? 'Deactivate' : 'Activate'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
                             </div>
                         )}
                     </div>
@@ -389,6 +575,15 @@ const ViewPatientInfo = ({ patientId }) => {
                     </div>
                 )}
             </div>
+
+            {/* Alert Modal */}
+            <AlertModal
+                isOpen={isAlertModalOpen}
+                onClose={() => setIsAlertModalOpen(false)}
+                onSave={handleAlertSaved}
+                personId={patientId}
+                alertTypes={alertTypes}
+            />
         </div>
     );
 };

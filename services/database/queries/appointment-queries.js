@@ -1,7 +1,7 @@
 /**
  * Appointment-related database queries
  */
-import { executeStoredProcedure, TYPES } from '../index.js';
+import { executeStoredProcedure, executeMultipleResultSets, TYPES } from '../index.js';
 
 /**
  * Retrieves appointment information for a given date.
@@ -40,68 +40,6 @@ export function getPresentAps(PDate) {
                 return responseObject;
             }
         }
-    );
-}
-
-/**
- * Retrieves all appointments for a given date that are not checked in.
- * @param {string} AppsDate - The date for which to retrieve appointments.
- * @returns {Promise<Array>} - A promise that resolves with all appointments for the date.
- */
-export function getAllTodayApps(AppsDate) {
-    return executeStoredProcedure(
-        'AllTodayApps',
-        [['AppsDate', TYPES.Date, AppsDate]],
-        null,
-        (columns) => ({
-            appointmentID: columns[0].value,
-            PersonID: columns[1].value,
-            AppDetail: columns[2].value,
-            AppDate: columns[3].value,
-            PatientType: columns[4].value,
-            PatientName: columns[5].value,
-            Alerts: columns[6].value,
-            apptime: columns[7].value
-        }),
-        (result) => result
-    );
-}
-
-/**
- * Retrieves all present appointments for a given date (including dismissed).
- * @param {string} AppsDate - The date for which to retrieve present appointments.
- * @returns {Promise<Array>} - A promise that resolves with all present appointments for the date.
- */
-export function getPresentTodayApps(AppsDate) {
-    return executeStoredProcedure(
-        'PresentTodayApps',
-        [['AppsDate', TYPES.Date, AppsDate]],
-        null,
-        (columns) => {
-            const presentTime = columns[3].value;
-            const seatedTime = columns[4].value;
-            const dismissedTime = columns[5].value;
-
-            return {
-                appointmentID: columns[0].value,
-                PersonID: columns[1].value,
-                AppDetail: columns[2].value,
-                Present: presentTime ? true : false,
-                Seated: seatedTime ? true : false,
-                Dismissed: dismissedTime ? true : false,
-                PresentTime: presentTime,
-                SeatedTime: seatedTime,
-                DismissedTime: dismissedTime,
-                AppDate: columns[6].value,
-                AppCost: columns[7].value,
-                apptime: columns[8].value,
-                PatientType: columns[9].value,
-                PatientName: columns[10].value,
-                Alerts: columns[11].value,
-                HasVisit: columns[12].value
-            };
-        },
-        (result) => result
     );
 }
 
@@ -147,5 +85,19 @@ export function undoAppointmentState(appointmentID, stateField) {
             success: columns[2].value
         }),
         (result) => result[0] || { success: true, appointmentID, stateCleared: stateField }
+    );
+}
+
+/**
+ * Get daily appointments using optimized stored procedure (OPTIMIZED - Phase 1)
+ * Replaces getAllTodayApps + getPresentTodayApps with single call
+ * Returns 3 result sets: all appointments, checked-in appointments, and statistics
+ * @param {string} AppsDate - The date for which to retrieve appointments
+ * @returns {Promise<Array>} - Array of 3 result sets
+ */
+export function getDailyAppointmentsOptimized(AppsDate) {
+    return executeMultipleResultSets(
+        'GetDailyAppointmentsOptimized',
+        [['AppsDate', TYPES.Date, AppsDate]]
     );
 }

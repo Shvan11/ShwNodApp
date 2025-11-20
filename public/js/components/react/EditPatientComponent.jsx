@@ -655,8 +655,7 @@ const EditPatientComponent = ({ patientId }) => {
                                             type="date"
                                             value={uploadData.recordDate}
                                             onChange={(e) => setUploadData({...uploadData, recordDate: e.target.value})}
-                                            className="input-height-consistent"
-                                            className="w-full"
+                                            className="input-height-consistent w-full"
                                         />
                                     </div>
                                     <div>
@@ -666,8 +665,7 @@ const EditPatientComponent = ({ patientId }) => {
                                         <select
                                             value={uploadData.targetClass}
                                             onChange={(e) => setUploadData({...uploadData, targetClass: e.target.value})}
-                                            className="input-height-consistent"
-                                            className="w-full"
+                                            className="input-height-consistent w-full"
                                         >
                                             {photoTypes.map(type => (
                                                 <option key={type.class} value={type.class}>{type.name}</option>
