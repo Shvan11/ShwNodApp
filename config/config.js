@@ -40,6 +40,8 @@ export default {
       encrypt: false,
       trustServerCertificate: true,
       rowCollectionOnRequestCompletion: true,
+      requestTimeout: 60000, // 60 seconds for complex queries with triggers
+      connectionTimeout: 30000, // 30 seconds for initial connection
     },
     authentication: {
       type: 'default',

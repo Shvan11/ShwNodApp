@@ -39,12 +39,12 @@ const RouteErrorFallback = ({ routeName }) => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{__html: `
         .route-error-screen {
           display: flex;
           align-items: center;
           justify-content: center;
-          min-height: calc(100vh - 50px); /* Account for header */
+          min-height: calc(100vh - 50px);
           padding: 40px 20px;
           background-color: #f8f9fa;
         }
@@ -124,7 +124,7 @@ const RouteErrorFallback = ({ routeName }) => {
           background-color: #545b62;
           transform: translateY(-1px);
         }
-      `}</style>
+      `}} />
     </div>
   );
 };

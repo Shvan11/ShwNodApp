@@ -465,8 +465,8 @@ export const getActiveWork = async (personId) => {
 
 export const getWorkTypes = async () => {
     return executeQuery(
-        `SELECT ID, WorkType as TypeName
-        FROM tblWorkType 
+        `SELECT ID, WorkType
+        FROM tblWorkType
         ORDER BY WorkType`,
         [],
         (columns) => {

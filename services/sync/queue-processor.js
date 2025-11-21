@@ -207,6 +207,59 @@ class QueueProcessor {
     }
 
     /**
+     * Fetch aligner batch record from SQL Server
+     * Used when sync trigger stores only IDs (optimized mode)
+     */
+    async fetchAlignerBatchFromSqlServer(batchId) {
+        const query = `
+            SELECT
+                AlignerBatchID as aligner_batch_id,
+                AlignerSetID as aligner_set_id,
+                BatchSequence as batch_sequence,
+                UpperAlignerCount as upper_aligner_count,
+                LowerAlignerCount as lower_aligner_count,
+                UpperAlignerStartSequence as upper_aligner_start_sequence,
+                UpperAlignerEndSequence as upper_aligner_end_sequence,
+                LowerAlignerStartSequence as lower_aligner_start_sequence,
+                LowerAlignerEndSequence as lower_aligner_end_sequence,
+                ManufactureDate as manufacture_date,
+                DeliveredToPatientDate as delivered_to_patient_date,
+                Days as days,
+                ValidityPeriod as validity_period,
+                NextBatchReadyDate as next_batch_ready_date,
+                Notes as notes,
+                IsActive as is_active
+            FROM tblAlignerBatches
+            WHERE AlignerBatchID = @batchId
+        `;
+
+        const results = await executeQuery(
+            query,
+            [['batchId', TYPES.Int, batchId]],
+            (columns) => ({
+                aligner_batch_id: columns[0].value,
+                aligner_set_id: columns[1].value,
+                batch_sequence: columns[2].value,
+                upper_aligner_count: columns[3].value,
+                lower_aligner_count: columns[4].value,
+                upper_aligner_start_sequence: columns[5].value,
+                upper_aligner_end_sequence: columns[6].value,
+                lower_aligner_start_sequence: columns[7].value,
+                lower_aligner_end_sequence: columns[8].value,
+                manufacture_date: columns[9].value,
+                delivered_to_patient_date: columns[10].value,
+                days: columns[11].value,
+                validity_period: columns[12].value,
+                next_batch_ready_date: columns[13].value,
+                notes: columns[14].value,
+                is_active: columns[15].value
+            })
+        );
+
+        return results && results.length > 0 ? results[0] : null;
+    }
+
+    /**
      * Ensure related work and patient exist in Supabase (for aligner_sets)
      */
     async ensureRelatedRecordsExist(data, tableName) {
@@ -320,9 +373,47 @@ class QueueProcessor {
      */
     async processItem(item) {
         try {
-            const data = JSON.parse(item.JsonData);
-            const primaryKey = this.getPrimaryKey(item.TableName);
+            // Handle JsonData - if NULL, fetch from SQL Server
+            let data;
+            if (item.JsonData) {
+                // Traditional flow: JSON was pre-built by trigger
+                data = JSON.parse(item.JsonData);
+            } else {
+                // Optimized flow: Fetch data on-demand
+                console.log(`  📥 JsonData is NULL - fetching fresh data from SQL Server...`);
 
+                switch (item.TableName) {
+                    case 'aligner_batches':
+                        data = await this.fetchAlignerBatchFromSqlServer(item.RecordID);
+                        break;
+                    case 'aligner_sets':
+                        data = await this.fetchAlignerSetFromSqlServer(item.RecordID);
+                        break;
+                    case 'work':
+                        data = await this.fetchWorkFromSqlServer(item.RecordID);
+                        break;
+                    case 'patients':
+                        data = await this.fetchPatientFromSqlServer(item.RecordID);
+                        break;
+                    default:
+                        throw new Error(`Unknown table type: ${item.TableName}`);
+                }
+
+                if (!data) {
+                    // Record no longer exists (was deleted before sync)
+                    console.log(`  ⚠️  Record not found in SQL Server - marking as skipped`);
+                    await this.executeUpdate(`
+                        UPDATE SyncQueue
+                        SET Status = 'Skipped',
+                            LastAttempt = GETDATE(),
+                            LastError = 'Record not found in source table'
+                        WHERE QueueID = @id
+                    `, [['id', TYPES.Int, item.QueueID]]);
+                    return true; // Consider as success (nothing to sync)
+                }
+            }
+
+            const primaryKey = this.getPrimaryKey(item.TableName);
             console.log(`🔄 Syncing ${item.TableName} ID ${item.RecordID} (${item.Operation})`);
 
             // Handle different operations
@@ -347,14 +438,19 @@ class QueueProcessor {
 
             if (error) throw error;
 
-            // Mark as synced using direct connection (executeQuery doesn't work for UPDATEs)
+            // Mark as synced and store JSON for future reference
             console.log(`📝 Attempting to mark QueueID ${item.QueueID} as Synced...`);
+            const jsonData = JSON.stringify(data);
             const updateResult = await this.executeUpdate(`
                 UPDATE SyncQueue
                 SET Status = 'Synced',
+                    JsonData = @json,
                     LastAttempt = GETDATE()
                 WHERE QueueID = @id
-            `, [['id', TYPES.Int, item.QueueID]]);
+            `, [
+                ['id', TYPES.Int, item.QueueID],
+                ['json', TYPES.NVarChar, jsonData]
+            ]);
 
             console.log(`  ✅ Synced successfully (UPDATE affected ${updateResult} rows)`);
             return true;

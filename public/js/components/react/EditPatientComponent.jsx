@@ -14,6 +14,7 @@ const EditPatientComponent = ({ patientId }) => {
     const [addresses, setAddresses] = useState([]);
     const [referralSources, setReferralSources] = useState([]);
     const [patientTypes, setPatientTypes] = useState([]);
+    const [tags, setTags] = useState([]);
 
     // WebCeph integration state
     const [webcephData, setWebcephData] = useState(null);
@@ -43,26 +44,28 @@ const EditPatientComponent = ({ patientId }) => {
         ReferralSourceID: '',
         PatientTypeID: '',
         Notes: '',
-        Alerts: '',
         Language: '0',
         CountryCode: '',
         EstimatedCost: '',
-        Currency: 'IQD'
+        Currency: 'IQD',
+        TagID: ''
     });
 
     const loadDropdownData = useCallback(async () => {
         try {
-            const [gendersRes, addressesRes, referralsRes, typesRes] = await Promise.all([
+            const [gendersRes, addressesRes, referralsRes, typesRes, tagsRes] = await Promise.all([
                 fetch('/api/genders'),
                 fetch('/api/addresses'),
                 fetch('/api/referral-sources'),
-                fetch('/api/patient-types')
+                fetch('/api/patient-types'),
+                fetch('/api/tag-options')
             ]);
 
             if (gendersRes.ok) setGenders(await gendersRes.json());
             if (addressesRes.ok) setAddresses(await addressesRes.json());
             if (referralsRes.ok) setReferralSources(await referralsRes.json());
             if (typesRes.ok) setPatientTypes(await typesRes.json());
+            if (tagsRes.ok) setTags(await tagsRes.json());
         } catch (err) {
             console.error('Error loading dropdown data:', err);
         }
@@ -99,11 +102,11 @@ const EditPatientComponent = ({ patientId }) => {
                 ReferralSourceID: data.ReferralSourceID || '',
                 PatientTypeID: data.PatientTypeID || '',
                 Notes: data.Notes || '',
-                Alerts: data.Alerts || '',
                 Language: (data.Language !== null && data.Language !== undefined) ? data.Language.toString() : '0',
                 CountryCode: data.CountryCode || '',
                 EstimatedCost: data.EstimatedCost || '',
-                Currency: data.Currency || 'IQD'
+                Currency: data.Currency || 'IQD',
+                TagID: data.TagID || ''
             });
         } catch (err) {
             console.error('Error loading patient data:', err);
@@ -494,7 +497,7 @@ const EditPatientComponent = ({ patientId }) => {
                 </div>
 
                 <div className="form-row">
-                    <div className="form-group full-width">
+                    <div className="form-group">
                         <label>Patient Type</label>
                         <select
                             value={formData.PatientTypeID}
@@ -504,6 +507,20 @@ const EditPatientComponent = ({ patientId }) => {
                             {patientTypes.map(type => (
                                 <option key={type.id} value={type.id}>
                                     {type.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="form-group">
+                        <label>Tag</label>
+                        <select
+                            value={formData.TagID}
+                            onChange={(e) => setFormData({...formData, TagID: e.target.value})}
+                        >
+                            <option value="">Select Tag</option>
+                            {tags.map(tag => (
+                                <option key={tag.id} value={tag.id}>
+                                    {tag.tag}
                                 </option>
                             ))}
                         </select>
@@ -544,16 +561,6 @@ const EditPatientComponent = ({ patientId }) => {
                         value={formData.Notes}
                         onChange={(e) => setFormData({...formData, Notes: e.target.value})}
                         rows="3"
-                    />
-                </div>
-
-                <div className="form-group full-width">
-                    <label>Alerts</label>
-                    <textarea
-                        value={formData.Alerts}
-                        onChange={(e) => setFormData({...formData, Alerts: e.target.value})}
-                        rows="2"
-                        placeholder="Important alerts about this patient"
                     />
                 </div>
 

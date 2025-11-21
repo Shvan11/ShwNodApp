@@ -24,8 +24,13 @@ const TemplateDesigner = () => {
         if (templateId) {
             loadTemplate(templateId);
         } else {
+            // No template ID means we're creating a new template
             setIsLoading(false);
-            setError('No template ID provided');
+            setTemplate({
+                template_id: null,
+                template_name: 'New Template',
+                template_file_path: null
+            });
         }
     }, [templateId]);
 
@@ -33,7 +38,16 @@ const TemplateDesigner = () => {
         try {
             setIsLoading(true);
             const response = await fetch(`/api/templates/${id}`);
+
+            // Check if response is ok (status 200-299)
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API error response:', response.status, errorText);
+                throw new Error(`Failed to load template (HTTP ${response.status}): ${errorText}`);
+            }
+
             const result = await response.json();
+            console.log('Template loaded:', result);
 
             if (result.status === 'success') {
                 setTemplate(result.data);
@@ -44,6 +58,7 @@ const TemplateDesigner = () => {
         } catch (err) {
             console.error('Error loading template:', err);
             setError('Failed to load template: ' + err.message);
+            toast?.error('Failed to load template: ' + err.message);
         } finally {
             setIsLoading(false);
         }

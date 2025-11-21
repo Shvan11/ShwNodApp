@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Appointment Confirmation</title>
+    <title>Receipt Preview</title>
     <style>
         @page {
             size: 190mm 75mm;
@@ -15,186 +15,23 @@
             box-sizing: border-box;
         }
 
-        html, body {
-            width: 100%;
-            height: 100%;
+        body {
             margin: 0;
             padding: 0;
             background: white;
             font-family: Arial, sans-serif;
-            color: #000;
+            width: 718px;
+            min-height: 283px;
+            max-width: 718px;
+            margin: 0 auto;
         }
 
-        .receipt-container {
-            width: 100%;
-            height: 100%;
-            background-color: #fff;
-            padding: 8px;
-            box-sizing: border-box;
-        }
-
-        .header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            padding: 6px 0;
-            border-bottom: 2px solid #000;
-            margin-bottom: 10px;
-        }
-
-        .clinic-header {
-            flex: 1;
-        }
-
-        .clinic-name {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 3px;
-        }
-
-        .receipt-subtitle {
-            font-size: 12px;
-            color: #000;
-            font-weight: bold;
-            margin-top: 2px;
-        }
-
-        .receipt-ids {
-            font-size: 9px;
-            color: #000;
-            margin-top: 2px;
-        }
-
-        .receipt-timestamp {
-            text-align: right;
-            font-size: 9px;
-        }
-
-        .timestamp-label {
-            color: #000;
-            font-weight: bold;
-            margin-bottom: 2px;
-        }
-
-        .timestamp-value {
-            color: #000;
-        }
-
-        .main-content {
-            border: 1px solid #000;
-            padding: 12px;
-            margin-bottom: 10px;
-        }
-
-        .section-header {
-            font-size: 11px;
-            font-weight: bold;
-            padding: 4px 6px;
-            margin-bottom: 8px;
-            border: 1px solid #000;
-            background-color: #fff;
-            color: #000;
-            text-align: center;
-        }
-
-        .info-row {
-            font-size: 11px;
-            margin-bottom: 6px;
-            display: flex;
-        }
-
-        .patient-name-row {
-            font-size: 14px;
-            margin-bottom: 8px;
-        }
-
-        .info-label {
-            font-weight: bold;
-            min-width: 80px;
-            color: #000;
-        }
-
-        .info-value {
-            flex: 1;
-            color: #000;
-        }
-
-        .patient-name-value {
-            font-size: 14px;
-            font-weight: bold;
-        }
-
-        .appointment-section {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 2px solid #000;
-        }
-
-        .appointment-header {
-            font-size: 12px;
-            font-weight: bold;
-            margin-bottom: 8px;
-            text-align: center;
-            color: #000;
-            background-color: #f0f0f0;
-            padding: 5px;
-            border: 1px solid #000;
-        }
-
-        .appointment-details {
-            text-align: center;
-            padding: 10px;
-            border: 2px solid #000;
-            background-color: #fff;
-        }
-
-        .appointment-date {
-            font-size: 16px;
-            font-weight: bold;
-            color: #000;
-            margin-bottom: 4px;
-        }
-
-        .appointment-time {
-            font-size: 14px;
-            font-weight: bold;
-            color: #000;
-        }
-
-        .clinic-footer {
-            margin-top: 10px;
-            padding-top: 8px;
-            border-top: 1px solid #000;
-            font-size: 8px;
-            text-align: center;
-        }
-
-        .clinic-footer-title {
-            font-weight: bold;
-            margin-bottom: 4px;
-            color: #000;
-            font-size: 9px;
-        }
-
-        .clinic-footer-info {
-            color: #000;
-            margin-bottom: 2px;
-        }
+        * { box-sizing: border-box; } body {margin: 0;}*{margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px;box-sizing:border-box;}html, body{width:100%;height:100%;margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px;background-image:initial;background-position-x:initial;background-position-y:initial;background-size:initial;background-repeat:initial;background-attachment:initial;background-origin:initial;background-clip:initial;background-color:white;font-family:Arial, sans-serif;color:rgb(0, 0, 0);}.receipt-container{width:100%;height:100%;background-color:rgb(255, 255, 255);padding-top:8px;padding-right:8px;padding-bottom:8px;padding-left:8px;box-sizing:border-box;}.header-row{display:flex;justify-content:space-between;align-items:flex-start;padding-top:6px;padding-right:0px;padding-bottom:6px;padding-left:0px;border-bottom-width:2px;border-bottom-style:solid;border-bottom-color:rgb(0, 0, 0);margin-bottom:10px;}.clinic-header{flex-grow:1;flex-shrink:1;flex-basis:0%;}.clinic-name{font-size:18px;font-weight:bold;margin-bottom:3px;}.receipt-subtitle{font-size:12px;color:rgb(0, 0, 0);font-weight:bold;margin-top:2px;}.receipt-timestamp{text-align:right;font-size:9px;}.timestamp-label{color:rgb(0, 0, 0);font-weight:bold;margin-bottom:2px;}.timestamp-value{color:rgb(0, 0, 0);}.main-content{border-top-width:1px;border-right-width:1px;border-bottom-width:1px;border-left-width:1px;border-top-style:solid;border-right-style:solid;border-bottom-style:solid;border-left-style:solid;border-top-color:rgb(0, 0, 0);border-right-color:rgb(0, 0, 0);border-bottom-color:rgb(0, 0, 0);border-left-color:rgb(0, 0, 0);border-image-source:initial;border-image-slice:initial;border-image-width:initial;border-image-outset:initial;border-image-repeat:initial;padding-top:12px;padding-right:12px;padding-bottom:12px;padding-left:12px;margin-bottom:10px;}.section-header{font-size:11px;font-weight:bold;padding-top:4px;padding-right:6px;padding-bottom:4px;padding-left:6px;margin-bottom:8px;border-top-width:1px;border-right-width:1px;border-bottom-width:1px;border-left-width:1px;border-top-style:solid;border-right-style:solid;border-bottom-style:solid;border-left-style:solid;border-top-color:rgb(0, 0, 0);border-right-color:rgb(0, 0, 0);border-bottom-color:rgb(0, 0, 0);border-left-color:rgb(0, 0, 0);border-image-source:initial;border-image-slice:initial;border-image-width:initial;border-image-outset:initial;border-image-repeat:initial;background-color:rgb(255, 255, 255);color:rgb(0, 0, 0);text-align:center;}.info-row{font-size:11px;margin-bottom:6px;display:flex;}.patient-name-row{font-size:14px;margin-bottom:8px;}.info-label{font-weight:bold;min-width:80px;color:rgb(0, 0, 0);}.info-value{flex-grow:1;flex-shrink:1;flex-basis:0%;color:rgb(0, 0, 0);}.patient-name-value{font-size:14px;font-weight:bold;}.appointment-section{margin-top:12px;padding-top:12px;border-top-width:2px;border-top-style:solid;border-top-color:rgb(0, 0, 0);}.appointment-header{font-size:12px;font-weight:bold;margin-bottom:8px;text-align:center;color:rgb(0, 0, 0);background-color:rgb(240, 240, 240);padding-top:5px;padding-right:5px;padding-bottom:5px;padding-left:5px;border-top-width:1px;border-right-width:1px;border-bottom-width:1px;border-left-width:1px;border-top-style:solid;border-right-style:solid;border-bottom-style:solid;border-left-style:solid;border-top-color:rgb(0, 0, 0);border-right-color:rgb(0, 0, 0);border-bottom-color:rgb(0, 0, 0);border-left-color:rgb(0, 0, 0);border-image-source:initial;border-image-slice:initial;border-image-width:initial;border-image-outset:initial;border-image-repeat:initial;}.appointment-details{text-align:center;padding-top:10px;padding-right:10px;padding-bottom:10px;padding-left:10px;border-top-width:2px;border-right-width:2px;border-bottom-width:2px;border-left-width:2px;border-top-style:solid;border-right-style:solid;border-bottom-style:solid;border-left-style:solid;border-top-color:rgb(0, 0, 0);border-right-color:rgb(0, 0, 0);border-bottom-color:rgb(0, 0, 0);border-left-color:rgb(0, 0, 0);border-image-source:initial;border-image-slice:initial;border-image-width:initial;border-image-outset:initial;border-image-repeat:initial;background-color:rgb(255, 255, 255);}.appointment-date{font-size:16px;font-weight:bold;color:rgb(0, 0, 0);margin-bottom:4px;}@page{size:190mm 75mm;margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;}@media print{body{margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px;width:190mm;height:75mm;overflow-x:hidden;overflow-y:hidden;}.receipt-container{print-color-adjust:exact;break-inside:avoid;break-after:avoid;}*{print-color-adjust:exact;}}@media screen{body{background-image:initial;background-position-x:initial;background-position-y:initial;background-size:initial;background-repeat:initial;background-attachment:initial;background-origin:initial;background-clip:initial;background-color:rgb(240, 240, 240);padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px;}}@media (max-width: 756px){.receipt-container{margin-top:5px;margin-right:0px;margin-bottom:0px;margin-left:0px;}}@media (max-width: 718px){.receipt-container{padding-top:8px;padding-right:8px;padding-bottom:8px;padding-left:8px;margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px;}.clinic-name{font-size:16px;}.patient-name-value{font-size:16px;}.appointment-date{font-size:18px;}.info-value{display:inline;width:auto;float:none;}.info-label{display:inline;}}
 
         @media print {
             body {
                 margin: 0;
                 padding: 0;
-                width: 190mm;
-                height: 75mm;
-                overflow: hidden;
-            }
-
-            .receipt-container {
-                print-color-adjust: exact;
-                -webkit-print-color-adjust: exact;
-                break-inside: avoid;
-                break-after: avoid;
             }
 
             * {
@@ -207,45 +44,6 @@
             body {
                 background: #f0f0f0;
                 padding: 0;
-            }
-        }
-
-        @media (max-width: 756px) {
-            .receipt-container {
-                margin: 5px 0 0 0;
-            }
-        }
-
-        @media (max-width: 718px) {
-            .receipt-container {
-                padding: 8px;
-                margin: 0;
-            }
-
-            .clinic-name {
-                font-size: 16px;
-            }
-
-            .patient-name-value {
-                font-size: 16px;
-            }
-
-            .appointment-date {
-                font-size: 18px;
-            }
-
-            .appointment-time {
-                font-size: 16px;
-            }
-
-            .clinic-footer-title {
-                font-size: 12px;
-                padding: 3px 0 0 0;
-            }
-
-            .clinic-footer-info {
-                font-size: 12px;
-                padding: 3px 0 0 0;
             }
         }
     </style>
@@ -262,56 +60,6 @@
     </script>
 </head>
 <body>
-    <div class="receipt-container">
-        <!-- Header Row -->
-        <div class="header-row">
-            <div class="clinic-header">
-                <div class="clinic-name">SHWAN ORTHODONTICS</div>
-                <div class="receipt-subtitle">Appointment Confirmation</div>
-                <div class="receipt-ids">Patient ID: {{patient.PersonID}} | Phone: {{patient.Phone}}</div>
-            </div>
-            <div class="receipt-timestamp">
-                <div class="timestamp-label">Printed:</div>
-                <div class="timestamp-value">{{receipt.PrintedDate|date:DD/MM/YYYY h:mm A}}</div>
-            </div>
-        </div>
-
-        <!-- Main Content -->
-        <div class="main-content">
-            <!-- Patient Information Section -->
-            <div class="section-header">PATIENT INFORMATION</div>
-
-            <div class="info-row patient-name-row">
-                <span class="info-label">Patient Name:</span>
-                <span class="info-value patient-name-value">{{patient.PatientName}}</span>
-            </div>
-
-            <div class="info-row">
-                <span class="info-label">Patient ID:</span>
-                <span class="info-value">{{patient.PersonID}}</span>
-            </div>
-
-            <div class="info-row">
-                <span class="info-label">Phone:</span>
-                <span class="info-value">{{patient.Phone}}</span>
-            </div>
-
-            <!-- Appointment Section -->
-            <div class="appointment-section">
-                <div class="appointment-header">NEXT APPOINTMENT</div>
-                <div class="appointment-details">
-                    <div class="appointment-date">{{patient.AppDate|date:dddd, DD-MM-YYYY - h:mm A}}</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Clinic Footer -->
-        <div class="clinic-footer">
-            <div class="clinic-footer-title">SHWAN ORTHODONTICS</div>
-            <div class="clinic-footer-info">Duhok, Kurdistan - Iraq</div>
-            <div class="clinic-footer-info">Tel: +964 750 8108833 | Instagram: @shwanorthodontics</div>
-            <div class="clinic-footer-info">Please arrive 10 minutes before your appointment</div>
-        </div>
-    </div>
+    <body><div class="receipt-container"><!-- Header Row --><div class="header-row"><div class="clinic-header"><div class="clinic-name">SHWAN ORTHODONTICS</div><div class="receipt-subtitle">Appointment Confirmation</div></div><div class="receipt-timestamp"><div class="timestamp-label">Printed:</div><div class="timestamp-value">{{receipt.PrintedDate|date:DD/MM/YYYY h:mm A}}</div></div></div><!-- Main Content --><div class="main-content"><!-- Patient Information Section --><div class="section-header">PATIENT INFORMATION</div><div class="info-row patient-name-row"><span class="info-label">Patient Name:</span><span class="info-value patient-name-value">{{patient.PatientName}}</span></div><div class="info-row"><span class="info-label">Patient ID:</span><span class="info-value">{{patient.PersonID}}</span><span class="info-label">Phone:</span><span class="info-value">{{patient.Phone}}</span></div><div class="info-row"></div><!-- Appointment Section --><div class="appointment-section"><div class="appointment-header">NEXT APPOINTMENT</div><div class="appointment-details"><div class="appointment-date">{{patient.AppDate|date:dddd, DD-MM-YYYY - h:mm A}}</div></div></div></div><!-- Clinic Footer --></div></body>
 </body>
 </html>

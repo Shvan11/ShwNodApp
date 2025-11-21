@@ -348,7 +348,7 @@ export async function getPatientById(personId) {
                 p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
                 p.AddressID, p.ReferralSourceID, p.PatientTypeID,
                 p.Notes, p.Language, p.CountryCode,
-                p.EstimatedCost, p.Currency
+                p.EstimatedCost, p.Currency, p.TagID, p.DateAdded
          FROM dbo.tblpatients p
          WHERE p.PersonID = @personId`,
         [['personId', TYPES.Int, personId]],
@@ -370,7 +370,9 @@ export async function getPatientById(personId) {
             Language: columns[14].value,
             CountryCode: columns[15].value,
             EstimatedCost: columns[16].value,
-            Currency: columns[17].value
+            Currency: columns[17].value,
+            TagID: columns[18].value,
+            DateAdded: columns[19].value
         })
     );
     return result[0] || null;
@@ -445,7 +447,8 @@ export async function updatePatient(personId, patientData) {
             Language = @language,
             CountryCode = @countryCode,
             EstimatedCost = @estimatedCost,
-            Currency = @currency
+            Currency = @currency,
+            TagID = @tagID
         WHERE PersonID = @personId
     `;
 
@@ -467,7 +470,8 @@ export async function updatePatient(personId, patientData) {
         ['language', TYPES.TinyInt, patientData.Language ? parseInt(patientData.Language) : 0],
         ['countryCode', TYPES.NVarChar, patientData.CountryCode || null],
         ['estimatedCost', TYPES.Int, patientData.EstimatedCost ? parseInt(patientData.EstimatedCost) : null],
-        ['currency', TYPES.NVarChar, patientData.Currency || null]
+        ['currency', TYPES.NVarChar, patientData.Currency || null],
+        ['tagID', TYPES.Int, patientData.TagID ? parseInt(patientData.TagID) : null]
     ];
 
     await executeQuery(query, parameters);

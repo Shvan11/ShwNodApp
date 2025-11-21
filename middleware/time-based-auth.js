@@ -169,7 +169,7 @@ export async function getExpenseCreationDate(req) {
   const { id } = req.params;
 
   const result = await executeQuery(
-    'SELECT expenseDate FROM dbo.tblExpenses WHERE ExpenseID = @expenseId',
+    'SELECT expenseDate FROM dbo.tblExpenses WHERE ID = @expenseId',
     [['expenseId', TYPES.Int, id]],
     (columns) => ({ createdAt: columns[0].value })
   );

@@ -228,18 +228,28 @@ function formatDate(dateValue, pattern) {
     console.log('[DATE-FORMAT] Day of week:', date.getUTCDay(), '=', daysFull[date.getUTCDay()]);
 
     // Replace tokens in order of length (longest first) to prevent partial matches
-    // This ensures 'MMMM' is replaced before 'MMM', 'dddd' before 'DD', etc.
+    // Use unique placeholders to prevent re-replacement
     let formatted = pattern;
     const tokens = Object.keys(replacements).sort((a, b) => b.length - a.length);
+    const placeholders = {};
 
-    for (const token of tokens) {
-        const oldFormatted = formatted;
-        // Use split/join to replace all occurrences without regex
-        formatted = formatted.split(token).join(replacements[token]);
+    // First pass: Replace tokens with unique placeholders
+    for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+        const placeholder = `\u0000${i}\u0000`; // Use null bytes as placeholders (very unlikely to appear in pattern)
+        placeholders[placeholder] = replacements[token];
 
-        if (oldFormatted !== formatted) {
-            console.log(`[DATE-FORMAT] Replaced "${token}" with "${replacements[token]}": ${oldFormatted} → ${formatted}`);
-        }
+        // Replace all occurrences of the token with the placeholder
+        const regex = new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+        formatted = formatted.replace(regex, placeholder);
+
+        console.log(`[DATE-FORMAT] Replaced token "${token}" with placeholder ${i}`);
+    }
+
+    // Second pass: Replace placeholders with actual values
+    for (const [placeholder, value] of Object.entries(placeholders)) {
+        formatted = formatted.split(placeholder).join(value);
+        console.log(`[DATE-FORMAT] Replaced placeholder with "${value}"`);
     }
 
     console.log('[DATE-FORMAT] Final result:', formatted);

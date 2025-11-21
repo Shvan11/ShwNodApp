@@ -13,7 +13,8 @@ const ViewPatientInfo = ({ patientId }) => {
         genders: [],
         addresses: [],
         referralSources: [],
-        patientTypes: []
+        patientTypes: [],
+        tags: []
     });
     const [editingCost, setEditingCost] = useState(false);
     const [costValue, setCostValue] = useState('');
@@ -52,19 +53,21 @@ const ViewPatientInfo = ({ patientId }) => {
 
     const loadLookupData = useCallback(async () => {
         try {
-            const [gendersRes, addressesRes, referralsRes, typesRes, alertTypesRes] = await Promise.all([
+            const [gendersRes, addressesRes, referralsRes, typesRes, alertTypesRes, tagsRes] = await Promise.all([
                 fetch('/api/genders'),
                 fetch('/api/addresses'),
                 fetch('/api/referral-sources'),
                 fetch('/api/patient-types'),
-                fetch('/api/alert-types')
+                fetch('/api/alert-types'),
+                fetch('/api/tag-options')
             ]);
 
             const lookups = {
                 genders: gendersRes.ok ? await gendersRes.json() : [],
                 addresses: addressesRes.ok ? await addressesRes.json() : [],
                 referralSources: referralsRes.ok ? await referralsRes.json() : [],
-                patientTypes: typesRes.ok ? await typesRes.json() : []
+                patientTypes: typesRes.ok ? await typesRes.json() : [],
+                tags: tagsRes.ok ? await tagsRes.json() : []
             };
 
             setLookupData(lookups);
@@ -121,6 +124,11 @@ const ViewPatientInfo = ({ patientId }) => {
     const getPatientTypeName = (typeId) => {
         const type = lookupData.patientTypes.find(t => t.PatientTypeID === typeId);
         return type?.TypeName || 'N/A';
+    };
+
+    const getTagName = (tagId) => {
+        const tag = lookupData.tags.find(t => t.id === tagId);
+        return tag?.tag || 'N/A';
     };
 
     const calculateAge = (dateOfBirth) => {
@@ -370,6 +378,10 @@ const ViewPatientInfo = ({ patientId }) => {
                             <span className="info-label">Gender:</span>
                             <span className="info-value">{getGenderName(patientData.Gender)}</span>
                         </div>
+                        <div className="info-row">
+                            <span className="info-label">Date Added:</span>
+                            <span className="info-value">{formatDate(patientData.DateAdded)}</span>
+                        </div>
                     </div>
                 </div>
 
@@ -421,6 +433,10 @@ const ViewPatientInfo = ({ patientId }) => {
                         <div className="info-row">
                             <span className="info-label">Referral Source:</span>
                             <span className="info-value">{getReferralSourceName(patientData.ReferralSourceID)}</span>
+                        </div>
+                        <div className="info-row">
+                            <span className="info-label">Tag:</span>
+                            <span className="info-value">{getTagName(patientData.TagID)}</span>
                         </div>
                         <div className="info-row">
                             <span className="info-label">

@@ -11,7 +11,8 @@
     display: flex;
     flex-direction: column;
     background: white;
-    z-index: 100;
+    z-index: 1001; /* Above universal header */
+    overflow: hidden;
 }
 
 /* Designer Header/Toolbar */
@@ -108,15 +109,10 @@
     font-size: 1.125rem;
 }
 
-/* GrapesJS Editor Container */
-#gjs {
-    flex: 1;
-    overflow: hidden;
-}
-
+/* GrapesJS Editor Container - minimal styling, let GrapesJS handle its own layout */
 .grapesjs-editor-container {
     height: calc(100vh - 71px);
-    overflow: hidden;
+    width: 100%;
 }
 
 /* Override some GrapesJS default styles for better integration */

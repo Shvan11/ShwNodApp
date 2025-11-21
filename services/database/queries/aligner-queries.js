@@ -741,46 +741,40 @@ export async function getBatchesBySetId(setId) {
 }
 
 /**
- * Create a new aligner batch
+ * Create a new aligner batch using optimized stored procedure
  * @param {Object} batchData - Batch data
  * @returns {Promise<number>} New batch ID
  */
 export async function createBatch(batchData) {
     const {
-        AlignerSetID, BatchSequence, UpperAlignerCount, LowerAlignerCount,
-        UpperAlignerStartSequence, LowerAlignerStartSequence,
+        AlignerSetID, UpperAlignerCount, LowerAlignerCount,
         ManufactureDate, DeliveredToPatientDate, Days, Notes, IsActive
     } = batchData;
 
+    // Call stored procedure (calculates sequences automatically)
     const query = `
-        DECLARE @OutputTable TABLE (AlignerBatchID INT);
+        DECLARE @NewBatchID INT;
 
-        INSERT INTO tblAlignerBatches (
-            AlignerSetID, BatchSequence, UpperAlignerCount, LowerAlignerCount,
-            UpperAlignerStartSequence, LowerAlignerStartSequence,
-            ManufactureDate, DeliveredToPatientDate, Days,
-            Notes, IsActive
-        )
-        OUTPUT INSERTED.AlignerBatchID INTO @OutputTable
-        VALUES (
-            @AlignerSetID, @BatchSequence, @UpperAlignerCount, @LowerAlignerCount,
-            @UpperAlignerStartSequence, @LowerAlignerStartSequence,
-            @ManufactureDate, @DeliveredToPatientDate, @Days,
-            @Notes, @IsActive
-        );
+        EXEC usp_CreateAlignerBatch
+            @AlignerSetID = @AlignerSetID,
+            @UpperAlignerCount = @UpperAlignerCount,
+            @LowerAlignerCount = @LowerAlignerCount,
+            @ManufactureDate = @ManufactureDate,
+            @DeliveredToPatientDate = @DeliveredToPatientDate,
+            @Days = @Days,
+            @Notes = @Notes,
+            @IsActive = @IsActive,
+            @NewBatchID = @NewBatchID OUTPUT;
 
-        SELECT AlignerBatchID FROM @OutputTable;
+        SELECT @NewBatchID AS BatchID;
     `;
 
     const result = await executeQuery(
         query,
         [
             ['AlignerSetID', TYPES.Int, parseInt(AlignerSetID)],
-            ['BatchSequence', TYPES.Int, BatchSequence ? parseInt(BatchSequence) : null],
             ['UpperAlignerCount', TYPES.Int, UpperAlignerCount ? parseInt(UpperAlignerCount) : 0],
             ['LowerAlignerCount', TYPES.Int, LowerAlignerCount ? parseInt(LowerAlignerCount) : 0],
-            ['UpperAlignerStartSequence', TYPES.Int, UpperAlignerStartSequence ? parseInt(UpperAlignerStartSequence) : null],
-            ['LowerAlignerStartSequence', TYPES.Int, LowerAlignerStartSequence ? parseInt(LowerAlignerStartSequence) : null],
             ['ManufactureDate', TYPES.Date, ManufactureDate || null],
             ['DeliveredToPatientDate', TYPES.Date, DeliveredToPatientDate || null],
             ['Days', TYPES.Int, Days ? parseInt(Days) : null],
@@ -794,48 +788,43 @@ export async function createBatch(batchData) {
 }
 
 /**
- * Update an aligner batch
+ * Update an aligner batch using optimized stored procedure
  * @param {number} batchId - Batch ID
  * @param {Object} batchData - Batch data
  * @returns {Promise<void>}
  */
 export async function updateBatch(batchId, batchData) {
     const {
-        BatchSequence, UpperAlignerCount, LowerAlignerCount,
-        UpperAlignerStartSequence, LowerAlignerStartSequence,
+        AlignerSetID, UpperAlignerCount, LowerAlignerCount,
         ManufactureDate, DeliveredToPatientDate, Notes, IsActive, Days
     } = batchData;
 
+    // Call stored procedure (handles resequencing automatically)
     const query = `
-        UPDATE tblAlignerBatches
-        SET
-            BatchSequence = @BatchSequence,
-            UpperAlignerCount = @UpperAlignerCount,
-            LowerAlignerCount = @LowerAlignerCount,
-            UpperAlignerStartSequence = @UpperAlignerStartSequence,
-            LowerAlignerStartSequence = @LowerAlignerStartSequence,
-            ManufactureDate = @ManufactureDate,
-            DeliveredToPatientDate = @DeliveredToPatientDate,
-            Notes = @Notes,
-            IsActive = @IsActive,
-            Days = @Days
-        WHERE AlignerBatchID = @batchId
+        EXEC usp_UpdateAlignerBatch
+            @AlignerBatchID = @batchId,
+            @AlignerSetID = @AlignerSetID,
+            @UpperAlignerCount = @UpperAlignerCount,
+            @LowerAlignerCount = @LowerAlignerCount,
+            @ManufactureDate = @ManufactureDate,
+            @DeliveredToPatientDate = @DeliveredToPatientDate,
+            @Days = @Days,
+            @Notes = @Notes,
+            @IsActive = @IsActive
     `;
 
     await executeQuery(
         query,
         [
-            ['BatchSequence', TYPES.Int, BatchSequence ? parseInt(BatchSequence) : null],
+            ['batchId', TYPES.Int, parseInt(batchId)],
+            ['AlignerSetID', TYPES.Int, parseInt(AlignerSetID)],
             ['UpperAlignerCount', TYPES.Int, UpperAlignerCount ? parseInt(UpperAlignerCount) : 0],
             ['LowerAlignerCount', TYPES.Int, LowerAlignerCount ? parseInt(LowerAlignerCount) : 0],
-            ['UpperAlignerStartSequence', TYPES.Int, UpperAlignerStartSequence ? parseInt(UpperAlignerStartSequence) : null],
-            ['LowerAlignerStartSequence', TYPES.Int, LowerAlignerStartSequence ? parseInt(LowerAlignerStartSequence) : null],
             ['ManufactureDate', TYPES.Date, ManufactureDate || null],
             ['DeliveredToPatientDate', TYPES.Date, DeliveredToPatientDate || null],
-            ['Notes', TYPES.NVarChar, Notes || null],
-            ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : true],
             ['Days', TYPES.Int, Days ? parseInt(Days) : null],
-            ['batchId', TYPES.Int, parseInt(batchId)]
+            ['Notes', TYPES.NVarChar, Notes || null],
+            ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : null]
         ]
     );
 }
@@ -853,13 +842,14 @@ export async function markBatchAsDelivered(batchId) {
 }
 
 /**
- * Delete a batch
+ * Delete a batch using optimized stored procedure
  * @param {number} batchId - Batch ID
  * @returns {Promise<void>}
  */
 export async function deleteBatch(batchId) {
+    // Call stored procedure (handles remaining count restoration and resequencing)
     await executeQuery(
-        'DELETE FROM tblAlignerBatches WHERE AlignerBatchID = @batchId',
+        'EXEC usp_DeleteAlignerBatch @AlignerBatchID = @batchId',
         [['batchId', TYPES.Int, parseInt(batchId)]]
     );
 }

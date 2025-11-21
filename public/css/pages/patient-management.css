@@ -115,7 +115,7 @@
 .pm-name-search-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 0.75rem;
+    gap: var(--spacing-sm);
     margin-bottom: var(--spacing-lg);
     padding: var(--spacing-lg);
     background-color: var(--gray-50);
@@ -135,12 +135,12 @@
     width: 100%;
     height: 2.75rem;
     line-height: 1.5;
-    padding: var(--spacing-sm) 0.75rem;
+    padding: var(--spacing-sm) var(--spacing-md);
 }
 
 .pm-search-form {
     display: flex;
-    gap: 0.75rem;
+    gap: var(--spacing-sm);
     margin-bottom: var(--spacing-lg);
     align-items: center;
     flex-wrap: wrap;
@@ -148,7 +148,7 @@
 
 .pm-search-input {
     flex: 1 1 300px;
-    min-width: 250px;
+    min-width: 0;
 }
 
 /* ===================================
@@ -232,10 +232,18 @@
 }
 
 /* ===================================
-   TABLE - PATIENT NAME CELL
+   TABLE - SEARCH RESULTS
    =================================== */
+.work-table tbody {
+    font-size: var(--font-size-base);
+}
+
+.work-table thead th {
+    font-size: var(--font-size-base);
+}
+
 .pm-patient-name-secondary {
-    font-size: 0.85rem;
+    font-size: var(--font-size-sm);
     color: var(--gray-500);
 }
 
@@ -301,7 +309,7 @@
 .pm-delete-warning-header {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--spacing-sm);
     margin-bottom: var(--spacing-md);
 }
 
@@ -350,6 +358,230 @@
 }
 
 /* ===================================
+   ADVANCED FILTERS SECTION
+   =================================== */
+.pm-advanced-filters {
+    margin-bottom: var(--spacing-lg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    /* overflow: hidden removed to allow React-Select dropdowns to display fully */
+}
+
+.pm-advanced-filters__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background-color: var(--background-secondary);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.pm-advanced-filters__header:hover {
+    background-color: var(--gray-100);
+}
+
+.pm-advanced-filters__header h4 {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.pm-filter-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    margin-left: var(--spacing-sm);
+}
+
+.pm-advanced-filters__content {
+    padding: var(--spacing-lg);
+    background-color: var(--background-primary);
+}
+
+.pm-advanced-filters__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.pm-filter-group label {
+    display: block;
+    margin-bottom: var(--spacing-sm);
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+}
+
+/* Active Filters Display */
+.pm-active-filters {
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--border-color);
+}
+
+.pm-active-filters__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.pm-active-filters__header span {
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.pm-clear-filters-btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    background-color: var(--error-500);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.pm-clear-filters-btn:hover {
+    background-color: var(--error-600);
+}
+
+.pm-filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+}
+
+.pm-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    background-color: var(--gray-100);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.pm-filter-chip--work {
+    background-color: var(--blue-50);
+    border-color: var(--blue-200);
+    color: var(--blue-700);
+}
+
+.pm-filter-chip--keyword {
+    background-color: var(--success-50);
+    border-color: var(--success-200);
+    color: var(--success-700);
+}
+
+.pm-filter-chip--tag {
+    background-color: var(--warning-50);
+    border-color: var(--warning-200);
+    color: var(--warning-700);
+}
+
+.pm-filter-chip__remove {
+    background: transparent;
+    border: none;
+    font-size: var(--font-size-xl);
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    margin-left: var(--spacing-xs);
+    color: inherit;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.pm-filter-chip__remove:hover {
+    opacity: 1;
+}
+
+/* ===================================
+   TABLE - WORK BADGES & TAGS
+   =================================== */
+.pm-work-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+}
+
+.pm-work-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    background-color: var(--blue-100);
+    color: var(--blue-700);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    white-space: nowrap;
+}
+
+.pm-tag-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    background-color: var(--warning-100);
+    color: var(--warning-700);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+}
+
+.pm-empty-value {
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: var(--font-size-sm);
+}
+
+/* ===================================
+   REACT SELECT CUSTOM STYLES
+   =================================== */
+/* Note: React-Select requires !important to override library defaults */
+.pm-select__control {
+    min-height: 2.75rem !important;
+    border-color: var(--gray-300) !important;
+}
+
+.pm-select__control:hover {
+    border-color: var(--blue-500) !important;
+}
+
+.pm-select__control--is-focused {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 1px var(--primary-color) !important;
+}
+
+.pm-select__menu {
+    z-index: var(--z-index-modal) !important;
+}
+
+.pm-select__multi-value {
+    background-color: var(--blue-100) !important;
+}
+
+.pm-select__multi-value__label {
+    color: var(--blue-700) !important;
+}
+
+.pm-select__multi-value__remove:hover {
+    background-color: var(--blue-200) !important;
+    color: var(--blue-800) !important;
+}
+
+/* ===================================
    RESPONSIVE DESIGN
    =================================== */
 @media (max-width: 768px) {
@@ -365,6 +597,9 @@
 
     .pm-search-input {
         width: 100%;
+        height: auto;
+        padding: var(--spacing-xs) var(--spacing-sm);
+        line-height: 1.5;
     }
 
     .patient-management-header {
@@ -374,5 +609,77 @@
 
     .patient-management-header-actions {
         width: 100%;
+    }
+
+    /* Advanced Filters Responsive */
+    .pm-advanced-filters__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .pm-active-filters__header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+    }
+
+    .pm-clear-filters-btn {
+        width: 100%;
+    }
+
+    .pm-filter-chips {
+        flex-direction: column;
+    }
+
+    .pm-filter-chip {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    /* Table responsive - work badges and tags */
+    .pm-work-badges {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    /* Table horizontal scroll */
+    .work-table-container {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .work-table {
+        min-width: 600px;
+    }
+
+    /* Action buttons - reduce size */
+    .pm-action-buttons .btn {
+        font-size: var(--font-size-xs);
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+
+    /* Quick search - reduce padding */
+    .pm-quick-search-container {
+        padding: var(--spacing-md);
+    }
+
+    /* Modals - fit small screens */
+    .pm-modal-narrow,
+    .pm-modal-wide {
+        max-width: 95vw;
+        margin: var(--spacing-sm);
+    }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+    .work-table {
+        min-width: 500px;
+    }
+
+    .pm-quick-search-header h3 {
+        font-size: var(--font-size-base);
+    }
+
+    .pm-search-input {
+        min-width: 0;
     }
 }

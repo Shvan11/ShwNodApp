@@ -232,8 +232,8 @@ router.get("/patientsPhones", async (req, res) => {
 // ===== PATIENT SEARCH =====
 
 /**
- * Search patients by name, phone, or ID
- * GET /patients/search?q={query}&patientName={name}&firstName={first}&lastName={last}
+ * Search patients by name, phone, ID, work type, keywords, and tags
+ * GET /patients/search?q={query}&patientName={name}&firstName={first}&lastName={last}&workTypes={ids}&keywords={ids}&tags={ids}
  */
 router.get('/patients/search', async (req, res) => {
     try {
@@ -241,6 +241,14 @@ router.get('/patients/search', async (req, res) => {
         const patientName = req.query.patientName || '';
         const firstName = req.query.firstName || '';
         const lastName = req.query.lastName || '';
+        const workTypesParam = req.query.workTypes || '';
+        const keywordsParam = req.query.keywords || '';
+        const tagsParam = req.query.tags || '';
+
+        // Parse comma-separated IDs into arrays
+        const workTypeIds = workTypesParam ? workTypesParam.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id)) : [];
+        const keywordIds = keywordsParam ? keywordsParam.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id)) : [];
+        const tagIds = tagsParam ? tagsParam.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id)) : [];
 
         // Build WHERE clause for search
         let whereConditions = [];
@@ -268,23 +276,76 @@ router.get('/patients/search', async (req, res) => {
             parameters.push(['search', database.TYPES.NVarChar, `%${searchQuery.trim()}%`]);
         }
 
+        // Filter by work types (ANY work, past or current)
+        if (workTypeIds.length > 0) {
+            const workTypePlaceholders = workTypeIds.map((_, idx) => `@workType${idx}`).join(',');
+            whereConditions.push(`EXISTS (
+                SELECT 1 FROM dbo.tblwork w
+                WHERE w.PersonID = p.PersonID
+                AND w.Typeofwork IN (${workTypePlaceholders})
+            )`);
+            workTypeIds.forEach((id, idx) => {
+                parameters.push([`workType${idx}`, database.TYPES.Int, id]);
+            });
+        }
+
+        // Filter by keywords (check all 5 keyword columns)
+        if (keywordIds.length > 0) {
+            const keywordPlaceholders = keywordIds.map((_, idx) => `@keyword${idx}`).join(',');
+            whereConditions.push(`EXISTS (
+                SELECT 1 FROM dbo.tblwork w
+                WHERE w.PersonID = p.PersonID
+                AND (
+                    w.KeyWordID1 IN (${keywordPlaceholders})
+                    OR w.KeyWordID2 IN (${keywordPlaceholders})
+                    OR w.KeywordID3 IN (${keywordPlaceholders})
+                    OR w.KeywordID4 IN (${keywordPlaceholders})
+                    OR w.KeywordID5 IN (${keywordPlaceholders})
+                )
+            )`);
+            keywordIds.forEach((id, idx) => {
+                parameters.push([`keyword${idx}`, database.TYPES.Int, id]);
+            });
+        }
+
+        // Filter by patient tags
+        if (tagIds.length > 0) {
+            const tagPlaceholders = tagIds.map((_, idx) => `@tag${idx}`).join(',');
+            whereConditions.push(`p.TagID IN (${tagPlaceholders})`);
+            tagIds.forEach((id, idx) => {
+                parameters.push([`tag${idx}`, database.TYPES.Int, id]);
+            });
+        }
+
         const whereClause = whereConditions.length > 0
             ? 'WHERE ' + whereConditions.join(' AND ')
             : '';
 
         const query = `
-            SELECT TOP 100 p.PersonID, p.patientID, p.PatientName, p.FirstName, p.LastName,
+            SELECT DISTINCT TOP 100
+                    p.PersonID, p.patientID, p.PatientName, p.FirstName, p.LastName,
                     p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
-                    p.AddressID, p.ReferralSourceID, p.PatientTypeID,
+                    p.AddressID, p.ReferralSourceID, p.PatientTypeID, p.TagID,
                     p.Notes, p.Language, p.CountryCode,
                     p.EstimatedCost, p.Currency,
                     g.Gender as GenderName, a.Zone as AddressName,
-                    r.Referral as ReferralSource, pt.PatientType as PatientTypeName
+                    r.Referral as ReferralSource, pt.PatientType as PatientTypeName,
+                    tag.Tag as TagName,
+                    (
+                        SELECT STRING_AGG(wt.WorkType, ', ')
+                        FROM (
+                            SELECT DISTINCT wt2.WorkType
+                            FROM dbo.tblwork w2
+                            INNER JOIN dbo.tblWorkType wt2 ON w2.Typeofwork = wt2.ID
+                            WHERE w2.PersonID = p.PersonID AND w2.Finished = 0
+                        ) wt
+                    ) as ActiveWorkTypes
             FROM dbo.tblpatients p
             LEFT JOIN dbo.tblGender g ON p.Gender = g.Gender_ID
             LEFT JOIN dbo.tblAddress a ON p.AddressID = a.ID
             LEFT JOIN dbo.tblReferrals r ON p.ReferralSourceID = r.ID
             LEFT JOIN dbo.tblPatientType pt ON p.PatientTypeID = pt.ID
+            LEFT JOIN dbo.tblTagOptions tag ON p.TagID = tag.ID
             ${whereClause}
             ORDER BY p.PatientName
         `;
@@ -306,15 +367,18 @@ router.get('/patients/search', async (req, res) => {
                 AddressID: columns[10].value,
                 ReferralSourceID: columns[11].value,
                 PatientTypeID: columns[12].value,
-                Notes: columns[13].value,
-                Language: columns[14].value,
-                CountryCode: columns[15].value,
-                EstimatedCost: columns[16].value,
-                Currency: columns[17].value,
-                GenderName: columns[18].value,
-                AddressName: columns[19].value,
-                ReferralSource: columns[20].value,
-                PatientTypeName: columns[21].value
+                TagID: columns[13].value,
+                Notes: columns[14].value,
+                Language: columns[15].value,
+                CountryCode: columns[16].value,
+                EstimatedCost: columns[17].value,
+                Currency: columns[18].value,
+                GenderName: columns[19].value,
+                AddressName: columns[20].value,
+                ReferralSource: columns[21].value,
+                PatientTypeName: columns[22].value,
+                TagName: columns[23].value,
+                ActiveWorkTypes: columns[24].value
             })
         );
 
@@ -530,6 +594,29 @@ router.get('/patients/:patientId/has-appointment', async (req, res) => {
     } catch (error) {
         log.error(`Error checking appointment for patient ${req.params.patientId}:`, error);
         return ErrorResponses.internalError(res, 'Failed to check appointment status', error);
+    }
+});
+
+// ===== TAG OPTIONS =====
+
+/**
+ * Get all tag options
+ * GET /tag-options
+ */
+router.get('/tag-options', async (req, res) => {
+    try {
+        const tags = await database.executeQuery(
+            'SELECT ID, Tag FROM dbo.tblTagOptions ORDER BY Tag',
+            [],
+            (columns) => ({
+                ID: columns[0].value,
+                Tag: columns[1].value
+            })
+        );
+        res.json(tags);
+    } catch (error) {
+        log.error('Error fetching tag options:', error);
+        return ErrorResponses.internalError(res, 'Failed to fetch tag options', error);
     }
 });
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AsyncSelect from 'react-select/async';
+import Select from 'react-select';
 
 /**
  * Patient Management Component
@@ -12,7 +13,6 @@ const PatientManagement = () => {
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [hasSearched, setHasSearched] = useState(false);
-    const [showEditModal, setShowEditModal] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [selectedPatient, setSelectedPatient] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
@@ -27,35 +27,17 @@ const PatientManagement = () => {
     const [showQuickSearch, setShowQuickSearch] = useState(true);
     const [allPatients, setAllPatients] = useState([]);
 
-    // Dropdown data
-    const [genders, setGenders] = useState([]);
-    const [addresses, setAddresses] = useState([]);
-    const [referralSources, setReferralSources] = useState([]);
-    const [patientTypes, setPatientTypes] = useState([]);
+    // Advanced filters state
+    const [selectedWorkTypes, setSelectedWorkTypes] = useState([]);
+    const [selectedKeywords, setSelectedKeywords] = useState([]);
+    const [selectedTags, setSelectedTags] = useState([]);
+    const [workTypes, setWorkTypes] = useState([]);
+    const [keywords, setKeywords] = useState([]);
+    const [tags, setTags] = useState([]);
+    const [showFilters, setShowFilters] = useState(false);
 
-    // Edit form state
-    const [editFormData, setEditFormData] = useState({
-        PersonID: '',
-        patientID: '',
-        PatientName: '',
-        FirstName: '',
-        LastName: '',
-        Phone: '',
-        Phone2: '',
-        Email: '',
-        DateofBirth: '',
-        Gender: '',
-        AddressID: '',
-        ReferralSourceID: '',
-        PatientTypeID: '',
-        Notes: '',
-        Alerts: '',
-        Language: '0',
-        CountryCode: ''
-    });
 
     useEffect(() => {
-        loadDropdownData();
         loadAllPatientsForDropdown();
 
         // Check for search parameter in URL
@@ -75,6 +57,47 @@ const PatientManagement = () => {
             setAllPatients(data);
         } catch (err) {
             console.error('Error loading patient list for dropdown:', err);
+        }
+    };
+
+    // Load filter data on mount
+    useEffect(() => {
+        loadFilterData();
+    }, []);
+
+    const loadFilterData = async () => {
+        try {
+            // Load work types
+            const workTypesResponse = await fetch('/api/getworktypes');
+            if (workTypesResponse.ok) {
+                const workTypesData = await workTypesResponse.json();
+                setWorkTypes(workTypesData.map(wt => ({
+                    value: wt.ID,
+                    label: wt.WorkType
+                })));
+            }
+
+            // Load keywords
+            const keywordsResponse = await fetch('/api/getworkkeywords');
+            if (keywordsResponse.ok) {
+                const keywordsData = await keywordsResponse.json();
+                setKeywords(keywordsData.map(kw => ({
+                    value: kw.ID,
+                    label: kw.KeyWord
+                })));
+            }
+
+            // Load tags
+            const tagsResponse = await fetch('/api/tag-options');
+            if (tagsResponse.ok) {
+                const tagsData = await tagsResponse.json();
+                setTags(tagsData.map(tag => ({
+                    value: tag.ID,
+                    label: tag.Tag
+                })));
+            }
+        } catch (err) {
+            console.error('Error loading filter data:', err);
         }
     };
 
@@ -131,25 +154,8 @@ const PatientManagement = () => {
         callback(filtered);
     };
 
-    // Custom styles for React Select
-    const selectStyles = {
-        control: (provided) => ({
-            ...provided,
-            minHeight: '44px',
-            borderColor: '#d1d5db',
-            '&:hover': {
-                borderColor: '#3b82f6'
-            }
-        }),
-        menu: (provided) => ({
-            ...provided,
-            zIndex: 100
-        })
-    };
-
-    // RTL styles for Arabic name search
+    // RTL styles for Arabic name search (dynamic runtime values - allowed)
     const selectStylesRTL = {
-        ...selectStyles,
         input: (provided) => ({
             ...provided,
             direction: 'rtl',
@@ -174,13 +180,18 @@ const PatientManagement = () => {
             clearTimeout(searchDebounce);
         }
 
-        // Check if any field has at least 2 characters
+        // Check if any field has at least 2 characters OR any filters are selected
         const hasMinimumInput =
             searchPatientName.trim().length >= 2 ||
             searchFirstName.trim().length >= 2 ||
             searchLastName.trim().length >= 2;
 
-        if (hasMinimumInput) {
+        const hasFilters =
+            selectedWorkTypes.length > 0 ||
+            selectedKeywords.length > 0 ||
+            selectedTags.length > 0;
+
+        if (hasMinimumInput || hasFilters) {
             // Set new timeout for debounced search
             const timeoutId = setTimeout(() => {
                 performSearch();
@@ -188,8 +199,8 @@ const PatientManagement = () => {
 
             setSearchDebounce(timeoutId);
         } else {
-            // Clear results if all fields are empty or too short
-            if (!searchPatientName && !searchFirstName && !searchLastName) {
+            // Clear results if all fields are empty or too short and no filters
+            if (!searchPatientName && !searchFirstName && !searchLastName && !hasFilters) {
                 setPatients([]);
                 setHasSearched(false);
             }
@@ -201,7 +212,7 @@ const PatientManagement = () => {
                 clearTimeout(searchDebounce);
             }
         };
-    }, [searchPatientName, searchFirstName, searchLastName]);
+    }, [searchPatientName, searchFirstName, searchLastName, selectedWorkTypes, selectedKeywords, selectedTags]);
 
     const performSearch = async () => {
         try {
@@ -213,6 +224,17 @@ const PatientManagement = () => {
             if (searchPatientName.trim()) params.append('patientName', searchPatientName.trim());
             if (searchFirstName.trim()) params.append('firstName', searchFirstName.trim());
             if (searchLastName.trim()) params.append('lastName', searchLastName.trim());
+
+            // Add filter parameters
+            if (selectedWorkTypes.length > 0) {
+                params.append('workTypes', selectedWorkTypes.map(wt => wt.value).join(','));
+            }
+            if (selectedKeywords.length > 0) {
+                params.append('keywords', selectedKeywords.map(kw => kw.value).join(','));
+            }
+            if (selectedTags.length > 0) {
+                params.append('tags', selectedTags.map(tag => tag.value).join(','));
+            }
 
             const response = await fetch(`/api/patients/search?${params.toString()}`);
             if (!response.ok) throw new Error('Failed to search patients');
@@ -261,47 +283,6 @@ const PatientManagement = () => {
         searchPatients('', true);
     };
 
-    const loadDropdownData = async () => {
-        try {
-            const [gendersRes, addressesRes, referralsRes, typesRes] = await Promise.all([
-                fetch('/api/genders'),
-                fetch('/api/addresses'),
-                fetch('/api/referral-sources'),
-                fetch('/api/patient-types')
-            ]);
-
-            if (gendersRes.ok) setGenders(await gendersRes.json());
-            if (addressesRes.ok) setAddresses(await addressesRes.json());
-            if (referralsRes.ok) setReferralSources(await referralsRes.json());
-            if (typesRes.ok) setPatientTypes(await typesRes.json());
-        } catch (err) {
-            console.error('Error loading dropdown data:', err);
-        }
-    };
-
-    const handleEditClick = (patient) => {
-        setSelectedPatient(patient);
-        setEditFormData({
-            PersonID: patient.PersonID,
-            patientID: patient.patientID || '',
-            PatientName: patient.PatientName || '',
-            FirstName: patient.FirstName || '',
-            LastName: patient.LastName || '',
-            Phone: patient.Phone || '',
-            Phone2: patient.Phone2 || '',
-            Email: patient.Email || '',
-            DateofBirth: patient.DateofBirth ? new Date(patient.DateofBirth).toISOString().split('T')[0] : '',
-            Gender: patient.Gender || '',
-            AddressID: patient.AddressID || '',
-            ReferralSourceID: patient.ReferralSourceID || '',
-            PatientTypeID: patient.PatientTypeID || '',
-            Notes: patient.Notes || '',
-            Alerts: patient.Alerts || '',
-            Language: patient.Language !== null ? patient.Language.toString() : '0',
-            CountryCode: patient.CountryCode || ''
-        });
-        setShowEditModal(true);
-    };
 
     const handleDeleteClick = (patient) => {
         setSelectedPatient(patient);
@@ -343,32 +324,6 @@ const PatientManagement = () => {
         }
     };
 
-    const handleEditSubmit = async (e) => {
-        e.preventDefault();
-
-        try {
-            const response = await fetch(`/api/patients/${editFormData.PersonID}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(editFormData)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to update patient');
-            }
-
-            // Refresh search results
-            if (hasSearched) {
-                await searchPatients(searchTerm, searchTerm === '');
-            }
-            setShowEditModal(false);
-            setSuccessMessage('Patient updated successfully!');
-            setTimeout(() => setSuccessMessage(null), 5000);
-        } catch (err) {
-            setError(err.message);
-        }
-    };
 
     const handleDeleteConfirm = async () => {
         try {
@@ -443,6 +398,7 @@ const PatientManagement = () => {
                                 onChange={handleQuickSearchSelect}
                                 placeholder="اكتب للبحث..."
                                 isClearable
+                                classNamePrefix="pm-select"
                                 styles={selectStylesRTL}
                                 noOptionsMessage={() => "لم يتم العثور على مرضى"}
                                 loadingMessage={() => "جاري البحث..."}
@@ -460,7 +416,7 @@ const PatientManagement = () => {
                                 onChange={handleQuickSearchSelect}
                                 placeholder="Type to search by phone..."
                                 isClearable
-                                styles={selectStyles}
+                                classNamePrefix="pm-select"
                                 noOptionsMessage={() => "No patients found"}
                                 loadingMessage={() => "Searching..."}
                             />
@@ -477,7 +433,7 @@ const PatientManagement = () => {
                                 onChange={handleQuickSearchSelect}
                                 placeholder="Type to search by ID..."
                                 isClearable
-                                styles={selectStyles}
+                                classNamePrefix="pm-select"
                                 noOptionsMessage={() => "No patients found"}
                                 loadingMessage={() => "Searching..."}
                             />
@@ -568,6 +524,152 @@ const PatientManagement = () => {
                 </button>
             </form>
 
+            {/* Advanced Filters Section */}
+            <div className="pm-advanced-filters">
+                <div className="pm-advanced-filters__header" onClick={() => setShowFilters(!showFilters)}>
+                    <h4>
+                        <i className={`fas fa-filter pm-icon-gap`}></i>
+                        Advanced Filters
+                        {(selectedWorkTypes.length + selectedKeywords.length + selectedTags.length > 0) && (
+                            <span className="pm-filter-badge">
+                                {selectedWorkTypes.length + selectedKeywords.length + selectedTags.length} active
+                            </span>
+                        )}
+                    </h4>
+                    <i className={`fas fa-chevron-${showFilters ? 'up' : 'down'}`}></i>
+                </div>
+
+                {showFilters && (
+                    <div className="pm-advanced-filters__content">
+                        <div className="pm-advanced-filters__grid">
+                            <div className="pm-filter-group">
+                                <label>
+                                    <i className="fas fa-tooth pm-icon-gap"></i>
+                                    Filter by Work Type
+                                </label>
+                                <Select
+                                    isMulti
+                                    isClearable
+                                    isSearchable
+                                    closeMenuOnSelect={false}
+                                    options={workTypes}
+                                    value={selectedWorkTypes}
+                                    onChange={setSelectedWorkTypes}
+                                    placeholder="Select work types..."
+                                    className="pm-filter-select"
+                                    classNamePrefix="pm-select"
+                                    menuPortalTarget={document.body}
+                                    menuPosition="fixed"
+                                    noOptionsMessage={() => "No work types found"}
+                                />
+                            </div>
+
+                            <div className="pm-filter-group">
+                                <label>
+                                    <i className="fas fa-tags pm-icon-gap"></i>
+                                    Filter by Keywords
+                                </label>
+                                <Select
+                                    isMulti
+                                    isClearable
+                                    isSearchable
+                                    closeMenuOnSelect={false}
+                                    options={keywords}
+                                    value={selectedKeywords}
+                                    onChange={setSelectedKeywords}
+                                    placeholder="Search keywords..."
+                                    className="pm-filter-select"
+                                    classNamePrefix="pm-select"
+                                    menuPortalTarget={document.body}
+                                    menuPosition="fixed"
+                                    noOptionsMessage={() => "No keywords found"}
+                                />
+                            </div>
+
+                            <div className="pm-filter-group">
+                                <label>
+                                    <i className="fas fa-bookmark pm-icon-gap"></i>
+                                    Filter by Patient Tag
+                                </label>
+                                <Select
+                                    isMulti
+                                    isClearable
+                                    isSearchable
+                                    options={tags}
+                                    value={selectedTags}
+                                    onChange={setSelectedTags}
+                                    placeholder="Select tags..."
+                                    className="pm-filter-select"
+                                    classNamePrefix="pm-select"
+                                    menuPortalTarget={document.body}
+                                    menuPosition="fixed"
+                                    noOptionsMessage={() => "No tags found"}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Selected Filters Display */}
+                        {(selectedWorkTypes.length + selectedKeywords.length + selectedTags.length > 0) && (
+                            <div className="pm-active-filters">
+                                <div className="pm-active-filters__header">
+                                    <span>Active Filters:</span>
+                                    <button
+                                        type="button"
+                                        className="pm-clear-filters-btn"
+                                        onClick={() => {
+                                            setSelectedWorkTypes([]);
+                                            setSelectedKeywords([]);
+                                            setSelectedTags([]);
+                                        }}
+                                    >
+                                        <i className="fas fa-times pm-icon-gap"></i>
+                                        Clear All Filters
+                                    </button>
+                                </div>
+                                <div className="pm-filter-chips">
+                                    {selectedWorkTypes.map(wt => (
+                                        <span key={`wt-${wt.value}`} className="pm-filter-chip pm-filter-chip--work">
+                                            <i className="fas fa-tooth pm-icon-gap"></i>
+                                            {wt.label}
+                                            <button
+                                                onClick={() => setSelectedWorkTypes(selectedWorkTypes.filter(item => item.value !== wt.value))}
+                                                className="pm-filter-chip__remove"
+                                            >
+                                                ×
+                                            </button>
+                                        </span>
+                                    ))}
+                                    {selectedKeywords.map(kw => (
+                                        <span key={`kw-${kw.value}`} className="pm-filter-chip pm-filter-chip--keyword">
+                                            <i className="fas fa-tags pm-icon-gap"></i>
+                                            {kw.label}
+                                            <button
+                                                onClick={() => setSelectedKeywords(selectedKeywords.filter(item => item.value !== kw.value))}
+                                                className="pm-filter-chip__remove"
+                                            >
+                                                ×
+                                            </button>
+                                        </span>
+                                    ))}
+                                    {selectedTags.map(tag => (
+                                        <span key={`tag-${tag.value}`} className="pm-filter-chip pm-filter-chip--tag">
+                                            <i className="fas fa-bookmark pm-icon-gap"></i>
+                                            {tag.label}
+                                            <button
+                                                onClick={() => setSelectedTags(selectedTags.filter(item => item.value !== tag.value))}
+                                                className="pm-filter-chip__remove"
+                                            >
+                                                ×
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
             {error && (
                 <div className="pm-error-message">
                     {error}
@@ -621,16 +723,14 @@ const PatientManagement = () => {
                                 <th>ID</th>
                                 <th>Patient Name</th>
                                 <th>Phone</th>
-                                <th>Email</th>
-                                <th>Date of Birth</th>
-                                <th>Gender</th>
+                                <th>Tag</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {patients.map((patient) => (
                             <tr key={patient.PersonID}>
-                                <td>{patient.patientID || patient.PersonID}</td>
+                                <td>{patient.PersonID}</td>
                                 <td>
                                     <strong>{patient.PatientName}</strong>
                                     {patient.FirstName && (
@@ -640,9 +740,13 @@ const PatientManagement = () => {
                                     )}
                                 </td>
                                 <td>{patient.Phone || 'N/A'}</td>
-                                <td>{patient.Email || 'N/A'}</td>
-                                <td>{formatDate(patient.DateofBirth)}</td>
-                                <td>{patient.GenderName || 'N/A'}</td>
+                                <td>
+                                    {patient.TagName ? (
+                                        <span className="pm-tag-badge">{patient.TagName}</span>
+                                    ) : (
+                                        <span className="pm-empty-value">-</span>
+                                    )}
+                                </td>
                                 <td>
                                     <div className="pm-action-buttons">
                                         <button
@@ -661,7 +765,7 @@ const PatientManagement = () => {
                                             <i className="fas fa-eye"></i> View
                                         </button>
                                         <button
-                                            onClick={() => handleEditClick(patient)}
+                                            onClick={() => window.location.href = `/patient/${patient.PersonID}/edit-patient`}
                                             className="btn btn-sm btn-secondary"
                                             title="Edit patient"
                                         >
@@ -687,195 +791,6 @@ const PatientManagement = () => {
                             )}
                         </tbody>
                     </table>
-                </div>
-            )}
-
-            {/* Edit Patient Modal */}
-            {showEditModal && selectedPatient && (
-                <div className="modal-overlay">
-                    <div className="work-modal pm-modal-wide">
-                        <div className="modal-header">
-                            <h3>Edit Patient - {selectedPatient.PatientName}</h3>
-                            <button
-                                onClick={() => setShowEditModal(false)}
-                                className="modal-close"
-                            >
-                                ×
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleEditSubmit} className="work-form">
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Patient ID</label>
-                                    <input
-                                        type="text"
-                                        value={editFormData.patientID}
-                                        onChange={(e) => setEditFormData({...editFormData, patientID: e.target.value})}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Patient Name <span className="pm-required-asterisk">*</span></label>
-                                    <input
-                                        type="text"
-                                        value={editFormData.PatientName}
-                                        onChange={(e) => setEditFormData({...editFormData, PatientName: e.target.value})}
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>First Name</label>
-                                    <input
-                                        type="text"
-                                        value={editFormData.FirstName}
-                                        onChange={(e) => setEditFormData({...editFormData, FirstName: e.target.value})}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Last Name</label>
-                                    <input
-                                        type="text"
-                                        value={editFormData.LastName}
-                                        onChange={(e) => setEditFormData({...editFormData, LastName: e.target.value})}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Phone</label>
-                                    <input
-                                        type="tel"
-                                        value={editFormData.Phone}
-                                        onChange={(e) => setEditFormData({...editFormData, Phone: e.target.value})}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Phone 2</label>
-                                    <input
-                                        type="tel"
-                                        value={editFormData.Phone2}
-                                        onChange={(e) => setEditFormData({...editFormData, Phone2: e.target.value})}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Email</label>
-                                    <input
-                                        type="email"
-                                        value={editFormData.Email}
-                                        onChange={(e) => setEditFormData({...editFormData, Email: e.target.value})}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Date of Birth</label>
-                                    <input
-                                        type="date"
-                                        value={editFormData.DateofBirth}
-                                        onChange={(e) => setEditFormData({...editFormData, DateofBirth: e.target.value})}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Gender</label>
-                                    <select
-                                        value={editFormData.Gender}
-                                        onChange={(e) => setEditFormData({...editFormData, Gender: e.target.value})}
-                                    >
-                                        <option value="">Select Gender</option>
-                                        {genders.map(gender => (
-                                            <option key={gender.id} value={gender.id}>
-                                                {gender.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>Address/Zone</label>
-                                    <select
-                                        value={editFormData.AddressID}
-                                        onChange={(e) => setEditFormData({...editFormData, AddressID: e.target.value})}
-                                    >
-                                        <option value="">Select Address</option>
-                                        {addresses.map(address => (
-                                            <option key={address.id} value={address.id}>
-                                                {address.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Referral Source</label>
-                                    <select
-                                        value={editFormData.ReferralSourceID}
-                                        onChange={(e) => setEditFormData({...editFormData, ReferralSourceID: e.target.value})}
-                                    >
-                                        <option value="">Select Referral Source</option>
-                                        {referralSources.map(source => (
-                                            <option key={source.id} value={source.id}>
-                                                {source.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>Patient Type</label>
-                                    <select
-                                        value={editFormData.PatientTypeID}
-                                        onChange={(e) => setEditFormData({...editFormData, PatientTypeID: e.target.value})}
-                                    >
-                                        <option value="">Select Patient Type</option>
-                                        {patientTypes.map(type => (
-                                            <option key={type.id} value={type.id}>
-                                                {type.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="form-group full-width">
-                                <label>Notes</label>
-                                <textarea
-                                    value={editFormData.Notes}
-                                    onChange={(e) => setEditFormData({...editFormData, Notes: e.target.value})}
-                                    rows="3"
-                                />
-                            </div>
-
-                            <div className="form-group full-width">
-                                <label>Alerts</label>
-                                <textarea
-                                    value={editFormData.Alerts}
-                                    onChange={(e) => setEditFormData({...editFormData, Alerts: e.target.value})}
-                                    rows="2"
-                                />
-                            </div>
-
-                            <div className="form-actions">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowEditModal(false)}
-                                    className="btn btn-secondary"
-                                >
-                                    Cancel
-                                </button>
-                                <button type="submit" className="btn btn-primary">
-                                    Update Patient
-                                </button>
-                            </div>
-                        </form>
-                    </div>
                 </div>
             )}
 
