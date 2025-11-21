@@ -6,10 +6,11 @@ import { Connection, Request, TYPES } from 'tedious';
 
 import ConnectionPool from './ConnectionPool.js';
 import ResourceManager from '../core/ResourceManager.js';
+import { log } from '../../utils/logger.js';
 
 // Register database service with resource manager
 ResourceManager.register('database-service', null, async () => {
-  console.log('Shutting down database service');
+  log.info('Shutting down database service');
   await ConnectionPool.cleanup();
 });
 
@@ -32,7 +33,7 @@ function executeQuery(query, params, rowMapper, resultMapper = (result) => resul
 
       const request = new Request(query, (err) => {
         if (err) {
-          console.error('Query execution error:', {
+          log.error('Query execution error', {
             error: err.message,
             query: query.substring(0, 100) + (query.length > 100 ? '...' : ''),
             code: err.code
@@ -69,7 +70,7 @@ function executeQuery(query, params, rowMapper, resultMapper = (result) => resul
           const mappedRow = rowMapper ? rowMapper(columns) : columns;
           result.push(mappedRow);
         } catch (mappingError) {
-          console.error('Row mapping error:', {
+          log.error('Row mapping error', {
             error: mappingError.message,
             rowIndex: rowCount - 1,
             query: query.substring(0, 50) + '...'
@@ -81,17 +82,17 @@ function executeQuery(query, params, rowMapper, resultMapper = (result) => resul
       // Handle output parameters
       request.on('returnValue', (parameterName, value) => {
         outputParams.push({ parameterName, value });
-        console.log(`Output parameter: ${parameterName} = ${value}`);
+        log.debug(`Output parameter: ${parameterName} = ${value}`);
       });
 
       // Handle completion
       request.on('requestCompleted', (rowCount, more) => {
         try {
-          console.log(`Query completed: ${rowCount} rows affected/returned`);
+          log.debug(`Query completed: ${rowCount} rows affected/returned`);
           const finalResult = resultMapper(result, outputParams);
           resolve(finalResult);
         } catch (resultMappingError) {
-          console.error('Result mapping error:', {
+          log.error('Result mapping error', {
             error: resultMappingError.message,
             rowCount: result.length,
             query: query.substring(0, 50) + '...'
@@ -102,7 +103,7 @@ function executeQuery(query, params, rowMapper, resultMapper = (result) => resul
 
       // Handle request errors
       request.on('error', (error) => {
-        console.error('Request error:', {
+        log.error('Request error', {
           error: error.message,
           code: error.code,
           query: query.substring(0, 100) + (query.length > 100 ? '...' : '')
@@ -114,7 +115,7 @@ function executeQuery(query, params, rowMapper, resultMapper = (result) => resul
       try {
         connection.execSql(request);
       } catch (execError) {
-        console.error('SQL execution error:', execError);
+        log.error('SQL execution error', { error: execError.message });
         reject(execError);
       }
     });
@@ -141,7 +142,7 @@ function executeStoredProcedure(procedureName, params, beforeExec, rowMapper, re
 
       const request = new Request(procedureName, (err) => {
         if (err) {
-          console.error('Stored procedure execution error:', {
+          log.error('Stored procedure execution error', {
             error: err.message,
             procedure: procedureName,
             code: err.code
@@ -172,7 +173,7 @@ function executeStoredProcedure(procedureName, params, beforeExec, rowMapper, re
         try {
           beforeExec(request);
         } catch (beforeExecError) {
-          console.error('beforeExec callback error:', {
+          log.error('beforeExec callback error', {
             error: beforeExecError.message,
             procedure: procedureName
           });
@@ -192,7 +193,7 @@ function executeStoredProcedure(procedureName, params, beforeExec, rowMapper, re
           const mappedRow = rowMapper ? rowMapper(columns) : columns;
           result.push(mappedRow);
         } catch (mappingError) {
-          console.error('Row mapping error in stored procedure:', {
+          log.error('Row mapping error in stored procedure', {
             error: mappingError.message,
             rowIndex: rowCount - 1,
             procedure: procedureName
@@ -212,7 +213,7 @@ function executeStoredProcedure(procedureName, params, beforeExec, rowMapper, re
           const finalResult = resultMapper ? resultMapper(result, outParams) : result;
           resolve(finalResult);
         } catch (resultMappingError) {
-          console.error('Result mapping error in stored procedure:', {
+          log.error('Result mapping error in stored procedure', {
             error: resultMappingError.message,
             procedure: procedureName,
             rowCount: result.length
@@ -223,7 +224,7 @@ function executeStoredProcedure(procedureName, params, beforeExec, rowMapper, re
 
       // Handle request errors
       request.on('error', (error) => {
-        console.error('Stored procedure request error:', {
+        log.error('Stored procedure request error', {
           error: error.message,
           code: error.code,
           procedure: procedureName
@@ -235,7 +236,7 @@ function executeStoredProcedure(procedureName, params, beforeExec, rowMapper, re
       try {
         connection.callProcedure(request);
       } catch (execError) {
-        console.error('Stored procedure execution error:', execError);
+        log.error('Stored procedure execution error', { error: execError.message });
         reject(execError);
       }
     });

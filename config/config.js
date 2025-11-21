@@ -4,12 +4,12 @@
  */
 import dotenv from 'dotenv';
 
-// Load base .env file first (shared configuration)
-dotenv.config({ path: '.env' });
+// Load base .env file first (shared configuration) - silent mode for production
+dotenv.config({ path: '.env', debug: false });
 
 // Then load environment-specific overrides
 if (process.env.NODE_ENV === 'development') {
-  dotenv.config({ path: '.env.development', override: true });
+  dotenv.config({ path: '.env.development', override: true, debug: false });
 }
 
 // Check for required environment variables

@@ -39,8 +39,8 @@ import { requestTimeout, TIMEOUTS } from './middleware/timeout.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables
-dotenv.config();
+// Load environment variables (silent mode - config is loaded by config.js)
+dotenv.config({ debug: false });
 
 // Create Express app
 const app = express();
