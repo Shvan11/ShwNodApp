@@ -67,8 +67,8 @@ export default defineConfig(({ mode }) => {
               return 'vendor-utils';
             }
 
-            // All other node_modules
-            return 'vendor-other';
+            // Let Vite auto-chunk remaining modules (prevents circular dependency errors)
+            // Previously: return 'vendor-other' - caused "Cannot access before initialization" errors
           }
         }
       }

@@ -7,6 +7,9 @@ import { ErrorDisplay } from '../components/whatsapp-auth/ErrorDisplay.jsx';
 import { ControlButtons } from '../components/whatsapp-auth/ControlButtons.jsx';
 import { ConnectionStatusFooter } from '../components/whatsapp-auth/ConnectionStatusFooter.jsx';
 
+// WhatsApp auth page styles
+import '../../css/components/whatsapp-auth.css';
+
 export default function WhatsAppAuth() {
   const {
     authState,

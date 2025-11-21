@@ -11,47 +11,13 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- Application CSS -->
-    <link rel="stylesheet" href="/css/main.css">
-    <link rel="stylesheet" href="/css/components/universal-header.css">
-
-    <!-- Page-specific CSS (loaded globally for SPA) -->
-    <link rel="stylesheet" href="/css/pages/dashboard.css">
-    <link rel="stylesheet" href="/css/pages/patient-shell.css">
-    <link rel="stylesheet" href="/css/pages/grid.css">
-    <link rel="stylesheet" href="/css/pages/add-patient.css">
-    <link rel="stylesheet" href="/css/pages/appointments.css">
-    <link rel="stylesheet" href="/css/pages/send.css">
-    <link rel="stylesheet" href="/css/pages/aligner.css">
-    <link rel="stylesheet" href="/css/pages/expenses.css">
-    <link rel="stylesheet" href="/css/pages/settings.css">
-    <link rel="stylesheet" href="/css/pages/template-management.css">
-    <link rel="stylesheet" href="/css/pages/template-designer.css">
-    <link rel="stylesheet" href="/css/pages/statistics.css">
-    <link rel="stylesheet" href="/css/pages/work-management.css">
-    <link rel="stylesheet" href="/css/pages/visits-summary.css">
-    <link rel="stylesheet" href="/css/pages/visits-spacing.css">
-    <link rel="stylesheet" href="/css/pages/xrays.css">
-    <link rel="stylesheet" href="/css/pages/work-payments.css">
-
-    <!-- Component CSS -->
-    <link rel="stylesheet" href="/css/components/buttons.css">
-    <link rel="stylesheet" href="/css/components/sidebar-navigation.css">
-    <link rel="stylesheet" href="/css/components/dental-chart.css">
-    <link rel="stylesheet" href="/css/components/appointment-calendar.css">
-    <link rel="stylesheet" href="/css/components/appointment-form.css">
-    <link rel="stylesheet" href="/css/components/calendar-picker-modal.css">
-    <link rel="stylesheet" href="/css/components/simplified-calendar-picker.css">
-    <link rel="stylesheet" href="/css/components/monthly-calendar-view.css">
-    <link rel="stylesheet" href="/css/components/timepoints-selector.css">
-    <link rel="stylesheet" href="/css/components/visits-component.css">
-    <link rel="stylesheet" href="/css/components/new-visit-component.css">
-    <link rel="stylesheet" href="/css/components/work-card.css">
-    <link rel="stylesheet" href="/css/components/new-work-component.css">
-    <link rel="stylesheet" href="/css/components/invoice-form.css">
-    <link rel="stylesheet" href="/css/components/aligner-set-card.css">
-    <link rel="stylesheet" href="/css/components/aligner-drawer-form.css">
-    <link rel="stylesheet" href="/css/components/whatsapp-auth.css">
+    <!--
+      CSS Migration Note:
+      All application CSS is now imported via JavaScript modules in App.jsx and route components.
+      This enables code splitting, Hot Module Replacement, and optimal performance.
+      See: /public/js/App.jsx for global CSS imports
+      See: /public/js/routes/*.jsx for route-specific CSS imports
+    -->
 
     <!-- PhotoSwipe CSS for image lightbox -->
     <link rel="stylesheet" href="/photoswipe/dist/photoswipe.css">

@@ -9,6 +9,27 @@
  * Stability: Wrapped with error boundaries to prevent crashes from propagating
  */
 
+// ===================================
+// GLOBAL CSS IMPORTS
+// ===================================
+
+// Base styles - Design system foundation
+import '../css/base/reset.css';
+import '../css/base/variables.css';
+import '../css/base/typography.css';
+import '../css/base/rtl-support.css';
+import '../css/base/utilities.css';
+
+// Universal components - Used across all routes
+import '../css/components/universal-header.css';
+import '../css/components/buttons.css';
+import '../css/components/modal.css';
+import '../css/components/toast.css';
+
+// ===================================
+// END GLOBAL CSS IMPORTS
+// ===================================
+
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { GlobalStateProvider } from './contexts/GlobalStateContext.jsx';

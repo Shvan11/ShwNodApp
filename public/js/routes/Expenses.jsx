@@ -7,6 +7,9 @@ import ExpenseModal from '../components/expenses/ExpenseModal.jsx';
 import DeleteConfirmModal from '../components/expenses/DeleteConfirmModal.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 
+// Expenses page styles
+import '../../css/pages/expenses.css';
+
 export default function Expenses() {
   // Toast notifications (now using unified global toast system)
   const toast = useToast();

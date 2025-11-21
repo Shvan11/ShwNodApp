@@ -8,6 +8,9 @@ import DateSelector from '../components/whatsapp-send/DateSelector.jsx';
 import ConnectionStatus from '../components/whatsapp-send/ConnectionStatus.jsx';
 import ProgressBar from '../components/whatsapp-send/ProgressBar.jsx';
 import ActionButtons from '../components/whatsapp-send/ActionButtons.jsx';
+
+// WhatsApp send page styles
+import '../../css/pages/send.css';
 import MessageStatusTable from '../components/whatsapp-send/MessageStatusTable.jsx';
 import { API_ENDPOINTS } from '../utils/whatsapp-send-constants.js';
 import { APIClient } from '../utils/whatsapp-api-client.js';

@@ -3,6 +3,10 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import TemplateManagement from '../components/templates/TemplateManagement.jsx';
 import TemplateDesigner from '../components/templates/TemplateDesigner.jsx';
 
+// Template management styles
+import '../../css/pages/template-management.css';
+import '../../css/pages/template-designer.css';
+
 /**
  * Template Management Routes
  *

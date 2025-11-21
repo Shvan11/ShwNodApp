@@ -7,6 +7,11 @@ import PatientSets from '../pages/aligner/PatientSets.jsx';
 import SearchPatient from '../pages/aligner/SearchPatient.jsx';
 import AllSetsList from '../pages/aligner/AllSetsList.jsx';
 
+// Aligner management styles
+import '../../css/pages/aligner.css';
+import '../../css/components/aligner-set-card.css';
+import '../../css/components/aligner-drawer-form.css';
+
 /**
  * Aligner Management Routes
  *

@@ -2,6 +2,11 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import SettingsComponent from '../components/react/SettingsComponent.jsx';
 
+// Settings page styles
+import '../../css/pages/settings.css';
+import '../../css/pages/cost-presets-settings.css';
+import '../../css/pages/user-management.css';
+
 /**
  * Settings Routes
  *
