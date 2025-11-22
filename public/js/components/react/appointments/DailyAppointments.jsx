@@ -82,6 +82,20 @@ const DailyAppointments = () => {
         loadAppointments(selectedDate);
     }, [selectedDate, loadAppointments]);
 
+    // Handle WebSocket reconnection (e.g., after computer wakes from sleep)
+    useEffect(() => {
+        const handleReconnect = () => {
+            console.log('[DailyAppointments] 🔄 Connection restored - refreshing appointments');
+            loadAppointments(selectedDate);
+        };
+
+        window.addEventListener('websocket_reconnected', handleReconnect);
+
+        return () => {
+            window.removeEventListener('websocket_reconnected', handleReconnect);
+        };
+    }, [selectedDate, loadAppointments]);
+
     // Flash update indicator
     const flashUpdateIndicator = () => {
         setShowFlash(true);

@@ -47,6 +47,12 @@ export function GlobalStateProvider({ children }) {
       console.log('[GlobalState] WebSocket connected');
       setIsWebSocketConnected(true);
 
+      // Broadcast reconnection event for components to refresh their data
+      console.log('[GlobalState] Broadcasting reconnection event');
+      window.dispatchEvent(new CustomEvent('websocket_reconnected', {
+        detail: { timestamp: Date.now() }
+      }));
+
       // NOTE: Initial WhatsApp state is requested by useWhatsAppWebSocket hook
       // with the current date, so we don't need to request it here
     };
@@ -156,6 +162,42 @@ export function GlobalStateProvider({ children }) {
       // Note: Don't disconnect here - other components may still need the connection
     };
   }, []);
+
+  // Wake detection - detects when computer wakes from sleep
+  useEffect(() => {
+    let lastCheck = Date.now();
+
+    const detectWake = () => {
+      const now = Date.now();
+      const elapsed = now - lastCheck;
+
+      // If more than 5 minutes passed, likely woke from sleep
+      if (elapsed > 5 * 60 * 1000) {
+        console.log('[GlobalState] 🌅 Wake from sleep detected - forcing reconnect');
+
+        if (websocket) {
+          // Disconnect and reconnect to ensure fresh connection
+          if (websocket.isConnected) {
+            console.log('[GlobalState] Disconnecting stale connection...');
+            websocket.disconnect(1000, 'Wake from sleep - forcing reconnect');
+          }
+
+          // Reconnect with fresh parameters
+          console.log('[GlobalState] Reconnecting...');
+          websocket.connect({ timestamp: Date.now(), reason: 'wake_from_sleep' }).catch(err => {
+            console.error('[GlobalState] Reconnect failed:', err);
+          });
+        }
+      }
+
+      lastCheck = now;
+    };
+
+    // Check every 30 seconds for time jumps
+    const interval = setInterval(detectWake, 30000);
+
+    return () => clearInterval(interval);
+  }, [websocket]);
 
   // Helper function to update patient
   const updateCurrentPatient = (patient) => {
