@@ -92,17 +92,27 @@ export function useAppointments() {
 
     /**
      * OPTIMISTIC UPDATE: Move appointment from "All" to "Checked In" list
+     * FIXED: Added deduplication to prevent duplicate appointments
      */
     const moveToCheckedIn = useCallback((appointmentId, appointmentData) => {
         // Remove from "All Appointments"
         setAllAppointments(prev => prev.filter(apt => apt.appointmentID !== appointmentId));
 
-        // Add to "Checked In Patients"
-        setCheckedInAppointments(prev => [...prev, appointmentData]);
+        // Add to "Checked In Patients" with deduplication
+        setCheckedInAppointments(prev => {
+            // Check if appointment already exists
+            const exists = prev.some(apt => apt.appointmentID === appointmentId);
+            if (exists) {
+                console.warn('⚠️ Prevented duplicate - appointment already in checked-in list:', appointmentId);
+                return prev; // Already exists, don't add again
+            }
+            return [...prev, appointmentData];
+        });
     }, []);
 
     /**
      * OPTIMISTIC UPDATE: Move appointment from "Checked In" back to "All" list
+     * FIXED: Added deduplication to prevent duplicate appointments
      */
     const moveToAll = useCallback((appointmentId, appointmentData) => {
         // Remove from "Checked In Patients"
@@ -119,7 +129,17 @@ export function useAppointments() {
             hasActiveAlert: appointmentData.hasActiveAlert,
             apptime: appointmentData.apptime
         };
-        setAllAppointments(prev => [...prev, basicAppointment]);
+
+        // Add with deduplication
+        setAllAppointments(prev => {
+            // Check if appointment already exists
+            const exists = prev.some(apt => apt.appointmentID === appointmentId);
+            if (exists) {
+                console.warn('⚠️ Prevented duplicate - appointment already in all list:', appointmentId);
+                return prev; // Already exists, don't add again
+            }
+            return [...prev, basicAppointment];
+        });
     }, []);
 
     /**
@@ -180,6 +200,26 @@ export function useAppointments() {
 
             const result = await response.json();
             console.log('✅ Check-in confirmed by server:', result);
+
+            // VERIFICATION: Ensure server response matches optimistic update
+            const verificationFailed =
+                result.appointmentID !== appointmentId ||
+                result.state !== 'Present' ||
+                !result.time; // Server must return a time
+
+            if (verificationFailed) {
+                console.error('❌ Server response mismatch - triggering full reload', {
+                    expected: { appointmentID: appointmentId, state: 'Present' },
+                    received: result
+                });
+
+                // Rollback optimistic update
+                setCheckedInAppointments(prev => prev.filter(apt => apt.appointmentID !== appointmentId));
+                setAllAppointments(prev => [...prev, savedAppointment]);
+
+                // Trigger full reload to reconcile state
+                throw new Error('Server state mismatch - reloading appointments');
+            }
 
             // PHASE 1: Remove from processing
             setProcessingAppointments(prev => {
@@ -261,6 +301,22 @@ export function useAppointments() {
             const result = await response.json();
             console.log('✅ Seat confirmed by server:', result);
 
+            // VERIFICATION: Ensure server response matches optimistic update
+            const verificationFailed =
+                result.appointmentID !== appointmentId ||
+                result.state !== 'Seated' ||
+                !result.time;
+
+            if (verificationFailed) {
+                console.error('❌ Server response mismatch for markSeated', {
+                    expected: { appointmentID: appointmentId, state: 'Seated' },
+                    received: result
+                });
+                // Rollback and trigger reload
+                updateCheckedInAppointment(appointmentId, previousState);
+                throw new Error('Server state mismatch - reloading appointments');
+            }
+
             return { success: true, previousState: 'Present', actionId };
         } catch (err) {
             console.error('❌ Seat failed, rolling back:', err);
@@ -312,6 +368,22 @@ export function useAppointments() {
 
             const result = await response.json();
             console.log('✅ Dismiss confirmed by server:', result);
+
+            // VERIFICATION: Ensure server response matches optimistic update
+            const verificationFailed =
+                result.appointmentID !== appointmentId ||
+                result.state !== 'Dismissed' ||
+                !result.time;
+
+            if (verificationFailed) {
+                console.error('❌ Server response mismatch for markDismissed', {
+                    expected: { appointmentID: appointmentId, state: 'Dismissed' },
+                    received: result
+                });
+                // Rollback and trigger reload
+                updateCheckedInAppointment(appointmentId, previousState);
+                throw new Error('Server state mismatch - reloading appointments');
+            }
 
             return { success: true, previousState: 'Seated', actionId };
         } catch (err) {
@@ -485,8 +557,8 @@ export function useAppointments() {
      * - Undo Present (PresentTime → null) → moves from checkedInAppointments back to allAppointments
      * - Other status changes → updates in place within checkedInAppointments
      *
-     * ARCHITECTURE: Uses existing helper functions (moveToAll, moveToCheckedIn, updateCheckedInAppointment)
-     * to prevent nested state setters which cause stale closures and duplicate appointments.
+     * FIXED: Removed stale closure bug by using functional setState pattern
+     * No longer depends on checkedInAppointments/allAppointments in closure
      */
     const applyGranularUpdate = useCallback((changeData) => {
         const { changeType, appointmentId, state, updates } = changeData;
@@ -500,15 +572,20 @@ export function useAppointments() {
             if (isUndoingPresent) {
                 console.log('⬅️ Undo Present detected - moving appointment back to all list:', appointmentId);
 
-                const appointment = checkedInAppointments.find(apt => apt.appointmentID === appointmentId);
+                // Use functional setState to access fresh state (no stale closure)
+                setCheckedInAppointments(prevCheckedIn => {
+                    const appointment = prevCheckedIn.find(apt => apt.appointmentID === appointmentId);
 
-                if (appointment) {
-                    // Use helper function to avoid nested state setters
-                    moveToAll(appointmentId, appointment);
-                    console.log('✅ Moved appointment back to all list');
-                } else {
-                    console.warn('⚠️ Appointment not found in checked-in list:', appointmentId);
-                }
+                    if (appointment) {
+                        // Move to all list using helper function
+                        moveToAll(appointmentId, appointment);
+                        console.log('✅ Moved appointment back to all list');
+                    } else {
+                        console.warn('⚠️ Appointment not found in checked-in list:', appointmentId);
+                    }
+
+                    return prevCheckedIn; // No change to this list, moveToAll handles it
+                });
 
                 return;
             }
@@ -519,18 +596,23 @@ export function useAppointments() {
             if (isCheckingIn) {
                 console.log('➡️ Check-in detected - moving appointment to checked-in list:', appointmentId);
 
-                const appointment = allAppointments.find(apt => apt.appointmentID === appointmentId);
+                // Use functional setState to access fresh state (no stale closure)
+                setAllAppointments(prevAll => {
+                    const appointment = prevAll.find(apt => apt.appointmentID === appointmentId);
 
-                if (appointment) {
-                    // Apply updates to create the checked-in appointment
-                    const updatedAppointment = { ...appointment, ...updates };
+                    if (appointment) {
+                        // Apply updates to create the checked-in appointment
+                        const updatedAppointment = { ...appointment, ...updates };
 
-                    // Use helper function to avoid nested state setters
-                    moveToCheckedIn(appointmentId, updatedAppointment);
-                    console.log('✅ Moved appointment to checked-in list');
-                } else {
-                    console.warn('⚠️ Appointment not found in all list:', appointmentId);
-                }
+                        // Move to checked-in list using helper function
+                        moveToCheckedIn(appointmentId, updatedAppointment);
+                        console.log('✅ Moved appointment to checked-in list');
+                    } else {
+                        console.warn('⚠️ Appointment not found in all list:', appointmentId);
+                    }
+
+                    return prevAll; // No change to this list, moveToCheckedIn handles it
+                });
 
                 return;
             }
@@ -543,7 +625,7 @@ export function useAppointments() {
         } else {
             console.warn('⚠️ Unknown change type, may need full reload:', changeType);
         }
-    }, [checkedInAppointments, allAppointments, moveToAll, moveToCheckedIn, updateCheckedInAppointment]);
+    }, [moveToAll, moveToCheckedIn, updateCheckedInAppointment]);
 
     /**
      * Get statistics (OPTIMIZED - Phase 3 & 4)

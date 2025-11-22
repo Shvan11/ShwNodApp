@@ -34,11 +34,12 @@ class ActionIdManager {
     // Store recent action IDs (with automatic cleanup)
     this.recentActions = new Map();
 
-    // Maximum age for action IDs (5 minutes)
-    this.MAX_AGE_MS = 5 * 60 * 1000;
+    // Maximum age for action IDs (30 minutes - extended from 5min to prevent false negatives)
+    // Longer retention handles: slow networks, tab throttling, long operations
+    this.MAX_AGE_MS = 30 * 60 * 1000;
 
-    // Cleanup interval (1 minute)
-    this.CLEANUP_INTERVAL_MS = 60 * 1000;
+    // Cleanup interval (5 minutes - less aggressive)
+    this.CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
     // Start periodic cleanup
     this.startCleanup();
@@ -86,6 +87,8 @@ class ActionIdManager {
 
   /**
    * Clean up old action IDs
+   * FIXED: Only remove if too old (not immediately when used)
+   * This prevents false negatives from duplicate WebSocket events or delayed broadcasts
    */
   cleanup() {
     const now = Date.now();
@@ -94,8 +97,9 @@ class ActionIdManager {
     for (const [actionId, action] of this.recentActions.entries()) {
       const age = now - action.timestamp;
 
-      // Remove if too old OR already used
-      if (age > this.MAX_AGE_MS || action.used) {
+      // Remove ONLY if too old (not based on 'used' flag anymore)
+      // This ensures action IDs remain valid for 30 minutes even after first use
+      if (age > this.MAX_AGE_MS) {
         this.recentActions.delete(actionId);
         cleanedCount++;
       }

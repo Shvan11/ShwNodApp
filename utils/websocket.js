@@ -425,9 +425,13 @@ function setupWebSocketServer(server) {
         }
       }
 
-      // Legacy support: screenID-based connection
+      // Legacy support: screenID-based connection (DEPRECATED)
+      // TODO: Update all clients to use clientType='daily-appointments' instead
       if (screenID && clientTypes.length === 0) {
-        logger.websocket.debug('Legacy screen connection', { screenID });
+        logger.websocket.warn('[DEPRECATED] Legacy screenID connection detected - migrate to clientType', {
+          screenID,
+          ipAddress: req.socket.remoteAddress
+        });
         connectionManager.registerConnection(ws, 'screen', {
           screenId: screenID,
           date: date,
@@ -912,8 +916,15 @@ function setupGlobalEventHandlers(emitter, connectionManager, ackManager) {
         });
       }
 
-      // Legacy: Broadcast without ACK to screens (for backward compatibility)
+      // Legacy: Broadcast without ACK to screens (DEPRECATED - for backward compatibility only)
+      // TODO: Remove this once all clients migrate to daily-appointments type
       const screenUpdates = connectionManager.broadcastToScreens(message);
+
+      if (screenUpdates > 0) {
+        logger.websocket.warn('[DEPRECATED] Legacy screen connections still active - migrate to daily-appointments', {
+          legacyScreenCount: screenUpdates
+        });
+      }
 
       logger.websocket.info('[PHASE 1] Broadcast appointment updates completed', {
         screenUpdates,

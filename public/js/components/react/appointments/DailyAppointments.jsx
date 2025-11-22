@@ -7,6 +7,7 @@ import AppointmentsList from './AppointmentsList.jsx';
 import { useAppointments } from '../../../hooks/useAppointments.js';
 import { useWebSocketSync } from '../../../hooks/useWebSocketSync.js';
 import { actionIdManager } from '../../../utils/action-id.js';
+import { appointmentMetrics } from '../../../utils/appointment-metrics.js';
 
 /**
  * DailyAppointments Component
@@ -28,6 +29,14 @@ const DailyAppointments = () => {
     const [mobileView, setMobileView] = useState('all');
     const [showFlash, setShowFlash] = useState(false);
 
+    // Event deduplication: Track processed WebSocket event IDs
+    const processedEventIds = useRef(new Set());
+    const EVENT_ID_MAX_SIZE = 100; // Limit memory usage
+
+    // Out-of-order detection: Track last server timestamp per appointment
+    const lastServerTimestamp = useRef(new Map());
+    const TIMESTAMP_BUFFER_SIZE = 50; // Track last 50 appointments
+
     // Use custom hooks
     const {
         allAppointments,
@@ -44,10 +53,30 @@ const DailyAppointments = () => {
         getStats
     } = useAppointments();
 
-    // WebSocket integration - GRANULAR updates with action ID tracking
+    // WebSocket integration - GRANULAR updates with action ID tracking and event deduplication
     const { connectionStatus } = useWebSocketSync(selectedDate, (data) => {
-        // Check if this update is from our own action using action ID
+        // STEP 1: Event deduplication - skip if already processed
+        const eventId = data?.id || data?.messageId;
+        if (eventId) {
+            if (processedEventIds.current.has(eventId)) {
+                console.log('⏭️ [DailyAppointments] Skipping duplicate event:', eventId);
+                appointmentMetrics.recordDuplicateEventBlocked(); // Track duplicate
+                return; // Already processed this event
+            }
+
+            // Mark as processed
+            processedEventIds.current.add(eventId);
+
+            // Limit memory usage: keep only last 100 event IDs
+            if (processedEventIds.current.size > EVENT_ID_MAX_SIZE) {
+                const firstId = processedEventIds.current.values().next().value;
+                processedEventIds.current.delete(firstId);
+            }
+        }
+
+        // STEP 2: Check if this update is from our own action using action ID
         const isOwnAction = data?.actionId && actionIdManager.isOwnAction(data.actionId);
+        appointmentMetrics.recordEventReceived(isOwnAction); // Track event
 
         if (isOwnAction) {
             // Our own action - optimistic update already handled it
@@ -57,9 +86,37 @@ const DailyAppointments = () => {
             // Update from another client - use GRANULAR update if available
             console.log('📡 [DailyAppointments] WebSocket update from another client');
 
+            // STEP 3: Out-of-order detection (warn if events arrive scrambled)
+            if (data?.serverTimestamp && data?.appointmentId) {
+                const lastTimestamp = lastServerTimestamp.current.get(data.appointmentId);
+
+                if (lastTimestamp && data.serverTimestamp < lastTimestamp) {
+                    const timeDiff = lastTimestamp - data.serverTimestamp;
+                    console.warn('⚠️ Out-of-order event detected!', {
+                        appointmentId: data.appointmentId,
+                        thisTimestamp: data.serverTimestamp,
+                        lastTimestamp: lastTimestamp,
+                        timeDiff
+                    });
+                    appointmentMetrics.recordOutOfOrderEvent(timeDiff); // Track out-of-order
+                    // Still apply the update (deduplication prevents true duplicates)
+                    // But log for monitoring/debugging
+                }
+
+                // Update last timestamp
+                lastServerTimestamp.current.set(data.appointmentId, data.serverTimestamp);
+
+                // Limit memory: keep only last 50 appointments
+                if (lastServerTimestamp.current.size > TIMESTAMP_BUFFER_SIZE) {
+                    const firstKey = lastServerTimestamp.current.keys().next().value;
+                    lastServerTimestamp.current.delete(firstKey);
+                }
+            }
+
             // Check if we have granular data (efficient update)
             if (data?.changeType && data?.appointmentId) {
                 console.log('✨ Using granular update - NO API call needed!', data);
+                appointmentMetrics.recordGranularUpdate(); // Track granular update
                 applyGranularUpdate({
                     changeType: data.changeType,
                     appointmentId: data.appointmentId,
@@ -69,6 +126,7 @@ const DailyAppointments = () => {
             } else {
                 // Fallback to full reload (legacy mode or unknown change type)
                 console.log('⚠️ No granular data, falling back to full reload');
+                appointmentMetrics.recordFullReload(); // Track full reload
                 loadAppointments(selectedDate);
             }
 
@@ -85,6 +143,7 @@ const DailyAppointments = () => {
     useEffect(() => {
         const handleReconnect = () => {
             console.log('[DailyAppointments] 🔄 Connection restored - refreshing appointments');
+            appointmentMetrics.recordReconnection(); // Track reconnection
             loadAppointments(selectedDate);
         };
 
@@ -94,6 +153,20 @@ const DailyAppointments = () => {
             window.removeEventListener('websocket_reconnected', handleReconnect);
         };
     }, [selectedDate, loadAppointments]);
+
+    // Log metrics summary periodically (development mode only)
+    useEffect(() => {
+        if (process.env.NODE_ENV === 'development') {
+            const interval = setInterval(() => {
+                const metrics = appointmentMetrics.getMetrics();
+                if (metrics.totalEventsReceived > 0) {
+                    appointmentMetrics.logSummary();
+                }
+            }, 60000); // Every 60 seconds
+
+            return () => clearInterval(interval);
+        }
+    }, []);
 
     // Flash update indicator
     const flashUpdateIndicator = () => {

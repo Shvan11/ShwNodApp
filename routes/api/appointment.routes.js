@@ -168,6 +168,7 @@ router.post("/updateAppointmentState", async (req, res) => {
         if (wsEmitter) {
             log.info(`[WebSocket] Broadcasting state change after DB commit for appointment ${appointmentID}`);
             // Emit DATA_UPDATED event with granular data (no full reload needed)
+            // Include server timestamp for ordering (more reliable than client timestamps)
             wsEmitter.emit(WebSocketEvents.DATA_UPDATED, appointmentDate, actionId, {
                 changeType: 'status_changed',
                 appointmentId: appointmentID,
@@ -175,7 +176,8 @@ router.post("/updateAppointmentState", async (req, res) => {
                 updates: {
                     [state]: 1,  // Present, Seated, or Dismissed
                     [`${state}Time`]: currentTime  // PresentTime, SeatedTime, or DismissedTime
-                }
+                },
+                serverTimestamp: Date.now()  // High-precision server timestamp for ordering
             });
         }
 
@@ -231,7 +233,8 @@ router.post("/undoAppointmentState", async (req, res) => {
                 updates: {
                     [state]: null,  // Clear the state
                     [`${state}Time`]: null  // Clear the time
-                }
+                },
+                serverTimestamp: Date.now()  // High-precision server timestamp for ordering
             });
         }
 
