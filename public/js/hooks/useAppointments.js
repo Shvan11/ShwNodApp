@@ -479,6 +479,14 @@ export function useAppointments() {
      * GRANULAR UPDATE: Apply specific changes from WebSocket (external client updates)
      * This prevents full reloads when other clients make changes
      * Updates ONLY the affected appointment without refetching all data
+     *
+     * HANDLES LIST MOVEMENTS:
+     * - Check-in (Present set) → moves from allAppointments to checkedInAppointments
+     * - Undo Present (PresentTime → null) → moves from checkedInAppointments back to allAppointments
+     * - Other status changes → updates in place within checkedInAppointments
+     *
+     * ARCHITECTURE: Uses existing helper functions (moveToAll, moveToCheckedIn, updateCheckedInAppointment)
+     * to prevent nested state setters which cause stale closures and duplicate appointments.
      */
     const applyGranularUpdate = useCallback((changeData) => {
         const { changeType, appointmentId, state, updates } = changeData;
@@ -486,44 +494,56 @@ export function useAppointments() {
         console.log('🔄 Applying granular update:', changeData);
 
         if (changeType === 'status_changed') {
-            // Try updating in allAppointments first
-            setAllAppointments(prev => {
-                const index = prev.findIndex(apt => apt.appointmentID === appointmentId);
+            // CASE 1: Undo Present (PresentTime → null) - Move from checkedIn → all
+            const isUndoingPresent = state === 'Present' && updates.PresentTime === null;
 
-                if (index !== -1) {
-                    // Found in allAppointments
-                    const updated = [...prev];
-                    updated[index] = { ...updated[index], ...updates };
+            if (isUndoingPresent) {
+                console.log('⬅️ Undo Present detected - moving appointment back to all list:', appointmentId);
 
-                    // If they checked in (Present), move to checkedIn list
-                    if (state === 'Present' && updates.Present) {
-                        console.log('📋 Moving appointment to checked-in list:', appointmentId);
-                        setCheckedInAppointments(prevChecked => [...prevChecked, updated[index]]);
-                        return prev.filter(apt => apt.appointmentID !== appointmentId);
-                    }
+                const appointment = checkedInAppointments.find(apt => apt.appointmentID === appointmentId);
 
-                    return updated;
+                if (appointment) {
+                    // Use helper function to avoid nested state setters
+                    moveToAll(appointmentId, appointment);
+                    console.log('✅ Moved appointment back to all list');
+                } else {
+                    console.warn('⚠️ Appointment not found in checked-in list:', appointmentId);
                 }
-                return prev;
-            });
 
-            // Try updating in checkedInAppointments
-            setCheckedInAppointments(prev => {
-                const index = prev.findIndex(apt => apt.appointmentID === appointmentId);
-                if (index !== -1) {
-                    console.log('✏️ Updating appointment in checked-in list:', appointmentId);
-                    const updated = [...prev];
-                    updated[index] = { ...updated[index], ...updates };
-                    return updated;
+                return;
+            }
+
+            // CASE 2: Check-in (Present set) - Move from all → checkedIn
+            const isCheckingIn = state === 'Present' && updates.PresentTime !== null;
+
+            if (isCheckingIn) {
+                console.log('➡️ Check-in detected - moving appointment to checked-in list:', appointmentId);
+
+                const appointment = allAppointments.find(apt => apt.appointmentID === appointmentId);
+
+                if (appointment) {
+                    // Apply updates to create the checked-in appointment
+                    const updatedAppointment = { ...appointment, ...updates };
+
+                    // Use helper function to avoid nested state setters
+                    moveToCheckedIn(appointmentId, updatedAppointment);
+                    console.log('✅ Moved appointment to checked-in list');
+                } else {
+                    console.warn('⚠️ Appointment not found in all list:', appointmentId);
                 }
-                return prev;
-            });
 
+                return;
+            }
+
+            // CASE 3: Other status changes (Seated, Dismissed, or undo Seated/Dismissed)
+            // These stay in checkedInAppointments, just update the fields
+            console.log('✏️ Updating appointment status in checked-in list:', appointmentId, updates);
+            updateCheckedInAppointment(appointmentId, updates);
             console.log('✅ Granular update applied successfully');
         } else {
             console.warn('⚠️ Unknown change type, may need full reload:', changeType);
         }
-    }, []);
+    }, [checkedInAppointments, allAppointments, moveToAll, moveToCheckedIn, updateCheckedInAppointment]);
 
     /**
      * Get statistics (OPTIMIZED - Phase 3 & 4)
