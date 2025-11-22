@@ -2,6 +2,7 @@
  * Appointment-related database queries
  */
 import { executeStoredProcedure, executeMultipleResultSets, TYPES } from '../index.js';
+import { Request } from 'tedious';
 
 /**
  * Retrieves appointment information for a given date.
@@ -100,4 +101,110 @@ export function getDailyAppointmentsOptimized(AppsDate) {
         'GetDailyAppointmentsOptimized',
         [['AppsDate', TYPES.Date, AppsDate]]
     );
+}
+
+/**
+ * Updates appointment state within a transaction (TRANSACTION-AWARE)
+ * @param {Transaction} transaction - Active transaction object
+ * @param {number} Aid - The appointment ID
+ * @param {string} state - The state field to update (Present, Seated, Dismissed)
+ * @param {string} Tim - The time value to set
+ * @returns {Promise<Object>} - A promise that resolves with the update result
+ */
+export function updatePresentInTransaction(transaction, Aid, state, Tim) {
+    return new Promise((resolve, reject) => {
+        const request = new Request('UpdatePresent', (err) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+        });
+
+        // Add parameters
+        request.addParameter('Aid', TYPES.Int, Aid);
+        request.addParameter('state', TYPES.VarChar, state);
+        request.addParameter('Tim', TYPES.VarChar, Tim);
+
+        const result = [];
+
+        request.on('row', (columns) => {
+            result.push(columns);
+        });
+
+        request.on('requestCompleted', () => {
+            resolve({
+                success: true,
+                appointmentID: Aid,
+                state: state,
+                time: Tim,
+                dbResult: result
+            });
+        });
+
+        request.on('error', (error) => {
+            reject(error);
+        });
+
+        // Execute within the transaction
+        transaction.executeRequest(request).then(resolve).catch(reject);
+    });
+}
+
+/**
+ * Verify appointment state after update (CONFIRMATION QUERY)
+ * @param {Transaction} transaction - Active transaction object
+ * @param {number} appointmentID - The appointment ID to verify
+ * @param {string} stateField - The state field that was updated
+ * @returns {Promise<Object>} - Current state from database
+ */
+export function verifyAppointmentState(transaction, appointmentID, stateField) {
+    return new Promise((resolve, reject) => {
+        const query = `
+            SELECT appointmentID,
+                   Present, Seated, Dismissed,
+                   PresentTime, SeatedTime, DismissedTime
+            FROM Appointments
+            WHERE appointmentID = @AppointmentID
+        `;
+
+        const request = new Request(query, (err) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+        });
+
+        request.addParameter('AppointmentID', TYPES.Int, appointmentID);
+
+        const rows = [];
+        const columns = [];
+
+        request.on('columnMetadata', (columnsMetadata) => {
+            columnsMetadata.forEach(column => columns.push(column));
+        });
+
+        request.on('row', (rowColumns) => {
+            const row = {};
+            rowColumns.forEach((column, index) => {
+                row[columns[index].colName] = column.value;
+            });
+            rows.push(row);
+        });
+
+        request.on('requestCompleted', () => {
+            if (rows.length === 0) {
+                reject(new Error(`Appointment ${appointmentID} not found after update`));
+                return;
+            }
+            resolve(rows[0]);
+        });
+
+        request.on('error', (error) => {
+            reject(error);
+        });
+
+        transaction.executeRequest(request).then(() => {
+            // Transaction.executeRequest returns rows, so we handle them in the 'row' event
+        }).catch(reject);
+    });
 }

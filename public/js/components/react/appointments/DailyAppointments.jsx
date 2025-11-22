@@ -3,7 +3,7 @@ import AppointmentsHeader from './AppointmentsHeader.jsx';
 import StatsCards from './StatsCards.jsx';
 import MobileViewToggle from './MobileViewToggle.jsx';
 import AppointmentsList from './AppointmentsList.jsx';
-import Notification from './Notification.jsx';
+
 import { useAppointments } from '../../../hooks/useAppointments.js';
 import { useWebSocketSync } from '../../../hooks/useWebSocketSync.js';
 import { actionIdManager } from '../../../utils/action-id.js';
@@ -26,7 +26,6 @@ const DailyAppointments = () => {
 
     const [selectedDate, setSelectedDate] = useState(getTodayDate());
     const [mobileView, setMobileView] = useState('all');
-    const [notification, setNotification] = useState(null);
     const [showFlash, setShowFlash] = useState(false);
 
     // Use custom hooks
@@ -107,21 +106,6 @@ const DailyAppointments = () => {
         setSelectedDate(newDate);
     };
 
-    // Show notification
-    const showNotification = (message, type = 'info', undoData = null) => {
-        setNotification({
-            message,
-            type,
-            undoData,
-            id: Date.now()
-        });
-    };
-
-    // Close notification
-    const closeNotification = () => {
-        setNotification(null);
-    };
-
     // Handle check-in (OPTIMISTIC UPDATE - no reload needed!)
     const handleCheckIn = async (appointmentId) => {
         try {
@@ -131,13 +115,8 @@ const DailyAppointments = () => {
                 actionIdManager.registerAction(result.actionId);
 
                 // No loadAppointments() needed! Hook updates state optimistically
-                showNotification('Patient checked in', 'success', {
-                    appointmentId,
-                    previousState: result.previousState
-                });
             }
         } catch (err) {
-            showNotification('Failed to check in patient', 'error');
         }
     };
 
@@ -150,13 +129,8 @@ const DailyAppointments = () => {
                 actionIdManager.registerAction(result.actionId);
 
                 // No loadAppointments() needed! Hook updates state optimistically
-                showNotification('Patient seated', 'success', {
-                    appointmentId,
-                    previousState: result.previousState
-                });
             }
         } catch (err) {
-            showNotification('Failed to seat patient', 'error');
         }
     };
 
@@ -169,13 +143,8 @@ const DailyAppointments = () => {
                 actionIdManager.registerAction(result.actionId);
 
                 // No loadAppointments() needed! Hook updates state optimistically
-                showNotification('Visit completed', 'success', {
-                    appointmentId,
-                    previousState: result.previousState
-                });
             }
         } catch (err) {
-            showNotification('Failed to complete visit', 'error');
         }
     };
 
@@ -188,9 +157,7 @@ const DailyAppointments = () => {
                 actionIdManager.registerAction(result.actionId);
             }
             // No loadAppointments() needed! Hook updates state optimistically
-            showNotification(`${stateToUndo} status cleared`, 'info');
         } catch (err) {
-            showNotification(`Failed to undo ${stateToUndo}`, 'error');
         }
     };
 
@@ -199,9 +166,7 @@ const DailyAppointments = () => {
         try {
             await undoAction(undoData.appointmentId, undoData.previousState);
             // No loadAppointments() needed! Hook updates state optimistically
-            showNotification('Action undone', 'info');
         } catch (err) {
-            showNotification('Failed to undo action', 'error');
         }
     };
 
@@ -240,7 +205,7 @@ const DailyAppointments = () => {
             <StatsCards
                 total={stats.total}
                 checkedIn={stats.checkedIn}
-                waiting={stats.waiting}
+                waiting={stats.completed}
                 completed={stats.completed}
             />
 
@@ -274,16 +239,6 @@ const DailyAppointments = () => {
                 <p>&copy; 2025 Shwan Orthodontics. All rights reserved.</p>
             </footer>
 
-            {/* Notification */}
-            {notification && (
-                <Notification
-                    message={notification.message}
-                    type={notification.type}
-                    onClose={closeNotification}
-                    onUndo={notification.undoData ? handleUndoAction : null}
-                    undoData={notification.undoData}
-                />
-            )}
         </div>
     );
 };

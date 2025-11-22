@@ -70,6 +70,12 @@ class WebSocketService extends EventEmitter {
       forceClose: false,        // Whether close was requested (to prevent auto-reconnect)
       screenId: null,           // Screen ID for this connection (loaded on demand)
       hasConnectedBefore: false, // Track if we've ever successfully connected
+
+      // PHASE 1: ACK and sequence number tracking
+      sequenceNumbers: new Map(), // Map of date -> last received sequence number
+      missedEventRequests: new Set(), // Track dates we've requested missed events for
+      syncStatus: 'synced',     // 'synced', 'syncing', 'out_of_sync'
+      pendingEventCount: 0,     // Number of events being processed
     };
     
     // Bind methods to ensure correct 'this' context
@@ -433,6 +439,7 @@ class WebSocketService extends EventEmitter {
     this.state.status = 'connected';
     this.state.reconnectAttempts = 0;
     this.state.lastActivity = Date.now();
+    const wasReconnect = this.state.hasConnectedBefore;
     this.state.hasConnectedBefore = true; // Mark that we've successfully connected
 
     // Start heartbeat
@@ -440,6 +447,24 @@ class WebSocketService extends EventEmitter {
 
     // Process queued messages
     this.processQueue();
+
+    // PHASE 1: Request state verification on reconnect
+    if (wasReconnect) {
+      this.log('[PHASE 1] Reconnected - requesting state verification');
+      this.state.syncStatus = 'syncing';
+
+      // Emit event for app to verify state
+      this.emit('reconnected', {
+        sequenceNumbers: Object.fromEntries(this.state.sequenceNumbers)
+      });
+
+      // Clear sync status after 5 seconds (assume synced if no issues)
+      setTimeout(() => {
+        if (this.state.syncStatus === 'syncing') {
+          this.state.syncStatus = 'synced';
+        }
+      }, 5000);
+    }
 
     // Emit event
     this.emit('connected', event);
@@ -503,11 +528,11 @@ class WebSocketService extends EventEmitter {
   onMessage(event) {
     // Update last activity
     this.state.lastActivity = Date.now();
-    
+
     // Process message
     try {
       let message;
-      
+
       // Try to parse as JSON
       try {
         message = JSON.parse(event.data);
@@ -515,12 +540,45 @@ class WebSocketService extends EventEmitter {
         // Not JSON, use raw data
         message = event.data;
       }
-      
+
       this.log(`Received message: ${typeof message === 'string' ? message : JSON.stringify(message).substring(0, 100)}`);
-      
+
+      // PHASE 1: Send ACK for messages that require it
+      if (typeof message === 'object' && message.requiresAck && message.id) {
+        this.log(`[PHASE 1] Sending ACK for message ${message.id}`);
+        this.send({
+          type: 'ack',
+          messageId: message.id
+        }, { queueIfDisconnected: false });
+      }
+
+      // PHASE 1: Handle sequence numbers for appointment events
+      if (typeof message === 'object' && message.sequenceNum !== undefined && message.date) {
+        const lastSeq = this.state.sequenceNumbers.get(message.date) || 0;
+        const receivedSeq = message.sequenceNum;
+
+        this.log(`[PHASE 1] Sequence check - Date: ${message.date}, Last: ${lastSeq}, Received: ${receivedSeq}`);
+
+        // Check for sequence gap
+        if (receivedSeq > lastSeq + 1) {
+          console.warn(`[PHASE 1] Sequence gap detected! Expected ${lastSeq + 1}, got ${receivedSeq}`);
+          this.handleSequenceGap(message.date, lastSeq, receivedSeq);
+        }
+
+        // Update last sequence number
+        this.state.sequenceNumbers.set(message.date, receivedSeq);
+      }
+
+      // PHASE 1: Handle full refresh request from server
+      if (typeof message === 'object' && message.fullRefreshRequired) {
+        console.warn(`[PHASE 1] Server requesting full refresh: ${message.reason || 'unknown'}`);
+        this.emit('fullRefreshRequired', { date: message.date, reason: message.reason });
+        return;
+      }
+
       // Check if it's a heartbeat/ping response
       if (typeof message === 'object' && (
-          message.type === WebSocketEvents.HEARTBEAT_PING || 
+          message.type === WebSocketEvents.HEARTBEAT_PING ||
           message.type === WebSocketEvents.HEARTBEAT_PONG
         )) {
         // Handle ping/pong
@@ -529,47 +587,47 @@ class WebSocketService extends EventEmitter {
           this.send({ type: WebSocketEvents.HEARTBEAT_PONG }, { queueIfDisconnected: false });
         } else if (message.type === WebSocketEvents.HEARTBEAT_PONG) {
           this.log('Received heartbeat pong response');
-  
+
           // Clear the timeout timer since we got a response
           if (this.state.heartbeatTimeoutTimer) {
             clearTimeout(this.state.heartbeatTimeoutTimer);
             this.state.heartbeatTimeoutTimer = null;
           }
-          
+
           // Schedule the next heartbeat ping
           this.scheduleNextHeartbeat();
         }
-        
+
         return;
       }
-      
+
       // Check if it's a response to a pending message
       if (typeof message === 'object' && message.id) {
         const pendingMessage = this.state.pendingMessages.get(message.id);
-        
+
         if (pendingMessage) {
           // Clear timeout
           clearTimeout(pendingMessage.timeout);
-          
+
           // Resolve promise
           pendingMessage.resolve(message);
-          
+
           // Remove from pending messages
           this.state.pendingMessages.delete(message.id);
-          
+
           // Also emit the message as an event
           this.emit('message', message);
-          
+
           return;
         }
       }
-      
+
       // Not a response to a pending message, emit as event
       // Specific events based on message type (for backward compatibility)
       if (typeof message === 'object' && message.messageType) {
         this.emit(message.messageType, message);
       }
-      
+
       // Handle messages with 'type' field
       if (typeof message === 'object' && message.type) {
         this.log(`Emitting event for message type '${message.type}'`);
@@ -588,13 +646,46 @@ class WebSocketService extends EventEmitter {
           console.log(`📡 [WebSocket Service] Event '${message.type}' emitted successfully`);
         }
       }
-      
+
       // Always emit generic message event
       this.emit('message', message);
     } catch (error) {
       this.log('Error processing message:', error);
       this.emit('error', error);
     }
+  }
+
+  /**
+   * Handle sequence gap - request missed events
+   * PHASE 1 ENHANCEMENT
+   * @param {string} date - Date for which events were missed
+   * @param {number} lastSeq - Last sequence number we have
+   * @param {number} receivedSeq - Sequence number we just received
+   * @private
+   */
+  handleSequenceGap(date, lastSeq, receivedSeq) {
+    // Avoid duplicate requests
+    if (this.state.missedEventRequests.has(date)) {
+      this.log(`[PHASE 1] Already requested missed events for ${date}, skipping`);
+      return;
+    }
+
+    this.log(`[PHASE 1] Requesting missed events for ${date} (seq ${lastSeq + 1} to ${receivedSeq - 1})`);
+    this.state.syncStatus = 'syncing';
+    this.state.missedEventRequests.add(date);
+
+    // Request missed events from server
+    this.send({
+      type: 'request_missed_events',
+      date: date,
+      lastSequenceNum: lastSeq
+    }, { queueIfDisconnected: false });
+
+    // Clear the request flag after 10 seconds to allow retry if needed
+    setTimeout(() => {
+      this.state.missedEventRequests.delete(date);
+      this.state.syncStatus = 'synced';
+    }, 10000);
   }
   
   setHeartbeatTimeout() {
@@ -911,6 +1002,53 @@ class WebSocketService extends EventEmitter {
     } else {
       console.log(`[WebSocketService] ${message}`);
     }
+  }
+}
+
+  /**
+   * Get sync status for a specific date
+   * PHASE 1 ENHANCEMENT
+   * @param {string} date - Date to check sync status for
+   * @returns {Object} - Sync status information
+   */
+  getSyncStatus(date = null) {
+    if (date) {
+      return {
+        date,
+        lastSequenceNum: this.state.sequenceNumbers.get(date) || 0,
+        isSyncing: this.state.missedEventRequests.has(date),
+        syncStatus: this.state.syncStatus
+      };
+    }
+
+    // Return overall sync status
+    return {
+      syncStatus: this.state.syncStatus,
+      pendingEventCount: this.state.pendingEventCount,
+      trackedDates: Array.from(this.state.sequenceNumbers.keys()),
+      sequenceNumbers: Object.fromEntries(this.state.sequenceNumbers)
+    };
+  }
+
+  /**
+   * Get last sequence number for a date
+   * PHASE 1 ENHANCEMENT
+   * @param {string} date - Date to get sequence number for
+   * @returns {number} - Last sequence number
+   */
+  getLastSequenceNumber(date) {
+    return this.state.sequenceNumbers.get(date) || 0;
+  }
+
+  /**
+   * Reset sequence tracking for a date (useful for date changes)
+   * PHASE 1 ENHANCEMENT
+   * @param {string} date - Date to reset
+   */
+  resetSequenceTracking(date) {
+    this.state.sequenceNumbers.delete(date);
+    this.state.missedEventRequests.delete(date);
+    this.log(`[PHASE 1] Reset sequence tracking for ${date}`);
   }
 }
 

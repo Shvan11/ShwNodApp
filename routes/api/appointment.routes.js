@@ -18,7 +18,9 @@ import * as database from '../../services/database/index.js';
 import {
     getPresentAps,
     updatePresent,
-    undoAppointmentState
+    undoAppointmentState,
+    updatePresentInTransaction,
+    verifyAppointmentState
 } from '../../services/database/queries/appointment-queries.js';
 import { WebSocketEvents } from '../../services/messaging/websocket-events.js';
 import { ErrorResponses } from '../../utils/error-response.js';
@@ -123,6 +125,7 @@ router.get("/getDailyAppointments", async (req, res) => {
  * Update patient appointment state (Present, Seated, or Dismissed)
  * Records the time when each state transition occurs
  * Enhanced with action ID tracking for event source detection
+ * PHASE 1 ENHANCEMENT: Transaction-aware with confirmed broadcast
  */
 router.post("/updateAppointmentState", async (req, res) => {
     try {
@@ -134,14 +137,32 @@ router.post("/updateAppointmentState", async (req, res) => {
         // Format time as string for the modified stored procedure
         const now = new Date();
         const currentTime = time || `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-        log.info(`Updating appointment ${appointmentID} with state: ${state}, time: ${currentTime}, actionId: ${actionId || 'none'}`);
-        const result = await updatePresent(appointmentID, state, currentTime);
+        log.info(`[Transaction] Updating appointment ${appointmentID} with state: ${state}, time: ${currentTime}, actionId: ${actionId || 'none'}`);
 
-        // Emit WebSocket event with GRANULAR appointment data for efficient updates
+        // Execute within transaction with confirmation
+        const result = await database.transactionManager.executeInTransaction(async (transaction) => {
+            // Step 1: Update the appointment state
+            const updateResult = await updatePresentInTransaction(transaction, appointmentID, state, currentTime);
+
+            // Step 2: Verify the update succeeded by reading back the data
+            const verifiedState = await verifyAppointmentState(transaction, appointmentID, state);
+
+            log.info(`[Transaction] Verified appointment ${appointmentID} state after update:`, {
+                [state]: verifiedState[state],
+                [`${state}Time`]: verifiedState[`${state}Time`]
+            });
+
+            return {
+                ...updateResult,
+                verified: verifiedState
+            };
+        });
+
+        // Step 3: ONLY AFTER TRANSACTION COMMITS, emit WebSocket event
         const appointmentDate = new Date().toISOString().split('T')[0];
 
-        // Use proper WebSocket event with data payload including actionId
         if (wsEmitter) {
+            log.info(`[WebSocket] Broadcasting state change after DB commit for appointment ${appointmentID}`);
             // Emit DATA_UPDATED event with granular data (no full reload needed)
             wsEmitter.emit(WebSocketEvents.DATA_UPDATED, appointmentDate, actionId, {
                 changeType: 'status_changed',
@@ -154,9 +175,15 @@ router.post("/updateAppointmentState", async (req, res) => {
             });
         }
 
-        res.json(result);
+        res.json({
+            success: true,
+            appointmentID,
+            state,
+            time: currentTime
+        });
     } catch (error) {
-        log.error("Error updating appointment state:", error);
+        log.error("[Transaction] Error updating appointment state:", error);
+        // Transaction automatically rolled back by TransactionManager
         return ErrorResponses.internalError(res, "Failed to update appointment state", error);
     }
 });

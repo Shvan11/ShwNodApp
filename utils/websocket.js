@@ -10,6 +10,7 @@ import { createWebSocketMessage, validateWebSocketMessage, MessageSchemas } from
 import { WebSocketEvents, createStandardMessage } from '../services/messaging/websocket-events.js';
 import { logger } from '../services/core/Logger.js';
 import qrcode from 'qrcode';
+import { AckManager } from '../services/websocket/AckManager.js';
 /**
  * WebSocket Connection Manager
  * Manages different types of WebSocket connections
@@ -341,14 +342,17 @@ function setupWebSocketServer(server) {
   // Create connection manager
   const connectionManager = new ConnectionManager();
 
+  // Create ACK manager for reliable message delivery (PHASE 1 ENHANCEMENT)
+  const ackManager = new AckManager();
+
   // Create WebSocket server
   const wss = new WebSocketServer({ server });
 
   // Set up global event handlers
-  setupGlobalEventHandlers(wsEmitter, connectionManager);
+  setupGlobalEventHandlers(wsEmitter, connectionManager, ackManager);
 
   // Set up cleanup interval
-  setupPeriodicCleanup(connectionManager);
+  setupPeriodicCleanup(connectionManager, ackManager);
 
   // Handle new connections
   wss.on('connection', (ws, req) => {
@@ -453,26 +457,26 @@ function setupWebSocketServer(server) {
           if (capabilities) {
             capabilities.lastActivity = Date.now();
           }
-  
+
           // Parse message
           let parsedMessage;
           const messageStr = message.toString();
-  
+
           try {
             parsedMessage = JSON.parse(messageStr);
           } catch (e) {
             // Not JSON, use raw message
             parsedMessage = messageStr;
           }
-  
-          logger.websocket.debug('Received message', { 
+
+          logger.websocket.debug('Received message', {
             messageType: typeof parsedMessage,
             preview: typeof parsedMessage === 'string' ? parsedMessage : JSON.stringify(parsedMessage).substring(0, 100)
           });
-  
+
           // Handle message based on type - only support universal typed messages
           if (typeof parsedMessage === 'object' && parsedMessage.type) {
-            handleTypedMessage(ws, parsedMessage, date, connectionManager);
+            handleTypedMessage(ws, parsedMessage, date, connectionManager, ackManager);
           } else {
             // Unrecognized message format
             logger.websocket.debug('Unrecognized message format, ignoring');
@@ -485,7 +489,7 @@ function setupWebSocketServer(server) {
       // Handle errors
       ws.on('error', (error) => {
         logger.websocket.error('WebSocket error', error);
-        
+
         // If this was a QR viewer client (waStatus or auth), unregister it
         const capabilities = connectionManager.clientCapabilities.get(ws);
         if (capabilities && (capabilities.type === 'waStatus' || capabilities.type === 'auth') && ws.qrViewerRegistered) {
@@ -493,10 +497,13 @@ function setupWebSocketServer(server) {
             messageState.unregisterQRViewer(ws.viewerId);
           }
         }
-        
+
+        // Cleanup ACK manager for this client
+        ackManager.cleanupClient(ws);
+
         connectionManager.unregisterConnection(ws);
       });
-  
+
    // Handle close event
    ws.on('close', (code, reason) => {
     // If this was a QR viewer client (waStatus or auth), unregister it
@@ -507,7 +514,10 @@ function setupWebSocketServer(server) {
         logger.websocket.debug('Unregistered QR viewer on connection close', { viewerId: ws.viewerId });
       }
     }
-    
+
+    // Cleanup ACK manager for this client
+    ackManager.cleanupClient(ws);
+
     // Then unregister the connection
     connectionManager.unregisterConnection(ws);
     logger.websocket.debug('Client disconnected', { code, reason: reason || 'unknown' });
@@ -526,8 +536,9 @@ function setupWebSocketServer(server) {
    * @param {Object} message - Parsed message
    * @param {string} date - Date parameter
    * @param {ConnectionManager} connectionManager - Connection manager
+   * @param {AckManager} ackManager - ACK manager (PHASE 1 ENHANCEMENT)
    */
- async function handleTypedMessage(ws, message, date, connectionManager) {
+ async function handleTypedMessage(ws, message, date, connectionManager, ackManager) {
   // ===== FIXED: More flexible validation for ping/pong messages =====
   // Simple validation that allows ping/pong without data field
   if (!message || typeof message !== 'object' || !message.type) {
@@ -537,6 +548,22 @@ function setupWebSocketServer(server) {
       { error: 'Invalid message format: missing type' }
     );
     connectionManager.sendToClient(ws, errorMessage);
+    return;
+  }
+
+  // PHASE 1: Handle ACK messages
+  if (message.type === 'ack' && message.messageId) {
+    ackManager.handleAck(message.messageId);
+    return;
+  }
+
+  // PHASE 1: Handle missed events request
+  if (message.type === 'request_missed_events' && message.date && message.lastSequenceNum !== undefined) {
+    logger.websocket.info('Client requesting missed events', {
+      date: message.date,
+      lastSequenceNum: message.lastSequenceNum
+    });
+    ackManager.handleMissedEventsRequest(ws, message.date, message.lastSequenceNum);
     return;
   }
 
@@ -821,11 +848,12 @@ function setupWebSocketServer(server) {
  * Set up global event handlers
  * @param {EventEmitter} emitter - WebSocket event emitter
  * @param {ConnectionManager} connectionManager - Connection manager
+ * @param {AckManager} ackManager - ACK manager (PHASE 1 ENHANCEMENT)
  */
-function setupGlobalEventHandlers(emitter, connectionManager) {
+function setupGlobalEventHandlers(emitter, connectionManager, ackManager) {
   // Handle appointment updates with action ID tracking and GRANULAR data support
   const handleAppointmentUpdate = async (dateParam, actionId = null, granularData = null) => {
-    logger.websocket.info('Received appointment update event', { date: dateParam, actionId, hasGranularData: !!granularData });
+    logger.websocket.info('[PHASE 1] Received appointment update event', { date: dateParam, actionId, hasGranularData: !!granularData });
 
     try {
       // Create message with BOTH granular data (for efficient updates) and full data (for legacy screens)
@@ -868,12 +896,28 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
         );
       }
 
-      // Broadcast to screens and daily appointments clients specifically
+      // PHASE 1: Broadcast with ACK requirement to daily appointments clients
+      const dailyAppointmentClients = Array.from(connectionManager.dailyAppointmentsConnections)
+        .filter(ws => ws.readyState === ws.OPEN);
+
+      if (dailyAppointmentClients.length > 0) {
+        logger.websocket.info('[PHASE 1] Broadcasting with ACK to daily appointments clients', {
+          clientCount: dailyAppointmentClients.length,
+          date: dateParam
+        });
+
+        // Send with ACK and sequence numbers
+        ackManager.broadcastWithAck(dailyAppointmentClients, message, dateParam).catch(error => {
+          logger.websocket.error('[PHASE 1] Failed to broadcast with ACK', error);
+        });
+      }
+
+      // Legacy: Broadcast without ACK to screens (for backward compatibility)
       const screenUpdates = connectionManager.broadcastToScreens(message);
-      const dailyAppointmentsUpdates = connectionManager.broadcastToDailyAppointments(message);
-      logger.websocket.info('Broadcast appointment updates', {
+
+      logger.websocket.info('[PHASE 1] Broadcast appointment updates completed', {
         screenUpdates,
-        dailyAppointmentsUpdates,
+        dailyAppointmentsWithAck: dailyAppointmentClients.length,
         actionId,
         granular: !!granularData
       });
@@ -1070,7 +1114,7 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
  * Set up periodic cleanup
  * @param {ConnectionManager} connectionManager - Connection manager
  */
-function setupPeriodicCleanup(connectionManager) {
+function setupPeriodicCleanup(connectionManager, ackManager) {
   // Close inactive connections every 10 minutes
   const inactivityTimeout = 30 * 60 * 1000; // 30 minutes
 
@@ -1085,7 +1129,7 @@ function setupPeriodicCleanup(connectionManager) {
     logger.websocket.debug('Active connections status', counts);
   }, 10 * 60 * 1000); // Every 10 minutes
 
-  
+
   setInterval(() => {
     // Get all active WhatsApp status connections with their viewer IDs
     const activeViewerIds = [];
@@ -1094,21 +1138,33 @@ function setupPeriodicCleanup(connectionManager) {
         activeViewerIds.push(ws.viewerId);
       }
     });
-    
+
     // Verify QR viewer count matches actual connections
     if (messageState && typeof messageState.verifyQRViewerCount === 'function') {
       messageState.verifyQRViewerCount(activeViewerIds);
     }
-    
+
     // Log connection health
     const counts = connectionManager.getConnectionCounts();
     if (counts.waStatus > 0) {
-      logger.websocket.debug('WebSocket health check', { 
-        waStatusConnections: counts.waStatus, 
-        qrViewersRegistered: activeViewerIds.length 
+      logger.websocket.debug('WebSocket health check', {
+        waStatusConnections: counts.waStatus,
+        qrViewersRegistered: activeViewerIds.length
       });
     }
   }, 60000); // Every minute
+
+  // PHASE 1: Cleanup old event buffers every hour
+  setInterval(() => {
+    const cleared = ackManager.clearOldBuffers(24 * 60 * 60 * 1000); // 24 hours
+    if (cleared > 0) {
+      logger.websocket.info('[PHASE 1] Cleared old event buffers', { count: cleared });
+    }
+
+    // Log ACK manager statistics
+    const stats = ackManager.getStats();
+    logger.websocket.debug('[PHASE 1] ACK Manager stats', stats);
+  }, 60 * 60 * 1000); // Every hour
 
 }
 

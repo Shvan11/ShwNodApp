@@ -27,6 +27,10 @@ export function useAppointments() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    // PHASE 1: Track which appointments are currently processing (for loading indicators)
+    const [processingAppointments, setProcessingAppointments] = useState(new Set());
+    const [failedAppointments, setFailedAppointments] = useState(new Map()); // appointmentId -> error message
+
     /**
      * Get current time in HH:MM:SS format
      */
@@ -136,6 +140,14 @@ export function useAppointments() {
         // Save for rollback
         const savedAppointment = { ...appointment };
 
+        // PHASE 1: Mark as processing
+        setProcessingAppointments(prev => new Set(prev).add(appointmentId));
+        setFailedAppointments(prev => {
+            const next = new Map(prev);
+            next.delete(appointmentId); // Clear any previous errors
+            return next;
+        });
+
         // OPTIMISTIC UPDATE: Move to checked-in list
         const currentTime = getCurrentTime();
         const checkedInAppointment = {
@@ -169,12 +181,38 @@ export function useAppointments() {
             const result = await response.json();
             console.log('✅ Check-in confirmed by server:', result);
 
+            // PHASE 1: Remove from processing
+            setProcessingAppointments(prev => {
+                const next = new Set(prev);
+                next.delete(appointmentId);
+                return next;
+            });
+
             return { success: true, previousState: 'Scheduled', actionId };
         } catch (err) {
             console.error('❌ Check-in failed, rolling back:', err);
+
+            // PHASE 1: Mark as failed
+            setProcessingAppointments(prev => {
+                const next = new Set(prev);
+                next.delete(appointmentId);
+                return next;
+            });
+            setFailedAppointments(prev => new Map(prev).set(appointmentId, err.message));
+
             // ROLLBACK: Move back to "All Appointments"
             setCheckedInAppointments(prev => prev.filter(apt => apt.appointmentID !== appointmentId));
             setAllAppointments(prev => [...prev, savedAppointment]);
+
+            // Auto-clear error after 3 seconds
+            setTimeout(() => {
+                setFailedAppointments(prev => {
+                    const next = new Map(prev);
+                    next.delete(appointmentId);
+                    return next;
+                });
+            }, 3000);
+
             throw err;
         }
     }, [allAppointments, moveToCheckedIn]);
@@ -519,6 +557,12 @@ export function useAppointments() {
         // State
         loading,
         error,
+
+        // PHASE 1: Processing and error states for individual appointments
+        processingAppointments,
+        failedAppointments,
+        isProcessing: (appointmentId) => processingAppointments.has(appointmentId),
+        getError: (appointmentId) => failedAppointments.get(appointmentId),
 
         // Actions (with optimistic updates - NO unnecessary reloads!)
         loadAppointments,
