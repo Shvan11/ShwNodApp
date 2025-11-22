@@ -5,7 +5,7 @@
    =================================== */
 .patient-management {
     padding: var(--spacing-lg) var(--spacing-xl);
-    max-width: 1400px;
+    max-width: var(--container-max-width);
     margin: 0 auto;
 }
 
@@ -43,8 +43,8 @@
     margin-bottom: var(--spacing-lg);
     padding: var(--spacing-lg);
     background-color: var(--blue-50);
-    border-radius: 12px;
-    border: 2px solid var(--blue-300);
+    border-radius: var(--radius-2xl);
+    border: var(--border-width-medium) solid var(--blue-300);
 }
 
 .pm-quick-search-header {
@@ -62,7 +62,7 @@
 .pm-quick-search-header h3 {
     margin: 0;
     color: var(--info-700);
-    font-size: 1.1rem;
+    font-size: var(--font-size-lg);
 }
 
 .pm-quick-search-description {
@@ -73,7 +73,7 @@
 
 .pm-quick-search-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(var(--grid-min-column-width), 1fr));
     gap: var(--spacing-md);
 }
 
@@ -89,9 +89,9 @@
    SECTION DIVIDER
    =================================== */
 .pm-section-divider {
-    margin: 2rem 0;
+    margin: var(--spacing-xl) 0;
     border: none;
-    border-top: 2px solid var(--gray-200);
+    border-top: var(--border-width-medium) solid var(--gray-200);
 }
 
 /* ===================================
@@ -103,7 +103,7 @@
 
 .pm-search-section-header h3 {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: var(--font-size-lg);
     color: var(--gray-700);
 }
 
@@ -123,13 +123,13 @@
    =================================== */
 .pm-name-search-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(var(--grid-min-column-width), 1fr));
     gap: var(--spacing-sm);
     margin-bottom: var(--spacing-lg);
     padding: var(--spacing-lg);
     background-color: var(--gray-50);
     border-radius: var(--radius-lg);
-    border: 1px solid var(--gray-200);
+    border: var(--border-width-thin) solid var(--gray-200);
 }
 
 .pm-name-search-grid label {
@@ -142,10 +142,10 @@
 
 .pm-name-search-grid input {
     width: 100%;
-    height: 2.75rem;
+    height: var(--input-height);
     line-height: 1.5;
     padding: var(--spacing-sm) var(--spacing-md);
-    border: 1px solid var(--gray-300);
+    border: var(--border-width-thin) solid var(--gray-300);
     border-radius: var(--radius-lg);
     font-size: var(--font-size-base);
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -154,7 +154,7 @@
 .pm-name-search-grid input:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    box-shadow: var(--shadow-focus);
 }
 
 .pm-search-form {
@@ -166,12 +166,12 @@
 }
 
 .pm-search-input {
-    flex: 1 1 300px;
+    flex: 1 1 var(--grid-min-column-width-lg);
     min-width: 0;
-    height: 2.75rem;
+    height: var(--input-height);
     line-height: 1.5;
     padding: var(--spacing-sm) var(--spacing-md);
-    border: 1px solid var(--gray-300);
+    border: var(--border-width-thin) solid var(--gray-300);
     border-radius: var(--radius-lg);
     font-size: var(--font-size-base);
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -180,7 +180,7 @@
 .pm-search-input:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    box-shadow: var(--shadow-focus);
 }
 
 /* ===================================
@@ -217,26 +217,26 @@
    LOADING & EMPTY STATES
    =================================== */
 .pm-loading-container {
-    padding: 3rem;
+    padding: var(--spacing-xxl);
     text-align: center;
 }
 
 .pm-loading-spinner {
-    font-size: 2rem;
+    font-size: var(--font-size-4xl);
     color: var(--blue-300);
     margin-bottom: var(--spacing-md);
 }
 
 .pm-empty-state {
-    padding: 3rem;
+    padding: var(--spacing-xxl);
     text-align: center;
     background-color: var(--gray-50);
     border-radius: var(--radius-lg);
-    border: 2px dashed var(--gray-300);
+    border: var(--border-width-medium) dashed var(--gray-300);
 }
 
 .pm-empty-state i {
-    font-size: 3rem;
+    font-size: var(--font-size-5xl);
     color: var(--gray-400);
     margin-bottom: var(--spacing-md);
 }
@@ -290,19 +290,19 @@
 
 .pm-btn-checkin {
     background-color: var(--success-300);
-    color: white;
+    color: var(--color-white);
     border: none;
 }
 
 .pm-btn-view {
     background-color: var(--blue-300);
-    color: white;
+    color: var(--color-white);
     border: none;
 }
 
 .pm-btn-delete {
     background-color: var(--error-500);
-    color: white;
+    color: var(--color-white);
     border: none;
 }
 
@@ -310,13 +310,13 @@
    MODALS
    =================================== */
 .pm-modal-wide {
-    max-width: 800px;
-    max-height: 90vh;
+    max-width: var(--container-max-width-narrow);
+    max-height: var(--viewport-height-90);
     overflow: auto;
 }
 
 .pm-modal-narrow {
-    max-width: 500px;
+    max-width: var(--container-max-width-sm);
 }
 
 .pm-required-asterisk {
@@ -332,7 +332,7 @@
 
 .pm-delete-warning-box {
     background-color: var(--error-50);
-    border: 2px solid var(--error-500);
+    border: var(--border-width-medium) solid var(--error-500);
     border-radius: var(--radius-lg);
     padding: var(--spacing-lg);
     margin-bottom: var(--spacing-lg);
@@ -347,12 +347,12 @@
 
 .pm-delete-warning-header i {
     color: var(--error-500);
-    font-size: 2rem;
+    font-size: var(--font-size-4xl);
 }
 
 .pm-delete-warning-header strong {
     color: var(--error-600);
-    font-size: 1.1rem;
+    font-size: var(--font-size-lg);
 }
 
 .pm-delete-warning-box > p {
@@ -363,10 +363,10 @@
 }
 
 .pm-delete-warning-list-container {
-    background-color: white;
+    background-color: var(--color-white);
     padding: var(--spacing-md);
-    border-radius: 6px;
-    border: 1px solid var(--error-200);
+    border-radius: var(--radius-md);
+    border: var(--border-width-thin) solid var(--error-200);
     margin-bottom: var(--spacing-md);
 }
 
@@ -386,7 +386,7 @@
     margin: 0;
     color: var(--error-600);
     font-weight: var(--font-weight-bold);
-    font-size: 0.95rem;
+    font-size: var(--font-size-md);
 }
 
 /* ===================================
@@ -394,7 +394,7 @@
    =================================== */
 .pm-advanced-filters {
     margin-bottom: var(--spacing-lg);
-    border: 1px solid var(--border-color);
+    border: var(--border-width-thin) solid var(--border-color);
     border-radius: var(--radius-lg);
     /* overflow: hidden removed to allow React-Select dropdowns to display fully */
 }
@@ -427,7 +427,7 @@
     align-items: center;
     padding: var(--spacing-xs) var(--spacing-sm);
     background-color: var(--primary-color);
-    color: white;
+    color: var(--color-white);
     border-radius: var(--radius-full);
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
@@ -441,7 +441,7 @@
 
 .pm-advanced-filters__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(var(--grid-min-column-width-md), 1fr));
     gap: var(--spacing-lg);
     margin-bottom: var(--spacing-lg);
 }
@@ -458,7 +458,7 @@
 .pm-active-filters {
     margin-top: var(--spacing-lg);
     padding-top: var(--spacing-lg);
-    border-top: 1px solid var(--border-color);
+    border-top: var(--border-width-thin) solid var(--border-color);
 }
 
 .pm-active-filters__header {
@@ -476,7 +476,7 @@
 .pm-clear-filters-btn {
     padding: var(--spacing-sm) var(--spacing-md);
     background-color: var(--error-500);
-    color: white;
+    color: var(--color-white);
     border: none;
     border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
@@ -504,7 +504,7 @@
     font-weight: var(--font-weight-medium);
     background-color: var(--gray-100);
     color: var(--text-primary);
-    border: 1px solid var(--border-color);
+    border: var(--border-width-thin) solid var(--border-color);
 }
 
 .pm-filter-chip--work {
@@ -553,7 +553,7 @@
 
 .pm-work-badge {
     display: inline-block;
-    padding: 0.25rem 0.5rem;
+    padding: var(--spacing-xs) var(--spacing-sm);
     background-color: var(--blue-100);
     color: var(--blue-700);
     border-radius: var(--radius-sm);
@@ -564,7 +564,7 @@
 
 .pm-tag-badge {
     display: inline-block;
-    padding: 0.25rem 0.5rem;
+    padding: var(--spacing-xs) var(--spacing-sm);
     background-color: var(--warning-100);
     color: var(--warning-700);
     border-radius: var(--radius-sm);
@@ -583,7 +583,7 @@
    =================================== */
 /* Note: React-Select requires !important to override library defaults */
 .pm-select__control {
-    min-height: 2.75rem !important;
+    min-height: var(--input-height) !important;
     border-color: var(--gray-300) !important;
 }
 
@@ -593,7 +593,7 @@
 
 .pm-select__control--is-focused {
     border-color: var(--primary-color) !important;
-    box-shadow: 0 0 0 1px var(--primary-color) !important;
+    box-shadow: var(--shadow-focus-strong) !important;
 }
 
 .pm-select__menu {
@@ -634,7 +634,7 @@
 
     .pm-search-input {
         width: 100%;
-        height: 2.75rem;
+        height: var(--input-height);
         padding: var(--spacing-sm) var(--spacing-md);
         line-height: 1.5;
     }
@@ -684,7 +684,7 @@
     }
 
     .work-table {
-        min-width: 600px;
+        min-width: var(--table-min-width);
     }
 
     /* Action buttons - reduce size */
@@ -701,7 +701,7 @@
     /* Modals - fit small screens */
     .pm-modal-narrow,
     .pm-modal-wide {
-        max-width: 95vw;
+        max-width: var(--viewport-width-95);
         margin: var(--spacing-sm);
     }
 }
@@ -714,7 +714,7 @@
     }
 
     .work-table {
-        min-width: 500px;
+        min-width: var(--table-min-width-sm);
     }
 
     .pm-quick-search-header h3 {
