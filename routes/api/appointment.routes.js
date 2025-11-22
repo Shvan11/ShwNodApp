@@ -159,7 +159,12 @@ router.post("/updateAppointmentState", async (req, res) => {
         });
 
         // Step 3: ONLY AFTER TRANSACTION COMMITS, emit WebSocket event
-        const appointmentDate = new Date().toISOString().split('T')[0];
+        // Use local date (not UTC) to match client's date format
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const appointmentDate = `${year}-${month}-${day}`;
 
         if (wsEmitter) {
             log.info(`[WebSocket] Broadcasting state change after DB commit for appointment ${appointmentID}`);
@@ -213,7 +218,12 @@ router.post("/undoAppointmentState", async (req, res) => {
         const result = await undoAppointmentState(appointmentID, state);
 
         // Emit WebSocket event with granular data and actionId
-        const appointmentDate = new Date().toISOString().split('T')[0];
+        // Use local date (not UTC) to match client's date format
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const appointmentDate = `${year}-${month}-${day}`;
         if (wsEmitter) {
             wsEmitter.emit(WebSocketEvents.DATA_UPDATED, appointmentDate, actionId, {
                 changeType: 'status_changed',
@@ -265,8 +275,18 @@ router.post("/appointments", async (req, res) => {
 
         // Emit WebSocket event for real-time updates
         if (wsEmitter) {
-            const appointmentDate = new Date(AppDate);
-            const appointmentDay = appointmentDate.toISOString().split('T')[0];
+            // Use the AppDate as-is if it's already in YYYY-MM-DD format
+            // Otherwise extract date from Date object using local time
+            let appointmentDay;
+            if (typeof AppDate === 'string' && AppDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                appointmentDay = AppDate;
+            } else {
+                const appointmentDate = new Date(AppDate);
+                const year = appointmentDate.getFullYear();
+                const month = String(appointmentDate.getMonth() + 1).padStart(2, '0');
+                const day = String(appointmentDate.getDate()).padStart(2, '0');
+                appointmentDay = `${year}-${month}-${day}`;
+            }
             wsEmitter.emit('appointments_updated', appointmentDay);
         }
 
@@ -480,8 +500,12 @@ router.post("/appointments/quick-checkin", async (req, res) => {
 
         // Emit WebSocket event for real-time updates
         if (wsEmitter) {
+            // Use local date (not UTC) to match client's date format
             const now = new Date();
-            const todayDateOnly = now.toISOString().split('T')[0];
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const todayDateOnly = `${year}-${month}-${day}`;
             wsEmitter.emit('appointments_updated', todayDateOnly);
         }
 
