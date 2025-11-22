@@ -7,7 +7,7 @@
  */
 
 import { Request, ISOLATION_LEVEL } from 'tedious';
-import logger from '../logger.js';
+import { log } from '../../utils/logger.js';
 
 export class Transaction {
     constructor(connection, transactionId) {
@@ -36,7 +36,8 @@ export class Transaction {
 
             const request = new Request('COMMIT TRANSACTION', (err) => {
                 if (err) {
-                    logger.database.error('Transaction commit failed', err, {
+                    log.error('Transaction commit failed', {
+                        error: err,
                         transactionId: this.transactionId
                     });
                     this.isActive = false;
@@ -44,7 +45,7 @@ export class Transaction {
                 } else {
                     this.isCommitted = true;
                     this.isActive = false;
-                    logger.database.debug('Transaction committed successfully', {
+                    log.debug('Transaction committed successfully', {
                         transactionId: this.transactionId
                     });
                     resolve();
@@ -74,7 +75,8 @@ export class Transaction {
 
             const request = new Request('ROLLBACK TRANSACTION', (err) => {
                 if (err) {
-                    logger.database.error('Transaction rollback failed', err, {
+                    log.error('Transaction rollback failed', {
+                        error: err,
                         transactionId: this.transactionId
                     });
                     this.isActive = false;
@@ -82,7 +84,7 @@ export class Transaction {
                 } else {
                     this.isRolledBack = true;
                     this.isActive = false;
-                    logger.database.debug('Transaction rolled back successfully', {
+                    log.debug('Transaction rolled back successfully', {
                         transactionId: this.transactionId
                     });
                     resolve();
@@ -125,7 +127,8 @@ export class Transaction {
             });
 
             request.on('error', (err) => {
-                logger.database.error('Query execution error in transaction', err, {
+                log.error('Query execution error in transaction', {
+                    error: err,
                     transactionId: this.transactionId
                 });
                 reject(err);
@@ -165,14 +168,15 @@ export class TransactionManager {
 
             const request = new Request(sql, (err) => {
                 if (err) {
-                    logger.database.error('Failed to begin transaction', err, {
+                    log.error('Failed to begin transaction', {
+                        error: err,
                         transactionId,
                         isolationLevel: isolationLevelStr
                     });
                     this.connectionPool.releaseConnection(connection);
                     reject(err);
                 } else {
-                    logger.database.debug('Transaction begun', {
+                    log.debug('Transaction begun', {
                         transactionId,
                         isolationLevel: isolationLevelStr
                     });
@@ -223,7 +227,8 @@ export class TransactionManager {
             try {
                 await transaction.rollback();
             } catch (rollbackError) {
-                logger.database.error('Rollback failed after error', rollbackError, {
+                log.error('Rollback failed after error', {
+                    error: rollbackError,
                     originalError: error.message,
                     transactionId: transaction.transactionId
                 });
