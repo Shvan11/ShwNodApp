@@ -70,6 +70,7 @@ class WebSocketService extends EventEmitter {
       forceClose: false,        // Whether close was requested (to prevent auto-reconnect)
       screenId: null,           // Screen ID for this connection (loaded on demand)
       hasConnectedBefore: false, // Track if we've ever successfully connected
+      lastConnectionParams: null, // Store connection params for auto-reconnection
 
       // PHASE 1: ACK and sequence number tracking
       sequenceNumbers: new Map(), // Map of date -> last received sequence number
@@ -118,20 +119,24 @@ class WebSocketService extends EventEmitter {
    */
   connect(params = {}) {
     this.log('Connecting to WebSocket server...');
-    
+
+    // Store connection params for auto-reconnection
+    // This ensures that when scheduleReconnect() runs, it preserves clientType and other params
+    this.state.lastConnectionParams = params;
+
     // If already connected or connecting, return
     if (this.state.status === 'connected' || this.state.status === 'connecting') {
       this.log('Already connected or connecting');
       return Promise.resolve(this);
     }
-    
+
     // Reset force close flag
     this.state.forceClose = false;
-    
+
     // Update state
     this.state.status = 'connecting';
     this.emit('connecting');
-    
+
     // Clear any existing timers
     this.clearTimers();
 
@@ -835,7 +840,9 @@ class WebSocketService extends EventEmitter {
     // Set timer
     this.state.reconnectTimer = setTimeout(() => {
       this.state.reconnectAttempts++;
-      this.connect().catch(() => {}); // Ignore errors
+      // Reuse last connection params to preserve clientType, PDate, etc.
+      // This fixes the bug where reconnection would register as 'generic' instead of 'daily-appointments'
+      this.connect(this.state.lastConnectionParams || {}).catch(() => {}); // Ignore errors
     }, delay);
   }
   
