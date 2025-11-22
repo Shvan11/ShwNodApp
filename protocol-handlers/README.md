@@ -125,12 +125,47 @@ The installer sets this registry policy:
 
 ```json
 AutoLaunchProtocolsFromOrigins = [
-  {"protocol": "explorer", "allowed_origins": ["http://clinic:3000"]},
-  {"protocol": "csimaging", "allowed_origins": ["http://clinic:3000"]}
+  {
+    "protocol": "explorer",
+    "allowed_origins": [
+      "http://clinic:3000",
+      "http://192.168.100.2:3000",
+      "http://localhost:3000",
+      "http://192.168.100.2:5173",
+      "http://localhost:5173"
+    ]
+  },
+  {
+    "protocol": "csimaging",
+    "allowed_origins": [
+      "http://clinic:3000",
+      "http://192.168.100.2:3000",
+      "http://localhost:3000",
+      "http://192.168.100.2:5173",
+      "http://localhost:5173"
+    ]
+  },
+  {
+    "protocol": "launch",
+    "allowed_origins": [
+      "http://clinic:3000",
+      "http://192.168.100.2:3000",
+      "http://localhost:3000",
+      "http://192.168.100.2:5173",
+      "http://localhost:5173"
+    ]
+  }
 ]
 ```
 
-**Result**: No browser prompts when launching protocols from your domain!
+**Supported Origins:**
+- `http://clinic:3000` - Production server (hostname)
+- `http://192.168.100.2:3000` - Production server (IP)
+- `http://localhost:3000` - Local production server
+- `http://192.168.100.2:5173` - Vite dev server (IP)
+- `http://localhost:5173` - Vite dev server (local)
+
+**Result**: No browser prompts when launching protocols from any of these origins!
 
 ---
 
@@ -336,7 +371,9 @@ All should return "not found"
 ✅ **Path validation** - Checks paths before executing
 ✅ **User confirmation** - Asks before creating folders
 ✅ **Clear error messages** - Users know what's happening
-✅ **Domain-restricted** - Only works from http://clinic:3000
+✅ **Origin-restricted** - Only works from approved origins (see Browser Configuration section)
+✅ **Development + Production** - Supports both dev (5173) and prod (3000) ports
+✅ **Flexible access** - Works with hostname, IP, and localhost
 
 ---
 
