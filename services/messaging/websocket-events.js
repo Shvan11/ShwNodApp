@@ -87,7 +87,10 @@ export const WebSocketEvents = {
   
   /** WhatsApp client disconnected */
   WHATSAPP_CLIENT_DISCONNECTED: 'whatsapp_client_disconnected',
-  
+
+  /** WhatsApp session restoration in progress */
+  WHATSAPP_SESSION_RESTORING: 'whatsapp_session_restoring',
+
   /** QR code updated for WhatsApp authentication */
   WHATSAPP_QR_UPDATED: 'whatsapp_qr_updated',
   
@@ -97,9 +100,12 @@ export const WebSocketEvents = {
   /** Batch message status updates */
   WHATSAPP_MESSAGE_BATCH_STATUS: 'whatsapp_message_batch_status',
   
+  /** Message sending process started */
+  WHATSAPP_SENDING_STARTED: 'whatsapp_sending_started',
+
   /** Message sending process finished */
   WHATSAPP_SENDING_FINISHED: 'whatsapp_sending_finished',
-  
+
   /** Message sending progress update */
   WHATSAPP_SENDING_PROGRESS: 'whatsapp_sending_progress',
   
@@ -224,7 +230,13 @@ export const EventMetadata = {
     description: 'WhatsApp client is ready for messaging',
     data: { status: 'object', timestamp: 'number' }
   },
-  
+
+  [WebSocketEvents.WHATSAPP_SESSION_RESTORING]: {
+    direction: EventDirection.SERVER_TO_CLIENT,
+    description: 'WhatsApp session restoration in progress',
+    data: { elapsed: 'number', maxWait: 'number' }
+  },
+
   [WebSocketEvents.WHATSAPP_QR_UPDATED]: {
     direction: EventDirection.SERVER_TO_CLIENT,
     description: 'QR code updated for WhatsApp authentication',
@@ -242,7 +254,13 @@ export const EventMetadata = {
     description: 'Batch message status updates',
     data: { statusUpdates: 'array', date: 'string' }
   },
-  
+
+  [WebSocketEvents.WHATSAPP_SENDING_STARTED]: {
+    direction: EventDirection.SERVER_TO_CLIENT,
+    description: 'Message sending process started',
+    data: { total: 'number', sent: 'number', failed: 'number', started: 'boolean', finished: 'boolean', sessionId: 'string', date: 'string' }
+  },
+
   [WebSocketEvents.REQUEST_WHATSAPP_INITIAL_STATE]: {
     direction: EventDirection.CLIENT_TO_SERVER,
     description: 'Request initial WhatsApp state',
@@ -375,9 +393,11 @@ export function getEventsByCategory() {
       WebSocketEvents.WHATSAPP_CLIENT_READY,
       WebSocketEvents.WHATSAPP_CLIENT_INITIALIZING,
       WebSocketEvents.WHATSAPP_CLIENT_DISCONNECTED,
+      WebSocketEvents.WHATSAPP_SESSION_RESTORING,
       WebSocketEvents.WHATSAPP_QR_UPDATED,
       WebSocketEvents.WHATSAPP_MESSAGE_STATUS,
       WebSocketEvents.WHATSAPP_MESSAGE_BATCH_STATUS,
+      WebSocketEvents.WHATSAPP_SENDING_STARTED,
       WebSocketEvents.WHATSAPP_SENDING_FINISHED,
       WebSocketEvents.WHATSAPP_SENDING_PROGRESS,
       WebSocketEvents.REQUEST_WHATSAPP_INITIAL_STATE,

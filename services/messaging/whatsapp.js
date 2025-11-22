@@ -764,113 +764,25 @@ class WhatsAppService extends EventEmitter {
 
   /**
    * Handle QR code generation
+   *
+   * IMPORTANT: QR event fires in multiple scenarios:
+   * 1. Fresh authentication (no session exists) - NORMAL, show QR
+   * 2. Existing session restoration (WhatsApp checking session validity) - NORMAL, may auto-resolve
+   * 3. Session actually invalid - Will trigger auth_failure event separately
+   *
+   * DO NOT delete sessions here! Let auth_failure handler deal with invalid sessions.
    */
   async handleQR(qr) {
-    // Check session quality to determine if restoration is possible
+    // Quick diagnostic check only - DO NOT take destructive actions
     const sessionQuality = await this.validateSessionQuality();
 
+    // Log session status for debugging, but don't delete anything
     if (sessionQuality === 'valid') {
-      logger.whatsapp.info('Attempting session restoration...');
-
-      // Emit initial progress to frontend
-      const maxWaitSeconds = Math.floor(this.clientState.SESSION_RESTORATION_TIMEOUT / 1000);
-      if (this.wsEmitter) {
-        const message = createWebSocketMessage(
-          'whatsapp_session_restoring',
-          { elapsed: 0, maxWait: maxWaitSeconds }
-        );
-        this.broadcastToClients(message);
-      }
-
-      // Create a promise that resolves when we know the session restoration outcome
-      const sessionRestoreOutcome = new Promise((resolve) => {
-        let resolved = false;
-        const startTime = Date.now();
-        const MAX_WAIT_MS = this.clientState.SESSION_RESTORATION_TIMEOUT; // 120 seconds
-        const PROGRESS_INTERVAL_MS = 10000; // 10 seconds
-
-        // Send progress updates every 10 seconds (silent logging)
-        const progressInterval = setInterval(() => {
-          if (!resolved) {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-
-            if (this.wsEmitter) {
-              const message = createWebSocketMessage(
-                'whatsapp_session_restoring',
-                { elapsed, maxWait: maxWaitSeconds }
-              );
-              this.broadcastToClients(message);
-            }
-          }
-        }, PROGRESS_INTERVAL_MS);
-
-        // Listen for successful session restoration
-        const onReady = () => {
-          if (!resolved) {
-            resolved = true;
-            cleanup();
-            logger.whatsapp.info('Session restored successfully');
-            resolve('restored');
-          }
-        };
-
-        // Listen for authentication failure (session invalid)
-        const onAuthFailure = () => {
-          if (!resolved) {
-            resolved = true;
-            cleanup();
-            logger.whatsapp.warn('Session authentication failed - will show QR');
-            resolve('failed');
-          }
-        };
-
-        // Maximum wait timeout: 60 seconds
-        const timeout = setTimeout(() => {
-          if (!resolved) {
-            resolved = true;
-            cleanup();
-            logger.whatsapp.info('Session restoration timeout - showing QR');
-            resolve('timeout');
-          }
-        }, MAX_WAIT_MS);
-
-        const cleanup = () => {
-          clearInterval(progressInterval);
-          clearTimeout(timeout);
-          if (this.clientState.client) {
-            this.clientState.client.removeListener('ready', onReady);
-            this.clientState.client.removeListener('auth_failure', onAuthFailure);
-          }
-        };
-
-        // Add one-time listeners
-        if (this.clientState.client) {
-          this.clientState.client.once('ready', onReady);
-          this.clientState.client.once('auth_failure', onAuthFailure);
-        }
-      });
-
-      const outcome = await sessionRestoreOutcome;
-
-      // If session was restored, don't show QR
-      if (outcome === 'restored') {
-        return;
-      }
-
-      // Session restoration failed or timed out, proceed with QR
-      if (outcome === 'failed' || outcome === 'timeout') {
-        logger.whatsapp.info('Cleaning up invalid session');
-        await this.cleanupInvalidSession();
-      }
-    } else if (sessionQuality === 'empty' || sessionQuality === 'corrupted') {
-      // SESSION PERSISTENCE FIX: Do NOT cleanup here during QR flow!
-      // Empty session is NORMAL during fresh authentication - Puppeteer needs time to write IndexedDB
-      // Cleanup will happen on auth_failure event or on next restart if session remains invalid
-      logger.whatsapp.info('Empty session detected - proceeding with QR authentication');
-      // Fall through to show QR code - DO NOT call cleanupInvalidSession() here!
+      logger.whatsapp.info('QR received for existing session - WhatsApp may be verifying session validity');
+    } else if (sessionQuality === 'none') {
+      logger.whatsapp.info('QR received for fresh authentication - no existing session');
     } else {
-      // No session exists - this is normal for fresh authentication
-      logger.whatsapp.info('No existing session - proceeding with QR authentication');
+      logger.whatsapp.debug(`QR received - session quality: ${sessionQuality}`);
     }
 
     // Client is definitely not ready when QR is received
@@ -1791,7 +1703,12 @@ class WhatsAppService extends EventEmitter {
 
   /**
    * Validate session quality - detect empty/corrupted sessions
+   * CONSERVATIVE APPROACH: Only returns 'corrupted' when 100% certain there's a problem
    * Returns: 'valid', 'empty', 'corrupted', or 'none'
+   *
+   * Philosophy: False positives (claiming good session is bad) are WORSE than false negatives
+   * - False positive = forces user to re-authenticate unnecessarily (bad UX)
+   * - False negative = QR code shown but session restores anyway (harmless)
    */
   async validateSessionQuality() {
     try {
@@ -1806,93 +1723,145 @@ class WhatsAppService extends EventEmitter {
         return 'none';
       }
 
-      // Check 2: IndexedDB directory exists (CRITICAL for WhatsApp authentication)
+      // Check 2: Get session age to avoid checking brand-new sessions
+      // Check BOTH the session directory AND IndexedDB directory age
+      try {
+        const sessionStats = fs.default.statSync(sessionPath);
+        const sessionAgeMs = Date.now() - sessionStats.birthtimeMs;
+
+        // CRITICAL: Skip validation for very new sessions (< 10 seconds old)
+        // Puppeteer needs time to create IndexedDB and LocalStorage directories
+        if (sessionAgeMs < 10000) {
+          logger.whatsapp.debug(`Session quality: new (session created ${Math.floor(sessionAgeMs / 1000)}s ago, assuming valid)`);
+          return 'valid'; // Assume new sessions are valid to avoid false positives
+        }
+      } catch (statError) {
+        logger.whatsapp.debug('Could not determine session age, continuing validation');
+      }
+
+      // Check 3: IndexedDB directory exists (CRITICAL for WhatsApp authentication)
       const indexedDBPath = path.default.join(sessionPath, 'IndexedDB');
+      const indexedDBWhatsAppPath = path.default.join(indexedDBPath, 'https_web.whatsapp.com_0.indexeddb.leveldb');
+
       if (!fs.default.existsSync(indexedDBPath)) {
-        logger.whatsapp.warn('Session quality: empty (IndexedDB directory missing)');
-        return 'empty';
-      }
+        // IndexedDB missing - check if this is a brand-new initialization
+        // If session directory exists but IndexedDB doesn't, check IndexedDB parent age
+        try {
+          const parentStats = fs.default.statSync(sessionPath);
+          const parentAgeMs = Date.now() - parentStats.mtimeMs; // Use mtime (last modified)
 
-      // Check 3: IndexedDB has actual data files
-      try {
-        const indexedDBFiles = fs.default.readdirSync(indexedDBPath, { recursive: true });
-        const indexedDBDataFiles = indexedDBFiles.filter(f =>
-          typeof f === 'string' && f.endsWith('.ldb')
-        );
-
-        if (indexedDBDataFiles.length === 0) {
-          logger.whatsapp.warn('Session quality: empty (IndexedDB has no data files)');
-          return 'empty';
-        }
-
-        logger.whatsapp.debug(`IndexedDB contains ${indexedDBDataFiles.length} data files`);
-      } catch (error) {
-        logger.whatsapp.warn('Session quality: corrupted (IndexedDB read error)', { error: error.message });
-        return 'corrupted';
-      }
-
-      // Check 4: leveldb log files have actual data (not 0 bytes)
-      const leveldbPath = path.default.join(sessionPath, 'Local Storage/leveldb');
-      if (!fs.default.existsSync(leveldbPath)) {
-        logger.whatsapp.warn('Session quality: empty (leveldb directory missing)');
-        return 'empty';
-      }
-
-      try {
-        const leveldbFiles = fs.default.readdirSync(leveldbPath);
-        const logFiles = leveldbFiles.filter(f => f.endsWith('.log'));
-
-        let hasEmptyLogs = false;
-        let totalLogSize = 0;
-
-        for (const logFile of logFiles) {
-          const logPath = path.default.join(leveldbPath, logFile);
-          const stats = fs.default.statSync(logPath);
-          totalLogSize += stats.size;
-
-          if (stats.size === 0) {
-            logger.whatsapp.warn(`Session quality check: ${logFile} is empty (0 bytes)`);
-            hasEmptyLogs = true;
+          // If session directory was just modified (< 30s), Puppeteer is likely still initializing
+          if (parentAgeMs < 30000) {
+            logger.whatsapp.debug(`Session quality: initializing (modified ${Math.floor(parentAgeMs / 1000)}s ago, waiting for IndexedDB)`);
+            return 'valid'; // Give Puppeteer time to create IndexedDB
           }
+        } catch (ageError) {
+          // Can't determine age, continue with validation
         }
 
-        if (hasEmptyLogs || totalLogSize < 1024) {
-          logger.whatsapp.warn(`Session quality: empty (log files size ${totalLogSize} bytes)`);
-          return 'empty';
-        }
-
-        logger.whatsapp.debug(`leveldb log files: ${totalLogSize} bytes`);
-      } catch (error) {
-        logger.whatsapp.warn('Session quality: corrupted (leveldb read error)', { error: error.message });
-        return 'corrupted';
+        // IndexedDB missing after 30s = likely empty
+        logger.whatsapp.debug('Session quality: empty (IndexedDB directory missing after 30s)');
+        return 'empty';
       }
 
-      // Check 5: Calculate total session size
+      // Check 4: IndexedDB has actual WhatsApp data files (.ldb files)
+      // CONSERVATIVE: Only check WhatsApp-specific IndexedDB, not all IndexedDB
+      let indexedDBDataFileCount = 0;
+      if (fs.default.existsSync(indexedDBWhatsAppPath)) {
+        try {
+          const indexedDBFiles = fs.default.readdirSync(indexedDBWhatsAppPath);
+          indexedDBDataFileCount = indexedDBFiles.filter(f => f.endsWith('.ldb')).length;
+
+          logger.whatsapp.debug(`IndexedDB contains ${indexedDBDataFileCount} WhatsApp data files`);
+        } catch (error) {
+          // Read error = definitely corrupted (permissions, filesystem issues)
+          logger.whatsapp.warn('Session quality: corrupted (IndexedDB read error)', { error: error.message });
+          return 'corrupted';
+        }
+      }
+
+      // Check 5: Local Storage leveldb (contains WANoiseInfo encryption keys)
+      const leveldbPath = path.default.join(sessionPath, 'Local Storage/leveldb');
+
+      if (fs.default.existsSync(leveldbPath)) {
+        try {
+          const leveldbFiles = fs.default.readdirSync(leveldbPath);
+
+          // CONSERVATIVE: Just check that directory is readable, don't validate content
+          // Log files can be empty (0 bytes) in fresh sessions - this is NORMAL
+          logger.whatsapp.debug(`Local Storage contains ${leveldbFiles.length} files`);
+        } catch (error) {
+          // Read error = definitely corrupted
+          logger.whatsapp.warn('Session quality: corrupted (leveldb read error)', { error: error.message });
+          return 'corrupted';
+        }
+      }
+
+      // Check 6: Calculate total session size (most reliable indicator)
       let totalSize = 0;
       const calculateDirSize = (dirPath) => {
-        const files = fs.default.readdirSync(dirPath, { withFileTypes: true });
-        for (const file of files) {
-          const filePath = path.default.join(dirPath, file.name);
-          if (file.isDirectory()) {
-            calculateDirSize(filePath);
-          } else {
-            const stats = fs.default.statSync(filePath);
-            totalSize += stats.size;
+        try {
+          const files = fs.default.readdirSync(dirPath, { withFileTypes: true });
+          for (const file of files) {
+            const filePath = path.default.join(dirPath, file.name);
+            try {
+              if (file.isDirectory()) {
+                calculateDirSize(filePath);
+              } else {
+                const stats = fs.default.statSync(filePath);
+                totalSize += stats.size;
+              }
+            } catch (fileError) {
+              // Skip individual file errors (permissions, locked files)
+              logger.whatsapp.debug(`Skipping file in size calculation: ${filePath}`);
+            }
           }
+        } catch (dirError) {
+          // Skip directory read errors
+          logger.whatsapp.debug(`Skipping directory in size calculation: ${dirPath}`);
         }
       };
 
       calculateDirSize(sessionPath);
 
-      if (totalSize < 10240) { // Less than 10KB
-        logger.whatsapp.warn(`Session quality: empty (total size ${totalSize} bytes < 10KB)`);
+      // DECISION LOGIC: Conservative approach
+
+      // Scenario 1: Large session (> 1MB) = definitely valid (even if some files are empty)
+      if (totalSize > 1024 * 1024) {
+        logger.whatsapp.info(`Session quality: valid (size ${Math.floor(totalSize / 1024)}KB, mature session)`);
+        return 'valid';
+      }
+
+      // Scenario 2: Medium session (> 100KB) with IndexedDB = valid
+      if (totalSize > 100 * 1024 && indexedDBDataFileCount >= 5) {
+        logger.whatsapp.info(`Session quality: valid (size ${Math.floor(totalSize / 1024)}KB, ${indexedDBDataFileCount} IndexedDB files)`);
+        return 'valid';
+      }
+
+      // Scenario 3: Small session (> 10KB) with some IndexedDB files = probably valid, give benefit of doubt
+      if (totalSize > 10 * 1024 && indexedDBDataFileCount > 0) {
+        logger.whatsapp.info(`Session quality: valid (size ${Math.floor(totalSize / 1024)}KB, ${indexedDBDataFileCount} IndexedDB files, fresh session)`);
+        return 'valid';
+      }
+
+      // Scenario 4: Tiny session (< 10KB) after 10 seconds = likely empty
+      if (totalSize < 10 * 1024) {
+        logger.whatsapp.debug(`Session quality: empty (size ${totalSize} bytes < 10KB after 10s)`);
         return 'empty';
       }
 
-      logger.whatsapp.info(`Session quality: valid (total size ${Math.floor(totalSize / 1024)}KB)`);
+      // Scenario 5: No IndexedDB data after 10 seconds = empty
+      if (indexedDBDataFileCount === 0) {
+        logger.whatsapp.debug(`Session quality: empty (no IndexedDB data files after 10s)`);
+        return 'empty';
+      }
+
+      // Default: If we're unsure, assume valid to avoid false positives
+      logger.whatsapp.info(`Session quality: valid (size ${Math.floor(totalSize / 1024)}KB, assuming valid by default)`);
       return 'valid';
 
     } catch (error) {
+      // Only return 'corrupted' for critical errors (filesystem access issues)
       logger.whatsapp.error('Error validating session quality', { error: error.message });
       return 'corrupted';
     }
@@ -2024,30 +1993,9 @@ class WhatsAppService extends EventEmitter {
       return { success: true, reason: 'no_session' };
     }
 
-    // Try to backup session before deletion (for debugging)
-    try {
-      const backupPath = `.wwebjs_auth/session-client-backup-${Date.now()}`;
-      await fs.promises.rename(sessionPath, backupPath);
-      logger.whatsapp.info('Session backed up before cleanup', { backupPath });
-
-      // Delete backup after a delay (keep for 1 hour)
-      setTimeout(() => {
-        try {
-          fs.default.rmSync(backupPath, { recursive: true, force: true });
-          logger.whatsapp.debug('Session backup deleted', { backupPath });
-        } catch (err) {
-          logger.whatsapp.debug('Could not delete backup', { error: err.message });
-        }
-      }, 60 * 60 * 1000);
-
-      return { success: true, reason: 'backed_up_and_removed' };
-
-    } catch (renameError) {
-      // Backup failed, try direct deletion with retry
-      logger.whatsapp.warn('Could not backup session, attempting direct deletion', {
-        error: renameError.message
-      });
-    }
+    // Direct deletion without backup (backups create clutter and are rarely useful)
+    // If debugging is needed, backups are already in production logs
+    logger.whatsapp.info('Deleting session directory without backup');
 
     // Retry deletion with exponential backoff
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
