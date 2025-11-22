@@ -160,6 +160,7 @@ router.post("/updateAppointmentState", async (req, res) => {
 
         // Step 3: ONLY AFTER TRANSACTION COMMITS, emit WebSocket event
         // Use local date (not UTC) to match client's date format
+        const now = new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const day = String(now.getDate()).padStart(2, '0');
