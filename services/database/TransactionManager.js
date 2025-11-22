@@ -6,7 +6,7 @@
  * and WebSocket broadcasts.
  */
 
-import { Request, ISOLATION_LEVEL } from 'tedious';
+import { ISOLATION_LEVEL } from 'tedious';
 import { log } from '../../utils/logger.js';
 
 export class Transaction {
@@ -19,7 +19,7 @@ export class Transaction {
     }
 
     /**
-     * Commit the transaction
+     * Commit the transaction using Tedious native API
      * @returns {Promise<void>}
      */
     commit() {
@@ -34,7 +34,8 @@ export class Transaction {
                 return;
             }
 
-            const request = new Request('COMMIT TRANSACTION', (err) => {
+            // Use Tedious native commitTransaction method
+            this.connection.commitTransaction((err) => {
                 if (err) {
                     log.error('Transaction commit failed', {
                         error: err,
@@ -51,13 +52,11 @@ export class Transaction {
                     resolve();
                 }
             });
-
-            this.connection.execSql(request);
         });
     }
 
     /**
-     * Rollback the transaction
+     * Rollback the transaction using Tedious native API
      * @returns {Promise<void>}
      */
     rollback() {
@@ -73,7 +72,8 @@ export class Transaction {
                 return;
             }
 
-            const request = new Request('ROLLBACK TRANSACTION', (err) => {
+            // Use Tedious native rollbackTransaction method
+            this.connection.rollbackTransaction((err) => {
                 if (err) {
                     log.error('Transaction rollback failed', {
                         error: err,
@@ -90,8 +90,6 @@ export class Transaction {
                     resolve();
                 }
             });
-
-            this.connection.execSql(request);
         });
     }
 
@@ -137,6 +135,49 @@ export class Transaction {
             this.connection.execSql(request);
         });
     }
+
+    /**
+     * Execute a stored procedure within this transaction
+     * @param {Request} request - Tedious request object for stored procedure
+     * @returns {Promise}
+     */
+    callProcedure(request) {
+        return new Promise((resolve, reject) => {
+            if (!this.isActive) {
+                reject(new Error('Transaction is not active'));
+                return;
+            }
+
+            const rows = [];
+            const columns = [];
+
+            request.on('columnMetadata', (columnsMetadata) => {
+                columnsMetadata.forEach(column => columns.push(column));
+            });
+
+            request.on('row', (rowColumns) => {
+                const row = {};
+                rowColumns.forEach((column, index) => {
+                    row[columns[index].colName] = column.value;
+                });
+                rows.push(row);
+            });
+
+            request.on('requestCompleted', () => {
+                resolve(rows);
+            });
+
+            request.on('error', (err) => {
+                log.error('Stored procedure execution error in transaction', {
+                    error: err,
+                    transactionId: this.transactionId
+                });
+                reject(err);
+            });
+
+            this.connection.callProcedure(request);
+        });
+    }
 }
 
 export class TransactionManager {
@@ -146,7 +187,7 @@ export class TransactionManager {
     }
 
     /**
-     * Begin a new transaction
+     * Begin a new transaction using Tedious native API
      * @param {string} isolationLevel - Transaction isolation level (default: READ_COMMITTED)
      * @returns {Promise<Transaction>}
      */
@@ -155,30 +196,21 @@ export class TransactionManager {
         const transactionId = `txn_${Date.now()}_${++this.transactionCounter}`;
 
         return new Promise((resolve, reject) => {
-            const isolationLevelMap = {
-                [ISOLATION_LEVEL.READ_UNCOMMITTED]: 'READ UNCOMMITTED',
-                [ISOLATION_LEVEL.READ_COMMITTED]: 'READ COMMITTED',
-                [ISOLATION_LEVEL.REPEATABLE_READ]: 'REPEATABLE READ',
-                [ISOLATION_LEVEL.SERIALIZABLE]: 'SERIALIZABLE',
-                [ISOLATION_LEVEL.SNAPSHOT]: 'SNAPSHOT'
-            };
-
-            const isolationLevelStr = isolationLevelMap[isolationLevel] || 'READ COMMITTED';
-            const sql = `SET TRANSACTION ISOLATION LEVEL ${isolationLevelStr}; BEGIN TRANSACTION`;
-
-            const request = new Request(sql, (err) => {
+            // Use Tedious native beginTransaction method
+            // Parameters: callback, name (optional), isolationLevel (optional)
+            connection.beginTransaction((err) => {
                 if (err) {
                     log.error('Failed to begin transaction', {
                         error: err,
                         transactionId,
-                        isolationLevel: isolationLevelStr
+                        isolationLevel
                     });
                     this.connectionPool.releaseConnection(connection);
                     reject(err);
                 } else {
                     log.debug('Transaction begun', {
                         transactionId,
-                        isolationLevel: isolationLevelStr
+                        isolationLevel
                     });
                     const transaction = new Transaction(connection, transactionId);
 
@@ -204,9 +236,7 @@ export class TransactionManager {
 
                     resolve(transaction);
                 }
-            });
-
-            connection.execSql(request);
+            }, '', isolationLevel); // name = '', isolationLevel as third parameter
         });
     }
 

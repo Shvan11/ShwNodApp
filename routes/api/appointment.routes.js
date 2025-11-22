@@ -182,7 +182,15 @@ router.post("/updateAppointmentState", async (req, res) => {
             time: currentTime
         });
     } catch (error) {
-        log.error("[Transaction] Error updating appointment state:", error);
+        // Log detailed error information including nested errors
+        log.error("[Transaction] Error updating appointment state:", {
+            message: error.message,
+            code: error.code,
+            number: error.number,
+            state: error.state,
+            errors: error.errors, // AggregateError contains this
+            stack: error.stack
+        });
         // Transaction automatically rolled back by TransactionManager
         return ErrorResponses.internalError(res, "Failed to update appointment state", error);
     }

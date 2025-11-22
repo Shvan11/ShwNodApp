@@ -105,6 +105,7 @@ export function getDailyAppointmentsOptimized(AppsDate) {
 
 /**
  * Updates appointment state within a transaction (TRANSACTION-AWARE)
+ * Calls UpdatePresent stored procedure within an active transaction
  * @param {Transaction} transaction - Active transaction object
  * @param {number} Aid - The appointment ID
  * @param {string} state - The state field to update (Present, Seated, Dismissed)
@@ -113,6 +114,7 @@ export function getDailyAppointmentsOptimized(AppsDate) {
  */
 export function updatePresentInTransaction(transaction, Aid, state, Tim) {
     return new Promise((resolve, reject) => {
+        // Call stored procedure: EXEC UpdatePresent @Aid, @state, @Tim
         const request = new Request('UpdatePresent', (err) => {
             if (err) {
                 reject(err);
@@ -145,8 +147,8 @@ export function updatePresentInTransaction(transaction, Aid, state, Tim) {
             reject(error);
         });
 
-        // Execute within the transaction
-        transaction.executeRequest(request).then(resolve).catch(reject);
+        // Execute stored procedure within the transaction
+        transaction.callProcedure(request).then(resolve).catch(reject);
     });
 }
 
@@ -161,9 +163,8 @@ export function verifyAppointmentState(transaction, appointmentID, stateField) {
     return new Promise((resolve, reject) => {
         const query = `
             SELECT appointmentID,
-                   Present, Seated, Dismissed,
-                   PresentTime, SeatedTime, DismissedTime
-            FROM Appointments
+                   Present, Seated, Dismissed
+            FROM tblappointments
             WHERE appointmentID = @AppointmentID
         `;
 
