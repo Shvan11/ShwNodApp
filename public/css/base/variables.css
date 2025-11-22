@@ -38,23 +38,34 @@
     --radius-md: 0.25rem;   /* 4px */
     --radius-lg: 0.5rem;    /* 8px */
     --radius-xl: 1rem;      /* 16px */
+    --radius-2xl: 0.75rem;  /* 12px */
     --radius-full: 9999px;  /* Full round */
+
+    /* Border widths */
+    --border-width-thin: 1px;
+    --border-width-medium: 2px;
+    --border-width-thick: 3px;
     
     /* Box shadows */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    --shadow-focus: 0 0 0 3px rgba(0, 123, 255, 0.1); /* Focus outline shadow */
+    --shadow-focus-strong: 0 0 0 1px var(--primary-color); /* Stronger focus outline */
     
     /* Font settings */
     --font-primary: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-size-xs: 0.75rem;    /* 12px */
     --font-size-sm: 0.875rem;   /* 14px */
+    --font-size-md: 0.95rem;    /* 15px */
     --font-size-base: 1rem;     /* 16px */
     --font-size-lg: 1.125rem;   /* 18px */
     --font-size-xl: 1.25rem;    /* 20px */
     --font-size-2xl: 1.5rem;    /* 24px */
     --font-size-3xl: 1.875rem;  /* 30px */
+    --font-size-4xl: 2rem;      /* 32px */
+    --font-size-5xl: 3rem;      /* 48px */
     --font-weight-light: 300;
     --font-weight-normal: 400;
     --font-weight-medium: 500;
@@ -257,6 +268,28 @@
     --breakpoint-md: 768px;
     --breakpoint-lg: 1024px;
     --breakpoint-xl: 1400px;
+
+    /* Container & Layout Widths */
+    --container-max-width: 1400px;
+    --container-max-width-narrow: 800px;
+    --container-max-width-sm: 500px;
+    --container-max-width-md: 600px;
+    --table-min-width: 600px;
+    --table-min-width-sm: 500px;
+    --grid-min-column-width: 250px;
+    --grid-min-column-width-md: 280px;
+    --grid-min-column-width-lg: 300px;
+
+    /* Viewport units */
+    --viewport-width-full: 100vw;
+    --viewport-height-full: 100vh;
+    --viewport-width-95: 95vw;
+    --viewport-height-90: 90vh;
+
+    /* Input dimensions */
+    --input-height: 2.75rem;
+    --input-height-sm: 2.25rem;
+    --input-height-lg: 3.25rem;
   }
 
 /* RTL (Right-to-Left) Support */
