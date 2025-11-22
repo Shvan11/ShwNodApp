@@ -996,14 +996,13 @@ class WebSocketService extends EventEmitter {
    */
   log(message, data) {
     if (!this.options.debug) return;
-    
+
     if (data !== undefined) {
       console.log(`[WebSocketService] ${message}`, data);
     } else {
       console.log(`[WebSocketService] ${message}`);
     }
   }
-}
 
   /**
    * Get sync status for a specific date
