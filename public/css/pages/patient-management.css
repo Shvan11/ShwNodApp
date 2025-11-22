@@ -1,6 +1,15 @@
 /* patient-management.css - Patient Management Page Styles */
 
 /* ===================================
+   PAGE CONTAINER
+   =================================== */
+.patient-management {
+    padding: var(--spacing-lg) var(--spacing-xl);
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* ===================================
    PAGE HEADER
    =================================== */
 .patient-management-header {
@@ -136,6 +145,16 @@
     height: 2.75rem;
     line-height: 1.5;
     padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-base);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pm-name-search-grid input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
 .pm-search-form {
@@ -149,6 +168,19 @@
 .pm-search-input {
     flex: 1 1 300px;
     min-width: 0;
+    height: 2.75rem;
+    line-height: 1.5;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-base);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pm-search-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
 /* ===================================
@@ -585,6 +617,11 @@
    RESPONSIVE DESIGN
    =================================== */
 @media (max-width: 768px) {
+    /* Reduce page container padding on tablets and below */
+    .patient-management {
+        padding: var(--spacing-md) var(--spacing-lg);
+    }
+
     .pm-quick-search-grid,
     .pm-name-search-grid {
         grid-template-columns: 1fr;
@@ -597,8 +634,8 @@
 
     .pm-search-input {
         width: 100%;
-        height: auto;
-        padding: var(--spacing-xs) var(--spacing-sm);
+        height: 2.75rem;
+        padding: var(--spacing-sm) var(--spacing-md);
         line-height: 1.5;
     }
 
@@ -671,6 +708,11 @@
 
 /* Very small screens */
 @media (max-width: 480px) {
+    /* Further reduce padding on phones */
+    .patient-management {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+
     .work-table {
         min-width: 500px;
     }
@@ -681,5 +723,14 @@
 
     .pm-search-input {
         min-width: 0;
+    }
+
+    /* Reduce padding in containers for better mobile spacing */
+    .pm-quick-search-container {
+        padding: var(--spacing-sm);
+    }
+
+    .pm-name-search-grid {
+        padding: var(--spacing-md);
     }
 }
