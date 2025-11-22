@@ -14,3 +14,10 @@
 |____FOLDER_STRUCTURE.txt
 |____UNINSTALL.bat
 |____INSTALL.bat
+|____ProtocolHandlers.ini
+|____UPGRADE_GUIDE.md
+|____ALLOWED_ORIGINS.md
+|____CONFIGURATION.md
+|____ExplorerProtocolHandler.exe
+|____CSImagingProtocolHandler.exe
+|____UniversalProtocolHandler.exe
