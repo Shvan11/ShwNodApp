@@ -120,15 +120,15 @@ class WebSocketService extends EventEmitter {
   connect(params = {}) {
     this.log('Connecting to WebSocket server...');
 
-    // Store connection params for auto-reconnection
-    // This ensures that when scheduleReconnect() runs, it preserves clientType and other params
-    this.state.lastConnectionParams = params;
-
     // If already connected or connecting, return
     if (this.state.status === 'connected' || this.state.status === 'connecting') {
       this.log('Already connected or connecting');
       return Promise.resolve(this);
     }
+
+    // Store connection params for auto-reconnection
+    // This ensures that when scheduleReconnect() runs, it preserves clientType and PDate
+    this.state.lastConnectionParams = params;
 
     // Reset force close flag
     this.state.forceClose = false;
@@ -840,8 +840,7 @@ class WebSocketService extends EventEmitter {
     // Set timer
     this.state.reconnectTimer = setTimeout(() => {
       this.state.reconnectAttempts++;
-      // Reuse last connection params to preserve clientType, PDate, etc.
-      // This fixes the bug where reconnection would register as 'generic' instead of 'daily-appointments'
+      // Reuse last connection params to preserve clientType and PDate
       this.connect(this.state.lastConnectionParams || {}).catch(() => {}); // Ignore errors
     }, delay);
   }
@@ -977,17 +976,25 @@ class WebSocketService extends EventEmitter {
       url.searchParams.append('screenID', this.state.screenId);
     }
     
-    // Add current date with zero padding to match client format
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const dateParam = `${year}-${month}-${day}`;
+    // Add date parameter - use provided PDate if available, otherwise default to today
+    // This fixes date mismatch after midnight when viewing appointments for a different date
+    let dateParam;
+    if (params.PDate) {
+      // Use provided date (important for reconnections and viewing past/future dates)
+      dateParam = params.PDate;
+    } else {
+      // Default to today's date if not provided
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      dateParam = `${year}-${month}-${day}`;
+    }
     url.searchParams.append('PDate', dateParam);
-    
-    // Add additional parameters
+
+    // Add additional parameters (skip PDate since we already added it)
     for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== null) {
+      if (key !== 'PDate' && value !== undefined && value !== null) {
         url.searchParams.append(key, value);
       }
     }
