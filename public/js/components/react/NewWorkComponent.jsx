@@ -351,7 +351,7 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
                                 <div className="detail-section">
                                     <h4><i className="fas fa-tooth"></i> New Work (FINISHED)</h4>
                                     <div className="detail-row">
-                                        <strong>Type:</strong> {workTypes.find(t => t.ID == formData.Typeofwork)?.TypeName || 'N/A'}
+                                        <strong>Type:</strong> {workTypes.find(t => t.ID == formData.Typeofwork)?.WorkType || 'N/A'}
                                     </div>
                                     <div className="detail-row">
                                         <strong>Doctor:</strong> {doctors.find(d => d.ID == formData.DrID)?.employeeName || 'N/A'}
@@ -449,7 +449,7 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
                                 <option value="">Select Type</option>
                                 {workTypes.map(type => (
                                     <option key={type.ID} value={type.ID}>
-                                        {type.TypeName}
+                                        {type.WorkType}
                                     </option>
                                 ))}
                             </select>
