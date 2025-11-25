@@ -176,7 +176,7 @@ const PatientAppointments = ({ patientId }) => {
                                             onClick={() => handleEdit(appointment)}
                                             title="Edit appointment"
                                         >
-                                            <i className="fas fa-edit"></i>
+                                            Edit
                                         </button>
                                     )}
                                     <button
@@ -184,7 +184,7 @@ const PatientAppointments = ({ patientId }) => {
                                         onClick={() => setDeleteConfirm(appointment.appointmentID)}
                                         title="Delete appointment"
                                     >
-                                        <i className="fas fa-trash"></i>
+                                        Delete
                                     </button>
                                 </div>
                             </div>
@@ -209,10 +209,10 @@ const PatientAppointments = ({ patientId }) => {
                                 Cancel
                             </button>
                             <button
-                                className="btn btn-delete"
+                                className="btn-delete"
                                 onClick={() => handleDelete(deleteConfirm)}
                             >
-                                <i className="fas fa-trash"></i> Delete
+                                Delete
                             </button>
                         </div>
                     </div>
@@ -343,41 +343,7 @@ const PatientAppointments = ({ patientId }) => {
                     flex-shrink: 0;
                 }
 
-                .btn-edit {
-                    background: #10b981;
-                    color: white;
-                    border: none;
-                    padding: 0.5rem 1rem;
-                    border-radius: 0.375rem;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                    display: flex;
-                    align-items: center;
-                    gap: 0.25rem;
-                }
-
-                .btn-edit:hover {
-                    background: #059669;
-                    transform: translateY(-1px);
-                }
-
-                .btn-delete {
-                    background: #ef4444;
-                    color: white;
-                    border: none;
-                    padding: 0.5rem 1rem;
-                    border-radius: 0.375rem;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                    display: flex;
-                    align-items: center;
-                    gap: 0.25rem;
-                }
-
-                .btn-delete:hover {
-                    background: #dc2626;
-                    transform: translateY(-1px);
-                }
+                /* .btn-edit and .btn-delete styles now come from global buttons.css */
 
                 .empty-state, .loading-state, .error-state {
                     text-align: center;

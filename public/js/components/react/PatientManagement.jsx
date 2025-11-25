@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AsyncSelect from 'react-select/async';
 import Select from 'react-select';
 
@@ -35,6 +35,11 @@ const PatientManagement = () => {
     const [keywords, setKeywords] = useState([]);
     const [tags, setTags] = useState([]);
     const [showFilters, setShowFilters] = useState(false);
+    const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
+
+    // Ref to track if this is the initial mount (to prevent overwriting sessionStorage)
+    const isInitialMount = useRef(true);
+
 
 
     useEffect(() => {
@@ -100,6 +105,121 @@ const PatientManagement = () => {
             console.error('Error loading filter data:', err);
         }
     };
+
+    // Save search state to sessionStorage
+    useEffect(() => {
+        // Skip saving on initial mount to allow restoration to happen first
+        if (isInitialMount.current) return;
+
+        const stateToSave = {
+            searchPatientName,
+            searchFirstName,
+            searchLastName,
+            selectedWorkTypes,
+            selectedKeywords,
+            selectedTags,
+            showFilters,
+            sortConfig,
+            hasSearched,
+            scrollPosition: window.scrollY
+        };
+        sessionStorage.setItem('pm_search_state', JSON.stringify(stateToSave));
+    }, [searchPatientName, searchFirstName, searchLastName, selectedWorkTypes, selectedKeywords, selectedTags, showFilters, sortConfig, hasSearched]);
+
+    // Save scroll position independently (throttled)
+    useEffect(() => {
+        if (isInitialMount.current) return;
+
+        let scrollTimeout;
+        const handleScroll = () => {
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                const currentState = sessionStorage.getItem('pm_search_state');
+                if (currentState) {
+                    try {
+                        const parsed = JSON.parse(currentState);
+                        parsed.scrollPosition = window.scrollY;
+                        sessionStorage.setItem('pm_search_state', JSON.stringify(parsed));
+                    } catch (e) {
+                        console.error('[PM] Failed to update scroll position', e);
+                    }
+                }
+            }, 500);
+        };
+
+        window.addEventListener('scroll', handleScroll);
+
+        return () => {
+            clearTimeout(scrollTimeout);
+            window.removeEventListener('scroll', handleScroll);
+        };
+    }, []);
+
+    // Restore search state on mount
+    useEffect(() => {
+        // Check for search parameter in URL - if present, skip restoration to allow URL to take precedence
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('search')) {
+            isInitialMount.current = false; // Mark as no longer initial mount
+            return;
+        }
+
+        const savedState = sessionStorage.getItem('pm_search_state');
+        if (savedState) {
+            try {
+                const parsed = JSON.parse(savedState);
+
+                // Check if this was an advanced search
+                // We consider it advanced if any of the specific filter fields are populated
+                const isAdvancedSearch = parsed.searchPatientName || parsed.searchFirstName || parsed.searchLastName ||
+                    (parsed.selectedWorkTypes && parsed.selectedWorkTypes.length > 0) ||
+                    (parsed.selectedKeywords && parsed.selectedKeywords.length > 0) ||
+                    (parsed.selectedTags && parsed.selectedTags.length > 0);
+
+                if (isAdvancedSearch) {
+                    // Restore only advanced search states
+                    setSearchPatientName(parsed.searchPatientName || '');
+                    setSearchFirstName(parsed.searchFirstName || '');
+                    setSearchLastName(parsed.searchLastName || '');
+                    setSelectedWorkTypes(parsed.selectedWorkTypes || []);
+                    setSelectedKeywords(parsed.selectedKeywords || []);
+                    setSelectedTags(parsed.selectedTags || []);
+
+                    // Restore UI state for advanced search
+                    if (parsed.showFilters !== undefined) setShowFilters(parsed.showFilters);
+                    if (parsed.sortConfig) setSortConfig(parsed.sortConfig);
+
+                    // Save scroll position for later restoration (after search results load)
+                    if (parsed.scrollPosition !== undefined) {
+                        sessionStorage.setItem('pm_pending_scroll', parsed.scrollPosition.toString());
+                    }
+
+                    // The auto-search useEffect will trigger when the above states update
+                }
+                // If it was a Quick Search (searchTerm only), we intentionally do NOT restore it,
+                // effectively resetting the view to the initial state as requested.
+            } catch (e) {
+                console.error('[PM] Failed to parse saved search state', e);
+            }
+        } else {
+
+        }
+
+        // Mark as no longer initial mount after restoration attempt
+        isInitialMount.current = false;
+    }, []);
+
+    // Restore scroll position after search results are loaded
+    useEffect(() => {
+        const pendingScroll = sessionStorage.getItem('pm_pending_scroll');
+        if (pendingScroll && patients.length > 0) {
+            // Use setTimeout to ensure DOM has updated
+            setTimeout(() => {
+                window.scrollTo(0, parseInt(pendingScroll));
+                sessionStorage.removeItem('pm_pending_scroll');
+            }, 100);
+        }
+    }, [patients]);
 
     // Handle patient selection from quick search
     const handleQuickSearchSelect = (selectedOption) => {
@@ -236,6 +356,10 @@ const PatientManagement = () => {
                 params.append('tags', selectedTags.map(tag => tag.value).join(','));
             }
 
+            // Add sort parameters
+            params.append('sortBy', sortConfig.key);
+            params.append('order', sortConfig.direction);
+
             const response = await fetch(`/api/patients/search?${params.toString()}`);
             if (!response.ok) throw new Error('Failed to search patients');
             const data = await response.json();
@@ -260,7 +384,7 @@ const PatientManagement = () => {
             setLoading(true);
             setError(null);
             const query = showAll ? '' : searchQuery.trim();
-            const response = await fetch(`/api/patients/search?q=${encodeURIComponent(query)}`);
+            const response = await fetch(`/api/patients/search?q=${encodeURIComponent(query)}&sortBy=${sortConfig.key}&order=${sortConfig.direction}`);
             if (!response.ok) throw new Error('Failed to search patients');
             const data = await response.json();
             setPatients(data);
@@ -281,6 +405,72 @@ const PatientManagement = () => {
     const handleShowAll = () => {
         setSearchTerm('');
         searchPatients('', true);
+    };
+
+    const handleResetAdvancedSearch = () => {
+        // Clear all advanced search fields
+        setSearchPatientName('');
+        setSearchFirstName('');
+        setSearchLastName('');
+        setSelectedWorkTypes([]);
+        setSelectedKeywords([]);
+        setSelectedTags([]);
+
+        // Clear results and search state
+        setPatients([]);
+        setHasSearched(false);
+
+        // Clear sessionStorage
+        sessionStorage.removeItem('pm_search_state');
+    };
+
+    const handleSortToggle = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        } else if (key === 'date') {
+            // Default to newest first for date
+            direction = sortConfig.key === key && sortConfig.direction === 'desc' ? 'asc' : 'desc';
+        }
+
+        setSortConfig({ key, direction });
+
+        // Trigger search with new sort immediately if we have results or search term
+        if (hasSearched) {
+            // Use a timeout to allow state update to propagate (or pass directly)
+            setTimeout(() => {
+                // We need to pass the current state values directly since state update is async
+                // But simpler to just re-call performSearch which uses current state... 
+                // actually performSearch uses state which might be stale in this closure without useEffect
+                // Better to trigger via useEffect on sortConfig change or pass params
+
+                // Re-implementing fetch here to ensure we use new sort params
+                const params = new URLSearchParams();
+                if (searchPatientName.trim()) params.append('patientName', searchPatientName.trim());
+                if (searchFirstName.trim()) params.append('firstName', searchFirstName.trim());
+                if (searchLastName.trim()) params.append('lastName', searchLastName.trim());
+                if (searchTerm.trim()) params.append('q', searchTerm.trim());
+
+                if (selectedWorkTypes.length > 0) params.append('workTypes', selectedWorkTypes.map(wt => wt.value).join(','));
+                if (selectedKeywords.length > 0) params.append('keywords', selectedKeywords.map(kw => kw.value).join(','));
+                if (selectedTags.length > 0) params.append('tags', selectedTags.map(tag => tag.value).join(','));
+
+                params.append('sortBy', key);
+                params.append('order', direction);
+
+                setLoading(true);
+                fetch(`/api/patients/search?${params.toString()}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        setPatients(data);
+                        setLoading(false);
+                    })
+                    .catch(err => {
+                        setError(err.message);
+                        setLoading(false);
+                    });
+            }, 0);
+        }
     };
 
 
@@ -354,7 +544,7 @@ const PatientManagement = () => {
     };
 
     return (
-        <div className="patient-management">
+        <div className="page-patient-management">
             <div className="patient-management-header">
                 <h2>Patient Management</h2>
                 <div className="patient-management-header-actions">
@@ -454,7 +644,7 @@ const PatientManagement = () => {
                 </p>
             </div>
 
-            {/* Search Form - 3 separate name fields */}
+            {/* Search Form - 4 separate fields now */}
             <div className="pm-name-search-grid">
                 <div>
                     <label>
@@ -465,7 +655,7 @@ const PatientManagement = () => {
                         placeholder="e.g., احمد محمد"
                         value={searchPatientName}
                         onChange={(e) => setSearchPatientName(e.target.value)}
-                        className="search-input text-rtl"
+                        className="form-control text-rtl"
                         lang="ar"
                         dir="rtl"
                     />
@@ -479,7 +669,7 @@ const PatientManagement = () => {
                         placeholder="e.g., Ahmad"
                         value={searchFirstName}
                         onChange={(e) => setSearchFirstName(e.target.value)}
-                        className="search-input"
+                        className="form-control"
                     />
                 </div>
                 <div>
@@ -491,22 +681,29 @@ const PatientManagement = () => {
                         placeholder="e.g., Mohammad"
                         value={searchLastName}
                         onChange={(e) => setSearchLastName(e.target.value)}
-                        className="search-input"
+                        className="form-control"
+                    />
+                </div>
+                <div>
+                    <label>
+                        Phone or ID
+                    </label>
+                    <input
+                        type="text"
+                        placeholder="Search by phone or ID..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSearch(e)}
+                        className="form-control"
                     />
                 </div>
             </div>
 
-            {/* Additional search options */}
-            <form onSubmit={handleSearch} className="pm-search-form">
-                <input
-                    type="text"
-                    placeholder="Or search by phone or ID..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="search-input pm-search-input"
-                />
+            {/* Search Actions */}
+            <div className="pm-search-form">
                 <button
-                    type="submit"
+                    type="button"
+                    onClick={handleSearch}
                     className="btn btn-primary"
                     disabled={loading}
                 >
@@ -522,7 +719,17 @@ const PatientManagement = () => {
                     <i className="fas fa-list pm-icon-gap"></i>
                     Show All
                 </button>
-            </form>
+                <button
+                    onClick={handleResetAdvancedSearch}
+                    className="btn btn-secondary"
+                    type="button"
+                    disabled={loading}
+                    title="Clear all advanced search fields and filters"
+                >
+                    <i className="fas fa-redo pm-icon-gap"></i>
+                    Reset
+                </button>
+            </div>
 
             {/* Advanced Filters Section */}
             <div className="pm-advanced-filters">
@@ -692,6 +899,23 @@ const PatientManagement = () => {
                         <h3>Results Found</h3>
                         <span className="summary-value">{patients.length}</span>
                     </div>
+                    <div className="pm-sort-controls">
+                        <span className="pm-sort-label">Sort by:</span>
+                        <div className="pm-sort-toggle">
+                            <button
+                                className={`pm-sort-btn ${sortConfig.key === 'name' ? 'active' : ''}`}
+                                onClick={() => handleSortToggle('name')}
+                            >
+                                Name {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                            </button>
+                            <button
+                                className={`pm-sort-btn ${sortConfig.key === 'date' ? 'active' : ''}`}
+                                onClick={() => handleSortToggle('date')}
+                            >
+                                Date {sortConfig.key === 'date' && (sortConfig.direction === 'desc' ? '↓' : '↑')}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -716,75 +940,79 @@ const PatientManagement = () => {
             )}
 
             {hasSearched && !loading && (
-                <div className="work-table-container">
-                    <table className="work-table">
+                <div className="pm-table-container">
+                    <table className="pm-table">
                         <thead>
                             <tr>
                                 <th>ID</th>
                                 <th>Patient Name</th>
                                 <th>Phone</th>
+                                <th>Creation Date</th>
                                 <th>Tag</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {patients.map((patient) => (
-                            <tr key={patient.PersonID}>
-                                <td>{patient.PersonID}</td>
-                                <td>
-                                    <strong>{patient.PatientName}</strong>
-                                    {patient.FirstName && (
-                                        <div className="pm-patient-name-secondary">
-                                            {patient.FirstName} {patient.LastName}
+                                <tr key={patient.PersonID}>
+                                    <td data-label="ID">{patient.PersonID}</td>
+                                    <td data-label="Patient Name">
+                                        <strong>{patient.PatientName}</strong>
+                                        {patient.FirstName && (
+                                            <div className="pm-patient-name-secondary">
+                                                {patient.FirstName} {patient.LastName}
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td data-label="Phone">{patient.Phone || 'N/A'}</td>
+                                    <td data-label="Creation Date">
+                                        {patient.DateAdded ? new Date(patient.DateAdded).toLocaleDateString() : 'N/A'}
+                                    </td>
+                                    <td data-label="Tag">
+                                        {patient.TagName ? (
+                                            <span className="pm-tag-badge">{patient.TagName}</span>
+                                        ) : (
+                                            <span className="pm-empty-value">-</span>
+                                        )}
+                                    </td>
+                                    <td data-label="Actions">
+                                        <div className="pm-action-buttons">
+                                            <button
+                                                onClick={() => handleQuickCheckin(patient)}
+                                                className="btn btn-icon btn-outline-success"
+                                                title="Add to today's appointments and check in"
+                                                disabled={loading}
+                                            >
+                                                <i className="fas fa-user-check"></i>
+                                            </button>
+                                            <button
+                                                onClick={() => window.location.href = `/patient/${patient.PersonID}/works`}
+                                                className="btn btn-icon btn-outline-primary"
+                                                title="View patient details"
+                                            >
+                                                <i className="fas fa-eye"></i>
+                                            </button>
+                                            <button
+                                                onClick={() => window.location.href = `/patient/${patient.PersonID}/edit-patient`}
+                                                className="btn btn-icon btn-outline-warning"
+                                                title="Edit patient"
+                                            >
+                                                <i className="fas fa-edit"></i>
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteClick(patient)}
+                                                className="btn btn-icon btn-outline-danger"
+                                                title="Delete patient"
+                                            >
+                                                <i className="fas fa-trash"></i>
+                                            </button>
                                         </div>
-                                    )}
-                                </td>
-                                <td>{patient.Phone || 'N/A'}</td>
-                                <td>
-                                    {patient.TagName ? (
-                                        <span className="pm-tag-badge">{patient.TagName}</span>
-                                    ) : (
-                                        <span className="pm-empty-value">-</span>
-                                    )}
-                                </td>
-                                <td>
-                                    <div className="pm-action-buttons">
-                                        <button
-                                            onClick={() => handleQuickCheckin(patient)}
-                                            className="btn btn-sm pm-btn-checkin"
-                                            title="Add to today's appointments and check in"
-                                            disabled={loading}
-                                        >
-                                            <i className="fas fa-check-circle"></i> Check In
-                                        </button>
-                                        <button
-                                            onClick={() => window.location.href = `/patient/${patient.PersonID}/works`}
-                                            className="btn btn-sm pm-btn-view"
-                                            title="View patient details"
-                                        >
-                                            <i className="fas fa-eye"></i> View
-                                        </button>
-                                        <button
-                                            onClick={() => window.location.href = `/patient/${patient.PersonID}/edit-patient`}
-                                            className="btn btn-sm btn-secondary"
-                                            title="Edit patient"
-                                        >
-                                            <i className="fas fa-edit"></i> Edit
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteClick(patient)}
-                                            className="btn btn-sm pm-btn-delete"
-                                            title="Delete patient"
-                                        >
-                                            <i className="fas fa-trash"></i> Delete
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
+                                    </td>
+                                </tr>
                             ))}
                             {patients.length === 0 && (
                                 <tr>
-                                    <td colSpan="7" className="no-data">
+                                    <td colSpan="6" className="no-data">
                                         No patients match your search
                                     </td>
                                 </tr>
@@ -845,7 +1073,7 @@ const PatientManagement = () => {
                                 </button>
                                 <button
                                     onClick={handleDeleteConfirm}
-                                    className="btn pm-btn-delete"
+                                    className="btn btn-danger"
                                 >
                                     <i className="fas fa-trash pm-icon-gap"></i>
                                     Delete Patient

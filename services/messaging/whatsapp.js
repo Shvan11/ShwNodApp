@@ -129,12 +129,12 @@ class ClientStateManager {
 
   setState(newState, error = null) {
     const oldState = this.state;
-    
+
     // Only proceed if state actually changes
     if (oldState === newState && !error) {
       return; // No change, no event emission, no resource waste
     }
-    
+
     this.state = newState;
     this.lastError = error;
 
@@ -397,10 +397,10 @@ class WhatsAppService extends EventEmitter {
     if (this.clientState.isState('DISCONNECTED') && !this.clientState.client) {
       logger.whatsapp.debug('Client disconnected with no instance - will wait for explicit initialization request');
     } else {
-      logger.whatsapp.debug('Skipping auto-initialization', { 
-        state: this.clientState.state, 
+      logger.whatsapp.debug('Skipping auto-initialization', {
+        state: this.clientState.state,
         hasClient: !!this.clientState.client,
-        qrViewers: this.messageState.activeQRViewers 
+        qrViewers: this.messageState.activeQRViewers
       });
     }
   }
@@ -1236,14 +1236,14 @@ class WhatsAppService extends EventEmitter {
           logger.whatsapp.info(`No messages to send for date ${date}`);
           await this.messageState.setFinishedSending(true);
           this.emit('finishedSending');
-          
+
           // Complete the session even if no messages
           messageSessionManager.completeSession(date);
           return;
         }
 
         logger.whatsapp.info(`Sending ${numbers.length} messages with session ${session.sessionId}`);
-        
+
         // Broadcast sending started with total count
         if (this.wsEmitter) {
           const message = {
@@ -1288,7 +1288,7 @@ class WhatsAppService extends EventEmitter {
         // DO NOT complete session immediately - let it stay active to receive status updates
         // Session will auto-expire after ackTrackingWindow (extended to 7 days)
         // messageSessionManager.completeSession(date);
-        
+
         logger.whatsapp.info(`Message sending finished - session remains active for status updates`, {
           sessionId: session.sessionId,
           date: date,
@@ -1297,7 +1297,7 @@ class WhatsAppService extends EventEmitter {
         });
 
         return results;
-        
+
       } catch (error) {
         // Complete session on error too
         messageSessionManager.completeSession(date);
@@ -1361,7 +1361,7 @@ class WhatsAppService extends EventEmitter {
       if (session) {
         session.recordMessageFailed(null, error.message); // No messageId since send failed
       }
-      
+
       // Add failed person to state
       const person = {
         name,

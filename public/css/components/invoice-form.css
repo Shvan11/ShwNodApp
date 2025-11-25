@@ -61,7 +61,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: var(--z-index-modal);
     padding: 20px;
     animation: fadeIn 0.2s ease;
 }
@@ -70,6 +70,7 @@
     from {
         opacity: 0;
     }
+
     to {
         opacity: 1;
     }
@@ -78,7 +79,7 @@
 /* Modal content */
 .modal-content {
     background: white;
-    border-radius: 12px;
+    border-radius: var(--radius-xl);
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     max-width: 600px;
     width: 100%;
@@ -98,6 +99,7 @@
         opacity: 0;
         transform: translateY(-20px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -150,7 +152,7 @@
     color: white;
     padding: 24px;
     margin: 0 24px 24px 24px;
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     box-shadow: 0 4px 6px rgba(102, 126, 234, 0.2);
 }
 
@@ -254,7 +256,7 @@
 .form-section {
     background: var(--gray-50);
     border: 1px solid var(--gray-200);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     padding: 20px;
     margin-bottom: 20px;
 }
@@ -369,7 +371,7 @@
 .suggested-payment-box {
     background: linear-gradient(135deg, var(--warning-100) 0%, var(--warning-400) 100%);
     border: 2px solid var(--warning-300);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     padding: 20px;
     margin-top: 20px;
     display: flex;
@@ -551,6 +553,7 @@
 
 /* Responsive Design */
 @media (max-width: 1024px) {
+
     /* Single column on tablet and mobile */
     .invoice-form-grid {
         grid-template-columns: 1fr;
@@ -608,6 +611,7 @@
 
 /* Print Styles for Thermal Printer Receipt - 80mm x 210mm Landscape */
 @media print {
+
     /* Page Setup - Landscape 210mm wide x 80mm tall */
     @page {
         size: 210mm 80mm landscape;

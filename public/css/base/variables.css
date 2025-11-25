@@ -287,9 +287,9 @@
     --viewport-height-90: 90vh;
 
     /* Input dimensions */
-    --input-height: 2.75rem;
-    --input-height-sm: 2.25rem;
-    --input-height-lg: 3.25rem;
+    --input-height: 3rem; /* 48px - matches React-Select default height */
+    --input-height-sm: 2.5rem;
+    --input-height-lg: 3.5rem;
   }
 
 /* RTL (Right-to-Left) Support */

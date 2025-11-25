@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import AppointmentsHeader from './AppointmentsHeader.jsx';
 import StatsCards from './StatsCards.jsx';
 import MobileViewToggle from './MobileViewToggle.jsx';
@@ -6,14 +6,17 @@ import AppointmentsList from './AppointmentsList.jsx';
 
 import { useAppointments } from '../../../hooks/useAppointments.js';
 import { useWebSocketSync } from '../../../hooks/useWebSocketSync.js';
-import { actionIdManager } from '../../../utils/action-id.js';
-import { appointmentMetrics } from '../../../utils/appointment-metrics.js';
 
 /**
  * DailyAppointments Component
  * Main application for daily appointments management
  *
- * Enhanced with robust action ID tracking for event source detection
+ * SIMPLIFIED APPROACH:
+ * - No optimistic updates
+ * - No action ID tracking
+ * - No deduplication logic
+ * - Just reload on every WebSocket message
+ * - Database is the single source of truth
  */
 const DailyAppointments = () => {
     // Get today's date in local timezone
@@ -29,14 +32,6 @@ const DailyAppointments = () => {
     const [mobileView, setMobileView] = useState('all');
     const [showFlash, setShowFlash] = useState(false);
 
-    // Event deduplication: Track processed WebSocket event IDs
-    const processedEventIds = useRef(new Set());
-    const EVENT_ID_MAX_SIZE = 100; // Limit memory usage
-
-    // Out-of-order detection: Track last server timestamp per appointment
-    const lastServerTimestamp = useRef(new Map());
-    const TIMESTAMP_BUFFER_SIZE = 50; // Track last 50 appointments
-
     // Use custom hooks
     const {
         allAppointments,
@@ -48,90 +43,14 @@ const DailyAppointments = () => {
         markSeated,
         markDismissed,
         undoState,
-        undoAction,
-        applyGranularUpdate,  // NEW: Efficient granular updates
         getStats
     } = useAppointments();
 
-    // WebSocket integration - GRANULAR updates with action ID tracking and event deduplication
+    // WebSocket integration - SIMPLIFIED: just reload on message
     const { connectionStatus } = useWebSocketSync(selectedDate, (data) => {
-        // STEP 1: Event deduplication - skip if already processed
-        const eventId = data?.id || data?.messageId;
-        if (eventId) {
-            if (processedEventIds.current.has(eventId)) {
-                console.log('⏭️ [DailyAppointments] Skipping duplicate event:', eventId);
-                appointmentMetrics.recordDuplicateEventBlocked(); // Track duplicate
-                return; // Already processed this event
-            }
-
-            // Mark as processed
-            processedEventIds.current.add(eventId);
-
-            // Limit memory usage: keep only last 100 event IDs
-            if (processedEventIds.current.size > EVENT_ID_MAX_SIZE) {
-                const firstId = processedEventIds.current.values().next().value;
-                processedEventIds.current.delete(firstId);
-            }
-        }
-
-        // STEP 2: Check if this update is from our own action using action ID
-        const isOwnAction = data?.actionId && actionIdManager.isOwnAction(data.actionId);
-        appointmentMetrics.recordEventReceived(isOwnAction); // Track event
-
-        if (isOwnAction) {
-            // Our own action - optimistic update already handled it
-            console.log('📡 [DailyAppointments] WebSocket update from own action - skipping');
-            flashUpdateIndicator();
-        } else {
-            // Update from another client - use GRANULAR update if available
-            console.log('📡 [DailyAppointments] WebSocket update from another client');
-
-            // STEP 3: Out-of-order detection (warn if events arrive scrambled)
-            if (data?.serverTimestamp && data?.appointmentId) {
-                const lastTimestamp = lastServerTimestamp.current.get(data.appointmentId);
-
-                if (lastTimestamp && data.serverTimestamp < lastTimestamp) {
-                    const timeDiff = lastTimestamp - data.serverTimestamp;
-                    console.warn('⚠️ Out-of-order event detected!', {
-                        appointmentId: data.appointmentId,
-                        thisTimestamp: data.serverTimestamp,
-                        lastTimestamp: lastTimestamp,
-                        timeDiff
-                    });
-                    appointmentMetrics.recordOutOfOrderEvent(timeDiff); // Track out-of-order
-                    // Still apply the update (deduplication prevents true duplicates)
-                    // But log for monitoring/debugging
-                }
-
-                // Update last timestamp
-                lastServerTimestamp.current.set(data.appointmentId, data.serverTimestamp);
-
-                // Limit memory: keep only last 50 appointments
-                if (lastServerTimestamp.current.size > TIMESTAMP_BUFFER_SIZE) {
-                    const firstKey = lastServerTimestamp.current.keys().next().value;
-                    lastServerTimestamp.current.delete(firstKey);
-                }
-            }
-
-            // Check if we have granular data (efficient update)
-            if (data?.changeType && data?.appointmentId) {
-                console.log('✨ Using granular update - NO API call needed!', data);
-                appointmentMetrics.recordGranularUpdate(); // Track granular update
-                applyGranularUpdate({
-                    changeType: data.changeType,
-                    appointmentId: data.appointmentId,
-                    state: data.state,
-                    updates: data.updates
-                });
-            } else {
-                // Fallback to full reload (legacy mode or unknown change type)
-                console.log('⚠️ No granular data, falling back to full reload');
-                appointmentMetrics.recordFullReload(); // Track full reload
-                loadAppointments(selectedDate);
-            }
-
-            flashUpdateIndicator();
-        }
+        console.log('📡 [DailyAppointments] WebSocket update received - reloading appointments');
+        loadAppointments(selectedDate);
+        flashUpdateIndicator();
     });
 
     // Load appointments when date changes
@@ -139,11 +58,10 @@ const DailyAppointments = () => {
         loadAppointments(selectedDate);
     }, [selectedDate, loadAppointments]);
 
-    // Handle WebSocket reconnection (e.g., after computer wakes from sleep)
+    // Handle WebSocket reconnection
     useEffect(() => {
         const handleReconnect = () => {
             console.log('[DailyAppointments] 🔄 Connection restored - refreshing appointments');
-            appointmentMetrics.recordReconnection(); // Track reconnection
             loadAppointments(selectedDate);
         };
 
@@ -153,20 +71,6 @@ const DailyAppointments = () => {
             window.removeEventListener('websocket_reconnected', handleReconnect);
         };
     }, [selectedDate, loadAppointments]);
-
-    // Log metrics summary periodically (development mode only)
-    useEffect(() => {
-        if (process.env.NODE_ENV === 'development') {
-            const interval = setInterval(() => {
-                const metrics = appointmentMetrics.getMetrics();
-                if (metrics.totalEventsReceived > 0) {
-                    appointmentMetrics.logSummary();
-                }
-            }, 60000); // Every 60 seconds
-
-            return () => clearInterval(interval);
-        }
-    }, []);
 
     // Flash update indicator
     const flashUpdateIndicator = () => {
@@ -179,71 +83,43 @@ const DailyAppointments = () => {
         setSelectedDate(newDate);
     };
 
-    // Handle check-in (OPTIMISTIC UPDATE - no reload needed!)
+    // Handle check-in
     const handleCheckIn = async (appointmentId) => {
         try {
-            const result = await checkInPatient(appointmentId);
-            if (result.success) {
-                // Register action ID for tracking
-                actionIdManager.registerAction(result.actionId);
-
-                // No loadAppointments() needed! Hook updates state optimistically
-            }
+            await checkInPatient(appointmentId, selectedDate);
         } catch (err) {
+            console.error('Check-in failed:', err);
         }
     };
 
-    // Handle mark seated (OPTIMISTIC UPDATE - no reload needed!)
+    // Handle mark seated
     const handleMarkSeated = async (appointmentId) => {
         try {
-            const result = await markSeated(appointmentId);
-            if (result.success) {
-                // Register action ID for tracking
-                actionIdManager.registerAction(result.actionId);
-
-                // No loadAppointments() needed! Hook updates state optimistically
-            }
+            await markSeated(appointmentId, selectedDate);
         } catch (err) {
+            console.error('Seat failed:', err);
         }
     };
 
-    // Handle mark dismissed (OPTIMISTIC UPDATE - no reload needed!)
+    // Handle mark dismissed
     const handleMarkDismissed = async (appointmentId) => {
         try {
-            const result = await markDismissed(appointmentId);
-            if (result.success) {
-                // Register action ID for tracking
-                actionIdManager.registerAction(result.actionId);
-
-                // No loadAppointments() needed! Hook updates state optimistically
-            }
+            await markDismissed(appointmentId, selectedDate);
         } catch (err) {
+            console.error('Dismiss failed:', err);
         }
     };
 
-    // Handle undo state (OPTIMISTIC UPDATE - no reload needed!)
+    // Handle undo state
     const handleUndoState = async (appointmentId, stateToUndo) => {
         try {
-            const result = await undoState(appointmentId, stateToUndo);
-            if (result.success && result.actionId) {
-                // Register action ID for tracking
-                actionIdManager.registerAction(result.actionId);
-            }
-            // No loadAppointments() needed! Hook updates state optimistically
+            await undoState(appointmentId, stateToUndo, selectedDate);
         } catch (err) {
+            console.error('Undo failed:', err);
         }
     };
 
-    // Handle undo action from notification (OPTIMISTIC UPDATE - no reload needed!)
-    const handleUndoAction = async (undoData) => {
-        try {
-            await undoAction(undoData.appointmentId, undoData.previousState);
-            // No loadAppointments() needed! Hook updates state optimistically
-        } catch (err) {
-        }
-    };
-
-    // Get statistics (from API or calculated)
+    // Get statistics
     const stats = getStats();
 
     // Error state
@@ -278,7 +154,7 @@ const DailyAppointments = () => {
             <StatsCards
                 total={stats.total}
                 checkedIn={stats.checkedIn}
-                waiting={stats.completed}
+                waiting={stats.waiting}
                 completed={stats.completed}
             />
 

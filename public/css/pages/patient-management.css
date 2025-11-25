@@ -3,8 +3,8 @@
 /* ===================================
    PAGE CONTAINER
    =================================== */
-.patient-management {
-    padding: var(--spacing-lg) var(--spacing-xl);
+.page-patient-management {
+    padding: calc(50px + var(--spacing-lg)) var(--spacing-xl) var(--spacing-lg);
     max-width: var(--container-max-width);
     margin: 0 auto;
 }
@@ -77,12 +77,13 @@
     gap: var(--spacing-md);
 }
 
+/* Quick search field labels - using consistent label styling */
 .pm-quick-search-field label {
     display: block;
     margin-bottom: var(--spacing-sm);
     font-weight: var(--font-weight-semibold);
     font-size: var(--font-size-sm);
-    color: var(--info-800);
+    color: var(--gray-700);
 }
 
 /* ===================================
@@ -124,7 +125,7 @@
 .pm-name-search-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(var(--grid-min-column-width), 1fr));
-    gap: var(--spacing-sm);
+    gap: var(--spacing-md);
     margin-bottom: var(--spacing-lg);
     padding: var(--spacing-lg);
     background-color: var(--gray-50);
@@ -132,30 +133,17 @@
     border: var(--border-width-thin) solid var(--gray-200);
 }
 
+/* Advanced search field labels - using consistent label styling */
 .pm-name-search-grid label {
     display: block;
     margin-bottom: var(--spacing-sm);
-    font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-semibold);
     font-size: var(--font-size-sm);
     color: var(--gray-700);
 }
 
-.pm-name-search-grid input {
-    width: 100%;
-    height: var(--input-height);
-    line-height: 1.5;
-    padding: var(--spacing-sm) var(--spacing-md);
-    border: var(--border-width-thin) solid var(--gray-300);
-    border-radius: var(--radius-lg);
-    font-size: var(--font-size-base);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.pm-name-search-grid input:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: var(--shadow-focus);
-}
+/* All input fields use global .form-control from /css/components/inputs.css */
+/* All React-Select fields use global .pm-select__ styles from /css/components/inputs.css */
 
 .pm-search-form {
     display: flex;
@@ -165,23 +153,7 @@
     flex-wrap: wrap;
 }
 
-.pm-search-input {
-    flex: 1 1 var(--grid-min-column-width-lg);
-    min-width: 0;
-    height: var(--input-height);
-    line-height: 1.5;
-    padding: var(--spacing-sm) var(--spacing-md);
-    border: var(--border-width-thin) solid var(--gray-300);
-    border-radius: var(--radius-lg);
-    font-size: var(--font-size-base);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.pm-search-input:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: var(--shadow-focus);
-}
+/* Local search input styles removed - using global .form-control */
 
 /* ===================================
    MESSAGES (Error & Success)
@@ -251,7 +223,7 @@
     margin: 0;
 }
 
-.pm-empty-state p + p {
+.pm-empty-state p+p {
     margin: var(--spacing-sm) 0 0 0;
     font-size: var(--font-size-sm);
 }
@@ -261,22 +233,118 @@
    =================================== */
 .pm-results-summary {
     margin-bottom: var(--spacing-lg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+}
+
+.pm-sort-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.pm-sort-label {
+    color: var(--gray-600);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.pm-sort-toggle {
+    display: flex;
+    background-color: var(--gray-100);
+    padding: 4px;
+    border-radius: var(--radius-md);
+    border: var(--border-width-thin) solid var(--gray-200);
+}
+
+.pm-sort-btn {
+    padding: var(--spacing-xs) var(--spacing-md);
+    border: none;
+    background: transparent;
+    color: var(--gray-600);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.pm-sort-btn:hover {
+    color: var(--gray-800);
+}
+
+.pm-sort-btn.active {
+    background-color: var(--color-white);
+    color: var(--primary-color);
+    box-shadow: var(--shadow-sm);
+    font-weight: var(--font-weight-semibold);
 }
 
 /* ===================================
    TABLE - SEARCH RESULTS
    =================================== */
-.work-table tbody {
-    font-size: var(--font-size-base);
+.pm-table-container {
+    background: var(--color-white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
+    border: var(--border-width-thin) solid var(--gray-200);
 }
 
-.work-table thead th {
+.pm-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.pm-table thead {
+    background-color: var(--gray-50);
+    border-bottom: var(--border-width-medium) solid var(--gray-200);
+}
+
+.pm-table th {
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--gray-700);
+    font-size: var(--font-size-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.pm-table tbody tr {
+    border-bottom: var(--border-width-thin) solid var(--gray-100);
+    transition: background-color var(--transition-base);
+}
+
+.pm-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.pm-table tbody tr:hover {
+    background-color: var(--blue-50);
+}
+
+.pm-table td {
+    padding: var(--spacing-md) var(--spacing-lg);
+    vertical-align: middle;
+    color: var(--gray-800);
     font-size: var(--font-size-base);
 }
 
 .pm-patient-name-secondary {
     font-size: var(--font-size-sm);
     color: var(--gray-500);
+    margin-top: var(--spacing-xs);
+}
+
+.no-data {
+    text-align: center;
+    padding: var(--spacing-xl);
+    color: var(--gray-500);
+    font-style: italic;
 }
 
 /* ===================================
@@ -285,26 +353,30 @@
 .pm-action-buttons {
     display: flex;
     gap: var(--spacing-sm);
-    flex-wrap: wrap;
+    justify-content: flex-start;
 }
 
-.pm-btn-checkin {
-    background-color: var(--success-300);
-    color: var(--color-white);
-    border: none;
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    border: var(--border-width-thin) solid transparent;
+    background-color: transparent;
+    cursor: pointer;
+    transition: all var(--transition-base);
+    font-size: var(--font-size-md);
 }
 
-.pm-btn-view {
-    background-color: var(--blue-300);
-    color: var(--color-white);
-    border: none;
+.btn-icon:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
 }
 
-.pm-btn-delete {
-    background-color: var(--error-500);
-    color: var(--color-white);
-    border: none;
-}
+/* Local button styles removed - using global .btn classes */
+/* Preserving only icon-specific tweaks if needed, but for now relying on global .btn-icon */
 
 /* ===================================
    MODALS
@@ -355,7 +427,7 @@
     font-size: var(--font-size-lg);
 }
 
-.pm-delete-warning-box > p {
+.pm-delete-warning-box>p {
     margin: 0 0 var(--spacing-md) 0;
     color: var(--error-700);
     font-size: var(--font-size-base);
@@ -406,7 +478,7 @@
     padding: var(--spacing-md) var(--spacing-lg);
     background-color: var(--background-secondary);
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: background-color var(--transition-base);
 }
 
 .pm-advanced-filters__header:hover {
@@ -481,7 +553,7 @@
     border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: background-color var(--transition-base);
 }
 
 .pm-clear-filters-btn:hover {
@@ -535,7 +607,7 @@
     margin-left: var(--spacing-xs);
     color: inherit;
     opacity: 0.7;
-    transition: opacity 0.2s ease;
+    transition: opacity var(--transition-base);
 }
 
 .pm-filter-chip__remove:hover {
@@ -578,47 +650,15 @@
     font-size: var(--font-size-sm);
 }
 
-/* ===================================
-   REACT SELECT CUSTOM STYLES
-   =================================== */
-/* Note: React-Select requires !important to override library defaults */
-.pm-select__control {
-    min-height: var(--input-height) !important;
-    border-color: var(--gray-300) !important;
-}
-
-.pm-select__control:hover {
-    border-color: var(--blue-500) !important;
-}
-
-.pm-select__control--is-focused {
-    border-color: var(--primary-color) !important;
-    box-shadow: var(--shadow-focus-strong) !important;
-}
-
-.pm-select__menu {
-    z-index: var(--z-index-modal) !important;
-}
-
-.pm-select__multi-value {
-    background-color: var(--blue-100) !important;
-}
-
-.pm-select__multi-value__label {
-    color: var(--blue-700) !important;
-}
-
-.pm-select__multi-value__remove:hover {
-    background-color: var(--blue-200) !important;
-    color: var(--blue-800) !important;
-}
+/* React-Select styles moved to global /css/components/inputs.css */
 
 /* ===================================
    RESPONSIVE DESIGN
    =================================== */
 @media (max-width: 768px) {
+
     /* Reduce page container padding on tablets and below */
-    .patient-management {
+    .page-patient-management {
         padding: var(--spacing-md) var(--spacing-lg);
     }
 
@@ -630,13 +670,6 @@
     .pm-search-form {
         flex-direction: column;
         align-items: stretch;
-    }
-
-    .pm-search-input {
-        width: 100%;
-        height: var(--input-height);
-        padding: var(--spacing-sm) var(--spacing-md);
-        line-height: 1.5;
     }
 
     .patient-management-header {
@@ -678,19 +711,64 @@
         align-items: flex-start;
     }
 
-    /* Table horizontal scroll */
-    .work-table-container {
-        -webkit-overflow-scrolling: touch;
+    /* Table responsive - Card View */
+    .pm-table thead {
+        display: none;
     }
 
-    .work-table {
-        min-width: var(--table-min-width);
+    .pm-table,
+    .pm-table tbody,
+    .pm-table tr,
+    .pm-table td {
+        display: block;
+        width: 100%;
     }
 
-    /* Action buttons - reduce size */
-    .pm-action-buttons .btn {
-        font-size: var(--font-size-xs);
-        padding: var(--spacing-xs) var(--spacing-sm);
+    .pm-table tr {
+        margin-bottom: var(--spacing-md);
+        background-color: var(--color-white);
+        border: var(--border-width-thin) solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-md);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .pm-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--spacing-sm) 0;
+        border-bottom: var(--border-width-thin) solid var(--gray-100);
+        text-align: right;
+    }
+
+    .pm-table td:last-child {
+        border-bottom: none;
+        padding-top: var(--spacing-md);
+        justify-content: flex-end;
+    }
+
+    .pm-table td::before {
+        content: attr(data-label);
+        font-weight: var(--font-weight-semibold);
+        color: var(--gray-500);
+        font-size: var(--font-size-sm);
+        text-transform: uppercase;
+        margin-right: var(--spacing-md);
+        text-align: left;
+    }
+
+    /* Specific adjustments for card content */
+    .pm-action-buttons {
+        width: 100%;
+        justify-content: flex-end;
+        gap: var(--spacing-md);
+    }
+
+    .btn-icon {
+        width: 40px;
+        height: 40px;
+        font-size: var(--font-size-lg);
     }
 
     /* Quick search - reduce padding */
@@ -708,6 +786,7 @@
 
 /* Very small screens */
 @media (max-width: 480px) {
+
     /* Further reduce padding on phones */
     .patient-management {
         padding: var(--spacing-sm) var(--spacing-md);
@@ -719,10 +798,6 @@
 
     .pm-quick-search-header h3 {
         font-size: var(--font-size-base);
-    }
-
-    .pm-search-input {
-        min-width: 0;
     }
 
     /* Reduce padding in containers for better mobile spacing */

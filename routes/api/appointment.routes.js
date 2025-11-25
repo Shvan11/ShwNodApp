@@ -18,9 +18,7 @@ import * as database from '../../services/database/index.js';
 import {
     getPresentAps,
     updatePresent,
-    undoAppointmentState,
-    updatePresentInTransaction,
-    verifyAppointmentState
+    undoAppointmentState
 } from '../../services/database/queries/appointment-queries.js';
 import { WebSocketEvents } from '../../services/messaging/websocket-events.js';
 import { ErrorResponses } from '../../utils/error-response.js';
@@ -123,62 +121,31 @@ router.get("/getDailyAppointments", async (req, res) => {
 
 /**
  * Update patient appointment state (Present, Seated, or Dismissed)
- * Records the time when each state transition occurs
- * Enhanced with action ID tracking for event source detection
- * PHASE 1 ENHANCEMENT: Transaction-aware with confirmed broadcast
+ * SIMPLIFIED: Direct update, broadcast date only
  */
 router.post("/updateAppointmentState", async (req, res) => {
     try {
-        const { appointmentID, state, time, actionId } = req.body;
+        const { appointmentID, state, time } = req.body;
         if (!appointmentID || !state) {
             return ErrorResponses.badRequest(res, "Missing required parameters: appointmentID, state");
         }
 
-        // Format time as string for the modified stored procedure
         const now = new Date();
         const currentTime = time || `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-        log.info(`[Transaction] Updating appointment ${appointmentID} with state: ${state}, time: ${currentTime}, actionId: ${actionId || 'none'}`);
+        log.info(`Updating appointment ${appointmentID} with state: ${state}, time: ${currentTime}`);
 
-        // Execute within transaction with confirmation
-        const result = await database.transactionManager.executeInTransaction(async (transaction) => {
-            // Step 1: Update the appointment state
-            const updateResult = await updatePresentInTransaction(transaction, appointmentID, state, currentTime);
+        // Direct update - no transaction complexity
+        await updatePresent(appointmentID, state, currentTime);
 
-            // Step 2: Verify the update succeeded by reading back the data
-            const verifiedState = await verifyAppointmentState(transaction, appointmentID, state);
-
-            log.info(`[Transaction] Verified appointment ${appointmentID} state after update:`, {
-                [state]: verifiedState[state],
-                [`${state}Time`]: verifiedState[`${state}Time`]
-            });
-
-            return {
-                ...updateResult,
-                verified: verifiedState
-            };
-        });
-
-        // Step 3: ONLY AFTER TRANSACTION COMMITS, emit WebSocket event
-        // Use local date (not UTC) to match client's date format
+        // Broadcast to WebSocket - just the date, clients will reload
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const day = String(now.getDate()).padStart(2, '0');
         const appointmentDate = `${year}-${month}-${day}`;
 
         if (wsEmitter) {
-            log.info(`[WebSocket] Broadcasting state change after DB commit for appointment ${appointmentID}`);
-            // Emit DATA_UPDATED event with granular data (no full reload needed)
-            // Include server timestamp for ordering (more reliable than client timestamps)
-            wsEmitter.emit(WebSocketEvents.DATA_UPDATED, appointmentDate, actionId, {
-                changeType: 'status_changed',
-                appointmentId: appointmentID,
-                state: state,
-                updates: {
-                    [state]: 1,  // Present, Seated, or Dismissed
-                    [`${state}Time`]: currentTime  // PresentTime, SeatedTime, or DismissedTime
-                },
-                serverTimestamp: Date.now()  // High-precision server timestamp for ordering
-            });
+            log.info(`Broadcasting state change for appointment ${appointmentID}`);
+            wsEmitter.emit(WebSocketEvents.DATA_UPDATED, appointmentDate);
         }
 
         res.json({
@@ -188,54 +155,34 @@ router.post("/updateAppointmentState", async (req, res) => {
             time: currentTime
         });
     } catch (error) {
-        // Log detailed error information including nested errors
-        log.error("[Transaction] Error updating appointment state:", {
-            message: error.message,
-            code: error.code,
-            number: error.number,
-            state: error.state,
-            errors: error.errors, // AggregateError contains this
-            stack: error.stack
-        });
-        // Transaction automatically rolled back by TransactionManager
+        log.error("Error updating appointment state:", error);
         return ErrorResponses.internalError(res, "Failed to update appointment state", error);
     }
 });
 
 /**
  * Undo appointment state by setting field to NULL
- * Uses dedicated UndoAppointmentState procedure to revert state changes
- * Enhanced with state transition validation to enforce logical rules
+ * SIMPLIFIED: Direct undo, broadcast date only
  */
 router.post("/undoAppointmentState", async (req, res) => {
     try {
-        const { appointmentID, state, actionId } = req.body;
+        const { appointmentID, state } = req.body;
         if (!appointmentID || !state) {
             return ErrorResponses.badRequest(res, "Missing required parameters: appointmentID, state");
         }
 
-        // Use dedicated undo procedure with validation logic
-        log.info(`Undoing appointment ${appointmentID} state: ${state}, actionId: ${actionId || 'none'}`);
+        log.info(`Undoing appointment ${appointmentID} state: ${state}`);
         const result = await undoAppointmentState(appointmentID, state);
 
-        // Emit WebSocket event with granular data and actionId
-        // Use local date (not UTC) to match client's date format
+        // Broadcast to WebSocket - just the date, clients will reload
         const now = new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const day = String(now.getDate()).padStart(2, '0');
         const appointmentDate = `${year}-${month}-${day}`;
+
         if (wsEmitter) {
-            wsEmitter.emit(WebSocketEvents.DATA_UPDATED, appointmentDate, actionId, {
-                changeType: 'status_changed',
-                appointmentId: appointmentID,
-                state: state,
-                updates: {
-                    [state]: null,  // Clear the state
-                    [`${state}Time`]: null  // Clear the time
-                },
-                serverTimestamp: Date.now()  // High-precision server timestamp for ordering
-            });
+            wsEmitter.emit(WebSocketEvents.DATA_UPDATED, appointmentDate);
         }
 
         res.json(result);
@@ -247,7 +194,6 @@ router.post("/undoAppointmentState", async (req, res) => {
             error.message.includes('Cannot undo check-in') ||
             error.message.includes('Cannot undo seated')
         )) {
-            // Return 400 Bad Request with the validation error message
             return ErrorResponses.badRequest(res, error.message, {
                 code: 'INVALID_STATE_TRANSITION',
                 appointmentID,

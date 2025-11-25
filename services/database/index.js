@@ -7,10 +7,6 @@ import { Connection, Request, TYPES } from 'tedious';
 import ConnectionPool from './ConnectionPool.js';
 import ResourceManager from '../core/ResourceManager.js';
 import { log } from '../../utils/logger.js';
-import TransactionManager from './TransactionManager.js';
-
-// Create TransactionManager instance
-const transactionManager = new TransactionManager(ConnectionPool);
 
 // Register database service with resource manager
 ResourceManager.register('database-service', null, async () => {
@@ -528,6 +524,5 @@ export {
   getDatabaseStats,
   healthCheck,
   shutdown,
-  transactionManager,
   TYPES
 };

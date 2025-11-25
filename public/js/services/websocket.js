@@ -42,9 +42,9 @@ class WebSocketService extends EventEmitter {
       initialConnectionTimeout: 45000,   // First connection: 45s (allows for backend startup + DB queries)
       reconnectionTimeout: 15000,        // Reconnections: 15s (increased from 10s for slow DB)
 
-      // Heartbeat configuration
-      heartbeatInterval: 30000,     // Interval for sending heartbeats (ms)
-      heartbeatTimeout: 20000,      // Timeout for heartbeat response (increased from 15000)
+      // Heartbeat configuration - OPTIMIZED for performance
+      heartbeatInterval: 60000,     // Interval for sending heartbeats (ms) - 60 seconds
+      heartbeatTimeout: 30000,      // Timeout for heartbeat response (30 seconds)
 
       // Message handling
       maxQueueSize: 100,            // Maximum number of queued messages

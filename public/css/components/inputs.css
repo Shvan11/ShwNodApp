@@ -1,0 +1,312 @@
+/* inputs.css - Global Form Input Component */
+
+/* Base Input Style */
+.form-control {
+    display: block;
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-normal);
+    line-height: var(--line-height-normal);
+    color: var(--text-primary);
+    background-color: var(--color-white);
+    background-clip: padding-box;
+    border: var(--border-width-thin) solid var(--gray-300);
+    border-radius: var(--radius-md);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    height: var(--input-height);
+    box-sizing: border-box;
+}
+
+.form-control:focus {
+    color: var(--text-primary);
+    background-color: var(--color-white);
+    border-color: var(--primary-color);
+    outline: 0;
+    box-shadow: var(--shadow-focus);
+}
+
+.form-control::placeholder {
+    color: var(--gray-500);
+    opacity: 1;
+}
+
+.form-control:disabled,
+.form-control[readonly] {
+    background-color: var(--gray-100);
+    opacity: 1;
+    cursor: not-allowed;
+}
+
+/* Select Input */
+select.form-control {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right var(--spacing-md) center;
+    background-size: 16px 12px;
+    padding-right: calc(var(--spacing-xl) + var(--spacing-sm));
+}
+
+/* Textarea Input */
+textarea.form-control {
+    resize: vertical;
+    min-height: calc(var(--input-height) * 2);
+    font-family: inherit;
+    line-height: var(--line-height-relaxed);
+}
+
+/* Input Sizes */
+.form-control-sm {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    border-radius: var(--radius-sm);
+    min-height: var(--input-height-sm);
+}
+
+.form-control-lg {
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-size: var(--font-size-lg);
+    border-radius: var(--radius-lg);
+    min-height: var(--input-height-lg);
+}
+
+/* Form Group */
+.form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.form-label {
+    display: inline-block;
+    margin-bottom: var(--spacing-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--gray-700);
+    font-size: var(--font-size-sm);
+}
+
+/* Input Group */
+.input-group {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    width: 100%;
+}
+
+.input-group>.form-control {
+    position: relative;
+    flex: 1 1 auto;
+    width: 1%;
+    min-width: 0;
+}
+
+.input-group-text {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-normal);
+    line-height: var(--line-height-normal);
+    color: var(--gray-700);
+    text-align: center;
+    white-space: nowrap;
+    background-color: var(--gray-100);
+    border: var(--border-width-thin) solid var(--gray-300);
+    border-radius: var(--radius-md);
+}
+
+/* Validation States */
+.is-invalid {
+    border-color: var(--error-color);
+    padding-right: calc(1.5em + var(--spacing-md));
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(0.375em + var(--spacing-xs)) center;
+    background-size: calc(0.75em + var(--spacing-sm)) calc(0.75em + var(--spacing-sm));
+}
+
+.is-invalid:focus {
+    border-color: var(--error-color);
+    box-shadow: 0 0 0 3px var(--error-alpha, rgba(220, 53, 69, 0.25));
+}
+
+.invalid-feedback {
+    display: none;
+    width: 100%;
+    margin-top: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    color: var(--error-color);
+}
+
+.is-invalid~.invalid-feedback {
+    display: block;
+}
+
+/* RTL Text Direction Support */
+.text-rtl {
+    direction: rtl;
+    text-align: right;
+}
+
+/* ===================================
+   REACT SELECT GLOBAL STYLES
+   =================================== */
+/* React-Select component styling to match form-control inputs */
+.pm-select__control {
+    min-height: var(--input-height);
+    height: var(--input-height);
+    border-color: var(--gray-300);
+    border-radius: var(--radius-md);
+    border-width: var(--border-width-thin);
+    box-shadow: none;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    background-color: var(--color-white);
+}
+
+.pm-select__control:hover {
+    border-color: var(--primary-color);
+}
+
+.pm-select__control--is-focused {
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-focus);
+}
+
+.pm-select__control--is-disabled {
+    background-color: var(--gray-100);
+    opacity: 1;
+    cursor: not-allowed;
+}
+
+.pm-select__value-container {
+    padding: var(--spacing-xs) var(--spacing-md);
+    height: calc(var(--input-height) - 2px);
+}
+
+.pm-select__placeholder {
+    color: var(--gray-500);
+    font-size: var(--font-size-base);
+}
+
+.pm-select__single-value {
+    color: var(--text-primary);
+    font-size: var(--font-size-base);
+}
+
+.pm-select__input-container {
+    color: var(--text-primary);
+    font-size: var(--font-size-base);
+}
+
+.pm-select__menu {
+    z-index: var(--z-index-dropdown);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    border: var(--border-width-thin) solid var(--gray-200);
+    margin-top: var(--spacing-xs);
+}
+
+.pm-select__menu-list {
+    padding: var(--spacing-xs);
+}
+
+.pm-select__option {
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+}
+
+.pm-select__option:hover {
+    background-color: var(--blue-50);
+}
+
+.pm-select__option--is-focused {
+    background-color: var(--blue-50);
+}
+
+.pm-select__option--is-selected {
+    background-color: var(--primary-color);
+    color: var(--color-white);
+}
+
+.pm-select__multi-value {
+    background-color: var(--blue-100);
+    border-radius: var(--radius-sm);
+    margin: var(--spacing-xs);
+}
+
+.pm-select__multi-value__label {
+    color: var(--blue-700);
+    font-size: var(--font-size-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.pm-select__multi-value__remove {
+    color: var(--blue-700);
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+}
+
+.pm-select__multi-value__remove:hover {
+    background-color: var(--blue-200);
+    color: var(--blue-800);
+}
+
+.pm-select__clear-indicator,
+.pm-select__dropdown-indicator {
+    color: var(--gray-500);
+    transition: color var(--transition-fast);
+    cursor: pointer;
+    padding: var(--spacing-xs);
+}
+
+.pm-select__clear-indicator:hover,
+.pm-select__dropdown-indicator:hover {
+    color: var(--gray-700);
+}
+
+.pm-select__indicator-separator {
+    background-color: var(--gray-300);
+}
+
+.pm-select__loading-indicator {
+    color: var(--primary-color);
+}
+
+/* Responsive Input Adjustments */
+@media (max-width: 768px) {
+    .form-control {
+        font-size: var(--font-size-base);
+        padding: var(--spacing-sm) var(--spacing-md);
+        height: var(--input-height);
+    }
+
+    .form-control-sm {
+        font-size: var(--font-size-sm);
+        height: var(--input-height-sm);
+    }
+
+    .form-control-lg {
+        font-size: var(--font-size-lg);
+        height: var(--input-height-lg);
+    }
+
+    .pm-select__control {
+        min-height: var(--input-height);
+        height: var(--input-height);
+    }
+
+    .pm-select__value-container {
+        height: calc(var(--input-height) - 2px);
+    }
+
+    .pm-select__placeholder,
+    .pm-select__single-value,
+    .pm-select__input-container,
+    .pm-select__option {
+        font-size: var(--font-size-base);
+    }
+}

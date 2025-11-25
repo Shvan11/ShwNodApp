@@ -4,7 +4,7 @@ import PatientShell from '../components/react/PatientShell.jsx';
 
 // Patient portal styles (comprehensive - all patient pages)
 import '../../css/pages/patient-shell.css';
-import '../../css/components/sidebar-navigation.css';
+import '../../css/layout/sidebar-navigation.css';
 import '../../css/pages/patient-info.css';
 import '../../css/pages/add-patient.css';
 import '../../css/pages/edit-patient.css';

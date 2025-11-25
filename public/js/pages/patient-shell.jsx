@@ -9,8 +9,8 @@ import '../../css/pages/xrays.css';
 import '../../css/pages/visits-summary.css';
 import '../../css/pages/canvas.css';
 import 'photoswipe/dist/photoswipe.css';
-import '../../css/components/universal-header.css';
-import '../../css/components/sidebar-navigation.css';
+import '../../css/layout/universal-header.css';
+import '../../css/layout/sidebar-navigation.css';
 import '../../css/pages/patient-shell.css';
 import '../../css/pages/edit-patient.css';
 import '../../css/components/timepoints-selector.css';
@@ -19,7 +19,7 @@ import '../../css/components/calendar-picker-modal.css';
 import '../../css/components/simplified-calendar-picker.css';
 
 // Initialize the patient portal with React Router
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     console.log('🚀 Initializing React Patient Portal with Router...');
 
     // Name this window so tabManager can reuse it for ANY patient

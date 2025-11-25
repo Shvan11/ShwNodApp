@@ -1,110 +1,279 @@
-/* buttons.css - Button styles */
+/* buttons.css - Global Button Component */
+
+/* Base Button Style */
 .btn {
-    display: inline-block;
-    font-weight: 400;
-    text-align: center;
-    white-space: nowrap;
-    vertical-align: middle;
-    user-select: none;
-    border: 1px solid transparent;
-    padding: 0.375rem 0.75rem;
-    font-size: 1rem;
-    line-height: 1.5;
-    border-radius: 0.25rem;
-    transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, 
-                border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-    cursor: pointer;
-  }
-  
-  /* Button variants */
-  .btn-primary {
-    color: var(--color-white);
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-  }
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+  user-select: none;
+  border: 1px solid transparent;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  gap: 0.5rem;
+  text-decoration: none;
+  margin: var(--spacing-xs);
+}
 
-  .btn-primary:hover {
-    background-color: var(--primary-hover);
-    border-color: var(--primary-hover);
-  }
+.btn:focus {
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
 
-  .btn-secondary {
-    color: var(--color-white);
-    background-color: var(--secondary-color);
-    border-color: var(--secondary-color);
-  }
+.btn:disabled,
+.btn.disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 
-  .btn-secondary:hover {
-    background-color: var(--secondary-hover);
-    border-color: var(--secondary-hover);
-  }
-  
-  /* Button sizes */
-  .btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-    line-height: 1.5;
-    border-radius: 0.2rem;
-  }
-  
-  .btn-lg {
-    padding: 0.5rem 1rem;
-    font-size: 1.25rem;
-    line-height: 1.5;
-    border-radius: 0.3rem;
-  }
-  
-  /* Block button */
-  .btn-block {
-    display: block;
-    width: 100%;
-  }
-  
-  /* Specific button styles from your application */
-  .PButton {
-    border: 1px solid var(--color-black);
-    padding: 8px;
-    border-radius: 2px;
-    font-size: 12px;
-    cursor: pointer;
-  }
+/* Button Variants */
+.btn-primary {
+  color: #fff;
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
 
-  .PButton:hover {
-    background-color: var(--color-beige);
-  }
-  
-  .PButton:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  
-  .openButton {
-    margin: 20px;
-    border: none;
-    border-radius: 5px;
-    background-color: var(--color-blue-action);
-    color: var(--color-white);
-    padding: 14px 20px;
-    cursor: pointer;
-    align-self: flex-end;
-  }
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+  border-color: var(--primary-hover);
+  transform: translateY(-1px);
+}
 
-  /* For your existing "Send" type buttons */
-  .submit-btn {
-    text-decoration: none;
-    width: 100%;
-    text-align: center;
-    display: block;
-    background-color: var(--color-yellow);
-    color: var(--color-white);
-    border: 1px solid var(--color-yellow-border);
-    padding: 10px 0;
-    font-size: 20px;
-    cursor: pointer;
-    border-radius: 5px;
-    margin-top: 20px;
-  }
+.btn-secondary {
+  color: #fff;
+  background-color: var(--secondary-color);
+  border-color: var(--secondary-color);
+}
 
-  .submit-btn:hover {
-    background-color: var(--color-yellow-hover);
-  }
+.btn-secondary:hover {
+  background-color: var(--secondary-hover);
+  border-color: var(--secondary-hover);
+  transform: translateY(-1px);
+}
+
+.btn-success {
+  color: #fff;
+  background-color: var(--success-color);
+  border-color: var(--success-color);
+}
+
+.btn-success:hover {
+  background-color: var(--success-dark);
+  border-color: var(--success-dark);
+  transform: translateY(-1px);
+}
+
+.btn-danger {
+  color: #fff;
+  background-color: var(--error-color);
+  border-color: var(--error-color);
+}
+
+.btn-danger:hover {
+  background-color: var(--error-dark);
+  border-color: var(--error-dark);
+  transform: translateY(-1px);
+}
+
+.btn-warning {
+  color: #212529;
+  background-color: var(--warning-color);
+  border-color: var(--warning-color);
+}
+
+.btn-warning:hover {
+  background-color: var(--warning-dark);
+  border-color: var(--warning-dark);
+  transform: translateY(-1px);
+}
+
+.btn-info {
+  color: #fff;
+  background-color: var(--info-color);
+  border-color: var(--info-color);
+}
+
+.btn-info:hover {
+  background-color: var(--info-dark);
+  border-color: var(--info-dark);
+  transform: translateY(-1px);
+}
+
+.btn-light {
+  color: #212529;
+  background-color: var(--gray-100);
+  border-color: var(--gray-300);
+}
+
+.btn-light:hover {
+  background-color: var(--gray-200);
+  border-color: var(--gray-400);
+}
+
+.btn-dark {
+  color: #fff;
+  background-color: var(--gray-800);
+  border-color: var(--gray-800);
+}
+
+.btn-dark:hover {
+  background-color: var(--gray-900);
+  border-color: var(--gray-900);
+}
+
+/* Outline Variants */
+.btn-outline-primary {
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+  background-color: transparent;
+}
+
+.btn-outline-primary:hover {
+  color: #fff;
+  background-color: var(--primary-color);
+}
+
+.btn-outline-secondary {
+  color: var(--secondary-color);
+  border-color: var(--secondary-color);
+  background-color: transparent;
+}
+
+.btn-outline-secondary:hover {
+  color: #fff;
+  background-color: var(--secondary-color);
+}
+
+.btn-outline-success {
+  color: var(--success-color);
+  border-color: var(--success-color);
+  background-color: transparent;
+}
+
+.btn-outline-success:hover {
+  color: #fff;
+  background-color: var(--success-color);
+}
+
+.btn-outline-danger {
+  color: var(--error-color);
+  border-color: var(--error-color);
+  background-color: transparent;
+}
+
+.btn-outline-danger:hover {
+  color: #fff;
+  background-color: var(--error-color);
+}
+
+/* Button Sizes */
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  border-radius: var(--radius-sm);
+}
+
+.btn-lg {
+  padding: 0.75rem 1.5rem;
+  font-size: 1.25rem;
+  border-radius: var(--radius-lg);
+}
+
+/* Block Button */
+.btn-block {
+  display: flex;
+  width: 100%;
+}
+
+/* Icon Button (Square/Circle) */
+.btn-icon {
+  padding: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: var(--gray-600);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  background-color: var(--gray-100);
+  color: var(--gray-900);
+}
+
+.btn-icon-sm {
+  padding: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.btn-icon-lg {
+  padding: 0.75rem;
+  font-size: 1.25rem;
+}
+
+/* Action Buttons (Edit/Delete) */
+.btn-edit {
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--info-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: transparent;
+  color: var(--info-color);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.btn-edit::before {
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  content: "\f044"; /* fa-edit / fa-pen-to-square */
+}
+
+.btn-edit:hover {
+  background-color: var(--info-color);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-delete {
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--error-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: transparent;
+  color: var(--error-color);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.btn-delete::before {
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  content: "\f2ed"; /* fa-trash-alt */
+}
+
+.btn-delete:hover {
+  background-color: var(--error-color);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}

@@ -59,7 +59,7 @@ const SendMessage = () => {
             // No manual listener cleanup needed - we use GlobalStateContext
         };
     }, []);
-    
+
     // Initialize WebSocket connection
     const initializeWebSocket = async () => {
         try {
@@ -91,7 +91,7 @@ const SendMessage = () => {
             fallbackStatusCheck();
         }
     };
-    
+
     // Fallback API status check
     const fallbackStatusCheck = async () => {
         try {
@@ -111,7 +111,7 @@ const SendMessage = () => {
             });
         }
     };
-    
+
     // Load contacts based on source
     const loadContacts = async (source) => {
         try {
@@ -121,11 +121,11 @@ const SendMessage = () => {
             } else {
                 response = await fetch(`/api/google?source=${encodeURIComponent(source)}`);
             }
-            
+
             if (response.ok) {
                 const data = await response.json();
                 const contactsArray = Array.isArray(data) ? data : [];
-                
+
                 // Convert to React-Select format
                 const options = contactsArray.map(contact => ({
                     value: contact.id || contact.phone,
@@ -144,7 +144,7 @@ const SendMessage = () => {
             setContactOptions([]);
         }
     };
-    
+
     // Handle source change
     const handleSourceChange = (newSource) => {
         setSelectedSource(newSource);
@@ -152,11 +152,11 @@ const SendMessage = () => {
         setPhoneNumber('');
         loadContacts(newSource);
     };
-    
+
     // Handle contact selection with React-Select
     const handleContactSelect = (selectedOption) => {
         setSelectedContact(selectedOption);
-        
+
         if (selectedOption && selectedOption.phone) {
             if (selectedSource === 'pat') {
                 setPhoneNumber('964' + selectedOption.phone);
@@ -173,22 +173,22 @@ const SendMessage = () => {
             setPhoneNumber('');
         }
     };
-    
+
     // Handle form submission
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         // Validate inputs
         if (!phoneNumber.trim()) {
             showMessage('Please enter a phone number', 'error');
             return;
         }
-        
+
         if (!filePath.trim()) {
             showMessage('Please select a file to send', 'error');
             return;
         }
-        
+
         // Check WhatsApp client status if WhatsApp is selected
         if (program === 'WhatsApp' && !whatsappClientReady) {
             if (clientError) {
@@ -198,30 +198,30 @@ const SendMessage = () => {
             }
             return;
         }
-        
+
         // TODO: Start progress bar (disabled - needs React component integration)
         // if (progressBarRef.current) {
         //     progressBarRef.current.initiate();
         // }
-        
+
         // Prepare form data
         const formData = new FormData();
         formData.append('prog', program);
         formData.append('phone', phoneNumber);
         formData.append('file', filePath);
-        
+
         try {
             const response = await fetch('/api/sendmedia2', {
                 method: 'POST',
                 body: formData
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            
+
             const data = await response.json();
-            
+
             if (data.result === 'OK') {
                 // TODO: progressBarRef.current.finish();
                 const fileCount = pathsArray.length;
@@ -239,12 +239,12 @@ const SendMessage = () => {
             showMessage(`Failed to send ${program} message: ${error.message}`, 'error');
         }
     };
-    
+
     // Show message
     const showMessage = (message, type) => {
         setStatusMessage(message);
         setStatusType(type);
-        
+
         // Auto-remove success messages after 5 seconds
         if (type === 'success') {
             setTimeout(() => {
@@ -253,20 +253,20 @@ const SendMessage = () => {
             }, 5000);
         }
     };
-    
+
     // Show authentication required message
     const showAuthenticationRequired = () => {
         setStatusMessage('');
         setStatusType('auth-required');
     };
-    
+
     // Handle close
     const handleClose = () => {
         // Cleanup WebSocket connection
         if (connectionManagerRef.current) {
             connectionManagerRef.current.disconnect();
         }
-        
+
         // Close the window
         if (window.opener) {
             window.close();
@@ -274,7 +274,7 @@ const SendMessage = () => {
             window.location.href = '/';
         }
     };
-    
+
     return (
         <div className="send-message-container">
             {/* Status Messages */}
@@ -283,7 +283,7 @@ const SendMessage = () => {
                     {statusMessage}
                 </div>
             )}
-            
+
             {statusType === 'auth-required' && (
                 <div className="status-message auth-required">
                     <h3>WhatsApp Authentication Required</h3>
@@ -309,7 +309,7 @@ const SendMessage = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* Source Selection */}
             <div className="form-group">
                 <select
@@ -322,7 +322,7 @@ const SendMessage = () => {
                     <option value="cli">Clinic Phone</option>
                 </select>
             </div>
-            
+
             {/* Contact Selection with React-Select */}
             <div className="form-group">
                 <Select
@@ -379,21 +379,21 @@ const SendMessage = () => {
                     }}
                 />
             </div>
-            
+
             {/* Main Form */}
             <form onSubmit={handleSubmit} className="waform">
-                <button 
-                    type="button" 
+                <button
+                    type="button"
                     onClick={handleClose}
                     className="close-btn"
                     aria-label="Close"
                 >
                     <i className="fa-solid fa-rectangle-xmark fa-2xl"></i>
                 </button>
-                
+
                 <h2>Send WhatsApp</h2>
                 <hr />
-                
+
                 {/* Program Selection */}
                 <div className="form-group">
                     <select
@@ -405,7 +405,7 @@ const SendMessage = () => {
                         <option value="Telegram">Telegram</option>
                     </select>
                 </div>
-                
+
                 {/* Phone Input */}
                 <div className="phone-input-wrapper">
                     <input
@@ -417,7 +417,7 @@ const SendMessage = () => {
                         required
                     />
                 </div>
-                
+
                 {/* File Input */}
                 <div className="form-group">
                     <input
@@ -430,12 +430,13 @@ const SendMessage = () => {
                         readOnly
                     />
                 </div>
-                
+
                 {/* Submit Button */}
-                <button type="submit" className="submit-btn">
+                {/* Submit Button */}
+                <button type="submit" className="btn btn-warning btn-block mt-4">
                     Send
                 </button>
-                
+
                 {/* Progress Bar */}
                 <div className="progress-container">
                     <div id="emptyBar">

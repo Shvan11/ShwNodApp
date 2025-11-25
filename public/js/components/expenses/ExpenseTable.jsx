@@ -72,14 +72,14 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }) {
                                 <td>
                                     <div className="action-buttons">
                                         <button
-                                            className="btn-icon btn-edit"
+                                            className="btn-edit"
                                             onClick={() => onEdit(expense.ID)}
                                             aria-label="Edit expense"
                                         >
                                             Edit
                                         </button>
                                         <button
-                                            className="btn-icon btn-delete"
+                                            className="btn-delete"
                                             onClick={() => onDelete(expense.ID)}
                                             aria-label="Delete expense"
                                         >

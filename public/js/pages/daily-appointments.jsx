@@ -17,10 +17,10 @@ import ReactDOM from 'react-dom/client';
 import UniversalHeader from '../components/react/UniversalHeader.jsx';
 import DailyAppointmentsApp from '../apps/DailyAppointmentsApp.jsx';
 import '../../css/pages/appointments.css';
-import '../../css/components/universal-header.css';
+import '../../css/layout/universal-header.css';
 
 // Initialize the daily appointments application
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     console.log('🚀 Initializing Daily Appointments App...');
 
     // Name this window so window.open() can reuse/focus it

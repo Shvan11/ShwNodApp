@@ -259,10 +259,10 @@ const WorkComponent = ({ patientId }) => {
 
     const handleDetailFormSubmit = async (e) => {
         e.preventDefault();
-        
+
         try {
             let response;
-            
+
             if (editingDetail) {
                 // Update existing detail
                 response = await fetch('/api/updateworkdetail', {
@@ -293,7 +293,7 @@ const WorkComponent = ({ patientId }) => {
 
     const handleDeleteDetail = async (detailId) => {
         if (!confirm('Are you sure you want to delete this work detail?')) return;
-        
+
         try {
             const response = await fetch('/api/deleteworkdetail', {
                 method: 'DELETE',
@@ -315,23 +315,23 @@ const WorkComponent = ({ patientId }) => {
     const getProgressPercentage = (work) => {
         if (work.Finished) return 100;
         if (!work.StartDate) return 0;
-        
+
         let progress = 25; // Started
         if (work.IPhotoDate) progress = 50;
         if (work.DebondDate) progress = 75;
         if (work.FPhotoDate) progress = 90;
-        
+
         return progress;
     };
 
     const filteredWorks = works
         .filter(work => {
             const matchesSearch = work.Notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                work.DoctorName?.toLowerCase().includes(searchTerm.toLowerCase());
+                work.DoctorName?.toLowerCase().includes(searchTerm.toLowerCase());
 
             const matchesFilter = filterStatus === 'all' ||
-                                (filterStatus === 'active' && !work.Finished) ||
-                                (filterStatus === 'completed' && work.Finished);
+                (filterStatus === 'active' && !work.Finished) ||
+                (filterStatus === 'completed' && work.Finished);
 
             return matchesSearch && matchesFilter;
         })
@@ -408,27 +408,27 @@ const WorkComponent = ({ patientId }) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ workId: work.workid })
         })
-        .then(res => {
-            console.log('📱 [WHATSAPP] Response status:', res.status);
-            return res.json();
-        })
-        .then(result => {
-            console.log('📱 [WHATSAPP] Response data:', result);
-            if (result.success) {
-                toast.success('Receipt sent via WhatsApp!', 3000);
-                console.log('✅ [WHATSAPP] Success toast shown');
-            } else {
-                // Show error message to user
-                const errorMsg = result.message || 'Failed to send WhatsApp receipt';
-                toast.error(errorMsg, 5000);
-                console.error('❌ [WHATSAPP] Error:', errorMsg);
-            }
-        })
-        .catch((err) => {
-            // Show network/server error
-            toast.error('Network error: Could not send WhatsApp receipt', 5000);
-            console.error('❌ [WHATSAPP] Network error:', err);
-        });
+            .then(res => {
+                console.log('📱 [WHATSAPP] Response status:', res.status);
+                return res.json();
+            })
+            .then(result => {
+                console.log('📱 [WHATSAPP] Response data:', result);
+                if (result.success) {
+                    toast.success('Receipt sent via WhatsApp!', 3000);
+                    console.log('✅ [WHATSAPP] Success toast shown');
+                } else {
+                    // Show error message to user
+                    const errorMsg = result.message || 'Failed to send WhatsApp receipt';
+                    toast.error(errorMsg, 5000);
+                    console.error('❌ [WHATSAPP] Error:', errorMsg);
+                }
+            })
+            .catch((err) => {
+                // Show network/server error
+                toast.error('Network error: Could not send WhatsApp receipt', 5000);
+                console.error('❌ [WHATSAPP] Network error:', err);
+            });
     };
 
     const toggleWorkExpanded = (workId) => {
@@ -496,7 +496,7 @@ const WorkComponent = ({ patientId }) => {
                             className="patient-photo"
                             onError={(e) => {
                                 e.target.style.display = 'none';
-                                e.target.parentElement.innerHTML = '<i class="fas fa-user" style="font-size: 48px; color: #9ca3af;"></i>';
+                                e.target.parentElement.innerHTML = '<i class="fas fa-user patient-photo-fallback"></i>';
                             }}
                         />
                     </div>
@@ -559,11 +559,11 @@ const WorkComponent = ({ patientId }) => {
                             </select>
                             <button
                                 onClick={handleQuickCheckin}
-                                className={`btn-checkin ${checkedIn ? 'checked-in' : ''} ${checkingIn ? 'checking-in' : ''}`}
+                                className={`btn-work-checkin ${checkedIn ? 'checked-in' : ''} ${checkingIn ? 'checking-in' : ''}`}
                                 disabled={checkingIn || checkedIn}
                                 title={checkedIn ? 'Patient already checked in today' : 'Check in patient for today'}
                             >
-                                <i className={`fas ${checkedIn ? 'fa-check-circle' : 'fa-calendar-check'}`}></i>
+                                <i className="fas fa-user-check"></i>
                                 {checkingIn ? 'Checking In...' : checkedIn ? 'Checked In' : 'Check In'}
                             </button>
                             <button
@@ -602,7 +602,7 @@ const WorkComponent = ({ patientId }) => {
                     <div className="work-success-actions">
                         <button
                             onClick={() => handleAddAlignerSet({ workid: newAlignerWorkId })}
-                            className="btn-success-action"
+                            className="work-btn-success-action"
                         >
                             <i className="fas fa-tooth"></i> Add Aligner Set
                         </button>
@@ -611,7 +611,7 @@ const WorkComponent = ({ patientId }) => {
                                 setSuccessMessage(null);
                                 setNewAlignerWorkId(null);
                             }}
-                            className="btn-success-close"
+                            className="work-btn-success-close"
                         >
                             ×
                         </button>
@@ -754,7 +754,7 @@ const WorkComponent = ({ patientId }) => {
                             <div className="details-section">
                                 <div className="section-header">
                                     <h4>Treatment Details</h4>
-                                    <button 
+                                    <button
                                         onClick={handleAddDetail}
                                         className="btn btn-sm btn-primary"
                                     >
@@ -784,13 +784,13 @@ const WorkComponent = ({ patientId }) => {
                                                     <td>{detail.Note || '-'}</td>
                                                     <td>
                                                         <div className="action-buttons">
-                                                            <button 
+                                                            <button
                                                                 onClick={() => handleEditDetail(detail)}
                                                                 className="btn btn-xs btn-secondary"
                                                             >
                                                                 Edit
                                                             </button>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => handleDeleteDetail(detail.ID)}
                                                                 className="btn btn-xs btn-danger"
                                                             >
@@ -822,14 +822,14 @@ const WorkComponent = ({ patientId }) => {
                     <div className="work-modal detail-form-modal">
                         <div className="modal-header">
                             <h3>{editingDetail ? 'Edit Treatment Detail' : 'Add Treatment Detail'}</h3>
-                            <button 
+                            <button
                                 onClick={() => setShowDetailForm(false)}
                                 className="modal-close"
                             >
                                 ×
                             </button>
                         </div>
-                        
+
                         <form onSubmit={handleDetailFormSubmit} className="detail-form">
                             <div className="form-row">
                                 <div className="form-group">
@@ -837,16 +837,16 @@ const WorkComponent = ({ patientId }) => {
                                     <input
                                         type="text"
                                         value={detailFormData.Tooth}
-                                        onChange={(e) => setDetailFormData({...detailFormData, Tooth: e.target.value})}
+                                        onChange={(e) => setDetailFormData({ ...detailFormData, Tooth: e.target.value })}
                                         placeholder="e.g., 14, 27, etc."
                                     />
                                 </div>
-                                
+
                                 <div className="form-group">
                                     <label>Filling Type</label>
                                     <select
                                         value={detailFormData.FillingType}
-                                        onChange={(e) => setDetailFormData({...detailFormData, FillingType: e.target.value})}
+                                        onChange={(e) => setDetailFormData({ ...detailFormData, FillingType: e.target.value })}
                                     >
                                         <option value="">Select Type</option>
                                         <option value="Composite">Composite</option>
@@ -866,7 +866,7 @@ const WorkComponent = ({ patientId }) => {
                                     <label>Filling Depth</label>
                                     <select
                                         value={detailFormData.FillingDepth}
-                                        onChange={(e) => setDetailFormData({...detailFormData, FillingDepth: e.target.value})}
+                                        onChange={(e) => setDetailFormData({ ...detailFormData, FillingDepth: e.target.value })}
                                     >
                                         <option value="">Select Depth</option>
                                         <option value="Superficial">Superficial</option>
@@ -875,13 +875,13 @@ const WorkComponent = ({ patientId }) => {
                                         <option value="Pulp">Pulp</option>
                                     </select>
                                 </div>
-                                
+
                                 <div className="form-group">
                                     <label>Number of Canals</label>
                                     <input
                                         type="number"
                                         value={detailFormData.CanalsNo}
-                                        onChange={(e) => setDetailFormData({...detailFormData, CanalsNo: e.target.value})}
+                                        onChange={(e) => setDetailFormData({ ...detailFormData, CanalsNo: e.target.value })}
                                         min="1"
                                         max="5"
                                         placeholder="1-5"
@@ -893,15 +893,15 @@ const WorkComponent = ({ patientId }) => {
                                 <label>Notes</label>
                                 <textarea
                                     value={detailFormData.Note}
-                                    onChange={(e) => setDetailFormData({...detailFormData, Note: e.target.value})}
+                                    onChange={(e) => setDetailFormData({ ...detailFormData, Note: e.target.value })}
                                     rows="3"
                                     placeholder="Additional notes about this treatment..."
                                 />
                             </div>
 
                             <div className="form-actions">
-                                <button 
-                                    type="button" 
+                                <button
+                                    type="button"
                                     onClick={() => setShowDetailForm(false)}
                                     className="btn btn-secondary"
                                 >
@@ -952,126 +952,126 @@ const WorkComponent = ({ patientId }) => {
                         </div>
                         <div className="modal-content-scroll">
 
-                        <div className="payment-summary-box">
-                            <div className="payment-summary-grid">
-                                <div className="payment-summary-item">
-                                    <span className="payment-summary-label">Total Required:</span>
-                                    <span className="payment-summary-value total">
-                                        {formatCurrency(selectedWorkForPayment.TotalRequired, selectedWorkForPayment.Currency)}
-                                    </span>
-                                </div>
-                                <div className="payment-summary-item">
-                                    <span className="payment-summary-label">Total Paid:</span>
-                                    <span className="payment-summary-value paid">
-                                        {formatCurrency(selectedWorkForPayment.TotalPaid, selectedWorkForPayment.Currency)}
-                                    </span>
-                                </div>
-                                <div className="payment-summary-item">
-                                    <span className="payment-summary-label">Balance Remaining:</span>
-                                    <span className="payment-summary-value balance">
-                                        {formatCurrency((selectedWorkForPayment.TotalRequired || 0) - (selectedWorkForPayment.TotalPaid || 0), selectedWorkForPayment.Currency)}
-                                    </span>
+                            <div className="payment-summary-box">
+                                <div className="payment-summary-grid">
+                                    <div className="payment-summary-item">
+                                        <span className="payment-summary-label">Total Required:</span>
+                                        <span className="payment-summary-value total">
+                                            {formatCurrency(selectedWorkForPayment.TotalRequired, selectedWorkForPayment.Currency)}
+                                        </span>
+                                    </div>
+                                    <div className="payment-summary-item">
+                                        <span className="payment-summary-label">Total Paid:</span>
+                                        <span className="payment-summary-value paid">
+                                            {formatCurrency(selectedWorkForPayment.TotalPaid, selectedWorkForPayment.Currency)}
+                                        </span>
+                                    </div>
+                                    <div className="payment-summary-item">
+                                        <span className="payment-summary-label">Balance Remaining:</span>
+                                        <span className="payment-summary-value balance">
+                                            {formatCurrency((selectedWorkForPayment.TotalRequired || 0) - (selectedWorkForPayment.TotalPaid || 0), selectedWorkForPayment.Currency)}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {loadingPayments ? (
-                            <div className="work-loading">
-                                Loading payment history...
-                            </div>
-                        ) : (
-                            <div className="details-table-container">
-                                <table className="details-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Date</th>
-                                            <th>Amount Paid ({selectedWorkForPayment.Currency})</th>
-                                            <th>Actual Amount</th>
-                                            <th>Actual Currency</th>
-                                            <th>Change</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {paymentHistory.map((payment, index) => (
-                                            <tr key={payment.InvoiceID || index}>
-                                                <td>{formatDate(payment.Dateofpayment)}</td>
-                                                <td className="payment-amount">
-                                                    {formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}
-                                                </td>
-                                                <td>{payment.ActualAmount ? formatCurrency(payment.ActualAmount, payment.ActualCur) : '-'}</td>
-                                                <td>{payment.ActualCur || '-'}</td>
-                                                <td>{payment.Change ? formatCurrency(payment.Change, payment.ActualCur) : '-'}</td>
-                                                <td>
-                                                    <div className="payment-actions">
-                                                        <button
-                                                            onClick={() => {
-                                                                toast.info(`Edit payment functionality coming soon!\n\nPayment ID: ${payment.InvoiceID}\nAmount: ${formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}`);
-                                                            }}
-                                                            className="btn-action-edit"
-                                                            title="Edit Payment"
-                                                        >
-                                                            <i className="fas fa-edit"></i>
-                                                        </button>
-                                                        <button
-                                                            onClick={async () => {
-                                                                if (window.confirm(`Are you sure you want to delete this payment?\n\nAmount: ${formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}\nDate: ${formatDate(payment.Dateofpayment)}\n\nThis action cannot be undone.`)) {
-                                                                    try {
-                                                                        const response = await fetch(`/api/deleteInvoice/${payment.InvoiceID}`, {
-                                                                            method: 'DELETE'
-                                                                        });
-                                                                        const result = await response.json();
-                                                                        if (result.status === 'success') {
-                                                                            toast.success('Payment deleted successfully!');
-                                                                            loadPaymentHistory(selectedWorkForPayment.workid);
-                                                                            loadWorks();
-                                                                        } else {
-                                                                            throw new Error(result.message || 'Failed to delete payment');
-                                                                        }
-                                                                    } catch (error) {
-                                                                        console.error('Error deleting payment:', error);
-                                                                        toast.error(`Error deleting payment: ${error.message}`);
-                                                                    }
-                                                                }
-                                                            }}
-                                                            className="btn-action-delete"
-                                                            title="Delete Payment"
-                                                        >
-                                                            <i className="fas fa-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {paymentHistory.length === 0 && (
-                                            <tr>
-                                                <td colSpan="6" className="no-data">
-                                                    No payments recorded yet for this work
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-
-                        <div className="payment-history-footer">
-                            {((selectedWorkForPayment.TotalRequired || 0) - (selectedWorkForPayment.TotalPaid || 0)) > 0 ? (
-                                <button
-                                    onClick={() => {
-                                        setShowPaymentHistoryModal(false);
-                                        handleAddPayment(selectedWorkForPayment);
-                                    }}
-                                    className="btn-primary btn-add-payment"
-                                >
-                                    <i className="fas fa-plus"></i> Add New Payment
-                                </button>
+                            {loadingPayments ? (
+                                <div className="work-loading">
+                                    Loading payment history...
+                                </div>
                             ) : (
-                                <div className="payment-fully-paid">
-                                    <i className="fas fa-check-circle"></i> This work is fully paid
+                                <div className="details-table-container">
+                                    <table className="details-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Amount Paid ({selectedWorkForPayment.Currency})</th>
+                                                <th>Actual Amount</th>
+                                                <th>Actual Currency</th>
+                                                <th>Change</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {paymentHistory.map((payment, index) => (
+                                                <tr key={payment.InvoiceID || index}>
+                                                    <td>{formatDate(payment.Dateofpayment)}</td>
+                                                    <td className="payment-amount">
+                                                        {formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}
+                                                    </td>
+                                                    <td>{payment.ActualAmount ? formatCurrency(payment.ActualAmount, payment.ActualCur) : '-'}</td>
+                                                    <td>{payment.ActualCur || '-'}</td>
+                                                    <td>{payment.Change ? formatCurrency(payment.Change, payment.ActualCur) : '-'}</td>
+                                                    <td>
+                                                        <div className="payment-actions">
+                                                            <button
+                                                                onClick={() => {
+                                                                    toast.info(`Edit payment functionality coming soon!\n\nPayment ID: ${payment.InvoiceID}\nAmount: ${formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}`);
+                                                                }}
+                                                                className="work-btn-action-edit"
+                                                                title="Edit Payment"
+                                                            >
+                                                                <i className="fas fa-edit"></i>
+                                                            </button>
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (window.confirm(`Are you sure you want to delete this payment?\n\nAmount: ${formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}\nDate: ${formatDate(payment.Dateofpayment)}\n\nThis action cannot be undone.`)) {
+                                                                        try {
+                                                                            const response = await fetch(`/api/deleteInvoice/${payment.InvoiceID}`, {
+                                                                                method: 'DELETE'
+                                                                            });
+                                                                            const result = await response.json();
+                                                                            if (result.status === 'success') {
+                                                                                toast.success('Payment deleted successfully!');
+                                                                                loadPaymentHistory(selectedWorkForPayment.workid);
+                                                                                loadWorks();
+                                                                            } else {
+                                                                                throw new Error(result.message || 'Failed to delete payment');
+                                                                            }
+                                                                        } catch (error) {
+                                                                            console.error('Error deleting payment:', error);
+                                                                            toast.error(`Error deleting payment: ${error.message}`);
+                                                                        }
+                                                                    }
+                                                                }}
+                                                                className="work-btn-action-delete"
+                                                                title="Delete Payment"
+                                                            >
+                                                                <i className="fas fa-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {paymentHistory.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="6" className="no-data">
+                                                        No payments recorded yet for this work
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
                             )}
-                        </div>
+
+                            <div className="payment-history-footer">
+                                {((selectedWorkForPayment.TotalRequired || 0) - (selectedWorkForPayment.TotalPaid || 0)) > 0 ? (
+                                    <button
+                                        onClick={() => {
+                                            setShowPaymentHistoryModal(false);
+                                            handleAddPayment(selectedWorkForPayment);
+                                        }}
+                                        className="btn-primary btn-add-payment"
+                                    >
+                                        <i className="fas fa-plus"></i> Add New Payment
+                                    </button>
+                                ) : (
+                                    <div className="payment-fully-paid">
+                                        <i className="fas fa-check-circle"></i> This work is fully paid
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

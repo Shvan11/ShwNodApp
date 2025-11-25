@@ -1,35 +1,23 @@
 import { useState, useCallback } from 'react';
-import { generateActionId } from '../utils/action-id.js';
 
 /**
- * Custom hook for managing appointments data and actions with OPTIMISTIC UPDATES
+ * Custom hook for managing appointments data and actions
  *
- * KEY IMPROVEMENTS:
- * 1. Optimistic updates with proper list separation
- *    - allAppointments: Non-checked-in only (Present IS NULL from AllTodayApps)
- *    - checkedInAppointments: Checked-in only (Present/Seated/Dismissed from PresentTodayApps)
- *    - Optimistic updates move appointments between lists instantly
- *    - No page scrolling issues
- *    - No unnecessary reloads
+ * SIMPLIFIED APPROACH:
+ * - NO optimistic updates (wait for server confirmation)
+ * - NO action ID tracking (unnecessary complexity)
+ * - NO rollback logic (just reload on error)
+ * - Database is the single source of truth
  *
- * 2. Action ID tracking for event source detection
- *    - Each action gets a unique ID
- *    - Server echoes the ID in WebSocket broadcasts
- *    - Enables robust detection of own actions vs external updates
+ * User sees loading spinner → Server updates DB → Broadcast to all clients → Reload
  */
 export function useAppointments() {
     // TWO SEPARATE LISTS (matching database structure)
-    // AllTodayApps returns appointments with Present IS NULL (no status fields)
-    // PresentTodayApps returns appointments with Present/Seated/Dismissed fields
     const [allAppointments, setAllAppointments] = useState([]);
     const [checkedInAppointments, setCheckedInAppointments] = useState([]);
     const [stats, setStats] = useState({ total: 0, checkedIn: 0, waiting: 0, completed: 0 });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-
-    // PHASE 1: Track which appointments are currently processing (for loading indicators)
-    const [processingAppointments, setProcessingAppointments] = useState(new Set());
-    const [failedAppointments, setFailedAppointments] = useState(new Map()); // appointmentId -> error message
 
     /**
      * Get current time in HH:MM:SS format
@@ -40,9 +28,8 @@ export function useAppointments() {
     };
 
     /**
-     * Fetch appointments for a specific date (OPTIMIZED - Phase 3)
-     * Uses unified endpoint for 80% performance improvement
-     * ONLY called on: initial load, date change, WebSocket update
+     * Fetch appointments for a specific date
+     * Called on: initial load, date change, WebSocket update
      */
     const loadAppointments = useCallback(async (date) => {
         if (!date) return;
@@ -53,7 +40,6 @@ export function useAppointments() {
             setLoading(true);
             setError(null);
 
-            // Use unified optimized endpoint (single API call)
             const response = await fetch(`/api/getDailyAppointments?AppsDate=${date}`);
 
             if (!response.ok) {
@@ -62,7 +48,7 @@ export function useAppointments() {
 
             const data = await response.json();
 
-            console.log('✅ Fetched appointments (optimized):', {
+            console.log('✅ Loaded appointments:', {
                 all: data.allAppointments?.length || 0,
                 checkedIn: data.checkedInAppointments?.length || 0,
                 stats: data.stats
@@ -72,7 +58,7 @@ export function useAppointments() {
             setCheckedInAppointments(data.checkedInAppointments || []);
             setStats(data.stats || { total: 0, checkedIn: 0, waiting: 0, completed: 0 });
         } catch (err) {
-            console.error('Error loading appointments:', err);
+            console.error('❌ Error loading appointments:', err);
             setError(err.message);
         } finally {
             setLoading(false);
@@ -80,117 +66,23 @@ export function useAppointments() {
     }, []);
 
     /**
-     * OPTIMISTIC UPDATE: Update appointment in checked-in list
-     */
-    const updateCheckedInAppointment = useCallback((appointmentId, updates) => {
-        setCheckedInAppointments(prev => prev.map(apt =>
-            apt.appointmentID === appointmentId
-                ? { ...apt, ...updates }
-                : apt
-        ));
-    }, []);
-
-    /**
-     * OPTIMISTIC UPDATE: Move appointment from "All" to "Checked In" list
-     * FIXED: Added deduplication to prevent duplicate appointments
-     */
-    const moveToCheckedIn = useCallback((appointmentId, appointmentData) => {
-        // Remove from "All Appointments"
-        setAllAppointments(prev => prev.filter(apt => apt.appointmentID !== appointmentId));
-
-        // Add to "Checked In Patients" with deduplication
-        setCheckedInAppointments(prev => {
-            // Check if appointment already exists
-            const exists = prev.some(apt => apt.appointmentID === appointmentId);
-            if (exists) {
-                console.warn('⚠️ Prevented duplicate - appointment already in checked-in list:', appointmentId);
-                return prev; // Already exists, don't add again
-            }
-            return [...prev, appointmentData];
-        });
-    }, []);
-
-    /**
-     * OPTIMISTIC UPDATE: Move appointment from "Checked In" back to "All" list
-     * FIXED: Added deduplication to prevent duplicate appointments
-     */
-    const moveToAll = useCallback((appointmentId, appointmentData) => {
-        // Remove from "Checked In Patients"
-        setCheckedInAppointments(prev => prev.filter(apt => apt.appointmentID !== appointmentId));
-
-        // Add back to "All Appointments" (without status fields)
-        const basicAppointment = {
-            appointmentID: appointmentData.appointmentID,
-            PersonID: appointmentData.PersonID,
-            AppDetail: appointmentData.AppDetail,
-            AppDate: appointmentData.AppDate,
-            PatientType: appointmentData.PatientType,
-            PatientName: appointmentData.PatientName,
-            hasActiveAlert: appointmentData.hasActiveAlert,
-            apptime: appointmentData.apptime
-        };
-
-        // Add with deduplication
-        setAllAppointments(prev => {
-            // Check if appointment already exists
-            const exists = prev.some(apt => apt.appointmentID === appointmentId);
-            if (exists) {
-                console.warn('⚠️ Prevented duplicate - appointment already in all list:', appointmentId);
-                return prev; // Already exists, don't add again
-            }
-            return [...prev, basicAppointment];
-        });
-    }, []);
-
-    /**
      * Check in a patient (Scheduled → Present)
-     * OPTIMISTIC: Moves from "All" to "Checked In" list immediately
-     * Returns actionId for event source detection
+     * SIMPLIFIED: Wait for server, then reload
      */
-    const checkInPatient = useCallback(async (appointmentId) => {
-        // Generate unique action ID for tracking
-        const actionId = generateActionId();
-
-        // Find appointment in "All Appointments" list
-        const appointment = allAppointments.find(a => a.appointmentID === appointmentId);
-        if (!appointment) {
-            throw new Error('Appointment not found');
-        }
-
-        // Save for rollback
-        const savedAppointment = { ...appointment };
-
-        // PHASE 1: Mark as processing
-        setProcessingAppointments(prev => new Set(prev).add(appointmentId));
-        setFailedAppointments(prev => {
-            const next = new Map(prev);
-            next.delete(appointmentId); // Clear any previous errors
-            return next;
-        });
-
-        // OPTIMISTIC UPDATE: Move to checked-in list
+    const checkInPatient = useCallback(async (appointmentId, currentDate) => {
         const currentTime = getCurrentTime();
-        const checkedInAppointment = {
-            ...appointment,
-            PresentTime: currentTime,
-            SeatedTime: null,
-            DismissedTime: null,
-            HasVisit: false,
-            AppCost: null
-        };
-
-        moveToCheckedIn(appointmentId, checkedInAppointment);
+        console.log(`🔵 Checking in appointment ${appointmentId}`);
 
         try {
-            // Sync with server (includes actionId for tracking)
+            setLoading(true);
+
             const response = await fetch('/api/updateAppointmentState', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     appointmentID: appointmentId,
                     state: 'Present',
-                    time: currentTime,
-                    actionId: actionId  // Track this action
+                    time: currentTime
                 })
             });
 
@@ -199,98 +91,39 @@ export function useAppointments() {
             }
 
             const result = await response.json();
-            console.log('✅ Check-in confirmed by server:', result);
+            console.log('✅ Check-in confirmed:', result);
 
-            // VERIFICATION: Ensure server response matches optimistic update
-            const verificationFailed =
-                result.appointmentID !== appointmentId ||
-                result.state !== 'Present' ||
-                !result.time; // Server must return a time
+            // Reload appointments to get fresh data
+            await loadAppointments(currentDate);
 
-            if (verificationFailed) {
-                console.error('❌ Server response mismatch - triggering full reload', {
-                    expected: { appointmentID: appointmentId, state: 'Present' },
-                    received: result
-                });
-
-                // Rollback optimistic update
-                setCheckedInAppointments(prev => prev.filter(apt => apt.appointmentID !== appointmentId));
-                setAllAppointments(prev => [...prev, savedAppointment]);
-
-                // Trigger full reload to reconcile state
-                throw new Error('Server state mismatch - reloading appointments');
-            }
-
-            // PHASE 1: Remove from processing
-            setProcessingAppointments(prev => {
-                const next = new Set(prev);
-                next.delete(appointmentId);
-                return next;
-            });
-
-            return { success: true, previousState: 'Scheduled', actionId };
+            return { success: true };
         } catch (err) {
-            console.error('❌ Check-in failed, rolling back:', err);
-
-            // PHASE 1: Mark as failed
-            setProcessingAppointments(prev => {
-                const next = new Set(prev);
-                next.delete(appointmentId);
-                return next;
-            });
-            setFailedAppointments(prev => new Map(prev).set(appointmentId, err.message));
-
-            // ROLLBACK: Move back to "All Appointments"
-            setCheckedInAppointments(prev => prev.filter(apt => apt.appointmentID !== appointmentId));
-            setAllAppointments(prev => [...prev, savedAppointment]);
-
-            // Auto-clear error after 3 seconds
-            setTimeout(() => {
-                setFailedAppointments(prev => {
-                    const next = new Map(prev);
-                    next.delete(appointmentId);
-                    return next;
-                });
-            }, 3000);
-
+            console.error('❌ Check-in failed:', err);
+            setError(err.message);
             throw err;
+        } finally {
+            setLoading(false);
         }
-    }, [allAppointments, moveToCheckedIn]);
+    }, [loadAppointments]);
 
     /**
      * Mark patient as seated (Present → Seated)
-     * OPTIMISTIC: Updates in "Checked In" list only (NO reload needed!)
-     * Returns actionId for event source detection
+     * SIMPLIFIED: Wait for server, then reload
      */
-    const markSeated = useCallback(async (appointmentId) => {
-        // Generate unique action ID for tracking
-        const actionId = generateActionId();
-
-        const appointment = checkedInAppointments.find(a => a.appointmentID === appointmentId);
-        if (!appointment) {
-            throw new Error('Appointment not found');
-        }
-
-        const previousState = {
-            Seated: appointment.Seated,
-            SeatedTime: appointment.SeatedTime
-        };
-
-        // OPTIMISTIC UPDATE
+    const markSeated = useCallback(async (appointmentId, currentDate) => {
         const currentTime = getCurrentTime();
-        updateCheckedInAppointment(appointmentId, {
-            SeatedTime: currentTime
-        });
+        console.log(`🪑 Seating appointment ${appointmentId}`);
 
         try {
+            setLoading(true);
+
             const response = await fetch('/api/updateAppointmentState', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     appointmentID: appointmentId,
                     state: 'Seated',
-                    time: currentTime,
-                    actionId: actionId  // Track this action
+                    time: currentTime
                 })
             });
 
@@ -299,66 +132,39 @@ export function useAppointments() {
             }
 
             const result = await response.json();
-            console.log('✅ Seat confirmed by server:', result);
+            console.log('✅ Seated confirmed:', result);
 
-            // VERIFICATION: Ensure server response matches optimistic update
-            const verificationFailed =
-                result.appointmentID !== appointmentId ||
-                result.state !== 'Seated' ||
-                !result.time;
+            // Reload appointments to get fresh data
+            await loadAppointments(currentDate);
 
-            if (verificationFailed) {
-                console.error('❌ Server response mismatch for markSeated', {
-                    expected: { appointmentID: appointmentId, state: 'Seated' },
-                    received: result
-                });
-                // Rollback and trigger reload
-                updateCheckedInAppointment(appointmentId, previousState);
-                throw new Error('Server state mismatch - reloading appointments');
-            }
-
-            return { success: true, previousState: 'Present', actionId };
+            return { success: true };
         } catch (err) {
-            console.error('❌ Seat failed, rolling back:', err);
-            updateCheckedInAppointment(appointmentId, previousState);
+            console.error('❌ Seat failed:', err);
+            setError(err.message);
             throw err;
+        } finally {
+            setLoading(false);
         }
-    }, [checkedInAppointments, updateCheckedInAppointment]);
+    }, [loadAppointments]);
 
     /**
      * Mark patient as dismissed (Seated → Dismissed)
-     * OPTIMISTIC: Updates in "Checked In" list only (NO reload needed!)
-     * Returns actionId for event source detection
+     * SIMPLIFIED: Wait for server, then reload
      */
-    const markDismissed = useCallback(async (appointmentId) => {
-        // Generate unique action ID for tracking
-        const actionId = generateActionId();
-
-        const appointment = checkedInAppointments.find(a => a.appointmentID === appointmentId);
-        if (!appointment) {
-            throw new Error('Appointment not found');
-        }
-
-        const previousState = {
-            Dismissed: appointment.Dismissed,
-            DismissedTime: appointment.DismissedTime
-        };
-
-        // OPTIMISTIC UPDATE
+    const markDismissed = useCallback(async (appointmentId, currentDate) => {
         const currentTime = getCurrentTime();
-        updateCheckedInAppointment(appointmentId, {
-            DismissedTime: currentTime
-        });
+        console.log(`✅ Dismissing appointment ${appointmentId}`);
 
         try {
+            setLoading(true);
+
             const response = await fetch('/api/updateAppointmentState', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     appointmentID: appointmentId,
                     state: 'Dismissed',
-                    time: currentTime,
-                    actionId: actionId  // Track this action
+                    time: currentTime
                 })
             });
 
@@ -367,96 +173,41 @@ export function useAppointments() {
             }
 
             const result = await response.json();
-            console.log('✅ Dismiss confirmed by server:', result);
+            console.log('✅ Dismissed confirmed:', result);
 
-            // VERIFICATION: Ensure server response matches optimistic update
-            const verificationFailed =
-                result.appointmentID !== appointmentId ||
-                result.state !== 'Dismissed' ||
-                !result.time;
+            // Reload appointments to get fresh data
+            await loadAppointments(currentDate);
 
-            if (verificationFailed) {
-                console.error('❌ Server response mismatch for markDismissed', {
-                    expected: { appointmentID: appointmentId, state: 'Dismissed' },
-                    received: result
-                });
-                // Rollback and trigger reload
-                updateCheckedInAppointment(appointmentId, previousState);
-                throw new Error('Server state mismatch - reloading appointments');
-            }
-
-            return { success: true, previousState: 'Seated', actionId };
+            return { success: true };
         } catch (err) {
-            console.error('❌ Dismiss failed, rolling back:', err);
-            updateCheckedInAppointment(appointmentId, previousState);
+            console.error('❌ Dismiss failed:', err);
+            setError(err.message);
             throw err;
+        } finally {
+            setLoading(false);
         }
-    }, [checkedInAppointments, updateCheckedInAppointment]);
+    }, [loadAppointments]);
 
     /**
-     * Undo state (sets state to NULL/false in database)
-     * OPTIMISTIC: Updates immediately, may move between lists
-     * Returns actionId for event source detection
-     * Enhanced with validation to enforce logical state transitions
+     * Undo state (sets state to NULL in database)
+     * SIMPLIFIED: Wait for server, then reload
      */
-    const undoState = useCallback(async (appointmentId, stateToUndo) => {
-        // Generate unique action ID for tracking
-        const actionId = generateActionId();
-
-        const appointment = checkedInAppointments.find(a => a.appointmentID === appointmentId);
-        if (!appointment) {
-            throw new Error('Appointment not found');
-        }
-
-        // CLIENT-SIDE VALIDATION: Check logical state transition rules
-        if (stateToUndo === 'Present' && appointment.SeatedTime) {
-            const errorMsg = 'Cannot undo check-in: Patient is already seated';
-            console.warn('⚠️ Validation failed:', errorMsg);
-            throw new Error(errorMsg);
-        }
-
-        if (stateToUndo === 'Seated' && appointment.DismissedTime) {
-            const errorMsg = 'Cannot undo seated: Patient visit is already completed';
-            console.warn('⚠️ Validation failed:', errorMsg);
-            throw new Error(errorMsg);
-        }
-
-        // Save full state for rollback
-        const savedAppointment = { ...appointment };
-
-        // Determine if this will move appointment back to "All" list
-        // Undo Present when no other status -> goes back to "All"
-        const willMoveToAll = stateToUndo === 'Present' && !appointment.SeatedTime && !appointment.DismissedTime;
-
-        if (willMoveToAll) {
-            // OPTIMISTIC UPDATE: Move back to "All Appointments"
-            moveToAll(appointmentId, appointment);
-        } else {
-            // OPTIMISTIC UPDATE: Just clear the specific state
-            const updates = {};
-            if (stateToUndo === 'Present') {
-                updates.PresentTime = null;
-            } else if (stateToUndo === 'Seated') {
-                updates.SeatedTime = null;
-            } else if (stateToUndo === 'Dismissed') {
-                updates.DismissedTime = null;
-            }
-            updateCheckedInAppointment(appointmentId, updates);
-        }
+    const undoState = useCallback(async (appointmentId, stateToUndo, currentDate) => {
+        console.log(`↩️ Undoing ${stateToUndo} for appointment ${appointmentId}`);
 
         try {
+            setLoading(true);
+
             const response = await fetch('/api/undoAppointmentState', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     appointmentID: appointmentId,
-                    state: stateToUndo,
-                    actionId: actionId  // Track this action
+                    state: stateToUndo
                 })
             });
 
             if (!response.ok) {
-                // Parse error response for validation errors
                 const errorData = await response.json().catch(() => null);
                 if (errorData && errorData.error) {
                     throw new Error(errorData.error);
@@ -465,219 +216,41 @@ export function useAppointments() {
             }
 
             const result = await response.json();
-            console.log(`✅ Undo ${stateToUndo} confirmed by server:`, result);
+            console.log(`✅ Undo ${stateToUndo} confirmed:`, result);
 
-            return { success: true, actionId };
-        } catch (err) {
-            console.error(`❌ Undo ${stateToUndo} failed, rolling back:`, err);
-
-            // ROLLBACK
-            if (willMoveToAll) {
-                setAllAppointments(prev => prev.filter(apt => apt.appointmentID !== appointmentId));
-                setCheckedInAppointments(prev => [...prev, savedAppointment]);
-            } else {
-                updateCheckedInAppointment(appointmentId, savedAppointment);
-            }
-            throw err;
-        }
-    }, [checkedInAppointments, updateCheckedInAppointment, moveToAll]);
-
-    /**
-     * Undo action from notification (restores to previous state)
-     * OPTIMISTIC: May move between lists
-     */
-    const undoAction = useCallback(async (appointmentId, previousStateName) => {
-        const appointment = checkedInAppointments.find(a => a.appointmentID === appointmentId);
-        if (!appointment) {
-            throw new Error('Appointment not found');
-        }
-
-        const savedAppointment = { ...appointment };
-        const currentTime = getCurrentTime();
-
-        // Determine if we need to move to "All" list
-        const willMoveToAll = previousStateName === 'Scheduled';
-
-        if (willMoveToAll) {
-            // OPTIMISTIC: Move back to "All Appointments"
-            moveToAll(appointmentId, appointment);
-        } else {
-            // OPTIMISTIC: Update in checked-in list
-            const updates = {};
-            if (previousStateName === 'Present') {
-                updates.PresentTime = currentTime;
-                updates.SeatedTime = null;
-            } else if (previousStateName === 'Seated') {
-                updates.SeatedTime = currentTime;
-                updates.DismissedTime = null;
-            }
-            updateCheckedInAppointment(appointmentId, updates);
-        }
-
-        try {
-            const response = await fetch('/api/updateAppointmentState', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    appointmentID: appointmentId,
-                    state: previousStateName,
-                    time: currentTime
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to undo action');
-            }
-
-            const result = await response.json();
-            console.log('✅ Undo action confirmed by server:', result);
+            // Reload appointments to get fresh data
+            await loadAppointments(currentDate);
 
             return { success: true };
         } catch (err) {
-            console.error('❌ Undo action failed, rolling back:', err);
-
-            // ROLLBACK
-            if (willMoveToAll) {
-                setAllAppointments(prev => prev.filter(apt => apt.appointmentID !== appointmentId));
-                setCheckedInAppointments(prev => [...prev, savedAppointment]);
-            } else {
-                updateCheckedInAppointment(appointmentId, savedAppointment);
-            }
+            console.error(`❌ Undo ${stateToUndo} failed:`, err);
+            setError(err.message);
             throw err;
+        } finally {
+            setLoading(false);
         }
-    }, [checkedInAppointments, updateCheckedInAppointment, moveToAll]);
+    }, [loadAppointments]);
 
     /**
-     * GRANULAR UPDATE: Apply specific changes from WebSocket (external client updates)
-     * This prevents full reloads when other clients make changes
-     * Updates ONLY the affected appointment without refetching all data
-     *
-     * HANDLES LIST MOVEMENTS:
-     * - Check-in (Present set) → moves from allAppointments to checkedInAppointments
-     * - Undo Present (PresentTime → null) → moves from checkedInAppointments back to allAppointments
-     * - Other status changes → updates in place within checkedInAppointments
-     *
-     * FIXED: Removed stale closure bug by using functional setState pattern
-     * No longer depends on checkedInAppointments/allAppointments in closure
-     */
-    const applyGranularUpdate = useCallback((changeData) => {
-        const { changeType, appointmentId, state, updates } = changeData;
-
-        console.log('🔄 Applying granular update:', changeData);
-
-        if (changeType === 'status_changed') {
-            // CASE 1: Undo Present (PresentTime → null) - Move from checkedIn → all
-            const isUndoingPresent = state === 'Present' && updates.PresentTime === null;
-
-            if (isUndoingPresent) {
-                console.log('⬅️ Undo Present detected - moving appointment back to all list:', appointmentId);
-
-                // Use functional setState to access fresh state (no stale closure)
-                setCheckedInAppointments(prevCheckedIn => {
-                    const appointment = prevCheckedIn.find(apt => apt.appointmentID === appointmentId);
-
-                    if (appointment) {
-                        // Move to all list using helper function
-                        moveToAll(appointmentId, appointment);
-                        console.log('✅ Moved appointment back to all list');
-                    } else {
-                        console.warn('⚠️ Appointment not found in checked-in list:', appointmentId);
-                    }
-
-                    return prevCheckedIn; // No change to this list, moveToAll handles it
-                });
-
-                return;
-            }
-
-            // CASE 2: Check-in (Present set) - Move from all → checkedIn
-            const isCheckingIn = state === 'Present' && updates.PresentTime !== null;
-
-            if (isCheckingIn) {
-                console.log('➡️ Check-in detected - moving appointment to checked-in list:', appointmentId);
-
-                // Use functional setState to access fresh state (no stale closure)
-                setAllAppointments(prevAll => {
-                    const appointment = prevAll.find(apt => apt.appointmentID === appointmentId);
-
-                    if (appointment) {
-                        // Apply updates to create the checked-in appointment
-                        const updatedAppointment = { ...appointment, ...updates };
-
-                        // Move to checked-in list using helper function
-                        moveToCheckedIn(appointmentId, updatedAppointment);
-                        console.log('✅ Moved appointment to checked-in list');
-                    } else {
-                        console.warn('⚠️ Appointment not found in all list:', appointmentId);
-                    }
-
-                    return prevAll; // No change to this list, moveToCheckedIn handles it
-                });
-
-                return;
-            }
-
-            // CASE 3: Other status changes (Seated, Dismissed, or undo Seated/Dismissed)
-            // These stay in checkedInAppointments, just update the fields
-            console.log('✏️ Updating appointment status in checked-in list:', appointmentId, updates);
-            updateCheckedInAppointment(appointmentId, updates);
-            console.log('✅ Granular update applied successfully');
-        } else {
-            console.warn('⚠️ Unknown change type, may need full reload:', changeType);
-        }
-    }, [moveToAll, moveToCheckedIn, updateCheckedInAppointment]);
-
-    /**
-     * Get statistics (OPTIMIZED - Phase 3 & 4)
-     * Now uses stats from API instead of calculating client-side
-     * Falls back to calculation for optimistic updates
-     *
-     * Performance: Automatically optimized by React Compiler (React 19).
-     * No manual useCallback needed - the compiler memoizes this automatically.
+     * Get statistics (from API data)
      */
     const getStats = () => {
-        // If we have fresh stats from API, use them
-        if (stats && stats.total > 0) {
-            return stats;
-        }
-
-        // Fallback: Calculate from current state (for optimistic updates)
-        // React Compiler will automatically memoize this calculation
-        const total = allAppointments.length + checkedInAppointments.length;
-        const checkedIn = checkedInAppointments.length;
-        const waiting = checkedInAppointments.filter(a => a.Present && !a.Seated && !a.Dismissed).length;
-        const completed = checkedInAppointments.filter(a => a.Dismissed).length;
-
-        return { total, checkedIn, waiting, completed };
+        return stats;
     };
 
     return {
-        // Two separate lists (matching database behavior)
+        // Data
         allAppointments,
         checkedInAppointments,
-
-        // State
         loading,
         error,
 
-        // PHASE 1: Processing and error states for individual appointments
-        processingAppointments,
-        failedAppointments,
-        isProcessing: (appointmentId) => processingAppointments.has(appointmentId),
-        getError: (appointmentId) => failedAppointments.get(appointmentId),
-
-        // Actions (with optimistic updates - NO unnecessary reloads!)
+        // Actions
         loadAppointments,
         checkInPatient,
         markSeated,
         markDismissed,
         undoState,
-        undoAction,
-
-        // Granular WebSocket updates (efficient real-time sync)
-        applyGranularUpdate,
-
-        // Stats (OPTIMIZED - from API or calculated)
         getStats
     };
 }

@@ -17,6 +17,57 @@
 }
 
 /* ===================================
+   GLOBAL MODAL COMPONENTS
+   Moved from work-card.css - used across multiple components
+   =================================== */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background-color: white;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.modal-close {
+    background: var(--error-400);
+    border: none;
+    font-size: 2rem;
+    color: white;
+    cursor: pointer;
+    padding: 0;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-weight: 700;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.modal-close:hover {
+    background: var(--error-500);
+}
+
+.modal-content-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+/* ===================================
    WHATSAPP MODAL
    =================================== */
 .whatsapp-modal-overlay {
@@ -29,7 +80,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 10000;
+    z-index: var(--z-index-modal);
 }
 
 .whatsapp-modal {

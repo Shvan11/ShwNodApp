@@ -191,7 +191,7 @@ const AppointmentCard = ({
 
             <div className="appointment-info">
                 <div className="appointment-info-line-1">
-                    <div className="patient-name">
+                    <div className="patient-name text-md">
                         <a
                             href="javascript:void(0)"
                             className="patient-link"

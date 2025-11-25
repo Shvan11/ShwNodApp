@@ -1,4 +1,4 @@
-// utils/websocket.js - SIMPLIFIED VERSION
+// utils/websocket.js
 import { WebSocketServer } from 'ws';
 import { EventEmitter } from 'events';
 import * as database from '../services/database/index.js';
@@ -10,30 +10,49 @@ import { createWebSocketMessage, validateWebSocketMessage, MessageSchemas } from
 import { WebSocketEvents, createStandardMessage } from '../services/messaging/websocket-events.js';
 import { logger } from '../services/core/Logger.js';
 import qrcode from 'qrcode';
-
+import { AckManager } from '../services/websocket/AckManager.js';
 /**
- * WebSocket Connection Manager - SIMPLIFIED
- * No AckManager, no sequence numbers, no complexity
+ * WebSocket Connection Manager
+ * Manages different types of WebSocket connections
  */
 class ConnectionManager {
   constructor() {
+    // Map to store screen ID to WebSocket connections
     this.screenConnections = new Map();
+
+    // Set to store WhatsApp status connections
     this.waStatusConnections = new Set();
+
+    // Set to store daily appointment connections
     this.dailyAppointmentsConnections = new Set();
+
+    // Set to store all active connections
     this.allConnections = new Set();
+
+    // Keep track of client capabilities
     this.clientCapabilities = new WeakMap();
   }
 
+  /**
+   * Register a new connection
+   * @param {WebSocket} ws - WebSocket connection
+   * @param {string} type - Connection type ('screen', 'waStatus', etc.)
+   * @param {Object} metadata - Connection metadata
+   */
   registerConnection(ws, type, metadata = {}) {
+    // Add to all connections
     this.allConnections.add(ws);
+
+    // Store client capabilities
     this.clientCapabilities.set(ws, {
       type,
       metadata,
-      supportsJson: true,
-      supportsPing: true,
+      supportsJson: true,     // Assume JSON support by default
+      supportsPing: true,     // Assume ping support by default
       lastActivity: Date.now()
     });
 
+    // Add to specific collection based on type
     if (type === 'screen' && metadata.screenId) {
       this.screenConnections.set(metadata.screenId, ws);
       logger.websocket.debug('Registered screen connection', { screenId: metadata.screenId });
@@ -41,6 +60,7 @@ class ConnectionManager {
       this.waStatusConnections.add(ws);
       logger.websocket.debug('Registered WhatsApp status connection');
     } else if (type === 'auth') {
+      // Auth connections also need QR events, so add them to waStatusConnections
       this.waStatusConnections.add(ws);
       logger.websocket.debug('Registered auth connection (QR enabled)');
     } else if (type === 'daily-appointments') {
@@ -49,11 +69,19 @@ class ConnectionManager {
     }
   }
 
+  /**
+   * Unregister a connection
+   * @param {WebSocket} ws - WebSocket connection
+   */
   unregisterConnection(ws) {
+    // Remove from all connections
     this.allConnections.delete(ws);
+
+    // Get client capabilities
     const capabilities = this.clientCapabilities.get(ws);
     if (!capabilities) return;
 
+    // Remove from specific collection based on type
     if (capabilities.type === 'screen' && capabilities.metadata.screenId) {
       this.screenConnections.delete(capabilities.metadata.screenId);
       logger.websocket.debug('Unregistered screen connection', { screenId: capabilities.metadata.screenId });
@@ -68,9 +96,16 @@ class ConnectionManager {
       logger.websocket.debug('Unregistered daily appointments connection');
     }
 
+    // Remove capabilities
     this.clientCapabilities.delete(ws);
   }
 
+  /**
+   * Send message to a specific screen
+   * @param {string} screenId - Screen ID
+   * @param {Object|string} message - Message to send
+   * @returns {boolean} - Whether message was sent
+   */
   sendToScreen(screenId, message) {
     const ws = this.screenConnections.get(screenId);
     if (!ws || ws.readyState !== ws.OPEN) return false;
@@ -84,10 +119,19 @@ class ConnectionManager {
     }
   }
 
+  /**
+   * Broadcast message to all WhatsApp status connections
+   * @param {Object|string} message - Message to send
+   * @param {Function} [filter] - Filter function to determine which clients to send to
+   * @returns {number} - Number of clients message was sent to
+   */
   broadcastToWaStatus(message, filter = null) {
     let sentCount = 0;
+
     for (const ws of this.waStatusConnections) {
       if (ws.readyState !== ws.OPEN) continue;
+
+      // Apply filter if provided
       if (filter && !filter(ws, this.clientCapabilities.get(ws))) continue;
 
       try {
@@ -97,13 +141,23 @@ class ConnectionManager {
         logger.websocket.error('Error sending to WhatsApp status client', error);
       }
     }
+
     return sentCount;
   }
 
+  /**
+   * Broadcast message to all screen connections
+   * @param {Object|string} message - Message to send
+   * @param {Function} [filter] - Filter function to determine which clients to send to
+   * @returns {number} - Number of clients message was sent to
+   */
   broadcastToScreens(message, filter = null) {
     let sentCount = 0;
+
     for (const [screenId, ws] of this.screenConnections.entries()) {
       if (ws.readyState !== ws.OPEN) continue;
+
+      // Apply filter if provided
       const capabilities = this.clientCapabilities.get(ws);
       if (filter && !filter(ws, capabilities)) continue;
 
@@ -114,13 +168,23 @@ class ConnectionManager {
         logger.websocket.error('Error sending to screen', error, { screenId });
       }
     }
+
     return sentCount;
   }
 
+  /**
+   * Broadcast message to all daily appointment connections
+   * @param {Object|string} message - Message to send
+   * @param {Function} [filter] - Filter function to determine which clients to send to
+   * @returns {number} - Number of clients message was sent to
+   */
   broadcastToDailyAppointments(message, filter = null) {
     let sentCount = 0;
+
     for (const ws of this.dailyAppointmentsConnections) {
       if (ws.readyState !== ws.OPEN) continue;
+
+      // Apply filter if provided
       const capabilities = this.clientCapabilities.get(ws);
       if (filter && !filter(ws, capabilities)) continue;
 
@@ -131,13 +195,23 @@ class ConnectionManager {
         logger.websocket.error('Error sending to daily appointments client', error);
       }
     }
+
     return sentCount;
   }
 
+  /**
+   * Broadcast message to all connections
+   * @param {Object|string} message - Message to send
+   * @param {Function} [filter] - Filter function to determine which clients to send to
+   * @returns {number} - Number of clients message was sent to
+   */
   broadcastToAll(message, filter = null) {
     let sentCount = 0;
+
     for (const ws of this.allConnections) {
       if (ws.readyState !== ws.OPEN) continue;
+
+      // Apply filter if provided
       const capabilities = this.clientCapabilities.get(ws);
       if (filter && !filter(ws, capabilities)) continue;
 
@@ -148,11 +222,22 @@ class ConnectionManager {
         logger.websocket.error('Error broadcasting to client', error);
       }
     }
+
     return sentCount;
   }
 
+  /**
+   * Send message to a specific client
+   * @param {WebSocket} ws - WebSocket connection
+   * @param {Object|string} message - Message to send
+   */
   sendToClient(ws, message) {
-    const capabilities = this.clientCapabilities.get(ws) || { supportsJson: true };
+    // Get client capabilities
+    const capabilities = this.clientCapabilities.get(ws) || {
+      supportsJson: true
+    };
+
+    // Format message based on capabilities
     let formattedMessage;
 
     if (typeof message === 'string') {
@@ -160,16 +245,26 @@ class ConnectionManager {
     } else if (capabilities.supportsJson) {
       formattedMessage = JSON.stringify(message);
     } else {
-      formattedMessage = typeof message.toString === 'function' ? message.toString() : String(message);
+      // Convert to simple string if JSON not supported
+      formattedMessage = typeof message.toString === 'function'
+        ? message.toString()
+        : String(message);
     }
 
+    // Send message
     ws.send(formattedMessage);
 
+    // Update last activity
     if (capabilities) {
       capabilities.lastActivity = Date.now();
     }
   }
 
+  /**
+   * Update client capabilities
+   * @param {WebSocket} ws - WebSocket connection
+   * @param {Object} capabilities - Capabilities to update
+   */
   updateClientCapabilities(ws, capabilities) {
     const existing = this.clientCapabilities.get(ws) || {};
     this.clientCapabilities.set(ws, {
@@ -179,6 +274,11 @@ class ConnectionManager {
     });
   }
 
+  /**
+   * Get all inactive connections
+   * @param {number} timeout - Inactivity timeout in ms
+   * @returns {Array} - Inactive connections
+   */
   getInactiveConnections(timeout) {
     const now = Date.now();
     const inactive = [];
@@ -196,6 +296,11 @@ class ConnectionManager {
     return inactive;
   }
 
+  /**
+   * Close inactive connections
+   * @param {number} timeout - Inactivity timeout in ms
+   * @returns {number} - Number of connections closed
+   */
   closeInactiveConnections(timeout) {
     const inactive = this.getInactiveConnections(timeout);
 
@@ -211,6 +316,10 @@ class ConnectionManager {
     return inactive.length;
   }
 
+  /**
+   * Get counts of active connections
+   * @returns {Object} - Connection counts
+   */
   getConnectionCounts() {
     return {
       total: this.allConnections.size,
@@ -222,37 +331,54 @@ class ConnectionManager {
 }
 
 /**
- * Setup WebSocket server - SIMPLIFIED
+ * Setup WebSocket server and event handling
+ * @param {Object} server - HTTP server instance
+ * @returns {EventEmitter} - Event emitter for WebSocket events
  */
 function setupWebSocketServer(server) {
+  // Create event emitter for communication
   const wsEmitter = new EventEmitter();
+
+  // Create connection manager
   const connectionManager = new ConnectionManager();
+
+  // Create ACK manager for reliable message delivery (PHASE 1 ENHANCEMENT)
+  const ackManager = new AckManager();
+
+  // Create WebSocket server
   const wss = new WebSocketServer({ server });
 
   // Set up global event handlers
-  setupGlobalEventHandlers(wsEmitter, connectionManager);
+  setupGlobalEventHandlers(wsEmitter, connectionManager, ackManager);
 
   // Set up cleanup interval
-  setupPeriodicCleanup(connectionManager);
+  setupPeriodicCleanup(connectionManager, ackManager);
 
   // Handle new connections
   wss.on('connection', (ws, req) => {
     logger.websocket.debug('Client connected');
-    ws.qrViewerRegistered = false;
-
+   // Add this at the beginning
+   ws.qrViewerRegistered = false;
     try {
+      // Parse query parameters
       const url = new URL(req.url, 'http://localhost');
       const screenID = url.searchParams.get('screenID');
       const date = url.searchParams.get('PDate');
       const clientTypeParam = url.searchParams.get('clientType');
+
+      // Support multiple client types (comma-separated)
       const clientTypes = clientTypeParam ? clientTypeParam.split(',').map(t => t.trim()) : [];
+
+      // Create a unique ID for this connection
       const clientIP = req.socket.remoteAddress;
       const viewerId = `${clientIP}-${clientTypes.join('-')}-${date || 'unknown'}-${Date.now()}`;
 
+      // Store viewer ID on the connection object
       ws.viewerId = viewerId;
       ws.qrViewerRegistered = false;
       logger.websocket.debug('New connection', { screenID, date, clientTypes });
 
+      //Register connection for ALL client types
       const needsQR = url.searchParams.get('needsQR') === 'true';
 
       // Register for each client type
@@ -265,12 +391,14 @@ function setupWebSocketServer(server) {
             viewerId: viewerId
           });
 
+          // Register as QR viewer ONLY if explicitly requested
           if (needsQR && messageState && typeof messageState.registerQRViewer === 'function' && !ws.qrViewerRegistered) {
             messageState.registerQRViewer(viewerId);
             ws.qrViewerRegistered = true;
             logger.websocket.debug('QR viewer registered', { viewerId });
           }
 
+          // Store date for filtering updates
           ws.waDate = date;
           ws.isWaClient = true;
 
@@ -281,6 +409,7 @@ function setupWebSocketServer(server) {
             viewerId: viewerId
           });
 
+          // Register as QR viewer if explicitly requested
           if (needsQR && messageState && typeof messageState.registerQRViewer === 'function' && !ws.qrViewerRegistered) {
             messageState.registerQRViewer(viewerId);
             ws.qrViewerRegistered = true;
@@ -296,9 +425,13 @@ function setupWebSocketServer(server) {
         }
       }
 
-      // Legacy support: screenID-based connection
+      // Legacy support: screenID-based connection (DEPRECATED)
+      // TODO: Update all clients to use clientType='daily-appointments' instead
       if (screenID && clientTypes.length === 0) {
-        logger.websocket.warn('[DEPRECATED] Legacy screenID connection', { screenID });
+        logger.websocket.warn('[DEPRECATED] Legacy screenID connection detected - migrate to clientType', {
+          screenID,
+          ipAddress: req.socket.remoteAddress
+        });
         connectionManager.registerConnection(ws, 'screen', {
           screenId: screenID,
           date: date,
@@ -307,6 +440,7 @@ function setupWebSocketServer(server) {
         sendInitialData(ws, date, connectionManager);
       }
 
+      // If no client types registered, treat as generic
       if (clientTypes.length === 0 && !screenID) {
         logger.websocket.debug('Generic client connected');
         connectionManager.registerConnection(ws, 'generic', {
@@ -314,34 +448,42 @@ function setupWebSocketServer(server) {
         });
       }
 
+      // Send initial data if this is an appointment client
       if (clientTypes.includes('daily-appointments') || screenID) {
         sendInitialData(ws, date, connectionManager);
       }
   
-      // Handle messages
+      // Handle messages from clients
       ws.on('message', async (message) => {
         try {
+          // Update last activity
           const capabilities = connectionManager.clientCapabilities.get(ws);
           if (capabilities) {
             capabilities.lastActivity = Date.now();
           }
 
+          // Parse message
           let parsedMessage;
           const messageStr = message.toString();
 
           try {
             parsedMessage = JSON.parse(messageStr);
           } catch (e) {
+            // Not JSON, use raw message
             parsedMessage = messageStr;
           }
 
           logger.websocket.debug('Received message', {
-            messageType: typeof parsedMessage
+            messageType: typeof parsedMessage,
+            preview: typeof parsedMessage === 'string' ? parsedMessage : JSON.stringify(parsedMessage).substring(0, 100)
           });
 
-          // SIMPLIFIED: No ACK handling, just basic typed messages
+          // Handle message based on type - only support universal typed messages
           if (typeof parsedMessage === 'object' && parsedMessage.type) {
-            handleTypedMessage(ws, parsedMessage, date, connectionManager);
+            handleTypedMessage(ws, parsedMessage, date, connectionManager, ackManager);
+          } else {
+            // Unrecognized message format
+            logger.websocket.debug('Unrecognized message format, ignoring');
           }
         } catch (msgError) {
           logger.websocket.error('Error processing message', msgError);
@@ -352,6 +494,7 @@ function setupWebSocketServer(server) {
       ws.on('error', (error) => {
         logger.websocket.error('WebSocket error', error);
 
+        // If this was a QR viewer client (waStatus or auth), unregister it
         const capabilities = connectionManager.clientCapabilities.get(ws);
         if (capabilities && (capabilities.type === 'waStatus' || capabilities.type === 'auth') && ws.qrViewerRegistered) {
           if (messageState && typeof messageState.unregisterQRViewer === 'function') {
@@ -359,21 +502,31 @@ function setupWebSocketServer(server) {
           }
         }
 
+        // Cleanup ACK manager for this client
+        ackManager.cleanupClient(ws);
+
         connectionManager.unregisterConnection(ws);
       });
 
-      ws.on('close', (code, reason) => {
-        const capabilities = connectionManager.clientCapabilities.get(ws);
-        if (capabilities && (capabilities.type === 'waStatus' || capabilities.type === 'auth') && ws.qrViewerRegistered) {
-          if (messageState && typeof messageState.unregisterQRViewer === 'function') {
-            messageState.unregisterQRViewer(ws.viewerId);
-            logger.websocket.debug('Unregistered QR viewer on connection close', { viewerId: ws.viewerId });
-          }
-        }
+   // Handle close event
+   ws.on('close', (code, reason) => {
+    // If this was a QR viewer client (waStatus or auth), unregister it
+    const capabilities = connectionManager.clientCapabilities.get(ws);
+    if (capabilities && (capabilities.type === 'waStatus' || capabilities.type === 'auth') && ws.qrViewerRegistered) {
+      if (messageState && typeof messageState.unregisterQRViewer === 'function') {
+        messageState.unregisterQRViewer(ws.viewerId);
+        logger.websocket.debug('Unregistered QR viewer on connection close', { viewerId: ws.viewerId });
+      }
+    }
 
-        connectionManager.unregisterConnection(ws);
-        logger.websocket.debug('Client disconnected', { code, reason: reason || 'unknown' });
-      });
+    // Cleanup ACK manager for this client
+    ackManager.cleanupClient(ws);
+
+    // Then unregister the connection
+    connectionManager.unregisterConnection(ws);
+    logger.websocket.debug('Client disconnected', { code, reason: reason || 'unknown' });
+  });
+  
   
     } catch (error) {
       logger.websocket.error('Error setting up WebSocket connection', error);
@@ -382,9 +535,16 @@ function setupWebSocketServer(server) {
 
 
  /**
-   * Handle typed messages - SIMPLIFIED
+   * Handle typed messages (with a 'type' property)
+   * @param {WebSocket} ws - WebSocket connection
+   * @param {Object} message - Parsed message
+   * @param {string} date - Date parameter
+   * @param {ConnectionManager} connectionManager - Connection manager
+   * @param {AckManager} ackManager - ACK manager (PHASE 1 ENHANCEMENT)
    */
- async function handleTypedMessage(ws, message, date, connectionManager) {
+ async function handleTypedMessage(ws, message, date, connectionManager, ackManager) {
+  // ===== FIXED: More flexible validation for ping/pong messages =====
+  // Simple validation that allows ping/pong without data field
   if (!message || typeof message !== 'object' || !message.type) {
     logger.websocket.warn('Invalid message format: missing type');
     const errorMessage = createWebSocketMessage(
@@ -395,7 +555,23 @@ function setupWebSocketServer(server) {
     return;
   }
 
-  // Handle different message types
+  // PHASE 1: Handle ACK messages
+  if (message.type === 'ack' && message.messageId) {
+    ackManager.handleAck(message.messageId);
+    return;
+  }
+
+  // PHASE 1: Handle missed events request
+  if (message.type === 'request_missed_events' && message.date && message.lastSequenceNum !== undefined) {
+    logger.websocket.info('Client requesting missed events', {
+      date: message.date,
+      lastSequenceNum: message.lastSequenceNum
+    });
+    ackManager.handleMissedEventsRequest(ws, message.date, message.lastSequenceNum);
+    return;
+  }
+
+  // Handle different message types using universal event constants
   switch (message.type) {
     case WebSocketEvents.HEARTBEAT_PING:
       const pongMessage = {
@@ -440,8 +616,14 @@ function setupWebSocketServer(server) {
   }
 }
 
+  /**
+   * Send initial data to a client
+   * @param {WebSocket} ws - WebSocket connection
+   * @param {string} date - Date parameter
+   */
   async function sendInitialData(ws, date, connectionManager) {
     if (!date || ws.readyState !== ws.OPEN) return;
+
     logger.websocket.debug('Sending initial data', { date });
 
     try {
@@ -451,23 +633,34 @@ function setupWebSocketServer(server) {
     }
   }
 
+  /**
+   * Send initial state for WhatsApp status clients
+   * @param {WebSocket} ws - WebSocket connection
+   * @param {Object} requestData - Request data from client
+   * @param {ConnectionManager} connectionManager - Connection manager
+   */
   async function sendInitialStateForWaClient(ws, requestData, connectionManager) {
     if (ws.readyState !== ws.OPEN) return;
-    logger.websocket.debug('Sending initial state for WhatsApp client');
+
+    logger.websocket.debug('Sending initial state for WhatsApp client via WebSocket');
 
     try {
+      // Get state from messageState and whatsapp service
       const stateDump = messageState.dump();
       
+      // Try to get whatsapp status - handle case where service might not be ready
       let clientStatus;
       let whatsappService;
       try {
         whatsappService = (await import('../services/messaging/whatsapp.js')).default;
         clientStatus = whatsappService.getStatus();
         
+        // If client is disconnected and has no instance, but has active QR viewers, initialize
         if (clientStatus.state === 'DISCONNECTED' && 
             !clientStatus.hasClient && 
             messageState.activeQRViewers > 0) {
           logger.websocket.info('No client instance with active QR viewers - triggering initialization');
+          // Trigger initialization asynchronously without waiting
           whatsappService.initialize().catch(error => {
             logger.websocket.error('Failed to initialize WhatsApp client', error);
           });
@@ -493,6 +686,7 @@ function setupWebSocketServer(server) {
         html = '<p>Initializing the client...</p>';
       }
 
+      // Convert QR code to data URL if present
       let qrDataUrl = null;
       if (!isClientReady && messageState.qr) {
         try {
@@ -503,10 +697,11 @@ function setupWebSocketServer(server) {
           });
         } catch (error) {
           logger.websocket.error('Failed to convert QR code to data URL:', error);
-          qrDataUrl = messageState.qr;
+          qrDataUrl = messageState.qr; // Fallback to raw string
         }
       }
 
+      // Create response similar to /api/update endpoint
       const responseData = {
         success: true,
         htmltext: html,
@@ -528,10 +723,10 @@ function setupWebSocketServer(server) {
       );
 
       connectionManager.sendToClient(ws, message);
-      logger.websocket.debug('Sent initial state response');
+      logger.websocket.debug('Sent initial state response via WebSocket');
       
     } catch (error) {
-      logger.websocket.error('Error sending initial state', error);
+      logger.websocket.error('Error sending initial state for WhatsApp client', error);
       
       const errorMessage = createWebSocketMessage(
         MessageSchemas.WebSocketMessage.ERROR,
@@ -541,8 +736,14 @@ function setupWebSocketServer(server) {
     }
   }
 
+  /**
+   * Send appointments data to a WebSocket
+   * @param {WebSocket} ws - WebSocket connection
+   * @param {string} date - Date to get appointments for
+   */
   async function sendAppointmentsData(ws, date, connectionManager) {
     if (!date || ws.readyState !== ws.OPEN) return;
+  
     logger.websocket.debug('Fetching appointments data', { date });
   
     try {
@@ -558,7 +759,7 @@ function setupWebSocketServer(server) {
       );
   
       connectionManager.sendToClient(ws, message);
-      logger.websocket.debug('Sent appointments data', { date });
+      logger.websocket.debug('Sent appointments data to client', { date });
     } catch (error) {
       logger.websocket.error('Error fetching appointment data', error, { date });
       
@@ -570,8 +771,14 @@ function setupWebSocketServer(server) {
     }
   }
 
+  /**
+   * Send patient data to a WebSocket
+   * @param {WebSocket} ws - WebSocket connection
+   * @param {string} patientId - Patient ID
+   */
   async function sendPatientData(ws, patientId, connectionManager) {
     if (!patientId || ws.readyState !== ws.OPEN) return;
+  
     logger.websocket.debug('Fetching patient data', { patientId });
   
     try {
@@ -598,13 +805,35 @@ function setupWebSocketServer(server) {
       );
       connectionManager.sendToClient(ws, errorMessage);
     }
+  
+    // Helper function for patient images
+    async function getPatientImages(pid) {
+      try {
+        const tp = "0";
+        const images = await getTimePointImgs(pid, tp);
+  
+        return images.map(code => {
+          const name = `${pid}0${tp}.i${code}`;
+          return { name };
+        });
+      } catch (error) {
+        logger.websocket.error('Error getting patient images', error);
+        return [];
+      }
+    }
   }
 
+  /**
+   * Get patient images
+   * @param {string} pid - Patient ID
+   * @returns {Promise<Array>} - Patient images
+   */
   async function getPatientImages(pid) {
     try {
-      const tp = "0";
+      const tp = "0"; // Default timepoint
       const images = await getTimePointImgs(pid, tp);
 
+      // Transform image names to proper format
       return images.map(code => {
         const name = `${pid}0${tp}.i${code}`;
         return { name };
@@ -615,53 +844,117 @@ function setupWebSocketServer(server) {
     }
   }
 
+  // Return the WebSocket emitter
   return wsEmitter;
 }
 
 /**
- * Global event handlers - SIMPLIFIED
+ * Set up global event handlers
+ * @param {EventEmitter} emitter - WebSocket event emitter
+ * @param {ConnectionManager} connectionManager - Connection manager
+ * @param {AckManager} ackManager - ACK manager (PHASE 1 ENHANCEMENT)
  */
-function setupGlobalEventHandlers(emitter, connectionManager) {
-  // SIMPLIFIED: Just broadcast the date, clients will reload
-  const handleAppointmentUpdate = async (dateParam) => {
-    logger.websocket.info('Appointment update event', { date: dateParam });
+function setupGlobalEventHandlers(emitter, connectionManager, ackManager) {
+  // Handle appointment updates with action ID tracking and GRANULAR data support
+  const handleAppointmentUpdate = async (dateParam, actionId = null, granularData = null) => {
+    logger.websocket.info('[PHASE 1] Received appointment update event', { date: dateParam, actionId, hasGranularData: !!granularData });
 
     try {
-      const message = createStandardMessage(
-        WebSocketEvents.APPOINTMENTS_UPDATED,
-        { date: dateParam }
-      );
+      // Create message with BOTH granular data (for efficient updates) and full data (for legacy screens)
+      let message;
 
-      // Broadcast to all daily appointments clients
-      const sentCount = connectionManager.broadcastToDailyAppointments(message);
-      
-      // Also broadcast to legacy screens
-      const screenCount = connectionManager.broadcastToScreens(message);
+      if (granularData) {
+        // OPTIMIZED PATH: Send granular data for efficient updates (no database query needed!)
+        logger.websocket.debug('Using granular data for efficient update', granularData);
 
-      logger.websocket.info('Broadcast appointment updates', {
-        dailyAppointments: sentCount,
-        screens: screenCount
+        message = createStandardMessage(
+          WebSocketEvents.APPOINTMENTS_UPDATED,
+          {
+            date: dateParam,
+            actionId: actionId || null,
+            // Granular update data (for modern clients)
+            changeType: granularData.changeType,
+            appointmentId: granularData.appointmentId,
+            state: granularData.state,
+            updates: granularData.updates,
+            // Legacy support: also fetch full data for older screens
+            tableData: await getPresentAps(dateParam)  // Still needed for legacy screens
+          }
+        );
+      } else {
+        // LEGACY PATH: Fetch full appointment data (used by older endpoints)
+        const appointmentData = await getPresentAps(dateParam);
+        logger.websocket.debug('Fetched full appointment data (legacy mode)', {
+          date: dateParam,
+          appointmentCount: appointmentData.appointments ? appointmentData.appointments.length : 0,
+          actionId
+        });
+
+        message = createStandardMessage(
+          WebSocketEvents.APPOINTMENTS_UPDATED,
+          {
+            tableData: appointmentData,
+            date: dateParam,
+            actionId: actionId || null
+          }
+        );
+      }
+
+      // PHASE 1: Broadcast with ACK requirement to daily appointments clients
+      const dailyAppointmentClients = Array.from(connectionManager.dailyAppointmentsConnections)
+        .filter(ws => ws.readyState === ws.OPEN);
+
+      if (dailyAppointmentClients.length > 0) {
+        logger.websocket.info('[PHASE 1] Broadcasting with ACK to daily appointments clients', {
+          clientCount: dailyAppointmentClients.length,
+          date: dateParam
+        });
+
+        // Send with ACK and sequence numbers
+        ackManager.broadcastWithAck(dailyAppointmentClients, message, dateParam).catch(error => {
+          logger.websocket.error('[PHASE 1] Failed to broadcast with ACK', error);
+        });
+      }
+
+      // Legacy: Broadcast without ACK to screens (DEPRECATED - for backward compatibility only)
+      // TODO: Remove this once all clients migrate to daily-appointments type
+      const screenUpdates = connectionManager.broadcastToScreens(message);
+
+      if (screenUpdates > 0) {
+        logger.websocket.warn('[DEPRECATED] Legacy screen connections still active - migrate to daily-appointments', {
+          legacyScreenCount: screenUpdates
+        });
+      }
+
+      logger.websocket.info('[PHASE 1] Broadcast appointment updates completed', {
+        screenUpdates,
+        dailyAppointmentsWithAck: dailyAppointmentClients.length,
+        actionId,
+        granular: !!granularData
       });
     } catch (error) {
-      logger.websocket.error('Error broadcasting appointment update', error, { date: dateParam });
+      logger.websocket.error('Error fetching appointment data', error, { date: dateParam });
     }
   };
 
+  // Listen to universal event names only
   emitter.on(WebSocketEvents.DATA_UPDATED, handleAppointmentUpdate);
 
-  // Patient loaded event
+  // Handle patient loaded event
   const handlePatientLoaded = async (pid, targetScreenID) => {
-    logger.websocket.info('Patient loaded event', { patientId: pid, screenId: targetScreenID });
+    logger.websocket.info('Received patient loaded event', { patientId: pid, screenId: targetScreenID });
     
+    // Check if target screen is connected and ready
     const screenConnection = connectionManager.screenConnections.get(targetScreenID);
     if (!screenConnection || screenConnection.readyState !== screenConnection.OPEN) {
-      logger.websocket.debug('Screen not connected', { screenId: targetScreenID });
+      logger.websocket.debug('Screen not connected - skipping patient data send', { screenId: targetScreenID });
       return;
     }
 
+    // Verify this is actually an appointments screen (not another type of connection)
     const capabilities = connectionManager.clientCapabilities.get(screenConnection);
     if (!capabilities || capabilities.type !== 'screen') {
-      logger.websocket.debug('Not an appointments screen', { screenId: targetScreenID });
+      logger.websocket.debug('Screen is not an appointments screen - skipping patient data send', { screenId: targetScreenID });
       return;
     }
     
@@ -680,7 +973,7 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
         return sortOrder.indexOf(aExt) - sortOrder.indexOf(bExt);
       });
 
-      logger.websocket.debug('Filtered images', { patientId: pid, filteredCount: filteredImages.length });
+      logger.websocket.debug('Filtered images for patient', { patientId: pid, filteredCount: filteredImages.length });
       
       const latestVisit = await getLatestVisitsSum(pid);
       
@@ -698,43 +991,31 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
       if (success) {
         logger.websocket.debug('Sent patient data to screen', { patientId: pid, screenId: targetScreenID });
       } else {
-        logger.websocket.warn('Failed to send patient data', { screenId: targetScreenID });
+        logger.websocket.warn('Failed to send patient data - screen not found or not ready', { screenId: targetScreenID });
       }
     } catch (error) {
       logger.websocket.error('Error processing patient loaded event', error);
     }
-
-    async function getPatientImages(pid) {
-      try {
-        const tp = "0";
-        const images = await getTimePointImgs(pid, tp);
-
-        return images.map(code => {
-          const name = `${pid}0${tp}.i${code}`;
-          return { name };
-        });
-      } catch (error) {
-        logger.websocket.error('Error getting patient images', error);
-        return [];
-      }
-    }
   };
 
+  // Listen to universal event names only
   emitter.on(WebSocketEvents.PATIENT_LOADED, handlePatientLoaded);
 
-  // Patient unloaded event
+  // Handle patient unloaded event
   const handlePatientUnloaded = (targetScreenID) => {
-    logger.websocket.info('Patient unloaded event', { screenId: targetScreenID });
+    logger.websocket.info('Received patient unloaded event', { screenId: targetScreenID });
 
+    // Check if target screen is connected and ready
     const screenConnection = connectionManager.screenConnections.get(targetScreenID);
     if (!screenConnection || screenConnection.readyState !== screenConnection.OPEN) {
-      logger.websocket.debug('Screen not connected', { screenId: targetScreenID });
+      logger.websocket.debug('Screen not connected - skipping patient unload send', { screenId: targetScreenID });
       return;
     }
 
+    // Verify this is actually an appointments screen (not another type of connection)
     const capabilities = connectionManager.clientCapabilities.get(screenConnection);
     if (!capabilities || capabilities.type !== 'screen') {
-      logger.websocket.debug('Not an appointments screen', { screenId: targetScreenID });
+      logger.websocket.debug('Screen is not an appointments screen - skipping patient unload send', { screenId: targetScreenID });
       return;
     }
 
@@ -746,27 +1027,30 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
     const success = connectionManager.sendToScreen(targetScreenID, message);
 
     if (success) {
-      logger.websocket.debug('Sent patient unloaded', { screenId: targetScreenID });
+      logger.websocket.debug('Sent patient unloaded to screen', { screenId: targetScreenID });
     } else {
-      logger.websocket.warn('Failed to send patient unloaded', { screenId: targetScreenID });
+      logger.websocket.warn('Failed to send patient unloaded - screen not found or not ready', { screenId: targetScreenID });
     }
   };
 
+  // Listen to universal event names only
   emitter.on(WebSocketEvents.PATIENT_UNLOADED, handlePatientUnloaded);
 
-  // WhatsApp message updates with batching
+  // Handle WhatsApp message updates with batching
   const statusUpdateBuffer = new Map();
-  const BATCH_DELAY = 1000;
+  const BATCH_DELAY = 1000; // 1 second
   
   emitter.on('wa_message_update', (messageId, status, date) => {
-    logger.websocket.debug('WhatsApp message update', { messageId, status, date });
+    logger.websocket.debug('Received WhatsApp message update event', { messageId, status, date });
 
+    // Add to buffer
     if (!statusUpdateBuffer.has(date)) {
       statusUpdateBuffer.set(date, []);
     }
     
     statusUpdateBuffer.get(date).push({ messageId, status });
 
+    // Debounce the batch send
     setTimeout(() => {
       const updates = statusUpdateBuffer.get(date);
       if (updates && updates.length > 0) {
@@ -786,14 +1070,15 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
         };
 
         const updateCount = connectionManager.broadcastToWaStatus(message, dateFilter);
-        logger.websocket.info('Broadcast batched WhatsApp updates', { updateCount });
+        logger.websocket.info('Broadcast batched WhatsApp message updates', { updateCount });
         
+        // Clear the buffer
         statusUpdateBuffer.delete(date);
       }
     }, BATCH_DELAY);
   });
 
-  // Broadcast messages
+  // Handle broadcast messages from WhatsApp service
   emitter.on('broadcast_message', (message) => {
     const validation = validateWebSocketMessage(message);
     if (!validation.valid) {
@@ -801,6 +1086,7 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
       return;
     }
 
+    // Broadcast to appropriate clients based on message type
     switch (message.type) {
       case MessageSchemas.WebSocketMessage.QR_UPDATE:
         connectionManager.broadcastToWaStatus(message);
@@ -815,12 +1101,32 @@ function setupGlobalEventHandlers(emitter, connectionManager) {
         connectionManager.broadcastToAll(message);
     }
   });
+
+  /**
+   * Get patient images helper function
+   */
+  async function getPatientImages(pid) {
+    try {
+      const tp = "0";
+      const images = await getTimePointImgs(pid, tp);
+
+      return images.map(code => {
+        const name = `${pid}0${tp}.i${code}`;
+        return { name };
+      });
+    } catch (error) {
+      logger.websocket.error('Error getting patient images', error);
+      return [];
+    }
+  }
 }
 
 /**
- * Periodic cleanup
+ * Set up periodic cleanup
+ * @param {ConnectionManager} connectionManager - Connection manager
  */
-function setupPeriodicCleanup(connectionManager) {
+function setupPeriodicCleanup(connectionManager, ackManager) {
+  // Close inactive connections every 10 minutes
   const inactivityTimeout = 30 * 60 * 1000; // 30 minutes
 
   setInterval(() => {
@@ -829,11 +1135,14 @@ function setupPeriodicCleanup(connectionManager) {
       logger.websocket.info('Closed inactive connections', { count: closed });
     }
 
+    // Log active connection counts
     const counts = connectionManager.getConnectionCounts();
-    logger.websocket.debug('Active connections', counts);
+    logger.websocket.debug('Active connections status', counts);
   }, 10 * 60 * 1000); // Every 10 minutes
 
+
   setInterval(() => {
+    // Get all active WhatsApp status connections with their viewer IDs
     const activeViewerIds = [];
     connectionManager.waStatusConnections.forEach(ws => {
       if (ws.qrViewerRegistered && ws.viewerId) {
@@ -841,10 +1150,12 @@ function setupPeriodicCleanup(connectionManager) {
       }
     });
 
+    // Verify QR viewer count matches actual connections
     if (messageState && typeof messageState.verifyQRViewerCount === 'function') {
       messageState.verifyQRViewerCount(activeViewerIds);
     }
 
+    // Log connection health
     const counts = connectionManager.getConnectionCounts();
     if (counts.waStatus > 0) {
       logger.websocket.debug('WebSocket health check', {
@@ -853,6 +1164,40 @@ function setupPeriodicCleanup(connectionManager) {
       });
     }
   }, 60000); // Every minute
+
+  // PHASE 1: Cleanup old event buffers every hour
+  setInterval(() => {
+    const cleared = ackManager.clearOldBuffers(24 * 60 * 60 * 1000); // 24 hours
+    if (cleared > 0) {
+      logger.websocket.info('[PHASE 1] Cleared old event buffers', { count: cleared });
+    }
+
+    // Log ACK manager statistics
+    const stats = ackManager.getStats();
+    logger.websocket.debug('[PHASE 1] ACK Manager stats', stats);
+  }, 60 * 60 * 1000); // Every hour
+
+}
+
+/**
+ * Set up periodic updates to all clients
+ * @param {EventEmitter} emitter - WebSocket event emitter
+ */
+function setupPeriodicUpdate(emitter) {
+  // Check for updates every minute
+  const updateInterval = 60000; // 1 minute
+
+  setInterval(() => {
+    // Get current date in YYYY-MM-DD format
+    const now = new Date();
+    const today = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+
+    // Emit update event for today's date
+    logger.websocket.debug('Triggering periodic update', { date: today });
+    emitter.emit('updated', today);
+  }, updateInterval);
+
+  logger.websocket.info('Set up periodic updates', { intervalSeconds: updateInterval / 1000 });
 }
 
 export { setupWebSocketServer };

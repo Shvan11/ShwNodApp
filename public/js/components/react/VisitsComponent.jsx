@@ -138,17 +138,17 @@ const VisitsComponent = ({ workId, patientId }) => {
                             <div className="action-buttons">
                                 <button
                                     onClick={() => handleEditVisit(visit.ID)}
-                                    className="btn btn-sm btn-secondary"
+                                    className="btn-edit"
                                     title="Edit visit"
                                 >
-                                    <i className="fas fa-edit"></i>
+                                    Edit
                                 </button>
                                 <button
                                     onClick={() => handleDeleteVisit(visit.ID)}
-                                    className="btn btn-sm btn-danger"
+                                    className="btn-delete"
                                     title="Delete visit"
                                 >
-                                    <i className="fas fa-trash"></i>
+                                    Delete
                                 </button>
                             </div>
                         </div>

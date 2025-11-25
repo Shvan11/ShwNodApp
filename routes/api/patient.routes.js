@@ -245,6 +245,9 @@ router.get('/patients/search', async (req, res) => {
         const keywordsParam = req.query.keywords || '';
         const tagsParam = req.query.tags || '';
 
+        const sortBy = req.query.sortBy || 'name'; // 'name' or 'date'
+        const order = req.query.order || 'asc'; // 'asc' or 'desc'
+
         // Parse comma-separated IDs into arrays
         const workTypeIds = workTypesParam ? workTypesParam.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id)) : [];
         const keywordIds = keywordsParam ? keywordsParam.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id)) : [];
@@ -321,13 +324,21 @@ router.get('/patients/search', async (req, res) => {
             ? 'WHERE ' + whereConditions.join(' AND ')
             : '';
 
+        // Determine ORDER BY clause
+        let orderByClause = 'ORDER BY p.PatientName ASC';
+        if (sortBy === 'date') {
+            orderByClause = order === 'desc' ? 'ORDER BY p.DateAdded DESC' : 'ORDER BY p.DateAdded ASC';
+        } else {
+            orderByClause = order === 'desc' ? 'ORDER BY p.PatientName DESC' : 'ORDER BY p.PatientName ASC';
+        }
+
         const query = `
             SELECT DISTINCT TOP 100
                     p.PersonID, p.patientID, p.PatientName, p.FirstName, p.LastName,
                     p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
                     p.AddressID, p.ReferralSourceID, p.PatientTypeID, p.TagID,
                     p.Notes, p.Language, p.CountryCode,
-                    p.EstimatedCost, p.Currency,
+                    p.EstimatedCost, p.Currency, p.DateAdded,
                     g.Gender as GenderName, a.Zone as AddressName,
                     r.Referral as ReferralSource, pt.PatientType as PatientTypeName,
                     tag.Tag as TagName,
@@ -347,7 +358,7 @@ router.get('/patients/search', async (req, res) => {
             LEFT JOIN dbo.tblPatientType pt ON p.PatientTypeID = pt.ID
             LEFT JOIN dbo.tblTagOptions tag ON p.TagID = tag.ID
             ${whereClause}
-            ORDER BY p.PatientName
+            ${orderByClause}
         `;
 
         const patients = await database.executeQuery(
@@ -373,12 +384,13 @@ router.get('/patients/search', async (req, res) => {
                 CountryCode: columns[16].value,
                 EstimatedCost: columns[17].value,
                 Currency: columns[18].value,
-                GenderName: columns[19].value,
-                AddressName: columns[20].value,
-                ReferralSource: columns[21].value,
-                PatientTypeName: columns[22].value,
-                TagName: columns[23].value,
-                ActiveWorkTypes: columns[24].value
+                DateAdded: columns[19].value,
+                GenderName: columns[20].value,
+                AddressName: columns[21].value,
+                ReferralSource: columns[22].value,
+                PatientTypeName: columns[23].value,
+                TagName: columns[24].value,
+                ActiveWorkTypes: columns[25].value
             })
         );
 

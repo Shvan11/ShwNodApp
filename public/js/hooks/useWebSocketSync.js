@@ -1,24 +1,24 @@
 import { useEffect, useCallback, useState } from 'react';
 import connectionManager from '../services/websocket-connection-manager.js';
 import { WebSocketEvents } from '../constants/websocket-events.js';
-import { config } from '../config/environment.js';
 
 /**
  * Custom hook for WebSocket real-time appointment updates
- * Manages connection state and listens for appointment updates
  *
- * Uses the centralized connection manager to prevent duplicate connections
+ * SIMPLIFIED APPROACH:
+ * - Just reload appointments when WebSocket message arrives
+ * - No sequence numbers, no ACKs, no deduplication
+ * - Database is the single source of truth
  */
 export function useWebSocketSync(currentDate, onAppointmentsUpdated) {
     const [connectionStatus, setConnectionStatus] = useState('connecting');
 
-    // Initialize WebSocket connection using connection manager
+    // Initialize WebSocket connection
     useEffect(() => {
         const initializeWebSocket = async () => {
             console.log('[useWebSocketSync] Requesting WebSocket connection');
 
             try {
-                // Use connection manager to ensure single connection
                 await connectionManager.ensureConnected('daily-appointments', {
                     PDate: currentDate
                 });
@@ -26,27 +26,21 @@ export function useWebSocketSync(currentDate, onAppointmentsUpdated) {
                 setConnectionStatus('connected');
                 console.log('[useWebSocketSync] WebSocket connected successfully');
             } catch (err) {
-                // Initial connection failed, but auto-reconnect will retry automatically
                 console.error('[useWebSocketSync] Connection failed, auto-reconnect will retry:', err);
                 setConnectionStatus('connecting');
-                // Don't disconnect - let auto-reconnect handle it
             }
         };
 
         initializeWebSocket();
 
-        // Cleanup on unmount
         return () => {
-            console.log('[useWebSocketSync] Cleanup - removing client type from connection manager');
-            // Remove our client type, but DON'T disconnect
-            // (other components may still need the connection)
+            console.log('[useWebSocketSync] Cleanup');
             connectionManager.removeClientType('daily-appointments');
         };
     }, []);
 
     // Listen for connection events
     useEffect(() => {
-        // Get the WebSocket service from connection manager
         const wsService = connectionManager.getService();
 
         const handleConnected = () => {
@@ -74,7 +68,6 @@ export function useWebSocketSync(currentDate, onAppointmentsUpdated) {
         wsService.on('reconnecting', handleReconnecting);
         wsService.on('error', handleError);
 
-        // Cleanup listeners
         return () => {
             wsService.off('connected', handleConnected);
             wsService.off('disconnected', handleDisconnected);
@@ -83,22 +76,20 @@ export function useWebSocketSync(currentDate, onAppointmentsUpdated) {
         };
     }, []);
 
-    // Listen for appointment updates
+    // Listen for appointment updates - SIMPLIFIED
     useEffect(() => {
-        // Get the WebSocket service from connection manager
         const wsService = connectionManager.getService();
 
         const handleAppointmentsUpdated = (data) => {
             // Only reload if the update is for the currently displayed date
             if (data && data.date === currentDate) {
-                console.log('📡 [useWebSocketSync] Appointments updated via WebSocket for date:', currentDate);
+                console.log('📡 [useWebSocketSync] Appointments updated for date:', currentDate);
                 onAppointmentsUpdated(data);
             }
         };
 
         wsService.on(WebSocketEvents.APPOINTMENTS_UPDATED, handleAppointmentsUpdated);
 
-        // Cleanup listener
         return () => {
             wsService.off(WebSocketEvents.APPOINTMENTS_UPDATED, handleAppointmentsUpdated);
         };

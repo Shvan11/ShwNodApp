@@ -486,20 +486,7 @@
     color: var(--danger-color);
 }
 
-.form-control {
-    width: 100%;
-    padding: 0.625rem 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    font-size: 0.9375rem;
-    transition: all 0.2s;
-}
-
-.form-control:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-}
+/* Form controls now use global .form-control from /css/components/inputs.css */
 
 textarea.form-control {
     resize: vertical;

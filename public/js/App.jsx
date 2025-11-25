@@ -21,8 +21,9 @@ import '../css/base/rtl-support.css';
 import '../css/base/utilities.css';
 
 // Universal components - Used across all routes
-import '../css/components/universal-header.css';
+import '../css/layout/universal-header.css';
 import '../css/components/buttons.css';
+import '../css/components/inputs.css';
 import '../css/components/modal.css';
 import '../css/components/toast.css';
 
@@ -100,158 +101,158 @@ export default function App() {
             <UniversalHeader />
           </div>
 
-        {/* Main application content - wrapped in Suspense for lazy loading */}
-        <div id="app-container">
-          <Suspense fallback={<LoadingFallback />}>
-            <Routes>
-              {/* Dashboard - Landing page */}
-              <Route
-                path="/"
-                element={
-                  <RouteErrorBoundary routeName="Dashboard">
-                    <Dashboard />
-                  </RouteErrorBoundary>
-                }
-              />
-              <Route
-                path="/dashboard"
-                element={
-                  <RouteErrorBoundary routeName="Dashboard">
-                    <Dashboard />
-                  </RouteErrorBoundary>
-                }
-              />
+          {/* Main application content - wrapped in Suspense for lazy loading */}
+          <div id="app-container">
+            <Suspense fallback={<LoadingFallback />}>
+              <Routes>
+                {/* Dashboard - Landing page */}
+                <Route
+                  path="/"
+                  element={
+                    <RouteErrorBoundary routeName="Dashboard">
+                      <Dashboard />
+                    </RouteErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <RouteErrorBoundary routeName="Dashboard">
+                      <Dashboard />
+                    </RouteErrorBoundary>
+                  }
+                />
 
-              {/* Patient Portal - Nested routes */}
-              <Route
-                path="/patient/*"
-                element={
-                  <RouteErrorBoundary routeName="Patient Portal">
-                    <PatientRoutes />
-                  </RouteErrorBoundary>
-                }
-              />
+                {/* Patient Portal - Nested routes */}
+                <Route
+                  path="/patient/*"
+                  element={
+                    <RouteErrorBoundary routeName="Patient Portal">
+                      <PatientRoutes />
+                    </RouteErrorBoundary>
+                  }
+                />
 
-              {/* Patient Management - Search and grid */}
-              <Route
-                path="/patient-management"
-                element={
-                  <RouteErrorBoundary routeName="Patient Management">
-                    <PatientManagement />
-                  </RouteErrorBoundary>
-                }
-              />
+                {/* Patient Management - Search and grid */}
+                <Route
+                  path="/patient-management"
+                  element={
+                    <RouteErrorBoundary routeName="Patient Management">
+                      <PatientManagement />
+                    </RouteErrorBoundary>
+                  }
+                />
 
-              {/* React Compiler Test */}
-              <Route
-                path="/test-compiler"
-                element={
-                  <RouteErrorBoundary routeName="Compiler Test">
-                    <CompilerTest />
-                  </RouteErrorBoundary>
-                }
-              />
+                {/* React Compiler Test */}
+                <Route
+                  path="/test-compiler"
+                  element={
+                    <RouteErrorBoundary routeName="Compiler Test">
+                      <CompilerTest />
+                    </RouteErrorBoundary>
+                  }
+                />
 
-              {/* Appointments */}
-              <Route
-                path="/appointments"
-                element={
-                  <RouteErrorBoundary routeName="Daily Appointments">
-                    <DailyAppointments />
-                  </RouteErrorBoundary>
-                }
-              />
+                {/* Appointments */}
+                <Route
+                  path="/appointments"
+                  element={
+                    <RouteErrorBoundary routeName="Daily Appointments">
+                      <DailyAppointments />
+                    </RouteErrorBoundary>
+                  }
+                />
 
-              <Route
-                path="/calendar"
-                element={
-                  <RouteErrorBoundary routeName="Calendar">
-                    <Calendar />
-                  </RouteErrorBoundary>
-                }
-              />
+                <Route
+                  path="/calendar"
+                  element={
+                    <RouteErrorBoundary routeName="Calendar">
+                      <Calendar />
+                    </RouteErrorBoundary>
+                  }
+                />
 
-              {/* WhatsApp Messaging */}
-              <Route
-                path="/send"
-                element={
-                  <RouteErrorBoundary routeName="WhatsApp Send">
-                    <WhatsAppSend />
-                  </RouteErrorBoundary>
-                }
-              />
-              <Route
-                path="/send-message"
-                element={
-                  <RouteErrorBoundary routeName="Send Message">
-                    <SendMessage />
-                  </RouteErrorBoundary>
-                }
-              />
-              <Route
-                path="/auth"
-                element={
-                  <RouteErrorBoundary routeName="WhatsApp Auth">
-                    <WhatsAppAuth />
-                  </RouteErrorBoundary>
-                }
-              />
+                {/* WhatsApp Messaging */}
+                <Route
+                  path="/send"
+                  element={
+                    <RouteErrorBoundary routeName="WhatsApp Send">
+                      <WhatsAppSend />
+                    </RouteErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/send-message"
+                  element={
+                    <RouteErrorBoundary routeName="Send Message">
+                      <SendMessage />
+                    </RouteErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/auth"
+                  element={
+                    <RouteErrorBoundary routeName="WhatsApp Auth">
+                      <WhatsAppAuth />
+                    </RouteErrorBoundary>
+                  }
+                />
 
-              {/* Aligner Management - Nested routes */}
-              <Route
-                path="/aligner/*"
-                element={
-                  <RouteErrorBoundary routeName="Aligner Management">
-                    <AlignerRoutes />
-                  </RouteErrorBoundary>
-                }
-              />
+                {/* Aligner Management - Nested routes */}
+                <Route
+                  path="/aligner/*"
+                  element={
+                    <RouteErrorBoundary routeName="Aligner Management">
+                      <AlignerRoutes />
+                    </RouteErrorBoundary>
+                  }
+                />
 
-              {/* Expenses */}
-              <Route
-                path="/expenses"
-                element={
-                  <RouteErrorBoundary routeName="Expenses">
-                    <Expenses />
-                  </RouteErrorBoundary>
-                }
-              />
+                {/* Expenses */}
+                <Route
+                  path="/expenses"
+                  element={
+                    <RouteErrorBoundary routeName="Expenses">
+                      <Expenses />
+                    </RouteErrorBoundary>
+                  }
+                />
 
-              {/* Settings - Nested routes */}
-              <Route
-                path="/settings/*"
-                element={
-                  <RouteErrorBoundary routeName="Settings">
-                    <SettingsRoutes />
-                  </RouteErrorBoundary>
-                }
-              />
+                {/* Settings - Nested routes */}
+                <Route
+                  path="/settings/*"
+                  element={
+                    <RouteErrorBoundary routeName="Settings">
+                      <SettingsRoutes />
+                    </RouteErrorBoundary>
+                  }
+                />
 
-              {/* Templates - Nested routes */}
-              <Route
-                path="/templates/*"
-                element={
-                  <RouteErrorBoundary routeName="Templates">
-                    <TemplateRoutes />
-                  </RouteErrorBoundary>
-                }
-              />
+                {/* Templates - Nested routes */}
+                <Route
+                  path="/templates/*"
+                  element={
+                    <RouteErrorBoundary routeName="Templates">
+                      <TemplateRoutes />
+                    </RouteErrorBoundary>
+                  }
+                />
 
-              {/* Financial Statistics */}
-              <Route
-                path="/statistics"
-                element={
-                  <RouteErrorBoundary routeName="Statistics">
-                    <Statistics />
-                  </RouteErrorBoundary>
-                }
-              />
+                {/* Financial Statistics */}
+                <Route
+                  path="/statistics"
+                  element={
+                    <RouteErrorBoundary routeName="Statistics">
+                      <Statistics />
+                    </RouteErrorBoundary>
+                  }
+                />
 
-              {/* Fallback - redirect to dashboard */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-        </div>
+                {/* Fallback - redirect to dashboard */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </div>
         </GlobalStateProvider>
       </ToastProvider>
     </GlobalErrorBoundary>

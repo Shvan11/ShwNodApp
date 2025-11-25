@@ -4,10 +4,10 @@ import UniversalHeader from '../components/react/UniversalHeader.jsx';
 import AlignerApp from '../apps/AlignerApp.jsx';
 import '../../css/main.css';
 import '../../css/pages/aligner.css';
-import '../../css/components/universal-header.css';
+import '../../css/layout/universal-header.css';
 
 // Initialize the aligner management app with React Router
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     console.log('🚀 Initializing Aligner App with React Router...');
 
     // Name this window so tabManager can reuse it

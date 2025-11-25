@@ -4,7 +4,7 @@ import UniversalHeader from '../components/react/UniversalHeader.jsx'
 import AddPatientForm from '../components/react/AddPatientForm.jsx'
 import '../../css/main.css'
 import '../../css/pages/add-patient.css'
-import '../../css/components/universal-header.css'
+import '../../css/layout/universal-header.css'
 
 const AddPatientPage = () => {
     return (
@@ -17,9 +17,9 @@ const AddPatientPage = () => {
 };
 
 // Initialize the add patient page
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     console.log('🚀 Initializing React Add Patient Page...');
-    
+
     // Mount Universal Header
     const headerRoot = document.getElementById('universal-header-root');
     if (headerRoot) {
@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
         headerReactRoot.render(React.createElement(UniversalHeader));
         console.log('✅ Universal Header initialized');
     }
-    
+
     // Mount Add Patient Form
     const reactRoot = document.getElementById('react-root');
     if (reactRoot) {

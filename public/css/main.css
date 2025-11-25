@@ -12,9 +12,18 @@
 /* ===================================
    COMPONENT STYLES
    =================================== */
+/* ===================================
+   LAYOUT STYLES
+   =================================== */
+@import 'layout/universal-header.css';
+@import 'layout/sidebar-navigation.css';
+
+/* ===================================
+   COMPONENT STYLES
+   =================================== */
 @import 'components/buttons.css';
-@import 'components/universal-header.css';
-@import 'components/sidebar-navigation.css';
+@import 'components/inputs.css';
+@import 'components/cards.css';
 @import 'components/toast.css';
 @import 'components/modal.css';
 @import 'components/payment-modal.css';

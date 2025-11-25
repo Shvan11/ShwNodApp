@@ -2,7 +2,8 @@
 .settings-container {
     margin: 0;
     padding: 0;
-    margin-top: 80px; /* Account for UniversalHeader */
+    margin-top: 80px;
+    /* Account for UniversalHeader */
     display: flex;
     flex-direction: column;
     min-height: calc(100vh - 80px);
@@ -15,7 +16,7 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     position: sticky;
     top: 80px;
-    z-index: 100;
+    z-index: var(--z-index-sticky);
 }
 
 .tab-header {
@@ -23,7 +24,7 @@
     padding: 2.5rem 2rem 1.5rem;
     background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
     color: white;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .tab-header h2 {
@@ -31,7 +32,7 @@
     margin-bottom: 0.75rem;
     font-weight: 800;
     letter-spacing: -0.5px;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .tab-header p {
@@ -47,10 +48,14 @@
     display: flex;
     background: white;
     border-bottom: 3px solid var(--gray-200);
-    overflow-x: visible; /* Changed from auto - NO SCROLLBAR! */
-    flex-wrap: wrap; /* Allow wrapping on smaller screens */
-    justify-content: center; /* Center the tabs */
-    padding: 0 1rem; /* Add padding for breathing room */
+    overflow-x: visible;
+    /* Changed from auto - NO SCROLLBAR! */
+    flex-wrap: wrap;
+    /* Allow wrapping on smaller screens */
+    justify-content: center;
+    /* Center the tabs */
+    padding: 0 1rem;
+    /* Add padding for breathing room */
 }
 
 /* Modern Tab Button Design */
@@ -134,11 +139,11 @@
 }
 
 /* Inner wrapper - ensures all tabs have same max-width */
-.settings-content > * {
+.settings-content>* {
     width: 100%;
     max-width: 1400px;
     background: white;
-    border-radius: 12px;
+    border-radius: var(--radius-xl);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     min-height: 500px;
     padding: 2.5rem;
@@ -147,7 +152,7 @@
 
 .tab-content {
     background: white;
-    border-radius: 12px;
+    border-radius: var(--radius-xl);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     min-height: 500px;
 }
@@ -161,7 +166,7 @@
     padding: 6rem 2rem;
     text-align: center;
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
-    border-radius: 12px;
+    border-radius: var(--radius-xl);
 }
 
 .placeholder-icon {
@@ -231,9 +236,7 @@
 }
 
 /* General Settings Tab Styles - No padding (handled by parent) */
-.general-settings {
-    /* Padding removed - handled by .settings-content > * */
-}
+
 
 .section-description {
     color: var(--text-secondary);
@@ -242,9 +245,7 @@
 }
 
 /* Database Settings Tab Styles - No padding (handled by parent) */
-.database-settings {
-    /* Padding removed - handled by .settings-content > * */
-}
+
 
 .config-group {
     margin-bottom: 2rem;
@@ -376,8 +377,15 @@
 
 /* Animation for pulse effect */
 @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
 }
 
 .page-header {
@@ -406,7 +414,7 @@
 /* Settings Section - Modern Card Design */
 .settings-section {
     background: white;
-    border-radius: 12px;
+    border-radius: var(--radius-xl);
     /* Padding removed - handled by .settings-content > * parent selector */
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     border: 1px solid var(--gray-200);
@@ -549,7 +557,7 @@
 .modal {
     display: none;
     position: fixed;
-    z-index: 1000;
+    z-index: var(--z-index-modal);
     left: 0;
     top: 0;
     width: 100%;
@@ -561,7 +569,7 @@
     background: white;
     margin: 15% auto;
     padding: 0;
-    border-radius: 12px;
+    border-radius: var(--radius-xl);
     width: 90%;
     max-width: 500px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
@@ -649,7 +657,7 @@
         padding: 1.5rem;
     }
 
-    .settings-content > * {
+    .settings-content>* {
         padding: 2rem;
     }
 
@@ -681,7 +689,7 @@
         padding: 1rem;
     }
 
-    .settings-content > * {
+    .settings-content>* {
         padding: 1.5rem;
     }
 
@@ -752,7 +760,7 @@
 }
 
 @media (max-width: 480px) {
-    .settings-content > * {
+    .settings-content>* {
         padding: 1.25rem;
     }
 
@@ -792,9 +800,7 @@
 }
 
 /* Aligner Doctors Settings Styles - No padding (handled by parent) */
-.aligner-doctors-settings {
-    /* Padding removed - handled by .settings-content > * */
-}
+
 
 .aligner-doctors-settings .section-header {
     display: flex;
@@ -1311,24 +1317,17 @@
     font-size: 14px;
 }
 
+/* Form inputs now use global .form-control from /css/components/inputs.css */
 .form-group input,
 .form-group select,
-.form-group textarea,
-.form-control {
+.form-group textarea {
     width: 100%;
-    padding: 10px 12px;
-    border: 2px solid var(--gray-200);
-    border-radius: 8px;
-    font-size: 14px;
-    transition: border-color 0.3s ease;
 }
 
 .form-group input:focus,
 .form-group select:focus,
-.form-group textarea:focus,
-.form-control:focus {
+.form-group textarea:focus {
     outline: none;
-    border-color: var(--primary-color);
 }
 
 .form-text,
