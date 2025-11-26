@@ -22,14 +22,6 @@ const WorkCard = ({
 }) => {
     const [showActions, setShowActions] = useState(false);
 
-    // Debug: Log if onEdit and onDelete are defined
-    console.log('WorkCard props:', {
-        hasOnEdit: !!onEdit,
-        hasOnDelete: !!onDelete,
-        workId: work.workid,
-        isExpanded
-    });
-
     const getStatusBadge = () => {
         if (work.Finished) {
             return <span className="work-status-badge completed">Completed</span>;

@@ -121,12 +121,6 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }) => {
                     />
                 );
 
-            case 'diagnosis':
-                // Diagnosis and treatment planning page
-                return (
-                    <Diagnosis />
-                );
-
             case 'compare':
                 return (
                     <CompareComponent
