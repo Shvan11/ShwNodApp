@@ -730,45 +730,147 @@ th.qasa-column {
         height: 250px;
     }
 
+    /* CARD-BASED TABLE LAYOUT FOR MOBILE */
     .table-wrapper {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        margin-left: -1rem;
-        margin-right: -1rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
+        overflow: visible;
+        margin: 0;
+        padding: 0;
     }
 
     .data-table {
+        display: block;
+        font-size: 0.875rem;
+        min-width: 0;
+    }
+
+    .data-table thead {
+        display: none;
+    }
+
+    .data-table tbody {
+        display: block;
+    }
+
+    .data-table tbody tr {
+        display: block;
+        margin-bottom: 1rem;
+        background: white;
+        border: 1px solid var(--border-color, var(--gray-200));
+        border-radius: 8px;
+        padding: 1rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .data-table tbody tr.clickable-row:active {
+        background-color: rgba(52, 152, 219, 0.05);
+    }
+
+    .data-table tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.625rem 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        text-align: right;
+        min-width: 0;
+        white-space: normal;
+    }
+
+    .data-table tbody td:last-child {
+        border-bottom: none;
+    }
+
+    .data-table tbody td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        text-align: left;
+        flex-shrink: 0;
+        margin-right: 1rem;
+        color: var(--text-secondary, var(--gray-600));
         font-size: 0.8125rem;
     }
 
-    .data-table th,
-    .data-table td {
-        padding: 10px 8px;
+    .data-table tbody td:first-child {
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--primary-color, var(--info-color));
+        padding-bottom: 0.75rem;
+        margin-bottom: 0.5rem;
+        border-bottom: 2px solid var(--border-color, var(--gray-200));
+    }
+
+    .data-table tbody td:first-child::before {
+        content: "📅 ";
+        font-weight: 700;
+    }
+
+    .data-table .amount-cell {
+        font-family: 'Courier New', monospace;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        white-space: normal;
+        word-break: normal;
+    }
+
+    .data-table .qasa-column {
+        background-color: rgba(243, 156, 18, 0.08);
+        padding: 0.75rem;
+        margin: 0.25rem -1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        border-radius: 4px;
+    }
+
+    .data-table .qasa-column::before {
+        content: attr(data-label) " 💰";
+    }
+
+    /* Footer - Keep as summary card */
+    .data-table tfoot {
+        display: block;
+        background-color: rgba(52, 152, 219, 0.1);
+        border: 2px solid var(--primary-color, var(--info-color));
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+
+    .data-table tfoot tr {
+        display: block;
+    }
+
+    .data-table tfoot td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.625rem 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        text-align: right;
+    }
+
+    .data-table tfoot td:last-child {
+        border-bottom: none;
+    }
+
+    .data-table tfoot td::before {
+        content: attr(data-label);
+        font-weight: 700;
+        text-align: left;
+        margin-right: 1rem;
+        color: var(--primary-color, var(--info-color));
         font-size: 0.8125rem;
-        min-width: 80px;
-    }
-
-    .data-table th:first-child,
-    .data-table td:first-child {
-        min-width: 90px;
-        position: sticky;
-        left: 0;
-        background-color: white;
-        z-index: 2;
-    }
-
-    .data-table thead th:first-child {
-        background-color: var(--primary-color, var(--info-color));
     }
 
     .data-table tfoot td:first-child {
-        background-color: rgba(52, 152, 219, 0.1); /* Match tfoot background */
+        font-size: 1.125rem;
+        color: var(--primary-color, var(--info-color));
+        padding-bottom: 0.75rem;
+        margin-bottom: 0.5rem;
+        border-bottom: 2px solid var(--primary-color, var(--info-color));
     }
 
-    .data-table th {
-        font-size: 0.75rem;
+    .data-table tfoot td:first-child::before {
+        content: "📊 ";
     }
 
     /* Modal adjustments */
@@ -803,6 +905,165 @@ th.qasa-column {
     .statistics-btn-close {
         width: 100%;
     }
+
+    /* CARD-BASED LAYOUT FOR INVOICES MODAL TABLE */
+    .statistics-table-wrapper {
+        overflow: visible;
+        margin: 0;
+        padding: 0;
+    }
+
+    .statistics-invoices-table {
+        display: block;
+        font-size: 0.875rem;
+    }
+
+    .statistics-invoices-table thead {
+        display: none;
+    }
+
+    .statistics-invoices-table tbody {
+        display: block;
+    }
+
+    .statistics-invoices-table tbody tr {
+        display: block;
+        margin-bottom: 1rem;
+        background: white;
+        border: 1px solid var(--border-color, var(--gray-200));
+        border-radius: 8px;
+        padding: 1rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .statistics-invoices-table tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.625rem 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        text-align: right;
+    }
+
+    .statistics-invoices-table tbody td:last-child {
+        border-bottom: none;
+    }
+
+    .statistics-invoices-table tbody td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        text-align: left;
+        flex-shrink: 0;
+        margin-right: 1rem;
+        color: var(--text-secondary, var(--gray-600));
+        font-size: 0.8125rem;
+    }
+
+    /* Invoice ID - Header style */
+    .statistics-invoices-table tbody td.invoice-id {
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--info-color);
+        padding-bottom: 0.75rem;
+        margin-bottom: 0.5rem;
+        border-bottom: 2px solid var(--border-color, var(--gray-200));
+        font-family: 'Courier New', monospace;
+    }
+
+    .statistics-invoices-table tbody td.invoice-id::before {
+        content: "🧾 " attr(data-label);
+        font-weight: 700;
+    }
+
+    /* Patient Name - Prominent display */
+    .statistics-invoices-table tbody td.patient-name {
+        font-weight: 600;
+        font-size: 0.9375rem;
+        color: var(--text-primary, var(--color-dark-blue));
+    }
+
+    .statistics-invoices-table tbody td.patient-name::before {
+        content: "👤 " attr(data-label);
+    }
+
+    /* Time field */
+    .statistics-invoices-table tbody td.time::before {
+        content: "🕒 " attr(data-label);
+    }
+
+    /* Currency Badge */
+    .statistics-invoices-table tbody td.currency-badge {
+        align-items: center;
+    }
+
+    .statistics-invoices-table tbody td.currency-badge::before {
+        content: "💱 " attr(data-label);
+    }
+
+    .statistics-invoices-table .badge {
+        padding: 0.375rem 0.875rem;
+        border-radius: 16px;
+        font-size: 0.8125rem;
+        font-weight: 700;
+    }
+
+    .statistics-invoices-table .badge.IQD {
+        background: var(--success-green);
+        color: white;
+    }
+
+    .statistics-invoices-table .badge.USD {
+        background: var(--info-color);
+        color: white;
+    }
+
+    /* Amount fields */
+    .statistics-invoices-table tbody td.amount {
+        font-family: 'Courier New', monospace;
+        font-size: 0.9375rem;
+        font-weight: 600;
+    }
+
+    .statistics-invoices-table tbody td.amount::before {
+        content: attr(data-label);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    /* IQD/USD highlight */
+    .statistics-invoices-table tbody td.iqd {
+        background-color: rgba(76, 175, 80, 0.05);
+        padding: 0.75rem;
+        margin: 0 -1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        border-radius: 4px;
+    }
+
+    .statistics-invoices-table tbody td.iqd::before {
+        content: "💵 " attr(data-label);
+    }
+
+    .statistics-invoices-table tbody td.usd {
+        background-color: rgba(33, 150, 243, 0.05);
+        padding: 0.75rem;
+        margin: 0 -1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        border-radius: 4px;
+    }
+
+    .statistics-invoices-table tbody td.usd::before {
+        content: "💵 " attr(data-label);
+    }
+
+    .statistics-invoices-table tbody td.change {
+        color: var(--warning-color, var(--warning-orange));
+        font-weight: 700;
+    }
+
+    .statistics-invoices-table tbody td.change::before {
+        content: "💰 " attr(data-label);
+    }
 }
 
 /* Small mobile devices */
@@ -835,23 +1096,31 @@ th.qasa-column {
         height: 220px;
     }
 
-    .table-wrapper {
-        margin-left: -0.75rem;
-        margin-right: -0.75rem;
-        padding-left: 0.75rem;
-        padding-right: 0.75rem;
+    /* Card layout adjustments for smaller screens */
+    .data-table tbody tr {
+        padding: 0.875rem;
     }
 
-    .data-table th,
-    .data-table td {
-        padding: 8px 6px;
+    .data-table tbody td {
+        padding: 0.5rem 0;
+        font-size: 0.8125rem;
+    }
+
+    .data-table tbody td::before {
         font-size: 0.75rem;
-        min-width: 70px;
     }
 
-    .data-table th:first-child,
-    .data-table td:first-child {
-        min-width: 80px;
+    .data-table .amount-cell {
+        font-size: 0.875rem;
+    }
+
+    .data-table tfoot {
+        padding: 0.875rem;
+    }
+
+    .data-table tfoot td {
+        padding: 0.5rem 0;
+        font-size: 0.8125rem;
     }
 
     .statistics-modal-header h2 {
@@ -873,6 +1142,37 @@ th.qasa-column {
     .statistics-invoices-table th,
     .statistics-invoices-table td {
         padding: 8px 6px;
+    }
+
+    /* Refine invoice card layout for smaller screens */
+    .statistics-invoices-table tbody tr {
+        padding: 0.875rem;
+    }
+
+    .statistics-invoices-table tbody td {
+        padding: 0.5rem 0;
+        font-size: 0.8125rem;
+    }
+
+    .statistics-invoices-table tbody td::before {
+        font-size: 0.75rem;
+    }
+
+    .statistics-invoices-table tbody td.invoice-id {
+        font-size: 0.9375rem;
+    }
+
+    .statistics-invoices-table tbody td.patient-name {
+        font-size: 0.875rem;
+    }
+
+    .statistics-invoices-table tbody td.amount {
+        font-size: 0.875rem;
+    }
+
+    .statistics-invoices-table .badge {
+        padding: 0.3125rem 0.75rem;
+        font-size: 0.75rem;
     }
 }
 
@@ -903,23 +1203,47 @@ th.qasa-column {
         height: 200px;
     }
 
-    .table-wrapper {
-        margin-left: -0.625rem;
-        margin-right: -0.625rem;
-        padding-left: 0.625rem;
-        padding-right: 0.625rem;
+    /* Card layout adjustments for smallest screens */
+    .data-table tbody tr {
+        padding: 0.75rem;
+        margin-bottom: 0.875rem;
     }
 
-    .data-table th,
-    .data-table td {
-        padding: 6px 4px;
+    .data-table tbody td {
+        padding: 0.5rem 0;
+        font-size: 0.75rem;
+    }
+
+    .data-table tbody td::before {
         font-size: 0.6875rem;
-        min-width: 65px;
     }
 
-    .data-table th:first-child,
-    .data-table td:first-child {
-        min-width: 75px;
+    .data-table tbody td:first-child {
+        font-size: 0.9375rem;
+    }
+
+    .data-table .amount-cell {
+        font-size: 0.8125rem;
+    }
+
+    .data-table .qasa-column {
+        padding: 0.625rem;
+        margin: 0.25rem -0.75rem;
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+
+    .data-table tfoot {
+        padding: 0.75rem;
+    }
+
+    .data-table tfoot td {
+        padding: 0.5rem 0;
+        font-size: 0.75rem;
+    }
+
+    .data-table tfoot td:first-child {
+        font-size: 1rem;
     }
 
     .statistics-modal-header {
@@ -932,6 +1256,46 @@ th.qasa-column {
 
     .statistics-btn-close {
         padding: 14px 16px;
+    }
+
+    /* Refine invoice card layout for smallest screens */
+    .statistics-invoices-table tbody tr {
+        padding: 0.75rem;
+        margin-bottom: 0.875rem;
+    }
+
+    .statistics-invoices-table tbody td {
+        padding: 0.5rem 0;
+        font-size: 0.75rem;
+    }
+
+    .statistics-invoices-table tbody td::before {
+        font-size: 0.6875rem;
+    }
+
+    .statistics-invoices-table tbody td.invoice-id {
+        font-size: 0.875rem;
+    }
+
+    .statistics-invoices-table tbody td.patient-name {
+        font-size: 0.8125rem;
+    }
+
+    .statistics-invoices-table tbody td.amount {
+        font-size: 0.8125rem;
+    }
+
+    .statistics-invoices-table .badge {
+        padding: 0.25rem 0.625rem;
+        font-size: 0.6875rem;
+    }
+
+    .statistics-invoices-table tbody td.iqd,
+    .statistics-invoices-table tbody td.usd {
+        padding: 0.625rem;
+        margin: 0.25rem -0.75rem;
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
     }
 }
 

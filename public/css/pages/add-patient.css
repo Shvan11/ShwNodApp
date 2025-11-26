@@ -230,43 +230,8 @@ textarea.form-control {
     grid-column: 1 / -1; /* Span full width in grid layout */
 }
 
-/* Enhanced button styling */
-.btn {
-    padding: var(--spacing-md) var(--spacing-xl);
-    border: none;
-    border-radius: var(--radius-lg);
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-medium);
-    cursor: pointer;
-    transition: all 0.3s ease;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-sm);
-    min-width: 140px;
-    box-shadow: var(--shadow-sm);
-    position: relative;
-    overflow: hidden;
-}
-
-.btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-    transition: left 0.5s;
-}
-
-.btn:hover::before {
-    left: 100%;
-}
-
-/* REMOVED GLOBAL .btn-primary and .btn-secondary - These belong in /css/components/buttons.css */
-/* If this page needs special gradient buttons, create page-specific classes like .add-patient-btn-primary */
+/* Button styles now use global definitions from /css/components/buttons.css */
+/* No page-specific button overrides - maintaining consistency across the application */
 
 /* Loading spinner animation */
 .loading-spinner {
@@ -335,8 +300,11 @@ textarea.form-control {
         align-items: stretch;
     }
     
-    .btn {
-        min-width: auto;
+    .form-actions {
+        flex-direction: column;
+    }
+
+    .form-actions > * {
         width: 100%;
     }
     
@@ -416,9 +384,7 @@ textarea.form-control {
     border-top: 2px solid var(--gray-100);
 }
 
-.btn .btn-text {
-    display: inline;
-}
+/* Button text styling handled by global buttons.css */
 
 /* Desktop Tabs Container */
 .form-tabs-container {
@@ -670,14 +636,7 @@ textarea.form-control {
         gap: var(--spacing-sm);
     }
 
-    .btn {
-        width: 100%;
-        justify-content: center;
-    }
-
-    .btn .btn-text {
-        display: inline;
-    }
+    /* Button styling handled by global buttons.css */
 
     .accordion-content .form-row {
         grid-template-columns: 1fr;
@@ -713,12 +672,5 @@ textarea.form-control {
         font-size: var(--font-size-sm);
     }
 
-    .btn {
-        padding: var(--spacing-sm) var(--spacing-md);
-        font-size: var(--font-size-sm);
-    }
-
-    .btn i {
-        font-size: 0.9rem;
-    }
+    /* Button sizing handled by global buttons.css */
 }

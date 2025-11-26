@@ -389,30 +389,30 @@ const StatisticsComponent = () => {
                                             onClick={() => setSelectedDate(day)}
                                             title="Click to view daily invoices"
                                         >
-                                            <td>{formatDate(day.Day)}</td>
-                                            <td className="amount-cell">{formatCurrency(day.SumIQD)}</td>
-                                            <td className="amount-cell negative">{formatCurrency(Math.abs(day.ExpensesIQD || 0))}</td>
-                                            <td className="amount-cell">{formatCurrency(day.FinalIQDSum)}</td>
-                                            <td className="amount-cell">{formatCurrency(day.SumUSD, 'USD')}</td>
-                                            <td className="amount-cell negative">{formatCurrency(Math.abs(day.ExpensesUSD || 0), 'USD')}</td>
-                                            <td className="amount-cell">{formatCurrency(day.FinalUSDSum, 'USD')}</td>
-                                            <td className="amount-cell grand-total">{formatCurrency(day.GrandTotal, 'USD')}</td>
-                                            <td className="amount-cell qasa-column qasa-iqd">{formatCurrency(day.QasaIQD)}</td>
-                                            <td className="amount-cell qasa-column qasa-usd">{formatCurrency(day.QasaUSD, 'USD')}</td>
+                                            <td data-label="Date">{formatDate(day.Day)}</td>
+                                            <td data-label="IQD Revenue" className="amount-cell">{formatCurrency(day.SumIQD)}</td>
+                                            <td data-label="IQD Expenses" className="amount-cell negative">{formatCurrency(Math.abs(day.ExpensesIQD || 0))}</td>
+                                            <td data-label="IQD Net" className="amount-cell">{formatCurrency(day.FinalIQDSum)}</td>
+                                            <td data-label="USD Revenue" className="amount-cell">{formatCurrency(day.SumUSD, 'USD')}</td>
+                                            <td data-label="USD Expenses" className="amount-cell negative">{formatCurrency(Math.abs(day.ExpensesUSD || 0), 'USD')}</td>
+                                            <td data-label="USD Net" className="amount-cell">{formatCurrency(day.FinalUSDSum, 'USD')}</td>
+                                            <td data-label="Grand Total" className="amount-cell grand-total">{formatCurrency(day.GrandTotal, 'USD')}</td>
+                                            <td data-label="Qasa IQD" className="amount-cell qasa-column qasa-iqd">{formatCurrency(day.QasaIQD)}</td>
+                                            <td data-label="Qasa USD" className="amount-cell qasa-column qasa-usd">{formatCurrency(day.QasaUSD, 'USD')}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                                 <tfoot>
                                     <tr className="total-row">
-                                        <td><strong>MONTH TOTAL</strong></td>
-                                        <td className="amount-cell"><strong>{formatCurrency(statistics.summary.totalRevenue.IQD)}</strong></td>
-                                        <td className="amount-cell negative"><strong>{formatCurrency(statistics.summary.totalExpenses.IQD)}</strong></td>
-                                        <td className="amount-cell"><strong>{formatCurrency(statistics.summary.netProfit.IQD)}</strong></td>
-                                        <td className="amount-cell"><strong>{formatCurrency(statistics.summary.totalRevenue.USD, 'USD')}</strong></td>
-                                        <td className="amount-cell negative"><strong>{formatCurrency(statistics.summary.totalExpenses.USD, 'USD')}</strong></td>
-                                        <td className="amount-cell"><strong>{formatCurrency(statistics.summary.netProfit.USD, 'USD')}</strong></td>
-                                        <td className="amount-cell grand-total"><strong>{formatCurrency(statistics.summary.grandTotal.USD, 'USD')}</strong></td>
-                                        <td className="amount-cell qasa-column" colSpan="2"><em>(Daily Values Only)</em></td>
+                                        <td data-label="Period"><strong>MONTH TOTAL</strong></td>
+                                        <td data-label="IQD Revenue" className="amount-cell"><strong>{formatCurrency(statistics.summary.totalRevenue.IQD)}</strong></td>
+                                        <td data-label="IQD Expenses" className="amount-cell negative"><strong>{formatCurrency(statistics.summary.totalExpenses.IQD)}</strong></td>
+                                        <td data-label="IQD Net" className="amount-cell"><strong>{formatCurrency(statistics.summary.netProfit.IQD)}</strong></td>
+                                        <td data-label="USD Revenue" className="amount-cell"><strong>{formatCurrency(statistics.summary.totalRevenue.USD, 'USD')}</strong></td>
+                                        <td data-label="USD Expenses" className="amount-cell negative"><strong>{formatCurrency(statistics.summary.totalExpenses.USD, 'USD')}</strong></td>
+                                        <td data-label="USD Net" className="amount-cell"><strong>{formatCurrency(statistics.summary.netProfit.USD, 'USD')}</strong></td>
+                                        <td data-label="Grand Total" className="amount-cell grand-total"><strong>{formatCurrency(statistics.summary.grandTotal.USD, 'USD')}</strong></td>
+                                        <td data-label="Cash Box Note" className="amount-cell qasa-column" colSpan="2"><em>(Daily Values Only)</em></td>
                                     </tr>
                                 </tfoot>
                             </table>

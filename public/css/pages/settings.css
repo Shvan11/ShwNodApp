@@ -513,19 +513,7 @@
     gap: 1rem;
 }
 
-.btn {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-}
+/* Button styles use global definitions from /css/components/buttons.css */
 
 .btn-primary {
     background: var(--primary-color);
@@ -1109,6 +1097,10 @@
     color: var(--info-700);
 }
 
+.btn-edit::before {
+    content: none; /* Remove icon from buttons.css */
+}
+
 .btn-edit:hover {
     background: var(--info-200);
     transform: scale(1.1);
@@ -1117,6 +1109,10 @@
 .btn-delete {
     background: var(--error-50);
     color: var(--error-600);
+}
+
+.btn-delete::before {
+    content: none; /* Remove icon from buttons.css */
 }
 
 .btn-delete:hover {

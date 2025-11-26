@@ -674,11 +674,31 @@
 
     .patient-management-header {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: stretch;
+        gap: var(--spacing-md);
+    }
+
+    .patient-management-header h2 {
+        text-align: center;
     }
 
     .patient-management-header-actions {
         width: 100%;
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    /* Make buttons full-width and touch-friendly on mobile */
+    .patient-management-header-actions .btn,
+    .patient-management-header-actions button {
+        width: 100%;
+        justify-content: center;
+        padding: var(--spacing-md) var(--spacing-lg);
+        font-size: var(--font-size-base);
+        min-height: 48px; /* Touch-friendly */
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-sm);
     }
 
     /* Advanced Filters Responsive */
@@ -788,7 +808,7 @@
 @media (max-width: 480px) {
 
     /* Further reduce padding on phones */
-    .patient-management {
+    .page-patient-management {
         padding: var(--spacing-sm) var(--spacing-md);
     }
 
@@ -807,5 +827,27 @@
 
     .pm-name-search-grid {
         padding: var(--spacing-md);
+    }
+
+    /* Header optimizations for small phones */
+    .patient-management-header h2 {
+        font-size: var(--font-size-xl);
+    }
+
+    .patient-management-header-actions .btn,
+    .patient-management-header-actions button {
+        padding: var(--spacing-sm) var(--spacing-md);
+        font-size: var(--font-size-sm);
+    }
+
+    /* Results summary - stack vertically */
+    .pm-results-summary {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .pm-sort-controls {
+        width: 100%;
+        justify-content: space-between;
     }
 }

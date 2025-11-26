@@ -559,7 +559,7 @@ const WorkComponent = ({ patientId }) => {
                             </select>
                             <button
                                 onClick={handleQuickCheckin}
-                                className={`btn-work-checkin ${checkedIn ? 'checked-in' : ''} ${checkingIn ? 'checking-in' : ''}`}
+                                className={`btn btn-work-checkin ${checkedIn ? 'checked-in' : ''} ${checkingIn ? 'checking-in' : ''}`}
                                 disabled={checkingIn || checkedIn}
                                 title={checkedIn ? 'Patient already checked in today' : 'Check in patient for today'}
                             >
@@ -568,14 +568,14 @@ const WorkComponent = ({ patientId }) => {
                             </button>
                             <button
                                 onClick={handlePrintNoWorkReceipt}
-                                className="btn-secondary"
+                                className="btn btn-secondary"
                                 disabled={loadingAppointment || !hasNextAppointment}
                                 title={!hasNextAppointment ? 'No future appointment scheduled' : 'Print appointment confirmation receipt'}
                             >
                                 <i className="fas fa-print"></i>
                                 {loadingAppointment ? 'Loading...' : 'Print Appointment Receipt'}
                             </button>
-                            <button onClick={handleAddWork} className="btn-primary">
+                            <button onClick={handleAddWork} className="btn btn-primary">
                                 <i className="fas fa-plus"></i>
                                 Add New Work
                             </button>

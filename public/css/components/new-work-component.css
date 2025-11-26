@@ -261,46 +261,8 @@
     justify-content: flex-end;
 }
 
-.form-actions .btn-primary,
-.form-actions .btn-secondary {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: all 0.2s;
-    border: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    line-height: 1.2;
-    white-space: nowrap;
-}
-
-.form-actions .btn-primary {
-    background-color: var(--indigo-600);
-    color: white;
-}
-
-.form-actions .btn-primary:hover:not(:disabled) {
-    background-color: var(--indigo-600);
-    box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3);
-}
-
-.form-actions .btn-primary:disabled {
-    background-color: var(--gray-400);
-    cursor: not-allowed;
-}
-
-.form-actions .btn-secondary {
-    background-color: var(--gray-100);
-    color: var(--gray-700);
-    border: 1px solid var(--gray-300);
-}
-
-.form-actions .btn-secondary:hover {
-    background-color: var(--gray-200);
-}
+/* All button styles inherit from global /css/components/buttons.css */
+/* Use classes: .btn .btn-primary, .btn .btn-secondary, etc. */
 
 /* Confirmation Dialog */
 .confirmation-dialog-overlay {
@@ -418,48 +380,7 @@
     justify-content: flex-end;
 }
 
-.confirmation-actions .btn-primary,
-.confirmation-actions .btn-secondary {
-    padding: 0.625rem 1.25rem;
-    font-size: 0.9375rem;
-    font-weight: 500;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.confirmation-actions .btn-primary {
-    background-color: var(--indigo-600);
-    color: white;
-}
-
-.confirmation-actions .btn-primary:hover:not(:disabled) {
-    background-color: var(--indigo-600);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(79, 70, 229, 0.3);
-}
-
-.confirmation-actions .btn-primary:disabled {
-    background-color: var(--gray-400);
-    cursor: not-allowed;
-    transform: none;
-}
-
-.confirmation-actions .btn-secondary {
-    background-color: var(--gray-100);
-    color: var(--gray-700);
-    border: 1px solid var(--gray-300);
-}
-
-.confirmation-actions .btn-secondary:hover:not(:disabled) {
-    background-color: var(--gray-200);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
+/* Button styles inherited from global /css/components/buttons.css */
 
 /* Responsive adjustments */
 @media (max-width: 640px) {
@@ -480,8 +401,7 @@
         flex-direction: column-reverse;
     }
 
-    .confirmation-actions .btn-primary,
-    .confirmation-actions .btn-secondary {
+    .confirmation-actions .btn {
         width: 100%;
         justify-content: center;
     }

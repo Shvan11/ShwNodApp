@@ -366,7 +366,5 @@
         flex-direction: column;
     }
 
-    .payment-success-actions .btn {
-        width: 100%;
-    }
+    /* Button styles use global definitions from /css/components/buttons.css */
 }

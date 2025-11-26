@@ -1216,17 +1216,7 @@
     justify-content: flex-end;
 }
 
-.btn {
-    padding: 0.6rem 1.5rem;
-    border: none;
-    border-radius: 6px;
-    font-size: 0.95rem;
-    cursor: pointer;
-    transition: all 0.3s;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
+/* Button styles use global definitions from /css/components/buttons.css */
 
 .btn-primary {
     background: var(--blue-300);

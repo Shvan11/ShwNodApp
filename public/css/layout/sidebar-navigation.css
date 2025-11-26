@@ -220,7 +220,7 @@
 .photos-flyout-menu {
     position: fixed;
     left: 70px;
-    width: 320px;
+    width: 250px;
     max-height: 500px;
     background: white;
     border-radius: 8px;
@@ -530,7 +530,7 @@
     /* Adjust flyout menu position on small screens */
     .photos-flyout-menu {
         width: calc(100vw - 85px);
-        max-width: 320px;
+        max-width: 250px;
         left: 70px;
     }
 
@@ -570,7 +570,7 @@
     /* Full-width flyout on very small screens */
     .photos-flyout-menu {
         width: calc(100vw - 66px);
-        max-width: 280px;
+        max-width: 240px;
         left: 58px;
         border-radius: 6px;
     }

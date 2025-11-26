@@ -382,10 +382,14 @@ export async function getAlignerSetById(setId) {
  * @returns {Promise<number>} New set ID
  */
 export async function createAlignerSet(setData) {
+    const startTime = Date.now();
     const {
         WorkID, SetSequence, Type, UpperAlignersCount, LowerAlignersCount,
         Days, AlignerDrID, SetUrl, SetPdfUrl, SetCost, Currency, Notes, IsActive
     } = setData;
+
+    const afterExtraction = Date.now();
+    console.log(`⏱️  [DB QUERY TIMING] Parameter extraction took: ${afterExtraction - startTime}ms`);
 
     const query = `
         DECLARE @OutputTable TABLE (AlignerSetID INT);
@@ -414,6 +418,9 @@ export async function createAlignerSet(setData) {
         SELECT AlignerSetID FROM @OutputTable;
     `;
 
+    const beforeExecute = Date.now();
+    console.log(`⏱️  [DB QUERY TIMING] Query preparation took: ${beforeExecute - afterExtraction}ms`);
+
     const result = await executeQuery(
         query,
         [
@@ -433,6 +440,10 @@ export async function createAlignerSet(setData) {
         ],
         (columns) => columns[0].value
     );
+
+    const afterExecute = Date.now();
+    console.log(`⏱️  [DB QUERY TIMING] SQL execution took: ${afterExecute - beforeExecute}ms`);
+    console.log(`⏱️  [DB QUERY TIMING] Total createAlignerSet() took: ${afterExecute - startTime}ms`);
 
     return result && result.length > 0 ? result[0] : null;
 }

@@ -72,42 +72,7 @@
     justify-content: flex-end;
 }
 
-.edit-patient-form .btn {
-    padding: 0.625rem 1.25rem;
-    border: none;
-    border-radius: 6px;
-    font-size: 0.9375rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.edit-patient-form .btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.edit-patient-form .btn.btn-secondary {
-    background: var(--gray-100);
-    color: var(--gray-700);
-    border: 1px solid var(--gray-300);
-}
-
-.edit-patient-form .btn.btn-secondary:hover:not(:disabled) {
-    background: var(--gray-200);
-}
-
-.edit-patient-form .btn:not(.btn-secondary) {
-    color: white;
-}
-
-.edit-patient-form .btn:not(.btn-secondary):hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
+/* Button styles use global definitions from /css/components/buttons.css */
 
 /* ===== RESPONSIVE MOBILE DESIGN ===== */
 
@@ -167,13 +132,7 @@
         padding-top: 1.25rem;
     }
 
-    .edit-patient-form .btn {
-        width: 100%;
-        justify-content: center;
-        padding: 14px 20px;
-        min-height: 48px;
-        font-size: 16px;
-    }
+    /* Button styles use global definitions from /css/components/buttons.css */
 
     .patient-management {
         padding: 0 0.875rem;
@@ -202,8 +161,6 @@
         gap: 1rem;
     }
 
-    .edit-patient-form .btn {
-        padding: 16px;
     }
 
     .patient-management {
@@ -238,8 +195,6 @@
     .edit-patient-form .form-group textarea {
         min-height: 48px;
     }
-
-    .edit-patient-form .btn {
         min-height: 48px;
         -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
     }
@@ -277,13 +232,6 @@
     gap: var(--spacing-md);
     margin: 0 0 var(--spacing-sm) 0;
     font-size: 1.75rem;
-    font-weight: var(--font-weight-bold);
-    color: var(--text-primary);
-}
-
-.edit-patient-title-icon {
-    color: var(--success-500);
-}
 
 .edit-patient-description {
     color: var(--gray-500);

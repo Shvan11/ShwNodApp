@@ -155,17 +155,17 @@ const ViewPatientInfo = ({ patientId }) => {
         );
 
         if (matchingPreset) {
-            // Use preset value
+            // Use preset value, clear custom
             setCostValue(currentCost);
-            setIsCustomCost(false);
             setCustomCostValue('');
         } else {
-            // Use custom value
-            setCostValue('custom');
-            setIsCustomCost(true);
+            // Use custom value, clear preset
+            setCostValue('');
             setCustomCostValue(currentCost || '');
         }
 
+        // Always show both input and custom field
+        setIsCustomCost(true);
         setEditingCost(true);
     };
 
@@ -173,11 +173,11 @@ const ViewPatientInfo = ({ patientId }) => {
         try {
             setSavingCost(true);
 
-            // Determine the final cost value to save
-            const finalCost = isCustomCost ? customCostValue : costValue;
+            // Determine the final cost value to save (custom takes priority over preset)
+            const finalCost = customCostValue || costValue;
 
             if (!finalCost) {
-                toast.warning('Please enter a cost value');
+                toast.warning('Please select a preset or enter a custom amount');
                 setSavingCost(false);
                 return;
             }
@@ -231,15 +231,9 @@ const ViewPatientInfo = ({ patientId }) => {
 
     const handlePresetSelectChange = (e) => {
         const selectedValue = e.target.value;
-        if (selectedValue === 'custom') {
-            setIsCustomCost(true);
-            setCostValue('custom');
-            setCustomCostValue('');
-        } else {
-            setIsCustomCost(false);
-            setCostValue(selectedValue);
-            setCustomCostValue('');
-        }
+        // When selecting a preset, clear the custom input
+        setCostValue(selectedValue);
+        setCustomCostValue('');
     };
 
     const handleCustomCostInputChange = (e) => {
@@ -247,6 +241,10 @@ const ViewPatientInfo = ({ patientId }) => {
         const rawValue = e.target.value.replace(/,/g, '');
         if (rawValue === '' || /^\d+$/.test(rawValue)) {
             setCustomCostValue(rawValue);
+            // When typing in custom input, clear the preset selection
+            if (rawValue) {
+                setCostValue('');
+            }
         }
     };
 
@@ -466,9 +464,8 @@ const ViewPatientInfo = ({ patientId }) => {
                                         value={costValue}
                                         onChange={handlePresetSelectChange}
                                         className="cost-edit-select-preset"
-                                        disabled={isCustomCost && costValue !== 'custom'}
                                     >
-                                        <option value="">Select amount...</option>
+                                        <option value="">Select preset...</option>
                                         {costPresets
                                             .filter(p => p.Currency === currencyValue)
                                             .map(preset => (
@@ -476,17 +473,14 @@ const ViewPatientInfo = ({ patientId }) => {
                                                     {formatNumberWithCommas(preset.Amount)}
                                                 </option>
                                             ))}
-                                        <option value="custom">Custom Amount...</option>
                                     </select>
-                                    {isCustomCost && (
-                                        <input
-                                            type="text"
-                                            value={formatNumberWithCommas(customCostValue)}
-                                            onChange={handleCustomCostInputChange}
-                                            placeholder="Enter custom amount"
-                                            className="cost-edit-input-custom"
-                                        />
-                                    )}
+                                    <input
+                                        type="text"
+                                        value={formatNumberWithCommas(customCostValue)}
+                                        onChange={handleCustomCostInputChange}
+                                        placeholder="Or enter custom amount"
+                                        className="cost-edit-input-custom"
+                                    />
                                     <button
                                         onClick={handleSaveCost}
                                         disabled={savingCost}

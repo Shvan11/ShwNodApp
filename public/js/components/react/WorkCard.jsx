@@ -173,7 +173,7 @@ const WorkCard = ({
                     <div className="work-card-primary-actions">
                         <button
                             type="button"
-                            className="btn-card-action btn-new-visit"
+                            className="btn btn-card-action btn-new-visit"
                             onClick={() => onNewVisit(work)}
                             title="Add new visit for this work"
                         >
@@ -182,7 +182,7 @@ const WorkCard = ({
                         </button>
                         <button
                             type="button"
-                            className="btn-card-action btn-visits"
+                            className="btn btn-card-action btn-visits"
                             onClick={() => onViewVisits(work)}
                             title="View visits for this work"
                         >
@@ -191,7 +191,7 @@ const WorkCard = ({
                         </button>
                         <button
                             type="button"
-                            className="btn-card-action btn-diagnosis"
+                            className="btn btn-card-action btn-diagnosis"
                             onClick={() => window.location.href = `/patient/${patientId}/diagnosis?workId=${work.workid}`}
                             title="View diagnosis and treatment plan"
                         >
@@ -200,7 +200,7 @@ const WorkCard = ({
                         </button>
                         <button
                             type="button"
-                            className="btn-card-action btn-payments"
+                            className="btn btn-card-action btn-payments"
                             onClick={() => onViewPaymentHistory(work)}
                             title="View payment history"
                         >
@@ -209,7 +209,7 @@ const WorkCard = ({
                         </button>
                         <button
                             type="button"
-                            className="btn-card-action btn-details"
+                            className="btn btn-card-action btn-details"
                             onClick={() => onViewDetails(work)}
                             title="View work details"
                         >
@@ -222,7 +222,7 @@ const WorkCard = ({
                     <div className="work-card-secondary-actions">
                         <button
                             type="button"
-                            className={`btn-card-secondary btn-add-payment ${isFullyPaid() ? 'disabled' : ''}`}
+                            className={`btn btn-card-secondary btn-add-payment ${isFullyPaid() ? 'disabled' : ''}`}
                             onClick={() => !isFullyPaid() && onAddPayment(work)}
                             disabled={isFullyPaid()}
                             title={isFullyPaid() ? "No balance remaining" : "Add payment for this work"}
@@ -232,7 +232,7 @@ const WorkCard = ({
                         </button>
                         <button
                             type="button"
-                            className="btn-card-secondary btn-print-receipt"
+                            className="btn btn-card-secondary btn-print-receipt"
                             onClick={() => onPrintReceipt(work)}
                             title="Print today's receipt"
                         >
@@ -242,7 +242,7 @@ const WorkCard = ({
                         {isAlignerWork(work) && (
                             <button
                                 type="button"
-                                className="btn-card-secondary btn-add-set"
+                                className="btn btn-card-secondary btn-add-set"
                                 onClick={() => onAddAlignerSet(work)}
                                 title="Add or manage aligner sets"
                             >

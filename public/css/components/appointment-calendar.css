@@ -241,7 +241,7 @@ body:has(.appointment-calendar) {
 }
 
 .appointment-calendar .early-slots-toggle i {
-    font-size: 14px;
+    font-size: var(--font-size-base);
 }
 
 /* Doctor Filter */
@@ -260,7 +260,7 @@ body:has(.appointment-calendar) {
     border-radius: 4px;
     background: var(--color-white);
     color: var(--color-light-slate);
-    font-size: 11px;
+    font-size: var(--font-size-xs);
     cursor: pointer;
     transition: all 0.2s ease;
     min-width: 110px;
@@ -363,7 +363,7 @@ body:has(.appointment-calendar) {
     padding: 6px 4px;
     background: var(--background-secondary);
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -396,7 +396,7 @@ body:has(.appointment-calendar) {
 
 
 .day-header-count {
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     font-weight: 600;
     padding: 2px 8px;
     border-radius: 10px;
@@ -468,7 +468,7 @@ body:has(.appointment-calendar) {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    font-size: var(--font-size-lg);
     font-weight: 700;
     color: var(--text-primary);
     background: var(--background-secondary);
@@ -578,7 +578,7 @@ body:has(.appointment-calendar) {
 /* Unified appointment detail styling for ALL appointments (single and multiple) */
 .appointment-detail,
 .appointment-detail-compact {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
     line-height: 16px;
     font-weight: 500;
@@ -613,7 +613,7 @@ body:has(.appointment-calendar) {
 
 .appointment-count {
     font-weight: 800;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--color-white);
     text-align: center;
     margin-bottom: 2px;
@@ -671,14 +671,14 @@ body:has(.appointment-calendar) {
 }
 
 .add-appointment-icon {
-    font-size: 24px;
+    font-size: var(--font-size-2xl);
     color: var(--primary-color);
     margin-bottom: 3px;
     font-weight: bold;
 }
 
 .add-appointment-text {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--primary-color);
     text-align: center;
     line-height: 1.3;
@@ -743,7 +743,7 @@ body:has(.appointment-calendar) {
 }
 
 .loading-text {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--text-medium);
 }
 
@@ -773,7 +773,7 @@ body:has(.appointment-calendar) {
 .error-container h3 {
     color: var(--error-color);
     margin-bottom: 16px;
-    font-size: 20px;
+    font-size: var(--font-size-xl);
 }
 
 .error-container p {
@@ -854,7 +854,7 @@ body:has(.appointment-calendar) {
     }
 
     .week-text {
-        font-size: 18px;
+        font-size: var(--font-size-lg);
     }
 
     .stat-item {
@@ -863,7 +863,7 @@ body:has(.appointment-calendar) {
     }
 
     .stat-value {
-        font-size: 20px;
+        font-size: var(--font-size-xl);
     }
 }
 
@@ -891,7 +891,7 @@ body:has(.appointment-calendar) {
     }
 
     .day-header-date-line {
-        font-size: 11px;
+        font-size: var(--font-size-xs);
     }
 
     .day-header-cell {
@@ -908,7 +908,7 @@ body:has(.appointment-calendar) {
     .nav-button {
         width: 52px;
         height: 52px;
-        font-size: 20px;
+        font-size: var(--font-size-xl);
     }
 
     .week-display {
@@ -917,12 +917,12 @@ body:has(.appointment-calendar) {
     }
 
     .week-text {
-        font-size: 16px;
+        font-size: var(--font-size-lg);
         font-weight: 700;
     }
 
     .today-button {
-        font-size: 11px;
+        font-size: var(--font-size-xs);
         padding: 4px 12px;
     }
 
@@ -948,11 +948,11 @@ body:has(.appointment-calendar) {
     }
 
     .stat-label {
-        font-size: 9px;
+        font-size: var(--font-size-xs);
     }
 
     .stat-value {
-        font-size: 18px;
+        font-size: var(--font-size-lg);
     }
 
     /* Doctor filter - full width on mobile */
@@ -967,7 +967,7 @@ body:has(.appointment-calendar) {
 
     /* Early slots toggle */
     .early-slots-toggle {
-        font-size: 12px;
+        font-size: var(--font-size-sm);
         padding: 6px 12px;
     }
 
@@ -987,7 +987,7 @@ body:has(.appointment-calendar) {
 
     .time-header {
         height: 80px;
-        font-size: 13px;
+        font-size: var(--font-size-sm);
     }
 
     .time-slot-label {
@@ -1015,7 +1015,7 @@ body:has(.appointment-calendar) {
     }
 
     .day-name {
-        font-size: 12px;
+        font-size: var(--font-size-sm);
     }
 
     .day-date {
@@ -1023,7 +1023,7 @@ body:has(.appointment-calendar) {
     }
 
     .day-appointment-count {
-        font-size: 10px;
+        font-size: var(--font-size-xs);
         padding: 3px 8px;
     }
 
@@ -1042,15 +1042,15 @@ body:has(.appointment-calendar) {
 
     /* Appointment content - optimized for mobile */
     .patient-name {
-        font-size: 13px;
+        font-size: var(--font-size-sm);
     }
 
     .appointment-detail {
-        font-size: 12px;
+        font-size: var(--font-size-sm);
     }
 
     .appointment-count {
-        font-size: 11px;
+        font-size: var(--font-size-xs);
         padding: 5px 8px;
     }
 
@@ -1060,11 +1060,11 @@ body:has(.appointment-calendar) {
     }
 
     .patient-name-compact {
-        font-size: 12px;
+        font-size: var(--font-size-sm);
     }
 
     .appointment-detail-compact {
-        font-size: 11px;
+        font-size: var(--font-size-xs);
     }
 }
 
@@ -1077,11 +1077,11 @@ body:has(.appointment-calendar) {
     .nav-button {
         width: 48px;
         height: 48px;
-        font-size: 18px;
+        font-size: var(--font-size-lg);
     }
 
     .week-text {
-        font-size: 14px;
+        font-size: var(--font-size-base);
     }
 
     .day-date {
@@ -1094,7 +1094,7 @@ body:has(.appointment-calendar) {
     }
 
     .stat-value {
-        font-size: 16px;
+        font-size: var(--font-size-lg);
     }
 }
 
@@ -1296,7 +1296,7 @@ body:has(.appointment-calendar) {
 
 .context-menu-item.appointment-item i.fa-chevron-right {
     opacity: 0.4;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
 }
 
 .context-menu-item.appointment-item:hover i.fa-chevron-right {
@@ -1381,18 +1381,7 @@ body:has(.appointment-calendar) {
     justify-content: flex-end;
 }
 
-.btn {
-    padding: var(--spacing-sm) var(--spacing-lg);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: none;
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
+/* Button styles use global definitions from /css/components/buttons.css */
 
 .btn-cancel {
     background: var(--background-secondary);

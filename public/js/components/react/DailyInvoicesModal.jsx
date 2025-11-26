@@ -179,26 +179,26 @@ const DailyInvoicesModal = ({ selectedDate, onClose }) => {
                                     <tbody>
                                         {invoices.map((invoice) => (
                                             <tr key={invoice.invoiceID}>
-                                                <td className="invoice-id">{invoice.invoiceID}</td>
-                                                <td className="patient-name text-rtl">
+                                                <td data-label="Invoice #" className="invoice-id">{invoice.invoiceID}</td>
+                                                <td data-label="Patient Name" className="patient-name text-rtl">
                                                     {invoice.PatientName}
                                                 </td>
-                                                <td className="time">{formatTime(invoice.SysStartTime)}</td>
-                                                <td className="currency-badge">
+                                                <td data-label="Time" className="time">{formatTime(invoice.SysStartTime)}</td>
+                                                <td data-label="Treatment Currency" className="currency-badge">
                                                     <span className={`badge ${invoice.currency}`}>
                                                         {invoice.currency}
                                                     </span>
                                                 </td>
-                                                <td className="amount">
+                                                <td data-label="Amount Paid" className="amount">
                                                     {invoice.Amountpaid} {invoice.currency}
                                                 </td>
-                                                <td className="amount iqd">
+                                                <td data-label="IQD Received" className="amount iqd">
                                                     {invoice.IQDReceived ? formatCurrency(invoice.IQDReceived, 'IQD') : '-'}
                                                 </td>
-                                                <td className="amount usd">
+                                                <td data-label="USD Received" className="amount usd">
                                                     {invoice.USDReceived ? formatCurrency(invoice.USDReceived, 'USD') : '-'}
                                                 </td>
-                                                <td className="amount change">
+                                                <td data-label="Change Given" className="amount change">
                                                     {invoice.Change ? formatCurrency(invoice.Change, 'IQD') : '-'}
                                                 </td>
                                             </tr>

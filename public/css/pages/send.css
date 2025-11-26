@@ -452,10 +452,7 @@
     margin: 0;
 }
 
-.date-controls .btn {
-    margin: 0;
-    align-self: center;
-}
+/* Button styles use global definitions from /css/components/buttons.css */
 
 .date-dropdown:focus {
     outline: none;
@@ -465,95 +462,7 @@
 
 /* Enhanced Button System - Scoped to send page */
 /* Using .container.main-layout for higher specificity than buttons.css */
-.container.main-layout .btn {
-    padding: 8px 12px;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    text-decoration: none;
-    line-height: 1.4;
-    position: relative;
-    white-space: nowrap;
-    vertical-align: baseline;
-}
-
-.container.main-layout .btn:disabled {
-    background-color: var(--gray-400);
-    color: var(--text-secondary);
-    cursor: not-allowed;
-    transform: none;
-}
-
-.container.main-layout .btn:not(:disabled):hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.container.main-layout .btn:not(:disabled):active {
-    transform: translateY(0);
-}
-
-/* Button Color Variants - Scoped to send page */
-.container.main-layout .btn-primary {
-    background-color: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
-}
-
-.container.main-layout .btn-primary:hover:not(:disabled) {
-    background-color: var(--blue-700);
-    border-color: var(--blue-700);
-}
-
-.container.main-layout .btn-secondary {
-    background-color: var(--text-secondary);
-    color: white;
-    border-color: var(--text-secondary);
-}
-
-.container.main-layout .btn-secondary:hover:not(:disabled) {
-    background-color: var(--gray-600);
-    border-color: var(--gray-600);
-}
-
-.container.main-layout .btn-success {
-    background-color: var(--success-color);
-    color: white;
-    border-color: var(--success-color);
-}
-
-.container.main-layout .btn-success:hover:not(:disabled) {
-    background-color: var(--success-600);
-    border-color: var(--success-600);
-}
-
-.container.main-layout .btn-warning {
-    background-color: var(--warning-color);
-    color: var(--text-primary);
-    border-color: var(--warning-300);
-}
-
-.container.main-layout .btn-warning:hover:not(:disabled) {
-    background-color: var(--warning-400);
-    border-color: var(--warning-600);
-}
-
-.container.main-layout .btn-danger {
-    background-color: var(--error-color);
-    color: white;
-    border-color: var(--error-color);
-}
-
-.container.main-layout .btn-danger:hover:not(:disabled) {
-    background-color: var(--error-600);
-    border-color: var(--error-600);
-}
+/* Button styles use global definitions from /css/components/buttons.css */
 
 /* Button State Classes - CRITICAL FOR JAVASCRIPT */
 .btn-loading {
@@ -817,15 +726,7 @@
         width: 100%;
     }
 
-    .container.main-layout .btn {
-        width: 100%;
-        justify-content: center;
-        margin-bottom: 8px;
-    }
-
-    .container.main-layout .btn:last-child {
-        margin-bottom: 0;
-    }
+    /* Button styles use global definitions from /css/components/buttons.css */
 
     .date-selection-panel {
         padding: 16px;

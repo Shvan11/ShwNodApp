@@ -48,7 +48,7 @@
 
 .appointment-form-header h2 {
     margin: 0;
-    font-size: 24px;
+    font-size: var(--font-size-2xl);
     font-weight: 600;
     color: var(--text-color);
     display: flex;
@@ -66,7 +66,7 @@
 .close-btn {
     background: none;
     border: none;
-    font-size: 20px;
+    font-size: var(--font-size-xl);
     color: var(--text-light);
     cursor: pointer;
     padding: 8px;
@@ -95,7 +95,7 @@
     margin-bottom: 8px;
     font-weight: 500;
     color: var(--text-color);
-    font-size: 14px;
+    font-size: var(--font-size-base);
 }
 
 .form-input {
@@ -103,7 +103,7 @@
     padding: 12px 16px;
     border: 2px solid var(--gray-200);
     border-radius: 8px;
-    font-size: 16px;
+    font-size: var(--font-size-lg);
     transition: all 0.2s ease;
     background: white;
     box-sizing: border-box;
@@ -143,7 +143,7 @@
     background: none;
     border: none;
     color: var(--primary-color);
-    font-size: 16px;
+    font-size: var(--font-size-lg);
     cursor: pointer;
     padding: 4px;
     border-radius: 4px;
@@ -157,7 +157,7 @@
 .validation-error {
     display: block;
     color: var(--error-color);
-    font-size: 14px;
+    font-size: var(--font-size-base);
     margin-top: 6px;
     font-weight: 500;
 }
@@ -171,7 +171,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 14px;
+    font-size: var(--font-size-base);
 }
 
 .form-actions {
@@ -184,45 +184,7 @@
 }
 
 /* Modal Form Buttons - Scoped to Modal Only */
-.appointment-form-modal .btn {
-    padding: 12px 24px;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 120px;
-    justify-content: center;
-}
-
-.appointment-form-modal .btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.appointment-form-modal .btn-primary {
-    background: var(--primary-color);
-    color: white;
-}
-
-.appointment-form-modal .btn-primary:hover:not(:disabled) {
-    background: var(--blue-700);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
-}
-
-.appointment-form-modal .btn-secondary {
-    background: var(--text-secondary);
-    color: white;
-}
-
-.appointment-form-modal .btn-secondary:hover:not(:disabled) {
-    background: var(--gray-600);
-}
+/* Button styles use global definitions from /css/components/buttons.css */
 
 /* Calendar Picker Modal */
 .calendar-picker-overlay {
@@ -258,7 +220,7 @@
 
 .calendar-picker-header h3 {
     margin: 0;
-    font-size: 20px;
+    font-size: var(--font-size-xl);
     font-weight: 600;
     color: var(--text-color);
 }
@@ -281,7 +243,7 @@
     }
 
     .appointment-form-header h2 {
-        font-size: 20px;
+        font-size: var(--font-size-xl);
     }
 
     .appointment-form {
@@ -329,6 +291,6 @@
 }
 
 .appointment-form-page .loading-state i {
-    font-size: 3rem;
+    font-size: var(--font-size-3xl);
     color: var(--primary-color);
 }

@@ -325,20 +325,7 @@
     flex-wrap: wrap;
 }
 
-.btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.625rem 1.25rem;
-    border: none;
-    border-radius: var(--radius-md);
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-decoration: none;
-    white-space: nowrap;
-}
+/* Button styles use global definitions from /css/components/buttons.css */
 
 .btn-primary {
     background: var(--primary-color);
@@ -560,8 +547,5 @@ textarea.form-control {
         flex-direction: column;
     }
 
-    .template-actions .btn {
-        width: 100%;
-        justify-content: center;
-    }
+    /* Button styles use global definitions from /css/components/buttons.css */
 }

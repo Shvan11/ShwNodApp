@@ -632,62 +632,15 @@
 }
 
 /* Form Action Buttons - Clean, Maintainable Styles */
-.appointment-form-page .form-actions .btn {
-    padding: 10px 16px;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-height: 40px;
-    box-sizing: border-box;
-    border: none;
-    font-family: inherit;
-    white-space: nowrap;
-}
-
-.appointment-form-page .form-actions .btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
+.appointment-form-page /* Button styles use global definitions from /css/components/buttons.css */
+.appointment-form-page /* Button styles use global definitions from /css/components/buttons.css */
 /* Cancel Button */
-.appointment-form-page .form-actions .btn-cancel {
-    background: white;
-    color: var(--gray-600);
-    border: 2px solid var(--gray-200);
-    flex: 0 1 auto;
-}
-
-.appointment-form-page .form-actions .btn-cancel:hover:not(:disabled) {
-    background: var(--gray-50);
-    border-color: var(--gray-300);
-    transform: translateY(-1px);
-}
-
+.appointment-form-page /* Button styles use global definitions from /css/components/buttons.css */
+.appointment-form-page /* Button styles use global definitions from /css/components/buttons.css */
 /* Create Appointment Button */
-.appointment-form-page .form-actions .btn-create {
-    background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
-    color: white;
-    border: none;
-    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
-    flex: 1 1 auto;
-}
-
-.appointment-form-page .form-actions .btn-create:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
-}
-
-.appointment-form-page .form-actions .btn-create:active:not(:disabled) {
-    transform: translateY(0);
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-}
-
+.appointment-form-page /* Button styles use global definitions from /css/components/buttons.css */
+.appointment-form-page /* Button styles use global definitions from /css/components/buttons.css */
+.appointment-form-page /* Button styles use global definitions from /css/components/buttons.css */
 /* ==================== RESPONSIVE ==================== */
 
 @media (max-width: 1600px) {
@@ -729,20 +682,189 @@
 }
 
 @media (max-width: 768px) {
-    .page-header h1 {
-        font-size: 20px;
+    /* Stack all 3 sections vertically on mobile */
+    .appointment-form-page .page-content {
+        grid-template-columns: 1fr;
+        gap: 0;
     }
 
-    .slots-grid {
+    /* Each section takes full width */
+    .appointment-form-page .calendar-column,
+    .appointment-form-page .schedule-column,
+    .appointment-form-page .form-column {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--gray-200);
+        padding: 16px;
+        max-height: none;
+        overflow-y: visible;
+    }
+
+    /* Optimize calendar for mobile */
+    .appointment-form-page .calendar-column {
+        padding: 12px;
+    }
+
+    .appointment-form-page .calendar-header {
+        margin-bottom: 12px;
+    }
+
+    .appointment-form-page .month-name {
+        font-size: 14px;
+    }
+
+    .appointment-form-page .calendar-days {
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+
+    .appointment-form-page .calendar-day {
+        font-size: 12px;
+        min-height: 36px;
+    }
+
+    .appointment-form-page .jump-to-days {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .appointment-form-page .days-ahead-input,
+    .appointment-form-page .jump-btn {
+        width: 100%;
+    }
+
+    .appointment-form-page .jump-btn {
+        height: 44px;
+        font-size: 16px;
+    }
+
+    .appointment-form-page .full-calendar-link {
+        padding: 12px;
+        font-size: 14px;
+    }
+
+    /* Optimize schedule column for mobile */
+    .appointment-form-page .schedule-column {
+        padding: 16px 12px;
+    }
+
+    .appointment-form-page .schedule-header h3 {
+        font-size: 16px;
+    }
+
+    .appointment-form-page .slots-grid {
         grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .appointment-form-page .time-slot {
+        padding: 14px;
+    }
+
+    .appointment-form-page .slot-time {
+        font-size: 18px;
+    }
+
+    .appointment-form-page .apt-name {
+        font-size: 15px;
+    }
+
+    .appointment-form-page .apt-type {
+        font-size: 13px;
+    }
+
+    /* Optimize form column for mobile */
+    .appointment-form-page .form-column {
+        border-bottom: none;
+    }
+
+    .appointment-form-page .form-header {
+        padding: 16px 12px;
+    }
+
+    .appointment-form-page .form-header h2 {
+        font-size: 16px;
+    }
+
+    .appointment-form-page .appointment-form {
+        padding: 12px;
+        gap: 14px;
+    }
+
+    .appointment-form-page .form-field label {
+        font-size: 14px;
+    }
+
+    .appointment-form-page .form-field select,
+    .appointment-form-page .selected-time {
+        padding: 14px 12px;
+        font-size: 16px; /* Prevents iOS zoom */
+        min-height: 48px; /* Touch-friendly */
     }
 
     .appointment-form-page .form-actions {
         flex-direction: column;
+        gap: 12px;
+        margin-top: 16px;
+        padding-top: 12px;
     }
 
-    .appointment-form-page .form-actions .btn {
+    /* Touch-friendly buttons */
+    .appointment-form-page .btn-cancel,
+    .appointment-form-page .btn-create {
         width: 100%;
+        min-height: 48px;
+        font-size: 16px;
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    /* Page header adjustments */
+    .page-header h1 {
+        font-size: 18px;
+    }
+
+    .page-header p {
+        font-size: 13px;
+    }
+}
+
+/* Extra small phones */
+@media (max-width: 480px) {
+    .appointment-form-page .calendar-column,
+    .appointment-form-page .schedule-column,
+    .appointment-form-page .form-column {
+        padding: 12px 8px;
+    }
+
+    .appointment-form-page .calendar-days {
+        gap: 4px;
+    }
+
+    .appointment-form-page .calendar-day {
+        font-size: 11px;
+        min-height: 32px;
+    }
+
+    .appointment-form-page .slot-count {
+        width: 14px;
+        height: 14px;
+        font-size: 8px;
+    }
+
+    .appointment-form-page .time-slot {
+        padding: 12px;
+    }
+
+    .appointment-form-page .slot-time {
+        font-size: 16px;
+    }
+
+    .appointment-form-page .appointment-form {
+        padding: 8px;
     }
 }
 

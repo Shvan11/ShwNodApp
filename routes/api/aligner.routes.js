@@ -244,16 +244,33 @@ router.get('/aligner/batches/:setId', async (req, res) => {
  * Create a new aligner set
  */
 router.post('/aligner/sets', async (req, res) => {
+    const startTime = Date.now();
+    log.info('⏱️  [TIMING] POST /aligner/sets - Request received');
+
     try {
         // Delegate to service layer for business logic and creation
+        const serviceStartTime = Date.now();
         const newSetId = await AlignerService.validateAndCreateSet(req.body);
+        const serviceEndTime = Date.now();
+
+        log.info(`⏱️  [TIMING] Service layer took: ${serviceEndTime - serviceStartTime}ms`);
+
+        const totalTime = Date.now() - startTime;
+        log.info(`⏱️  [TIMING] TOTAL request time: ${totalTime}ms`);
 
         res.json({
             success: true,
             setId: newSetId,
-            message: 'Aligner set created successfully'
+            message: 'Aligner set created successfully',
+            _timing: {
+                total_ms: totalTime,
+                service_ms: serviceEndTime - serviceStartTime
+            }
         });
     } catch (error) {
+        const errorTime = Date.now() - startTime;
+        log.error(`⏱️  [TIMING] Error after ${errorTime}ms:`, error);
+
         if (error instanceof AlignerValidationError) {
             return ErrorResponses.badRequest(res, error.message, { code: error.code, ...error.details });
         }
@@ -548,12 +565,13 @@ router.patch('/aligner/activity/set/:setId/mark-all-read', async (req, res) => {
 router.post('/aligner/batches', async (req, res) => {
     try {
         // Delegate to service layer for validation and creation
-        const newBatchId = await AlignerService.validateAndCreateBatch(req.body);
+        const result = await AlignerService.validateAndCreateBatch(req.body);
 
         res.json({
             success: true,
-            batchId: newBatchId,
-            message: 'Aligner batch created successfully'
+            batchId: result.newBatchId,
+            message: 'Aligner batch created successfully',
+            deactivatedBatch: result.deactivatedBatch // Include info about deactivated batch
         });
     } catch (error) {
         if (error instanceof AlignerValidationError) {

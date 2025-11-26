@@ -305,47 +305,7 @@
     gap: 16px;
 }
 
-.action-buttons .btn {
-    padding: 12px 24px;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 140px;
-    justify-content: center;
-}
-
-.action-buttons .btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-}
-
-.action-buttons .btn-primary {
-    background: var(--primary-color);
-    color: white;
-}
-
-.action-buttons .btn-primary:hover:not(:disabled) {
-    background: var(--blue-700);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 123, 255, 0.3);
-}
-
-.action-buttons .btn-secondary {
-    background: var(--text-secondary);
-    color: white;
-}
-
-.action-buttons .btn-secondary:hover:not(:disabled) {
-    background: var(--gray-600);
-    transform: translateY(-1px);
-}
+/* Button styles use global definitions from /css/components/buttons.css */
 
 /* Help Legend */
 .calendar-picker-help {
@@ -475,9 +435,7 @@
         flex-direction: column;
     }
 
-    .action-buttons .btn {
-        width: 100%;
-    }
+    /* Button styles use global definitions from /css/components/buttons.css */
 
     .help-legend {
         flex-wrap: wrap;

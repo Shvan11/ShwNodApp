@@ -413,46 +413,7 @@
     justify-content: flex-end;
 }
 
-.form-actions .btn-primary,
-.form-actions .btn-secondary {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    border-radius: 3px;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    line-height: 1.2;
-    white-space: nowrap;
-}
-
-.form-actions .btn-primary {
-    background-color: var(--indigo-600);
-    color: white;
-}
-
-.form-actions .btn-primary:hover:not(:disabled) {
-    background-color: var(--indigo-600);
-    box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3);
-}
-
-.form-actions .btn-primary:disabled {
-    background-color: var(--gray-400);
-    cursor: not-allowed;
-}
-
-.form-actions .btn-secondary {
-    background-color: var(--gray-100);
-    color: var(--gray-700);
-    border: 1px solid var(--gray-300);
-}
-
-.form-actions .btn-secondary:hover {
-    background-color: var(--gray-200);
-}
+/* Button styles use global definitions from /css/components/buttons.css */
 
 /* ===== RESPONSIVE MOBILE OPTIMIZATIONS ===== */
 
@@ -519,14 +480,8 @@
     }
 
     /* Better button sizing */
-    .form-actions .btn-primary,
-    .form-actions .btn-secondary {
-        padding: 0.625rem 1rem;
-        font-size: 0.875rem;
-        min-height: 44px;
-    }
-
-    /* Optimize latest wires section */
+    /* Button styles use global definitions from /css/components/buttons.css */
+/* Optimize latest wires section */
     .latest-wires-section {
         padding: 0.5rem;
     }
@@ -621,16 +576,8 @@
         padding-top: 0.75rem;
     }
 
-    .form-actions .btn-primary,
-    .form-actions .btn-secondary {
-        width: 100%;
-        justify-content: center;
-        padding: 0.875rem 1rem;
-        font-size: 1rem;
-        min-height: 48px;
-    }
-
-    .form-actions.top-actions {
+    /* Button styles use global definitions from /css/components/buttons.css */
+.form-actions.top-actions {
         display: none; /* Hide top actions on mobile to save space */
     }
 
@@ -832,15 +779,8 @@
     }
 
     /* Buttons remain touchable */
-    .form-actions .btn-primary,
-    .form-actions .btn-secondary {
-        padding: 0.875rem 1rem;
-        font-size: 0.9375rem;
-        min-height: 50px;
-        font-weight: 600;
-    }
-
-    /* Tabs optimized for small screens */
+    /* Button styles use global definitions from /css/components/buttons.css */
+/* Tabs optimized for small screens */
     .visit-tabs {
         gap: 0.125rem;
         margin-bottom: 0.625rem;
@@ -920,13 +860,8 @@
         font-size: 0.8125rem;
     }
 
-    .form-actions .btn-primary,
-    .form-actions .btn-secondary {
-        padding: 0.875rem;
-        font-size: 0.875rem;
-    }
-
-    .wire-btn {
+    /* Button styles use global definitions from /css/components/buttons.css */
+.wire-btn {
         padding: 0.5rem;
         min-height: 48px;
     }
@@ -947,12 +882,8 @@
         min-height: 48px;
     }
 
-    .form-actions .btn-primary,
-    .form-actions .btn-secondary {
-        min-height: 48px;
-    }
-
-    .visit-tab {
+    /* Button styles use global definitions from /css/components/buttons.css */
+.visit-tab {
         min-height: 48px;
     }
 
@@ -965,13 +896,8 @@
         transform: scale(0.98);
     }
 
-    .form-actions .btn-primary:active,
-    .form-actions .btn-secondary:active {
-        transform: scale(0.98);
-        opacity: 0.9;
-    }
-
-    .visit-tab:active {
+    /* Button styles use global definitions from /css/components/buttons.css */
+.visit-tab:active {
         transform: scale(0.98);
     }
 
@@ -1004,13 +930,8 @@
         justify-content: flex-end;
     }
 
-    .form-actions .btn-primary,
-    .form-actions .btn-secondary {
-        width: auto;
-        min-width: 120px;
-    }
-
-    .checkboxes-grid {
+    /* Button styles use global definitions from /css/components/buttons.css */
+.checkboxes-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 }

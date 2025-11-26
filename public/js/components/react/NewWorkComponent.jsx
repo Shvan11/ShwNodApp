@@ -320,14 +320,14 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
                         <div className="confirmation-actions">
                             <button
                                 onClick={handleFinishExistingAndAddNew}
-                                className="btn-primary"
+                                className="btn btn-primary"
                                 disabled={loading}
                             >
                                 <i className="fas fa-check"></i> Yes, Finish & Add New
                             </button>
                             <button
                                 onClick={handleCancelConfirmation}
-                                className="btn-secondary"
+                                className="btn btn-secondary"
                                 disabled={loading}
                             >
                                 <i className="fas fa-times"></i> Cancel
@@ -380,14 +380,14 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
                         <div className="confirmation-actions">
                             <button
                                 onClick={handleConfirmFinishedWork}
-                                className="btn-primary"
+                                className="btn btn-primary"
                                 disabled={loading}
                             >
                                 <i className="fas fa-check"></i> Confirm & Create
                             </button>
                             <button
                                 onClick={handleCancelFinishedWork}
-                                className="btn-secondary"
+                                className="btn btn-secondary"
                                 disabled={loading}
                             >
                                 <i className="fas fa-times"></i> Cancel
@@ -401,11 +401,11 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
             <form onSubmit={handleFormSubmit} className="new-work-form">
                 {/* Top Action Buttons */}
                 <div className="form-actions top-actions">
-                    <button type="submit" className="btn-primary" disabled={loading}>
+                    <button type="submit" className="btn btn-primary" disabled={loading}>
                         <i className="fas fa-save"></i> {loading ? 'Saving...' : (workId ? 'Update' : 'Add Work')}
                     </button>
                     {onCancel && (
-                        <button type="button" onClick={onCancel} className="btn-secondary">
+                        <button type="button" onClick={onCancel} className="btn btn-secondary">
                             <i className="fas fa-times"></i> Cancel
                         </button>
                     )}
@@ -632,11 +632,11 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
 
                 {/* Bottom Form Actions */}
                 <div className="form-actions">
-                    <button type="submit" className="btn-primary" disabled={loading}>
+                    <button type="submit" className="btn btn-primary" disabled={loading}>
                         <i className="fas fa-save"></i> {loading ? 'Saving...' : (workId ? 'Update Work' : 'Add Work')}
                     </button>
                     {onCancel && (
-                        <button type="button" onClick={onCancel} className="btn-secondary">
+                        <button type="button" onClick={onCancel} className="btn btn-secondary">
                             <i className="fas fa-times"></i> Cancel
                         </button>
                     )}

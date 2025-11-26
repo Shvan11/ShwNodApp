@@ -237,58 +237,7 @@
     justify-content: center;
 }
 
-.auth-actions .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    text-decoration: none;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    min-width: 120px;
-    justify-content: center;
-}
-
-/* Button variants */
-.btn-primary {
-    background: var(--success-color);
-    color: white;
-}
-
-.btn-primary:hover {
-    background: var(--success-green);
-    transform: translateY(-1px);
-}
-
-.btn-secondary {
-    background: var(--text-secondary);
-    color: white;
-}
-
-.btn-secondary:hover {
-    background: var(--gray-600);
-    transform: translateY(-1px);
-}
-
-.btn-danger {
-    background: var(--error-color);
-    color: white;
-}
-
-.btn-danger:hover {
-    background: var(--error-600);
-    transform: translateY(-1px);
-}
-
-.btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-}
+/* Button styles use global definitions from /css/components/buttons.css */
 
 .btn-icon {
     font-size: 1em;
@@ -434,11 +383,8 @@
         flex-direction: column;
         align-items: center;
     }
-    
-    .auth-actions .btn {
-        width: 100%;
-        max-width: 200px;
-    }
+
+    /* Button styles use global definitions from /css/components/buttons.css */
 }
 
 @media (max-width: 480px) {

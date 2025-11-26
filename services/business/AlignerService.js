@@ -46,6 +46,7 @@ export class AlignerValidationError extends Error {
  * @throws {AlignerValidationError} If validation fails
  */
 export async function validateAndCreateSet(setData) {
+    const startTime = Date.now();
     const { WorkID, AlignerDrID } = setData;
 
     // Validation
@@ -56,14 +57,22 @@ export async function validateAndCreateSet(setData) {
         );
     }
 
+    const afterValidation = Date.now();
+    log.info(`⏱️  [SERVICE TIMING] Validation took: ${afterValidation - startTime}ms`);
     log.info('Creating new aligner set with business logic:', setData);
 
     try {
+        const dbStartTime = Date.now();
         const newSetId = await alignerQueries.createAlignerSet(setData);
+        const dbEndTime = Date.now();
+
+        log.info(`⏱️  [SERVICE TIMING] Database query took: ${dbEndTime - dbStartTime}ms`);
+        log.info(`⏱️  [SERVICE TIMING] Total service time: ${dbEndTime - startTime}ms`);
         log.info(`Aligner set created successfully: Set ${newSetId} for Work ${WorkID}`);
         return newSetId;
     } catch (error) {
-        log.error('Error creating aligner set:', error);
+        const errorTime = Date.now() - startTime;
+        log.error(`⏱️  [SERVICE TIMING] Error after ${errorTime}ms:`, error);
         throw error;
     }
 }
@@ -164,13 +173,14 @@ export async function validateAndDeleteSet(setId) {
  * Business Rules:
  * - AlignerSetID is required
  * - Set must exist
+ * - If IsActive=1, automatically deactivates other active batches for the same set
  *
  * @param {Object} batchData - Batch data
- * @returns {Promise<number>} New batch ID
+ * @returns {Promise<Object>} Object with newBatchId and deactivatedBatch info
  * @throws {AlignerValidationError} If validation fails
  */
 export async function validateAndCreateBatch(batchData) {
-    const { AlignerSetID } = batchData;
+    const { AlignerSetID, IsActive } = batchData;
 
     if (!AlignerSetID) {
         throw new AlignerValidationError(
@@ -189,12 +199,30 @@ export async function validateAndCreateBatch(batchData) {
         );
     }
 
+    // Check for currently active batch (before creating new one)
+    let deactivatedBatch = null;
+    if (IsActive) {
+        const batches = await alignerQueries.getBatchesBySetId(AlignerSetID);
+        const activeBatch = batches.find(b => b.IsActive);
+        if (activeBatch) {
+            deactivatedBatch = {
+                batchId: activeBatch.AlignerBatchID,
+                batchSequence: activeBatch.BatchSequence
+            };
+            log.info(`Batch #${activeBatch.BatchSequence} will be deactivated when creating new active batch`);
+        }
+    }
+
     log.info('Creating new aligner batch:', batchData);
 
     try {
         const newBatchId = await alignerQueries.createBatch(batchData);
         log.info(`Aligner batch created successfully: Batch ${newBatchId}`);
-        return newBatchId;
+
+        return {
+            newBatchId,
+            deactivatedBatch
+        };
     } catch (error) {
         log.error('Error creating aligner batch:', error);
         throw error;

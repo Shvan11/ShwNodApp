@@ -193,6 +193,14 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
             const result = await response.json();
 
             if (result.success) {
+                // Show success message
+                toast.success(batch ? 'Batch updated successfully!' : 'Batch created successfully!');
+
+                // If a batch was automatically deactivated, inform the user
+                if (result.deactivatedBatch && formData.IsActive) {
+                    toast.info(`Batch #${result.deactivatedBatch.batchSequence} was automatically deactivated (only one batch can be active at a time)`);
+                }
+
                 onSave();
                 onClose();
             } else {
