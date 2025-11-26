@@ -49,6 +49,9 @@ import '../../css/components/patient-appointments.css';
 export default function PatientRoutes() {
   return (
     <Routes>
+      {/* Specific route for diagnosis with workId in path */}
+      <Route path=":patientId/work/:workId/diagnosis" element={<PatientShell />} />
+
       {/* Patient routes with page parameter - handles both simple and nested pages */}
       <Route path=":patientId/:page/*" element={<PatientShell />} />
 

@@ -7,8 +7,10 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import DentalChart from './DentalChart.jsx';
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
+    const toast = useToast();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [wires, setWires] = useState([]);
@@ -150,15 +152,24 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
             }
 
             const result = await response.json();
+
+            // Show success toast notification
+            if (visitId) {
+                toast.success('Visit updated successfully!');
+            } else {
+                toast.success('Visit added successfully!');
+            }
+
             if (onSave) {
                 onSave(result);
             }
         } catch (err) {
             setError(err.message);
+            toast.error(`Failed to save visit: ${err.message}`);
         } finally {
             setLoading(false);
         }
-    }, [visitId, formData, onSave]);
+    }, [visitId, formData, onSave, toast]);
 
     // Memoized tooth click handler - prevents DentalChart re-renders
     const handleToothClick = useCallback((palmerNotation) => {
@@ -229,11 +240,11 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
             <form onSubmit={handleFormSubmit} className="new-visit-form">
                 {/* Top Action Buttons */}
                 <div className="form-actions top-actions">
-                    <button type="submit" className="btn-primary" disabled={loading}>
+                    <button type="submit" className="btn btn-primary" disabled={loading}>
                         <i className="fas fa-save"></i> {loading ? 'Saving...' : (visitId ? 'Update' : 'Add Visit')}
                     </button>
                     {onCancel && (
-                        <button type="button" onClick={onCancel} className="btn-secondary">
+                        <button type="button" onClick={onCancel} className="btn btn-secondary">
                             <i className="fas fa-times"></i> Cancel
                         </button>
                     )}
@@ -488,11 +499,11 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
 
                 {/* Bottom Form Actions */}
                 <div className="form-actions">
-                    <button type="submit" className="btn-primary" disabled={loading}>
+                    <button type="submit" className="btn btn-primary" disabled={loading}>
                         <i className="fas fa-save"></i> {loading ? 'Saving...' : (visitId ? 'Update Visit' : 'Add Visit')}
                     </button>
                     {onCancel && (
-                        <button type="button" onClick={onCancel} className="btn-secondary">
+                        <button type="button" onClick={onCancel} className="btn btn-secondary">
                             <i className="fas fa-times"></i> Cancel
                         </button>
                     )}

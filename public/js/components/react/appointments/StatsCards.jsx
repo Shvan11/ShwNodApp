@@ -7,13 +7,13 @@ import { useEffect, useRef, useState } from 'react';
  * Performance: Automatically optimized by React Compiler (React 19).
  * No manual memoization needed - the compiler handles it automatically.
  */
-const StatsCards = ({ total, checkedIn, waiting, completed }) => {
+const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0 }) => {
     const [animatedTotal, setAnimatedTotal] = useState(0);
     const [animatedCheckedIn, setAnimatedCheckedIn] = useState(0);
+    const [animatedAbsent, setAnimatedAbsent] = useState(0);
     const [animatedWaiting, setAnimatedWaiting] = useState(0);
-    const [animatedCompleted, setAnimatedCompleted] = useState(0);
 
-    const prevValues = useRef({ total: 0, checkedIn: 0, waiting: 0, completed: 0 });
+    const prevValues = useRef({ total: 0, checkedIn: 0, absent: 0, waiting: 0 });
 
     // Animate value changes
     useEffect(() => {
@@ -47,20 +47,20 @@ const StatsCards = ({ total, checkedIn, waiting, completed }) => {
             prevValues.current.checkedIn = checkedIn;
         }
 
+        if (prevValues.current.absent !== absent) {
+            timers.push(animateValue(setAnimatedAbsent, prevValues.current.absent, absent));
+            prevValues.current.absent = absent;
+        }
+
         if (prevValues.current.waiting !== waiting) {
             timers.push(animateValue(setAnimatedWaiting, prevValues.current.waiting, waiting));
             prevValues.current.waiting = waiting;
         }
 
-        if (prevValues.current.completed !== completed) {
-            timers.push(animateValue(setAnimatedCompleted, prevValues.current.completed, completed));
-            prevValues.current.completed = completed;
-        }
-
         return () => {
             timers.forEach(timer => clearInterval(timer));
         };
-    }, [total, checkedIn, waiting, completed]);
+    }, [total, checkedIn, absent, waiting]);
 
     return (
         <div className="stats-container">
@@ -70,7 +70,7 @@ const StatsCards = ({ total, checkedIn, waiting, completed }) => {
                 </div>
                 <div className="stat-content">
                     <div className="stat-label">Total Appointments</div>
-                    <div className="stat-value">{animatedTotal}</div>
+                    <div className="stat-value">{isNaN(animatedTotal) ? 0 : animatedTotal}</div>
                 </div>
             </div>
 
@@ -80,7 +80,17 @@ const StatsCards = ({ total, checkedIn, waiting, completed }) => {
                 </div>
                 <div className="stat-content">
                     <div className="stat-label">Checked In</div>
-                    <div className="stat-value">{animatedCheckedIn}</div>
+                    <div className="stat-value">{isNaN(animatedCheckedIn) ? 0 : animatedCheckedIn}</div>
+                </div>
+            </div>
+
+            <div className="stat-card stat-absent">
+                <div className="stat-icon">
+                    <i className="fas fa-user-times"></i>
+                </div>
+                <div className="stat-content">
+                    <div className="stat-label">Absent</div>
+                    <div className="stat-value">{isNaN(animatedAbsent) ? 0 : animatedAbsent}</div>
                 </div>
             </div>
 
@@ -90,17 +100,7 @@ const StatsCards = ({ total, checkedIn, waiting, completed }) => {
                 </div>
                 <div className="stat-content">
                     <div className="stat-label">Waiting</div>
-                    <div className="stat-value">{animatedWaiting}</div>
-                </div>
-            </div>
-
-            <div className="stat-card stat-completed">
-                <div className="stat-icon">
-                    <i className="fas fa-check-circle"></i>
-                </div>
-                <div className="stat-content">
-                    <div className="stat-label">Completed</div>
-                    <div className="stat-value">{animatedCompleted}</div>
+                    <div className="stat-value">{isNaN(animatedWaiting) ? 0 : animatedWaiting}</div>
                 </div>
             </div>
         </div>

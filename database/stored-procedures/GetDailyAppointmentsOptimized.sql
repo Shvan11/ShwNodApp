@@ -133,8 +133,8 @@ BEGIN
     SELECT
         COUNT(*) AS total,
         SUM(CASE WHEN Present IS NOT NULL THEN 1 ELSE 0 END) AS checkedIn,
-        SUM(CASE WHEN Present IS NOT NULL AND Seated IS NULL AND Dismissed IS NULL THEN 1 ELSE 0 END) AS waiting,
-        SUM(CASE WHEN Dismissed IS NOT NULL THEN 1 ELSE 0 END) AS completed
+        SUM(CASE WHEN Present IS NULL THEN 1 ELSE 0 END) AS absent,
+        SUM(CASE WHEN Present IS NOT NULL AND Seated IS NULL AND Dismissed IS NULL THEN 1 ELSE 0 END) AS waiting
     FROM #BaseAppointments;
 
     -- Drop the temporary table
@@ -151,4 +151,4 @@ GO
 -- Returns 3 result sets:
 -- 1. All appointments (not checked in)
 -- 2. Checked-in appointments
--- 3. Statistics (total, checkedIn, waiting, completed)
+-- 3. Statistics (total, checkedIn, absent, waiting)

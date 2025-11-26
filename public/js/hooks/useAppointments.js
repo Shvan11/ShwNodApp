@@ -15,7 +15,7 @@ export function useAppointments() {
     // TWO SEPARATE LISTS (matching database structure)
     const [allAppointments, setAllAppointments] = useState([]);
     const [checkedInAppointments, setCheckedInAppointments] = useState([]);
-    const [stats, setStats] = useState({ total: 0, checkedIn: 0, waiting: 0, completed: 0 });
+    const [stats, setStats] = useState({ total: 0, checkedIn: 0, absent: 0, waiting: 0 });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -56,7 +56,7 @@ export function useAppointments() {
 
             setAllAppointments(data.allAppointments || []);
             setCheckedInAppointments(data.checkedInAppointments || []);
-            setStats(data.stats || { total: 0, checkedIn: 0, waiting: 0, completed: 0 });
+            setStats(data.stats || { total: 0, checkedIn: 0, absent: 0, waiting: 0 });
         } catch (err) {
             console.error('❌ Error loading appointments:', err);
             setError(err.message);

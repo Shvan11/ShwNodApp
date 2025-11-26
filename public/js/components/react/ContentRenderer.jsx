@@ -21,11 +21,18 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }) => {
     const wildcardParams = useParams();
     const [searchParams] = useSearchParams();
 
-    // Extract appointmentId from wildcard route (for edit-appointment/:appointmentId)
-    const appointmentId = wildcardParams['*'];
+    // Extract from wildcard route
+    const wildcardPath = wildcardParams['*'] || '';
+
+    // For edit-appointment/:appointmentId pattern
+    const appointmentId = wildcardPath;
+
+    // For work/:workId/diagnosis pattern
+    const workPathMatch = wildcardPath.match(/^(\d+)\/diagnosis$/);
+    const workIdFromPath = workPathMatch ? workPathMatch[1] : null;
 
     // Extract workId and visitId from query params for work-specific pages like visits
-    const workId = searchParams.get('workId');
+    const workId = workIdFromPath || searchParams.get('workId');
     const visitId = searchParams.get('visitId');
 
     // Get tpCode from params (passed from PatientShell)
@@ -64,15 +71,30 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }) => {
                         workId={workId ? parseInt(workId) : null}
                         visitId={visitId ? parseInt(visitId) : null}
                         onSave={() => {
-                            // Navigate back to visit history after save
-                            navigate(`/patient/${patientId}/visits?workId=${workId}`);
+                            // Navigate back to works page after save
+                            navigate(`/patient/${patientId}/works`);
                         }}
                         onCancel={() => {
-                            // Navigate back to visit history on cancel
-                            navigate(`/patient/${patientId}/visits?workId=${workId}`);
+                            // Navigate back to works page on cancel
+                            navigate(`/patient/${patientId}/works`);
                         }}
                     />
                 );
+
+            case 'work':
+                // Handle work/:workId/diagnosis nested route
+                if (workIdFromPath && wildcardPath.endsWith('/diagnosis')) {
+                    // Diagnosis component uses useParams() to get patientId and workId
+                    return <Diagnosis />;
+                }
+                // If just /work, redirect to /works
+                navigate(`/patient/${patientId}/works`, { replace: true });
+                return null;
+
+            case 'diagnosis':
+                // Direct diagnosis route (from /patient/:patientId/work/:workId/diagnosis)
+                // Diagnosis component uses useParams() to get patientId and workId
+                return <Diagnosis />;
 
             case 'works':
                 return (

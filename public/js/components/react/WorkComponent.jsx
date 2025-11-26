@@ -1062,7 +1062,7 @@ const WorkComponent = ({ patientId }) => {
                                             setShowPaymentHistoryModal(false);
                                             handleAddPayment(selectedWorkForPayment);
                                         }}
-                                        className="btn-primary btn-add-payment"
+                                        className="btn btn-primary btn-add-payment"
                                     >
                                         <i className="fas fa-plus"></i> Add New Payment
                                     </button>

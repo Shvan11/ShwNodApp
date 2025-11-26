@@ -96,7 +96,7 @@ router.get("/getWebApps", async (req, res) => {
  * Returns:
  * - allAppointments: Appointments not yet checked in
  * - checkedInAppointments: Appointments that have been checked in
- * - stats: Aggregated statistics (total, checkedIn, waiting, completed)
+ * - stats: Aggregated statistics (total, checkedIn, absent, waiting)
  */
 router.get("/getDailyAppointments", async (req, res) => {
     try {

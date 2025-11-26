@@ -154,8 +154,8 @@ const DailyAppointments = () => {
             <StatsCards
                 total={stats.total}
                 checkedIn={stats.checkedIn}
+                absent={stats.absent}
                 waiting={stats.waiting}
-                completed={stats.completed}
             />
 
             {/* Appointments lists */}

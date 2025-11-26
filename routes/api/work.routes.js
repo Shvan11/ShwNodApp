@@ -521,7 +521,7 @@ router.get('/diagnosis/:workId', async (req, res) => {
         `;
 
         const result = await database.executeQuery(query, [
-            { name: 'workId', type: database.TYPES.Int, value: parseInt(workId) }
+            ['workId', database.TYPES.Int, parseInt(workId)]
         ]);
 
         // Return null if no diagnosis found (not an error)
@@ -558,7 +558,7 @@ router.post('/diagnosis', async (req, res) => {
         // Check if diagnosis already exists for this work
         const checkQuery = `SELECT ID FROM tblDiagnosis WHERE WorkID = @workId`;
         const existingDiagnosis = await database.executeQuery(checkQuery, [
-            { name: 'workId', type: database.TYPES.Int, value: parseInt(diagnosisData.WorkID) }
+            ['workId', database.TYPES.Int, parseInt(diagnosisData.WorkID)]
         ]);
 
         let query;
@@ -649,55 +649,55 @@ router.post('/diagnosis', async (req, res) => {
 
         // Build parameters - handle null/empty values
         const params = [
-            { name: 'dxDate', type: database.TYPES.DateTime2, value: diagnosisData.DxDate ? new Date(diagnosisData.DxDate) : new Date() },
-            { name: 'workId', type: database.TYPES.Int, value: parseInt(diagnosisData.WorkID) },
-            { name: 'diagnosis', type: database.TYPES.NVarChar, value: diagnosisData.Diagnosis },
-            { name: 'treatmentPlan', type: database.TYPES.NVarChar, value: diagnosisData.TreatmentPlan },
-            { name: 'chiefComplain', type: database.TYPES.NVarChar, value: diagnosisData.ChiefComplain || null },
-            { name: 'appliance', type: database.TYPES.NVarChar, value: diagnosisData.Appliance || null },
+            ['dxDate', database.TYPES.DateTime2, diagnosisData.DxDate ? new Date(diagnosisData.DxDate) : new Date()],
+            ['workId', database.TYPES.Int, parseInt(diagnosisData.WorkID)],
+            ['diagnosis', database.TYPES.NVarChar, diagnosisData.Diagnosis],
+            ['treatmentPlan', database.TYPES.NVarChar, diagnosisData.TreatmentPlan],
+            ['chiefComplain', database.TYPES.NVarChar, diagnosisData.ChiefComplain || null],
+            ['appliance', database.TYPES.NVarChar, diagnosisData.Appliance || null],
             // Facial Analysis
-            { name: 'fAnteroPosterior', type: database.TYPES.NVarChar, value: diagnosisData.fAnteroPosterior || null },
-            { name: 'fVertical', type: database.TYPES.NVarChar, value: diagnosisData.fVertical || null },
-            { name: 'fTransverse', type: database.TYPES.NVarChar, value: diagnosisData.fTransverse || null },
-            { name: 'fLipCompetence', type: database.TYPES.NVarChar, value: diagnosisData.fLipCompetence || null },
-            { name: 'fNasoLabialAngle', type: database.TYPES.NVarChar, value: diagnosisData.fNasoLabialAngle || null },
-            { name: 'fUpperIncisorShowRest', type: database.TYPES.NVarChar, value: diagnosisData.fUpperIncisorShowRest || null },
-            { name: 'fUpperIncisorShowSmile', type: database.TYPES.NVarChar, value: diagnosisData.fUpperIncisorShowSmile || null },
+            ['fAnteroPosterior', database.TYPES.NVarChar, diagnosisData.fAnteroPosterior || null],
+            ['fVertical', database.TYPES.NVarChar, diagnosisData.fVertical || null],
+            ['fTransverse', database.TYPES.NVarChar, diagnosisData.fTransverse || null],
+            ['fLipCompetence', database.TYPES.NVarChar, diagnosisData.fLipCompetence || null],
+            ['fNasoLabialAngle', database.TYPES.NVarChar, diagnosisData.fNasoLabialAngle || null],
+            ['fUpperIncisorShowRest', database.TYPES.NVarChar, diagnosisData.fUpperIncisorShowRest || null],
+            ['fUpperIncisorShowSmile', database.TYPES.NVarChar, diagnosisData.fUpperIncisorShowSmile || null],
             // Intraoral Analysis
-            { name: 'iTeethPresent', type: database.TYPES.NVarChar, value: diagnosisData.ITeethPresent || null },
-            { name: 'iDentalHealth', type: database.TYPES.NVarChar, value: diagnosisData.IDentalHealth || null },
-            { name: 'iLowerCrowding', type: database.TYPES.NVarChar, value: diagnosisData.ILowerCrowding || null },
-            { name: 'iLowerIncisorInclination', type: database.TYPES.NVarChar, value: diagnosisData.ILowerIncisorInclination || null },
-            { name: 'iCurveofSpee', type: database.TYPES.NVarChar, value: diagnosisData.ICurveofSpee || null },
-            { name: 'iUpperCrowding', type: database.TYPES.NVarChar, value: diagnosisData.IUpperCrowding || null },
-            { name: 'iUpperIncisorInclination', type: database.TYPES.NVarChar, value: diagnosisData.IUpperIncisorInclination || null },
+            ['iTeethPresent', database.TYPES.NVarChar, diagnosisData.ITeethPresent || null],
+            ['iDentalHealth', database.TYPES.NVarChar, diagnosisData.IDentalHealth || null],
+            ['iLowerCrowding', database.TYPES.NVarChar, diagnosisData.ILowerCrowding || null],
+            ['iLowerIncisorInclination', database.TYPES.NVarChar, diagnosisData.ILowerIncisorInclination || null],
+            ['iCurveofSpee', database.TYPES.NVarChar, diagnosisData.ICurveofSpee || null],
+            ['iUpperCrowding', database.TYPES.NVarChar, diagnosisData.IUpperCrowding || null],
+            ['iUpperIncisorInclination', database.TYPES.NVarChar, diagnosisData.IUpperIncisorInclination || null],
             // Occlusion Analysis
-            { name: 'oIncisorRelation', type: database.TYPES.NVarChar, value: diagnosisData.OIncisorRelation || null },
-            { name: 'oOverjet', type: database.TYPES.NVarChar, value: diagnosisData.OOverjet || null },
-            { name: 'oOverbite', type: database.TYPES.NVarChar, value: diagnosisData.OOverbite || null },
-            { name: 'oCenterlines', type: database.TYPES.NVarChar, value: diagnosisData.OCenterlines || null },
-            { name: 'oMolarRelation', type: database.TYPES.NVarChar, value: diagnosisData.OMolarRelation || null },
-            { name: 'oCanineRelation', type: database.TYPES.NVarChar, value: diagnosisData.OCanineRelation || null },
-            { name: 'oFunctionalOcclusion', type: database.TYPES.NVarChar, value: diagnosisData.OFunctionalOcclusion || null },
+            ['oIncisorRelation', database.TYPES.NVarChar, diagnosisData.OIncisorRelation || null],
+            ['oOverjet', database.TYPES.NVarChar, diagnosisData.OOverjet || null],
+            ['oOverbite', database.TYPES.NVarChar, diagnosisData.OOverbite || null],
+            ['oCenterlines', database.TYPES.NVarChar, diagnosisData.OCenterlines || null],
+            ['oMolarRelation', database.TYPES.NVarChar, diagnosisData.OMolarRelation || null],
+            ['oCanineRelation', database.TYPES.NVarChar, diagnosisData.OCanineRelation || null],
+            ['oFunctionalOcclusion', database.TYPES.NVarChar, diagnosisData.OFunctionalOcclusion || null],
             // Cephalometric Analysis
-            { name: 'c_SNA', type: database.TYPES.NVarChar, value: diagnosisData.C_SNA || null },
-            { name: 'c_SNB', type: database.TYPES.NVarChar, value: diagnosisData.C_SNB || null },
-            { name: 'c_ANB', type: database.TYPES.NVarChar, value: diagnosisData.C_ANB || null },
-            { name: 'c_SNMx', type: database.TYPES.NVarChar, value: diagnosisData.C_SNMx || null },
-            { name: 'c_Wits', type: database.TYPES.NVarChar, value: diagnosisData.C_Wits || null },
-            { name: 'c_FMA', type: database.TYPES.NVarChar, value: diagnosisData.C_FMA || null },
-            { name: 'c_MMA', type: database.TYPES.NVarChar, value: diagnosisData.C_MMA || null },
-            { name: 'c_UIMX', type: database.TYPES.NVarChar, value: diagnosisData.C_UIMX || null },
-            { name: 'c_LIMd', type: database.TYPES.NVarChar, value: diagnosisData.C_LIMd || null },
-            { name: 'c_UI_LI', type: database.TYPES.NVarChar, value: diagnosisData.C_UI_LI || null },
-            { name: 'c_LI_APo', type: database.TYPES.NVarChar, value: diagnosisData.C_LI_APo || null },
-            { name: 'c_Ulip_E', type: database.TYPES.NVarChar, value: diagnosisData.C_Ulip_E || null },
-            { name: 'c_Llip_E', type: database.TYPES.NVarChar, value: diagnosisData.C_Llip_E || null },
-            { name: 'c_Naso_lip', type: database.TYPES.NVarChar, value: diagnosisData.C_Naso_lip || null },
-            { name: 'c_TAFH', type: database.TYPES.NVarChar, value: diagnosisData.C_TAFH || null },
-            { name: 'c_UAFH', type: database.TYPES.NVarChar, value: diagnosisData.C_UAFH || null },
-            { name: 'c_LAFH', type: database.TYPES.NVarChar, value: diagnosisData.C_LAFH || null },
-            { name: 'c_PercentLAFH', type: database.TYPES.NVarChar, value: diagnosisData.C_PercentLAFH || null }
+            ['c_SNA', database.TYPES.NVarChar, diagnosisData.C_SNA || null],
+            ['c_SNB', database.TYPES.NVarChar, diagnosisData.C_SNB || null],
+            ['c_ANB', database.TYPES.NVarChar, diagnosisData.C_ANB || null],
+            ['c_SNMx', database.TYPES.NVarChar, diagnosisData.C_SNMx || null],
+            ['c_Wits', database.TYPES.NVarChar, diagnosisData.C_Wits || null],
+            ['c_FMA', database.TYPES.NVarChar, diagnosisData.C_FMA || null],
+            ['c_MMA', database.TYPES.NVarChar, diagnosisData.C_MMA || null],
+            ['c_UIMX', database.TYPES.NVarChar, diagnosisData.C_UIMX || null],
+            ['c_LIMd', database.TYPES.NVarChar, diagnosisData.C_LIMd || null],
+            ['c_UI_LI', database.TYPES.NVarChar, diagnosisData.C_UI_LI || null],
+            ['c_LI_APo', database.TYPES.NVarChar, diagnosisData.C_LI_APo || null],
+            ['c_Ulip_E', database.TYPES.NVarChar, diagnosisData.C_Ulip_E || null],
+            ['c_Llip_E', database.TYPES.NVarChar, diagnosisData.C_Llip_E || null],
+            ['c_Naso_lip', database.TYPES.NVarChar, diagnosisData.C_Naso_lip || null],
+            ['c_TAFH', database.TYPES.NVarChar, diagnosisData.C_TAFH || null],
+            ['c_UAFH', database.TYPES.NVarChar, diagnosisData.C_UAFH || null],
+            ['c_LAFH', database.TYPES.NVarChar, diagnosisData.C_LAFH || null],
+            ['c_PercentLAFH', database.TYPES.NVarChar, diagnosisData.C_PercentLAFH || null]
         ];
 
         await database.executeQuery(query, params);
@@ -727,7 +727,7 @@ router.delete('/diagnosis/:workId', async (req, res) => {
         const query = `DELETE FROM tblDiagnosis WHERE WorkID = @workId`;
 
         await database.executeQuery(query, [
-            { name: 'workId', type: database.TYPES.Int, value: parseInt(workId) }
+            ['workId', database.TYPES.Int, parseInt(workId)]
         ]);
 
         res.json({

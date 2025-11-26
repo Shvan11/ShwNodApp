@@ -372,7 +372,7 @@ export async function getDailyAppointments(AppsDate) {
     // Extract and structure result sets
     let allAppointments = [];
     let checkedInAppointments = [];
-    let stats = { total: 0, checkedIn: 0, waiting: 0, completed: 0 };
+    let stats = { total: 0, checkedIn: 0, absent: 0, waiting: 0 };
 
     if (resultSets.length >= 3) {
         // All 3 result sets present

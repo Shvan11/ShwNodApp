@@ -204,12 +204,12 @@ html {
   border-left-color: var(--success-green);
 }
 
-.stat-card.stat-waiting {
-  border-left-color: var(--warning-600);
+.stat-card.stat-absent {
+  border-left-color: var(--error-color);
 }
 
-.stat-card.stat-completed {
-  border-left-color: var(--neutral-gray);
+.stat-card.stat-waiting {
+  border-left-color: var(--warning-600);
 }
 
 .stat-icon {
@@ -233,14 +233,14 @@ html {
   color: var(--success-600);
 }
 
+.stat-card.stat-absent .stat-icon {
+  background-color: var(--error-50);
+  color: var(--error-color);
+}
+
 .stat-card.stat-waiting .stat-icon {
   background-color: var(--warning-50);
   color: var(--warning-color);
-}
-
-.stat-card.stat-completed .stat-icon {
-  background-color: var(--gray-100);
-  color: var(--gray-500);
 }
 
 .stat-content {

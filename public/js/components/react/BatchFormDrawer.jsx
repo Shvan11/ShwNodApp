@@ -192,6 +192,13 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
 
             const result = await response.json();
 
+            // Check for HTTP errors (400, 500, etc.)
+            if (!response.ok) {
+                const errorMessage = result.error || result.message || 'Failed to save batch';
+                toast.error(errorMessage);
+                return;
+            }
+
             if (result.success) {
                 // Show success message
                 toast.success(batch ? 'Batch updated successfully!' : 'Batch created successfully!');

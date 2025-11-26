@@ -5,13 +5,17 @@ import ContentRenderer from './ContentRenderer.jsx';
 
 const PatientShell = () => {
     // React Router hooks
-    const { patientId, page } = useParams();
+    const allParams = useParams();
+    const { patientId, page, workId } = allParams;
     const [searchParams] = useSearchParams();
-    const wildcardParams = useParams();
 
     // Extract tpCode from wildcard path (e.g., "tp1" from /photos/tp1)
-    const wildcardPath = wildcardParams['*'] || '';
+    const wildcardPath = allParams['*'] || '';
     const tpCode = wildcardPath.match(/^tp(\d+)$/)?.[0] || null;
+
+    // Detect if this is the diagnosis route (/patient/:patientId/work/:workId/diagnosis)
+    const isDiagnosisRoute = !!workId && window.location.pathname.endsWith('/diagnosis');
+    const effectivePage = isDiagnosisRoute ? 'diagnosis' : page;
 
     const [patientData, setPatientData] = useState({ name: '', loading: true, error: null });
     const [workData, setWorkData] = useState({ typeName: '', loading: false, error: null });
@@ -86,17 +90,20 @@ const PatientShell = () => {
         }
     }, [patientId, fetchPatientData]);
 
-    // Fetch work data when workId query param changes
-    const workId = searchParams.get('workId');
+    // Fetch work data when workId (from route or query param) changes
+    const workIdFromQuery = searchParams.get('workId');
+    const effectiveWorkId = workId || workIdFromQuery;
+
     useEffect(() => {
-        fetchWorkData(workId);
-    }, [workId, fetchWorkData]);
+        fetchWorkData(effectiveWorkId);
+    }, [effectiveWorkId, fetchWorkData]);
 
     // Extract additional params from URL
     const params = {
         tpCode: tpCode,
         view: searchParams.get('view'),
         filter: searchParams.get('filter'),
+        workId: effectiveWorkId,
     };
 
     return (
@@ -105,7 +112,7 @@ const PatientShell = () => {
             <div className="navigation-sidebar">
                 <Navigation
                     patientId={patientId}
-                    currentPage={page}
+                    currentPage={effectivePage}
                 />
             </div>
 
@@ -147,13 +154,13 @@ const PatientShell = () => {
                         )}
 
                         {/* Current Page */}
-                        {page && page !== 'photos' && page !== 'works' && (
+                        {effectivePage && effectivePage !== 'photos' && effectivePage !== 'works' && (
                             <>
                                 <span className="breadcrumb-separator">/</span>
                                 <span className="breadcrumb-item active">
-                                    <i className={`fas fa-${page === 'visits' ? 'calendar-check' : page === 'appointments' ? 'calendar-alt' : page === 'xrays' ? 'x-ray' : page === 'patient-info' ? 'id-card' : 'file'}`}></i>
+                                    <i className={`fas fa-${effectivePage === 'visits' ? 'calendar-check' : effectivePage === 'appointments' ? 'calendar-alt' : effectivePage === 'xrays' ? 'x-ray' : effectivePage === 'patient-info' ? 'id-card' : effectivePage === 'diagnosis' ? 'stethoscope' : 'file'}`}></i>
                                     {' '}
-                                    {page.charAt(0).toUpperCase() + page.slice(1).replace(/-/g, ' ')}
+                                    {effectivePage.charAt(0).toUpperCase() + effectivePage.slice(1).replace(/-/g, ' ')}
                                 </span>
                             </>
                         )}
@@ -164,7 +171,7 @@ const PatientShell = () => {
                 <div className="page-content">
                     <ContentRenderer
                         patientId={patientId}
-                        page={page}
+                        page={effectivePage}
                         params={params}
                     />
                 </div>
