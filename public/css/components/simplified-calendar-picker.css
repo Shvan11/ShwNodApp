@@ -631,52 +631,44 @@
     flex-wrap: wrap;
 }
 
-/* Form Action Buttons - Clean, Maintainable Styles */
-.appointment-form-page /* Button styles use global definitions from /css/components/buttons.css */
-.appointment-form-page /* Button styles use global definitions from /css/components/buttons.css */
-/* Cancel Button */
-.appointment-form-page /* Button styles use global definitions from /css/components/buttons.css */
-.appointment-form-page /* Button styles use global definitions from /css/components/buttons.css */
-/* Create Appointment Button */
-.appointment-form-page /* Button styles use global definitions from /css/components/buttons.css */
-.appointment-form-page /* Button styles use global definitions from /css/components/buttons.css */
-.appointment-form-page /* Button styles use global definitions from /css/components/buttons.css */
+/* Form Action Buttons - Button styles use global definitions from /css/components/buttons.css */
+
 /* ==================== RESPONSIVE ==================== */
 
 @media (max-width: 1600px) {
-    .page-content {
+    .appointment-form-page .page-content {
         grid-template-columns: 340px minmax(450px, 700px) 330px;
     }
 }
 
 @media (max-width: 1400px) {
-    .page-content {
+    .appointment-form-page .page-content {
         grid-template-columns: 320px minmax(400px, 600px) 320px;
     }
 }
 
 @media (max-width: 1200px) {
-    .page-content {
+    .appointment-form-page .page-content {
         grid-template-columns: 300px 1fr 300px;
     }
 
-    .slots-grid {
+    .appointment-form-page .slots-grid {
         grid-template-columns: 1fr;
     }
 }
 
 @media (max-width: 992px) {
-    .page-content {
+    .appointment-form-page .page-content {
         grid-template-columns: 1fr;
     }
 
-    .calendar-column,
-    .schedule-column {
+    .appointment-form-page .calendar-column,
+    .appointment-form-page .schedule-column {
         border-right: none;
         border-bottom: 1px solid var(--gray-200);
     }
 
-    .slots-grid {
+    .appointment-form-page .slots-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 }

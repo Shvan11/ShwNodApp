@@ -161,8 +161,6 @@
         gap: 1rem;
     }
 
-    }
-
     .patient-management {
         padding: 0 0.75rem;
     }
@@ -193,8 +191,6 @@
     .edit-patient-form .form-group input,
     .edit-patient-form .form-group select,
     .edit-patient-form .form-group textarea {
-        min-height: 48px;
-    }
         min-height: 48px;
         -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
     }
@@ -232,6 +228,7 @@
     gap: var(--spacing-md);
     margin: 0 0 var(--spacing-sm) 0;
     font-size: 1.75rem;
+}
 
 .edit-patient-description {
     color: var(--gray-500);
