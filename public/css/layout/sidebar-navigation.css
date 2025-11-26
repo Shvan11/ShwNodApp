@@ -411,6 +411,8 @@
     overflow: hidden;
     z-index: 9999;
     animation: flyoutSlideIn 0.2s ease;
+    transform: translateY(-100%); /* Position above the button */
+    margin-top: -10px; /* Small gap */
 }
 
 .more-actions-flyout .flyout-header {
@@ -469,6 +471,10 @@
     justify-content: center;
     font-size: 1.125rem;
     color: var(--indigo-500);
+}
+
+.action-item-icon.dolphin-icon {
+    font-size: 1.25rem;
 }
 
 .flyout-action-item.active .action-item-icon {

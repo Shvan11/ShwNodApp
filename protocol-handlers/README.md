@@ -10,7 +10,8 @@
 protocol-handlers/
 ├── source/
 │   ├── ExplorerProtocolHandler.cs      # Explorer protocol source
-│   └── CSImagingProtocolHandler.cs     # CS Imaging protocol source
+│   ├── CSImagingProtocolHandler.cs     # CS Imaging protocol source
+│   └── DolphinImagingProtocolHandler.cs # Dolphin Imaging protocol source
 ├── registry/
 │   ├── register-protocols.reg          # Registers both protocols
 │   └── unregister-protocols.reg        # Removes both protocols
@@ -90,6 +91,40 @@ window.location.href = 'csimaging:12345?name=John_Doe';
 
 ---
 
+### 3. Dolphin Imaging Protocol (`dolphin:`)
+
+**Purpose**: Launch Dolphin Imaging software with patient context pre-loaded
+
+**Usage**: Click "Dolphin Imaging" button in More Actions flyout (patient sidebar)
+
+**Features**:
+- Reads `DolphinPath` from `C:\Windows\ProtocolHandlers.ini`
+- Validates `DolCtrl.exe` exists
+- Modifies `Dolphin.ini`: Sets `[Defaults]CaptureFromFilePath` to patient folder
+- Launches `DolCtrl.exe` with PatientID as argument
+- Dolphin automatically opens patient folder for imaging
+
+**Example**:
+```javascript
+window.location.href = 'dolphin:12345?name=John_Doe';
+```
+
+**How it works**:
+1. Protocol handler reads `DolphinPath` from config (e.g., `C:\Dolphin\`)
+2. Constructs patient folder: `{PatientsFolder}\{PatientID}\`
+3. Writes to `{DolphinPath}\Dolphin.ini`:
+   - Section: `[Defaults]`
+   - Key: `CaptureFromFilePath`
+   - Value: `\\Clinic\clinic1\12345\`
+4. Launches `{DolphinPath}\DolCtrl.exe {PatientID}`
+5. Dolphin loads with patient folder pre-configured
+
+**Configuration**:
+- `DolphinPath` in ProtocolHandlers.ini (default: `C:\Dolphin\`)
+- `PatientsFolder` in ProtocolHandlers.ini (shared with CS Imaging)
+
+---
+
 ## 🔧 How It Works
 
 ### Architecture:
@@ -116,7 +151,8 @@ window.location.href = 'csimaging:12345?name=John_Doe';
 [Protocol Handler .exe]
         │
         ├─► ExplorerProtocolHandler.exe → Opens/creates folders
-        └─► CSImagingProtocolHandler.exe → Launches CS Imaging
+        ├─► CSImagingProtocolHandler.exe → Launches CS Imaging
+        └─► DolphinImagingProtocolHandler.exe → Launches Dolphin Imaging
 ```
 
 ### Browser Configuration:

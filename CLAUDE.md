@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Patient Management**: Complete patient lifecycle including registration, demographic data, contact management, treatment history, photo/x-ray imaging with time-point organization, and WebCeph integration for cephalometric analysis.
 
-**Orthodontic Treatment**: Interactive dental chart (Palmer notation), wire tracking (upper/lower arch), visit recording with treatment notes, appliance/bracket tracking, treatment planning, and progress monitoring with photo milestones.
+**Orthodontic Treatment**: Interactive dental chart (Palmer notation), wire tracking (upper/lower arch), visit recording with treatment notes, appliance/bracket tracking, treatment planning, progress monitoring with photo milestones, CS Imaging integration, and Dolphin Imaging integration with automatic patient folder configuration.
 
 **Aligner Management**: Comprehensive aligner case management including doctor/partner registration, aligner set lifecycle tracking, batch management, payment tracking, activity logging, doctor communication with notes, and PDF case plan storage via Google Drive integration.
 

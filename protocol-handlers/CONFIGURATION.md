@@ -25,6 +25,7 @@ PatientsFolder=\\Clinic\clinic1
 | Setting | Description | Example |
 |---------|-------------|---------|
 | `PatientsFolder` | Base path where patient folders are stored | `\\Clinic\clinic1` |
+| `DolphinPath` | Dolphin Imaging installation directory | `C:\Dolphin\` |
 
 ---
 
@@ -126,6 +127,29 @@ When you click "CS Imaging" in the patient sidebar:
 3. Constructs OPG path: `{PatientsFolder}\{PatientID}\OPG`
 4. Example: `\\Clinic\clinic1\12345\OPG`
 5. Launches CS Imaging with this path
+
+---
+
+## How Dolphin Imaging Uses Configuration
+
+When you click "Dolphin Imaging" in More Actions flyout:
+
+1. Protocol handler reads `C:\Windows\ProtocolHandlers.ini`
+2. Extracts `DolphinPath` value (e.g., `C:\Dolphin\`)
+3. Constructs patient folder: `{PatientsFolder}\{PatientID}\`
+4. Writes to `{DolphinPath}\Dolphin.ini`:
+   - Section: `[Defaults]`
+   - Key: `CaptureFromFilePath`
+   - Value: `\\Clinic\clinic1\12345\`
+5. Launches `{DolphinPath}\DolCtrl.exe {PatientID}`
+6. Dolphin loads with patient folder pre-configured
+
+**Example Configuration**:
+```ini
+[Paths]
+PatientsFolder=\\Clinic\clinic1
+DolphinPath=C:\Dolphin\
+```
 
 ---
 

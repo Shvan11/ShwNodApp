@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
 
 const Navigation = ({ patientId, currentPage }) => {
-    const navigate = useNavigate();
     const toast = useToast();
     const { tpCode } = useParams();
     const [timepoints, setTimepoints] = useState([]);
@@ -227,9 +225,10 @@ const Navigation = ({ patientId, currentPage }) => {
     const isPhotosPageActive = currentPage === 'photos';
 
     return (
-        <div className="patient-sidebar narrow-bar">
-            {/* Main navigation content */}
-            <div className="sidebar-content">
+        <>
+            <div className="patient-sidebar narrow-bar">
+                {/* Main navigation content */}
+                <div className="sidebar-content">
                 {/* Static navigation items section */}
                 <div className="nav-section">
                     {staticNavItems.map(item => {
@@ -247,7 +246,22 @@ const Navigation = ({ patientId, currentPage }) => {
                             if (isNewPatient) return; // Disable for new patients
                             if (photosButtonRef.current) {
                                 const rect = photosButtonRef.current.getBoundingClientRect();
-                                setFlyoutPosition({ top: rect.top });
+                                const viewportHeight = window.innerHeight;
+                                const flyoutMaxHeight = 450; // Photos flyout can be taller (max-height: 500px)
+
+                                // Calculate ideal top position (aligned with button)
+                                let calculatedTop = rect.top;
+
+                                // Check if flyout would extend beyond viewport bottom
+                                if (calculatedTop + flyoutMaxHeight > viewportHeight) {
+                                    // Position flyout above the bottom edge with padding
+                                    calculatedTop = viewportHeight - flyoutMaxHeight - 20;
+                                }
+
+                                // Ensure flyout doesn't go above viewport top
+                                calculatedTop = Math.max(10, calculatedTop);
+
+                                setFlyoutPosition({ top: calculatedTop });
                             }
                             setPhotosExpanded(true);
                         }}
@@ -326,7 +340,8 @@ const Navigation = ({ patientId, currentPage }) => {
                         if (isNewPatient) return; // Disable for new patients
                         if (moreActionsButtonRef.current) {
                             const rect = moreActionsButtonRef.current.getBoundingClientRect();
-                            setMoreActionsFlyoutPosition({ top: rect.top });
+                            // Store the button's bottom position for positioning the flyout
+                            setMoreActionsFlyoutPosition({ bottom: rect.bottom });
                         }
                         setMoreActionsExpanded(true);
                     }}
@@ -382,49 +397,71 @@ const Navigation = ({ patientId, currentPage }) => {
                         </div>
                         <span className="nav-item-label">More Actions</span>
                     </div>
-
-                    {/* More Actions Flyout Menu */}
-                    {moreActionsExpanded && (
-                        <div
-                            className="more-actions-flyout"
-                            style={{ top: `${moreActionsFlyoutPosition.top}px` }}
-                            onMouseEnter={() => setMoreActionsExpanded(true)}
-                            onMouseLeave={() => setMoreActionsExpanded(false)}
-                        >
-                            <div className="flyout-header">
-                                <i className="fas fa-ellipsis-h" />
-                                More Actions
-                            </div>
-                            <div className="flyout-content">
-                                <Link
-                                    to={`/patient/${patientId}/compare`}
-                                    className={`flyout-action-item ${currentPage === 'compare' ? 'active' : ''}`}
-                                    onClick={() => setMoreActionsExpanded(false)}
-                                >
-                                    <div className="action-item-icon">
-                                        <i className="fas fa-exchange-alt" />
-                                    </div>
-                                    <span className="action-item-label">Compare Photos</span>
-                                </Link>
-
-                                <Link
-                                    to={`/patient/${patientId}/xrays`}
-                                    className={`flyout-action-item ${currentPage === 'xrays' ? 'active' : ''}`}
-                                    onClick={() => setMoreActionsExpanded(false)}
-                                >
-                                    <div className="action-item-icon">
-                                        <i className="fas fa-x-ray" />
-                                    </div>
-                                    <span className="action-item-label">X-rays</span>
-                                </Link>
-                            </div>
-                        </div>
-                    )}
                 </div>
-
 
             </div>
         </div>
+
+        {/* More Actions Flyout Menu - OUTSIDE SIDEBAR FOR PROPER POSITIONING */}
+        {moreActionsExpanded && (
+            <div
+                className="more-actions-flyout"
+                style={{
+                    bottom: `${window.innerHeight - moreActionsFlyoutPosition.bottom}px`,
+                    top: 'auto',
+                    transform: 'none'
+                }}
+                onMouseEnter={() => setMoreActionsExpanded(true)}
+                onMouseLeave={() => setMoreActionsExpanded(false)}
+            >
+                <div className="flyout-content">
+                    <Link
+                        to={`/patient/${patientId}/compare`}
+                        className={`flyout-action-item ${currentPage === 'compare' ? 'active' : ''}`}
+                        onClick={() => setMoreActionsExpanded(false)}
+                    >
+                        <div className="action-item-icon">
+                            <i className="fas fa-exchange-alt" />
+                        </div>
+                        <span className="action-item-label">Compare Photos</span>
+                    </Link>
+
+                    <Link
+                        to={`/patient/${patientId}/xrays`}
+                        className={`flyout-action-item ${currentPage === 'xrays' ? 'active' : ''}`}
+                        onClick={() => setMoreActionsExpanded(false)}
+                    >
+                        <div className="action-item-icon">
+                            <i className="fas fa-x-ray" />
+                        </div>
+                        <span className="action-item-label">X-rays</span>
+                    </Link>
+
+                    <Link
+                        to="#"
+                        className={`flyout-action-item ${isNewPatient ? 'disabled' : ''}`}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            if (isNewPatient) return;
+
+                            const patientName = patientInfo?.PatientName || 'Unknown';
+                            const formattedName = patientName.replace(/ /g, '_');
+                            const dolphinUrl = `dolphin:${patientId}?name=${encodeURIComponent(formattedName)}`;
+
+                            window.location.href = dolphinUrl;
+                            setMoreActionsExpanded(false);
+                        }}
+                        title={isNewPatient ? "Save patient first to access Dolphin Imaging" : "Launch Dolphin Imaging with patient data"}
+                    >
+                        <div className="action-item-icon dolphin-icon">
+                            🐬
+                        </div>
+                        <span className="action-item-label">Dolphin Imaging</span>
+                    </Link>
+                </div>
+            </div>
+        )}
+        </>
     );
 };
 

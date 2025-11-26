@@ -12,6 +12,7 @@ echo ============================================
 echo   Installing:
 echo   - Explorer Protocol (folder opening)
 echo   - CS Imaging Protocol (Trophy integration)
+echo   - Dolphin Imaging Protocol (Dolphin integration)
 echo   - Universal Protocol (launch any application)
 echo ============================================
 echo.
@@ -50,6 +51,13 @@ if not exist "%~dp0UniversalProtocolHandler.exe" (
     exit /b 1
 )
 
+if not exist "%~dp0DolphinImagingProtocolHandler.exe" (
+    echo.
+    echo ERROR: DolphinImagingProtocolHandler.exe not found after compilation!
+    pause
+    exit /b 1
+)
+
 echo.
 echo [Step 2/4] Creating/updating configuration file...
 echo.
@@ -76,12 +84,14 @@ echo.
 REM Kill any running protocol handler processes (they may be cached by Windows)
 taskkill /F /IM ExplorerProtocolHandler.exe >nul 2>&1
 taskkill /F /IM CSImagingProtocolHandler.exe >nul 2>&1
+taskkill /F /IM DolphinImagingProtocolHandler.exe >nul 2>&1
 taskkill /F /IM UniversalProtocolHandler.exe >nul 2>&1
 echo   - Stopped any running protocol handlers
 
 REM Check if files already exist and compare
 set NEEDS_COPY_EXPLORER=1
 set NEEDS_COPY_CSIMAGING=1
+set NEEDS_COPY_DOLPHIN=1
 set NEEDS_COPY_UNIVERSAL=1
 
 if exist "C:\Windows\ExplorerProtocolHandler.exe" (
@@ -158,6 +168,43 @@ if %NEEDS_COPY_CSIMAGING% equ 1 (
     )
 )
 
+if exist "C:\Windows\DolphinImagingProtocolHandler.exe" (
+    fc /b "%~dp0DolphinImagingProtocolHandler.exe" "C:\Windows\DolphinImagingProtocolHandler.exe" >nul 2>&1
+    if %errorLevel% equ 0 (
+        echo   - DolphinImagingProtocolHandler.exe is up to date
+        set NEEDS_COPY_DOLPHIN=0
+    ) else (
+        echo   - Updating DolphinImagingProtocolHandler.exe
+    )
+) else (
+    echo   - Installing DolphinImagingProtocolHandler.exe
+)
+
+if %NEEDS_COPY_DOLPHIN% equ 1 (
+    REM Try to copy with retries (file may be locked temporarily)
+    set COPY_SUCCESS=0
+    for /L %%i in (1,1,3) do (
+        copy /Y "%~dp0DolphinImagingProtocolHandler.exe" "C:\Windows\" >nul 2>&1
+        if !errorLevel! equ 0 (
+            set COPY_SUCCESS=1
+            goto :dolphin_copied
+        )
+        if %%i lss 3 (
+            timeout /t 2 /nobreak >nul
+        )
+    )
+    :dolphin_copied
+    if !COPY_SUCCESS! equ 0 (
+        echo ERROR: Failed to copy DolphinImagingProtocolHandler.exe after 3 attempts
+        echo The file may be locked by Windows. Try:
+        echo 1. Close all File Explorer windows
+        echo 2. Wait a few seconds
+        echo 3. Run the installer again
+        pause
+        exit /b 1
+    )
+)
+
 if exist "C:\Windows\UniversalProtocolHandler.exe" (
     fc /b "%~dp0UniversalProtocolHandler.exe" "C:\Windows\UniversalProtocolHandler.exe" >nul 2>&1
     if %errorLevel% equ 0 (
@@ -208,6 +255,10 @@ reg add "HKCR\csimaging" /ve /t REG_SZ /d "URL:CS Imaging Protocol" /f >nul 2>&1
 reg add "HKCR\csimaging" /v "URL Protocol" /t REG_SZ /d "" /f >nul 2>&1
 reg add "HKCR\csimaging\shell\open\command" /ve /t REG_SZ /d "\"C:\\Windows\\CSImagingProtocolHandler.exe\" \"%%1\"" /f >nul 2>&1
 
+reg add "HKCR\dolphin" /ve /t REG_SZ /d "URL:Dolphin Imaging Protocol" /f >nul 2>&1
+reg add "HKCR\dolphin" /v "URL Protocol" /t REG_SZ /d "" /f >nul 2>&1
+reg add "HKCR\dolphin\shell\open\command" /ve /t REG_SZ /d "\"C:\\Windows\\DolphinImagingProtocolHandler.exe\" \"%%1\"" /f >nul 2>&1
+
 reg add "HKCR\launch" /ve /t REG_SZ /d "URL:Universal Application Launcher" /f >nul 2>&1
 reg add "HKCR\launch" /v "URL Protocol" /t REG_SZ /d "" /f >nul 2>&1
 reg add "HKCR\launch\shell\open\command" /ve /t REG_SZ /d "\"C:\\Windows\\UniversalProtocolHandler.exe\" \"%%1\"" /f >nul 2>&1
@@ -223,7 +274,7 @@ if %errorLevel% equ 0 (
 ) else (
     echo   - Chrome policy not found, creating...
 )
-reg add %CHROME_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"launch\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
+reg add %CHROME_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"launch\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
 
 REM For Edge
 set EDGE_POLICY="HKLM\SOFTWARE\Policies\Microsoft\Edge"
@@ -233,7 +284,7 @@ if %errorLevel% equ 0 (
 ) else (
     echo   - Edge policy not found, creating...
 )
-reg add %EDGE_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"launch\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
+reg add %EDGE_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"launch\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
 
 echo   - Protocols registered successfully
 
@@ -265,6 +316,13 @@ if not exist "C:\Windows\CSImagingProtocolHandler.exe" (
     echo   + CSImagingProtocolHandler.exe OK
 )
 
+if not exist "C:\Windows\DolphinImagingProtocolHandler.exe" (
+    echo   X DolphinImagingProtocolHandler.exe NOT FOUND
+    set ALL_OK=0
+) else (
+    echo   + DolphinImagingProtocolHandler.exe OK
+)
+
 if not exist "C:\Windows\UniversalProtocolHandler.exe" (
     echo   X UniversalProtocolHandler.exe NOT FOUND
     set ALL_OK=0
@@ -286,6 +344,14 @@ if !errorLevel! equ 0 (
     echo   + csimaging: protocol registered
 ) else (
     echo   X csimaging: protocol NOT registered
+    set ALL_OK=0
+)
+
+reg query "HKCR\dolphin\shell\open\command" >nul 2>&1
+if !errorLevel! equ 0 (
+    echo   + dolphin: protocol registered
+) else (
+    echo   X dolphin: protocol NOT registered
     set ALL_OK=0
 )
 
@@ -312,6 +378,7 @@ if !ALL_OK! equ 1 (
     echo 3. Test protocols:
     echo    - Click "Open Folder" on aligner sets
     echo    - Click "CS Imaging" in patient sidebar
+    echo    - Click "Dolphin Imaging" in More Actions flyout
     echo    - Click "Print Labels" on aligner batch cards
     echo.
     echo The handlers are now active and ready to use!

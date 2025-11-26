@@ -29,7 +29,7 @@ $compiledCount = 0
 $failedCount = 0
 
 # Compile ExplorerProtocolHandler
-Write-Host "[1/3] Compiling ExplorerProtocolHandler.cs..." -ForegroundColor Cyan
+Write-Host "[1/4] Compiling ExplorerProtocolHandler.cs..." -ForegroundColor Cyan
 
 if (-not (Test-Path "source\ExplorerProtocolHandler.cs")) {
     Write-Host "ERROR: source\ExplorerProtocolHandler.cs not found!" -ForegroundColor Red
@@ -49,7 +49,7 @@ if (-not (Test-Path "source\ExplorerProtocolHandler.cs")) {
 Write-Host ""
 
 # Compile CSImagingProtocolHandler
-Write-Host "[2/3] Compiling CSImagingProtocolHandler.cs..." -ForegroundColor Cyan
+Write-Host "[2/4] Compiling CSImagingProtocolHandler.cs..." -ForegroundColor Cyan
 
 if (-not (Test-Path "source\CSImagingProtocolHandler.cs")) {
     Write-Host "ERROR: source\CSImagingProtocolHandler.cs not found!" -ForegroundColor Red
@@ -69,7 +69,7 @@ if (-not (Test-Path "source\CSImagingProtocolHandler.cs")) {
 Write-Host ""
 
 # Compile UniversalProtocolHandler
-Write-Host "[3/3] Compiling UniversalProtocolHandler.cs..." -ForegroundColor Cyan
+Write-Host "[3/4] Compiling UniversalProtocolHandler.cs..." -ForegroundColor Cyan
 
 if (-not (Test-Path "source\UniversalProtocolHandler.cs")) {
     Write-Host "ERROR: source\UniversalProtocolHandler.cs not found!" -ForegroundColor Red
@@ -79,6 +79,26 @@ if (-not (Test-Path "source\UniversalProtocolHandler.cs")) {
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "  SUCCESS: UniversalProtocolHandler.exe created" -ForegroundColor Green
+        $compiledCount++
+    } else {
+        Write-Host "  ERROR: Compilation failed" -ForegroundColor Red
+        $failedCount++
+    }
+}
+
+Write-Host ""
+
+# Compile DolphinImagingProtocolHandler
+Write-Host "[4/4] Compiling DolphinImagingProtocolHandler.cs..." -ForegroundColor Cyan
+
+if (-not (Test-Path "source\DolphinImagingProtocolHandler.cs")) {
+    Write-Host "ERROR: source\DolphinImagingProtocolHandler.cs not found!" -ForegroundColor Red
+    $failedCount++
+} else {
+    & $cscPath /target:winexe /out:DolphinImagingProtocolHandler.exe /reference:System.Web.dll /reference:System.Windows.Forms.dll "source\DolphinImagingProtocolHandler.cs" 2>&1 | Out-Null
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  SUCCESS: DolphinImagingProtocolHandler.exe created" -ForegroundColor Green
         $compiledCount++
     } else {
         Write-Host "  ERROR: Compilation failed" -ForegroundColor Red

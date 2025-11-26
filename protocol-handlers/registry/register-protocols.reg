@@ -39,13 +39,30 @@ Windows Registry Editor Version 5.00
 @="\"C:\\Windows\\CSImagingProtocolHandler.exe\" \"%1\""
 
 
+; --- DOLPHIN IMAGING PROTOCOL ---
+
+[HKEY_CLASSES_ROOT\dolphin]
+@="URL:Dolphin Imaging Protocol"
+"URL Protocol"=""
+
+[HKEY_CLASSES_ROOT\dolphin\DefaultIcon]
+@="C:\\Windows\\DolphinImagingProtocolHandler.exe,1"
+
+[HKEY_CLASSES_ROOT\dolphin\shell]
+
+[HKEY_CLASSES_ROOT\dolphin\shell\open]
+
+[HKEY_CLASSES_ROOT\dolphin\shell\open\command]
+@="\"C:\\Windows\\DolphinImagingProtocolHandler.exe\" \"%1\""
+
+
 ; --- BROWSER AUTO-LAUNCH CONFIGURATION ---
 ; This eliminates browser prompts by auto-launching protocols from your domain
 
 ; --- For Google Chrome ---
 [HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome]
-"AutoLaunchProtocolsFromOrigins"="[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"launch\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]"
+"AutoLaunchProtocolsFromOrigins"="[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"launch\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]"
 
 ; --- For Microsoft Edge ---
 [HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge]
-"AutoLaunchProtocolsFromOrigins"="[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"launch\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]"
+"AutoLaunchProtocolsFromOrigins"="[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"launch\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]"
