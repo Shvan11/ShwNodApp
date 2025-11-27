@@ -332,7 +332,45 @@ const Navigation = ({ patientId, currentPage }) => {
 
             {/* Sidebar footer */}
             <div className="sidebar-footer">
-                {/* More Actions Button with Flyout */}
+                {/* CS Imaging Button - Outside wrapper */}
+                <div
+                    className={`sidebar-nav-item csimaging-item ${isNewPatient ? 'disabled' : ''}`}
+                    onClick={(e) => {
+                        e.preventDefault();
+                        if (isNewPatient) return;
+                        handleOpenCSImaging();
+                    }}
+                    title={isNewPatient ? "Save patient first to access CS Imaging" : "Open CS Imaging Trophy"}
+                >
+                    <div className="nav-item-icon">
+                        <i className="fas fa-radiation" />
+                    </div>
+                    <span className="nav-item-label">CS Imaging</span>
+                </div>
+
+                {/* Patient Folder Button - Outside wrapper */}
+                <div
+                    className={`sidebar-nav-item folder-item ${isNewPatient ? 'disabled' : ''}`}
+                    onClick={(e) => {
+                        e.preventDefault();
+                        if (isNewPatient) return;
+                        if (!patientsFolder) {
+                            toast.error('Patients folder path is not configured. Please check settings.');
+                            return;
+                        }
+                        // Construct full path: PatientsFolder + PatientID
+                        const fullPath = `${patientsFolder}${patientId}`;
+                        window.location.href = `explorer:${fullPath}`;
+                    }}
+                    title={isNewPatient ? "Save patient first to access folder" : "Open Patient Folder"}
+                >
+                    <div className="nav-item-icon">
+                        <i className="fas fa-folder-open" />
+                    </div>
+                    <span className="nav-item-label">Open Folder</span>
+                </div>
+
+                {/* More Actions Button with Flyout - ONLY this button triggers the flyout */}
                 <div
                     ref={moreActionsButtonRef}
                     className="more-actions-wrapper"
@@ -349,45 +387,6 @@ const Navigation = ({ patientId, currentPage }) => {
                         setMoreActionsExpanded(false);
                     }}
                 >
-
-                    <div
-                        className={`sidebar-nav-item csimaging-item ${isNewPatient ? 'disabled' : ''}`}
-                        onClick={(e) => {
-                            e.preventDefault();
-                            if (isNewPatient) return;
-                            handleOpenCSImaging();
-                        }}
-                        title={isNewPatient ? "Save patient first to access CS Imaging" : "Open CS Imaging Trophy"}
-                    >
-                        <div className="nav-item-icon">
-                            <i className="fas fa-radiation" />
-                        </div>
-                        <span className="nav-item-label">CS Imaging</span>
-                    </div>
-
-                    <div
-                        className={`sidebar-nav-item folder-item ${isNewPatient ? 'disabled' : ''}`}
-                        onClick={(e) => {
-                            e.preventDefault();
-                            if (isNewPatient) return;
-                            if (!patientsFolder) {
-                                toast.error('Patients folder path is not configured. Please check settings.');
-                                return;
-                            }
-                            // Construct full path: PatientsFolder + PatientID
-                            const fullPath = `${patientsFolder}${patientId}`;
-                            window.location.href = `explorer:${fullPath}`;
-                        }}
-                        title={isNewPatient ? "Save patient first to access folder" : "Open Patient Folder"}
-                    >
-                        <div className="nav-item-icon">
-                            <i className="fas fa-folder-open" />
-                        </div>
-                        <span className="nav-item-label">Open Folder</span>
-                    </div>
-
-
-
                     <div
                         className={`sidebar-nav-item more-actions-btn ${(currentPage === 'compare' || currentPage === 'xrays') ? 'active' : ''} ${isNewPatient ? 'disabled' : ''}`}
                         title={isNewPatient ? "Save patient first to access more actions" : "More Actions"}

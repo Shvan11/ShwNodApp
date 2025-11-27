@@ -75,10 +75,15 @@ html {
   color: var(--text-color);
   font-size: var(--font-size-base);
   white-space: nowrap;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  height: 100%;
+  /* Fixed: Use consistent line-height matching the input (reset.css has 1.15 for inputs) */
+  line-height: var(--line-height-tight);
+  /* Fixed: Remove display: flex - labels should be inline-block for proper alignment */
+  display: inline-block;
+  /* Fixed: Use vertical-align to match input baseline */
+  vertical-align: middle;
+  /* Fixed: Remove height: 100% that causes layout shift */
+  margin: 0;
+  padding: 0;
 }
 
 .date-picker-left input[type="date"] {
@@ -89,9 +94,12 @@ html {
   font-family: var(--font-primary);
   transition: all var(--transition-base);
   background-color: var(--surface);
-  line-height: 1;
-  display: flex;
-  align-items: center;
+  /* Fixed: Use consistent line-height matching the label and reset.css */
+  line-height: var(--line-height-tight);
+  /* Fixed: Remove display: flex - inputs should be inline-block for proper alignment */
+  display: inline-block;
+  /* Fixed: Use vertical-align to match label baseline */
+  vertical-align: middle;
 }
 
 .date-picker-left input[type="date"]:focus {
@@ -286,6 +294,13 @@ html {
   flex: 1;
   min-width: 0;
   background: transparent;
+}
+
+/* Refreshing state - dim list and prevent clicks during data reload */
+.appointments-section.refreshing {
+  opacity: 0.6;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
 }
 
 .appointments-section h3 {

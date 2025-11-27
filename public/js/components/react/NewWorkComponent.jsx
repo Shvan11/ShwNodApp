@@ -181,15 +181,19 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
             if (!response.ok) {
                 const errorData = await response.json();
                 // Handle specific error cases with detailed messages
-                if (errorData.code === 'DUPLICATE_ACTIVE_WORK') {
+                // Check for DUPLICATE_ACTIVE_WORK in details.code or top-level code
+                const errorCode = errorData.details?.code || errorData.code;
+                if (errorCode === 'DUPLICATE_ACTIVE_WORK') {
                     // Show confirmation dialog instead of error
-                    setExistingWorkData(errorData.existingWork);
+                    setExistingWorkData(errorData.details?.existingWork || errorData.existingWork);
                     setPendingFormData(formData);
                     setShowConfirmDialog(true);
                     setLoading(false);
                     return;
                 }
-                throw new Error(errorData.details || errorData.error || 'Failed to save work');
+                // Extract error message properly (details.message > message > details > error)
+                const errorMessage = errorData.details?.message || errorData.message || errorData.details || errorData.error || 'Failed to save work';
+                throw new Error(errorMessage);
             }
 
             const result = await response.json();

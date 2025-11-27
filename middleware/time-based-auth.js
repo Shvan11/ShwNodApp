@@ -11,17 +11,17 @@ import { executeQuery, TYPES } from '../services/database/index.js';
 import { log } from '../utils/logger.js';
 
 /**
- * Check if date is today (simple!)
- * @param {Date} date - The date to check
- * @returns {boolean} - True if date is today
+ * Check if date is today (timezone-safe)
+ * @param {Date|string} date - The date to check
+ * @returns {boolean} - True if date is today in local timezone
  */
 function isToday(date) {
   const today = new Date();
   const recordDate = new Date(date);
 
-  return today.getFullYear() === recordDate.getFullYear() &&
-         today.getMonth() === recordDate.getMonth() &&
-         today.getDate() === recordDate.getDate();
+  // toDateString() returns "Thu Nov 28 2025" - compares date only, ignores time
+  // Works correctly with useUTC: false configuration
+  return today.toDateString() === recordDate.toDateString();
 }
 
 /**
@@ -182,6 +182,6 @@ export async function getExpenseCreationDate(req) {
 }
 
 /**
- * Export isToday for frontend usage (if needed)
+ * Export isToday for use in other modules
  */
 export { isToday };

@@ -34,7 +34,7 @@ import {
     addWorkWithInvoice
 } from '../../services/database/queries/work-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
-import { requireRecordAge, getWorkCreationDate } from '../../middleware/time-based-auth.js';
+import { requireRecordAge, getWorkCreationDate, isToday } from '../../middleware/time-based-auth.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 import {
@@ -195,12 +195,6 @@ router.post('/addWorkWithInvoice', async (req, res) => {
 router.put('/updatework',
     authenticate,
     authorize(['admin', 'secretary']),
-    requireRecordAge({
-        resourceType: 'work',
-        operation: 'update',
-        getRecordDate: getWorkCreationDate,
-        restrictedFields: ['TotalRequired', 'Paid', 'Discount'] // Money-related fields
-    }),
     async (req, res) => {
         try {
             const { workId, ...workData } = req.body;
@@ -229,6 +223,29 @@ router.put('/updatework',
                 workData[field] = date;
             }
         });
+
+        // ===== PERMISSION CHECK FOR FINANCIAL FIELDS =====
+        // Financial fields that require special permission (admin or same-day edit)
+        const financialFields = ['TotalRequired', 'Currency', 'Paid', 'Discount'];
+        const isUpdatingFinancialFields = financialFields.some(
+            field => workData.hasOwnProperty(field)
+        );
+
+        // If non-admin AND updating financial fields, check work creation date
+        if (req.session?.userRole !== 'admin' && isUpdatingFinancialFields) {
+            const workCreationDate = await getWorkCreationDate(req);
+
+            // Check if work was created today (uses improved isToday from middleware)
+            if (!isToday(workCreationDate)) {
+                // Work was NOT created today - block financial field updates
+                return res.status(403).json({
+                    error: 'Forbidden',
+                    message: 'Cannot edit financial fields (Total Required, Currency, etc.) for work not created today. Contact admin.',
+                    restrictedFields: financialFields
+                });
+            }
+        }
+        // ===== END PERMISSION CHECK =====
 
         const result = await updateWork(parseInt(workId), workData);
         res.json({

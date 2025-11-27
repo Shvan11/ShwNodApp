@@ -389,10 +389,12 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         }));
     };
 
-    // Handle focus - allow easy editing
-    const handleMoneyInputFocus = (fieldName) => {
-        // Keep the formatted value, user can edit it
-        // The parseFormattedNumber will handle comma removal
+    // Handle focus - select all text only when value is "0"
+    const handleMoneyInputFocus = (e, fieldName) => {
+        // If value is "0", select it so user can immediately type to replace (no cursor confusion)
+        if (e.target.value === '0') {
+            e.target.select();
+        }
     };
 
     const handleChangeOverride = (value) => {
@@ -756,7 +758,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                 value={displayValues.amountToRegister}
                                 onChange={(e) => handleMoneyInputChange('amountToRegister', e.target.value)}
                                 onBlur={() => handleMoneyInputBlur('amountToRegister')}
-                                onFocus={() => handleMoneyInputFocus('amountToRegister')}
+                                onFocus={(e) => handleMoneyInputFocus(e, 'amountToRegister')}
                                 required
                                 placeholder={`Amount to deduct from balance`}
                                 className="large-input"
@@ -817,7 +819,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                             value={displayValues.actualUSD}
                                             onChange={(e) => handleMoneyInputChange('actualUSD', e.target.value)}
                                             onBlur={() => handleMoneyInputBlur('actualUSD')}
-                                            onFocus={() => handleMoneyInputFocus('actualUSD')}
+                                            onFocus={(e) => handleMoneyInputFocus(e, 'actualUSD')}
                                             required
                                             placeholder="Enter USD amount"
                                             className="large-input"
@@ -837,7 +839,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                             value={displayValues.actualIQD}
                                             onChange={(e) => handleMoneyInputChange('actualIQD', e.target.value)}
                                             onBlur={() => handleMoneyInputBlur('actualIQD')}
-                                            onFocus={() => handleMoneyInputFocus('actualIQD')}
+                                            onFocus={(e) => handleMoneyInputFocus(e, 'actualIQD')}
                                             required
                                             placeholder="Enter IQD amount"
                                             className="large-input"
@@ -864,7 +866,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                         value={displayValues.actualUSD}
                                         onChange={(e) => handleMixedUSDChange(e.target.value)}
                                         onBlur={() => handleMoneyInputBlur('actualUSD')}
-                                        onFocus={() => handleMoneyInputFocus('actualUSD')}
+                                        onFocus={(e) => handleMoneyInputFocus(e, 'actualUSD')}
                                         placeholder="Enter USD amount"
                                     />
                                     {formData.actualUSD && (
@@ -892,7 +894,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                         value={displayValues.actualIQD}
                                         onChange={(e) => handleMixedIQDChange(e.target.value)}
                                         onBlur={() => handleMoneyInputBlur('actualIQD')}
-                                        onFocus={() => handleMoneyInputFocus('actualIQD')}
+                                        onFocus={(e) => handleMoneyInputFocus(e, 'actualIQD')}
                                         placeholder={calculations.suggestedIQD > 0 ? `Suggested: ${formatNumber(calculations.suggestedIQD)}` : "Enter IQD amount"}
                                     />
                                     {formData.actualIQD && (
@@ -988,7 +990,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                             value={displayValues.change}
                                             onChange={(e) => handleChangeOverride(e.target.value)}
                                             onBlur={() => handleMoneyInputBlur('change')}
-                                            onFocus={() => handleMoneyInputFocus('change')}
+                                            onFocus={(e) => handleMoneyInputFocus(e, 'change')}
                                             placeholder="0"
                                         />
                                         <small className="payment-form-helper-block">

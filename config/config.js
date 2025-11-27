@@ -42,6 +42,7 @@ export default {
       rowCollectionOnRequestCompletion: true,
       requestTimeout: 60000, // 60 seconds for complex queries with triggers
       connectionTimeout: 30000, // 30 seconds for initial connection
+      useUTC: false, // PERMANENT FIX: Treat datetime as local time, not UTC - prevents Z suffix
     },
     authentication: {
       type: 'default',

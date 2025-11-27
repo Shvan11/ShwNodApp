@@ -22,8 +22,15 @@ const AppointmentsList = ({
     // Trust database ordering - stored procedure already sorts by PresentTime
     const sortedAppointments = appointments;
 
-    // Render loading skeleton
-    if (loading) {
+    // Only show skeletons on INITIAL load (no data yet)
+    // During refresh, keep existing list visible to prevent height collapse
+    const showSkeletons = loading && (!sortedAppointments || sortedAppointments.length === 0);
+
+    // Check if we're refreshing (loading with existing data)
+    const isRefreshing = loading && sortedAppointments && sortedAppointments.length > 0;
+
+    // Render loading skeleton (initial load only)
+    if (showSkeletons) {
         return (
             <div className={`appointments-section ${className}`}>
                 <h3>{title}</h3>
@@ -50,8 +57,9 @@ const AppointmentsList = ({
     }
 
     // Render appointments grid
+    // Add 'refreshing' class during reload to dim list and prevent clicks
     return (
-        <div className={`appointments-section ${className}`}>
+        <div className={`appointments-section ${className} ${isRefreshing ? 'refreshing' : ''}`}>
             <h3>{title}</h3>
             <div className="appointments-grid">
                 {sortedAppointments.map(appointment => (
