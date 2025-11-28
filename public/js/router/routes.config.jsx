@@ -21,6 +21,7 @@ import { RouteError } from '../components/error-boundaries/RouteError.jsx';
 
 // Loaders (Phase 2+)
 import {
+  withAuth,
   templateListLoader,
   templateDesignerLoader,
   alignerDoctorsLoader,

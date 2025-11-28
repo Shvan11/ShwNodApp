@@ -18,6 +18,20 @@ export default function Dashboard() {
       } else {
         navigate(link);
       }
+    }
+    // Special handling for Appointments - restore last date or default to today
+    else if (link === '/appointments') {
+      const lastDate = sessionStorage.getItem('lastAppointmentDate');
+      if (lastDate) {
+        navigate(`/appointments?date=${lastDate}`);
+      } else {
+        // Default to today for first visit
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        navigate(`/appointments?date=${year}-${month}-${day}`);
+      }
     } else {
       navigate(link);
     }

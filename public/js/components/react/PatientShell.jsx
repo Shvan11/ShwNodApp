@@ -121,10 +121,10 @@ const PatientShell = () => {
                 {/* Enhanced Breadcrumb */}
                 <div className="breadcrumb-container">
                     <nav className="breadcrumb">
-                        {/* Home Link - Use regular anchor for external navigation */}
-                        <a href="/patient-management" className="breadcrumb-item breadcrumb-link">
+                        {/* Home Link - Use Link for SPA navigation */}
+                        <Link to="/patient-management" className="breadcrumb-item breadcrumb-link">
                             <i className="fas fa-home"></i> Home
-                        </a>
+                        </Link>
 
                         <span className="breadcrumb-separator">/</span>
 

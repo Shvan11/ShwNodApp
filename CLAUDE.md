@@ -46,6 +46,52 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **18+ Backend API Routes** with organized query modules
 - **20+ Database Tables** for complete data modeling
 
+### Navigation Patterns
+
+**This application uses React Router v7 for all internal navigation. NEVER use `window.location.href` for internal routes.**
+
+**Internal Navigation** - Use React Router exclusively:
+- `useNavigate()` hook for programmatic navigation
+- `<Link>` component for declarative navigation
+- Route loaders for auth checks and data prefetching
+- Native scroll restoration (automatic via React Router)
+
+**External Navigation** - Use `window.location.href` ONLY for:
+- External URLs (third-party websites, imaging systems)
+- System protocol handlers (`explorer:`, `csimaging:`, etc.)
+- Security logout (clearing React state intentionally)
+- Route loader 401 redirects (established auth pattern)
+
+**Example (Correct):**
+```javascript
+import { useNavigate } from 'react-router-dom';
+
+function MyComponent() {
+  const navigate = useNavigate();
+
+  return (
+    <button onClick={() => navigate('/patient/123/works')}>
+      View Patient
+    </button>
+  );
+}
+```
+
+**Example (Incorrect):**
+```javascript
+// ❌ WRONG - Causes full page reload, loses React state, bypasses route loaders
+<button onClick={() => window.location.href = '/patient/123/works'}>
+  View Patient
+</button>
+```
+
+**Benefits of using React Router navigation:**
+- ⚡ Instant transitions (no page reload)
+- 🔄 Automatic scroll restoration
+- 📦 Route loader caching works correctly
+- 🔌 WebSocket connections remain stable
+- 🎯 Browser back/forward work seamlessly
+
 ## MCP Servers
 
 This project uses Model Context Protocol (MCP) servers to enable AI-assisted development:

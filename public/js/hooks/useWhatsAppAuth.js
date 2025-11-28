@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalState } from '../contexts/GlobalStateContext.jsx';
 import connectionManager from '../services/websocket-connection-manager.js';
 
@@ -31,6 +32,9 @@ const CONFIG = {
 };
 
 export const useWhatsAppAuth = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   // Use GlobalStateContext for QR code and client ready status (single source of truth)
   const { whatsappQrCode: qrCode, whatsappClientReady: clientReady } = useGlobalState();
 
@@ -404,25 +408,16 @@ export const useWhatsAppAuth = () => {
   // Handle successful authentication redirect
   useEffect(() => {
     if (authState === AUTH_STATES.AUTHENTICATED) {
-      const urlParams = new URLSearchParams(window.location.search);
-      const returnTo = urlParams.get('returnTo');
+      // Get return path from navigation state (cleaner than URL params)
+      const returnPath = location.state?.returnPath || '/send';
 
-      if (returnTo) {
-        console.log('Authentication successful, redirecting to:', returnTo);
-        setTimeout(() => {
-          try {
-            const decodedUrl = decodeURIComponent(returnTo);
-            const returnUrl = new URL(decodedUrl, window.location.origin);
-            returnUrl.searchParams.set('authCompleted', Date.now().toString());
-            window.location.href = returnUrl.toString();
-          } catch (error) {
-            console.error('Error parsing return URL:', error);
-            window.location.href = '/send';
-          }
-        }, 2000);
-      }
+      console.log('Authentication successful, redirecting to:', returnPath);
+      setTimeout(() => {
+        // Use navigate with replace to prevent back button going to auth page
+        navigate(returnPath, { replace: true });
+      }, 2000);
     }
-  }, [authState]);
+  }, [authState, location.state, navigate]);
 
   return {
     authState,

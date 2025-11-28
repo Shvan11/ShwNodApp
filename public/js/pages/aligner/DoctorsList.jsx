@@ -1,6 +1,6 @@
 // DoctorsList.jsx - Select a doctor to browse their patients
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const DoctorsList = () => {
     const navigate = useNavigate();
@@ -51,14 +51,14 @@ const DoctorsList = () => {
                 </h2>
                 <div className="section-info">
                     <span>{doctors.length} doctor{doctors.length !== 1 ? 's' : ''}</span>
-                    <a
-                        href="/settings?tab=alignerDoctors"
+                    <Link
+                        to="/settings?tab=alignerDoctors"
                         className="btn-link btn-manage-doctors"
                         title="Manage aligner doctors and portal access"
                     >
                         <i className="fas fa-cog"></i>
                         Manage Doctors
-                    </a>
+                    </Link>
                 </div>
             </div>
 

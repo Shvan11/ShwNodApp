@@ -3,21 +3,20 @@
  * Primary action buttons for starting messages or authentication
  */
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function ActionButtons({ clientReady, onStartSending, sendingInProgress, sendingProgress }) {
+    const navigate = useNavigate();
+    const location = useLocation();
+
     const handleLoginClick = () => {
-        // Build the authentication URL with return parameters
-        const currentUrl = new URL(window.location);
-        const authUrl = new URL('/auth', window.location.origin);
-
-        // Add return URL so auth page can redirect back
-        authUrl.searchParams.set('returnTo', encodeURIComponent(currentUrl.pathname + currentUrl.search));
-
-        // Add a timestamp to force refresh after auth
-        authUrl.searchParams.set('timestamp', Date.now().toString());
-
-        // Perform the redirect
-        window.location.href = authUrl.toString();
+        // Navigate to auth page with return path in state (cleaner than URL params)
+        navigate('/auth', {
+            state: {
+                returnPath: location.pathname + location.search,
+                timestamp: Date.now()
+            }
+        });
     };
 
     const getButtonText = () => {

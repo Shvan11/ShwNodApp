@@ -38,9 +38,9 @@ const UniversalHeader = () => {
     const loadCurrentUser = () => {
         fetch('/api/auth/me')
             .then(response => {
-                if (response.status === 401) {
-                    // Not authenticated - redirect to login
-                    window.location.href = '/login.html';
+                // Route loaders handle 401 redirects - if we reach here, user is authenticated
+                if (!response.ok) {
+                    console.warn('Failed to load user info:', response.status);
                     return null;
                 }
                 return response.json();
@@ -104,7 +104,20 @@ const UniversalHeader = () => {
     };
 
     const navigateToAppointments = () => {
-        navigate('/appointments');
+        // Restore last viewed date or default to today
+        const lastDate = sessionStorage.getItem('lastAppointmentDate');
+
+        if (lastDate) {
+            navigate(`/appointments?date=${lastDate}`);
+        } else {
+            // Default to today for first visit
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            const dateParam = `${year}-${month}-${day}`;
+            navigate(`/appointments?date=${dateParam}`);
+        }
     };
 
     const navigateToPatientManagement = () => {

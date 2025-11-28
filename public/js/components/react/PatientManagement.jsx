@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AsyncSelect from 'react-select/async';
 import Select from 'react-select';
 import { useToast } from '../../contexts/ToastContext.jsx';
@@ -9,6 +10,7 @@ import { useToast } from '../../contexts/ToastContext.jsx';
  * Memoized to prevent unnecessary re-renders
  */
 const PatientManagement = () => {
+    const navigate = useNavigate();
     const toast = useToast();
     const [patients, setPatients] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -37,12 +39,6 @@ const PatientManagement = () => {
     const [showFilters, setShowFilters] = useState(false);
     const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
 
-    // Ref to track if this is the initial mount (to prevent overwriting sessionStorage)
-    const isInitialMount = useRef(true);
-    const isRestoring = useRef(false); // Track if we're restoring from sessionStorage
-
-
-
     useEffect(() => {
         loadAllPatientsForDropdown();
 
@@ -53,7 +49,6 @@ const PatientManagement = () => {
             setSearchPatientName(searchParam);
             // The useEffect for searchPatientName will trigger the search automatically
         }
-
     }, []);
 
     const loadAllPatientsForDropdown = async () => {
@@ -108,11 +103,8 @@ const PatientManagement = () => {
         }
     };
 
-    // Save search state to sessionStorage
+    // Save search state to sessionStorage (for search restoration only, NOT scroll)
     useEffect(() => {
-        // Skip saving on initial mount to allow restoration to happen first
-        if (isInitialMount.current) return;
-
         const stateToSave = {
             searchPatientName,
             searchFirstName,
@@ -122,47 +114,16 @@ const PatientManagement = () => {
             selectedTags,
             showFilters,
             sortConfig,
-            hasSearched,
-            scrollPosition: window.scrollY
+            hasSearched
         };
         sessionStorage.setItem('pm_search_state', JSON.stringify(stateToSave));
     }, [searchPatientName, searchFirstName, searchLastName, selectedWorkTypes, selectedKeywords, selectedTags, showFilters, sortConfig, hasSearched]);
 
-    // Save scroll position independently (throttled)
-    useEffect(() => {
-        if (isInitialMount.current) return;
-
-        let scrollTimeout;
-        const handleScroll = () => {
-            clearTimeout(scrollTimeout);
-            scrollTimeout = setTimeout(() => {
-                const currentState = sessionStorage.getItem('pm_search_state');
-                if (currentState) {
-                    try {
-                        const parsed = JSON.parse(currentState);
-                        parsed.scrollPosition = window.scrollY;
-                        sessionStorage.setItem('pm_search_state', JSON.stringify(parsed));
-                    } catch (e) {
-                        console.error('[PM] Failed to update scroll position', e);
-                    }
-                }
-            }, 500);
-        };
-
-        window.addEventListener('scroll', handleScroll);
-
-        return () => {
-            clearTimeout(scrollTimeout);
-            window.removeEventListener('scroll', handleScroll);
-        };
-    }, []);
-
-    // Restore search state on mount
+    // Restore search state on mount (React Router handles scroll restoration)
     useEffect(() => {
         // Check for search parameter in URL - if present, skip restoration to allow URL to take precedence
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('search')) {
-            isInitialMount.current = false; // Mark as no longer initial mount
             return;
         }
 
@@ -172,16 +133,12 @@ const PatientManagement = () => {
                 const parsed = JSON.parse(savedState);
 
                 // Check if this was an advanced search
-                // We consider it advanced if any of the specific filter fields are populated
                 const isAdvancedSearch = parsed.searchPatientName || parsed.searchFirstName || parsed.searchLastName ||
                     (parsed.selectedWorkTypes && parsed.selectedWorkTypes.length > 0) ||
                     (parsed.selectedKeywords && parsed.selectedKeywords.length > 0) ||
                     (parsed.selectedTags && parsed.selectedTags.length > 0);
 
                 if (isAdvancedSearch) {
-                    // FLAG THAT WE ARE RESTORING
-                    isRestoring.current = true;
-
                     // Restore only advanced search states
                     setSearchPatientName(parsed.searchPatientName || '');
                     setSearchFirstName(parsed.searchFirstName || '');
@@ -194,40 +151,18 @@ const PatientManagement = () => {
                     if (parsed.showFilters !== undefined) setShowFilters(parsed.showFilters);
                     if (parsed.sortConfig) setSortConfig(parsed.sortConfig);
 
-                    // Save scroll position for later restoration (after search results load)
-                    if (parsed.scrollPosition !== undefined) {
-                        sessionStorage.setItem('pm_pending_scroll', parsed.scrollPosition.toString());
-                    }
-
                     // The auto-search useEffect will trigger when the above states update
                 }
-                // If it was a Quick Search (searchTerm only), we intentionally do NOT restore it,
-                // effectively resetting the view to the initial state as requested.
             } catch (e) {
                 console.error('[PM] Failed to parse saved search state', e);
             }
-        } else {
-
         }
-
-        // Mark as no longer initial mount after restoration attempt
-        isInitialMount.current = false;
     }, []);
-
-    // Restore scroll position after search results are loaded (using useLayoutEffect to prevent visible jump)
-    useLayoutEffect(() => {
-        const pendingScroll = sessionStorage.getItem('pm_pending_scroll');
-        if (pendingScroll && patients.length > 0) {
-            // useLayoutEffect runs before browser paint, eliminating the visible jump
-            window.scrollTo(0, parseInt(pendingScroll));
-            sessionStorage.removeItem('pm_pending_scroll');
-        }
-    }, [patients]);
 
     // Handle patient selection from quick search
     const handleQuickSearchSelect = (selectedOption) => {
         if (selectedOption && selectedOption.value) {
-            window.location.href = `/patient/${selectedOption.value}/works`;
+            navigate(`/patient/${selectedOption.value}/works`);
         }
     };
 
@@ -315,18 +250,12 @@ const PatientManagement = () => {
             selectedTags.length > 0;
 
         if (hasMinimumInput || hasFilters) {
-            // CHECK IF WE ARE RESTORING
-            if (isRestoring.current) {
-                isRestoring.current = false; // Reset flag
-                performSearch(); // Search IMMEDIATELY, no timeout
-            } else {
-                // Normal user typing behavior - use debounce
-                const timeoutId = setTimeout(() => {
-                    performSearch();
-                }, 500); // 500ms delay
+            // Normal user typing behavior - use debounce
+            const timeoutId = setTimeout(() => {
+                performSearch();
+            }, 500); // 500ms delay
 
-                setSearchDebounce(timeoutId);
-            }
+            setSearchDebounce(timeoutId);
         } else {
             // Clear results if all fields are empty or too short and no filters
             if (!searchPatientName && !searchFirstName && !searchLastName && !hasFilters) {
@@ -571,7 +500,7 @@ const PatientManagement = () => {
                     </button>
                     <button
                         type="button"
-                        onClick={() => window.location.href = '/views/patient/add-patient.html'}
+                        onClick={() => navigate('/patient/new/edit-patient')}
                         className="btn btn-primary"
                     >
                         <i className="fas fa-plus pm-icon-gap"></i>
@@ -992,7 +921,7 @@ const PatientManagement = () => {
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => window.location.href = `/patient/${patient.PersonID}/works`}
+                                                onClick={() => navigate(`/patient/${patient.PersonID}/works`)}
                                                 className="btn btn-icon btn-outline-primary"
                                                 title="View patient details"
                                             >
@@ -1000,7 +929,7 @@ const PatientManagement = () => {
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => window.location.href = `/patient/${patient.PersonID}/edit-patient`}
+                                                onClick={() => navigate(`/patient/${patient.PersonID}/edit-patient`)}
                                                 className="btn btn-icon btn-outline-warning"
                                                 title="Edit patient"
                                             >

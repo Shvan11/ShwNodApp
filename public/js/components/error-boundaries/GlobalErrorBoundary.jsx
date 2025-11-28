@@ -5,7 +5,7 @@
  * Catches any unhandled errors and provides a user-friendly error screen.
  */
 import React from 'react';
-import ErrorBoundary from './ErrorBoundary.jsx';
+import { ErrorBoundary } from './ErrorBoundary.jsx';
 
 const GlobalErrorFallback = () => (
   <div className="global-error-screen">

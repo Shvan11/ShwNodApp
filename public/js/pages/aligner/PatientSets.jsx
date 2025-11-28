@@ -1180,7 +1180,7 @@ const PatientSets = () => {
 
                         <button
                             className="btn-add-set bg-success"
-                            onClick={() => window.location.href = `/patient/${patient.PersonID}/edit-patient`}
+                            onClick={() => navigate(`/patient/${patient.PersonID}/edit-patient`)}
                         >
                             <i className="fas fa-edit"></i>
                             Edit Patient

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Select from 'react-select';
 import { useGlobalState } from '../../contexts/GlobalStateContext.jsx';
 // TODO: Integrate React ProgressBar component from components/whatsapp-send/ProgressBar.jsx
@@ -6,6 +7,8 @@ import { useGlobalState } from '../../contexts/GlobalStateContext.jsx';
 // import ProgressBar from '../whatsapp-send/ProgressBar.jsx';
 
 const SendMessage = () => {
+    const navigate = useNavigate();
+
     // Use global state for WhatsApp client ready status
     const { whatsappClientReady } = useGlobalState();
 
@@ -271,7 +274,7 @@ const SendMessage = () => {
         if (window.opener) {
             window.close();
         } else {
-            window.location.href = '/';
+            navigate('/');
         }
     };
 

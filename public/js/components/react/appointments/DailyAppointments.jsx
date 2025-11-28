@@ -70,6 +70,11 @@ const DailyAppointments = () => {
         if (selectedDate && selectedDate !== urlDate) {
             setSearchParams({ date: selectedDate }, { replace: true });
         }
+
+        // Save current date to sessionStorage for return visits
+        if (selectedDate) {
+            sessionStorage.setItem('lastAppointmentDate', selectedDate);
+        }
     }, [selectedDate, searchParams, setSearchParams]);
 
     // 8. Load appointments when date changes (for user-initiated date changes)

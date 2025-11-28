@@ -10,6 +10,7 @@
  * </ErrorBoundary>
  */
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -91,7 +92,7 @@ export class ErrorBoundary extends React.Component {
               <button onClick={() => window.location.reload()} className="reload-btn">
                 Reload Page
               </button>
-              <button onClick={() => window.location.href = '/'} className="home-btn">
+              <button onClick={() => this.props.navigate?.('/')} className="home-btn">
                 Go to Dashboard
               </button>
             </div>
@@ -215,4 +216,10 @@ export class ErrorBoundary extends React.Component {
   }
 }
 
-export default ErrorBoundary;
+// Wrapper component to provide navigate function via hooks
+function ErrorBoundaryWithNavigate(props) {
+  const navigate = useNavigate();
+  return <ErrorBoundary {...props} navigate={navigate} />;
+}
+
+export default ErrorBoundaryWithNavigate;

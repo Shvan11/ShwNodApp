@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const WorkCard = ({
     work,
@@ -20,6 +21,7 @@ const WorkCard = ({
     formatCurrency,
     getProgressPercentage
 }) => {
+    const navigate = useNavigate();
     const [showActions, setShowActions] = useState(false);
 
     const getStatusBadge = () => {
@@ -184,7 +186,7 @@ const WorkCard = ({
                         <button
                             type="button"
                             className="btn btn-card-action btn-diagnosis"
-                            onClick={() => window.location.href = `/patient/${patientId}/work/${work.workid}/diagnosis`}
+                            onClick={() => navigate(`/patient/${patientId}/work/${work.workid}/diagnosis`)}
                             title="View diagnosis and treatment plan"
                         >
                             <i className="fas fa-stethoscope"></i>

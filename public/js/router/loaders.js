@@ -9,6 +9,44 @@
  */
 
 /**
+ * Higher-order loader that wraps any loader with authentication check
+ * Redirects to /login.html on 401 responses
+ *
+ * @param {Function} loaderFn - The actual loader function (can be null for auth-only check)
+ * @returns {Function} Wrapped loader with auth check
+ */
+export function withAuth(loaderFn = null) {
+  return async (args) => {
+    try {
+      // If a loader function is provided, execute it
+      // The apiLoader inside will handle 401 redirects automatically
+      if (loaderFn) {
+        return await loaderFn(args);
+      }
+
+      // Auth-only check: verify session with lightweight endpoint
+      const response = await fetch('/api/auth/verify', {
+        signal: args.request?.signal
+      });
+
+      if (response.status === 401) {
+        console.warn('[withAuth] 401 Unauthorized - redirecting to login');
+        window.location.href = '/login.html';
+        throw new Response('Unauthorized', { status: 401 });
+      }
+
+      return null; // No data to return for auth-only loaders
+    } catch (error) {
+      // Re-throw for route error boundary to handle
+      if (error instanceof Response) {
+        throw error;
+      }
+      throw error;
+    }
+  };
+}
+
+/**
  * Base API loader with error handling and 401 redirect
  * Preserves the existing auth interceptor pattern
  *
