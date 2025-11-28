@@ -203,11 +203,10 @@
     <script type="module">
         import React from 'react';
         import ReactDOM from 'react-dom/client';
-        import { BrowserRouter } from 'react-router-dom';
 
-        console.log('[App] Initializing unified React application');
+        console.log('[App] Initializing unified React application with Data Router');
 
-        // Import main App component
+        // Import main App component (contains RouterProvider with createBrowserRouter)
         import App from '/js/App.jsx';
 
         // Wait for ALL resources (including CSS) to load
@@ -218,20 +217,19 @@
             const appContainer = document.getElementById('single-spa-application');
             appContainer.innerHTML = '<div id="app-root"></div>';
 
-            // Mount the unified React application
-            // ONE BrowserRouter, ONE React tree, ALL routes in App.jsx
+            // Mount the unified React application with Data Router
+            // App.jsx contains RouterProvider with createBrowserRouter
+            // NO BrowserRouter wrapper needed - Data Router handles routing
             const root = ReactDOM.createRoot(document.getElementById('app-root'));
 
             try {
                 root.render(
                     React.createElement(React.StrictMode, null,
-                        React.createElement(BrowserRouter, null,
-                            React.createElement(App)
-                        )
+                        React.createElement(App)
                     )
                 );
 
-                console.log('[App] Application mounted successfully');
+                console.log('[App] Application mounted successfully with Data Router');
             } catch (error) {
                 console.error('[App] Failed to mount application:', error);
 

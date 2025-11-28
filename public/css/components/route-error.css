@@ -1,0 +1,92 @@
+/**
+ * Route Error Component Styles
+ * Displays user-friendly error pages for failed route loads
+ */
+
+.route-error-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: var(--spacing-xl);
+  background: var(--background-primary);
+}
+
+.route-error-content {
+  text-align: center;
+  max-width: 500px;
+}
+
+.route-error-icon {
+  font-size: 4rem;
+  color: var(--error-color);
+  margin-bottom: var(--spacing-lg);
+  display: block;
+}
+
+.route-error-content h1 {
+  font-size: var(--font-size-3xl);
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-md);
+  font-weight: 600;
+}
+
+.route-error-content p {
+  font-size: var(--font-size-lg);
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xl);
+  line-height: 1.6;
+}
+
+.route-error-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.route-error-actions .btn {
+  min-width: 120px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+}
+
+.route-error-actions .btn i {
+  font-size: var(--font-size-sm);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .route-error-container {
+    min-height: 50vh;
+    padding: var(--spacing-lg);
+  }
+
+  .route-error-icon {
+    font-size: 3rem;
+  }
+
+  .route-error-content h1 {
+    font-size: var(--font-size-2xl);
+  }
+
+  .route-error-content p {
+    font-size: var(--font-size-base);
+  }
+
+  .route-error-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .route-error-actions .btn {
+    width: 100%;
+  }
+}
+
+/* RTL support */
+[dir="rtl"] .route-error-actions .btn i {
+  transform: scaleX(-1);
+}

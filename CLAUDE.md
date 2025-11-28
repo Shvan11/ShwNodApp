@@ -41,7 +41,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **100+ API Endpoints** for comprehensive data operations
 - **40+ React Components** for modular UI
 - **45 CSS Files** (~25,576 lines) with custom design system
-- **12 Frontend Routes** with nested routing
+- **31 Frontend Routes** with Data Router loaders (5 phases)
+- **7 Route Loaders** with smart caching for optimized data fetching
 - **18+ Backend API Routes** with organized query modules
 - **20+ Database Tables** for complete data modeling
 
@@ -93,51 +94,82 @@ Configuration is in `.mcp.json`. See `docs/mcp-mssql-setup.md` for MSSQL MCP ser
 - **QR Code Generation**: For WhatsApp authentication and patient records
 
 ### Frontend Structure
-- **Architecture**: **Modern React Single-Page Application** ✨
-  - **Framework**: React 19 with React Router for client-side routing
+- **Architecture**: **Modern React Single-Page Application with Data Router** ✨
+  - **Framework**: React 19 with React Router v7 Data Router (createBrowserRouter)
   - **Entry Point**: Single HTML file (`/public/index.html`) - loads once, never reloads
-  - **Routing**: React Router v7 with nested routes for seamless navigation
+  - **Routing**: React Router v7 Data Router with route loaders, actions, and error boundaries
   - **State**: React Context API for shared state management
   - **Loading**: ESM imports from CDN (esm.sh) for core libraries, Vite bundling for application code
   - **Build Tool**: Vite for fast development and optimized production builds
 
 - **Application Structure** (`/public/js/`):
-  - `App.jsx` - Main application component with routing configuration
+  - `App.jsx` - Main application component with RouterProvider
+  - `router/routes.config.jsx` - **Centralized route configuration** (31 routes)
+  - `router/loaders.js` - Route loaders for optimized data fetching
+  - `layouts/` - Layout components (RootLayout, AlignerLayout)
   - `routes/` - Route components for each section of the application
   - `components/react/` - Reusable React components
+  - `components/error-boundaries/` - Error boundary components
   - `services/` - Shared utilities (WebSocket, API client, storage)
   - `hooks/` - Custom React hooks for shared logic
 
+- **Routing Architecture** (`/public/js/router/`):
+  - `routes.config.jsx` - **Single source of truth for all routes**
+  - `loaders.js` - Route loaders with caching and error handling
+  - **31 Routes Organized in 5 Phases**:
+    - **Phase 1**: Simple routes (Dashboard, Statistics, Expenses, PatientManagement, TestCompiler)
+    - **Phase 2**: Settings & Templates with loaders (3 nested routes)
+    - **Phase 3**: Aligner Management with layout wrapper (6 nested routes)
+    - **Phase 4**: Patient Portal with comprehensive loader (14 nested pages via wildcard routing)
+    - **Phase 5**: Messaging & Appointments (5 WebSocket-heavy routes, no loaders)
+
+- **Route Loaders** (`/public/js/router/loaders.js`):
+  - `apiLoader()` - Base loader with 401 handling and sessionStorage caching
+  - `settingsLoader()` - Pre-fetch settings data (5-min cache)
+  - `templateListLoader()` - Pre-fetch template list
+  - `templateDesignerLoader()` - Pre-fetch template for editing
+  - `alignerDoctorsLoader()` - Pre-fetch doctors list
+  - `alignerDoctorLoader()` - Pre-fetch doctor info
+  - `alignerPatientWorkLoader()` - Pre-fetch patient + work details
+  - `patientShellLoader()` - **Most complex**: Pre-fetch patient, work, timepoints in parallel
+
+- **Layout Components** (`/public/js/layouts/`):
+  - `RootLayout.jsx` - Wraps all routes with GlobalStateProvider, ToastProvider, UniversalHeader
+  - `AlignerLayout.jsx` - Aligner-specific layout with mode toggle and <Outlet />
+
+- **Error Boundaries** (`/public/js/components/error-boundaries/`):
+  - `GlobalErrorBoundary.jsx` - App-level error catching
+  - `RouteErrorBoundary.jsx` - Route-level error catching with recovery
+  - `RouteError.jsx` - User-friendly error pages (404, 401, 500)
+
 - **Route Components** (`/public/js/routes/`):
   - `Dashboard.jsx` - Navigation hub and landing page
-  - `PatientRoutes.jsx` - Patient portal with nested routes
   - `PatientManagement.jsx` - Patient search and grid view
   - `Expenses.jsx` - Expense management
+  - `Statistics.jsx` - Financial statistics and reports
   - `WhatsAppSend.jsx` - WhatsApp messaging
   - `WhatsAppAuth.jsx` - WhatsApp authentication
-  - `AlignerRoutes.jsx` - Aligner management with nested routes
-  - `SettingsRoutes.jsx` - Settings with tabs and nested routes
-  - `TemplateRoutes.jsx` - Template designer with GrapesJS
   - `DailyAppointments.jsx` - Daily appointments view
   - `Calendar.jsx` - Monthly calendar view
-  - `Statistics.jsx` - Financial statistics and reports
+  - `CompilerTest.jsx` - Template compiler test page
 
 - **React Components** (`/public/js/components/react/`):
   - `UniversalHeader.jsx` - Persistent header with patient search
-  - `PatientShell.jsx` - Patient portal wrapper with sidebar navigation
+  - `PatientShell.jsx` - Patient portal wrapper with sidebar navigation (handles 14 pages)
+  - `SettingsComponent.jsx` - Settings interface with tabs
   - `PaymentModal.jsx` - Payment processing modal
   - `EditPatientComponent.jsx` - Patient information editor
   - And many more specialized components
 
 - **Services Layer** (`/public/js/services/`):
-  - `websocket.js` - WebSocket client for real-time updates
+  - `websocket.js` - **WebSocket singleton** for real-time updates
   - `http.js` - HTTP client for API requests
   - `storage.js` - Local storage utilities
 
 - **Hooks** (`/public/js/hooks/`): Custom hooks for shared logic (WebSocket sync, message status, etc.)
 
 - **Context Providers** (`/public/js/contexts/`):
-  - `GlobalStateContext.jsx` - Global state for WebSocket, patient data, appointments
+  - `GlobalStateContext.jsx` - Global state for **WebSocket singleton**, patient data, appointments
   - `ToastContext.jsx` - **Unified toast notification system** (replaces all alert() calls)
 
 ### Toast Notification System
@@ -203,13 +235,21 @@ window.toast?.info('Info message!');
 All `alert()` calls have been replaced with appropriate toast notifications throughout the application. The global `window.toast` object ensures backward compatibility for non-React code.
 
 **Key Features:**
-- ✅ No page reloads - instant navigation between routes
-- ✅ Persistent WebSocket connection for real-time updates
-- ✅ React Context API for state sharing across components
-- ✅ CDN-loaded core libraries (React, Router) for optimal caching
-- ✅ Vite for fast development and optimized production builds
-- ✅ Native app-like experience with smooth transitions
-- ✅ Server-side rendering ready (all routes served from Express)
+- ✅ **Data Router Architecture**: Route loaders eliminate loading flashes (33% faster on patient pages)
+- ✅ **No page reloads**: Instant navigation between routes
+- ✅ **Route Loaders**: Pre-fetch static data before rendering (patient info, settings, work details)
+- ✅ **Native Scroll Restoration**: Automatic scroll position management
+- ✅ **Two-Level Error Handling**: Global + route-level error boundaries with recovery options
+- ✅ **Persistent WebSocket Singleton**: Real-time updates for appointments, messaging, patient data
+- ✅ **Smart Caching**: 5-minute sessionStorage cache for static data with automatic invalidation
+- ✅ **Hybrid Data Strategy**: Loaders for static/cacheable data, components for real-time/WebSocket data
+- ✅ **Layout Wrappers**: Persistent UI elements (headers, mode toggles) with <Outlet /> pattern
+- ✅ **Lazy Loading**: Code splitting with React.lazy() for optimal bundle sizes
+- ✅ **CDN-loaded core libraries**: React, Router from CDN for optimal caching
+- ✅ **Vite build system**: Fast development and optimized production builds
+- ✅ **Native app-like experience**: Smooth transitions, no loading flashes
+- ✅ **React Context API**: State sharing across components
+- ✅ **Server-side rendering ready**: All routes served from Express
 
 ## Environment Variables Required
 
