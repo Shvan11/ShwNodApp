@@ -16,7 +16,6 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
         Percentage: false,
         receiveEmail: false,
         getAppointments: false,
-        getAppointments: false,
         SortOrder: ''
     });
     const [activeTab, setActiveTab] = useState('basic');
