@@ -9,7 +9,18 @@ export default function Dashboard() {
 
   const handleCardClick = (e, link) => {
     e.preventDefault();
-    navigate(link);
+
+    // Special handling for Patient Management - restore last search
+    if (link === '/patient-management') {
+      const lastSearch = sessionStorage.getItem('lastPatientSearch');
+      if (lastSearch) {
+        navigate(`/patient-management?${lastSearch}`);
+      } else {
+        navigate(link);
+      }
+    } else {
+      navigate(link);
+    }
   };
 
   const dashboardCards = [

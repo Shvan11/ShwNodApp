@@ -25,7 +25,9 @@ import {
   templateDesignerLoader,
   alignerDoctorsLoader,
   alignerPatientWorkLoader,
-  patientShellLoader
+  patientShellLoader,
+  patientManagementLoader,
+  dailyAppointmentsLoader
 } from './loaders.js';
 
 // CSS imports for Phase 2
@@ -169,7 +171,7 @@ export const routesConfig = [
         ),
       },
 
-      // Patient Management (search/grid)
+      // Patient Management (search/grid with native scroll restoration)
       {
         path: '/patient-management',
         element: (
@@ -177,6 +179,7 @@ export const routesConfig = [
             <PatientManagement />
           </RouteErrorBoundary>
         ),
+        loader: patientManagementLoader, // Pre-fetch filter data
       },
 
       // ============================================================
@@ -366,7 +369,7 @@ export const routesConfig = [
       // PHASE 5: MESSAGING & APPOINTMENTS (WebSocket-heavy, NO loaders)
       // ============================================================
 
-      // Daily Appointments (100% WebSocket-driven)
+      // Daily Appointments (Hybrid: Loader + WebSocket)
       {
         path: '/appointments',
         element: (
@@ -374,7 +377,7 @@ export const routesConfig = [
             <DailyAppointments />
           </RouteErrorBoundary>
         ),
-        // No loader - 100% WebSocket-driven real-time data
+        loader: dailyAppointmentsLoader, // Pre-fetch initial data for scroll restoration
       },
 
       // Monthly Calendar (100% WebSocket-driven)

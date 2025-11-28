@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import AsyncSelect from 'react-select/async';
 import Select from 'react-select';
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 /**
  * Patient Management Component
@@ -8,14 +9,13 @@ import Select from 'react-select';
  * Memoized to prevent unnecessary re-renders
  */
 const PatientManagement = () => {
+    const toast = useToast();
     const [patients, setPatients] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [hasSearched, setHasSearched] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [selectedPatient, setSelectedPatient] = useState(null);
-    const [successMessage, setSuccessMessage] = useState(null);
 
     // Separate search fields for patient name components
     const [searchPatientName, setSearchPatientName] = useState('');
@@ -39,6 +39,7 @@ const PatientManagement = () => {
 
     // Ref to track if this is the initial mount (to prevent overwriting sessionStorage)
     const isInitialMount = useRef(true);
+    const isRestoring = useRef(false); // Track if we're restoring from sessionStorage
 
 
 
@@ -52,6 +53,7 @@ const PatientManagement = () => {
             setSearchPatientName(searchParam);
             // The useEffect for searchPatientName will trigger the search automatically
         }
+
     }, []);
 
     const loadAllPatientsForDropdown = async () => {
@@ -177,6 +179,9 @@ const PatientManagement = () => {
                     (parsed.selectedTags && parsed.selectedTags.length > 0);
 
                 if (isAdvancedSearch) {
+                    // FLAG THAT WE ARE RESTORING
+                    isRestoring.current = true;
+
                     // Restore only advanced search states
                     setSearchPatientName(parsed.searchPatientName || '');
                     setSearchFirstName(parsed.searchFirstName || '');
@@ -209,15 +214,13 @@ const PatientManagement = () => {
         isInitialMount.current = false;
     }, []);
 
-    // Restore scroll position after search results are loaded
-    useEffect(() => {
+    // Restore scroll position after search results are loaded (using useLayoutEffect to prevent visible jump)
+    useLayoutEffect(() => {
         const pendingScroll = sessionStorage.getItem('pm_pending_scroll');
         if (pendingScroll && patients.length > 0) {
-            // Use setTimeout to ensure DOM has updated
-            setTimeout(() => {
-                window.scrollTo(0, parseInt(pendingScroll));
-                sessionStorage.removeItem('pm_pending_scroll');
-            }, 100);
+            // useLayoutEffect runs before browser paint, eliminating the visible jump
+            window.scrollTo(0, parseInt(pendingScroll));
+            sessionStorage.removeItem('pm_pending_scroll');
         }
     }, [patients]);
 
@@ -312,12 +315,18 @@ const PatientManagement = () => {
             selectedTags.length > 0;
 
         if (hasMinimumInput || hasFilters) {
-            // Set new timeout for debounced search
-            const timeoutId = setTimeout(() => {
-                performSearch();
-            }, 500); // 500ms delay
+            // CHECK IF WE ARE RESTORING
+            if (isRestoring.current) {
+                isRestoring.current = false; // Reset flag
+                performSearch(); // Search IMMEDIATELY, no timeout
+            } else {
+                // Normal user typing behavior - use debounce
+                const timeoutId = setTimeout(() => {
+                    performSearch();
+                }, 500); // 500ms delay
 
-            setSearchDebounce(timeoutId);
+                setSearchDebounce(timeoutId);
+            }
         } else {
             // Clear results if all fields are empty or too short and no filters
             if (!searchPatientName && !searchFirstName && !searchLastName && !hasFilters) {
@@ -337,7 +346,6 @@ const PatientManagement = () => {
     const performSearch = async () => {
         try {
             setLoading(true);
-            setError(null);
 
             // Build query parameters
             const params = new URLSearchParams();
@@ -366,7 +374,7 @@ const PatientManagement = () => {
             setPatients(data);
             setHasSearched(true);
         } catch (err) {
-            setError(err.message);
+            toast.error(err.message || 'Failed to search patients');
             setPatients([]);
         } finally {
             setLoading(false);
@@ -376,13 +384,12 @@ const PatientManagement = () => {
     const searchPatients = async (searchQuery = searchTerm, showAll = false) => {
         // Don't search if no query and not showing all
         if (!showAll && (!searchQuery || searchQuery.trim().length < 2)) {
-            setError('Please enter at least 2 characters to search');
+            toast.warning('Please enter at least 2 characters to search');
             return;
         }
 
         try {
             setLoading(true);
-            setError(null);
             const query = showAll ? '' : searchQuery.trim();
             const response = await fetch(`/api/patients/search?q=${encodeURIComponent(query)}&sortBy=${sortConfig.key}&order=${sortConfig.direction}`);
             if (!response.ok) throw new Error('Failed to search patients');
@@ -390,7 +397,7 @@ const PatientManagement = () => {
             setPatients(data);
             setHasSearched(true);
         } catch (err) {
-            setError(err.message);
+            toast.error(err.message || 'Failed to search patients');
             setPatients([]);
         } finally {
             setLoading(false);
@@ -398,7 +405,16 @@ const PatientManagement = () => {
     };
 
     const handleSearch = (e) => {
-        e.preventDefault();
+        if (e && e.preventDefault) {
+            e.preventDefault();
+        }
+
+        // Validate search input
+        if (!searchTerm || searchTerm.trim().length < 2) {
+            toast.warning('Please enter at least 2 characters to search');
+            return;
+        }
+
         searchPatients();
     };
 
@@ -466,7 +482,7 @@ const PatientManagement = () => {
                         setLoading(false);
                     })
                     .catch(err => {
-                        setError(err.message);
+                        toast.error(err.message || 'Failed to sort patients');
                         setLoading(false);
                     });
             }, 0);
@@ -479,7 +495,13 @@ const PatientManagement = () => {
         setShowDeleteConfirm(true);
     };
 
-    const handleQuickCheckin = async (patient) => {
+    const handleQuickCheckin = async (e, patient) => {
+        // Prevent any default browser behavior
+        if (e && e.preventDefault) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
         try {
             setLoading(true);
             const response = await fetch('/api/appointments/quick-checkin', {
@@ -498,17 +520,14 @@ const PatientManagement = () => {
             const result = await response.json();
 
             if (result.alreadyCheckedIn) {
-                setSuccessMessage(`${patient.PatientName} is already checked in today!`);
+                toast.info(`${patient.PatientName} is already checked in today!`);
             } else if (result.created) {
-                setSuccessMessage(`${patient.PatientName} added to today's appointments and checked in!`);
+                toast.success(`${patient.PatientName} added to today's appointments and checked in!`);
             } else {
-                setSuccessMessage(`${patient.PatientName} checked in successfully!`);
+                toast.success(`${patient.PatientName} checked in successfully!`);
             }
-
-            setTimeout(() => setSuccessMessage(null), 5000);
         } catch (err) {
-            setError(err.message);
-            setTimeout(() => setError(null), 5000);
+            toast.error(err.message || 'Failed to check in patient');
         } finally {
             setLoading(false);
         }
@@ -531,16 +550,10 @@ const PatientManagement = () => {
                 await searchPatients(searchTerm, searchTerm === '');
             }
             setShowDeleteConfirm(false);
-            setSuccessMessage('Patient deleted successfully!');
-            setTimeout(() => setSuccessMessage(null), 5000);
+            toast.success('Patient deleted successfully!');
         } catch (err) {
-            setError(err.message);
+            toast.error(err.message || 'Failed to delete patient');
         }
-    };
-
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleDateString();
     };
 
     return (
@@ -549,6 +562,7 @@ const PatientManagement = () => {
                 <h2>Patient Management</h2>
                 <div className="patient-management-header-actions">
                     <button
+                        type="button"
                         onClick={() => setShowQuickSearch(!showQuickSearch)}
                         className="btn btn-secondary whitespace-nowrap"
                     >
@@ -556,6 +570,7 @@ const PatientManagement = () => {
                         {showQuickSearch ? 'Hide' : 'Show'} Quick Search
                     </button>
                     <button
+                        type="button"
                         onClick={() => window.location.href = '/views/patient/add-patient.html'}
                         className="btn btn-primary"
                     >
@@ -839,6 +854,7 @@ const PatientManagement = () => {
                                             <i className="fas fa-tooth pm-icon-gap"></i>
                                             {wt.label}
                                             <button
+                                                type="button"
                                                 onClick={() => setSelectedWorkTypes(selectedWorkTypes.filter(item => item.value !== wt.value))}
                                                 className="pm-filter-chip__remove"
                                             >
@@ -851,6 +867,7 @@ const PatientManagement = () => {
                                             <i className="fas fa-tags pm-icon-gap"></i>
                                             {kw.label}
                                             <button
+                                                type="button"
                                                 onClick={() => setSelectedKeywords(selectedKeywords.filter(item => item.value !== kw.value))}
                                                 className="pm-filter-chip__remove"
                                             >
@@ -863,6 +880,7 @@ const PatientManagement = () => {
                                             <i className="fas fa-bookmark pm-icon-gap"></i>
                                             {tag.label}
                                             <button
+                                                type="button"
                                                 onClick={() => setSelectedTags(selectedTags.filter(item => item.value !== tag.value))}
                                                 className="pm-filter-chip__remove"
                                             >
@@ -877,22 +895,6 @@ const PatientManagement = () => {
                 )}
             </div>
 
-            {error && (
-                <div className="pm-error-message">
-                    {error}
-                    <button onClick={() => setError(null)} className="pm-error-close">
-                        ×
-                    </button>
-                </div>
-            )}
-
-            {successMessage && (
-                <div className="pm-success-message">
-                    <i className="fas fa-check-circle pm-icon-gap"></i>
-                    {successMessage}
-                </div>
-            )}
-
             {hasSearched && (
                 <div className="pm-results-summary">
                     <div className="summary-card">
@@ -903,12 +905,14 @@ const PatientManagement = () => {
                         <span className="pm-sort-label">Sort by:</span>
                         <div className="pm-sort-toggle">
                             <button
+                                type="button"
                                 className={`pm-sort-btn ${sortConfig.key === 'name' ? 'active' : ''}`}
                                 onClick={() => handleSortToggle('name')}
                             >
                                 Name {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                             </button>
                             <button
+                                type="button"
                                 className={`pm-sort-btn ${sortConfig.key === 'date' ? 'active' : ''}`}
                                 onClick={() => handleSortToggle('date')}
                             >
@@ -978,7 +982,8 @@ const PatientManagement = () => {
                                     <td data-label="Actions">
                                         <div className="pm-action-buttons">
                                             <button
-                                                onClick={() => handleQuickCheckin(patient)}
+                                                type="button"
+                                                onClick={(e) => handleQuickCheckin(e, patient)}
                                                 className="btn btn-icon btn-outline-success"
                                                 title="Add to today's appointments and check in"
                                                 disabled={loading}
@@ -986,6 +991,7 @@ const PatientManagement = () => {
                                                 <i className="fas fa-user-check"></i>
                                             </button>
                                             <button
+                                                type="button"
                                                 onClick={() => window.location.href = `/patient/${patient.PersonID}/works`}
                                                 className="btn btn-icon btn-outline-primary"
                                                 title="View patient details"
@@ -993,6 +999,7 @@ const PatientManagement = () => {
                                                 <i className="fas fa-eye"></i>
                                             </button>
                                             <button
+                                                type="button"
                                                 onClick={() => window.location.href = `/patient/${patient.PersonID}/edit-patient`}
                                                 className="btn btn-icon btn-outline-warning"
                                                 title="Edit patient"
@@ -1000,6 +1007,7 @@ const PatientManagement = () => {
                                                 <i className="fas fa-edit"></i>
                                             </button>
                                             <button
+                                                type="button"
                                                 onClick={() => handleDeleteClick(patient)}
                                                 className="btn btn-icon btn-outline-danger"
                                                 title="Delete patient"
@@ -1029,6 +1037,7 @@ const PatientManagement = () => {
                         <div className="modal-header">
                             <h3>Confirm Delete</h3>
                             <button
+                                type="button"
                                 onClick={() => setShowDeleteConfirm(false)}
                                 className="modal-close"
                             >
@@ -1066,12 +1075,14 @@ const PatientManagement = () => {
 
                             <div className="form-actions">
                                 <button
+                                    type="button"
                                     onClick={() => setShowDeleteConfirm(false)}
                                     className="btn btn-secondary"
                                 >
                                     Cancel
                                 </button>
                                 <button
+                                    type="button"
                                     onClick={handleDeleteConfirm}
                                     className="btn btn-danger"
                                 >

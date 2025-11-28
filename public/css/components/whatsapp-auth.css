@@ -238,9 +238,9 @@
 }
 
 /* Button styles use global definitions from /css/components/buttons.css */
-
-.btn-icon {
-    font-size: 1em;
+/* Scoped to auth-actions to avoid polluting global .btn-icon */
+.auth-actions .btn-icon {
+    font-size: var(--font-size-base);
 }
 
 /* Footer */

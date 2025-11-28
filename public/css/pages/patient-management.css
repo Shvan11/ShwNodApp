@@ -356,27 +356,15 @@
     justify-content: flex-start;
 }
 
-.btn-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+/* All button styles use global .btn classes from /css/components/buttons.css */
+/* Icon buttons combine .btn .btn-icon with .btn-outline-* variants */
+
+/* Page-specific icon button sizing */
+.page-patient-management .btn-icon {
     width: 36px;
     height: 36px;
-    border-radius: var(--radius-md);
-    border: var(--border-width-thin) solid transparent;
-    background-color: transparent;
-    cursor: pointer;
-    transition: all var(--transition-base);
     font-size: var(--font-size-md);
 }
-
-.btn-icon:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-sm);
-}
-
-/* Local button styles removed - using global .btn classes */
-/* Preserving only icon-specific tweaks if needed, but for now relying on global .btn-icon */
 
 /* ===================================
    MODALS

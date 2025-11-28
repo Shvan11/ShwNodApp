@@ -108,7 +108,13 @@ const UniversalHeader = () => {
     };
 
     const navigateToPatientManagement = () => {
-        navigate('/patient-management');
+        // Restore last search params if available
+        const lastSearch = sessionStorage.getItem('lastPatientSearch');
+        if (lastSearch) {
+            navigate(`/patient-management?${lastSearch}`);
+        } else {
+            navigate('/patient-management');
+        }
     };
 
     // Header navigation items configuration

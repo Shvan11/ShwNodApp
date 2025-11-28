@@ -10,14 +10,25 @@ import { useState, useCallback } from 'react';
  * - Database is the single source of truth
  *
  * User sees loading spinner → Server updates DB → Broadcast to all clients → Reload
+ *
+ * @param {Object|null} initialData - Optional initial data from loader
  */
-export function useAppointments() {
+export function useAppointments(initialData = null) {
     // TWO SEPARATE LISTS (matching database structure)
-    const [allAppointments, setAllAppointments] = useState([]);
-    const [checkedInAppointments, setCheckedInAppointments] = useState([]);
-    const [stats, setStats] = useState({ total: 0, checkedIn: 0, absent: 0, waiting: 0 });
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    // Initialize from loader data if provided
+    const [allAppointments, setAllAppointments] = useState(
+        initialData?.allAppointments || []
+    );
+    const [checkedInAppointments, setCheckedInAppointments] = useState(
+        initialData?.checkedInAppointments || []
+    );
+    const [stats, setStats] = useState(
+        initialData?.stats || { total: 0, checkedIn: 0, absent: 0, waiting: 0 }
+    );
+
+    // Only show loading spinner if we have NO initial data
+    const [loading, setLoading] = useState(!initialData);
+    const [error, setError] = useState(initialData?.error || null);
 
     /**
      * Get current time in HH:MM:SS format

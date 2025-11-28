@@ -7,7 +7,7 @@
  * - Suspense (lazy loading)
  */
 import { Suspense } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, ScrollRestoration } from 'react-router-dom';
 import { GlobalStateProvider } from '../contexts/GlobalStateContext.jsx';
 import { ToastProvider } from '../contexts/ToastContext.jsx';
 import UniversalHeader from '../components/react/UniversalHeader.jsx';
@@ -36,6 +36,11 @@ export function RootLayout() {
             <Outlet />
           </Suspense>
         </div>
+
+        {/* Native scroll restoration for route navigation */}
+        <ScrollRestoration
+          getKey={(location) => location.pathname + location.search}
+        />
       </GlobalStateProvider>
     </ToastProvider>
   );

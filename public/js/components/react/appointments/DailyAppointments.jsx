@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLoaderData, useSearchParams } from 'react-router-dom';
 import AppointmentsHeader from './AppointmentsHeader.jsx';
 import StatsCards from './StatsCards.jsx';
 import MobileViewToggle from './MobileViewToggle.jsx';
@@ -6,21 +7,25 @@ import AppointmentsList from './AppointmentsList.jsx';
 
 import { useAppointments } from '../../../hooks/useAppointments.js';
 import { useWebSocketSync } from '../../../hooks/useWebSocketSync.js';
-import storage from '../../../core/storage.js';
 
 /**
  * DailyAppointments Component
  * Main application for daily appointments management
  *
- * SIMPLIFIED APPROACH:
- * - No optimistic updates
- * - No action ID tracking
- * - No deduplication logic
- * - Just reload on every WebSocket message
- * - Database is the single source of truth
+ * HYBRID APPROACH:
+ * - Loader pre-fetches initial data (eliminates loading flash)
+ * - URL searchParams as single source of truth for date
+ * - WebSocket for real-time updates
+ * - Native scroll restoration via React Router
  */
 const DailyAppointments = () => {
-    // Get today's date in local timezone
+    // 1. Get initial data from loader
+    const loaderData = useLoaderData();
+
+    // 2. Get/set URL search params (source of truth for date)
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    // 3. Helper to get today's date
     const getTodayDate = () => {
         const now = new Date();
         const year = now.getFullYear();
@@ -29,15 +34,15 @@ const DailyAppointments = () => {
         return `${year}-${month}-${day}`;
     };
 
-    // Initialize state from storage if available, otherwise use default
-    const [selectedDate, setSelectedDate] = useState(() => {
-        return storage.getItem('daily_appointments_date') || getTodayDate();
-    });
+    // 4. Initialize date from URL (loader guarantees URL has date)
+    const [selectedDate, setSelectedDate] = useState(
+        loaderData.loadedDate || searchParams.get('date') || getTodayDate()
+    );
 
     const [mobileView, setMobileView] = useState('all');
     const [showFlash, setShowFlash] = useState(false);
 
-    // Use custom hooks
+    // 5. Pass loader data to hook
     const {
         allAppointments,
         checkedInAppointments,
@@ -49,21 +54,37 @@ const DailyAppointments = () => {
         markDismissed,
         undoState,
         getStats
-    } = useAppointments();
+    } = useAppointments(loaderData);
 
-    // WebSocket integration - SIMPLIFIED: just reload on message
+    // 6. WebSocket integration (UNCHANGED - preserves existing scroll behavior)
     const { connectionStatus } = useWebSocketSync(selectedDate, (data) => {
         console.log('📡 [DailyAppointments] WebSocket update received - reloading appointments');
         loadAppointments(selectedDate);
         flashUpdateIndicator();
     });
 
-    // Load appointments when date changes
+    // 7. Sync URL when date changes (component-driven updates)
     useEffect(() => {
-        loadAppointments(selectedDate);
-    }, [selectedDate, loadAppointments]);
+        // Only update if date is different from URL
+        const urlDate = searchParams.get('date');
+        if (selectedDate && selectedDate !== urlDate) {
+            setSearchParams({ date: selectedDate }, { replace: true });
+        }
+    }, [selectedDate, searchParams, setSearchParams]);
 
-    // Handle WebSocket reconnection
+    // 8. Load appointments when date changes (for user-initiated date changes)
+    useEffect(() => {
+        // Skip if this is loader data (already loaded)
+        if (loaderData.loadedDate === selectedDate) {
+            console.log('📦 [DailyAppointments] Using loader data, skip fetch');
+            return;
+        }
+
+        console.log('📅 [DailyAppointments] Date changed, fetching new data');
+        loadAppointments(selectedDate);
+    }, [selectedDate]); // Only depend on selectedDate
+
+    // 9. Handle WebSocket reconnection (UNCHANGED)
     useEffect(() => {
         const handleReconnect = () => {
             console.log('[DailyAppointments] 🔄 Connection restored - refreshing appointments');
@@ -77,17 +98,16 @@ const DailyAppointments = () => {
         };
     }, [selectedDate, loadAppointments]);
 
-    // Flash update indicator
+    // 10. Flash update indicator (UNCHANGED)
     const flashUpdateIndicator = () => {
         setShowFlash(true);
         setTimeout(() => setShowFlash(false), 1000);
     };
 
-    // Handle date change
+    // 11. Handle date change (updates state + URL)
     const handleDateChange = (newDate) => {
         setSelectedDate(newDate);
-        // Persist the new date selection
-        storage.setItem('daily_appointments_date', newDate);
+        // URL sync happens in useEffect above
     };
 
     // Handle check-in

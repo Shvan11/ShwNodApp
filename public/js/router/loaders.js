@@ -349,3 +349,157 @@ export function clearLoaderCacheKey(cacheKey) {
   sessionStorage.removeItem(`loader_cache_${cacheKey}`);
   console.log(`[Loader] Cache cleared for ${cacheKey}`);
 }
+
+/**
+ * PATIENT MANAGEMENT LOADER
+ * Pre-fetches filter data (work types, keywords, tags, patient list)
+ * Enables native scroll restoration via React Router
+ *
+ * @param {Request} request - Request object with signal
+ * @returns {Promise<Object>} Filter data for dropdowns and advanced search
+ */
+export async function patientManagementLoader({ request }) {
+  const { signal } = request;
+  const url = new URL(request.url);
+
+  console.log('🚀 [Loader] Pre-fetching patient management filter data');
+
+  try {
+    // Fetch all filter data in parallel
+    const [allPatientsRes, workTypesRes, keywordsRes, tagsRes] = await Promise.all([
+      fetch('/api/patientsPhones', { signal }),
+      fetch('/api/getworktypes', { signal }),
+      fetch('/api/getworkkeywords', { signal }),
+      fetch('/api/tag-options', { signal })
+    ]);
+
+    // Parse responses
+    const allPatients = allPatientsRes.ok ? await allPatientsRes.json() : [];
+    const workTypesData = workTypesRes.ok ? await workTypesRes.json() : [];
+    const keywordsData = keywordsRes.ok ? await keywordsRes.json() : [];
+    const tagsData = tagsRes.ok ? await tagsRes.json() : [];
+
+    // Transform to react-select format
+    const workTypes = workTypesData.map(wt => ({
+      value: wt.ID,
+      label: wt.WorkType
+    }));
+
+    const keywords = keywordsData.map(kw => ({
+      value: kw.ID,
+      label: kw.KeyWord
+    }));
+
+    const tags = tagsData.map(tag => ({
+      value: tag.ID,
+      label: tag.Tag
+    }));
+
+    // Check if we have search params and need to execute search
+    const hasSearchParams =
+      url.searchParams.has('patientName') ||
+      url.searchParams.has('firstName') ||
+      url.searchParams.has('lastName') ||
+      url.searchParams.has('q') ||
+      url.searchParams.has('workTypes') ||
+      url.searchParams.has('keywords') ||
+      url.searchParams.has('tags');
+
+    let searchResults = null;
+
+    if (hasSearchParams) {
+      console.log('🔍 [Loader] Search params detected - fetching results');
+
+      // Build search query from URL params
+      const searchParams = new URLSearchParams();
+      if (url.searchParams.get('patientName')) searchParams.set('patientName', url.searchParams.get('patientName'));
+      if (url.searchParams.get('firstName')) searchParams.set('firstName', url.searchParams.get('firstName'));
+      if (url.searchParams.get('lastName')) searchParams.set('lastName', url.searchParams.get('lastName'));
+      if (url.searchParams.get('q')) searchParams.set('q', url.searchParams.get('q'));
+      if (url.searchParams.get('workTypes')) searchParams.set('workTypes', url.searchParams.get('workTypes'));
+      if (url.searchParams.get('keywords')) searchParams.set('keywords', url.searchParams.get('keywords'));
+      if (url.searchParams.get('tags')) searchParams.set('tags', url.searchParams.get('tags'));
+      if (url.searchParams.get('sortBy')) searchParams.set('sortBy', url.searchParams.get('sortBy'));
+      if (url.searchParams.get('order')) searchParams.set('order', url.searchParams.get('order'));
+
+      const searchRes = await fetch(`/api/patients/search?${searchParams.toString()}`, { signal });
+      searchResults = searchRes.ok ? await searchRes.json() : [];
+    }
+
+    return {
+      allPatients,
+      workTypes,
+      keywords,
+      tags,
+      searchResults, // Will be null if no search params, or array if search executed
+      _loaderTimestamp: Date.now()
+    };
+  } catch (error) {
+    console.error('❌ [Loader] Failed to load filter data:', error);
+    // Return empty arrays on error
+    return {
+      allPatients: [],
+      workTypes: [],
+      keywords: [],
+      tags: [],
+      searchResults: null,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * DAILY APPOINTMENTS LOADER
+ * Fetches initial data BEFORE component renders
+ * Enables native scroll restoration via React Router
+ *
+ * @param {Object} params - Route parameters (unused)
+ * @param {Request} request - Request object with URL
+ * @returns {Promise<Object>} Appointments data + metadata
+ */
+export async function dailyAppointmentsLoader({ request }) {
+  // Helper to get today's date in YYYY-MM-DD format
+  const getToday = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Read date from URL (source of truth)
+  const url = new URL(request.url);
+  const targetDate = url.searchParams.get('date') || getToday();
+
+  console.log(`🚀 [Loader] Pre-fetching appointments for: ${targetDate}`);
+
+  try {
+    const response = await fetch(`/api/getDailyAppointments?AppsDate=${targetDate}`, {
+      signal: request.signal // Abort on navigation
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    return {
+      allAppointments: data.allAppointments || [],
+      checkedInAppointments: data.checkedInAppointments || [],
+      stats: data.stats || { total: 0, checkedIn: 0, absent: 0, waiting: 0 },
+      loadedDate: targetDate,
+      _loaderTimestamp: Date.now() // For debugging
+    };
+  } catch (error) {
+    // Don't throw - return empty state (component will show error)
+    console.error('❌ [Loader] Failed:', error);
+    return {
+      allAppointments: [],
+      checkedInAppointments: [],
+      stats: { total: 0, checkedIn: 0, absent: 0, waiting: 0 },
+      loadedDate: targetDate,
+      error: error.message
+    };
+  }
+}

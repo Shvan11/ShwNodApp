@@ -129,49 +129,65 @@
   border-color: var(--gray-900);
 }
 
-/* Outline Variants */
+/* Outline Variants - Soft colored backgrounds with borders */
 .btn-outline-primary {
   color: var(--primary-color);
   border-color: var(--primary-color);
-  background-color: transparent;
+  background-color: var(--blue-50);
 }
 
 .btn-outline-primary:hover {
-  color: #fff;
+  color: var(--color-white);
   background-color: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
 .btn-outline-secondary {
   color: var(--secondary-color);
   border-color: var(--secondary-color);
-  background-color: transparent;
+  background-color: var(--success-50);
 }
 
 .btn-outline-secondary:hover {
-  color: #fff;
+  color: var(--color-white);
   background-color: var(--secondary-color);
+  border-color: var(--secondary-color);
 }
 
 .btn-outline-success {
   color: var(--success-color);
   border-color: var(--success-color);
-  background-color: transparent;
+  background-color: var(--success-50);
 }
 
 .btn-outline-success:hover {
-  color: #fff;
+  color: var(--color-white);
   background-color: var(--success-color);
+  border-color: var(--success-color);
 }
 
 .btn-outline-danger {
   color: var(--error-color);
   border-color: var(--error-color);
-  background-color: transparent;
+  background-color: var(--error-50);
 }
 
 .btn-outline-danger:hover {
-  color: #fff;
+  color: var(--color-white);
   background-color: var(--error-color);
+  border-color: var(--error-color);
+}
+
+.btn-outline-warning {
+  color: var(--warning-dark);
+  border-color: var(--warning-color);
+  background-color: var(--warning-50);
+}
+
+.btn-outline-warning:hover {
+  color: var(--text-primary);
+  background-color: var(--warning-color);
+  border-color: var(--warning-color);
 }
 
 /* Button Sizes */
@@ -194,21 +210,14 @@
 }
 
 /* Icon Button (Square/Circle) */
+/* Only handles layout/sizing - inherits colors from variant classes */
 .btn-icon {
-  padding: 0.5rem;
+  padding: var(--spacing-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-md);
-  color: var(--gray-600);
-  background: transparent;
-  border: 1px solid transparent;
-  transition: all 0.2s;
-}
-
-.btn-icon:hover {
-  background-color: var(--gray-100);
-  color: var(--gray-900);
+  transition: all var(--transition-base);
 }
 
 .btn-icon-sm {
