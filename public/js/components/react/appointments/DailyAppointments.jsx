@@ -6,6 +6,7 @@ import AppointmentsList from './AppointmentsList.jsx';
 
 import { useAppointments } from '../../../hooks/useAppointments.js';
 import { useWebSocketSync } from '../../../hooks/useWebSocketSync.js';
+import storage from '../../../core/storage.js';
 
 /**
  * DailyAppointments Component
@@ -28,7 +29,11 @@ const DailyAppointments = () => {
         return `${year}-${month}-${day}`;
     };
 
-    const [selectedDate, setSelectedDate] = useState(getTodayDate());
+    // Initialize state from storage if available, otherwise use default
+    const [selectedDate, setSelectedDate] = useState(() => {
+        return storage.getItem('daily_appointments_date') || getTodayDate();
+    });
+
     const [mobileView, setMobileView] = useState('all');
     const [showFlash, setShowFlash] = useState(false);
 
@@ -81,6 +86,8 @@ const DailyAppointments = () => {
     // Handle date change
     const handleDateChange = (newDate) => {
         setSelectedDate(newDate);
+        // Persist the new date selection
+        storage.setItem('daily_appointments_date', newDate);
     };
 
     // Handle check-in
