@@ -2,11 +2,11 @@
 .settings-container {
     margin: 0;
     padding: 0;
-    margin-top: 80px;
+    margin-top: var(--header-height, 50px);
     /* Account for UniversalHeader */
     display: flex;
     flex-direction: column;
-    min-height: calc(100vh - 80px);
+    min-height: calc(100vh - var(--header-height, 50px));
     background: var(--gray-50);
 }
 
@@ -15,8 +15,8 @@
     background: white;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     position: sticky;
-    top: 80px;
-    z-index: var(--z-index-sticky);
+    top: var(--header-height, 50px);
+    z-index: var(--z-index-fixed);
 }
 
 .tab-header {
@@ -541,65 +541,229 @@
     transform: none;
 }
 
-/* Modal Styles */
-.modal {
-    display: none;
-    position: fixed;
-    z-index: var(--z-index-modal);
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-}
+/* Modal Styles - Overrides for Employee Settings */
+/* Note: Basic modal structure (.modal-overlay, .modal-header, etc.) comes from /css/components/modal.css */
 
-.modal-content {
-    background: white;
-    margin: 15% auto;
+.modal-content.employee-modal {
+    background: var(--surface);
+    margin: 0;
+    /* Centered by flex in modal-overlay */
     padding: 0;
     border-radius: var(--radius-xl);
     width: 90%;
-    max-width: 500px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-}
-
-.modal-header {
+    max-width: 900px;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-light);
+    animation: modalSlideIn 0.3s var(--easing-ease-out);
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.5rem 2rem;
-    border-bottom: 1px solid var(--gray-200);
+    flex-direction: column;
+    max-height: 90vh;
+    /* Ensure it fits on screen */
 }
 
-.modal-header h3 {
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* CRITICAL FIX: Override sticky header from global modal.css */
+.employee-modal .modal-header {
+    position: relative !important;
+    top: auto;
+    z-index: 1;
+    background: var(--surface-elevated);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-bottom: 1px solid var(--border-light);
+    flex-shrink: 0;
+    /* Prevent header from shrinking */
+}
+
+.employee-modal .modal-header h3 {
     margin: 0;
+    color: var(--primary-color);
+    font-size: var(--font-size-xl);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.employee-modal .modal-close {
+    background: none;
+    border: none;
+    font-size: var(--font-size-xl);
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: var(--spacing-xs);
+    border-radius: 50%;
+    transition: all var(--transition-fast);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.employee-modal .modal-close:hover {
+    background: var(--gray-200);
+    color: var(--error-color);
+}
+
+.employee-modal .modal-body {
+    padding: var(--spacing-xl);
+    overflow-y: auto;
+    /* Enable scrolling for body content */
+    flex: 1;
+    /* Take remaining space */
+}
+
+.employee-modal .modal-footer {
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-md);
+    background: var(--surface-elevated);
+    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+    flex-shrink: 0;
+    /* Prevent footer from shrinking */
+}
+
+/* Form Layout Styles - Isolated for Employee Modal */
+.employee-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-light);
+    margin-bottom: var(--spacing-lg);
+    gap: var(--spacing-md);
+}
+
+.employee-tab-btn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-md);
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.employee-tab-btn:hover {
     color: var(--primary-color);
 }
 
-.modal-close {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: var(--text-secondary);
-    padding: 0.5rem;
-    border-radius: 50%;
-    transition: background-color 0.3s ease;
+.employee-tab-btn.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
 }
 
-.modal-close:hover {
-    background: var(--gray-100);
+.employee-tab-content {
+    min-height: 300px;
+    /* Prevent height jumping */
 }
 
-.modal-body {
-    padding: 2rem;
+.employee-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-xs);
 }
 
-.modal-footer {
-    padding: 1.5rem 2rem;
-    border-top: 1px solid var(--gray-200);
+.employee-modal .form-group {
+    margin-bottom: 0;
+}
+
+.employee-modal label {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+    display: block;
+    font-size: 0.95rem;
+}
+
+.employee-modal .required {
+    color: var(--error-color);
+    margin-left: var(--spacing-xs);
+}
+
+.employee-modal input[type="text"],
+.employee-modal input[type="email"],
+.employee-modal input[type="tel"],
+.employee-modal input[type="number"],
+.employee-modal select {
+    width: 100%;
+    box-sizing: border-box;
+    /* Ensure padding doesn't overflow */
+}
+
+.employee-checkbox-group {
+    background: var(--gray-50);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-light);
+    margin-top: var(--spacing-sm);
     display: flex;
-    justify-content: flex-end;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.employee-checkbox-group .form-group-checkbox {
+    margin: 0;
+}
+
+.employee-checkbox-group .form-group-checkbox label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    cursor: pointer;
+    width: 100%;
+    padding: var(--spacing-xs) 0;
+}
+
+.employee-checkbox-group input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    accent-color: var(--primary-color);
+    cursor: pointer;
+    margin: 0;
+}
+
+.employee-checkbox-group .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-md);
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+@media (max-width: 768px) {
+    .employee-form-row {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+
+    .modal-content.employee-modal {
+        width: 95%;
+        margin: 0;
+    }
+
+    .employee-modal .modal-header,
+    .employee-modal .modal-body,
+    .employee-modal .modal-footer {
+        padding: var(--spacing-md);
+    }
 }
 
 /* Success/Error states */
@@ -665,12 +829,12 @@
     }
 
     .settings-container {
-        margin-top: 60px;
-        min-height: calc(100vh - 60px);
+        margin-top: var(--header-height, 50px);
+        min-height: calc(100vh - var(--header-height, 50px));
     }
 
     .settings-tab-navigation {
-        top: 60px;
+        top: var(--header-height, 50px);
     }
 
     .settings-content {
@@ -1093,7 +1257,8 @@
 }
 
 .btn-edit::before {
-    content: none; /* Remove icon from buttons.css */
+    content: none;
+    /* Remove icon from buttons.css */
 }
 
 .btn-edit:hover {
@@ -1107,7 +1272,8 @@
 }
 
 .btn-delete::before {
-    content: none; /* Remove icon from buttons.css */
+    content: none;
+    /* Remove icon from buttons.css */
 }
 
 .btn-delete:hover {
@@ -1192,6 +1358,90 @@
     .btn-save {
         width: 100%;
         justify-content: center;
+    }
+}
+
+/* Mobile-specific styles for very small screens */
+@media (max-width: 480px) {
+
+    /* Hide table headers and convert table to card layout */
+    .doctors-table thead {
+        display: none;
+    }
+
+    .doctors-table,
+    .doctors-table tbody,
+    .doctors-table tr,
+    .doctors-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .doctors-table tbody tr {
+        margin-bottom: var(--spacing-md);
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-md);
+        background: white;
+    }
+
+    .doctors-table tbody tr:hover {
+        background: var(--gray-50);
+        box-shadow: var(--shadow-md);
+    }
+
+    .doctors-table td {
+        padding: var(--spacing-xs) 0;
+        border: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .doctors-table td::before {
+        content: attr(data-label);
+        font-weight: var(--font-weight-semibold);
+        color: var(--text-secondary);
+        font-size: var(--font-size-sm);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        flex-shrink: 0;
+        margin-right: var(--spacing-md);
+    }
+
+    /* Hide ID column on mobile */
+    .doctors-table td:first-child {
+        display: none;
+    }
+
+    /* Make name more prominent */
+    .doctors-table .doctor-name {
+        font-size: var(--font-size-lg);
+        font-weight: var(--font-weight-bold);
+    }
+
+    /* Actions row - full width buttons */
+    .doctors-table .actions {
+        justify-content: flex-end;
+        gap: var(--spacing-sm);
+        margin-top: var(--spacing-sm);
+        padding-top: var(--spacing-sm);
+        border-top: 1px solid var(--gray-200);
+    }
+
+    .doctors-table .btn-icon {
+        padding: var(--spacing-md);
+        font-size: var(--font-size-lg);
+    }
+
+    /* Adjust section header for mobile */
+    .aligner-doctors-settings .header-content h2 {
+        font-size: var(--font-size-xl);
+    }
+
+    .btn-add-doctor {
+        padding: var(--spacing-md) var(--spacing-lg);
+        font-size: var(--font-size-sm);
     }
 }
 

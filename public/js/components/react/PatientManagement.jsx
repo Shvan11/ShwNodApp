@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AsyncSelect from 'react-select/async';
 import Select from 'react-select';
@@ -6,483 +6,268 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 
 /**
  * Patient Management Component
- * Provides patient search, editing, and management functionality
- * Memoized to prevent unnecessary re-renders
+ * * Architecture Note:
+ * This component uses a "Synchronous Restoration" pattern to support React Router's <ScrollRestoration />.
+ * 1. State is initialized from sessionStorage BEFORE the first render.
+ * 2. This ensures the table is fully populated immediately on mount.
+ * 3. React Router then handles the scroll position automatically.
  */
 const PatientManagement = () => {
     const navigate = useNavigate();
     const toast = useToast();
-    const [patients, setPatients] = useState([]);
+    
+    // --- 1. Synchronous State Initialization ---
+    // We read storage ONCE via a ref/function. By passing this result to useState,
+    // React initializes the state with data available on the very first paint.
+    const savedState = useRef(() => {
+        try {
+            const saved = sessionStorage.getItem('pm_search_state');
+            return saved ? JSON.parse(saved) : null;
+        } catch (e) {
+            console.error('Failed to load saved state', e);
+            return null;
+        }
+    }).current();
+
+    // -- Data State --
+    const [patients, setPatients] = useState(savedState?.patients || []);
+    const [hasSearched, setHasSearched] = useState(savedState?.hasSearched || false);
     const [loading, setLoading] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [hasSearched, setHasSearched] = useState(false);
+
+    // -- Search Inputs --
+    const [searchPatientName, setSearchPatientName] = useState(savedState?.searchPatientName || '');
+    const [searchFirstName, setSearchFirstName] = useState(savedState?.searchFirstName || '');
+    const [searchLastName, setSearchLastName] = useState(savedState?.searchLastName || '');
+    const [searchTerm, setSearchTerm] = useState(savedState?.searchTerm || '');
+
+    // -- Filters & Sorting --
+    const [selectedWorkTypes, setSelectedWorkTypes] = useState(savedState?.selectedWorkTypes || []);
+    const [selectedKeywords, setSelectedKeywords] = useState(savedState?.selectedKeywords || []);
+    const [selectedTags, setSelectedTags] = useState(savedState?.selectedTags || []);
+    const [showFilters, setShowFilters] = useState(savedState?.showFilters || false);
+    const [sortConfig, setSortConfig] = useState(savedState?.sortConfig || { key: 'name', direction: 'asc' });
+
+    // -- UI State (Non-persistent) --
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [selectedPatient, setSelectedPatient] = useState(null);
-
-    // Separate search fields for patient name components
-    const [searchPatientName, setSearchPatientName] = useState('');
-    const [searchFirstName, setSearchFirstName] = useState('');
-    const [searchLastName, setSearchLastName] = useState('');
-    const [searchDebounce, setSearchDebounce] = useState(null);
-
-    // Dropdown quick search
     const [showQuickSearch, setShowQuickSearch] = useState(true);
-    const [allPatients, setAllPatients] = useState([]);
 
-    // Advanced filters state
-    const [selectedWorkTypes, setSelectedWorkTypes] = useState([]);
-    const [selectedKeywords, setSelectedKeywords] = useState([]);
-    const [selectedTags, setSelectedTags] = useState([]);
+    // -- Dropdown Data --
+    const [allPatients, setAllPatients] = useState([]);
     const [workTypes, setWorkTypes] = useState([]);
     const [keywords, setKeywords] = useState([]);
     const [tags, setTags] = useState([]);
-    const [showFilters, setShowFilters] = useState(false);
-    const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
 
+    // -- Refs --
+    const searchDebounceRef = useRef(null);
+    const abortControllerRef = useRef(null);
+    // Flag to skip the initial auto-search if we just restored valid data
+    const isRestoring = useRef(!!savedState); 
+
+    // --- 2. Data Loading (Dropdowns) ---
     useEffect(() => {
-        loadAllPatientsForDropdown();
-
-        // Check for search parameter in URL
+        loadDropdownData();
+        
+        // Handle URL Params (Deep linking has priority over Storage)
         const urlParams = new URLSearchParams(window.location.search);
-        const searchParam = urlParams.get('search');
-        if (searchParam) {
-            setSearchPatientName(searchParam);
-            // The useEffect for searchPatientName will trigger the search automatically
+        const urlSearch = urlParams.get('search');
+        if (urlSearch) {
+            setSearchPatientName(urlSearch);
+            isRestoring.current = false; // Force auto-search for URL param
         }
     }, []);
 
-    const loadAllPatientsForDropdown = async () => {
-        try {
-            const response = await fetch('/api/patientsPhones');
-            if (!response.ok) throw new Error('Failed to fetch patient list');
-            const data = await response.json();
-            setAllPatients(data);
-        } catch (err) {
-            console.error('Error loading patient list for dropdown:', err);
-        }
-    };
-
-    // Load filter data on mount
+    // --- 3. Persistence Logic ---
+    // Save state whenever relevant data changes
     useEffect(() => {
-        loadFilterData();
-    }, []);
-
-    const loadFilterData = async () => {
-        try {
-            // Load work types
-            const workTypesResponse = await fetch('/api/getworktypes');
-            if (workTypesResponse.ok) {
-                const workTypesData = await workTypesResponse.json();
-                setWorkTypes(workTypesData.map(wt => ({
-                    value: wt.ID,
-                    label: wt.WorkType
-                })));
-            }
-
-            // Load keywords
-            const keywordsResponse = await fetch('/api/getworkkeywords');
-            if (keywordsResponse.ok) {
-                const keywordsData = await keywordsResponse.json();
-                setKeywords(keywordsData.map(kw => ({
-                    value: kw.ID,
-                    label: kw.KeyWord
-                })));
-            }
-
-            // Load tags
-            const tagsResponse = await fetch('/api/tag-options');
-            if (tagsResponse.ok) {
-                const tagsData = await tagsResponse.json();
-                setTags(tagsData.map(tag => ({
-                    value: tag.ID,
-                    label: tag.Tag
-                })));
-            }
-        } catch (err) {
-            console.error('Error loading filter data:', err);
-        }
-    };
-
-    // Save search state to sessionStorage (for search restoration only, NOT scroll)
-    useEffect(() => {
-        const stateToSave = {
-            searchPatientName,
-            searchFirstName,
-            searchLastName,
-            selectedWorkTypes,
-            selectedKeywords,
-            selectedTags,
-            showFilters,
-            sortConfig,
-            hasSearched
+        const handleSaveState = () => {
+            const stateToSave = {
+                patients,
+                hasSearched,
+                searchPatientName,
+                searchFirstName,
+                searchLastName,
+                searchTerm,
+                selectedWorkTypes,
+                selectedKeywords,
+                selectedTags,
+                showFilters,
+                sortConfig
+            };
+            sessionStorage.setItem('pm_search_state', JSON.stringify(stateToSave));
         };
-        sessionStorage.setItem('pm_search_state', JSON.stringify(stateToSave));
-    }, [searchPatientName, searchFirstName, searchLastName, selectedWorkTypes, selectedKeywords, selectedTags, showFilters, sortConfig, hasSearched]);
 
-    // Restore search state on mount (React Router handles scroll restoration)
-    useEffect(() => {
-        // Check for search parameter in URL - if present, skip restoration to allow URL to take precedence
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('search')) {
-            return;
-        }
+        // Save on unmount (navigation)
+        return () => handleSaveState();
+    }, [
+        patients, hasSearched, searchPatientName, searchFirstName, searchLastName, searchTerm,
+        selectedWorkTypes, selectedKeywords, selectedTags, showFilters, sortConfig
+    ]);
 
-        const savedState = sessionStorage.getItem('pm_search_state');
-        if (savedState) {
-            try {
-                const parsed = JSON.parse(savedState);
+    const loadDropdownData = async () => {
+        try {
+            const [pRes, wtRes, kwRes, tagsRes] = await Promise.all([
+                fetch('/api/patientsPhones'),
+                fetch('/api/getworktypes'),
+                fetch('/api/getworkkeywords'),
+                fetch('/api/tag-options')
+            ]);
 
-                // Check if this was an advanced search
-                const isAdvancedSearch = parsed.searchPatientName || parsed.searchFirstName || parsed.searchLastName ||
-                    (parsed.selectedWorkTypes && parsed.selectedWorkTypes.length > 0) ||
-                    (parsed.selectedKeywords && parsed.selectedKeywords.length > 0) ||
-                    (parsed.selectedTags && parsed.selectedTags.length > 0);
-
-                if (isAdvancedSearch) {
-                    // Restore only advanced search states
-                    setSearchPatientName(parsed.searchPatientName || '');
-                    setSearchFirstName(parsed.searchFirstName || '');
-                    setSearchLastName(parsed.searchLastName || '');
-                    setSelectedWorkTypes(parsed.selectedWorkTypes || []);
-                    setSelectedKeywords(parsed.selectedKeywords || []);
-                    setSelectedTags(parsed.selectedTags || []);
-
-                    // Restore UI state for advanced search
-                    if (parsed.showFilters !== undefined) setShowFilters(parsed.showFilters);
-                    if (parsed.sortConfig) setSortConfig(parsed.sortConfig);
-
-                    // The auto-search useEffect will trigger when the above states update
-                }
-            } catch (e) {
-                console.error('[PM] Failed to parse saved search state', e);
-            }
-        }
-    }, []);
-
-    // Handle patient selection from quick search
-    const handleQuickSearchSelect = (selectedOption) => {
-        if (selectedOption && selectedOption.value) {
-            navigate(`/patient/${selectedOption.value}/works`);
+            if (pRes.ok) setAllPatients(await pRes.json());
+            if (wtRes.ok) setWorkTypes((await wtRes.json()).map(x => ({ value: x.ID, label: x.WorkType })));
+            if (kwRes.ok) setKeywords((await kwRes.json()).map(x => ({ value: x.ID, label: x.KeyWord })));
+            if (tagsRes.ok) setTags((await tagsRes.json()).map(x => ({ value: x.ID, label: x.Tag })));
+        } catch (err) {
+            console.error('Error loading dropdown data:', err);
         }
     };
 
-    // Async search function for name (with RTL support)
-    // Searches from the beginning of the name for better performance
-    const loadNameOptions = (inputValue, callback) => {
-        if (!inputValue || inputValue.length < 2) {
-            callback([]);
-            return;
-        }
+    // --- Search Logic ---
+    const executeSearch = useCallback(async (overrideSort = null) => {
+        if (abortControllerRef.current) abortControllerRef.current.abort();
+        const abortController = new AbortController();
+        abortControllerRef.current = abortController;
 
-        const filtered = allPatients
-            .filter(p => p.name && p.name.startsWith(inputValue))
-            .slice(0, 50) // Limit to 50 results for performance
-            .map(p => ({ value: p.id, label: p.name }));
+        const currentSort = overrideSort || sortConfig;
 
-        callback(filtered);
-    };
-
-    // Async search function for phone
-    const loadPhoneOptions = (inputValue, callback) => {
-        if (!inputValue || inputValue.length < 2) {
-            callback([]);
-            return;
-        }
-
-        const filtered = allPatients
-            .filter(p => p.phone && p.phone.includes(inputValue))
-            .slice(0, 50)
-            .map(p => ({ value: p.id, label: p.phone }));
-
-        callback(filtered);
-    };
-
-    // Async search function for ID
-    const loadIdOptions = (inputValue, callback) => {
-        if (!inputValue || inputValue.length < 1) {
-            callback([]);
-            return;
-        }
-
-        const filtered = allPatients
-            .filter(p => p.id.toString().includes(inputValue))
-            .slice(0, 50)
-            .map(p => ({ value: p.id, label: p.id.toString() }));
-
-        callback(filtered);
-    };
-
-    // RTL styles for Arabic name search (dynamic runtime values - allowed)
-    const selectStylesRTL = {
-        input: (provided) => ({
-            ...provided,
-            direction: 'rtl',
-            textAlign: 'right'
-        }),
-        singleValue: (provided) => ({
-            ...provided,
-            direction: 'rtl',
-            textAlign: 'right'
-        }),
-        placeholder: (provided) => ({
-            ...provided,
-            direction: 'rtl',
-            textAlign: 'right'
-        })
-    };
-
-    // Auto-search when any name field changes (with debounce)
-    useEffect(() => {
-        // Clear previous timeout
-        if (searchDebounce) {
-            clearTimeout(searchDebounce);
-        }
-
-        // Check if any field has at least 2 characters OR any filters are selected
-        const hasMinimumInput =
-            searchPatientName.trim().length >= 2 ||
-            searchFirstName.trim().length >= 2 ||
-            searchLastName.trim().length >= 2;
-
-        const hasFilters =
-            selectedWorkTypes.length > 0 ||
-            selectedKeywords.length > 0 ||
-            selectedTags.length > 0;
-
-        if (hasMinimumInput || hasFilters) {
-            // Normal user typing behavior - use debounce
-            const timeoutId = setTimeout(() => {
-                performSearch();
-            }, 500); // 500ms delay
-
-            setSearchDebounce(timeoutId);
-        } else {
-            // Clear results if all fields are empty or too short and no filters
-            if (!searchPatientName && !searchFirstName && !searchLastName && !hasFilters) {
-                setPatients([]);
-                setHasSearched(false);
-            }
-        }
-
-        // Cleanup
-        return () => {
-            if (searchDebounce) {
-                clearTimeout(searchDebounce);
-            }
-        };
-    }, [searchPatientName, searchFirstName, searchLastName, selectedWorkTypes, selectedKeywords, selectedTags]);
-
-    const performSearch = async () => {
         try {
             setLoading(true);
 
-            // Build query parameters
             const params = new URLSearchParams();
             if (searchPatientName.trim()) params.append('patientName', searchPatientName.trim());
             if (searchFirstName.trim()) params.append('firstName', searchFirstName.trim());
             if (searchLastName.trim()) params.append('lastName', searchLastName.trim());
+            if (searchTerm.trim()) params.append('q', searchTerm.trim());
 
-            // Add filter parameters
-            if (selectedWorkTypes.length > 0) {
-                params.append('workTypes', selectedWorkTypes.map(wt => wt.value).join(','));
-            }
-            if (selectedKeywords.length > 0) {
-                params.append('keywords', selectedKeywords.map(kw => kw.value).join(','));
-            }
-            if (selectedTags.length > 0) {
-                params.append('tags', selectedTags.map(tag => tag.value).join(','));
-            }
+            if (selectedWorkTypes.length > 0) params.append('workTypes', selectedWorkTypes.map(wt => wt.value).join(','));
+            if (selectedKeywords.length > 0) params.append('keywords', selectedKeywords.map(kw => kw.value).join(','));
+            if (selectedTags.length > 0) params.append('tags', selectedTags.map(tag => tag.value).join(','));
 
-            // Add sort parameters
-            params.append('sortBy', sortConfig.key);
-            params.append('order', sortConfig.direction);
+            params.append('sortBy', currentSort.key);
+            params.append('order', currentSort.direction);
 
-            const response = await fetch(`/api/patients/search?${params.toString()}`);
+            const response = await fetch(`/api/patients/search?${params.toString()}`, {
+                signal: abortController.signal
+            });
+
             if (!response.ok) throw new Error('Failed to search patients');
+
             const data = await response.json();
             setPatients(data);
             setHasSearched(true);
         } catch (err) {
-            toast.error(err.message || 'Failed to search patients');
-            setPatients([]);
+            if (err.name !== 'AbortError') {
+                toast.error(err.message || 'Failed to search patients');
+            }
         } finally {
-            setLoading(false);
+            if (!abortController.signal.aborted) {
+                setLoading(false);
+            }
         }
-    };
+    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, selectedWorkTypes, selectedKeywords, selectedTags, sortConfig, toast]);
 
-    const searchPatients = async (searchQuery = searchTerm, showAll = false) => {
-        // Don't search if no query and not showing all
-        if (!showAll && (!searchQuery || searchQuery.trim().length < 2)) {
-            toast.warning('Please enter at least 2 characters to search');
+    // --- Auto-Search Effect ---
+    useEffect(() => {
+        const hasInputs = searchPatientName || searchFirstName || searchLastName || searchTerm || 
+                          selectedWorkTypes.length > 0 || selectedKeywords.length > 0 || selectedTags.length > 0;
+
+        // SKIP search if we just restored data from storage
+        // This ensures the "cached view" remains stable and we don't flash a loading spinner unnecessarily
+        if (isRestoring.current) {
+            isRestoring.current = false; // Next change will trigger search normally
             return;
         }
 
-        try {
-            setLoading(true);
-            const query = showAll ? '' : searchQuery.trim();
-            const response = await fetch(`/api/patients/search?q=${encodeURIComponent(query)}&sortBy=${sortConfig.key}&order=${sortConfig.direction}`);
-            if (!response.ok) throw new Error('Failed to search patients');
-            const data = await response.json();
-            setPatients(data);
-            setHasSearched(true);
-        } catch (err) {
-            toast.error(err.message || 'Failed to search patients');
-            setPatients([]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSearch = (e) => {
-        if (e && e.preventDefault) {
-            e.preventDefault();
+        if (hasInputs) {
+            if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+            searchDebounceRef.current = setTimeout(() => {
+                executeSearch();
+            }, 500);
         }
 
-        // Validate search input
-        if (!searchTerm || searchTerm.trim().length < 2) {
-            toast.warning('Please enter at least 2 characters to search');
-            return;
-        }
+        return () => {
+            if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        };
+    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, selectedWorkTypes, selectedKeywords, selectedTags, executeSearch]);
 
-        searchPatients();
-    };
+    // --- Handlers ---
 
-    const handleShowAll = () => {
-        setSearchTerm('');
-        searchPatients('', true);
-    };
+    const handleSearchBtnClick = () => executeSearch();
 
-    const handleResetAdvancedSearch = () => {
-        // Clear all advanced search fields
-        setSearchPatientName('');
-        setSearchFirstName('');
-        setSearchLastName('');
-        setSelectedWorkTypes([]);
-        setSelectedKeywords([]);
-        setSelectedTags([]);
-
-        // Clear results and search state
-        setPatients([]);
-        setHasSearched(false);
-
-        // Clear sessionStorage
+    const handleReset = () => {
         sessionStorage.removeItem('pm_search_state');
+        setSearchPatientName(''); setSearchFirstName(''); setSearchLastName(''); setSearchTerm('');
+        setSelectedWorkTypes([]); setSelectedKeywords([]); setSelectedTags([]);
+        setPatients([]); setHasSearched(false); setShowFilters(false);
+        setSortConfig({ key: 'name', direction: 'asc' });
     };
 
     const handleSortToggle = (key) => {
         let direction = 'asc';
-        if (sortConfig.key === key && sortConfig.direction === 'asc') {
-            direction = 'desc';
-        } else if (key === 'date') {
-            // Default to newest first for date
-            direction = sortConfig.key === key && sortConfig.direction === 'desc' ? 'asc' : 'desc';
-        }
-
-        setSortConfig({ key, direction });
-
-        // Trigger search with new sort immediately if we have results or search term
-        if (hasSearched) {
-            // Use a timeout to allow state update to propagate (or pass directly)
-            setTimeout(() => {
-                // We need to pass the current state values directly since state update is async
-                // But simpler to just re-call performSearch which uses current state... 
-                // actually performSearch uses state which might be stale in this closure without useEffect
-                // Better to trigger via useEffect on sortConfig change or pass params
-
-                // Re-implementing fetch here to ensure we use new sort params
-                const params = new URLSearchParams();
-                if (searchPatientName.trim()) params.append('patientName', searchPatientName.trim());
-                if (searchFirstName.trim()) params.append('firstName', searchFirstName.trim());
-                if (searchLastName.trim()) params.append('lastName', searchLastName.trim());
-                if (searchTerm.trim()) params.append('q', searchTerm.trim());
-
-                if (selectedWorkTypes.length > 0) params.append('workTypes', selectedWorkTypes.map(wt => wt.value).join(','));
-                if (selectedKeywords.length > 0) params.append('keywords', selectedKeywords.map(kw => kw.value).join(','));
-                if (selectedTags.length > 0) params.append('tags', selectedTags.map(tag => tag.value).join(','));
-
-                params.append('sortBy', key);
-                params.append('order', direction);
-
-                setLoading(true);
-                fetch(`/api/patients/search?${params.toString()}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        setPatients(data);
-                        setLoading(false);
-                    })
-                    .catch(err => {
-                        toast.error(err.message || 'Failed to sort patients');
-                        setLoading(false);
-                    });
-            }, 0);
-        }
+        if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+        else if (key === 'date') direction = sortConfig.key === key && sortConfig.direction === 'desc' ? 'asc' : 'desc';
+        
+        const newSort = { key, direction };
+        setSortConfig(newSort);
+        executeSearch(newSort);
     };
 
-
-    const handleDeleteClick = (patient) => {
-        setSelectedPatient(patient);
-        setShowDeleteConfirm(true);
+    const handleShowAll = () => {
+        // Clear inputs and force search
+        setSearchPatientName(''); setSearchFirstName(''); setSearchLastName(''); setSearchTerm('');
+        setLoading(true);
+        fetch(`/api/patients/search?q=&sortBy=name&order=asc`)
+            .then(res => res.json())
+            .then(data => {
+                setPatients(data);
+                setHasSearched(true);
+                setLoading(false);
+            })
+            .catch(() => {
+                setLoading(false);
+                toast.error('Failed to load all patients');
+            });
     };
 
     const handleQuickCheckin = async (e, patient) => {
-        // Prevent any default browser behavior
-        if (e && e.preventDefault) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
+        e.preventDefault(); e.stopPropagation();
         try {
             setLoading(true);
-            const response = await fetch('/api/appointments/quick-checkin', {
+            const res = await fetch('/api/appointments/quick-checkin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    PersonID: patient.PersonID
-                })
+                body: JSON.stringify({ PersonID: patient.PersonID })
             });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to check in patient');
-            }
-
-            const result = await response.json();
-
-            if (result.alreadyCheckedIn) {
-                toast.info(`${patient.PatientName} is already checked in today!`);
-            } else if (result.created) {
-                toast.success(`${patient.PatientName} added to today's appointments and checked in!`);
-            } else {
-                toast.success(`${patient.PatientName} checked in successfully!`);
-            }
-        } catch (err) {
-            toast.error(err.message || 'Failed to check in patient');
-        } finally {
-            setLoading(false);
-        }
+            if(!res.ok) throw new Error((await res.json()).error);
+            const data = await res.json();
+            toast.success(data.alreadyCheckedIn ? 'Already checked in' : 'Checked in successfully');
+        } catch(err) { toast.error(err.message); } 
+        finally { setLoading(false); }
     };
 
-
+    const handleDeleteClick = (patient) => { setSelectedPatient(patient); setShowDeleteConfirm(true); };
+    
     const handleDeleteConfirm = async () => {
         try {
-            const response = await fetch(`/api/patients/${selectedPatient.PersonID}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to delete patient');
-            }
-
-            // Refresh search results
-            if (hasSearched) {
-                await searchPatients(searchTerm, searchTerm === '');
-            }
+            const res = await fetch(`/api/patients/${selectedPatient.PersonID}`, { method: 'DELETE' });
+            if(!res.ok) throw new Error('Delete failed');
+            executeSearch();
             setShowDeleteConfirm(false);
-            toast.success('Patient deleted successfully!');
-        } catch (err) {
-            toast.error(err.message || 'Failed to delete patient');
-        }
+            toast.success('Patient deleted');
+        } catch(err) { toast.error(err.message); }
+    };
+
+    const handleQuickSearchSelect = (opt) => opt?.value && navigate(`/patient/${opt.value}/works`);
+    
+    // Select Loaders
+    const loadNameOptions = (input, cb) => cb(input.length < 2 ? [] : allPatients.filter(p => p.name?.startsWith(input)).slice(0, 50).map(p => ({value: p.id, label: p.name})));
+    const loadPhoneOptions = (input, cb) => cb(input.length < 2 ? [] : allPatients.filter(p => p.phone?.includes(input)).slice(0, 50).map(p => ({value: p.id, label: p.phone})));
+    const loadIdOptions = (input, cb) => cb(input.length < 1 ? [] : allPatients.filter(p => p.id?.toString().includes(input)).slice(0, 50).map(p => ({value: p.id, label: p.id.toString()})));
+
+    const selectStylesRTL = {
+        input: (provided) => ({ ...provided, direction: 'rtl', textAlign: 'right' }),
+        singleValue: (provided) => ({ ...provided, direction: 'rtl', textAlign: 'right' }),
+        placeholder: (provided) => ({ ...provided, direction: 'rtl', textAlign: 'right' })
     };
 
     return (
@@ -490,534 +275,121 @@ const PatientManagement = () => {
             <div className="patient-management-header">
                 <h2>Patient Management</h2>
                 <div className="patient-management-header-actions">
-                    <button
-                        type="button"
-                        onClick={() => setShowQuickSearch(!showQuickSearch)}
-                        className="btn btn-secondary whitespace-nowrap"
-                    >
+                    <button type="button" onClick={() => setShowQuickSearch(!showQuickSearch)} className="btn btn-secondary whitespace-nowrap">
                         <i className={`fas fa-${showQuickSearch ? 'chevron-up' : 'chevron-down'} pm-icon-gap`}></i>
                         {showQuickSearch ? 'Hide' : 'Show'} Quick Search
                     </button>
-                    <button
-                        type="button"
-                        onClick={() => navigate('/patient/new/edit-patient')}
-                        className="btn btn-primary"
-                    >
-                        <i className="fas fa-plus pm-icon-gap"></i>
-                        Add New Patient
+                    <button type="button" onClick={() => navigate('/patient/new/edit-patient')} className="btn btn-primary">
+                        <i className="fas fa-plus pm-icon-gap"></i> Add New Patient
                     </button>
                 </div>
             </div>
 
-            {/* Quick Search Dropdowns */}
             {showQuickSearch && (
                 <div className="pm-quick-search-container">
-                    <div className="pm-quick-search-header">
-                        <i className="fas fa-bolt"></i>
-                        <h3>Quick Search - Select & Go</h3>
-                    </div>
-                    <p className="pm-quick-search-description">
-                        Start typing in any dropdown below to quickly find and open a patient's page
-                    </p>
+                    <div className="pm-quick-search-header"><i className="fas fa-bolt"></i><h3>Quick Search - Select & Go</h3></div>
                     <div className="pm-quick-search-grid">
                         <div className="pm-quick-search-field">
-                            <label>
-                                <i className="fas fa-user pm-icon-gap"></i>
-                                Search by Name (Arabic)
-                            </label>
-                            <AsyncSelect
-                                cacheOptions
-                                defaultOptions={false}
-                                loadOptions={loadNameOptions}
-                                onChange={handleQuickSearchSelect}
-                                placeholder="اكتب للبحث..."
-                                isClearable
-                                classNamePrefix="pm-select"
-                                styles={selectStylesRTL}
-                                noOptionsMessage={() => "لم يتم العثور على مرضى"}
-                                loadingMessage={() => "جاري البحث..."}
-                            />
+                            <label><i className="fas fa-user pm-icon-gap"></i>Search by Name (Arabic)</label>
+                            <AsyncSelect cacheOptions defaultOptions={false} loadOptions={loadNameOptions} onChange={handleQuickSearchSelect} placeholder="اكتب للبحث..." isClearable classNamePrefix="pm-select" styles={selectStylesRTL} />
                         </div>
                         <div className="pm-quick-search-field">
-                            <label>
-                                <i className="fas fa-phone pm-icon-gap"></i>
-                                Search by Phone
-                            </label>
-                            <AsyncSelect
-                                cacheOptions
-                                defaultOptions={false}
-                                loadOptions={loadPhoneOptions}
-                                onChange={handleQuickSearchSelect}
-                                placeholder="Type to search by phone..."
-                                isClearable
-                                classNamePrefix="pm-select"
-                                noOptionsMessage={() => "No patients found"}
-                                loadingMessage={() => "Searching..."}
-                            />
+                            <label><i className="fas fa-phone pm-icon-gap"></i>Search by Phone</label>
+                            <AsyncSelect cacheOptions defaultOptions={false} loadOptions={loadPhoneOptions} onChange={handleQuickSearchSelect} placeholder="Search phone..." isClearable classNamePrefix="pm-select" />
                         </div>
                         <div className="pm-quick-search-field">
-                            <label>
-                                <i className="fas fa-id-card pm-icon-gap"></i>
-                                Search by ID
-                            </label>
-                            <AsyncSelect
-                                cacheOptions
-                                defaultOptions={false}
-                                loadOptions={loadIdOptions}
-                                onChange={handleQuickSearchSelect}
-                                placeholder="Type to search by ID..."
-                                isClearable
-                                classNamePrefix="pm-select"
-                                noOptionsMessage={() => "No patients found"}
-                                loadingMessage={() => "Searching..."}
-                            />
+                            <label><i className="fas fa-id-card pm-icon-gap"></i>Search by ID</label>
+                            <AsyncSelect cacheOptions defaultOptions={false} loadOptions={loadIdOptions} onChange={handleQuickSearchSelect} placeholder="Search ID..." isClearable classNamePrefix="pm-select" />
                         </div>
                     </div>
                 </div>
             )}
 
             <hr className="pm-section-divider" />
+            <div className="pm-search-section-header"><h3><i className="fas fa-search"></i>Advanced Search</h3></div>
 
-            <div className="pm-search-section-header">
-                <h3>
-                    <i className="fas fa-search"></i>
-                    Advanced Search & Management
-                </h3>
-                <p>
-                    Search by name fields with auto-complete, or use phone/ID search. Edit and manage patient records.
-                </p>
-            </div>
-
-            {/* Search Form - 4 separate fields now */}
             <div className="pm-name-search-grid">
-                <div>
-                    <label>
-                        Patient Name (Arabic)
-                    </label>
-                    <input
-                        type="text"
-                        placeholder="e.g., احمد محمد"
-                        value={searchPatientName}
-                        onChange={(e) => setSearchPatientName(e.target.value)}
-                        className="form-control text-rtl"
-                        lang="ar"
-                        dir="rtl"
-                    />
-                </div>
-                <div>
-                    <label>
-                        First Name (English)
-                    </label>
-                    <input
-                        type="text"
-                        placeholder="e.g., Ahmad"
-                        value={searchFirstName}
-                        onChange={(e) => setSearchFirstName(e.target.value)}
-                        className="form-control"
-                    />
-                </div>
-                <div>
-                    <label>
-                        Last Name (English)
-                    </label>
-                    <input
-                        type="text"
-                        placeholder="e.g., Mohammad"
-                        value={searchLastName}
-                        onChange={(e) => setSearchLastName(e.target.value)}
-                        className="form-control"
-                    />
-                </div>
-                <div>
-                    <label>
-                        Phone or ID
-                    </label>
-                    <input
-                        type="text"
-                        placeholder="Search by phone or ID..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSearch(e)}
-                        className="form-control"
-                    />
-                </div>
+                <div><label>Name (Arabic)</label><input type="text" value={searchPatientName} onChange={e => setSearchPatientName(e.target.value)} className="form-control text-rtl" dir="rtl"/></div>
+                <div><label>First Name</label><input type="text" value={searchFirstName} onChange={e => setSearchFirstName(e.target.value)} className="form-control"/></div>
+                <div><label>Last Name</label><input type="text" value={searchLastName} onChange={e => setSearchLastName(e.target.value)} className="form-control"/></div>
+                <div><label>Phone/ID</label><input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} onKeyDown={e => e.key === 'Enter' && executeSearch()} className="form-control"/></div>
             </div>
 
-            {/* Search Actions */}
             <div className="pm-search-form">
-                <button
-                    type="button"
-                    onClick={handleSearch}
-                    className="btn btn-primary"
-                    disabled={loading}
-                >
-                    <i className="fas fa-search pm-icon-gap"></i>
-                    {loading ? 'Searching...' : 'Search'}
-                </button>
-                <button
-                    type="button"
-                    onClick={handleShowAll}
-                    className="btn btn-secondary"
-                    disabled={loading}
-                >
-                    <i className="fas fa-list pm-icon-gap"></i>
-                    Show All
-                </button>
-                <button
-                    onClick={handleResetAdvancedSearch}
-                    className="btn btn-secondary"
-                    type="button"
-                    disabled={loading}
-                    title="Clear all advanced search fields and filters"
-                >
-                    <i className="fas fa-redo pm-icon-gap"></i>
-                    Reset
-                </button>
+                <button type="button" onClick={handleSearchBtnClick} className="btn btn-primary" disabled={loading}><i className="fas fa-search pm-icon-gap"></i>Search</button>
+                <button type="button" onClick={handleShowAll} className="btn btn-secondary" disabled={loading}><i className="fas fa-list pm-icon-gap"></i>Show All</button>
+                <button type="button" onClick={handleReset} className="btn btn-secondary" disabled={loading}><i className="fas fa-redo pm-icon-gap"></i>Reset</button>
             </div>
 
-            {/* Advanced Filters Section */}
             <div className="pm-advanced-filters">
                 <div className="pm-advanced-filters__header" onClick={() => setShowFilters(!showFilters)}>
-                    <h4>
-                        <i className={`fas fa-filter pm-icon-gap`}></i>
-                        Advanced Filters
-                        {(selectedWorkTypes.length + selectedKeywords.length + selectedTags.length > 0) && (
-                            <span className="pm-filter-badge">
-                                {selectedWorkTypes.length + selectedKeywords.length + selectedTags.length} active
-                            </span>
-                        )}
-                    </h4>
+                    <h4><i className="fas fa-filter pm-icon-gap"></i>Filters {(selectedWorkTypes.length + selectedKeywords.length + selectedTags.length > 0) && <span className="pm-filter-badge">{selectedWorkTypes.length + selectedKeywords.length + selectedTags.length}</span>}</h4>
                     <i className={`fas fa-chevron-${showFilters ? 'up' : 'down'}`}></i>
                 </div>
-
                 {showFilters && (
                     <div className="pm-advanced-filters__content">
                         <div className="pm-advanced-filters__grid">
-                            <div className="pm-filter-group">
-                                <label>
-                                    <i className="fas fa-tooth pm-icon-gap"></i>
-                                    Filter by Work Type
-                                </label>
-                                <Select
-                                    isMulti
-                                    isClearable
-                                    isSearchable
-                                    closeMenuOnSelect={false}
-                                    options={workTypes}
-                                    value={selectedWorkTypes}
-                                    onChange={setSelectedWorkTypes}
-                                    placeholder="Select work types..."
-                                    className="pm-filter-select"
-                                    classNamePrefix="pm-select"
-                                    menuPortalTarget={document.body}
-                                    menuPosition="fixed"
-                                    noOptionsMessage={() => "No work types found"}
-                                />
-                            </div>
-
-                            <div className="pm-filter-group">
-                                <label>
-                                    <i className="fas fa-tags pm-icon-gap"></i>
-                                    Filter by Keywords
-                                </label>
-                                <Select
-                                    isMulti
-                                    isClearable
-                                    isSearchable
-                                    closeMenuOnSelect={false}
-                                    options={keywords}
-                                    value={selectedKeywords}
-                                    onChange={setSelectedKeywords}
-                                    placeholder="Search keywords..."
-                                    className="pm-filter-select"
-                                    classNamePrefix="pm-select"
-                                    menuPortalTarget={document.body}
-                                    menuPosition="fixed"
-                                    noOptionsMessage={() => "No keywords found"}
-                                />
-                            </div>
-
-                            <div className="pm-filter-group">
-                                <label>
-                                    <i className="fas fa-bookmark pm-icon-gap"></i>
-                                    Filter by Patient Tag
-                                </label>
-                                <Select
-                                    isMulti
-                                    isClearable
-                                    isSearchable
-                                    options={tags}
-                                    value={selectedTags}
-                                    onChange={setSelectedTags}
-                                    placeholder="Select tags..."
-                                    className="pm-filter-select"
-                                    classNamePrefix="pm-select"
-                                    menuPortalTarget={document.body}
-                                    menuPosition="fixed"
-                                    noOptionsMessage={() => "No tags found"}
-                                />
-                            </div>
+                            <div className="pm-filter-group"><label>Work Type</label><Select isMulti options={workTypes} value={selectedWorkTypes} onChange={setSelectedWorkTypes} classNamePrefix="pm-select" /></div>
+                            <div className="pm-filter-group"><label>Keywords</label><Select isMulti options={keywords} value={selectedKeywords} onChange={setSelectedKeywords} classNamePrefix="pm-select" /></div>
+                            <div className="pm-filter-group"><label>Tags</label><Select isMulti options={tags} value={selectedTags} onChange={setSelectedTags} classNamePrefix="pm-select" /></div>
                         </div>
-
-                        {/* Selected Filters Display */}
-                        {(selectedWorkTypes.length + selectedKeywords.length + selectedTags.length > 0) && (
-                            <div className="pm-active-filters">
-                                <div className="pm-active-filters__header">
-                                    <span>Active Filters:</span>
-                                    <button
-                                        type="button"
-                                        className="pm-clear-filters-btn"
-                                        onClick={() => {
-                                            setSelectedWorkTypes([]);
-                                            setSelectedKeywords([]);
-                                            setSelectedTags([]);
-                                        }}
-                                    >
-                                        <i className="fas fa-times pm-icon-gap"></i>
-                                        Clear All Filters
-                                    </button>
-                                </div>
-                                <div className="pm-filter-chips">
-                                    {selectedWorkTypes.map(wt => (
-                                        <span key={`wt-${wt.value}`} className="pm-filter-chip pm-filter-chip--work">
-                                            <i className="fas fa-tooth pm-icon-gap"></i>
-                                            {wt.label}
-                                            <button
-                                                type="button"
-                                                onClick={() => setSelectedWorkTypes(selectedWorkTypes.filter(item => item.value !== wt.value))}
-                                                className="pm-filter-chip__remove"
-                                            >
-                                                ×
-                                            </button>
-                                        </span>
-                                    ))}
-                                    {selectedKeywords.map(kw => (
-                                        <span key={`kw-${kw.value}`} className="pm-filter-chip pm-filter-chip--keyword">
-                                            <i className="fas fa-tags pm-icon-gap"></i>
-                                            {kw.label}
-                                            <button
-                                                type="button"
-                                                onClick={() => setSelectedKeywords(selectedKeywords.filter(item => item.value !== kw.value))}
-                                                className="pm-filter-chip__remove"
-                                            >
-                                                ×
-                                            </button>
-                                        </span>
-                                    ))}
-                                    {selectedTags.map(tag => (
-                                        <span key={`tag-${tag.value}`} className="pm-filter-chip pm-filter-chip--tag">
-                                            <i className="fas fa-bookmark pm-icon-gap"></i>
-                                            {tag.label}
-                                            <button
-                                                type="button"
-                                                onClick={() => setSelectedTags(selectedTags.filter(item => item.value !== tag.value))}
-                                                className="pm-filter-chip__remove"
-                                            >
-                                                ×
-                                            </button>
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
                     </div>
                 )}
             </div>
 
             {hasSearched && (
                 <div className="pm-results-summary">
-                    <div className="summary-card">
-                        <h3>Results Found</h3>
-                        <span className="summary-value">{patients.length}</span>
-                    </div>
+                    <div className="summary-card"><h3>Results</h3><span className="summary-value">{patients.length}</span>{loading && <span className="pm-refreshing-badge"><i className="fas fa-spinner fa-spin"></i></span>}</div>
                     <div className="pm-sort-controls">
-                        <span className="pm-sort-label">Sort by:</span>
+                        <span className="pm-sort-label">Sort:</span>
                         <div className="pm-sort-toggle">
-                            <button
-                                type="button"
-                                className={`pm-sort-btn ${sortConfig.key === 'name' ? 'active' : ''}`}
-                                onClick={() => handleSortToggle('name')}
-                            >
-                                Name {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                            </button>
-                            <button
-                                type="button"
-                                className={`pm-sort-btn ${sortConfig.key === 'date' ? 'active' : ''}`}
-                                onClick={() => handleSortToggle('date')}
-                            >
-                                Date {sortConfig.key === 'date' && (sortConfig.direction === 'desc' ? '↓' : '↑')}
-                            </button>
+                            <button className={`pm-sort-btn ${sortConfig.key === 'name' ? 'active' : ''}`} onClick={() => handleSortToggle('name')}>Name</button>
+                            <button className={`pm-sort-btn ${sortConfig.key === 'date' ? 'active' : ''}`} onClick={() => handleSortToggle('date')}>Date</button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {loading && (
-                <div className="pm-loading-container">
-                    <i className="fas fa-spinner fa-spin pm-loading-spinner"></i>
-                    <p>Searching patients...</p>
-                </div>
-            )}
+            {!hasSearched && !loading && <div className="pm-empty-state"><i className="fas fa-search"></i><h3>Start Typing to Search</h3></div>}
+            {loading && !hasSearched && <div className="pm-loading-container"><i className="fas fa-spinner fa-spin pm-loading-spinner"></i></div>}
 
-            {!loading && !hasSearched && (
-                <div className="pm-empty-state">
-                    <i className="fas fa-search"></i>
-                    <h3>Start Typing to Search</h3>
-                    <p>
-                        Type at least 2 characters in any name field above. Results will appear automatically as you type.
-                    </p>
-                    <p>
-                        Or use the phone/ID search below, or click "Show All" to view first 100 patients.
-                    </p>
-                </div>
-            )}
-
-            {hasSearched && !loading && (
-                <div className="pm-table-container">
+            {hasSearched && (
+                <div className={`pm-table-container ${loading ? 'pm-table-loading-overlay' : ''}`}>
                     <table className="pm-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Patient Name</th>
-                                <th>Phone</th>
-                                <th>Creation Date</th>
-                                <th>Tag</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>ID</th><th>Name</th><th>Phone</th><th>Date</th><th>Tag</th><th>Actions</th></tr></thead>
                         <tbody>
-                            {patients.map((patient) => (
-                                <tr key={patient.PersonID}>
-                                    <td data-label="ID">{patient.PersonID}</td>
-                                    <td data-label="Patient Name">
-                                        <strong>{patient.PatientName}</strong>
-                                        {patient.FirstName && (
-                                            <div className="pm-patient-name-secondary">
-                                                {patient.FirstName} {patient.LastName}
-                                            </div>
-                                        )}
-                                    </td>
-                                    <td data-label="Phone">{patient.Phone || 'N/A'}</td>
-                                    <td data-label="Creation Date">
-                                        {patient.DateAdded ? new Date(patient.DateAdded).toLocaleDateString() : 'N/A'}
-                                    </td>
-                                    <td data-label="Tag">
-                                        {patient.TagName ? (
-                                            <span className="pm-tag-badge">{patient.TagName}</span>
-                                        ) : (
-                                            <span className="pm-empty-value">-</span>
-                                        )}
-                                    </td>
+                            {patients.map(p => (
+                                <tr key={p.PersonID}>
+                                    <td data-label="ID">{p.PersonID}</td>
+                                    <td data-label="Name"><strong>{p.PatientName}</strong>{p.FirstName && <div>{p.FirstName} {p.LastName}</div>}</td>
+                                    <td data-label="Phone">{p.Phone || '-'}</td>
+                                    <td data-label="Date">{p.DateAdded ? new Date(p.DateAdded).toLocaleDateString() : '-'}</td>
+                                    <td data-label="Tag">{p.TagName ? <span className="pm-tag-badge">{p.TagName}</span> : '-'}</td>
                                     <td data-label="Actions">
                                         <div className="pm-action-buttons">
-                                            <button
-                                                type="button"
-                                                onClick={(e) => handleQuickCheckin(e, patient)}
-                                                className="btn btn-icon btn-outline-success"
-                                                title="Add to today's appointments and check in"
-                                                disabled={loading}
-                                            >
-                                                <i className="fas fa-user-check"></i>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => navigate(`/patient/${patient.PersonID}/works`)}
-                                                className="btn btn-icon btn-outline-primary"
-                                                title="View patient details"
-                                            >
-                                                <i className="fas fa-eye"></i>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => navigate(`/patient/${patient.PersonID}/edit-patient`)}
-                                                className="btn btn-icon btn-outline-warning"
-                                                title="Edit patient"
-                                            >
-                                                <i className="fas fa-edit"></i>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleDeleteClick(patient)}
-                                                className="btn btn-icon btn-outline-danger"
-                                                title="Delete patient"
-                                            >
-                                                <i className="fas fa-trash"></i>
-                                            </button>
+                                            <button onClick={(e) => handleQuickCheckin(e, p)} className="btn btn-icon btn-outline-success"><i className="fas fa-user-check"></i></button>
+                                            <button onClick={() => navigate(`/patient/${p.PersonID}/works`)} className="btn btn-icon btn-outline-primary"><i className="fas fa-eye"></i></button>
+                                            <button onClick={() => navigate(`/patient/${p.PersonID}/edit-patient`)} className="btn btn-icon btn-outline-warning"><i className="fas fa-edit"></i></button>
+                                            <button onClick={() => handleDeleteClick(p)} className="btn btn-icon btn-outline-danger"><i className="fas fa-trash"></i></button>
                                         </div>
                                     </td>
                                 </tr>
                             ))}
-                            {patients.length === 0 && (
-                                <tr>
-                                    <td colSpan="6" className="no-data">
-                                        No patients match your search
-                                    </td>
-                                </tr>
-                            )}
+                            {patients.length === 0 && <tr><td colSpan="6" className="no-data">No results</td></tr>}
                         </tbody>
                     </table>
                 </div>
             )}
 
-            {/* Delete Confirmation Modal */}
             {showDeleteConfirm && selectedPatient && (
                 <div className="modal-overlay">
                     <div className="work-modal pm-modal-narrow">
-                        <div className="modal-header">
-                            <h3>Confirm Delete</h3>
-                            <button
-                                type="button"
-                                onClick={() => setShowDeleteConfirm(false)}
-                                className="modal-close"
-                            >
-                                ×
-                            </button>
-                        </div>
-
+                        <div className="modal-header"><h3>Confirm Delete</h3><button onClick={() => setShowDeleteConfirm(false)} className="modal-close">×</button></div>
                         <div className="pm-delete-modal-content">
-                            <div className="pm-delete-warning-box">
-                                <div className="pm-delete-warning-header">
-                                    <i className="fas fa-exclamation-triangle"></i>
-                                    <strong>PERMANENT DELETION WARNING</strong>
-                                </div>
-                                <p>
-                                    Are you sure you want to permanently delete patient <strong>{selectedPatient.PatientName}</strong>?
-                                </p>
-                                <div className="pm-delete-warning-list-container">
-                                    <p>
-                                        The following data will be PERMANENTLY DELETED:
-                                    </p>
-                                    <ul>
-                                        <li>All treatment works and procedures</li>
-                                        <li>All payment records</li>
-                                        <li>All appointments (past and future)</li>
-                                        <li>All visit records</li>
-                                        <li>All orthodontic records (wires, screws, etc.)</li>
-                                        <li>Patient photos and documents</li>
-                                        <li>All other patient data</li>
-                                    </ul>
-                                </div>
-                                <p className="pm-delete-final-warning">
-                                    ⚠️ THIS ACTION CANNOT BE UNDONE! ⚠️
-                                </p>
-                            </div>
-
+                            <p>Are you sure you want to delete <strong>{selectedPatient.PatientName}</strong>?</p>
                             <div className="form-actions">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowDeleteConfirm(false)}
-                                    className="btn btn-secondary"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleDeleteConfirm}
-                                    className="btn btn-danger"
-                                >
-                                    <i className="fas fa-trash pm-icon-gap"></i>
-                                    Delete Patient
-                                </button>
+                                <button onClick={() => setShowDeleteConfirm(false)} className="btn btn-secondary">Cancel</button>
+                                <button onClick={handleDeleteConfirm} className="btn btn-danger">Delete</button>
                             </div>
                         </div>
                     </div>
@@ -1027,5 +399,4 @@ const PatientManagement = () => {
     );
 };
 
-// Memoize to prevent unnecessary re-renders
 export default React.memo(PatientManagement);

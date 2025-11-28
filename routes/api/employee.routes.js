@@ -66,11 +66,11 @@ router.get('/employees', async (req, res) => {
             : '';
 
         const query = `
-            SELECT e.ID, e.employeeName, e.Position, p.PositionName, e.Email, e.Phone, e.Percentage, e.receiveEmail, e.getAppointments
+            SELECT e.ID, e.employeeName, e.Position, p.PositionName, e.Email, e.Phone, e.Percentage, e.receiveEmail, e.getAppointments, e.SortOrder
             FROM tblEmployees e
             LEFT JOIN tblPositions p ON e.Position = p.ID
             ${whereClause}
-            ORDER BY e.employeeName
+            ORDER BY e.SortOrder, e.employeeName
         `;
 
         const employees = await database.executeQuery(
@@ -85,7 +85,8 @@ router.get('/employees', async (req, res) => {
                 Phone: columns[5].value,
                 Percentage: columns[6].value,
                 receiveEmail: columns[7].value,
-                getAppointments: columns[8].value
+                getAppointments: columns[8].value,
+                SortOrder: columns[9].value
             })
         );
 
@@ -150,7 +151,7 @@ router.get('/positions', async (req, res) => {
  */
 router.post('/employees', async (req, res) => {
     try {
-        const { employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments } = req.body;
+        const { employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments, SortOrder } = req.body;
 
         if (!employeeName || employeeName.trim() === '') {
             return ErrorResponses.badRequest(res, 'Employee name is required');
@@ -176,9 +177,9 @@ router.post('/employees', async (req, res) => {
         const insertQuery = `
             DECLARE @OutputTable TABLE (ID INT);
 
-            INSERT INTO tblEmployees (employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments)
+            INSERT INTO tblEmployees (employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments, SortOrder)
             OUTPUT INSERTED.ID INTO @OutputTable
-            VALUES (@name, @position, @email, @phone, @percentage, @receiveEmail, @getAppointments);
+            VALUES (@name, @position, @email, @phone, @percentage, @receiveEmail, @getAppointments, @sortOrder);
 
             SELECT ID FROM @OutputTable;
         `;
@@ -192,7 +193,8 @@ router.post('/employees', async (req, res) => {
                 ['phone', database.TYPES.NVarChar, Phone && Phone.trim() !== '' ? Phone.trim() : null],
                 ['percentage', database.TYPES.Bit, Percentage ? 1 : 0],
                 ['receiveEmail', database.TYPES.Bit, receiveEmail ? 1 : 0],
-                ['getAppointments', database.TYPES.Bit, getAppointments ? 1 : 0]
+                ['getAppointments', database.TYPES.Bit, getAppointments ? 1 : 0],
+                ['sortOrder', database.TYPES.Int, SortOrder !== undefined ? parseInt(SortOrder) : 999]
             ],
             (columns) => columns[0].value
         );
@@ -232,7 +234,7 @@ router.post('/employees', async (req, res) => {
 router.put('/employees/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments } = req.body;
+        const { employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments, SortOrder } = req.body;
 
         if (!employeeName || employeeName.trim() === '') {
             return ErrorResponses.badRequest(res, 'Employee name is required');
@@ -266,7 +268,8 @@ router.put('/employees/:id', async (req, res) => {
                 Phone = @phone,
                 Percentage = @percentage,
                 receiveEmail = @receiveEmail,
-                getAppointments = @getAppointments
+                getAppointments = @getAppointments,
+                SortOrder = @sortOrder
             WHERE ID = @id
         `;
 
@@ -280,6 +283,7 @@ router.put('/employees/:id', async (req, res) => {
                 ['percentage', database.TYPES.Bit, Percentage ? 1 : 0],
                 ['receiveEmail', database.TYPES.Bit, receiveEmail ? 1 : 0],
                 ['getAppointments', database.TYPES.Bit, getAppointments ? 1 : 0],
+                ['sortOrder', database.TYPES.Int, SortOrder !== undefined ? parseInt(SortOrder) : 999],
                 ['id', database.TYPES.Int, parseInt(id)]
             ]
         );

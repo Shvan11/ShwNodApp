@@ -6,9 +6,9 @@
 /* Toast Container - Fixed position, top-right corner */
 .toast-container {
   position: fixed;
-  top: 80px;
-  /* Below header */
-  right: 20px;
+  top: calc(var(--header-height) + var(--spacing-lg));
+  /* Below header with spacing */
+  right: var(--spacing-lg);
   z-index: var(--z-index-tooltip);
   display: flex;
   flex-direction: column;
@@ -143,7 +143,7 @@
     left: var(--spacing-sm);
     right: var(--spacing-sm);
     max-width: none;
-    top: 70px;
+    top: calc(var(--header-height) + var(--spacing-md));
     /* Adjust for smaller screens */
   }
 
@@ -154,7 +154,7 @@
 
 @media (max-width: 480px) {
   .toast-container {
-    top: 60px;
+    top: calc(var(--header-height) + var(--spacing-sm));
     left: var(--spacing-xs);
     right: var(--spacing-xs);
   }

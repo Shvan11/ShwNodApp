@@ -13,11 +13,13 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
         employeeName: '',
         Position: '',
         Email: '',
-        Phone: '',
         Percentage: false,
         receiveEmail: false,
-        getAppointments: false
+        getAppointments: false,
+        getAppointments: false,
+        SortOrder: ''
     });
+    const [activeTab, setActiveTab] = useState('basic');
 
     // Load employees and positions on component mount
     useEffect(() => {
@@ -62,12 +64,13 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
             employeeName: '',
             Position: '',
             Email: '',
-            Phone: '',
             Percentage: false,
             receiveEmail: false,
-            getAppointments: false
+            getAppointments: false,
+            SortOrder: ''
         });
         setEditingId(null);
+        setActiveTab('basic');
         setShowAddForm(true);
     };
 
@@ -76,12 +79,13 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
             employeeName: employee.employeeName || '',
             Position: employee.Position || '',
             Email: employee.Email || '',
-            Phone: employee.Phone || '',
             Percentage: employee.Percentage || false,
             receiveEmail: employee.receiveEmail || false,
-            getAppointments: employee.getAppointments || false
+            getAppointments: employee.getAppointments || false,
+            SortOrder: employee.SortOrder || ''
         });
         setEditingId(employee.ID);
+        setActiveTab('basic');
         setShowAddForm(true);
     };
 
@@ -90,10 +94,10 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
             employeeName: '',
             Position: '',
             Email: '',
-            Phone: '',
             Percentage: false,
             receiveEmail: false,
-            getAppointments: false
+            getAppointments: false,
+            SortOrder: ''
         });
         setEditingId(null);
         setShowAddForm(false);
@@ -216,145 +220,187 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
             </div>
 
             {showAddForm && (
-                <div className="doctor-form-container">
-                    <div className="form-header">
-                        <h3>
-                            <i className={editingId ? 'fas fa-edit' : 'fas fa-plus'}></i>
-                            {editingId ? 'Edit Employee' : 'Add New Employee'}
-                        </h3>
-                    </div>
-                    <form onSubmit={handleSubmit} className="doctor-form">
-                        <div className="form-group">
-                            <label htmlFor="employeeName">
-                                Employee Name <span className="required">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                id="employeeName"
-                                name="employeeName"
-                                value={formData.employeeName}
-                                onChange={handleInputChange}
-                                required
-                                placeholder="e.g., John Smith"
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="Position">
-                                Position <span className="required">*</span>
-                            </label>
-                            <select
-                                id="Position"
-                                name="Position"
-                                value={formData.Position}
-                                onChange={handleInputChange}
-                                required
-                            >
-                                <option value="">Select a position</option>
-                                {positions.map(pos => (
-                                    <option key={pos.ID} value={pos.ID}>
-                                        {pos.PositionName}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="Email">
-                                Email Address
-                                <span className="field-help">
-                                    (Required for receiving appointment notifications)
-                                </span>
-                            </label>
-                            <input
-                                type="email"
-                                id="Email"
-                                name="Email"
-                                value={formData.Email}
-                                onChange={handleInputChange}
-                                placeholder="employee@example.com"
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="Phone">
-                                Phone Number
-                            </label>
-                            <input
-                                type="tel"
-                                id="Phone"
-                                name="Phone"
-                                value={formData.Phone}
-                                onChange={handleInputChange}
-                                placeholder="+1234567890"
-                            />
-                        </div>
-
-                        <div className="form-group-checkbox">
-                            <label>
-                                <input
-                                    type="checkbox"
-                                    name="receiveEmail"
-                                    checked={formData.receiveEmail}
-                                    onChange={handleInputChange}
-                                />
-                                <span className="checkbox-label">
-                                    <i className="fas fa-envelope"></i>
-                                    Receive Email Notifications
-                                </span>
-                            </label>
-                            <p className="field-help">
-                                Enable to send appointment emails to this employee
-                            </p>
-                        </div>
-
-                        <div className="form-group-checkbox">
-                            <label>
-                                <input
-                                    type="checkbox"
-                                    name="getAppointments"
-                                    checked={formData.getAppointments}
-                                    onChange={handleInputChange}
-                                />
-                                <span className="checkbox-label">
-                                    <i className="fas fa-calendar-check"></i>
-                                    Include in Appointment Reports
-                                </span>
-                            </label>
-                            <p className="field-help">
-                                Include this employee in daily appointment reports
-                            </p>
-                        </div>
-
-                        <div className="form-group-checkbox">
-                            <label>
-                                <input
-                                    type="checkbox"
-                                    name="Percentage"
-                                    checked={formData.Percentage}
-                                    onChange={handleInputChange}
-                                />
-                                <span className="checkbox-label">
-                                    <i className="fas fa-percent"></i>
-                                    Percentage-Based Compensation
-                                </span>
-                            </label>
-                            <p className="field-help">
-                                Enable for commission-based employees
-                            </p>
-                        </div>
-
-                        <div className="form-actions">
-                            <button type="button" onClick={handleCancel} className="btn-cancel">
+                <div className="modal-overlay">
+                    <div className="modal-content employee-modal">
+                        <div className="modal-header">
+                            <h3>
+                                <i className={editingId ? 'fas fa-edit' : 'fas fa-plus'}></i>
+                                {editingId ? 'Edit Employee' : 'Add New Employee'}
+                            </h3>
+                            <button className="modal-close" onClick={handleCancel} aria-label="Close">
                                 <i className="fas fa-times"></i>
-                                Cancel
-                            </button>
-                            <button type="submit" className="btn-save">
-                                <i className="fas fa-save"></i>
-                                {editingId ? 'Update Employee' : 'Add Employee'}
                             </button>
                         </div>
-                    </form>
+                        <form onSubmit={handleSubmit}>
+                            <div className="modal-body">
+                                <div className="employee-tabs">
+                                    <button
+                                        type="button"
+                                        className={`employee-tab-btn ${activeTab === 'basic' ? 'active' : ''}`}
+                                        onClick={() => setActiveTab('basic')}
+                                    >
+                                        <i className="fas fa-id-card"></i> Basic Info
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`employee-tab-btn ${activeTab === 'other' ? 'active' : ''}`}
+                                        onClick={() => setActiveTab('other')}
+                                    >
+                                        <i className="fas fa-sliders-h"></i> Other Options
+                                    </button>
+                                </div>
+
+                                <div className="employee-tab-content">
+                                    {activeTab === 'basic' && (
+                                        <div className="tab-pane">
+                                            <div className="employee-form-row">
+                                                <div className="form-group">
+                                                    <label htmlFor="employeeName">
+                                                        Employee Name <span className="required">*</span>
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        id="employeeName"
+                                                        name="employeeName"
+                                                        value={formData.employeeName}
+                                                        onChange={handleInputChange}
+                                                        required
+                                                        placeholder="e.g., John Smith"
+                                                    />
+                                                </div>
+
+                                                <div className="form-group">
+                                                    <label htmlFor="Position">
+                                                        Position <span className="required">*</span>
+                                                    </label>
+                                                    <select
+                                                        id="Position"
+                                                        name="Position"
+                                                        value={formData.Position}
+                                                        onChange={handleInputChange}
+                                                        required
+                                                    >
+                                                        <option value="">Select a position</option>
+                                                        {positions.map(pos => (
+                                                            <option key={pos.ID} value={pos.ID}>
+                                                                {pos.PositionName}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div className="employee-form-row">
+                                                <div className="form-group">
+                                                    <label htmlFor="SortOrder">
+                                                        Sort Order
+                                                        <span className="field-help">
+                                                            (Lower numbers appear first)
+                                                        </span>
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        id="SortOrder"
+                                                        name="SortOrder"
+                                                        value={formData.SortOrder}
+                                                        onChange={handleInputChange}
+                                                        placeholder="e.g., 1"
+                                                        min="1"
+                                                        max="999"
+                                                    />
+                                                </div>
+                                                <div className="form-group">
+                                                    {/* Empty placeholder for grid alignment */}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeTab === 'other' && (
+                                        <div className="tab-pane">
+                                            <div className="employee-form-row">
+                                                <div className="form-group">
+                                                    <label htmlFor="Email">
+                                                        Email Address
+                                                        <span className="field-help">
+                                                            (Required for notifications)
+                                                        </span>
+                                                    </label>
+                                                    <input
+                                                        type="email"
+                                                        id="Email"
+                                                        name="Email"
+                                                        value={formData.Email}
+                                                        onChange={handleInputChange}
+                                                        placeholder="employee@example.com"
+                                                    />
+                                                </div>
+                                                <div className="form-group">
+                                                    {/* Empty placeholder */}
+                                                </div>
+                                            </div>
+
+                                            <div className="employee-checkbox-group">
+                                                <div className="form-group-checkbox">
+                                                    <label>
+                                                        <input
+                                                            type="checkbox"
+                                                            name="receiveEmail"
+                                                            checked={formData.receiveEmail}
+                                                            onChange={handleInputChange}
+                                                        />
+                                                        <span className="checkbox-label">
+                                                            <i className="fas fa-envelope"></i>
+                                                            Receive Email Notifications
+                                                        </span>
+                                                    </label>
+                                                </div>
+
+                                                <div className="form-group-checkbox">
+                                                    <label>
+                                                        <input
+                                                            type="checkbox"
+                                                            name="getAppointments"
+                                                            checked={formData.getAppointments}
+                                                            onChange={handleInputChange}
+                                                        />
+                                                        <span className="checkbox-label">
+                                                            <i className="fas fa-calendar-check"></i>
+                                                            Include in Appointment Reports
+                                                        </span>
+                                                    </label>
+                                                </div>
+
+                                                <div className="form-group-checkbox">
+                                                    <label>
+                                                        <input
+                                                            type="checkbox"
+                                                            name="Percentage"
+                                                            checked={formData.Percentage}
+                                                            onChange={handleInputChange}
+                                                        />
+                                                        <span className="checkbox-label">
+                                                            <i className="fas fa-percent"></i>
+                                                            Percentage-Based Compensation
+                                                        </span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" onClick={handleCancel} className="btn-cancel">
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn-save">
+                                    <i className="fas fa-save"></i>
+                                    {editingId ? 'Update Employee' : 'Add Employee'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
 
@@ -373,8 +419,8 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
                                     <th>ID</th>
                                     <th>Name</th>
                                     <th>Position</th>
+                                    <th>Sort Order</th>
                                     <th>Email</th>
-                                    <th>Phone</th>
                                     <th>Commission</th>
                                     <th>Email Notifications</th>
                                     <th>Appointments</th>
@@ -384,17 +430,22 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
                             <tbody>
                                 {employees.map(employee => (
                                     <tr key={employee.ID}>
-                                        <td>{employee.ID}</td>
-                                        <td className="doctor-name">
+                                        <td data-label="ID">{employee.ID}</td>
+                                        <td data-label="Name" className="doctor-name">
                                             <i className="fas fa-user"></i>
                                             {employee.employeeName}
                                         </td>
-                                        <td>
+                                        <td data-label="Position">
                                             <span className="position-badge">
                                                 {getPositionName(employee.Position)}
                                             </span>
                                         </td>
-                                        <td>
+                                        <td data-label="Sort Order">
+                                            <span className="sort-order-value">
+                                                {employee.SortOrder || '—'}
+                                            </span>
+                                        </td>
+                                        <td data-label="Email">
                                             {employee.Email ? (
                                                 <span className="email-value">
                                                     <i className="fas fa-envelope"></i>
@@ -404,10 +455,7 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
                                                 <span className="no-email">No email</span>
                                             )}
                                         </td>
-                                        <td>
-                                            {employee.Phone || <span className="text-muted">—</span>}
-                                        </td>
-                                        <td>
+                                        <td data-label="Commission">
                                             {employee.Percentage ? (
                                                 <span className="badge badge-success">
                                                     <i className="fas fa-percent"></i>
@@ -420,7 +468,7 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
                                                 </span>
                                             )}
                                         </td>
-                                        <td>
+                                        <td data-label="Email Notifications">
                                             {employee.receiveEmail ? (
                                                 <span className="badge badge-success">
                                                     <i className="fas fa-check-circle"></i>
@@ -433,7 +481,7 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
                                                 </span>
                                             )}
                                         </td>
-                                        <td>
+                                        <td data-label="Appointments">
                                             {employee.getAppointments ? (
                                                 <span className="badge badge-info">
                                                     <i className="fas fa-check"></i>
@@ -446,7 +494,7 @@ const EmployeeSettings = ({ onChangesUpdate }) => {
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="actions">
+                                        <td data-label="Actions" className="actions">
                                             <button
                                                 className="btn-icon btn-edit"
                                                 onClick={() => handleEdit(employee)}
