@@ -39,7 +39,7 @@ const DailyAppointments = () => {
         loaderData.loadedDate || searchParams.get('date') || getTodayDate()
     );
 
-    const [mobileView, setMobileView] = useState('all');
+    const [mobileView, setMobileView] = useState('checked-in');
     const [showFlash, setShowFlash] = useState(false);
 
     // 5. Pass loader data to hook
