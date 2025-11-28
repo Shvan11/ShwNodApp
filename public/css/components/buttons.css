@@ -209,6 +209,29 @@
   width: 100%;
 }
 
+/* Icon Sizing in Buttons */
+.btn i,
+.btn svg {
+  font-size: var(--icon-size-base);
+  width: var(--icon-size-base);
+  height: var(--icon-size-base);
+  flex-shrink: 0;
+}
+
+.btn-sm i,
+.btn-sm svg {
+  font-size: var(--icon-size-sm);
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+}
+
+.btn-lg i,
+.btn-lg svg {
+  font-size: var(--icon-size-lg);
+  width: var(--icon-size-lg);
+  height: var(--icon-size-lg);
+}
+
 /* Icon Button (Square/Circle) */
 /* Only handles layout/sizing - inherits colors from variant classes */
 .btn-icon {
@@ -249,7 +272,8 @@
 .btn-edit::before {
   font-family: "Font Awesome 6 Free";
   font-weight: 900;
-  content: "\f044"; /* fa-edit / fa-pen-to-square */
+  content: "\f044";
+  /* fa-edit / fa-pen-to-square */
 }
 
 .btn-edit:hover {
@@ -277,7 +301,8 @@
 .btn-delete::before {
   font-family: "Font Awesome 6 Free";
   font-weight: 900;
-  content: "\f2ed"; /* fa-trash-alt */
+  content: "\f2ed";
+  /* fa-trash-alt */
 }
 
 .btn-delete:hover {

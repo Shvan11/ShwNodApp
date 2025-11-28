@@ -132,10 +132,6 @@
 /* Buttons */
 /* Button styles use global definitions from /css/components/buttons.css */
 
-.btn i {
-    font-size: 0.6875rem;
-}
-
 .btn-primary {
     background-color: var(--indigo-600);
     color: white;
@@ -168,10 +164,6 @@
 .btn-sm {
     padding: 0.25rem 0.5rem;
     font-size: 0.6875rem;
-}
-
-.btn-sm i {
-    font-size: 0.625rem;
 }
 
 /* Wire Info Section */
@@ -369,5 +361,5 @@
         width: 100%;
     }
 
-/* Button styles use global definitions from /css/components/buttons.css */
+    /* Button styles use global definitions from /css/components/buttons.css */
 }
