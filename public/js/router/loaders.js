@@ -237,34 +237,9 @@ export async function alignerDoctorsLoader({ request }) {
 }
 
 /**
- * Aligner doctor info loader
- * Loads specific doctor information
- *
- * @param {Object} params - Route parameters
- * @param {string} params.doctorId - Doctor ID
- * @param {Request} request - Request object with signal
- * @returns {Promise<Object>} Doctor data
+ * Aligner doctor info loader - REMOVED
+ * Not needed since PatientsList fetches doctor info independently
  */
-export async function alignerDoctorLoader({ params, request }) {
-  const { doctorId } = params;
-  const { signal } = request;
-
-  // Special case: "all" doctors
-  if (doctorId === 'all') {
-    return {
-      doctor: { DrID: 'all', DoctorName: 'All Doctors' },
-      isAllDoctors: true
-    };
-  }
-
-  const data = await apiLoader(`/api/aligner/doctor/${doctorId}`, {
-    signal,
-    cache: true,
-    cacheKey: `aligner_doctor_${doctorId}`
-  });
-
-  return { doctor: data.doctor, isAllDoctors: false };
-}
 
 /**
  * Aligner patient work loader
@@ -285,11 +260,11 @@ export async function alignerPatientWorkLoader({ params, request }) {
     cacheKey: `work_${workId}`
   });
 
-  // Also load patient info
-  const patientData = await apiLoader(`/api/getinfos?code=${data.PatientID}`, {
+  // Also load patient info (Note: getWorkDetails returns PersonID, not PatientID)
+  const patientData = await apiLoader(`/api/getinfos?code=${data.PersonID}`, {
     signal,
     cache: true,
-    cacheKey: `patient_${data.PatientID}`
+    cacheKey: `patient_${data.PersonID}`
   });
 
   return {
@@ -299,32 +274,10 @@ export async function alignerPatientWorkLoader({ params, request }) {
 }
 
 /**
- * Settings loader
- * Used by settings routes
- *
- * @param {Object} params - Route parameters
- * @param {string} params.tab - Current settings tab
- * @param {Request} request - Request object with signal
- * @returns {Promise<Object>} Settings data
+ * Settings loader - REMOVED
+ * Not needed since SettingsComponent fetches user role independently
+ * and each settings tab fetches its own data
  */
-export async function settingsLoader({ params, request }) {
-  const { tab } = params;
-  const { signal } = request;
-
-  const validTabs = ['general', 'database', 'alignerDoctors', 'messaging', 'system', 'security'];
-  const currentTab = validTabs.includes(tab) ? tab : 'general';
-
-  const data = await apiLoader(`/api/settings?tab=${currentTab}`, {
-    signal,
-    cache: false // Settings should NOT be cached
-  });
-
-  return {
-    settings: data,
-    currentTab,
-    validTabs
-  };
-}
 
 /**
  * Template list loader

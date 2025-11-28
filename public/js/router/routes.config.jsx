@@ -21,11 +21,9 @@ import { RouteError } from '../components/error-boundaries/RouteError.jsx';
 
 // Loaders (Phase 2+)
 import {
-  settingsLoader,
   templateListLoader,
   templateDesignerLoader,
   alignerDoctorsLoader,
-  alignerDoctorLoader,
   alignerPatientWorkLoader,
   patientShellLoader
 } from './loaders.js';
@@ -200,7 +198,7 @@ export const routesConfig = [
                 <SettingsComponent />
               </RouteErrorBoundary>
             ),
-            loader: settingsLoader, // Load settings data before rendering
+            // No loader needed - SettingsComponent fetches user role independently
           },
           {
             path: '*',
@@ -281,7 +279,7 @@ export const routesConfig = [
                 <PatientsList />
               </RouteErrorBoundary>
             ),
-            loader: alignerDoctorLoader, // Load doctor info
+            // No loader - PatientsList fetches doctor and patients independently
           },
           {
             path: 'doctor/:doctorId/patient/:workId',

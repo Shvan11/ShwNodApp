@@ -125,11 +125,9 @@ Configuration is in `.mcp.json`. See `docs/mcp-mssql-setup.md` for MSSQL MCP ser
 
 - **Route Loaders** (`/public/js/router/loaders.js`):
   - `apiLoader()` - Base loader with 401 handling and sessionStorage caching
-  - `settingsLoader()` - Pre-fetch settings data (5-min cache)
   - `templateListLoader()` - Pre-fetch template list
   - `templateDesignerLoader()` - Pre-fetch template for editing
   - `alignerDoctorsLoader()` - Pre-fetch doctors list
-  - `alignerDoctorLoader()` - Pre-fetch doctor info
   - `alignerPatientWorkLoader()` - Pre-fetch patient + work details
   - `patientShellLoader()` - **Most complex**: Pre-fetch patient, work, timepoints in parallel
 
