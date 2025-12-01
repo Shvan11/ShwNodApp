@@ -186,50 +186,6 @@
 /* Modal Form Buttons - Scoped to Modal Only */
 /* Button styles use global definitions from /css/components/buttons.css */
 
-/* Calendar Picker Modal */
-.calendar-picker-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--z-index-modal);
-}
-
-.calendar-picker-modal {
-    background: white;
-    border-radius: var(--radius-xl);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-    width: 90%;
-    max-width: 800px;
-    max-height: 80vh;
-    overflow-y: auto;
-}
-
-.calendar-picker-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 20px 24px;
-    border-bottom: 1px solid var(--gray-200);
-}
-
-.calendar-picker-header h3 {
-    margin: 0;
-    font-size: var(--font-size-xl);
-    font-weight: 600;
-    color: var(--text-color);
-}
-
-.calendar-picker-content {
-    padding: 24px;
-    text-align: center;
-}
-
 /* Responsive Design */
 @media (max-width: 768px) {
     .appointment-form-modal {
@@ -257,11 +213,6 @@
     .btn {
         width: 100%;
         justify-content: center;
-    }
-
-    .calendar-picker-modal {
-        width: 95%;
-        margin: 10px;
     }
 }
 

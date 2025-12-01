@@ -5,7 +5,6 @@ import AppointmentCalendar from '../components/react/AppointmentCalendar.jsx';
 import '../../css/components/appointment-calendar.css';
 import '../../css/components/monthly-calendar-view.css';
 import '../../css/components/appointment-form.css';
-import '../../css/components/calendar-picker-modal.css';
 
 /**
  * Appointment Calendar Route

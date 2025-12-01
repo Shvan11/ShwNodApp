@@ -32,7 +32,6 @@
 @import 'components/appointment-form.css';
 @import 'components/aligner-drawer-form.css';
 @import 'components/aligner-set-card.css';
-@import 'components/calendar-picker-modal.css';
 @import 'components/comparison-viewer.css';
 @import 'components/dental-chart.css';
 @import 'components/invoice-form.css';
@@ -70,7 +69,19 @@
 @import 'pages/template-designer.css';
 @import 'pages/template-management.css';
 
-/* Excluded Files (unused/superseded):
+/* ===================================
+   EXCLUDED FILES
+   =================================== */
+
+/* Dead files (deleted during cleanup):
    - send-message.css (440 lines) - Legacy HTML, removed
-   - aligner-refactored.css (321 lines) - Superseded by aligner.css
+   - calendar-picker-modal.css (146 lines) - Obsolete component, deleted 2025-01-29
+   - aligner-refactored.css (321 lines) - Superseded by aligner.css, deleted 2025-01-29
+*/
+
+/* Intentionally not imported (component-specific imports):
+   - monthly-calendar-view.css - Imported in routes/Calendar.jsx
+   - patient-appointments.css - Imported in components/PatientAppointments.jsx
+   - route-error.css - Imported in App.jsx (error boundary styles)
+   - diagnosis.css - Imported in pages/Diagnosis.jsx
 */

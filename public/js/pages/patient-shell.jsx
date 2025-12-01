@@ -14,7 +14,6 @@ import '../../css/pages/patient-shell.css';
 import '../../css/pages/edit-patient.css';
 import '../../css/components/timepoints-selector.css';
 import '../../css/components/appointment-form.css';
-import '../../css/components/calendar-picker-modal.css';
 import '../../css/components/simplified-calendar-picker.css';
 
 // Initialize the patient portal with React Router

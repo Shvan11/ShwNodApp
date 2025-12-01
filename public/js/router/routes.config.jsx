@@ -66,7 +66,6 @@ import '../../css/pages/visits-spacing.css';
 import '../../css/components/visits-component.css';
 import '../../css/components/new-visit-component.css';
 import '../../css/components/appointment-form.css';
-import '../../css/components/calendar-picker-modal.css';
 import '../../css/components/simplified-calendar-picker.css';
 import '../../css/components/patient-appointments.css';
 
