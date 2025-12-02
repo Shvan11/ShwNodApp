@@ -1185,6 +1185,13 @@ const PatientSets = () => {
                             <i className="fas fa-edit"></i>
                             Edit Patient
                         </button>
+                        <button
+                            className="btn-add-set bg-info"
+                            onClick={() => navigate(`/patient/${patient.PersonID}/new-work?workId=${patient.workid}`)}
+                        >
+                            <i className="fas fa-tooth"></i>
+                            Edit Work
+                        </button>
                         <button className="btn-add-set" onClick={openAddSetDrawer}>
                             <i className="fas fa-plus"></i>
                             Add New Set

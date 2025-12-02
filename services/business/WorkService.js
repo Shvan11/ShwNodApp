@@ -17,8 +17,12 @@ import {
     addWork,
     getActiveWork,
     addWorkWithInvoice as dbAddWorkWithInvoice,
-    deleteWork as dbDeleteWork
+    deleteWork as dbDeleteWork,
+    WORK_STATUS
 } from '../database/queries/work-queries.js';
+
+// Re-export WORK_STATUS for convenience
+export { WORK_STATUS };
 
 /**
  * Validation error class for work business logic

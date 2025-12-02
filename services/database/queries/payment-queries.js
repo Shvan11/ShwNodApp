@@ -13,7 +13,7 @@ export function getPayments(PID) {
         `SELECT i.* FROM dbo.tblpatients p
          INNER JOIN dbo.tblwork w ON p.PersonID = w.PersonID
          INNER JOIN dbo.tblInvoice i ON w.workid = i.workid
-         WHERE w.Finished = 0 AND p.personID = @PID`,
+         WHERE w.Status = 1 AND p.personID = @PID`,
         [['PID', TYPES.Int, PID]],
         (columns) => ({ Payment: columns[1].value, Date: columns[2].value })
     );
@@ -32,7 +32,7 @@ export function getActiveWorkForInvoice(PID) {
          FROM dbo.tblpatients p
          INNER JOIN dbo.tblwork w ON p.PersonID = w.PersonID
          LEFT JOIN dbo.tblInvoice i ON w.workid = i.workid
-         WHERE w.Finished = 0 AND p.personID = @PID
+         WHERE w.Status = 1 AND p.personID = @PID
          GROUP BY w.workid, w.PersonID, w.TotalRequired, w.Currency, w.Typeofwork, w.StartDate, p.PatientName, p.Phone`,
         [['PID', TYPES.Int, PID]]
     );

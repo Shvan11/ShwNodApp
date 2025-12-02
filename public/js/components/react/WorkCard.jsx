@@ -14,22 +14,32 @@ const WorkCard = ({
     onViewPaymentHistory,
     onAddAlignerSet,
     onComplete,
+    onDiscontinue,
+    onReactivate,
     onViewVisits,
     onNewVisit,
     onPrintReceipt,
     formatDate,
     formatCurrency,
-    getProgressPercentage
+    getProgressPercentage,
+    WORK_STATUS
 }) => {
     const navigate = useNavigate();
     const [showActions, setShowActions] = useState(false);
 
     const getStatusBadge = () => {
-        if (work.Finished) {
+        if (work.Status === WORK_STATUS.FINISHED) {
             return <span className="work-status-badge completed">Completed</span>;
+        }
+        if (work.Status === WORK_STATUS.DISCONTINUED) {
+            return <span className="work-status-badge discontinued">Discontinued</span>;
         }
         return <span className="work-status-badge active">Active</span>;
     };
+
+    const isActive = work.Status === WORK_STATUS.ACTIVE;
+    const isFinished = work.Status === WORK_STATUS.FINISHED;
+    const isDiscontinued = work.Status === WORK_STATUS.DISCONTINUED;
 
     const getRemainingBalance = () => {
         return (work.TotalRequired || 0) - (work.TotalPaid || 0);
@@ -39,8 +49,14 @@ const WorkCard = ({
         return getRemainingBalance() <= 0;
     };
 
+    const getCardClass = () => {
+        if (isDiscontinued) return 'work-card-discontinued';
+        if (isFinished) return 'work-card-completed';
+        return 'work-card-active';
+    };
+
     return (
-        <div className={`work-card ${work.Finished ? 'work-card-completed' : 'work-card-active'} ${isExpanded ? 'expanded' : 'collapsed'}`}>
+        <div className={`work-card ${getCardClass()} ${isExpanded ? 'expanded' : 'collapsed'}`}>
             {/* Minimal Header - Always Visible */}
             <div className="work-card-collapsed-header" onClick={onToggleExpanded}>
                 <div className="work-card-title-section">
@@ -81,9 +97,19 @@ const WorkCard = ({
                             <button type="button" onClick={() => { onEdit(work); setShowActions(false); }}>
                                 <i className="fas fa-edit"></i> Edit Work
                             </button>
-                            {!work.Finished && (
-                                <button type="button" onClick={() => { onComplete(work.workid); setShowActions(false); }}>
-                                    <i className="fas fa-check-circle"></i> Mark Complete
+                            {isActive && (
+                                <>
+                                    <button type="button" onClick={() => { onComplete(work.workid); setShowActions(false); }}>
+                                        <i className="fas fa-check-circle"></i> Mark Complete
+                                    </button>
+                                    <button type="button" onClick={() => { onDiscontinue(work.workid); setShowActions(false); }}>
+                                        <i className="fas fa-ban"></i> Mark Discontinued
+                                    </button>
+                                </>
+                            )}
+                            {(isFinished || isDiscontinued) && (
+                                <button type="button" onClick={() => { onReactivate(work); setShowActions(false); }}>
+                                    <i className="fas fa-redo"></i> Reactivate
                                 </button>
                             )}
                             <button

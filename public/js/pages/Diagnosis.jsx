@@ -15,9 +15,11 @@ const Diagnosis = () => {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const [activeTab, setActiveTab] = useState('general');
     const [workInfo, setWorkInfo] = useState(null);
     const [patientInfo, setPatientInfo] = useState(null);
+    const [diagnosisExists, setDiagnosisExists] = useState(false);
 
     const [diagnosisData, setDiagnosisData] = useState({
         WorkID: parseInt(workId),
@@ -105,6 +107,7 @@ const Diagnosis = () => {
                         diagnosis.DxDate = new Date(diagnosis.DxDate).toISOString().split('T')[0];
                     }
                     setDiagnosisData({ ...diagnosisData, ...diagnosis });
+                    setDiagnosisExists(true);
                 }
             }
         } catch (err) {
@@ -143,6 +146,7 @@ const Diagnosis = () => {
             if (!response.ok) throw new Error('Failed to save diagnosis');
 
             toast.success('Diagnosis saved successfully');
+            setDiagnosisExists(true);
 
             // Navigate back to work page
             setTimeout(() => {
@@ -158,6 +162,34 @@ const Diagnosis = () => {
 
     const handleCancel = () => {
         navigate(`/patient/${patientId}/work`);
+    };
+
+    const handleReset = async () => {
+        // Show confirmation
+        const confirmMessage = `Are you sure you want to reset/delete this diagnosis?\n\nWork: ${workInfo?.TypeName || 'N/A'}\nDate: ${diagnosisData.DxDate}\n\n⚠️ This action cannot be undone!`;
+
+        if (!confirm(confirmMessage)) return;
+
+        try {
+            setDeleting(true);
+            const response = await fetch(`/api/diagnosis/${workId}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) throw new Error('Failed to delete diagnosis');
+
+            toast.success('Diagnosis deleted successfully');
+
+            // Navigate back to work page
+            setTimeout(() => {
+                navigate(`/patient/${patientId}/work`);
+            }, 500);
+        } catch (err) {
+            console.error('Error deleting diagnosis:', err);
+            toast.error('Failed to delete diagnosis');
+        } finally {
+            setDeleting(false);
+        }
     };
 
     const formatDate = (dateString) => {
@@ -227,16 +259,37 @@ const Diagnosis = () => {
                         type="button"
                         className="btn-cancel"
                         onClick={handleCancel}
-                        disabled={saving}
+                        disabled={saving || deleting}
                     >
                         <i className="fas fa-times"></i>
                         Cancel
                     </button>
+                    {diagnosisExists && (
+                        <button
+                            type="button"
+                            className="btn-delete"
+                            onClick={handleReset}
+                            disabled={saving || deleting}
+                            style={{ backgroundColor: 'var(--error-color)', color: 'white' }}
+                        >
+                            {deleting ? (
+                                <>
+                                    <i className="fas fa-spinner fa-spin"></i>
+                                    Deleting...
+                                </>
+                            ) : (
+                                <>
+                                    <i className="fas fa-trash"></i>
+                                    Reset Diagnosis
+                                </>
+                            )}
+                        </button>
+                    )}
                     <button
                         type="button"
                         className="btn-save"
                         onClick={handleSave}
-                        disabled={saving}
+                        disabled={saving || deleting}
                     >
                         {saving ? (
                             <>

@@ -348,7 +348,7 @@ router.get('/patients/search', async (req, res) => {
                             SELECT DISTINCT wt2.WorkType
                             FROM dbo.tblwork w2
                             INNER JOIN dbo.tblWorkType wt2 ON w2.Typeofwork = wt2.ID
-                            WHERE w2.PersonID = p.PersonID AND w2.Finished = 0
+                            WHERE w2.PersonID = p.PersonID AND w2.Status = 1
                         ) wt
                     ) as ActiveWorkTypes
             FROM dbo.tblpatients p

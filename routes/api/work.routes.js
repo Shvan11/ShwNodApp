@@ -23,15 +23,20 @@ import {
     addWork,
     updateWork,
     finishWork,
+    discontinueWork,
+    reactivateWork,
     deleteWork,
     getActiveWork,
+    getWorkById,
+    validateStatusChange,
     getWorkTypes,
     getWorkKeywords,
     getWorkDetailsList,
     addWorkDetail,
     updateWorkDetail,
     deleteWorkDetail,
-    addWorkWithInvoice
+    addWorkWithInvoice,
+    WORK_STATUS
 } from '../../services/database/queries/work-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { requireRecordAge, getWorkCreationDate, isToday } from '../../middleware/time-based-auth.js';
@@ -98,13 +103,15 @@ router.get('/getwork/:workId', async (req, res) => {
                 w.Currency,
                 w.Typeofwork,
                 w.Notes,
-                w.Finished,
+                w.Status,
                 w.DrID,
                 e.employeeName as DoctorName,
-                wt.WorkType as TypeName
+                wt.WorkType as TypeName,
+                ws.StatusName
             FROM tblwork w
             LEFT JOIN tblEmployees e ON w.DrID = e.ID
             LEFT JOIN tblWorkType wt ON w.Typeofwork = wt.ID
+            LEFT JOIN tblWorkStatus ws ON w.Status = ws.StatusID
             WHERE w.workid = @WorkID
         `;
 
@@ -118,10 +125,11 @@ router.get('/getwork/:workId', async (req, res) => {
                 Currency: columns[3].value,
                 Typeofwork: columns[4].value,
                 Notes: columns[5].value,
-                Finished: columns[6].value,
+                Status: columns[6].value,
                 DrID: columns[7].value,
                 DoctorName: columns[8].value,
-                TypeName: columns[9].value
+                TypeName: columns[9].value,
+                StatusName: columns[10].value
             }),
             (results) => results.length > 0 ? results[0] : null
         );
@@ -224,6 +232,36 @@ router.put('/updatework',
             }
         });
 
+        // ===== STATUS CHANGE VALIDATION =====
+        // If Status is being changed, validate the transition
+        if (workData.Status !== undefined) {
+            // Get current work to compare status
+            const currentWork = await getWorkById(parseInt(workId));
+
+            if (!currentWork) {
+                return ErrorResponses.notFound(res, 'Work not found');
+            }
+
+            // If status is actually changing (not just updating with same value)
+            if (currentWork.Status !== workData.Status) {
+                // Validate status transition (checks for duplicate active works)
+                const validation = await validateStatusChange(
+                    parseInt(workId),
+                    workData.Status,
+                    workData.PersonID || currentWork.PersonID
+                );
+
+                if (!validation.valid) {
+                    return res.status(409).json({
+                        error: 'Status Change Conflict',
+                        message: validation.error,
+                        existingWork: validation.existingWork
+                    });
+                }
+            }
+        }
+        // ===== END STATUS VALIDATION =====
+
         // ===== PERMISSION CHECK FOR FINANCIAL FIELDS =====
         // Financial fields that require special permission (admin or same-day edit)
         const financialFields = ['TotalRequired', 'Currency', 'Paid', 'Discount'];
@@ -283,6 +321,85 @@ router.post('/finishwork', async (req, res) => {
         log.error("Error finishing work:", error);
         return sendError(res, 500, 'Failed to finish work', error);
     }
+});
+
+// Discontinue work (patient abandoned treatment)
+router.post('/discontinuework', async (req, res) => {
+    try {
+        const { workId } = req.body;
+
+        if (!workId) {
+            return ErrorResponses.missingParameter(res, 'workId');
+        }
+
+        if (isNaN(parseInt(workId))) {
+            return ErrorResponses.invalidParameter(res, 'workId', 'Must be a valid number');
+        }
+
+        const result = await discontinueWork(parseInt(workId));
+        res.json({
+            success: true,
+            message: "Work discontinued successfully",
+            rowsAffected: result.rowCount
+        });
+    } catch (error) {
+        log.error("Error discontinuing work:", error);
+        return sendError(res, 500, 'Failed to discontinue work', error);
+    }
+});
+
+// Reactivate work (change from discontinued/finished back to active)
+router.post('/reactivatework', async (req, res) => {
+    try {
+        const { workId, personId } = req.body;
+
+        if (!workId) {
+            return ErrorResponses.missingParameter(res, 'workId');
+        }
+
+        if (isNaN(parseInt(workId))) {
+            return ErrorResponses.invalidParameter(res, 'workId', 'Must be a valid number');
+        }
+
+        // Check if patient already has an active work
+        if (personId) {
+            const activeWork = await getActiveWork(parseInt(personId));
+            if (activeWork && activeWork.workid !== parseInt(workId)) {
+                return ErrorResponses.conflict(res, 'Patient already has an active work. Please finish or discontinue it first.', {
+                    existingWorkId: activeWork.workid,
+                    existingWorkType: activeWork.TypeName
+                });
+            }
+        }
+
+        const result = await reactivateWork(parseInt(workId));
+        res.json({
+            success: true,
+            message: "Work reactivated successfully",
+            rowsAffected: result.rowCount
+        });
+    } catch (error) {
+        // Handle unique constraint violation (patient already has active work)
+        if (error.number === 2601 && error.message.includes('UNQ_tblWork_Active')) {
+            return ErrorResponses.conflict(res, 'Cannot reactivate: Patient already has an active work');
+        }
+        log.error("Error reactivating work:", error);
+        return sendError(res, 500, 'Failed to reactivate work', error);
+    }
+});
+
+// Get work status constants (for frontend reference)
+router.get('/workstatuses', (req, res) => {
+    res.json({
+        ACTIVE: WORK_STATUS.ACTIVE,
+        FINISHED: WORK_STATUS.FINISHED,
+        DISCONTINUED: WORK_STATUS.DISCONTINUED,
+        labels: {
+            [WORK_STATUS.ACTIVE]: 'Active',
+            [WORK_STATUS.FINISHED]: 'Finished',
+            [WORK_STATUS.DISCONTINUED]: 'Discontinued'
+        }
+    });
 });
 
 // Delete work - Protected: Secretary can only delete works created today

@@ -39,6 +39,12 @@
     opacity: 0.85;
 }
 
+.work-card-discontinued {
+    border-left-color: var(--warning-color);
+    opacity: 0.75;
+    background: linear-gradient(135deg, #fff 0%, #fffbeb 100%);
+}
+
 /* Collapsed Header - Always Visible */
 .work-card-collapsed-header {
     display: flex;
@@ -103,6 +109,11 @@
 .work-status-badge.completed {
     background: var(--gray-200);
     color: var(--gray-600);
+}
+
+.work-status-badge.discontinued {
+    background: var(--warning-100);
+    color: var(--warning-900);
 }
 
 .work-card-meta-minimal {

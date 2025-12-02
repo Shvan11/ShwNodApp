@@ -208,9 +208,13 @@ export async function getAllAlignerSets() {
             v.NextBatchReadyDate,
             v.Notes,
             v.NextBatchPresent,
-            ad.DoctorName
+            ad.DoctorName,
+            w.Status as WorkStatus,
+            ws.StatusName as WorkStatusName
         FROM dbo.v_allsets v
         INNER JOIN AlignerDoctors ad ON v.AlignerDrID = ad.DrID
+        INNER JOIN tblwork w ON v.WorkID = w.workid
+        LEFT JOIN tblWorkStatus ws ON w.Status = ws.StatusID
         ORDER BY
             CASE WHEN v.NextBatchPresent = 'False' THEN 0 ELSE 1 END,
             v.NextBatchReadyDate ASC,
@@ -234,7 +238,9 @@ export async function getAllAlignerSets() {
             NextBatchReadyDate: columns[10].value,
             Notes: columns[11].value,
             NextBatchPresent: columns[12].value,
-            DoctorName: columns[13].value
+            DoctorName: columns[13].value,
+            WorkStatus: columns[14].value,
+            WorkStatusName: columns[15].value
         })
     );
 }
@@ -811,6 +817,7 @@ export async function updateBatch(batchId, batchData) {
     } = batchData;
 
     // Call stored procedure (handles resequencing automatically)
+    // Returns info about any deactivated batch when setting IsActive = 1
     const query = `
         EXEC usp_UpdateAlignerBatch
             @AlignerBatchID = @batchId,
@@ -824,7 +831,7 @@ export async function updateBatch(batchId, batchData) {
             @IsActive = @IsActive
     `;
 
-    await executeQuery(
+    const result = await executeQuery(
         query,
         [
             ['batchId', TYPES.Int, parseInt(batchId)],
@@ -838,6 +845,18 @@ export async function updateBatch(batchId, batchData) {
             ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : null]
         ]
     );
+
+    // Return deactivated batch info if present
+    if (result && result.length > 0 && result[0].DeactivatedBatchID) {
+        return {
+            deactivatedBatch: {
+                batchId: result[0].DeactivatedBatchID,
+                batchSequence: result[0].DeactivatedBatchSequence
+            }
+        };
+    }
+
+    return null;
 }
 
 /**

@@ -1568,6 +1568,25 @@
         font-size: 0.85rem;
     }
 
+    /* AllSets Filter Container - Mobile */
+    .allsets-filter-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .allsets-filter-container .patient-filter-box {
+        min-width: 100%;
+    }
+
+    .doctor-filter {
+        min-width: 100%;
+    }
+
+    .no-batch-toggle {
+        width: 100%;
+        justify-content: center;
+    }
+
     .search-filters {
         flex-direction: column;
         gap: 1rem;
@@ -2375,7 +2394,13 @@
    ALL SETS LIST STYLES
    =================================== */
 
-/* Section Header Warning Badge */
+/* Section Header Info Badges */
+.section-info-initial {
+    margin-left: var(--spacing-md);
+    color: var(--blue-300);
+    font-weight: var(--font-weight-bold);
+}
+
 .section-info-warning {
     margin-left: var(--spacing-md);
     color: var(--warning-300);
@@ -2385,6 +2410,7 @@
 /* Filter Controls Container */
 .allsets-filter-container {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--spacing-md);
     margin-bottom: var(--spacing-lg);
     align-items: center;
@@ -2392,9 +2418,36 @@
 
 .allsets-filter-container .patient-filter-box {
     flex: 1;
+    min-width: 300px;
 }
 
-/* No Next Batch Toggle Label */
+/* Doctor Filter Dropdown */
+.doctor-filter {
+    min-width: 200px;
+}
+
+.doctor-filter-select {
+    width: 100%;
+    padding: 0.75rem var(--spacing-md);
+    font-size: 1rem;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    background-color: var(--color-white);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.doctor-filter-select:focus {
+    outline: none;
+    border-color: var(--blue-300);
+    box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.1);
+}
+
+.doctor-filter-select:hover {
+    border-color: var(--gray-300);
+}
+
+/* Toggle Labels (for both no-batch and finished toggles) */
 .no-batch-toggle {
     display: flex;
     align-items: center;
@@ -2415,10 +2468,26 @@
 
 .no-batch-toggle input[type="checkbox"] {
     cursor: pointer;
+    width: 18px;
+    height: 18px;
 }
 
 .no-batch-toggle .fa-exclamation-triangle {
     color: var(--warning-300);
+}
+
+.no-batch-toggle .fa-check-circle {
+    color: var(--success-500);
+}
+
+/* Active state for finished toggle - green theme */
+.no-batch-toggle:has(input[type="checkbox"]:checked) .fa-check-circle {
+    color: var(--success-700);
+}
+
+.no-batch-toggle:has(input[type="checkbox"]:checked):has(.fa-check-circle) {
+    background-color: var(--success-100);
+    border-color: var(--success-300);
 }
 
 /* Table Container */
@@ -2462,6 +2531,7 @@
     transition: background-color 0.15s;
 }
 
+/* Default row colors - lower specificity */
 .allsets-table tbody tr:nth-child(even) {
     background-color: var(--gray-50);
 }
@@ -2470,16 +2540,59 @@
     background-color: var(--color-white);
 }
 
-.allsets-table tbody tr.warning-row {
-    background-color: var(--warning-100);
+/* Info Row - Initial phase (no delivery yet) - higher specificity */
+.allsets-table tbody tr.info-row,
+.allsets-table tbody tr.info-row:nth-child(even),
+.allsets-table tbody tr.info-row:nth-child(odd) {
+    background-color: var(--blue-50);
+    display: table-row;
 }
 
-.allsets-table tbody tr:hover {
-    background-color: var(--blue-50);
+.allsets-table tbody tr.info-row:hover {
+    background-color: var(--blue-100);
+}
+
+.allsets-table tbody tr.info-row td {
+    display: table-cell;
+}
+
+/* Warning Row - Active patient waiting for next batch - higher specificity */
+.allsets-table tbody tr.warning-row,
+.allsets-table tbody tr.warning-row:nth-child(even),
+.allsets-table tbody tr.warning-row:nth-child(odd) {
+    background-color: var(--warning-100);
+    display: table-row;
 }
 
 .allsets-table tbody tr.warning-row:hover {
     background-color: var(--warning-200);
+}
+
+.allsets-table tbody tr.warning-row td {
+    display: table-cell;
+}
+
+/* Completed Work Row - Finished or Discontinued patients - higher specificity */
+.allsets-table tbody tr.completed-work-row,
+.allsets-table tbody tr.completed-work-row:nth-child(even),
+.allsets-table tbody tr.completed-work-row:nth-child(odd) {
+    background-color: #e8f5e9;
+    display: table-row;
+    opacity: 0.7;
+}
+
+.allsets-table tbody tr.completed-work-row:hover {
+    background-color: #c8e6c9;
+    opacity: 0.85;
+}
+
+.allsets-table tbody tr.completed-work-row td {
+    display: table-cell;
+}
+
+/* Normal row hover - only for rows without special classes */
+.allsets-table tbody tr:not(.info-row):not(.warning-row):not(.completed-work-row):hover {
+    background-color: var(--blue-50);
 }
 
 /* Patient Name Cell */
@@ -2526,6 +2639,12 @@
 }
 
 /* Status Badge */
+.allsets-badge-na {
+    background-color: var(--gray-100);
+    color: var(--gray-600);
+    font-weight: var(--font-weight-medium);
+}
+
 .allsets-badge-no-next {
     background-color: var(--error-50);
     color: var(--error-600);

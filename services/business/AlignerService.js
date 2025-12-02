@@ -251,8 +251,15 @@ export async function validateAndUpdateBatch(batchId, batchData) {
     log.info(`Updating aligner batch ${batchId}:`, batchData);
 
     try {
-        await alignerQueries.updateBatch(batchId, batchData);
+        const result = await alignerQueries.updateBatch(batchId, batchData);
         log.info(`Aligner batch ${batchId} updated successfully`);
+
+        // Return any deactivated batch info for user notification
+        if (result && result.deactivatedBatch) {
+            log.info(`Batch #${result.deactivatedBatch.batchSequence} was automatically deactivated`);
+        }
+
+        return result;
     } catch (error) {
         log.error('Error updating aligner batch:', error);
         throw error;

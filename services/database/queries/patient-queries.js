@@ -36,7 +36,7 @@ export function getInfos(PID) {
          LEFT OUTER JOIN (
            SELECT PersonID, StartDate
            FROM dbo.tblwork
-           WHERE Finished = 0
+           WHERE Status = 1
          ) w ON p.PersonID = w.PersonID
          LEFT OUTER JOIN (
            SELECT TOP 1 AlertID, PersonID, AlertTypeID, AlertDetails, AlertSeverity
@@ -199,7 +199,7 @@ export function getPatientsPhones() {
  */
 export async function getActiveWID(PID) {
     const result = await executeQuery(
-        'SELECT WorkID FROM dbo.tblwork WHERE PersonID = @PID AND Finished = 0',
+        'SELECT WorkID FROM dbo.tblwork WHERE PersonID = @PID AND Status = 1',
         [['PID', TYPES.Int, PID]],
         (columns) => columns[0].value
     );

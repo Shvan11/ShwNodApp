@@ -48,6 +48,10 @@ const WorkComponent = ({ patientId }) => {
     // Expanded works state - track which work IDs are expanded
     const [expandedWorks, setExpandedWorks] = useState(new Set());
 
+    // Delete confirmation modal state
+    const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+    const [workToDelete, setWorkToDelete] = useState(null);
+
     // Work detail form state
     const [detailFormData, setDetailFormData] = useState({
         WorkID: null,
@@ -66,10 +70,17 @@ const WorkComponent = ({ patientId }) => {
         }
     }, [patientId]);
 
+    // Work Status Constants (must match backend)
+    const WORK_STATUS = {
+        ACTIVE: 1,
+        FINISHED: 2,
+        DISCONTINUED: 3
+    };
+
     // Auto-expand the first active work when works are loaded
     useEffect(() => {
         if (works.length > 0) {
-            const firstActiveWork = works.find(work => !work.Finished);
+            const firstActiveWork = works.find(work => work.Status === WORK_STATUS.ACTIVE);
             if (firstActiveWork) {
                 setExpandedWorks(new Set([firstActiveWork.workid]));
             }
@@ -163,18 +174,69 @@ const WorkComponent = ({ patientId }) => {
                 throw new Error(errorData.error || 'Failed to complete work');
             }
 
+            toast.success('Work marked as completed');
             await loadWorks();
         } catch (err) {
             setError(err.message);
         }
     };
 
-    const handleDeleteWork = async (work) => {
-        const confirmMessage = `Are you sure you want to delete this work?\n\nWork Type: ${work.TypeName || 'N/A'}\nDoctor: ${work.DoctorName || 'N/A'}\nTotal Required: ${formatCurrency(work.TotalRequired, work.Currency)}\n\nThis action cannot be undone!`;
-
-        if (!confirm(confirmMessage)) return;
+    const handleDiscontinueWork = async (workId) => {
+        if (!confirm('Are you sure you want to mark this work as discontinued?\n\nThis indicates the patient has abandoned treatment.')) return;
 
         try {
+            const response = await fetch('/api/discontinuework', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ workId })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to discontinue work');
+            }
+
+            toast.success('Work marked as discontinued');
+            await loadWorks();
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    const handleReactivateWork = async (work) => {
+        if (!confirm('Are you sure you want to reactivate this work?\n\nThis will make it the active work for this patient.')) return;
+
+        try {
+            const response = await fetch('/api/reactivatework', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ workId: work.workid, personId: work.PersonID })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || errorData.error || 'Failed to reactivate work');
+            }
+
+            toast.success('Work reactivated successfully');
+            await loadWorks();
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    const handleDeleteWork = (work) => {
+        setWorkToDelete(work);
+        setShowDeleteConfirmation(true);
+    };
+
+    const confirmDeleteWork = async () => {
+        if (!workToDelete) return;
+
+        setShowDeleteConfirmation(false);
+
+        try {
+            const work = workToDelete;
             const response = await fetch('/api/deletework', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
@@ -187,7 +249,8 @@ const WorkComponent = ({ patientId }) => {
                 // Handle dependency error with detailed message
                 if (response.status === 409 && result.dependencies) {
                     const deps = result.dependencies;
-                    let detailMessage = 'Cannot delete this work because it has:\n\n';
+                    let detailMessage = '⚠️ CANNOT DELETE WORK - EXISTING RECORDS FOUND ⚠️\n\n';
+                    detailMessage += 'This work has the following records that must be deleted first:\n\n';
 
                     if (deps.InvoiceCount > 0) detailMessage += `• ${deps.InvoiceCount} payment(s)\n`;
                     if (deps.VisitCount > 0) detailMessage += `• ${deps.VisitCount} visit(s)\n`;
@@ -196,9 +259,9 @@ const WorkComponent = ({ patientId }) => {
                     if (deps.ImplantCount > 0) detailMessage += `• ${deps.ImplantCount} implant(s)\n`;
                     if (deps.ScrewCount > 0) detailMessage += `• ${deps.ScrewCount} screw(s)\n`;
 
-                    detailMessage += '\nPlease delete these records first before deleting the work.';
+                    detailMessage += '\n⚠️ Delete these records first, then try again.';
 
-                    toast.error(detailMessage, 6000); // Longer duration for detailed message
+                    toast.error(detailMessage, 10000); // 10 seconds for critical warning
                     return;
                 }
 
@@ -209,9 +272,15 @@ const WorkComponent = ({ patientId }) => {
             setTimeout(() => setSuccessMessage(null), 3000);
             await loadWorks();
         } catch (err) {
-            setError(err.message);
-            setTimeout(() => setError(null), 5000);
+            toast.error(err.message, 5000);
+        } finally {
+            setWorkToDelete(null);
         }
+    };
+
+    const cancelDeleteWork = () => {
+        setShowDeleteConfirmation(false);
+        setWorkToDelete(null);
     };
 
     const handleViewDetails = async (work) => {
@@ -313,7 +382,8 @@ const WorkComponent = ({ patientId }) => {
     };
 
     const getProgressPercentage = (work) => {
-        if (work.Finished) return 100;
+        if (work.Status === WORK_STATUS.FINISHED) return 100;
+        if (work.Status === WORK_STATUS.DISCONTINUED) return 0; // Show 0% for discontinued
         if (!work.StartDate) return 0;
 
         let progress = 25; // Started
@@ -330,17 +400,20 @@ const WorkComponent = ({ patientId }) => {
                 work.DoctorName?.toLowerCase().includes(searchTerm.toLowerCase());
 
             const matchesFilter = filterStatus === 'all' ||
-                (filterStatus === 'active' && !work.Finished) ||
-                (filterStatus === 'completed' && work.Finished);
+                (filterStatus === 'active' && work.Status === WORK_STATUS.ACTIVE) ||
+                (filterStatus === 'completed' && work.Status === WORK_STATUS.FINISHED) ||
+                (filterStatus === 'discontinued' && work.Status === WORK_STATUS.DISCONTINUED);
 
             return matchesSearch && matchesFilter;
         })
         .sort((a, b) => {
-            // First, sort by Finished status (active works first)
-            if (!a.Finished && b.Finished) return -1;
-            if (a.Finished && !b.Finished) return 1;
+            // First, sort by Status (active works first, then discontinued, then finished)
+            if (a.Status === WORK_STATUS.ACTIVE && b.Status !== WORK_STATUS.ACTIVE) return -1;
+            if (a.Status !== WORK_STATUS.ACTIVE && b.Status === WORK_STATUS.ACTIVE) return 1;
+            if (a.Status === WORK_STATUS.DISCONTINUED && b.Status === WORK_STATUS.FINISHED) return -1;
+            if (a.Status === WORK_STATUS.FINISHED && b.Status === WORK_STATUS.DISCONTINUED) return 1;
 
-            // Within each group (active or completed), sort by AdditionDate ascending (oldest first)
+            // Within each group, sort by AdditionDate ascending (oldest first)
             const dateA = new Date(a.AdditionDate || 0);
             const dateB = new Date(b.AdditionDate || 0);
             return dateA - dateB;
@@ -531,12 +604,16 @@ const WorkComponent = ({ patientId }) => {
                                     <span className="summary-label-inline">Total</span>
                                 </div>
                                 <div className="summary-card-inline">
-                                    <span className="summary-value-inline">{works.filter(w => !w.Finished).length}</span>
+                                    <span className="summary-value-inline">{works.filter(w => w.Status === WORK_STATUS.ACTIVE).length}</span>
                                     <span className="summary-label-inline">Active</span>
                                 </div>
                                 <div className="summary-card-inline">
-                                    <span className="summary-value-inline">{works.filter(w => w.Finished).length}</span>
+                                    <span className="summary-value-inline">{works.filter(w => w.Status === WORK_STATUS.FINISHED).length}</span>
                                     <span className="summary-label-inline">Completed</span>
+                                </div>
+                                <div className="summary-card-inline">
+                                    <span className="summary-value-inline">{works.filter(w => w.Status === WORK_STATUS.DISCONTINUED).length}</span>
+                                    <span className="summary-label-inline">Discontinued</span>
                                 </div>
                             </div>
                         </div>
@@ -556,6 +633,7 @@ const WorkComponent = ({ patientId }) => {
                                 <option value="all">All Works</option>
                                 <option value="active">Active</option>
                                 <option value="completed">Completed</option>
+                                <option value="discontinued">Discontinued</option>
                             </select>
                             <button
                                 onClick={handleQuickCheckin}
@@ -581,13 +659,6 @@ const WorkComponent = ({ patientId }) => {
                             </button>
                         </div>
                     </div>
-                </div>
-            )}
-
-            {error && (
-                <div className="work-error">
-                    {error}
-                    <button onClick={() => setError(null)} className="error-close">×</button>
                 </div>
             )}
 
@@ -636,12 +707,15 @@ const WorkComponent = ({ patientId }) => {
                         onViewPaymentHistory={handleViewPaymentHistory}
                         onAddAlignerSet={handleAddAlignerSet}
                         onComplete={handleCompleteWork}
+                        onDiscontinue={handleDiscontinueWork}
+                        onReactivate={handleReactivateWork}
                         onViewVisits={(work) => navigate(`/patient/${patientId}/visits?workId=${work.workid}`)}
                         onNewVisit={(work) => navigate(`/patient/${patientId}/new-visit?workId=${work.workid}`)}
                         onPrintReceipt={handlePrintReceipt}
                         formatDate={formatDate}
                         formatCurrency={formatCurrency}
                         getProgressPercentage={getProgressPercentage}
+                        WORK_STATUS={WORK_STATUS}
                     />
                 ))}
                 {filteredWorks.length === 0 && (
@@ -1072,6 +1146,63 @@ const WorkComponent = ({ patientId }) => {
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteConfirmation && workToDelete && (
+                <div className="modal-overlay" onClick={cancelDeleteWork}>
+                    <div className="whatsapp-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                        <div className="whatsapp-modal-header">
+                            <h3 className="whatsapp-modal-title" style={{ color: 'var(--error-color)' }}>
+                                <i className="fas fa-exclamation-triangle"></i> Confirm Delete Work
+                            </h3>
+                            <button onClick={cancelDeleteWork} className="whatsapp-modal-close">
+                                ×
+                            </button>
+                        </div>
+                        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+                            <p style={{ marginBottom: 'var(--spacing-md)', fontSize: 'var(--font-size-base)', color: 'var(--text-primary)' }}>
+                                Are you sure you want to delete this work?
+                            </p>
+                            <div style={{
+                                background: 'var(--background-secondary)',
+                                padding: 'var(--spacing-md)',
+                                borderRadius: 'var(--radius-md)',
+                                borderLeft: '4px solid var(--error-color)'
+                            }}>
+                                <p style={{ margin: '0 0 var(--spacing-sm) 0' }}>
+                                    <strong>Work Type:</strong> {workToDelete.TypeName || 'N/A'}
+                                </p>
+                                <p style={{ margin: '0 0 var(--spacing-sm) 0' }}>
+                                    <strong>Doctor:</strong> {workToDelete.DoctorName || 'N/A'}
+                                </p>
+                                <p style={{ margin: '0' }}>
+                                    <strong>Total Required:</strong> {formatCurrency(workToDelete.TotalRequired, workToDelete.Currency)}
+                                </p>
+                            </div>
+                            <p style={{
+                                marginTop: 'var(--spacing-md)',
+                                color: 'var(--error-color)',
+                                fontWeight: 'bold',
+                                fontSize: 'var(--font-size-sm)'
+                            }}>
+                                ⚠️ This action cannot be undone!
+                            </p>
+                        </div>
+                        <div className="whatsapp-actions">
+                            <button onClick={cancelDeleteWork} className="whatsapp-btn-cancel">
+                                <i className="fas fa-times"></i> Cancel
+                            </button>
+                            <button
+                                onClick={confirmDeleteWork}
+                                className="whatsapp-btn-send"
+                                style={{ backgroundColor: 'var(--error-color)' }}
+                            >
+                                <i className="fas fa-trash"></i> Delete Work
+                            </button>
                         </div>
                     </div>
                 </div>

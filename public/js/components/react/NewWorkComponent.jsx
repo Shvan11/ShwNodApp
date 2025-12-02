@@ -26,7 +26,7 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
         Currency: 'USD',
         Typeofwork: '',
         Notes: '',
-        Finished: false,
+        Status: 1, // 1=Active, 2=Finished, 3=Discontinued
         StartDate: '',
         DebondDate: '',
         FPhotoDate: '',
@@ -106,7 +106,7 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
                     Currency: work.Currency || 'USD',
                     Typeofwork: work.Typeofwork || '',
                     Notes: work.Notes || '',
-                    Finished: work.Finished || false,
+                    Status: work.Status || 1, // Default to Active
                     StartDate: work.StartDate ? new Date(work.StartDate).toISOString().split('T')[0] : '',
                     DebondDate: work.DebondDate ? new Date(work.DebondDate).toISOString().split('T')[0] : '',
                     FPhotoDate: work.FPhotoDate ? new Date(work.FPhotoDate).toISOString().split('T')[0] : '',
@@ -191,6 +191,18 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
                     setLoading(false);
                     return;
                 }
+
+                // Handle 409 Conflict - Status change conflict (Active work already exists)
+                if (response.status === 409 && errorData.existingWork) {
+                    const existingWork = errorData.existingWork;
+                    const errorMessage = `Cannot activate this work: Patient already has an active work:\n\n` +
+                        `Work Type: ${existingWork.type || 'N/A'}\n` +
+                        `Doctor: ${existingWork.doctor || 'N/A'}\n` +
+                        `Work ID: ${existingWork.workid}\n\n` +
+                        `Please finish or discontinue the existing work first.`;
+                    throw new Error(errorMessage);
+                }
+
                 // Extract error message properly (details.message > message > details > error)
                 const errorMessage = errorData.details?.message || errorData.message || errorData.details || errorData.error || 'Failed to save work';
                 throw new Error(errorMessage);
@@ -471,6 +483,33 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
                             </select>
                         </div>
                     </div>
+
+                    {workId && (
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Status <span className="required">*</span></label>
+                                <select
+                                    value={formData.Status}
+                                    onChange={(e) => setFormData({...formData, Status: parseInt(e.target.value)})}
+                                    required
+                                >
+                                    <option value={1}>Active</option>
+                                    <option value={2}>Finished</option>
+                                    <option value={3}>Discontinued</option>
+                                </select>
+                                {formData.Status === 2 && (
+                                    <small className="form-hint text-warning">
+                                        <i className="fas fa-exclamation-triangle"></i> Finishing a work marks the treatment as completed
+                                    </small>
+                                )}
+                                {formData.Status === 3 && (
+                                    <small className="form-hint text-warning">
+                                        <i className="fas fa-exclamation-triangle"></i> Discontinuing a work indicates the patient abandoned treatment
+                                    </small>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="form-row">
                         <div className="form-group">

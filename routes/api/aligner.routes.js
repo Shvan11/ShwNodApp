@@ -593,12 +593,19 @@ router.put('/aligner/batches/:batchId', async (req, res) => {
         const { batchId } = req.params;
 
         // Delegate to service layer for validation and update
-        await AlignerService.validateAndUpdateBatch(batchId, req.body);
+        const result = await AlignerService.validateAndUpdateBatch(batchId, req.body);
 
-        res.json({
+        const response = {
             success: true,
             message: 'Aligner batch updated successfully'
-        });
+        };
+
+        // Include deactivated batch info if another batch was deactivated
+        if (result && result.deactivatedBatch) {
+            response.deactivatedBatch = result.deactivatedBatch;
+        }
+
+        res.json(response);
     } catch (error) {
         if (error instanceof AlignerValidationError) {
             return ErrorResponses.badRequest(res, error.message, { code: error.code });

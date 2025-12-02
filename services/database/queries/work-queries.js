@@ -2,16 +2,28 @@ import { executeQuery, executeStoredProcedure, TYPES } from '../index.js';
 import ConnectionPool from '../ConnectionPool.js';
 import { Request } from 'tedious';
 
+/**
+ * Work Status Constants
+ * 1 = Active (ongoing treatment)
+ * 2 = Finished (completed successfully)
+ * 3 = Discontinued (abandoned by patient)
+ */
+export const WORK_STATUS = {
+    ACTIVE: 1,
+    FINISHED: 2,
+    DISCONTINUED: 3
+};
+
 export const getWorksByPatient = async (personId) => {
     return executeQuery(
-        `SELECT 
+        `SELECT
             w.workid,
             w.PersonID,
             w.TotalRequired,
             w.Currency,
             w.Typeofwork,
             w.Notes,
-            w.Finished,
+            w.Status,
             w.AdditionDate,
             w.StartDate,
             w.DebondDate,
@@ -27,13 +39,15 @@ export const getWorksByPatient = async (personId) => {
             w.KeywordID5,
             e.employeeName as DoctorName,
             wt.WorkType as TypeName,
+            ws.StatusName,
             k1.KeyWord as Keyword1,
             k2.KeyWord as Keyword2,
             k3.KeyWord as Keyword3,
             k4.KeyWord as Keyword4,
             k5.KeyWord as Keyword5,
-            CASE 
-                WHEN w.Finished = 1 THEN 'Completed'
+            CASE
+                WHEN w.Status = 2 THEN 'Completed'
+                WHEN w.Status = 3 THEN 'Discontinued'
                 WHEN w.StartDate IS NOT NULL THEN 'In Progress'
                 ELSE 'Planned'
             END as WorkStatus,
@@ -41,6 +55,7 @@ export const getWorksByPatient = async (personId) => {
         FROM tblwork w
         LEFT JOIN tblEmployees e ON w.DrID = e.ID
         LEFT JOIN tblWorkType wt ON w.Typeofwork = wt.ID
+        LEFT JOIN tblWorkStatus ws ON w.Status = ws.StatusID
         LEFT JOIN tblKeyWord k1 ON w.KeyWordID1 = k1.ID
         LEFT JOIN tblKeyWord k2 ON w.KeyWordID2 = k2.ID
         LEFT JOIN tblKeyWord k3 ON w.KeywordID3 = k3.ID
@@ -48,11 +63,11 @@ export const getWorksByPatient = async (personId) => {
         LEFT JOIN tblKeyWord k5 ON w.KeywordID5 = k5.ID
         LEFT JOIN tblInvoice i ON w.workid = i.workid
         WHERE w.PersonID = @PersonID
-        GROUP BY w.workid, w.PersonID, w.TotalRequired, w.Currency, w.Typeofwork, w.Notes, 
-                 w.Finished, w.AdditionDate, w.StartDate, w.DebondDate, w.FPhotoDate, 
-                 w.IPhotoDate, w.EstimatedDuration, w.DrID, w.NotesDate, w.KeyWordID1, 
+        GROUP BY w.workid, w.PersonID, w.TotalRequired, w.Currency, w.Typeofwork, w.Notes,
+                 w.Status, w.AdditionDate, w.StartDate, w.DebondDate, w.FPhotoDate,
+                 w.IPhotoDate, w.EstimatedDuration, w.DrID, w.NotesDate, w.KeyWordID1,
                  w.KeyWordID2, w.KeywordID3, w.KeywordID4, w.KeywordID5,
-                 e.employeeName, wt.WorkType, k1.KeyWord, k2.KeyWord, k3.KeyWord, k4.KeyWord, k5.KeyWord
+                 e.employeeName, wt.WorkType, ws.StatusName, k1.KeyWord, k2.KeyWord, k3.KeyWord, k4.KeyWord, k5.KeyWord
         ORDER BY w.AdditionDate DESC`,
         [['PersonID', TYPES.Int, personId]],
         (columns) => {
@@ -67,10 +82,11 @@ export const getWorksByPatient = async (personId) => {
 
 export const getWorkDetails = async (workId) => {
     return executeQuery(
-        `SELECT 
+        `SELECT
             w.*,
             e.employeeName as DoctorName,
             wt.WorkType as TypeName,
+            ws.StatusName,
             k1.KeyWord as Keyword1,
             k2.KeyWord as Keyword2,
             k3.KeyWord as Keyword3,
@@ -81,6 +97,7 @@ export const getWorkDetails = async (workId) => {
         FROM tblwork w
         LEFT JOIN tblEmployees e ON w.DrID = e.ID
         LEFT JOIN tblWorkType wt ON w.Typeofwork = wt.ID
+        LEFT JOIN tblWorkStatus ws ON w.Status = ws.StatusID
         LEFT JOIN tblKeyWord k1 ON w.KeyWordID1 = k1.ID
         LEFT JOIN tblKeyWord k2 ON w.KeyWordID2 = k2.ID
         LEFT JOIN tblKeyWord k3 ON w.KeywordID3 = k3.ID
@@ -89,11 +106,11 @@ export const getWorkDetails = async (workId) => {
         LEFT JOIN tblpatients p ON w.PersonID = p.PersonID
         LEFT JOIN tblInvoice i ON w.workid = i.workid
         WHERE w.workid = @WorkID
-        GROUP BY w.workid, w.PersonID, w.TotalRequired, w.Currency, w.Typeofwork, w.Notes, 
-                 w.Finished, w.AdditionDate, w.StartDate, w.DebondDate, w.FPhotoDate, 
-                 w.IPhotoDate, w.EstimatedDuration, w.DrID, w.NotesDate, w.KeyWordID1, 
+        GROUP BY w.workid, w.PersonID, w.TotalRequired, w.Currency, w.Typeofwork, w.Notes,
+                 w.Status, w.AdditionDate, w.StartDate, w.DebondDate, w.FPhotoDate,
+                 w.IPhotoDate, w.EstimatedDuration, w.DrID, w.NotesDate, w.KeyWordID1,
                  w.KeyWordID2, w.KeywordID3, w.KeywordID4, w.KeywordID5,
-                 e.employeeName, wt.WorkType, k1.KeyWord, k2.KeyWord, k3.KeyWord, k4.KeyWord, k5.KeyWord,
+                 e.employeeName, wt.WorkType, ws.StatusName, k1.KeyWord, k2.KeyWord, k3.KeyWord, k4.KeyWord, k5.KeyWord,
                  p.PatientName`,
         [['WorkID', TYPES.Int, workId]],
         (columns) => {
@@ -192,29 +209,32 @@ export const deleteWorkDetail = async (detailId) => {
 };
 
 export const addWork = async (workData) => {
+    // Determine Status: default to Active, or use provided Status
+    const status = workData.Status || WORK_STATUS.ACTIVE;
+
     return executeQuery(
         `INSERT INTO tblwork (
-            PersonID, TotalRequired, Currency, Typeofwork, Notes, Finished,
+            PersonID, TotalRequired, Currency, Typeofwork, Notes, Status,
             StartDate, DebondDate, FPhotoDate, IPhotoDate, EstimatedDuration,
             DrID, NotesDate, KeyWordID1, KeyWordID2, KeywordID3, KeywordID4, KeywordID5
         ) VALUES (
-            @PersonID, @TotalRequired, @Currency, @Typeofwork, @Notes, @Finished,
+            @PersonID, @TotalRequired, @Currency, @Typeofwork, @Notes, @Status,
             @StartDate, @DebondDate, @FPhotoDate, @IPhotoDate, @EstimatedDuration,
             @DrID, @NotesDate, @KeyWordID1, @KeyWordID2, @KeywordID3, @KeywordID4, @KeywordID5
         );
         SELECT SCOPE_IDENTITY() as workid;`,
         [
             ['PersonID', TYPES.Int, workData.PersonID],
-            ['TotalRequired', TYPES.Int, workData.TotalRequired ?? null], // Use ?? to allow 0 as valid value
+            ['TotalRequired', TYPES.Int, workData.TotalRequired ?? null],
             ['Currency', TYPES.NVarChar, workData.Currency || null],
-            ['Typeofwork', TYPES.Int, workData.Typeofwork ?? null], // Use ?? to allow 0 as valid value if needed
+            ['Typeofwork', TYPES.Int, workData.Typeofwork ?? null],
             ['Notes', TYPES.NVarChar, workData.Notes || null],
-            ['Finished', TYPES.Bit, workData.Finished || 0],
+            ['Status', TYPES.TinyInt, status],
             ['StartDate', TYPES.Date, workData.StartDate || null],
             ['DebondDate', TYPES.Date, workData.DebondDate || null],
             ['FPhotoDate', TYPES.Date, workData.FPhotoDate || null],
             ['IPhotoDate', TYPES.Date, workData.IPhotoDate || null],
-            ['EstimatedDuration', TYPES.TinyInt, workData.EstimatedDuration ?? null], // Use ?? to allow 0 as valid value
+            ['EstimatedDuration', TYPES.TinyInt, workData.EstimatedDuration ?? null],
             ['DrID', TYPES.Int, workData.DrID],
             ['NotesDate', TYPES.Date, workData.NotesDate || null],
             ['KeyWordID1', TYPES.Int, workData.KeyWordID1 || null],
@@ -237,7 +257,7 @@ export const updateWork = async (workId, workData) => {
         Currency: { param: 'Currency', type: TYPES.NVarChar, value: workData.Currency || null },
         Typeofwork: { param: 'Typeofwork', type: TYPES.Int, value: workData.Typeofwork || null },
         Notes: { param: 'Notes', type: TYPES.NVarChar, value: workData.Notes || null },
-        Finished: { param: 'Finished', type: TYPES.Bit, value: workData.Finished || 0 },
+        Status: { param: 'Status', type: TYPES.TinyInt, value: workData.Status || WORK_STATUS.ACTIVE },
         StartDate: { param: 'StartDate', type: TYPES.Date, value: workData.StartDate || null },
         DebondDate: { param: 'DebondDate', type: TYPES.Date, value: workData.DebondDate || null },
         FPhotoDate: { param: 'FPhotoDate', type: TYPES.Date, value: workData.FPhotoDate || null },
@@ -284,8 +304,51 @@ export const updateWork = async (workId, workData) => {
 
 export const finishWork = async (workId) => {
     return executeQuery(
-        `UPDATE tblwork SET Finished = 1 WHERE workid = @WorkID`,
-        [['WorkID', TYPES.Int, workId]],
+        `UPDATE tblwork SET Status = @Status WHERE workid = @WorkID`,
+        [
+            ['WorkID', TYPES.Int, workId],
+            ['Status', TYPES.TinyInt, WORK_STATUS.FINISHED]
+        ],
+        null,
+        (results) => ({
+            success: true,
+            rowCount: results.length || 0
+        })
+    );
+};
+
+/**
+ * Mark a work as discontinued (patient abandoned treatment)
+ * @param {number} workId - Work ID to discontinue
+ * @returns {Promise<Object>} - Result with success status
+ */
+export const discontinueWork = async (workId) => {
+    return executeQuery(
+        `UPDATE tblwork SET Status = @Status WHERE workid = @WorkID`,
+        [
+            ['WorkID', TYPES.Int, workId],
+            ['Status', TYPES.TinyInt, WORK_STATUS.DISCONTINUED]
+        ],
+        null,
+        (results) => ({
+            success: true,
+            rowCount: results.length || 0
+        })
+    );
+};
+
+/**
+ * Reactivate a work (change from discontinued/finished back to active)
+ * @param {number} workId - Work ID to reactivate
+ * @returns {Promise<Object>} - Result with success status
+ */
+export const reactivateWork = async (workId) => {
+    return executeQuery(
+        `UPDATE tblwork SET Status = @Status WHERE workid = @WorkID`,
+        [
+            ['WorkID', TYPES.Int, workId],
+            ['Status', TYPES.TinyInt, WORK_STATUS.ACTIVE]
+        ],
         null,
         (results) => ({
             success: true,
@@ -322,12 +385,12 @@ export const addWorkWithInvoice = async (workData) => {
                 DECLARE @workId INT;
 
                 INSERT INTO tblwork (
-                    PersonID, TotalRequired, Currency, Typeofwork, Notes, Finished,
+                    PersonID, TotalRequired, Currency, Typeofwork, Notes, Status,
                     StartDate, DebondDate, FPhotoDate, IPhotoDate, EstimatedDuration,
                     DrID, NotesDate, KeyWordID1, KeyWordID2, KeywordID3, KeywordID4, KeywordID5
                 )
                 VALUES (
-                    @PersonID, @TotalRequired, @Currency, @Typeofwork, @Notes, 1,
+                    @PersonID, @TotalRequired, @Currency, @Typeofwork, @Notes, 2,
                     @StartDate, @DebondDate, @FPhotoDate, @IPhotoDate, @EstimatedDuration,
                     @DrID, @NotesDate, @KeyWordID1, @KeyWordID2, @KeywordID3, @KeywordID4, @KeywordID5
                 );
@@ -445,11 +508,13 @@ export const getActiveWork = async (personId) => {
         `SELECT TOP 1
             w.*,
             e.employeeName as DoctorName,
-            wt.WorkType as TypeName
+            wt.WorkType as TypeName,
+            ws.StatusName
         FROM tblwork w
         LEFT JOIN tblEmployees e ON w.DrID = e.ID
         LEFT JOIN tblWorkType wt ON w.Typeofwork = wt.ID
-        WHERE w.PersonID = @PersonID AND w.Finished = 0
+        LEFT JOIN tblWorkStatus ws ON w.Status = ws.StatusID
+        WHERE w.PersonID = @PersonID AND w.Status = 1
         ORDER BY w.AdditionDate DESC`,
         [['PersonID', TYPES.Int, personId]],
         (columns) => {
@@ -461,6 +526,65 @@ export const getActiveWork = async (personId) => {
         },
         (results) => results.length > 0 ? results[0] : null
     );
+};
+
+/**
+ * Get work by ID with full details
+ * @param {number} workId - Work ID
+ * @returns {Promise<Object|null>} Work object or null if not found
+ */
+export const getWorkById = async (workId) => {
+    return executeQuery(
+        `SELECT
+            w.*,
+            e.employeeName as DoctorName,
+            wt.WorkType as TypeName,
+            ws.StatusName
+        FROM tblwork w
+        LEFT JOIN tblEmployees e ON w.DrID = e.ID
+        LEFT JOIN tblWorkType wt ON w.Typeofwork = wt.ID
+        LEFT JOIN tblWorkStatus ws ON w.Status = ws.StatusID
+        WHERE w.workid = @WorkID`,
+        [['WorkID', TYPES.Int, workId]],
+        (columns) => {
+            const result = {};
+            columns.forEach(column => {
+                result[column.metadata.colName] = column.value;
+            });
+            return result;
+        },
+        (results) => results.length > 0 ? results[0] : null
+    );
+};
+
+/**
+ * Validate status transition for a work
+ * Prevents multiple active works per patient (enforces UNQ_tblWork_Active constraint)
+ * @param {number} workId - Work ID being updated
+ * @param {number} newStatus - New status value (1=Active, 2=Finished, 3=Discontinued)
+ * @param {number} personId - Patient ID (required for Active status validation)
+ * @returns {Promise<{valid: boolean, error?: string, existingWork?: Object}>}
+ */
+export const validateStatusChange = async (workId, newStatus, personId) => {
+    // If changing to Active (1), check for existing active work
+    if (newStatus === WORK_STATUS.ACTIVE && personId) {
+        const activeWork = await getActiveWork(personId);
+
+        // If there's an active work and it's NOT the one being updated
+        if (activeWork && activeWork.workid !== workId) {
+            return {
+                valid: false,
+                error: 'Patient already has an active work',
+                existingWork: {
+                    workid: activeWork.workid,
+                    type: activeWork.TypeName,
+                    doctor: activeWork.DoctorName
+                }
+            };
+        }
+    }
+
+    return { valid: true };
 };
 
 export const getWorkTypes = async () => {
