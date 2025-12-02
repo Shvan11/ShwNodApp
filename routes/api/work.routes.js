@@ -232,19 +232,21 @@ router.put('/updatework',
             }
         });
 
-        // ===== STATUS CHANGE VALIDATION =====
-        // If Status is being changed, validate the transition
-        if (workData.Status !== undefined) {
-            // Get current work to compare status
-            const currentWork = await getWorkById(parseInt(workId));
+        // Fetch current work once if needed for validation
+        const needsCurrentWork = workData.Status !== undefined ||
+            (req.session?.userRole !== 'admin' && ['TotalRequired', 'Currency'].some(field => workData.hasOwnProperty(field)));
 
+        let currentWork = null;
+        if (needsCurrentWork) {
+            currentWork = await getWorkById(parseInt(workId));
             if (!currentWork) {
                 return ErrorResponses.notFound(res, 'Work not found');
             }
+        }
 
-            // If status is actually changing (not just updating with same value)
+        // ===== STATUS CHANGE VALIDATION =====
+        if (workData.Status !== undefined && currentWork) {
             if (currentWork.Status !== workData.Status) {
-                // Validate status transition (checks for duplicate active works)
                 const validation = await validateStatusChange(
                     parseInt(workId),
                     workData.Status,
@@ -262,28 +264,36 @@ router.put('/updatework',
         }
         // ===== END STATUS VALIDATION =====
 
-        // ===== PERMISSION CHECK FOR FINANCIAL FIELDS =====
-        // Financial fields that require special permission (admin or same-day edit)
-        const financialFields = ['TotalRequired', 'Currency', 'Paid', 'Discount'];
-        const isUpdatingFinancialFields = financialFields.some(
-            field => workData.hasOwnProperty(field)
-        );
+        // ===== FINANCIAL FIELDS PERMISSION CHECK =====
+        const financialFields = ['TotalRequired', 'Currency'];
+        let isChangingFinancialFields = false;
 
-        // If non-admin AND updating financial fields, check work creation date
-        if (req.session?.userRole !== 'admin' && isUpdatingFinancialFields) {
+        if (req.session?.userRole !== 'admin' && currentWork && financialFields.some(field => workData.hasOwnProperty(field))) {
+            isChangingFinancialFields = financialFields.some(field => {
+                if (!workData.hasOwnProperty(field)) return false;
+
+                const newValue = workData[field];
+                const currentValue = currentWork[field];
+
+                // Compare numeric and string fields appropriately
+                if (field === 'TotalRequired') {
+                    return Number(newValue) !== Number(currentValue);
+                }
+                return String(newValue) !== String(currentValue);
+            });
+        }
+
+        if (isChangingFinancialFields) {
             const workCreationDate = await getWorkCreationDate(req);
-
-            // Check if work was created today (uses improved isToday from middleware)
             if (!isToday(workCreationDate)) {
-                // Work was NOT created today - block financial field updates
                 return res.status(403).json({
                     error: 'Forbidden',
-                    message: 'Cannot edit financial fields (Total Required, Currency, etc.) for work not created today. Contact admin.',
+                    message: 'Cannot edit financial fields (Total Required, Currency) for work not created today. Contact admin.',
                     restrictedFields: financialFields
                 });
             }
         }
-        // ===== END PERMISSION CHECK =====
+        // ===== END FINANCIAL FIELDS PERMISSION CHECK =====
 
         const result = await updateWork(parseInt(workId), workData);
         res.json({

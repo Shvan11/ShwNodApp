@@ -253,11 +253,11 @@ export const addWork = async (workData) => {
 export const updateWork = async (workId, workData) => {
     // Build dynamic UPDATE query - only update fields that are provided
     const fieldMappings = {
-        TotalRequired: { param: 'TotalRequired', type: TYPES.Int, value: workData.TotalRequired || null },
+        TotalRequired: { param: 'TotalRequired', type: TYPES.Int, value: workData.TotalRequired ?? null }, // Use ?? to preserve 0
         Currency: { param: 'Currency', type: TYPES.NVarChar, value: workData.Currency || null },
-        Typeofwork: { param: 'Typeofwork', type: TYPES.Int, value: workData.Typeofwork || null },
+        Typeofwork: { param: 'Typeofwork', type: TYPES.Int, value: workData.Typeofwork ?? null }, // Use ?? to preserve 0
         Notes: { param: 'Notes', type: TYPES.NVarChar, value: workData.Notes || null },
-        Status: { param: 'Status', type: TYPES.TinyInt, value: workData.Status || WORK_STATUS.ACTIVE },
+        Status: { param: 'Status', type: TYPES.TinyInt, value: workData.Status ?? WORK_STATUS.ACTIVE }, // Use ?? to preserve 0
         StartDate: { param: 'StartDate', type: TYPES.Date, value: workData.StartDate || null },
         DebondDate: { param: 'DebondDate', type: TYPES.Date, value: workData.DebondDate || null },
         FPhotoDate: { param: 'FPhotoDate', type: TYPES.Date, value: workData.FPhotoDate || null },

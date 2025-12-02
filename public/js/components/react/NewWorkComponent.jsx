@@ -22,7 +22,7 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
     // Form state
     const [formData, setFormData] = useState({
         PersonID: patientId,
-        TotalRequired: '',
+        TotalRequired: 0, // Default to 0 instead of empty string (matches DB default)
         Currency: 'USD',
         Typeofwork: '',
         Notes: '',
@@ -102,11 +102,11 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }) => {
             if (work) {
                 setFormData({
                     PersonID: work.PersonID,
-                    TotalRequired: work.TotalRequired || '',
+                    TotalRequired: work.TotalRequired ?? 0, // Use nullish coalescing to preserve 0
                     Currency: work.Currency || 'USD',
                     Typeofwork: work.Typeofwork || '',
                     Notes: work.Notes || '',
-                    Status: work.Status || 1, // Default to Active
+                    Status: work.Status ?? 1, // Use nullish coalescing to preserve 0 if somehow status is 0
                     StartDate: work.StartDate ? new Date(work.StartDate).toISOString().split('T')[0] : '',
                     DebondDate: work.DebondDate ? new Date(work.DebondDate).toISOString().split('T')[0] : '',
                     FPhotoDate: work.FPhotoDate ? new Date(work.FPhotoDate).toISOString().split('T')[0] : '',

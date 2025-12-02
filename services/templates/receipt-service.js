@@ -201,31 +201,28 @@ function formatDate(dateValue, pattern) {
     const monthsFull = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const daysFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-    const hours24 = date.getUTCHours();
+    // Use LOCAL time methods (not UTC) - Iraq stores times in local timezone (UTC+3)
+    const hours24 = date.getHours();
     const hours12 = hours24 % 12 || 12; // Convert to 12-hour format (0 becomes 12)
     const ampm = hours24 >= 12 ? 'PM' : 'AM';
 
     // Create replacements object with actual values
     const replacements = {
-        'dddd': daysFull[date.getUTCDay()],
-        'YYYY': String(date.getUTCFullYear()),
-        'YY': String(date.getUTCFullYear()).slice(-2),
-        'MMMM': monthsFull[date.getUTCMonth()],
-        'MMM': months[date.getUTCMonth()],
-        'MM': String(date.getUTCMonth() + 1).padStart(2, '0'),
-        'DD': String(date.getUTCDate()).padStart(2, '0'),
+        'dddd': daysFull[date.getDay()],
+        'YYYY': String(date.getFullYear()),
+        'YY': String(date.getFullYear()).slice(-2),
+        'MMMM': monthsFull[date.getMonth()],
+        'MMM': months[date.getMonth()],
+        'MM': String(date.getMonth() + 1).padStart(2, '0'),
+        'DD': String(date.getDate()).padStart(2, '0'),
         'HH': String(hours24).padStart(2, '0'),
         'hh': String(hours12).padStart(2, '0'),
         'h': String(hours12),
-        'mm': String(date.getUTCMinutes()).padStart(2, '0'),
-        'ss': String(date.getUTCSeconds()).padStart(2, '0'),
+        'mm': String(date.getMinutes()).padStart(2, '0'),
+        'ss': String(date.getSeconds()).padStart(2, '0'),
         'A': ampm,
         'a': ampm.toLowerCase()
     };
-
-    console.log('[DATE-FORMAT] Input pattern:', pattern);
-    console.log('[DATE-FORMAT] Date object:', date.toISOString());
-    console.log('[DATE-FORMAT] Day of week:', date.getUTCDay(), '=', daysFull[date.getUTCDay()]);
 
     // Replace tokens in order of length (longest first) to prevent partial matches
     // Use unique placeholders to prevent re-replacement
@@ -242,17 +239,13 @@ function formatDate(dateValue, pattern) {
         // Replace all occurrences of the token with the placeholder
         const regex = new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
         formatted = formatted.replace(regex, placeholder);
-
-        console.log(`[DATE-FORMAT] Replaced token "${token}" with placeholder ${i}`);
     }
 
     // Second pass: Replace placeholders with actual values
     for (const [placeholder, value] of Object.entries(placeholders)) {
         formatted = formatted.split(placeholder).join(value);
-        console.log(`[DATE-FORMAT] Replaced placeholder with "${value}"`);
     }
 
-    console.log('[DATE-FORMAT] Final result:', formatted);
     return formatted;
 }
 
