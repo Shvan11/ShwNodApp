@@ -65,9 +65,9 @@ const VisitsComponent = ({ workId, patientId }) => {
         }
     };
 
-    const formatDateTime = (dateString) => {
+    const formatDate = (dateString) => {
         if (!dateString) return 'Not set';
-        return new Date(dateString).toLocaleString();
+        return new Date(dateString).toLocaleDateString();
     };
 
     if (loading) return <div className="work-loading">Loading visits...</div>;
@@ -121,7 +121,7 @@ const VisitsComponent = ({ workId, patientId }) => {
                         <div className="visit-card-header">
                             <div>
                                 <h3 className="visit-card-title">
-                                    <i className="fas fa-calendar-check"></i> {formatDateTime(visit.VisitDate)}
+                                    <i className="fas fa-calendar-check"></i> {formatDate(visit.VisitDate)}
                                 </h3>
                                 <div className="visit-card-meta">
                                     {visit.OperatorName && (

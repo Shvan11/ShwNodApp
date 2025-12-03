@@ -7,6 +7,9 @@ import { useNavigate } from 'react-router-dom';
  *
  * Performance: Automatically optimized by React Compiler (React 19).
  * No manual memoization needed - the compiler handles it automatically.
+ *
+ * Note: IsOrthoVisit flag is computed in SQL stored procedure.
+ * Business logic lives in database (single source of truth), not frontend.
  */
 const AppointmentCard = ({
     appointment,
@@ -218,7 +221,7 @@ const AppointmentCard = ({
                     )}
                 </div>
 
-                {showStatus && appointment.PatientType === 'Active' && (
+                {showStatus && appointment.IsOrthoVisit && (
                     <div className="appointment-info-line-2">
                         <span
                             className={`visit-notes-icon ${appointment.HasVisit ? 'visit-notes-registered' : 'visit-notes-missing'}`}

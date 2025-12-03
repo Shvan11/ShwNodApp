@@ -426,6 +426,91 @@ export PORT=8080  # Add to .env or set in environment
 - `.env.development` - Development-specific overrides (PORT=3001, VITE_DEV_PORT=5173)
 - `config/config.js` - Loads environment-specific files based on NODE_ENV
 
+## Logging with Winston
+
+This project uses **Winston** for structured logging. **NEVER use `console.log()` or `console.error()` in production code.**
+
+**Logger Location**: `utils/logger.js`
+
+### Usage
+
+```javascript
+import { log } from '../utils/logger.js';
+
+// Info level (default)
+log.info('Operation completed', { userId: 123, action: 'login' });
+
+// Error level
+log.error('Database connection failed', {
+  server: config.database.server,
+  error: err.message,
+  code: err.code
+});
+
+// Warning level
+log.warn('Rate limit approaching', { current: 95, max: 100 });
+
+// Debug level (development only)
+log.debug('Cache hit', { key: 'patient:123', ttl: 300 });
+```
+
+### Log Levels (in order of priority)
+
+- **error** - Error messages and exceptions
+- **warn** - Warning messages
+- **info** - Informational messages (default)
+- **http** - HTTP request logs
+- **verbose** - Verbose informational messages
+- **debug** - Debug messages (development only)
+- **silly** - Very detailed debug messages
+
+### Environment Configuration
+
+Set in `.env`:
+
+```bash
+LOG_LEVEL=warn        # Production: warn or error | Development: debug
+NODE_ENV=production   # Disables console logging in production
+```
+
+### Best Practices
+
+**✅ DO:**
+- Use structured logging with metadata objects
+- Log errors with context (error message, code, stack trace)
+- Use appropriate log levels (error for errors, warn for warnings, debug for verbose)
+- Include relevant IDs (patientId, appointmentId, messageId)
+
+**❌ DON'T:**
+- Use `console.log()` or `console.error()` (replace with Winston)
+- Log sensitive data (passwords, tokens, full credit card numbers)
+- Log every successful operation (use debug level instead)
+- Use emojis in production logs
+
+**Example (Correct):**
+```javascript
+log.error('Failed to generate appointment PDF', {
+  date,
+  error: error.message,
+  stack: error.stack
+});
+```
+
+**Example (Incorrect):**
+```javascript
+console.log('🚀 PDF generated!'); // ❌ Wrong: console.log + emoji
+```
+
+### Log Files
+
+Production logs are written to:
+- `logs/error.log` - Errors only
+- `logs/combined.log` - All logs
+
+See `docs/PRODUCTION_LOGGING_GUIDE.md` for comprehensive logging guidelines.
+
+---
+
 ## Development Notes
 
 - Uses ES modules (`"type": "module"` in package.json)
