@@ -110,7 +110,17 @@ async function initializeApplication() {
 
     // Use path resolver for cross-platform compatibility
     const pathResolver = createPathResolver(config.fileSystem.machinePath);
-    app.use('/DolImgs', express.static(pathResolver('working')));
+
+    // Custom MIME types for Dolphin Imaging files (extensions: .i10, .i12, .i13, .i20, .i21, .i22, .i23, .i24)
+    // These are JPEG images with non-standard extensions
+    app.use('/DolImgs', express.static(pathResolver('working'), {
+        setHeaders: (res, filePath) => {
+            // Check if file has Dolphin Imaging extension (.iXX)
+            if (/\.i\d+$/i.test(filePath)) {
+                res.setHeader('Content-Type', 'image/jpeg');
+            }
+        }
+    }));
     app.use('/clinic-assets', express.static(pathResolver('clinic1'))); // Changed from /assets to avoid conflict with Vite built assets
     app.use('/photoswipe', express.static('./public/photoswipe/'));
     app.use('/data', express.static('./data')); // Serve data directory for template files

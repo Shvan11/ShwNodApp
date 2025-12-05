@@ -78,9 +78,8 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                 cachedShareBlobRef.current.url = imageUrl;
                 cachedShareBlobRef.current.blob = blob;
             }
-        } catch (err) {
-            // Silent fail - share will fallback to URL
-            console.warn('Pre-fetch for share failed:', err.message);
+        } catch {
+            // Silent fail - user will see "please wait" message if they try to share
         }
     };
 
@@ -90,67 +89,27 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
     };
 
     // Native share handler - uses pre-cached blob for instant sharing
-    // IMPORTANT: This must be synchronous until navigator.share() to preserve user gesture
-    const handleNativeShare = (pswp, buttonEl) => {
+    // IMPORTANT: Must be synchronous until navigator.share() to preserve user gesture
+    const handleNativeShare = (pswp) => {
         if (isSharingRef.current) return;
         isSharingRef.current = true;
 
-        // Debug: Check user activation state
-        console.log('Share: userActivation.isActive =', navigator.userActivation?.isActive);
-
-        const slide = pswp.currSlide;
-        const imageUrl = slide.data.src;
-        const shareFileName = getShareFileName(imageUrl);
-        const photoName = shareFileName.replace('.jpg', '');
-
-        // Check if we have a cached blob for this exact URL
+        const imageUrl = pswp.currSlide.data.src;
         const cached = cachedShareBlobRef.current;
 
+        // Check if cached blob matches current slide
         if (cached.url !== imageUrl || !cached.blob) {
-            // No cached blob available - photo not ready for sharing yet
             toast.warning('Please wait a moment and try again');
             isSharingRef.current = false;
             return;
         }
 
-        // Debug: Log blob info
-        console.log('Share: blob type =', cached.blob.type, 'size =', cached.blob.size);
-        console.log('Share: fileName =', shareFileName);
+        const shareFileName = getShareFileName(imageUrl);
+        const file = new File([cached.blob], shareFileName, { type: 'image/jpeg' });
 
-        // Create file synchronously with explicit MIME type and lastModified
-        // Use image/jpeg if blob type is empty or unusual
-        const mimeType = cached.blob.type && cached.blob.type.startsWith('image/')
-            ? cached.blob.type
-            : 'image/jpeg';
-
-        const file = new File([cached.blob], shareFileName, {
-            type: mimeType,
-            lastModified: Date.now()
-        });
-
-        console.log('Share: file created - name:', file.name, 'type:', file.type, 'size:', file.size);
-
-        const shareData = {
-            files: [file],
-            title: `Patient Photo - ${photoName}`,
-            text: `Patient ${patientId} - ${photoName}`
-        };
-
-        const canShare = navigator.canShare(shareData);
-        console.log('Share: canShare =', canShare);
-
-        if (!canShare) {
-            toast.error('File sharing not supported');
-            isSharingRef.current = false;
-            return;
-        }
-
-        // Call share synchronously - handle promise with .then()/.catch()
-        // This preserves the user gesture context
-        navigator.share(shareData)
+        navigator.share({ files: [file] })
             .catch(err => {
                 if (err.name !== 'AbortError') {
-                    console.error('Share failed:', err.name, err.message);
                     toast.error('Failed to share photo');
                 }
             })
@@ -324,32 +283,11 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                                 el.setAttribute('target', '_blank');
                                 el.setAttribute('rel', 'noopener');
                                 el.setAttribute('title', 'Download Image');
-                                
+
                                 pswp.on('change', () => {
-                                    const downloadLink = pswp.currSlide.data.src;
-                                    const fileName = downloadLink.substring(downloadLink.lastIndexOf('/') + 1);
-                                    
-                                    // Extract the extension code (like i10, i12, etc.)
-                                    const extensionMatch = fileName.match(/\.([^.]+)$/);
-                                    const extension = extensionMatch ? extensionMatch[1] : '';
-                                    
-                                    // Map extension codes to descriptive names
-                                    const fileNameMap = {
-                                        'i10': 'Profile.jpg',
-                                        'i12': 'Rest.jpg',
-                                        'i13': 'Smile.jpg',
-                                        'i23': 'Upper.jpg',
-                                        'i24': 'Lower.jpg',
-                                        'i20': 'Right.jpg',
-                                        'i22': 'Center.jpg',
-                                        'i21': 'Left.jpg'
-                                    };
-                                    
-                                    // Get descriptive name or use original with patient prefix
-                                    const downloadFileName = fileNameMap[extension] || `patient_${patientId}_${fileName}`;
-                                    
-                                    el.setAttribute('download', downloadFileName);
-                                    el.href = downloadLink;
+                                    const imageUrl = pswp.currSlide.data.src;
+                                    el.setAttribute('download', getShareFileName(imageUrl));
+                                    el.href = imageUrl;
                                 });
                             }
                         });
@@ -372,9 +310,7 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                                     el.setAttribute('title', 'Share');
                                     el.setAttribute('aria-label', 'Share photo');
 
-                                    el.addEventListener('click', () => {
-                                        handleNativeShare(pswp, el);
-                                    });
+                                    el.addEventListener('click', () => handleNativeShare(pswp));
                                 }
                             });
                         }
