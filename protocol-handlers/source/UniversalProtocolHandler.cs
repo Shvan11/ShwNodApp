@@ -31,48 +31,21 @@ namespace UniversalProtocolHandler
 
                 // Parse the URL
                 // Format: launch://alias?args=arg1|arg2|arg3
-                // Or:     launch://C:/full/path/app.exe?args=arg1|arg2|arg3
 
                 Uri uri = new Uri(url);
-                string appIdentifier = uri.Host; // alias or drive letter (C)
-                string pathPart = uri.AbsolutePath; // empty for alias, or /path/to/app.exe for full path
+                string appIdentifier = uri.Host; // alias (e.g., msaccess)
                 string query = uri.Query; // ?args=...
 
-                // Determine if this is an alias or full path
-                string executablePath = null;
+                // Get executable path from [Applications] section (aliases only, security hardened)
+                string executablePath = GetApplicationPath(appIdentifier);
 
-                if (string.IsNullOrEmpty(pathPart) || pathPart == "/")
+                if (string.IsNullOrEmpty(executablePath))
                 {
-                    // It's an alias (e.g., launch://msaccess)
-                    executablePath = GetApplicationPath(appIdentifier);
-
-                    if (string.IsNullOrEmpty(executablePath))
-                    {
-                        ShowError("Application alias not found: " + appIdentifier + "\n\n" +
-                                "Please add it to C:\\Windows\\ProtocolHandlers.ini in the [Applications] section.\n\n" +
-                                "Example:\n" +
-                                appIdentifier + "=C:\\Path\\To\\Application.exe");
-                        return;
-                    }
-                }
-                else
-                {
-                    // It's a full path (e.g., launch://C:/Program%20Files/App/app.exe)
-                    // Reconstruct the full path
-                    executablePath = appIdentifier + ":" + pathPart;
-                    executablePath = HttpUtility.UrlDecode(executablePath);
-
-                    // Check whitelist if enabled
-                    if (IsWhitelistEnabled())
-                    {
-                        ShowError("Security Error:\n\n" +
-                                "Full executable paths are disabled.\n" +
-                                "UseWhitelist=true in configuration.\n\n" +
-                                "Please use application aliases instead,\n" +
-                                "or set UseWhitelist=false in:\n" +
-                                "C:\\Windows\\ProtocolHandlers.ini");
-                        return;
-                    }
+                    ShowError("Application alias not found: " + appIdentifier + "\n\n" +
+                            "Please add it to C:\\Windows\\ProtocolHandlers.ini in the [Applications] section.\n\n" +
+                            "Example:\n" +
+                            appIdentifier + "=C:\\Path\\To\\Application.exe");
+                    return;
                 }
 
                 // Validate that the executable exists
@@ -192,9 +165,7 @@ namespace UniversalProtocolHandler
             {
                 ShowError("Invalid URL format:\n\n" + ex.Message + "\n\n" +
                         "Expected format:\n" +
-                        "launch://alias?args=arg1|arg2\n" +
-                        "or\n" +
-                        "launch://C:/path/to/app.exe?args=arg1|arg2");
+                        "launch://alias?args=arg1|arg2");
             }
             catch (Exception ex)
             {
@@ -217,23 +188,6 @@ namespace UniversalProtocolHandler
 
             string path = result.ToString().Trim();
             return string.IsNullOrEmpty(path) ? null : path;
-        }
-
-        /// <summary>
-        /// Check if whitelist mode is enabled in INI file
-        /// </summary>
-        static bool IsWhitelistEnabled()
-        {
-            if (!File.Exists(CONFIG_FILE))
-            {
-                return false; // Default: allow full paths
-            }
-
-            StringBuilder result = new StringBuilder(50);
-            GetPrivateProfileString("Security", "UseWhitelist", "false", result, result.Capacity, CONFIG_FILE);
-
-            string value = result.ToString().Trim().ToLower();
-            return value == "true" || value == "1" || value == "yes";
         }
 
         /// <summary>

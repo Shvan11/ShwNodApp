@@ -1,518 +1,136 @@
-# Protocol Handlers for Shwan Orthodontics
+# Protocol Handlers
 
-**One unified solution for both Explorer and CS Imaging integrations**
-
----
-
-## 📁 Folder Structure
-
-```
-protocol-handlers/
-├── source/
-│   ├── ExplorerProtocolHandler.cs      # Explorer protocol source
-│   ├── CSImagingProtocolHandler.cs     # CS Imaging protocol source
-│   └── DolphinImagingProtocolHandler.cs # Dolphin Imaging protocol source
-├── registry/
-│   ├── register-protocols.reg          # Registers both protocols
-│   └── unregister-protocols.reg        # Removes both protocols
-├── docs/
-│   ├── EXPLORER_PROTOCOL.md            # Explorer protocol documentation
-│   └── CS_IMAGING_PROTOCOL.md          # CS Imaging protocol documentation
-├── compile-handlers.ps1                 # Compiles both handlers
-├── INSTALL.bat                          # Unified installer
-├── UNINSTALL.bat                        # Unified uninstaller
-└── README.md                            # This file
-```
+Custom Windows protocol handlers for Shwan Orthodontics Management System.
 
 ---
 
-## 🚀 Quick Start
+## Overview
 
-### Installation (One Command):
+| Protocol | Purpose | Usage |
+|----------|---------|-------|
+| `explorer:` | Open/create folders | `explorer:\\\\Server\\Path` |
+| `csimaging:` | Launch CS Imaging with patient | `csimaging:12345?name=John_Doe` |
+| `dolphin:` | Launch Dolphin Imaging with patient | `dolphin:12345?name=John_Doe` |
+| `launch:` | Universal app launcher | `launch://msaccess?args={AccessDatabase}\|/cmd\|Form` |
+
+---
+
+## Installation
 
 ```cmd
 Right-click INSTALL.bat → Run as Administrator
 ```
 
-**That's it!** The installer will:
-1. ✅ Compile both protocol handlers
-2. ✅ Create configuration file (ProtocolHandlers.ini)
-3. ✅ Copy executables to C:\Windows\
-4. ✅ Register protocols in Windows registry
-5. ✅ Configure browser to auto-launch (no prompts)
-6. ✅ Verify installation
+**Installs:** Handlers to `C:\Windows\`, registry entries, browser policies. **Time:** ~30s. **Restart:** Browser only.
 
-### Uninstallation:
-
+**Uninstall:**
 ```cmd
 Right-click UNINSTALL.bat → Run as Administrator
 ```
 
 ---
 
-## 🎯 What Gets Installed
+## Configuration
 
-### 1. Explorer Protocol (`explorer:`)
+**File:** `C:\Windows\ProtocolHandlers.ini`
 
-**Purpose**: Open/create folders on network shares
-
-**Usage**: Click "Open Folder" button on aligner sets
-
-**Features**:
-- Opens existing folders instantly
-- Creates folders if they don't exist (with confirmation)
-- Checks network share accessibility first
-- Works with UNC paths: `\\WORK_PC\Aligner_Sets\...`
-
-**Example**:
-```javascript
-window.location.href = 'explorer:\\\\WORK_PC\\Aligner_Sets\\5\\John_Doe\\1';
-```
-
----
-
-### 2. CS Imaging Protocol (`csimaging:`)
-
-**Purpose**: Launch CS Imaging Trophy software with patient X-rays
-
-**Usage**: Click "CS Imaging" button in patient sidebar
-
-**Features**:
-- Reads TW.EXE path from registry automatically
-- Reads configuration from `C:\Windows\ProtocolHandlers.ini`
-- Constructs OPG folder path: `{PatientsFolder}\{PatientID}\OPG`
-- Creates OPG folder if needed (with confirmation)
-- Launches CS Imaging with patient data
-
-**Example**:
-```javascript
-window.location.href = 'csimaging:12345?name=John_Doe';
-```
-
----
-
-### 3. Dolphin Imaging Protocol (`dolphin:`)
-
-**Purpose**: Launch Dolphin Imaging software with patient context pre-loaded
-
-**Usage**: Click "Dolphin Imaging" button in More Actions flyout (patient sidebar)
-
-**Features**:
-- Reads `DolphinPath` from `C:\Windows\ProtocolHandlers.ini`
-- Validates `DolCtrl.exe` exists
-- Modifies `Dolphin.ini`: Sets `[Defaults]CaptureFromFilePath` to patient folder
-- Launches `DolCtrl.exe` with PatientID as argument
-- Dolphin automatically opens patient folder for imaging
-
-**Example**:
-```javascript
-window.location.href = 'dolphin:12345?name=John_Doe';
-```
-
-**How it works**:
-1. Protocol handler reads `DolphinPath` from config (e.g., `C:\Dolphin\`)
-2. Constructs patient folder: `{PatientsFolder}\{PatientID}\`
-3. Writes to `{DolphinPath}\Dolphin.ini`:
-   - Section: `[Defaults]`
-   - Key: `CaptureFromFilePath`
-   - Value: `\\Clinic\clinic1\12345\`
-4. Launches `{DolphinPath}\DolCtrl.exe {PatientID}`
-5. Dolphin loads with patient folder pre-configured
-
-**Configuration**:
-- `DolphinPath` in ProtocolHandlers.ini (default: `C:\Dolphin\`)
-- `PatientsFolder` in ProtocolHandlers.ini (shared with CS Imaging)
-
----
-
-## 🔧 How It Works
-
-### Architecture:
-
-```
-[Web Application]
-        │
-        │ User clicks button
-        ▼
-[JavaScript Handler]
-        │
-        │ Constructs protocol URL
-        │ (explorer: or csimaging:)
-        ▼
-[Browser]
-        │
-        │ Checks AutoLaunchProtocolsFromOrigins policy
-        │ (no prompt due to policy)
-        ▼
-[Windows Registry]
-        │
-        │ Routes to appropriate handler
-        ▼
-[Protocol Handler .exe]
-        │
-        ├─► ExplorerProtocolHandler.exe → Opens/creates folders
-        ├─► CSImagingProtocolHandler.exe → Launches CS Imaging
-        └─► DolphinImagingProtocolHandler.exe → Launches Dolphin Imaging
-```
-
-### Browser Configuration:
-
-The installer sets this registry policy:
-
-```json
-AutoLaunchProtocolsFromOrigins = [
-  {
-    "protocol": "explorer",
-    "allowed_origins": [
-      "http://clinic:3000",
-      "http://192.168.100.2:3000",
-      "http://localhost:3000",
-      "http://192.168.100.2:5173",
-      "http://localhost:5173"
-    ]
-  },
-  {
-    "protocol": "csimaging",
-    "allowed_origins": [
-      "http://clinic:3000",
-      "http://192.168.100.2:3000",
-      "http://localhost:3000",
-      "http://192.168.100.2:5173",
-      "http://localhost:5173"
-    ]
-  },
-  {
-    "protocol": "launch",
-    "allowed_origins": [
-      "http://clinic:3000",
-      "http://192.168.100.2:3000",
-      "http://localhost:3000",
-      "http://192.168.100.2:5173",
-      "http://localhost:5173"
-    ]
-  }
-]
-```
-
-**Supported Origins:**
-- `http://clinic:3000` - Production server (hostname)
-- `http://192.168.100.2:3000` - Production server (IP)
-- `http://localhost:3000` - Local production server
-- `http://192.168.100.2:5173` - Vite dev server (IP)
-- `http://localhost:5173` - Vite dev server (local)
-
-**Result**: No browser prompts when launching protocols from any of these origins!
-
----
-
-## ⚙️ Configuration
-
-### Configuration File
-
-**Location**: `C:\Windows\ProtocolHandlers.ini`
-
-**Format**:
 ```ini
 [Paths]
 PatientsFolder=\\Clinic\clinic1
+AccessDatabase=C:\S_O\labels.accdb
+DolphinPath=C:\Dolphin\
+
+[Applications]
+msaccess=C:\Program Files\Microsoft Office\root\Office16\MSACCESS.EXE
 ```
 
-This is the **single source of truth** for all configuration.
-
-### How to Change Configuration:
-
-1. Open Notepad as Administrator
-2. Open `C:\Windows\ProtocolHandlers.ini`
-3. Edit the `PatientsFolder` path
-4. Save the file
-5. **Done!** Changes take effect immediately
-
-**See**: [CONFIGURATION.md](CONFIGURATION.md) for detailed configuration guide
-
-### CS Imaging Requirements:
-
-1. CS Imaging Trophy software must be installed
-2. Registry key must exist:
-   ```
-   HKEY_LOCAL_MACHINE\Software\Classes\Trophy\InstallDir
-   ```
+**Edit:** `notepad C:\Windows\ProtocolHandlers.ini` (as Admin). Changes apply immediately.
 
 ---
 
-## 🔄 Re-running the Installer
+## Allowed Origins
 
-**The installer is safe to run multiple times!**
+**7 origins** configured for no browser prompts:
 
-It intelligently:
-- ✅ Preserves existing configuration (doesn't overwrite ProtocolHandlers.ini)
-- ✅ Checks if files are identical (skips copy if same)
-- ✅ Updates files only if different
-- ✅ Never creates duplicate registry entries
-- ✅ Always verifies installation
+| Origin | Environment |
+|--------|-------------|
+| `http://clinic:3000` | Production |
+| `http://192.168.100.2:3000` | Production |
+| `https://local.shwan-orthodontics.com` | Production (HTTPS) |
+| `https://remote.shwan-orthodontics.com` | Production (HTTPS) |
+| `http://localhost:3000` | Testing |
+| `http://192.168.100.2:5173` | Development |
+| `http://localhost:5173` | Development |
 
-**Use cases**:
-- After updating handler source code
-- After reinstalling CS Imaging (path may change)
-- To verify installation integrity
-- After Windows updates
+**Registry:** `HKLM\SOFTWARE\Policies\{Chrome,Edge}\AutoLaunchProtocolsFromOrigins`
 
-**Note**: Configuration file (`ProtocolHandlers.ini`) is preserved during reinstall!
-
----
-
-## 🧪 Testing
-
-### Test Explorer Protocol:
-
-1. Go to aligner sets page
-2. Click "Open Folder" on any set
-3. Should open/create folder with NO browser prompt
-
-### Test CS Imaging Protocol:
-
-1. Go to patient details page
-2. Click "CS Imaging" in sidebar
-3. Should launch CS Imaging with patient X-rays (NO prompt)
-
-### Browser Policy Verification:
-
-**Chrome**: Navigate to `chrome://policy`
-- Look for: `AutoLaunchProtocolsFromOrigins`
-- Should show both protocols
-
-**Edge**: Navigate to `edge://policy`
-- Look for: `AutoLaunchProtocolsFromOrigins`
-- Should show both protocols
+**Add origin:** Edit `registry/register-protocols.reg`, add to all 4 protocol arrays, merge, restart browser.
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
-### "Browser still shows prompt"
+| Issue | Fix |
+|-------|-----|
+| Browser shows prompt | Close browser (Task Manager), re-run `INSTALL.bat`, restart browser. Force: `gpupdate /force` |
+| CS Imaging not found | Install CS Imaging. Verify: `reg query "HKLM\Software\Classes\Trophy" /v InstallDir` |
+| Dolphin not found | Edit config: `DolphinPath=C:\Correct\Path\`. Verify `DolCtrl.exe` exists |
+| Network share error | Test: `explorer \\Clinic\clinic1`. Update `PatientsFolder` in config |
+| Handler not found | Re-run `INSTALL.bat`. Check antivirus. Verify: `dir C:\Windows\*ProtocolHandler.exe` |
+| App not found (launch) | Add alias to `[Applications]` section in config (whitelist-only mode, secure) |
+| Policy not in browser | Verify registry, re-run `INSTALL.bat`, `gpupdate /force`, restart browser |
 
-**Cause**: Registry policy not applied or browser not restarted
-
-**Fix**:
-1. Close browser COMPLETELY (check Task Manager)
-2. Re-run `INSTALL.bat` as Administrator
-3. Restart browser
-4. Check browser policy (chrome://policy or edge://policy)
-
----
-
-### "CS Imaging not found"
-
-**Cause**: CS Imaging not installed or registry incorrect
-
-**Fix**:
-1. Install CS Imaging Trophy software
-2. Verify registry:
-   ```cmd
-   reg query "HKLM\Software\Classes\Trophy" /v InstallDir
-   ```
-3. If wrong, update registry or reinstall CS Imaging
+**Verify policies:** `chrome://policy` or `edge://policy` → Search `AutoLaunchProtocolsFromOrigins`
 
 ---
 
-### "Network share not accessible"
+## Technical
 
-**Cause**: Network path wrong or not accessible
+**Files:** `C:\Windows\{Explorer,CSImaging,Dolphin,Universal}ProtocolHandler.exe` + `ProtocolHandlers.ini`
 
-**Fix**:
-1. Test path manually:
-   ```cmd
-   explorer \\WORK_PC\clinic1
-   ```
-2. Check network connection
-3. Verify share permissions
-4. Set `PATIENTS_FOLDER` environment variable
+**Registry:** `HKCR\{explorer,csimaging,dolphin,launch}` → handlers
 
----
+**Requirements:** Windows 10/11, .NET 4.0+, Chrome/Edge
 
-### "Handler executable not found"
+**Source:** `source/*.cs` (C#, no dependencies)
 
-**Cause**: Files not copied to C:\Windows\
+**Compile:** `compile-handlers.ps1` → `INSTALL.bat`
 
-**Fix**:
-1. Re-run `INSTALL.bat` as Administrator
-2. Check antivirus (may block copy to C:\Windows\)
-3. Verify files exist:
-   ```cmd
-   dir C:\Windows\*ProtocolHandler.exe
-   ```
-
----
-
-## 📋 Manual Installation (Advanced)
-
-If automated installer fails:
-
-### 1. Compile Handlers:
-```powershell
-.\compile-handlers.ps1
-```
-
-### 2. Copy to Windows:
-```cmd
-copy ExplorerProtocolHandler.exe C:\Windows\
-copy CSImagingProtocolHandler.exe C:\Windows\
-```
-
-### 3. Register Protocols:
-```cmd
-reg import registry\register-protocols.reg
-```
-
-### 4. Restart Browser
-
----
-
-## 🗑️ Complete Removal
-
-The uninstaller removes:
-- ✅ Both .exe files from C:\Windows\
-- ✅ All registry protocol entries
-- ✅ Browser auto-launch policies
-- ✅ CS Imaging cache files
-
-**Verification**:
+**Verification:**
 ```cmd
 dir C:\Windows\*ProtocolHandler.exe
 reg query HKCR\explorer
-reg query HKCR\csimaging
+reg query "HKLM\SOFTWARE\Policies\Google\Chrome" /v AutoLaunchProtocolsFromOrigins
 ```
 
-All should return "not found"
+**Upgrade:** Re-run `INSTALL.bat` (preserves config)
 
 ---
 
-## 🔐 Security
+## Protocol Details
 
-### What Gets Registered:
+### Universal Launcher (`launch:`)
 
-**Windows Registry**:
-- `HKEY_CLASSES_ROOT\explorer` - Protocol definition
-- `HKEY_CLASSES_ROOT\csimaging` - Protocol definition
-- `HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome` - Browser policy
-- `HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge` - Browser policy
+**Features:** Application aliases only (whitelist-only, secure), variable substitution (`{AccessDatabase}`, `{PatientsFolder}`), multiple args via `|`, `/cmd` switch handling.
 
-### Files Installed:
+**Example:**
+```javascript
+// Alias with variables
+launch://msaccess?args={AccessDatabase}|/cmd|frmLabels|ID=123
+```
 
-- `C:\Windows\ExplorerProtocolHandler.exe` (Digitally unsigned)
-- `C:\Windows\CSImagingProtocolHandler.exe` (Digitally unsigned)
+**Security:** Only applications defined in `[Applications]` section can be launched. Full paths are not supported (hardened security).
 
-### Security Notes:
+### Dolphin Imaging (`dolphin:`)
 
-✅ **No shell injection** - Uses ProcessStartInfo with argument array
-✅ **Path validation** - Checks paths before executing
-✅ **User confirmation** - Asks before creating folders
-✅ **Clear error messages** - Users know what's happening
-✅ **Origin-restricted** - Only works from approved origins (see Browser Configuration section)
-✅ **Development + Production** - Supports both dev (5173) and prod (3000) ports
-✅ **Flexible access** - Works with hostname, IP, and localhost
+**Process:** Reads `DolphinPath` from config → Writes `{DolphinPath}\Dolphin.ini` with `CaptureFromFilePath={PatientsFolder}\{PatientID}\` → Launches `DolCtrl.exe {PatientID}`
 
----
+### CS Imaging (`csimaging:`)
 
-## 📊 Technical Specifications
+**Process:** Reads CS Imaging path from registry → Constructs OPG path `{PatientsFolder}\{PatientID}\OPG` → Creates folder if needed → Launches CS Imaging
 
-### Protocols:
-
-| Protocol | Handler | Purpose | Registry Read? | Network Access? |
-|----------|---------|---------|----------------|-----------------|
-| `explorer:` | ExplorerProtocolHandler.exe | Open/create folders | No | Yes |
-| `csimaging:` | CSImagingProtocolHandler.exe | Launch CS Imaging | Yes (1-5ms) | Yes |
-
-### Performance:
-
-- **Registry read**: ~1-5ms (fast enough, no caching needed)
-- **Folder creation**: Depends on network speed
-- **Total launch time**: ~50-100ms (dominated by application startup)
-
-### Compatibility:
-
-- ✅ Windows 10/11
-- ✅ Chrome (with policy)
-- ✅ Edge (with policy)
-- ✅ .NET Framework 4.0+
-- ✅ Network shares (UNC paths)
-- ✅ Local drives
+**Requires:** CS Imaging Trophy installed with registry key `HKLM\Software\Classes\Trophy\InstallDir`
 
 ---
 
-## 🆘 Support
-
-### Common Issues:
-
-1. **Permission denied** → Run as Administrator
-2. **Browser prompts** → Check chrome://policy
-3. **Handler not found** → Re-run installer
-4. **Network path wrong** → Set PATIENTS_FOLDER env var
-
-### Debug Steps:
-
-1. Check files exist: `dir C:\Windows\*ProtocolHandler.exe`
-2. Check registry: `reg query HKCR\explorer`
-3. Check browser policy: `chrome://policy`
-4. Test manually: Open Command Prompt, run handler directly
-
-### Logs:
-
-Handlers show error dialogs when issues occur. No log files are created.
-
----
-
-## 📝 Development
-
-### Modifying Handlers:
-
-1. Edit source files in `source/` folder
-2. Run `compile-handlers.ps1`
-3. Run `INSTALL.bat` to update
-4. Test changes
-
-### Source Code:
-
-- **ExplorerProtocolHandler.cs**: ~120 lines
-- **CSImagingProtocolHandler.cs**: ~250 lines
-- Both use standard Windows APIs (no external dependencies)
-
----
-
-## ✅ Installation Checklist
-
-After running `INSTALL.bat`, verify:
-
-- [ ] `C:\Windows\ExplorerProtocolHandler.exe` exists
-- [ ] `C:\Windows\CSImagingProtocolHandler.exe` exists
-- [ ] Registry key `HKCR\explorer` exists
-- [ ] Registry key `HKCR\csimaging` exists
-- [ ] Chrome policy shows `AutoLaunchProtocolsFromOrigins`
-- [ ] Edge policy shows `AutoLaunchProtocolsFromOrigins`
-- [ ] "Open Folder" button works (no prompt)
-- [ ] "CS Imaging" button works (no prompt)
-
----
-
-## 📚 Additional Documentation
-
-See `docs/` folder for detailed protocol-specific documentation:
-
-- `EXPLORER_PROTOCOL.md` - Explorer protocol implementation details
-- `CS_IMAGING_PROTOCOL.md` - CS Imaging integration guide
-
----
-
-## 🎉 Summary
-
-This unified solution provides:
-
-✅ **Two protocols** in one installation
-✅ **No browser prompts** thanks to AutoLaunchProtocolsFromOrigins
-✅ **Safe to re-run** - intelligent update mechanism
-✅ **Clean uninstall** - removes everything
-✅ **Production-ready** - error handling, user feedback
-✅ **Well-documented** - comprehensive guides
-
-**Install once, works forever!**
-
-Run `INSTALL.bat` and you're done. 🚀
+**Last Updated:** 2025-12-05 (Added HTTPS domains)
