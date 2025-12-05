@@ -90,49 +90,55 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
     };
 
     // Native share handler - uses pre-cached blob for instant sharing
-    const handleNativeShare = async (pswp, buttonEl) => {
+    // IMPORTANT: This must be synchronous until navigator.share() to preserve user gesture
+    const handleNativeShare = (pswp, buttonEl) => {
         if (isSharingRef.current) return;
         isSharingRef.current = true;
 
-        try {
-            const slide = pswp.currSlide;
-            const imageUrl = slide.data.src;
-            const shareFileName = getShareFileName(imageUrl);
-            const photoName = shareFileName.replace('.jpg', '');
+        const slide = pswp.currSlide;
+        const imageUrl = slide.data.src;
+        const shareFileName = getShareFileName(imageUrl);
+        const photoName = shareFileName.replace('.jpg', '');
 
-            // Check if we have a cached blob for this exact URL
-            const cached = cachedShareBlobRef.current;
+        // Check if we have a cached blob for this exact URL
+        const cached = cachedShareBlobRef.current;
 
-            if (cached.url !== imageUrl || !cached.blob) {
-                // No cached blob available - photo not ready for sharing yet
-                toast.warning('Please wait a moment and try again');
-                return;
-            }
-
-            // Use cached blob - instant share, no async before share()
-            const file = new File([cached.blob], shareFileName, {
-                type: cached.blob.type || 'image/jpeg'
-            });
-
-            const shareData = {
-                files: [file],
-                title: `Patient Photo - ${photoName}`,
-                text: `Patient ${patientId} - ${photoName}`
-            };
-
-            if (navigator.canShare(shareData)) {
-                await navigator.share(shareData);
-            } else {
-                throw new Error('File sharing not supported');
-            }
-        } catch (err) {
-            if (err.name !== 'AbortError') {
-                console.error('Share failed:', err.name, err.message);
-                toast.error('Failed to share photo');
-            }
-        } finally {
+        if (cached.url !== imageUrl || !cached.blob) {
+            // No cached blob available - photo not ready for sharing yet
+            toast.warning('Please wait a moment and try again');
             isSharingRef.current = false;
+            return;
         }
+
+        // Create file synchronously
+        const file = new File([cached.blob], shareFileName, {
+            type: cached.blob.type || 'image/jpeg'
+        });
+
+        const shareData = {
+            files: [file],
+            title: `Patient Photo - ${photoName}`,
+            text: `Patient ${patientId} - ${photoName}`
+        };
+
+        if (!navigator.canShare(shareData)) {
+            toast.error('File sharing not supported');
+            isSharingRef.current = false;
+            return;
+        }
+
+        // Call share synchronously - handle promise with .then()/.catch()
+        // This preserves the user gesture context
+        navigator.share(shareData)
+            .catch(err => {
+                if (err.name !== 'AbortError') {
+                    console.error('Share failed:', err.name, err.message);
+                    toast.error('Failed to share photo');
+                }
+            })
+            .finally(() => {
+                isSharingRef.current = false;
+            });
     };
 
     const loadTimepoints = async () => {
