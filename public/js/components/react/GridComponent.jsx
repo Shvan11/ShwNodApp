@@ -325,58 +325,60 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                             });
                         }
 
-                        // Add send message button
-                        lightboxInstance.pswp.ui.registerElement({
-                            name: 'send-message-button',
-                            order: 9,
-                            isButton: true,
-                            tagName: 'button',
-                            
-                            html: {
-                                isCustomSVG: true,
-                                inner: '<path d="M2 21l21-9L2 3v7l15 2-15 2v7z" id="pswp__icn-send"/>',
-                                outlineID: 'pswp__icn-send'
-                            },
-                            
-                            onInit: (el, pswp) => {
-                                el.setAttribute('title', 'Send Message');
-                                el.setAttribute('aria-label', 'Send Message');
-                                
-                                el.addEventListener('click', async () => {
-                                    const imageSrc = pswp.currSlide.data.src;
-                                    
-                                    try {
-                                        let webPath = imageSrc;
-                                        if (imageSrc.includes('://')) {
-                                            const url = new URL(imageSrc);
-                                            webPath = url.pathname.startsWith('/') ? url.pathname.substring(1) : url.pathname;
-                                        }
-                                        
-                                        console.log('Original path:', imageSrc);
-                                        console.log('Extracted web path:', webPath);
-                                        
-                                        const response = await fetch(`/api/convert-path?path=${encodeURIComponent(webPath)}`);
-                                        
-                                        if (!response.ok) {
-                                            throw new Error(`Failed to convert path: ${response.statusText}`);
-                                        }
-                                        
-                                        const { fullPath } = await response.json();
-                                        
-                                        // Use actual file path - backend will handle filename conversion
-                                        const convertedPath = fullPath;
-                                        console.log('Converted to full path:', convertedPath);
-                                        
-                                        const sendMessageUrl = `/send-message?file=${encodeURIComponent(convertedPath)}`;
-                                        window.open(sendMessageUrl, '_blank');
+                        // Add send message button (desktop only - mobile uses native share)
+                        if (!navigator.share || !navigator.canShare) {
+                            lightboxInstance.pswp.ui.registerElement({
+                                name: 'send-message-button',
+                                order: 9,
+                                isButton: true,
+                                tagName: 'button',
 
-                                    } catch (error) {
-                                        console.error('Error converting path for send message:', error);
-                                        toast.error('Failed to convert file path for messaging. Please check the console for details.');
-                                    }
-                                });
-                            }
-                        });
+                                html: {
+                                    isCustomSVG: true,
+                                    inner: '<path d="M2 21l21-9L2 3v7l15 2-15 2v7z" id="pswp__icn-send"/>',
+                                    outlineID: 'pswp__icn-send'
+                                },
+
+                                onInit: (el, pswp) => {
+                                    el.setAttribute('title', 'Send Message');
+                                    el.setAttribute('aria-label', 'Send Message');
+
+                                    el.addEventListener('click', async () => {
+                                        const imageSrc = pswp.currSlide.data.src;
+
+                                        try {
+                                            let webPath = imageSrc;
+                                            if (imageSrc.includes('://')) {
+                                                const url = new URL(imageSrc);
+                                                webPath = url.pathname.startsWith('/') ? url.pathname.substring(1) : url.pathname;
+                                            }
+
+                                            console.log('Original path:', imageSrc);
+                                            console.log('Extracted web path:', webPath);
+
+                                            const response = await fetch(`/api/convert-path?path=${encodeURIComponent(webPath)}`);
+
+                                            if (!response.ok) {
+                                                throw new Error(`Failed to convert path: ${response.statusText}`);
+                                            }
+
+                                            const { fullPath } = await response.json();
+
+                                            // Use actual file path - backend will handle filename conversion
+                                            const convertedPath = fullPath;
+                                            console.log('Converted to full path:', convertedPath);
+
+                                            const sendMessageUrl = `/send-message?file=${encodeURIComponent(convertedPath)}`;
+                                            window.open(sendMessageUrl, '_blank');
+
+                                        } catch (error) {
+                                            console.error('Error converting path for send message:', error);
+                                            toast.error('Failed to convert file path for messaging. Please check the console for details.');
+                                        }
+                                    });
+                                }
+                            });
+                        }
                     });
                     
                     lightboxInstance.init();
