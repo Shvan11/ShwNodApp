@@ -12,7 +12,9 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
     const [error, setError] = useState(null);
     const [lightbox, setLightbox] = useState(null);
     const [screenSize, setScreenSize] = useState('desktop');
+    const [canNativeShare, setCanNativeShare] = useState(false);
     const componentRef = useRef(null);
+    const isSharingRef = useRef(false);
     
     // Image elements configuration
     const imageElements = [
@@ -26,7 +28,83 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
         { id: 'ct', index: 7, alt: 'Center' },
         { id: 'lf', index: 8, alt: 'Left' }
     ];
-    
+
+    // Feature detection for native share API (mobile devices)
+    useEffect(() => {
+        const checkShareSupport = () => {
+            // Check if Web Share API is available (primarily mobile browsers)
+            const hasShareAPI = !!navigator.share && !!navigator.canShare;
+            setCanNativeShare(hasShareAPI);
+        };
+        checkShareSupport();
+    }, []);
+
+    // Native share handler for PhotoSwipe
+    const handleNativeShare = async (pswp, buttonEl) => {
+        if (isSharingRef.current) return;
+        isSharingRef.current = true;
+
+        // Show loading spinner on button
+        const originalHTML = buttonEl.innerHTML;
+        buttonEl.innerHTML = '<span class="pswp__share-spinner"></span>';
+        buttonEl.style.pointerEvents = 'none';
+
+        try {
+            const slide = pswp.currSlide;
+            const imageUrl = slide.data.src;
+
+            // Get descriptive filename from the extension code
+            const fileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
+            const extensionMatch = fileName.match(/\.([^.]+)$/);
+            const extension = extensionMatch ? extensionMatch[1] : '';
+
+            const fileNameMap = {
+                'i10': 'Profile.jpg',
+                'i12': 'Rest.jpg',
+                'i13': 'Smile.jpg',
+                'i23': 'Upper.jpg',
+                'i24': 'Lower.jpg',
+                'i20': 'Right.jpg',
+                'i22': 'Center.jpg',
+                'i21': 'Left.jpg'
+            };
+
+            const shareFileName = fileNameMap[extension] || `patient_${patientId}_photo.jpg`;
+
+            // Fetch image as blob
+            const response = await fetch(imageUrl);
+            if (!response.ok) throw new Error('Failed to fetch image');
+
+            const blob = await response.blob();
+            const file = new File([blob], shareFileName, { type: blob.type || 'image/jpeg' });
+
+            // Prepare share data
+            const shareData = {
+                files: [file],
+                title: `Patient Photo - ${shareFileName.replace('.jpg', '')}`,
+                text: `Patient ${patientId} - Photo`
+            };
+
+            // Check if sharing is supported for this data
+            if (navigator.canShare && navigator.canShare(shareData)) {
+                await navigator.share(shareData);
+            } else {
+                throw new Error('Sharing not supported for this file type');
+            }
+        } catch (err) {
+            // Don't show error for user cancellation
+            if (err.name !== 'AbortError') {
+                console.error('Share failed:', err);
+                toast.error('Failed to share photo');
+            }
+        } finally {
+            // Restore button
+            isSharingRef.current = false;
+            buttonEl.innerHTML = originalHTML;
+            buttonEl.style.pointerEvents = 'auto';
+        }
+    };
+
     const loadTimepoints = async () => {
         // Skip loading if patientId is not a valid number
         if (!patientId || isNaN(parseInt(patientId))) {
@@ -221,7 +299,32 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                                 });
                             }
                         });
-                        
+
+                        // Add native share button (mobile only)
+                        if (navigator.share && navigator.canShare) {
+                            lightboxInstance.pswp.ui.registerElement({
+                                name: 'native-share-button',
+                                order: 8.5,
+                                isButton: true,
+                                tagName: 'button',
+
+                                html: {
+                                    isCustomSVG: true,
+                                    inner: '<path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z" id="pswp__icn-share"/>',
+                                    outlineID: 'pswp__icn-share'
+                                },
+
+                                onInit: (el, pswp) => {
+                                    el.setAttribute('title', 'Share');
+                                    el.setAttribute('aria-label', 'Share photo');
+
+                                    el.addEventListener('click', () => {
+                                        handleNativeShare(pswp, el);
+                                    });
+                                }
+                            });
+                        }
+
                         // Add send message button
                         lightboxInstance.pswp.ui.registerElement({
                             name: 'send-message-button',
