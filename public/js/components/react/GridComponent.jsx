@@ -105,27 +105,9 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
         }
 
         const shareFileName = getShareFileName(imageUrl);
+        const file = new File([cached.blob], shareFileName, { type: 'image/jpeg' });
 
-        // Server may return wrong MIME type (application/octet-stream)
-        // Force image/jpeg for proper sharing
-        const file = new File([cached.blob], shareFileName, {
-            type: 'image/jpeg',
-            lastModified: Date.now()
-        });
-
-        const shareData = {
-            files: [file],
-            title: `Patient Photo - ${shareFileName.replace('.jpg', '')}`,
-            text: `Patient ${patientId}`
-        };
-
-        if (!navigator.canShare(shareData)) {
-            toast.error('File sharing not supported');
-            isSharingRef.current = false;
-            return;
-        }
-
-        navigator.share(shareData)
+        navigator.share({ files: [file] })
             .catch(err => {
                 if (err.name !== 'AbortError') {
                     toast.error('Failed to share photo');
