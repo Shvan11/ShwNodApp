@@ -95,6 +95,9 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
         if (isSharingRef.current) return;
         isSharingRef.current = true;
 
+        // Debug: Check user activation state
+        console.log('Share: userActivation.isActive =', navigator.userActivation?.isActive);
+
         const slide = pswp.currSlide;
         const imageUrl = slide.data.src;
         const shareFileName = getShareFileName(imageUrl);
@@ -110,10 +113,22 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
             return;
         }
 
-        // Create file synchronously
+        // Debug: Log blob info
+        console.log('Share: blob type =', cached.blob.type, 'size =', cached.blob.size);
+        console.log('Share: fileName =', shareFileName);
+
+        // Create file synchronously with explicit MIME type and lastModified
+        // Use image/jpeg if blob type is empty or unusual
+        const mimeType = cached.blob.type && cached.blob.type.startsWith('image/')
+            ? cached.blob.type
+            : 'image/jpeg';
+
         const file = new File([cached.blob], shareFileName, {
-            type: cached.blob.type || 'image/jpeg'
+            type: mimeType,
+            lastModified: Date.now()
         });
+
+        console.log('Share: file created - name:', file.name, 'type:', file.type, 'size:', file.size);
 
         const shareData = {
             files: [file],
@@ -121,7 +136,10 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
             text: `Patient ${patientId} - ${photoName}`
         };
 
-        if (!navigator.canShare(shareData)) {
+        const canShare = navigator.canShare(shareData);
+        console.log('Share: canShare =', canShare);
+
+        if (!canShare) {
             toast.error('File sharing not supported');
             isSharingRef.current = false;
             return;
