@@ -52,7 +52,6 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
         try {
             const slide = pswp.currSlide;
             const imageUrl = slide.data.src;
-            console.log('Share: fetching image from', imageUrl);
 
             // Get descriptive filename from the extension code
             const fileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
@@ -60,62 +59,40 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
             const extension = extensionMatch ? extensionMatch[1] : '';
 
             const fileNameMap = {
-                'i10': 'Profile.jpg',
-                'i12': 'Rest.jpg',
-                'i13': 'Smile.jpg',
-                'i23': 'Upper.jpg',
-                'i24': 'Lower.jpg',
-                'i20': 'Right.jpg',
-                'i22': 'Center.jpg',
-                'i21': 'Left.jpg'
+                'i10': 'Profile',
+                'i12': 'Rest',
+                'i13': 'Smile',
+                'i23': 'Upper',
+                'i24': 'Lower',
+                'i20': 'Right',
+                'i22': 'Center',
+                'i21': 'Left'
             };
 
-            const shareFileName = fileNameMap[extension] || `patient_${patientId}_photo.jpg`;
+            const photoName = fileNameMap[extension] || 'Photo';
 
-            // Fetch image as blob
-            const response = await fetch(imageUrl);
-            if (!response.ok) {
-                throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
-            }
+            // Build full URL for sharing
+            const fullUrl = imageUrl.startsWith('http')
+                ? imageUrl
+                : window.location.origin + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
 
-            const blob = await response.blob();
-            console.log('Share: blob type:', blob.type, 'size:', blob.size);
-
-            // Ensure we have a valid MIME type
-            const mimeType = blob.type || 'image/jpeg';
-            const file = new File([blob], shareFileName, { type: mimeType });
-            console.log('Share: file created:', file.name, file.type, file.size);
-
-            // Prepare share data
+            // Share URL directly (more reliable on Android, no permission issues)
             const shareData = {
-                files: [file],
-                title: `Patient Photo - ${shareFileName.replace('.jpg', '')}`,
-                text: `Patient ${patientId} - Photo`
+                title: `Patient Photo - ${photoName}`,
+                text: `Patient ${patientId} - ${photoName}`,
+                url: fullUrl
             };
 
-            // Check if sharing is supported for this data
             if (navigator.canShare && navigator.canShare(shareData)) {
-                console.log('Share: canShare = true, calling share()');
                 await navigator.share(shareData);
             } else {
-                // Try sharing without files as fallback
-                console.log('Share: canShare(files) = false, trying URL share');
-                const urlShareData = {
-                    title: `Patient Photo - ${shareFileName.replace('.jpg', '')}`,
-                    text: `Patient ${patientId} - Photo`,
-                    url: window.location.origin + imageUrl
-                };
-                if (navigator.canShare && navigator.canShare(urlShareData)) {
-                    await navigator.share(urlShareData);
-                } else {
-                    throw new Error('File sharing not supported on this device');
-                }
+                throw new Error('Sharing not supported');
             }
         } catch (err) {
             // Don't show error for user cancellation
             if (err.name !== 'AbortError') {
-                console.error('Share failed:', err.name, err.message, err);
-                toast.error(`Failed to share: ${err.message}`);
+                console.error('Share failed:', err.name, err.message);
+                toast.error('Failed to share photo');
             }
         } finally {
             // Restore button
