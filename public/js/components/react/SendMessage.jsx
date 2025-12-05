@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Select from 'react-select';
-import { useGlobalState } from '../../contexts/GlobalStateContext.jsx';
+import { useWhatsAppWebSocket } from '../../hooks/useWhatsAppWebSocket.js';
 // TODO: Integrate React ProgressBar component from components/whatsapp-send/ProgressBar.jsx
 // The old class-based ProgressBar no longer exists - needs refactoring to use React component
 // import ProgressBar from '../whatsapp-send/ProgressBar.jsx';
@@ -9,8 +9,8 @@ import { useGlobalState } from '../../contexts/GlobalStateContext.jsx';
 const SendMessage = () => {
     const navigate = useNavigate();
 
-    // Use global state for WhatsApp client ready status
-    const { whatsappClientReady } = useGlobalState();
+    // Use WhatsApp WebSocket hook (same pattern as /send page)
+    const { clientReady: whatsappClientReady } = useWhatsAppWebSocket();
 
     const [filePath, setFilePath] = useState('');
     const [pathsArray, setPathsArray] = useState([]);
@@ -19,12 +19,8 @@ const SendMessage = () => {
     const [selectedContact, setSelectedContact] = useState(null);
     const [phoneNumber, setPhoneNumber] = useState('');
     const [program, setProgram] = useState('WhatsApp');
-    const [clientError, setClientError] = useState(null);
     const [statusMessage, setStatusMessage] = useState('');
     const [statusType, setStatusType] = useState(''); // 'success', 'error', 'warning'
-
-    const progressBarRef = useRef(null);
-    const connectionManagerRef = useRef(null);
 
     // Initialize component
     useEffect(() => {
@@ -37,83 +33,12 @@ const SendMessage = () => {
             setPathsArray(decodedPath.split(','));
         }
 
-        // TODO: Re-implement progress bar with React component
-        // Old class-based ProgressBar code removed - component still functional without it
-        /*
-        const emptyBar = document.getElementById('emptyBar');
-        const filledBar = document.getElementById('filledBar');
-        if (emptyBar && filledBar) {
-            progressBarRef.current = new ProgressBar({
-                filledBar,
-                emptyBar,
-                interval: 200
-            });
-        }
-        */
-
-        // Initialize WebSocket and load contacts
-        initializeWebSocket();
+        // Load contacts
         loadContacts('pat');
 
-        // Cleanup function - no listeners to clean up since we use GlobalStateContext
-        // WebSocket cleanup is handled by the singleton service
-        return () => {
-            // connectionManagerRef cleanup is handled by the singleton service
-            // No manual listener cleanup needed - we use GlobalStateContext
-        };
+        // No cleanup needed - useWhatsAppWebSocket hook handles WebSocket lifecycle
     }, []);
 
-    // Initialize WebSocket connection
-    const initializeWebSocket = async () => {
-        try {
-            const websocketService = (await import('../../services/websocket.js')).default;
-            connectionManagerRef.current = websocketService;
-
-            // NOTE: whatsapp_client_ready is managed by GlobalStateContext - no duplicate listener needed
-            // The whatsappClientReady state is already available from useGlobalState hook
-
-            // Connect to WebSocket
-            try {
-                await connectionManagerRef.current.connect({
-                    clientType: 'send-message',
-                    timestamp: Date.now()
-                });
-                // Connection successful
-            } catch (error) {
-                // Initial connection failed, but auto-reconnect will retry automatically
-                console.error('Initial WebSocket connection failed, auto-reconnect will retry:', error);
-                // Use fallback API polling while waiting for reconnection
-                fallbackStatusCheck();
-                // Don't set persistent error - auto-reconnect is handling it
-            }
-
-            // No need to request initial state for clientReady - GlobalStateContext handles it
-        } catch (error) {
-            console.error('Failed to initialize WebSocket module:', error);
-            setClientError(error.message);
-            fallbackStatusCheck();
-        }
-    };
-
-    // Fallback API status check
-    const fallbackStatusCheck = async () => {
-        try {
-            const response = await fetch('/api/wa/status');
-            if (response.ok) {
-                const data = await response.json();
-                setClientStatus({
-                    ready: data.clientReady || false,
-                    error: data.error || null
-                });
-            }
-        } catch (error) {
-            console.error('Fallback status check failed:', error);
-            setClientStatus({
-                ready: false,
-                error: error.message
-            });
-        }
-    };
 
     // Load contacts based on source
     const loadContacts = async (source) => {
@@ -194,11 +119,7 @@ const SendMessage = () => {
 
         // Check WhatsApp client status if WhatsApp is selected
         if (program === 'WhatsApp' && !whatsappClientReady) {
-            if (clientError) {
-                showMessage(`WhatsApp Error: ${clientError}`, 'error');
-            } else {
-                showAuthenticationRequired();
-            }
+            showAuthenticationRequired();
             return;
         }
 
@@ -265,11 +186,6 @@ const SendMessage = () => {
 
     // Handle close
     const handleClose = () => {
-        // Cleanup WebSocket connection
-        if (connectionManagerRef.current) {
-            connectionManagerRef.current.disconnect();
-        }
-
         // Close the window
         if (window.opener) {
             window.close();
