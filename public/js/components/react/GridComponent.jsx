@@ -52,6 +52,7 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
         try {
             const slide = pswp.currSlide;
             const imageUrl = slide.data.src;
+            console.log('Share: fetching image from', imageUrl);
 
             // Get descriptive filename from the extension code
             const fileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
@@ -73,10 +74,17 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
 
             // Fetch image as blob
             const response = await fetch(imageUrl);
-            if (!response.ok) throw new Error('Failed to fetch image');
+            if (!response.ok) {
+                throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
+            }
 
             const blob = await response.blob();
-            const file = new File([blob], shareFileName, { type: blob.type || 'image/jpeg' });
+            console.log('Share: blob type:', blob.type, 'size:', blob.size);
+
+            // Ensure we have a valid MIME type
+            const mimeType = blob.type || 'image/jpeg';
+            const file = new File([blob], shareFileName, { type: mimeType });
+            console.log('Share: file created:', file.name, file.type, file.size);
 
             // Prepare share data
             const shareData = {
@@ -87,15 +95,27 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
 
             // Check if sharing is supported for this data
             if (navigator.canShare && navigator.canShare(shareData)) {
+                console.log('Share: canShare = true, calling share()');
                 await navigator.share(shareData);
             } else {
-                throw new Error('Sharing not supported for this file type');
+                // Try sharing without files as fallback
+                console.log('Share: canShare(files) = false, trying URL share');
+                const urlShareData = {
+                    title: `Patient Photo - ${shareFileName.replace('.jpg', '')}`,
+                    text: `Patient ${patientId} - Photo`,
+                    url: window.location.origin + imageUrl
+                };
+                if (navigator.canShare && navigator.canShare(urlShareData)) {
+                    await navigator.share(urlShareData);
+                } else {
+                    throw new Error('File sharing not supported on this device');
+                }
             }
         } catch (err) {
             // Don't show error for user cancellation
             if (err.name !== 'AbortError') {
-                console.error('Share failed:', err);
-                toast.error('Failed to share photo');
+                console.error('Share failed:', err.name, err.message, err);
+                toast.error(`Failed to share: ${err.message}`);
             }
         } finally {
             // Restore button
