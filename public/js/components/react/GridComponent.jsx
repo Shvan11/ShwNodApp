@@ -12,10 +12,13 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
     const [error, setError] = useState(null);
     const [lightbox, setLightbox] = useState(null);
     const [screenSize, setScreenSize] = useState('desktop');
-    const [canNativeShare, setCanNativeShare] = useState(false);
     const componentRef = useRef(null);
     const isSharingRef = useRef(false);
-    
+
+    // Pre-cached blob for native sharing (mobile only)
+    // Stores: { url, blob, fetchId } - fetchId prevents race conditions
+    const cachedShareBlobRef = useRef({ url: null, blob: null, fetchId: 0 });
+
     // Image elements configuration
     const imageElements = [
         { id: 'pf', index: 0, alt: 'Profile' },
@@ -29,76 +32,106 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
         { id: 'lf', index: 8, alt: 'Left' }
     ];
 
-    // Feature detection for native share API (mobile devices)
-    useEffect(() => {
-        const checkShareSupport = () => {
-            // Check if Web Share API is available (primarily mobile browsers)
-            const hasShareAPI = !!navigator.share && !!navigator.canShare;
-            setCanNativeShare(hasShareAPI);
-        };
-        checkShareSupport();
-    }, []);
+    // File name mapping for share
+    const fileNameMap = {
+        'i10': 'Profile.jpg',
+        'i12': 'Rest.jpg',
+        'i13': 'Smile.jpg',
+        'i23': 'Upper.jpg',
+        'i24': 'Lower.jpg',
+        'i20': 'Right.jpg',
+        'i22': 'Center.jpg',
+        'i21': 'Left.jpg'
+    };
 
-    // Native share handler for PhotoSwipe
+    // Get descriptive filename from image URL
+    const getShareFileName = (imageUrl) => {
+        const fileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
+        const extensionMatch = fileName.match(/\.([^.]+)$/);
+        const extension = extensionMatch ? extensionMatch[1] : '';
+        return fileNameMap[extension] || `patient_${patientId}_photo.jpg`;
+    };
+
+    // Pre-fetch blob for current slide (called on slide change, mobile only)
+    const prefetchBlobForShare = async (imageUrl) => {
+        // Only pre-fetch if native share is available
+        if (!navigator.share || !navigator.canShare) return;
+
+        // Skip logo and placeholder images
+        if (imageUrl.includes('logo.png') || imageUrl.includes('placeholder')) return;
+
+        // Increment fetchId to handle race conditions
+        const currentFetchId = ++cachedShareBlobRef.current.fetchId;
+
+        // Clear previous cache immediately
+        cachedShareBlobRef.current.url = null;
+        cachedShareBlobRef.current.blob = null;
+
+        try {
+            const response = await fetch(imageUrl);
+            if (!response.ok) return;
+
+            const blob = await response.blob();
+
+            // Only store if this is still the most recent fetch (race condition check)
+            if (currentFetchId === cachedShareBlobRef.current.fetchId) {
+                cachedShareBlobRef.current.url = imageUrl;
+                cachedShareBlobRef.current.blob = blob;
+            }
+        } catch (err) {
+            // Silent fail - share will fallback to URL
+            console.warn('Pre-fetch for share failed:', err.message);
+        }
+    };
+
+    // Clear cached blob (called on lightbox close and component unmount)
+    const clearCachedBlob = () => {
+        cachedShareBlobRef.current = { url: null, blob: null, fetchId: 0 };
+    };
+
+    // Native share handler - uses pre-cached blob for instant sharing
     const handleNativeShare = async (pswp, buttonEl) => {
         if (isSharingRef.current) return;
         isSharingRef.current = true;
 
-        // Show loading spinner on button
-        const originalHTML = buttonEl.innerHTML;
-        buttonEl.innerHTML = '<span class="pswp__share-spinner"></span>';
-        buttonEl.style.pointerEvents = 'none';
-
         try {
             const slide = pswp.currSlide;
             const imageUrl = slide.data.src;
+            const shareFileName = getShareFileName(imageUrl);
+            const photoName = shareFileName.replace('.jpg', '');
 
-            // Get descriptive filename from the extension code
-            const fileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
-            const extensionMatch = fileName.match(/\.([^.]+)$/);
-            const extension = extensionMatch ? extensionMatch[1] : '';
+            // Check if we have a cached blob for this exact URL
+            const cached = cachedShareBlobRef.current;
 
-            const fileNameMap = {
-                'i10': 'Profile',
-                'i12': 'Rest',
-                'i13': 'Smile',
-                'i23': 'Upper',
-                'i24': 'Lower',
-                'i20': 'Right',
-                'i22': 'Center',
-                'i21': 'Left'
-            };
+            if (cached.url !== imageUrl || !cached.blob) {
+                // No cached blob available - photo not ready for sharing yet
+                toast.warning('Please wait a moment and try again');
+                return;
+            }
 
-            const photoName = fileNameMap[extension] || 'Photo';
+            // Use cached blob - instant share, no async before share()
+            const file = new File([cached.blob], shareFileName, {
+                type: cached.blob.type || 'image/jpeg'
+            });
 
-            // Build full URL for sharing
-            const fullUrl = imageUrl.startsWith('http')
-                ? imageUrl
-                : window.location.origin + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
-
-            // Share URL directly (more reliable on Android, no permission issues)
             const shareData = {
+                files: [file],
                 title: `Patient Photo - ${photoName}`,
-                text: `Patient ${patientId} - ${photoName}`,
-                url: fullUrl
+                text: `Patient ${patientId} - ${photoName}`
             };
 
-            if (navigator.canShare && navigator.canShare(shareData)) {
+            if (navigator.canShare(shareData)) {
                 await navigator.share(shareData);
             } else {
-                throw new Error('Sharing not supported');
+                throw new Error('File sharing not supported');
             }
         } catch (err) {
-            // Don't show error for user cancellation
             if (err.name !== 'AbortError') {
                 console.error('Share failed:', err.name, err.message);
                 toast.error('Failed to share photo');
             }
         } finally {
-            // Restore button
             isSharingRef.current = false;
-            buttonEl.innerHTML = originalHTML;
-            buttonEl.style.pointerEvents = 'auto';
         }
     };
 
@@ -377,7 +410,31 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
                             });
                         }
                     });
-                    
+
+                    // Pre-fetch blob for sharing (mobile only)
+                    if (navigator.share && navigator.canShare) {
+                        // Pre-fetch on first slide when lightbox opens
+                        lightboxInstance.on('firstUpdate', () => {
+                            const pswp = lightboxInstance.pswp;
+                            if (pswp?.currSlide?.data?.src) {
+                                prefetchBlobForShare(pswp.currSlide.data.src);
+                            }
+                        });
+
+                        // Pre-fetch on slide change
+                        lightboxInstance.on('change', () => {
+                            const pswp = lightboxInstance.pswp;
+                            if (pswp?.currSlide?.data?.src) {
+                                prefetchBlobForShare(pswp.currSlide.data.src);
+                            }
+                        });
+
+                        // Clear cache when lightbox closes
+                        lightboxInstance.on('destroy', () => {
+                            clearCachedBlob();
+                        });
+                    }
+
                     lightboxInstance.init();
                     setLightbox(lightboxInstance);
                     
@@ -428,6 +485,8 @@ const GridComponent = ({ patientId, tpCode = '0' }) => {
             if (lightbox) {
                 lightbox.destroy();
             }
+            // Clear cached share blob
+            clearCachedBlob();
         };
     }, [lightbox]);
     
