@@ -124,3 +124,22 @@
 .gallery-image.logo-border {
     border: 2px solid var(--gray-300);
 }
+
+/* ===================================
+   PHOTOSWIPE SHARE BUTTON SPINNER
+   =================================== */
+.pswp__share-spinner {
+    display: inline-block;
+    width: var(--spacing-lg);
+    height: var(--spacing-lg);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--radius-full);
+    border-top-color: var(--white, #fff);
+    animation: pswp-share-spin 0.8s linear infinite;
+}
+
+@keyframes pswp-share-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
