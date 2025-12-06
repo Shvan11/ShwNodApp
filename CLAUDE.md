@@ -317,6 +317,25 @@ Sync system configuration (Supabase):
 
 See `docs/REVERSE_SYNC_CONFIGURATION.md` for detailed sync configuration guide.
 
+## Testing Credentials
+
+For development and testing, use these admin credentials:
+- **Username**: `Admin`
+- **Password**: `Yarmok11`
+
+These are also stored in `.env` as `TEST_ADMIN_USER` and `TEST_ADMIN_PASSWORD`.
+
+**Testing authenticated API endpoints with curl:**
+```bash
+# Login and save session cookie
+curl -c /tmp/cookies.txt -X POST http://localhost:3001/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"Admin","password":"Yarmok11"}'
+
+# Use the cookie for authenticated requests
+curl -b /tmp/cookies.txt http://localhost:3001/api/admin/lookups/tables
+```
+
 ## Key API Patterns
 
 ### Patient Data
@@ -590,33 +609,98 @@ className="card-container"
 .error-message .text-red { color: var(--error-color); }
 ```
 
-### CSS Architecture
+### CSS Architecture: Hybrid Co-location Strategy
+
+This project uses a **Hybrid Co-location Strategy** for CSS, following 2025 Vite/React best practices. CSS is imported at the JavaScript level, enabling Vite's automatic CSS code splitting.
 
 **File Structure** (`/public/css/`):
 ```
-├── main.css                    # Entry point - imports all modules
-├── base/
+├── base/                       # Design system foundation (5 files)
 │   ├── variables.css           # Design tokens (ALWAYS use these)
 │   ├── reset.css               # CSS reset/normalize
 │   ├── typography.css          # Font styles
-│   └── rtl-support.css         # RTL language support (Kurdish/Arabic)
-├── components/                 # Reusable component styles (18 files)
-│   ├── buttons.css
+│   ├── rtl-support.css         # RTL language support (Kurdish/Arabic)
+│   └── utilities.css           # Utility classes
+├── layout/                     # Layout components (2 files)
 │   ├── universal-header.css
-│   ├── sidebar-navigation.css
-│   └── [15 more files...]
-└── pages/                      # Page-specific styles (22 files)
+│   └── sidebar-navigation.css
+├── components/                 # Reusable component styles (25 files)
+│   ├── buttons.css
+│   ├── inputs.css
+│   ├── modal.css
+│   └── [22 more files...]
+└── pages/                      # Page-specific styles (24 files)
     ├── dashboard.css
     ├── patient-shell.css
-    └── [20 more files...]
+    └── [22 more files...]
 ```
 
-**Where to Add New Styles:**
+### CSS Import Strategy (3-Tier Ownership Model)
 
-1. **Reusable component** → `/css/components/{component-name}.css`
-2. **Page-specific** → `/css/pages/{page-name}.css`
-3. **Base styles** (typography, button variants) → `/css/base/{category}.css`
-4. **Utility classes** → `/css/main.css`
+**Tier 1: Global CSS** - Imported in `App.jsx`, loaded immediately:
+```javascript
+// App.jsx - Always loaded
+import '../css/base/reset.css';
+import '../css/base/variables.css';
+import '../css/base/typography.css';
+import '../css/base/rtl-support.css';
+import '../css/base/utilities.css';
+import '../css/layout/universal-header.css';
+import '../css/components/buttons.css';
+import '../css/components/inputs.css';
+import '../css/components/cards.css';
+import '../css/components/modal.css';
+import '../css/components/toast.css';
+import '../css/components/route-error.css';
+```
+
+**Tier 2: Route CSS** - Imported in route/layout components, lazy-loaded with route:
+```javascript
+// Example: AlignerLayout.jsx - loaded when visiting /aligner/*
+import '../../css/pages/aligner.css';
+import '../../css/components/aligner-set-card.css';
+
+// Example: PatientShell.jsx - loaded when visiting /patient/*
+import '../../../css/pages/patient-shell.css';
+import '../../../css/pages/patient-info.css';
+// ... (all patient portal CSS)
+```
+
+**Tier 3: Component CSS** - Imported in component files, loaded on-demand:
+```javascript
+// Example: LookupsSettings.jsx
+import '../../../css/components/lookup-editor.css';
+```
+
+### Where to Import New CSS
+
+| CSS Type | Import Location | When Loaded |
+|----------|-----------------|-------------|
+| Design tokens, shared UI | `App.jsx` | Immediately |
+| Route-specific styles | Route component (e.g., `Dashboard.jsx`) | When route visited |
+| Layout section styles | Layout component (e.g., `AlignerLayout.jsx`) | When section visited |
+| Component-specific styles | Component file (e.g., `LookupEditor.jsx`) | When component renders |
+
+**⚠️ NEVER import CSS in `routes.config.jsx`** - This defeats code splitting!
+
+### Adding New CSS Files
+
+1. **Create the CSS file** in the appropriate directory:
+   - `/css/base/` - Design system additions
+   - `/css/components/` - Reusable component styles
+   - `/css/pages/` - Route-specific styles
+   - `/css/layout/` - Layout component styles
+
+2. **Import in the correct JavaScript file**:
+   - Used across 80%+ of routes? → Add to `App.jsx`
+   - Route-specific? → Add to route component or layout
+   - Component-specific? → Add to component file
+
+3. **Verify code splitting** (optional):
+   ```bash
+   npm run build
+   ls -la dist/assets/*.css  # Check for split chunks
+   ```
 
 ### Design System - ALWAYS Use These Variables
 

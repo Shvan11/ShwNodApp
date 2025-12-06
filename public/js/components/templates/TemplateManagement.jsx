@@ -5,6 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+// Template management CSS
+import '../../../css/pages/template-management.css';
 import TemplateCard from './TemplateCard.jsx';
 import CreateTemplateModal from './CreateTemplateModal.jsx';
 import TemplateStats from './TemplateStats.jsx';

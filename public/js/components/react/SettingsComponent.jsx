@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+
+// Settings page CSS (loaded when settings route is visited)
+import '../../../css/pages/settings.css';
+import '../../../css/pages/cost-presets-settings.css';
+import '../../../css/pages/user-management.css';
 import SettingsTabNavigation from './SettingsTabNavigation.jsx';
 import GeneralSettings from './GeneralSettings.jsx';
 import DatabaseSettings from './DatabaseSettings.jsx';
@@ -9,6 +14,7 @@ import EmployeeSettings from './EmployeeSettings.jsx';
 import UserManagement from './UserManagement.jsx';
 import AdminUserManagement from './AdminUserManagement.jsx';
 import CostPresetsSettings from './CostPresetsSettings.jsx';
+import LookupsSettings from './LookupsSettings.jsx';
 
 const SettingsComponent = () => {
     const { tab } = useParams();
@@ -22,6 +28,7 @@ const SettingsComponent = () => {
         email: { hasChanges: false },
         employees: { hasChanges: false },
         costPresets: { hasChanges: false },
+        lookups: { hasChanges: false },
         messaging: { hasChanges: false },
         system: { hasChanges: false },
         security: { hasChanges: false },
@@ -87,6 +94,13 @@ const SettingsComponent = () => {
             icon: 'fas fa-dollar-sign',
             component: CostPresetsSettings,
             description: 'Manage estimated cost preset values'
+        },
+        {
+            id: 'lookups',
+            label: 'Lookups',
+            icon: 'fas fa-list',
+            component: LookupsSettings,
+            description: 'Manage dropdown and reference data'
         },
         {
             id: 'messaging',

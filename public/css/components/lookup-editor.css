@@ -1,0 +1,530 @@
+/**
+ * Lookup Editor Styles
+ *
+ * Styles for the lookup table management interface in Settings
+ */
+
+/* Main container */
+.lookups-settings {
+    padding: var(--spacing-md);
+}
+
+.lookups-settings .settings-section {
+    background: var(--background-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+}
+
+.lookups-settings .section-description {
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-lg);
+    font-size: var(--font-size-sm);
+}
+
+/* Loading state */
+.lookup-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-xxl);
+    color: var(--text-secondary);
+    gap: var(--spacing-md);
+}
+
+.lookup-loading i {
+    font-size: var(--font-size-2xl);
+    color: var(--primary-color);
+}
+
+/* Group headers */
+.lookup-group {
+    margin-bottom: var(--spacing-xl);
+}
+
+.lookup-group:last-child {
+    margin-bottom: 0;
+}
+
+.lookup-group-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.lookup-group-header i {
+    color: var(--primary-color);
+}
+
+/* Accordion */
+.lookup-accordion {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.lookup-accordion-item {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: box-shadow 0.2s ease;
+}
+
+.lookup-accordion-item:hover {
+    box-shadow: var(--shadow-sm);
+}
+
+.lookup-accordion-item.expanded {
+    box-shadow: var(--shadow-md);
+}
+
+.lookup-accordion-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--background-secondary);
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.lookup-accordion-header:hover {
+    background: var(--background-tertiary, #e9ecef);
+}
+
+.lookup-accordion-item.expanded .lookup-accordion-header {
+    background: var(--primary-color);
+    color: white;
+}
+
+.accordion-title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-weight: 500;
+}
+
+.accordion-title i {
+    width: 20px;
+    text-align: center;
+}
+
+.accordion-title-text {
+    font-size: var(--font-size-base);
+}
+
+.accordion-chevron {
+    transition: transform 0.2s ease;
+}
+
+.lookup-accordion-item.expanded .accordion-chevron {
+    transform: rotate(180deg);
+}
+
+.lookup-accordion-content {
+    padding: var(--spacing-lg);
+    background: var(--background-primary);
+    border-top: 1px solid var(--border-color);
+}
+
+/* Editor toolbar */
+.lookup-editor-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.search-box {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+    max-width: 400px;
+}
+
+.search-box i.fa-search {
+    position: absolute;
+    left: var(--spacing-md);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+}
+
+.search-box input {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    padding-left: calc(var(--spacing-md) * 2 + 16px);
+    padding-right: calc(var(--spacing-md) + 24px);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-box input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.search-clear {
+    position: absolute;
+    right: var(--spacing-sm);
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    padding: var(--spacing-xs);
+    cursor: pointer;
+    color: var(--text-secondary);
+    line-height: 1;
+}
+
+.search-clear:hover {
+    color: var(--text-primary);
+}
+
+/* Table styles */
+.lookup-table-container {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.lookup-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+
+.lookup-table thead {
+    background: var(--background-secondary);
+}
+
+.lookup-table th {
+    padding: var(--spacing-sm) var(--spacing-md);
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 2px solid var(--border-color);
+    white-space: nowrap;
+}
+
+.lookup-table td {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+}
+
+.lookup-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.lookup-table tbody tr:hover {
+    background: var(--background-secondary);
+}
+
+/* ID column - read-only, muted appearance */
+.id-column {
+    width: 60px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.id-cell {
+    text-align: center;
+    color: var(--text-secondary);
+    font-family: monospace;
+    font-size: var(--font-size-xs);
+}
+
+.actions-column {
+    width: 100px;
+    text-align: center;
+}
+
+.actions-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+}
+
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: var(--font-size-sm);
+}
+
+.btn-icon.btn-edit {
+    background: var(--info-color);
+    color: white;
+}
+
+.btn-icon.btn-edit:hover {
+    background: #138496;
+}
+
+.btn-icon.btn-delete {
+    background: var(--error-color);
+    color: white;
+}
+
+.btn-icon.btn-delete:hover {
+    background: #c82333;
+}
+
+/* Empty state */
+.empty-row {
+    text-align: center;
+    padding: var(--spacing-xl) !important;
+    color: var(--text-secondary);
+}
+
+.empty-row i {
+    display: block;
+    font-size: var(--font-size-2xl);
+    margin-bottom: var(--spacing-sm);
+    opacity: 0.5;
+}
+
+/* Table footer */
+.lookup-table-footer {
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--background-secondary);
+    border-top: 1px solid var(--border-color);
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+}
+
+.item-count {
+    font-weight: 500;
+}
+
+/* Modal styles */
+.lookup-editor-modal .modal-content {
+    max-width: 500px;
+}
+
+.delete-confirm-modal .modal-content.modal-sm {
+    max-width: 400px;
+}
+
+.delete-confirm-modal .modal-body p {
+    margin: 0;
+}
+
+.delete-confirm-modal .modal-body p:first-child {
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Form styles */
+.lookup-editor-modal .form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.lookup-editor-modal .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.lookup-editor-modal label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-weight: 500;
+    font-size: var(--font-size-sm);
+}
+
+.lookup-editor-modal label .required {
+    color: var(--error-color);
+    margin-left: 2px;
+}
+
+.lookup-editor-modal input[type="text"],
+.lookup-editor-modal input[type="number"],
+.lookup-editor-modal textarea {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lookup-editor-modal input:focus,
+.lookup-editor-modal textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.lookup-editor-modal input.input-error,
+.lookup-editor-modal textarea.input-error {
+    border-color: var(--error-color);
+}
+
+.lookup-editor-modal input.input-error:focus,
+.lookup-editor-modal textarea.input-error:focus {
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+
+.lookup-editor-modal .field-error {
+    display: block;
+    color: var(--error-color);
+    font-size: var(--font-size-xs);
+    margin-top: var(--spacing-xs);
+}
+
+.lookup-editor-modal .field-hint {
+    display: block;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    margin-top: var(--spacing-xs);
+}
+
+/* Checkbox styling */
+.form-group-checkbox {
+    display: flex;
+    align-items: center;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    font-weight: normal;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+/* Utility classes */
+.text-success {
+    color: var(--success-color);
+}
+
+.text-warning {
+    color: var(--warning-color);
+}
+
+.text-muted {
+    color: var(--text-secondary);
+}
+
+/* Button styles */
+.btn-sm {
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: var(--font-size-sm);
+}
+
+.btn-danger {
+    background: var(--error-color);
+    color: white;
+    border: none;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+    .lookup-editor-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .search-box {
+        max-width: none;
+    }
+
+    .lookup-editor-toolbar .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .lookup-table {
+        font-size: var(--font-size-xs);
+    }
+
+    .lookup-table th,
+    .lookup-table td {
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+
+    .lookup-accordion-header {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .accordion-title-text {
+        font-size: var(--font-size-sm);
+    }
+}
+
+@media (max-width: 480px) {
+    .lookups-settings .settings-section {
+        padding: var(--spacing-md);
+    }
+
+    .lookup-accordion-content {
+        padding: var(--spacing-md);
+    }
+
+    /* Stack action buttons vertically on very small screens */
+    .actions-cell {
+        flex-direction: column;
+        gap: var(--spacing-xs);
+    }
+
+    .btn-icon {
+        width: 28px;
+        height: 28px;
+    }
+}
+
+/* RTL Support */
+[dir="rtl"] .search-box i.fa-search {
+    left: auto;
+    right: var(--spacing-md);
+}
+
+[dir="rtl"] .search-box input {
+    padding-left: calc(var(--spacing-md) + 24px);
+    padding-right: calc(var(--spacing-md) * 2 + 16px);
+}
+
+[dir="rtl"] .search-clear {
+    right: auto;
+    left: var(--spacing-sm);
+}
+
+[dir="rtl"] .lookup-table th,
+[dir="rtl"] .lookup-table td {
+    text-align: right;
+}
+
+[dir="rtl"] .actions-column,
+[dir="rtl"] .id-column,
+[dir="rtl"] .id-cell {
+    text-align: center;
+}

@@ -31,50 +31,11 @@ import {
   dailyAppointmentsLoader
 } from './loaders.js';
 
-// CSS imports for Phase 2
-import '../../css/pages/settings.css';
-import '../../css/pages/cost-presets-settings.css';
-import '../../css/pages/user-management.css';
-import '../../css/pages/template-management.css';
-import '../../css/pages/template-designer.css';
-
-// CSS imports for Phase 3
-import '../../css/pages/aligner.css';
-import '../../css/components/aligner-set-card.css';
-import '../../css/components/aligner-drawer-form.css';
-
-// CSS imports for Phase 4 (Patient Portal - comprehensive)
-import '../../css/pages/patient-shell.css';
-import '../../css/layout/sidebar-navigation.css';
-import '../../css/pages/patient-info.css';
-import '../../css/pages/add-patient.css';
-import '../../css/pages/edit-patient.css';
-import '../../css/pages/grid.css';
-import '../../css/pages/xrays.css';
-import '../../css/pages/canvas.css';
-import '../../css/components/dental-chart.css';
-import '../../css/components/timepoints-selector.css';
-import '../../css/components/comparison-viewer.css';
-import '../../css/pages/work-management.css';
-import '../../css/pages/work-payments.css';
-import '../../css/components/work-card.css';
-import '../../css/components/new-work-component.css';
-import '../../css/components/invoice-form.css';
-import '../../css/components/payment-modal.css';
-import '../../css/pages/visits-summary.css';
-import '../../css/pages/visits-spacing.css';
-import '../../css/components/visits-component.css';
-import '../../css/components/new-visit-component.css';
-import '../../css/components/appointment-form.css';
-import '../../css/components/simplified-calendar-picker.css';
-import '../../css/components/patient-appointments.css';
-
-// CSS imports for Phase 5 (Messaging & Appointments - WebSocket-heavy)
-import '../../css/pages/appointments.css';
-import '../../css/pages/send.css';
-import '../../css/components/appointment-calendar.css';
-import '../../css/components/monthly-calendar-view.css';
-import '../../css/components/whatsapp-auth.css';
+// NOTE: CSS imports moved to co-located components (Hybrid Co-location Strategy)
+// - Global CSS: App.jsx
+// - Route CSS: Each route/layout component imports its own CSS
+// - Component CSS: Each component imports its dedicated CSS
+// See CLAUDE.md "CSS Import Strategy" for details
 
 // Lazy-loaded route components (Phase 1)
 const Dashboard = React.lazy(() => import('../routes/Dashboard.jsx'));

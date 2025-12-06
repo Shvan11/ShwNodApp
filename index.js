@@ -17,6 +17,7 @@ import authRoutes from './routes/auth.js';
 import userManagementRoutes from './routes/user-management.js';
 import costPresetRoutes from './routes/api/cost-preset.routes.js';
 import lookupRoutes from './routes/api/lookup.routes.js';
+import lookupAdminRoutes from './routes/api/lookup-admin.routes.js';
 import whatsappService from './services/messaging/whatsapp.js';
 import session from 'express-session';
 import SQLiteStore from 'connect-sqlite3';
@@ -166,6 +167,7 @@ async function initializeApplication() {
     app.use('/api/calendar', calendarRoutes);
     app.use('/api/email', emailApiRoutes);
     app.use('/api/users', userManagementRoutes); // User management (admin only)
+    app.use('/api/admin', lookupAdminRoutes); // Lookup table admin routes
     app.use('/', syncWebhookRoutes);
     app.use('/', adminRoutes);
 

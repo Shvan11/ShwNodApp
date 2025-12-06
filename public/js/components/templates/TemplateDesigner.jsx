@@ -5,6 +5,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+
+// Template designer CSS
+import '../../../css/pages/template-designer.css';
 import GrapesJSEditor from './GrapesJSEditor.jsx';
 import DesignerToolbar from './DesignerToolbar.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';

@@ -1,6 +1,11 @@
 // AlignerLayout.jsx - Layout wrapper for aligner section with persistent mode toggle
 import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+
+// Aligner section CSS (loaded when any aligner route is visited)
+import '../../css/pages/aligner.css';
+import '../../css/components/aligner-set-card.css';
+import '../../css/components/aligner-drawer-form.css';
 import AlignerModeToggle from '../components/react/AlignerModeToggle.jsx';
 
 /**

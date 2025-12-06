@@ -2,11 +2,9 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import AppointmentCalendar from '../components/react/AppointmentCalendar.jsx'
 import UniversalHeader from '../components/react/UniversalHeader.jsx'
-import '../../css/base/variables.css'
-import '../../css/base/reset.css'
-import '../../css/base/typography.css'
-import '../../css/components/buttons.css'
-import '../../css/layout/universal-header.css'
+
+// NOTE: Base CSS (variables, reset, typography, buttons, universal-header)
+// is imported globally in App.jsx - no need to import here
 import '../../css/components/appointment-calendar.css'
 
 // Initialize the calendar page

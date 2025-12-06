@@ -27,6 +27,7 @@ import '../css/base/utilities.css';
 import '../css/layout/universal-header.css';
 import '../css/components/buttons.css';
 import '../css/components/inputs.css';
+import '../css/components/cards.css';
 import '../css/components/modal.css';
 import '../css/components/toast.css';
 import '../css/components/route-error.css';
