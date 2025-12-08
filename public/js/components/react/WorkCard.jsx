@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { isOrthoWork, needsDetails } from '../../config/workTypeConfig.js';
 
 const WorkCard = ({
     work,
@@ -189,35 +190,42 @@ const WorkCard = ({
                         </div>
                     )}
 
-                    {/* Primary Actions */}
+                    {/* Primary Actions - Conditionally show based on work type */}
                     <div className="work-card-primary-actions">
-                        <button
-                            type="button"
-                            className="btn btn-card-action btn-new-visit"
-                            onClick={() => onNewVisit(work)}
-                            title="Add new visit for this work"
-                        >
-                            <i className="fas fa-plus-circle"></i>
-                            <span>New Visit</span>
-                        </button>
-                        <button
-                            type="button"
-                            className="btn btn-card-action btn-visits"
-                            onClick={() => onViewVisits(work)}
-                            title="View visits for this work"
-                        >
-                            <i className="fas fa-calendar-check"></i>
-                            <span>Visits</span>
-                        </button>
-                        <button
-                            type="button"
-                            className="btn btn-card-action btn-diagnosis"
-                            onClick={() => navigate(`/patient/${patientId}/work/${work.workid}/diagnosis`)}
-                            title="View diagnosis and treatment plan"
-                        >
-                            <i className="fas fa-stethoscope"></i>
-                            <span>Diagnosis</span>
-                        </button>
+                        {/* Visits & Diagnosis only for ortho-related works */}
+                        {isOrthoWork(work.Typeofwork) && (
+                            <>
+                                <button
+                                    type="button"
+                                    className="btn btn-card-action btn-new-visit"
+                                    onClick={() => onNewVisit(work)}
+                                    title="Add new visit for this work"
+                                >
+                                    <i className="fas fa-plus-circle"></i>
+                                    <span>New Visit</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-card-action btn-visits"
+                                    onClick={() => onViewVisits(work)}
+                                    title="View visits for this work"
+                                >
+                                    <i className="fas fa-calendar-check"></i>
+                                    <span>Visits</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-card-action btn-diagnosis"
+                                    onClick={() => navigate(`/patient/${patientId}/work/${work.workid}/diagnosis`)}
+                                    title="View diagnosis and treatment plan"
+                                >
+                                    <i className="fas fa-stethoscope"></i>
+                                    <span>Diagnosis</span>
+                                </button>
+                            </>
+                        )}
+
+                        {/* Payments - always visible */}
                         <button
                             type="button"
                             className="btn btn-card-action btn-payments"
@@ -227,15 +235,19 @@ const WorkCard = ({
                             <i className="fas fa-history"></i>
                             <span>Payments</span>
                         </button>
-                        <button
-                            type="button"
-                            className="btn btn-card-action btn-details"
-                            onClick={() => onViewDetails(work)}
-                            title="View work details"
-                        >
-                            <i className="fas fa-info-circle"></i>
-                            <span>Details</span>
-                        </button>
+
+                        {/* Details only for non-ortho works that need treatment items */}
+                        {needsDetails(work.Typeofwork) && (
+                            <button
+                                type="button"
+                                className="btn btn-card-action btn-details"
+                                onClick={() => onViewDetails(work)}
+                                title="View treatment details"
+                            >
+                                <i className="fas fa-list-alt"></i>
+                                <span>Details</span>
+                            </button>
+                        )}
                     </div>
 
                     {/* Secondary Actions */}

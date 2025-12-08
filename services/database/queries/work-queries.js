@@ -126,42 +126,77 @@ export const getWorkDetails = async (workId) => {
 
 export const getWorkDetailsList = async (workId) => {
     return executeQuery(
-        `SELECT 
-            wd.ID,
-            wd.WorkID,
-            wd.Tooth,
-            wd.FillingType,
-            wd.FillingDepth,
-            wd.CanalsNo,
-            wd.Note
-        FROM tblWorkDetails wd
-        WHERE wd.WorkID = @WorkID
-        ORDER BY wd.ID`,
+        `SELECT
+            wi.ID,
+            wi.WorkID,
+            wi.FillingType,
+            wi.FillingDepth,
+            wi.CanalsNo,
+            wi.WorkingLength,
+            wi.ImplantLength,
+            wi.ImplantDiameter,
+            wi.Material,
+            wi.LabName,
+            wi.ItemCost,
+            wi.StartDate,
+            wi.CompletedDate,
+            wi.Note,
+            STRING_AGG(tn.ToothCode, ', ') AS Teeth,
+            STRING_AGG(CAST(tn.ID AS VARCHAR), ',') AS TeethIds
+        FROM tblWorkItems wi
+        LEFT JOIN tblWorkItemTeeth wit ON wi.ID = wit.WorkItemID
+        LEFT JOIN tblToothNumber tn ON wit.ToothID = tn.ID
+        WHERE wi.WorkID = @WorkID
+        GROUP BY wi.ID, wi.WorkID, wi.FillingType, wi.FillingDepth,
+                 wi.CanalsNo, wi.WorkingLength, wi.ImplantLength, wi.ImplantDiameter,
+                 wi.Material, wi.LabName, wi.ItemCost, wi.StartDate, wi.CompletedDate, wi.Note
+        ORDER BY wi.ID`,
         [['WorkID', TYPES.Int, workId]],
         (columns) => {
             const detail = {};
             columns.forEach(column => {
                 detail[column.metadata.colName] = column.value;
             });
+            // Convert TeethIds string to array of integers
+            if (detail.TeethIds) {
+                detail.TeethIds = detail.TeethIds.split(',').map(id => parseInt(id));
+            } else {
+                detail.TeethIds = [];
+            }
             return detail;
         }
     );
 };
 
+// Alias for new naming convention
+export const getWorkItems = getWorkDetailsList;
+
 export const addWorkDetail = async (workDetailData) => {
-    return executeQuery(
-        `INSERT INTO tblWorkDetails (
-            WorkID, Tooth, FillingType, FillingDepth, CanalsNo, Note
+    // Insert the work item with all type-specific fields
+    const result = await executeQuery(
+        `INSERT INTO tblWorkItems (
+            WorkID, FillingType, FillingDepth, CanalsNo, WorkingLength,
+            ImplantLength, ImplantDiameter, Material, LabName,
+            ItemCost, StartDate, CompletedDate, Note
         ) VALUES (
-            @WorkID, @Tooth, @FillingType, @FillingDepth, @CanalsNo, @Note
+            @WorkID, @FillingType, @FillingDepth, @CanalsNo, @WorkingLength,
+            @ImplantLength, @ImplantDiameter, @Material, @LabName,
+            @ItemCost, @StartDate, @CompletedDate, @Note
         );
         SELECT SCOPE_IDENTITY() as ID;`,
         [
             ['WorkID', TYPES.Int, workDetailData.WorkID],
-            ['Tooth', TYPES.NVarChar, workDetailData.Tooth || null],
             ['FillingType', TYPES.NVarChar, workDetailData.FillingType || null],
             ['FillingDepth', TYPES.NVarChar, workDetailData.FillingDepth || null],
             ['CanalsNo', TYPES.Int, workDetailData.CanalsNo || null],
+            ['WorkingLength', TYPES.NVarChar, workDetailData.WorkingLength || null],
+            ['ImplantLength', TYPES.Decimal, workDetailData.ImplantLength || null],
+            ['ImplantDiameter', TYPES.Decimal, workDetailData.ImplantDiameter || null],
+            ['Material', TYPES.NVarChar, workDetailData.Material || null],
+            ['LabName', TYPES.NVarChar, workDetailData.LabName || null],
+            ['ItemCost', TYPES.Int, workDetailData.ItemCost || null],
+            ['StartDate', TYPES.Date, workDetailData.StartDate || null],
+            ['CompletedDate', TYPES.Date, workDetailData.CompletedDate || null],
             ['Note', TYPES.NVarChar, workDetailData.Note || null]
         ],
         (columns) => {
@@ -169,44 +204,82 @@ export const addWorkDetail = async (workDetailData) => {
         },
         (results) => results.length > 0 ? results[0] : null
     );
+
+    // If teeth are provided, add them to junction table
+    if (result && result.ID && workDetailData.TeethIds && workDetailData.TeethIds.length > 0) {
+        await setWorkItemTeeth(result.ID, workDetailData.TeethIds);
+    }
+
+    return result;
 };
 
+// Alias for new naming convention
+export const addWorkItem = addWorkDetail;
+
 export const updateWorkDetail = async (detailId, workDetailData) => {
-    return executeQuery(
-        `UPDATE tblWorkDetails SET
-            Tooth = @Tooth,
+    // Update the work item with all type-specific fields
+    const result = await executeQuery(
+        `UPDATE tblWorkItems SET
             FillingType = @FillingType,
             FillingDepth = @FillingDepth,
             CanalsNo = @CanalsNo,
+            WorkingLength = @WorkingLength,
+            ImplantLength = @ImplantLength,
+            ImplantDiameter = @ImplantDiameter,
+            Material = @Material,
+            LabName = @LabName,
+            ItemCost = @ItemCost,
+            StartDate = @StartDate,
+            CompletedDate = @CompletedDate,
             Note = @Note
         WHERE ID = @ID`,
         [
             ['ID', TYPES.Int, detailId],
-            ['Tooth', TYPES.NVarChar, workDetailData.Tooth || null],
             ['FillingType', TYPES.NVarChar, workDetailData.FillingType || null],
             ['FillingDepth', TYPES.NVarChar, workDetailData.FillingDepth || null],
             ['CanalsNo', TYPES.Int, workDetailData.CanalsNo || null],
+            ['WorkingLength', TYPES.NVarChar, workDetailData.WorkingLength || null],
+            ['ImplantLength', TYPES.Decimal, workDetailData.ImplantLength || null],
+            ['ImplantDiameter', TYPES.Decimal, workDetailData.ImplantDiameter || null],
+            ['Material', TYPES.NVarChar, workDetailData.Material || null],
+            ['LabName', TYPES.NVarChar, workDetailData.LabName || null],
+            ['ItemCost', TYPES.Int, workDetailData.ItemCost || null],
+            ['StartDate', TYPES.Date, workDetailData.StartDate || null],
+            ['CompletedDate', TYPES.Date, workDetailData.CompletedDate || null],
             ['Note', TYPES.NVarChar, workDetailData.Note || null]
         ],
         null,
-        (results) => ({ 
-            success: true, 
+        (results) => ({
+            success: true,
+            rowCount: results.length || 0
+        })
+    );
+
+    // If teeth are provided, update the junction table
+    if (workDetailData.TeethIds !== undefined) {
+        await setWorkItemTeeth(detailId, workDetailData.TeethIds || []);
+    }
+
+    return result;
+};
+
+// Alias for new naming convention
+export const updateWorkItem = updateWorkDetail;
+
+export const deleteWorkDetail = async (detailId) => {
+    return executeQuery(
+        `DELETE FROM tblWorkItems WHERE ID = @ID`,
+        [['ID', TYPES.Int, detailId]],
+        null,
+        (results) => ({
+            success: true,
             rowCount: results.length || 0
         })
     );
 };
 
-export const deleteWorkDetail = async (detailId) => {
-    return executeQuery(
-        `DELETE FROM tblWorkDetails WHERE ID = @ID`,
-        [['ID', TYPES.Int, detailId]],
-        null,
-        (results) => ({ 
-            success: true, 
-            rowCount: results.length || 0
-        })
-    );
-};
+// Alias for new naming convention
+export const deleteWorkItem = deleteWorkDetail;
 
 export const addWork = async (workData) => {
     // Determine Status: default to Active, or use provided Status
@@ -459,7 +532,7 @@ export const deleteWork = async (workId) => {
         `SELECT
             (SELECT COUNT(*) FROM tblInvoice WHERE workid = @WorkID) AS InvoiceCount,
             (SELECT COUNT(*) FROM tblvisits WHERE WorkID = @WorkID) AS VisitCount,
-            (SELECT COUNT(*) FROM tblWorkDetails WHERE WorkID = @WorkID) AS DetailCount,
+            (SELECT COUNT(*) FROM tblWorkItems WHERE WorkID = @WorkID) AS ItemCount,
             (SELECT COUNT(*) FROM tblDiagnosis WHERE WorkID = @WorkID) AS DiagnosisCount,
             (SELECT COUNT(*) FROM tblImplant WHERE WorkID = @WorkID) AS ImplantCount,
             (SELECT COUNT(*) FROM tblscrews WHERE WorkID = @WorkID) AS ScrewCount`,
@@ -467,7 +540,7 @@ export const deleteWork = async (workId) => {
         (columns) => ({
             InvoiceCount: columns[0].value,
             VisitCount: columns[1].value,
-            DetailCount: columns[2].value,
+            ItemCount: columns[2].value,
             DiagnosisCount: columns[3].value,
             ImplantCount: columns[4].value,
             ScrewCount: columns[5].value
@@ -477,7 +550,7 @@ export const deleteWork = async (workId) => {
 
     // Return dependency information if any exist
     if (dependencyCheck.InvoiceCount > 0 || dependencyCheck.VisitCount > 0 ||
-        dependencyCheck.DetailCount > 0 || dependencyCheck.DiagnosisCount > 0 ||
+        dependencyCheck.ItemCount > 0 || dependencyCheck.DiagnosisCount > 0 ||
         dependencyCheck.ImplantCount > 0 || dependencyCheck.ScrewCount > 0) {
         return {
             canDelete: false,
@@ -605,8 +678,8 @@ export const getWorkTypes = async () => {
 
 export const getWorkKeywords = async () => {
     return executeQuery(
-        `SELECT ID, KeyWord 
-        FROM tblKeyWord 
+        `SELECT ID, KeyWord
+        FROM tblKeyWord
         ORDER BY KeyWord`,
         [],
         (columns) => {
@@ -615,6 +688,98 @@ export const getWorkKeywords = async () => {
                 keyword[column.metadata.colName] = column.value;
             });
             return keyword;
+        }
+    );
+};
+
+// ===== TOOTH NUMBER FUNCTIONS =====
+
+/**
+ * Get all tooth numbers for dropdowns/selection
+ * @param {boolean} includePermanent - Include permanent teeth (default: true)
+ * @param {boolean} includeDeciduous - Include deciduous teeth (default: true)
+ * @returns {Promise<Array>} Array of tooth objects
+ */
+export const getToothNumbers = async (includePermanent = true, includeDeciduous = true) => {
+    let whereClause = '';
+    if (includePermanent && !includeDeciduous) {
+        whereClause = 'WHERE IsPermanent = 1';
+    } else if (!includePermanent && includeDeciduous) {
+        whereClause = 'WHERE IsPermanent = 0';
+    }
+
+    return executeQuery(
+        `SELECT ID, ToothCode, ToothName, Quadrant, ToothNumber, IsPermanent, SortOrder
+        FROM tblToothNumber
+        ${whereClause}
+        ORDER BY SortOrder`,
+        [],
+        (columns) => {
+            const tooth = {};
+            columns.forEach(column => {
+                tooth[column.metadata.colName] = column.value;
+            });
+            return tooth;
+        }
+    );
+};
+
+/**
+ * Set teeth for a work item (replaces existing teeth)
+ * @param {number} workItemId - Work item ID
+ * @param {Array<number>} teethIds - Array of tooth IDs
+ * @returns {Promise<Object>} Result with success status
+ */
+export const setWorkItemTeeth = async (workItemId, teethIds) => {
+    // First, delete existing teeth for this work item
+    await executeQuery(
+        `DELETE FROM tblWorkItemTeeth WHERE WorkItemID = @WorkItemID`,
+        [['WorkItemID', TYPES.Int, workItemId]],
+        null,
+        () => ({ success: true })
+    );
+
+    // If no teeth to add, return early
+    if (!teethIds || teethIds.length === 0) {
+        return { success: true, count: 0 };
+    }
+
+    // Insert new teeth
+    const values = teethIds.map((_, index) => `(@WorkItemID, @ToothID${index})`).join(', ');
+    const params = [['WorkItemID', TYPES.Int, workItemId]];
+    teethIds.forEach((toothId, index) => {
+        params.push([`ToothID${index}`, TYPES.Int, toothId]);
+    });
+
+    await executeQuery(
+        `INSERT INTO tblWorkItemTeeth (WorkItemID, ToothID) VALUES ${values}`,
+        params,
+        null,
+        () => ({ success: true })
+    );
+
+    return { success: true, count: teethIds.length };
+};
+
+/**
+ * Get teeth for a specific work item
+ * @param {number} workItemId - Work item ID
+ * @returns {Promise<Array>} Array of tooth objects
+ */
+export const getWorkItemTeeth = async (workItemId) => {
+    return executeQuery(
+        `SELECT tn.ID, tn.ToothCode, tn.ToothName, tn.Quadrant, tn.IsPermanent
+        FROM tblWorkItemTeeth wit
+        INNER JOIN tblToothNumber tn ON wit.ToothID = tn.ID
+        WHERE wit.WorkItemID = @WorkItemID
+        ORDER BY tn.SortOrder`,
+        [['WorkItemID', TYPES.Int, workItemId]],
+        (columns) => {
+            const tooth = {};
+            columns.forEach(column => {
+                tooth[column.metadata.colName] = column.value;
+            });
+            return tooth;
         }
     );
 };

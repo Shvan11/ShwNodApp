@@ -36,7 +36,15 @@ import {
     updateWorkDetail,
     deleteWorkDetail,
     addWorkWithInvoice,
-    WORK_STATUS
+    WORK_STATUS,
+    // New aliases for tblWorkItems
+    getWorkItems,
+    addWorkItem,
+    updateWorkItem,
+    deleteWorkItem,
+    // Tooth number functions
+    getToothNumbers,
+    getWorkItemTeeth
 } from '../../services/database/queries/work-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { requireRecordAge, getWorkCreationDate, isToday } from '../../middleware/time-based-auth.js';
@@ -492,6 +500,46 @@ router.get('/getworkkeywords', async (req, res) => {
     }
 });
 
+// Get tooth numbers for dropdown/selection
+router.get('/teeth', async (req, res) => {
+    try {
+        const { permanent, deciduous } = req.query;
+        const includePermanent = permanent !== 'false';
+        const includeDeciduous = deciduous !== 'false';
+
+        const teeth = await getToothNumbers(includePermanent, includeDeciduous);
+        res.json({
+            success: true,
+            teeth,
+            count: teeth.length
+        });
+    } catch (error) {
+        log.error("Error fetching tooth numbers:", error);
+        return sendError(res, 500, 'Failed to fetch tooth numbers', error);
+    }
+});
+
+// Get teeth for a specific work item
+router.get('/work/item/:itemId/teeth', async (req, res) => {
+    try {
+        const { itemId } = req.params;
+
+        if (!itemId || isNaN(parseInt(itemId))) {
+            return ErrorResponses.invalidParameter(res, 'itemId', 'Must be a valid number');
+        }
+
+        const teeth = await getWorkItemTeeth(parseInt(itemId));
+        res.json({
+            success: true,
+            teeth,
+            count: teeth.length
+        });
+    } catch (error) {
+        log.error("Error fetching work item teeth:", error);
+        return sendError(res, 500, 'Failed to fetch work item teeth', error);
+    }
+});
+
 // ===== WORK DETAILS API ENDPOINTS =====
 
 // Get work details list for a specific work
@@ -510,7 +558,7 @@ router.get('/getworkdetailslist', async (req, res) => {
     }
 });
 
-// Add new work detail
+// Add new work detail (work item)
 router.post('/addworkdetail', async (req, res) => {
     try {
         const workDetailData = req.body;
@@ -530,30 +578,42 @@ router.post('/addworkdetail', async (req, res) => {
             return ErrorResponses.invalidParameter(res, 'CanalsNo', 'Must be a valid number');
         }
 
+        // Validate ItemCost if provided
+        if (workDetailData.ItemCost && isNaN(parseInt(workDetailData.ItemCost))) {
+            return ErrorResponses.invalidParameter(res, 'ItemCost', 'Must be a valid number');
+        }
+
+        // Validate TeethIds if provided
+        if (workDetailData.TeethIds && !Array.isArray(workDetailData.TeethIds)) {
+            return ErrorResponses.invalidParameter(res, 'TeethIds', 'Must be an array of tooth IDs');
+        }
+
         const result = await addWorkDetail(workDetailData);
         res.json({
             success: true,
             detailId: result.ID,
-            message: "Work detail added successfully"
+            itemId: result.ID, // Alias for new naming
+            message: "Work item added successfully"
         });
     } catch (error) {
-        log.error("Error adding work detail:", error);
-        return sendError(res, 500, 'Failed to add work detail', error);
+        log.error("Error adding work item:", error);
+        return sendError(res, 500, 'Failed to add work item', error);
     }
 });
 
-// Update existing work detail
+// Update existing work detail (work item)
 router.put('/updateworkdetail', async (req, res) => {
     try {
-        const { detailId, ...workDetailData } = req.body;
+        const { detailId, itemId, ...workDetailData } = req.body;
+        const id = detailId || itemId; // Support both naming conventions
 
-        if (!detailId) {
-            return ErrorResponses.missingParameter(res, 'detailId');
+        if (!id) {
+            return ErrorResponses.missingParameter(res, 'detailId or itemId');
         }
 
         // Validate data types
-        if (isNaN(parseInt(detailId))) {
-            return ErrorResponses.invalidParameter(res, 'detailId', 'Must be a valid number');
+        if (isNaN(parseInt(id))) {
+            return ErrorResponses.invalidParameter(res, 'detailId/itemId', 'Must be a valid number');
         }
 
         // Validate CanalsNo if provided
@@ -561,40 +621,164 @@ router.put('/updateworkdetail', async (req, res) => {
             return ErrorResponses.invalidParameter(res, 'CanalsNo', 'Must be a valid number');
         }
 
-        const result = await updateWorkDetail(parseInt(detailId), workDetailData);
+        // Validate ItemCost if provided
+        if (workDetailData.ItemCost && isNaN(parseInt(workDetailData.ItemCost))) {
+            return ErrorResponses.invalidParameter(res, 'ItemCost', 'Must be a valid number');
+        }
+
+        // Validate TeethIds if provided
+        if (workDetailData.TeethIds && !Array.isArray(workDetailData.TeethIds)) {
+            return ErrorResponses.invalidParameter(res, 'TeethIds', 'Must be an array of tooth IDs');
+        }
+
+        const result = await updateWorkDetail(parseInt(id), workDetailData);
         res.json({
             success: true,
-            message: "Work detail updated successfully",
+            message: "Work item updated successfully",
             rowsAffected: result.rowCount
         });
     } catch (error) {
-        log.error("Error updating work detail:", error);
-        return sendError(res, 500, 'Failed to update work detail', error);
+        log.error("Error updating work item:", error);
+        return sendError(res, 500, 'Failed to update work item', error);
     }
 });
 
-// Delete work detail
+// Delete work detail (work item)
 router.delete('/deleteworkdetail', async (req, res) => {
     try {
-        const { detailId } = req.body;
+        const { detailId, itemId } = req.body;
+        const id = detailId || itemId; // Support both naming conventions
 
-        if (!detailId) {
-            return ErrorResponses.missingParameter(res, 'detailId');
+        if (!id) {
+            return ErrorResponses.missingParameter(res, 'detailId or itemId');
         }
 
-        if (isNaN(parseInt(detailId))) {
-            return ErrorResponses.invalidParameter(res, 'detailId', 'Must be a valid number');
+        if (isNaN(parseInt(id))) {
+            return ErrorResponses.invalidParameter(res, 'detailId/itemId', 'Must be a valid number');
         }
 
-        const result = await deleteWorkDetail(parseInt(detailId));
+        const result = await deleteWorkDetail(parseInt(id));
         res.json({
             success: true,
-            message: "Work detail deleted successfully",
+            message: "Work item deleted successfully",
             rowsAffected: result.rowCount
         });
     } catch (error) {
-        log.error("Error deleting work detail:", error);
-        return sendError(res, 500, 'Failed to delete work detail', error);
+        log.error("Error deleting work item:", error);
+        return sendError(res, 500, 'Failed to delete work item', error);
+    }
+});
+
+// ===== WORK ITEMS API ENDPOINTS (New RESTful Routes) =====
+
+/**
+ * GET /api/work/:workId/items
+ * Get all work items for a specific work
+ */
+router.get('/work/:workId/items', async (req, res) => {
+    try {
+        const { workId } = req.params;
+
+        if (!workId || isNaN(parseInt(workId))) {
+            return ErrorResponses.invalidParameter(res, 'workId', 'Must be a valid number');
+        }
+
+        const items = await getWorkItems(parseInt(workId));
+        res.json({
+            success: true,
+            items,
+            count: items.length
+        });
+    } catch (error) {
+        log.error("Error fetching work items:", error);
+        return sendError(res, 500, 'Failed to fetch work items', error);
+    }
+});
+
+/**
+ * POST /api/work/:workId/items
+ * Add a new work item to a work
+ */
+router.post('/work/:workId/items', async (req, res) => {
+    try {
+        const { workId } = req.params;
+        const itemData = req.body;
+
+        if (!workId || isNaN(parseInt(workId))) {
+            return ErrorResponses.invalidParameter(res, 'workId', 'Must be a valid number');
+        }
+
+        // Validate TeethIds if provided
+        if (itemData.TeethIds && !Array.isArray(itemData.TeethIds)) {
+            return ErrorResponses.invalidParameter(res, 'TeethIds', 'Must be an array of tooth IDs');
+        }
+
+        // Add workId from URL to item data
+        itemData.WorkID = parseInt(workId);
+
+        const result = await addWorkItem(itemData);
+        res.json({
+            success: true,
+            itemId: result.ID,
+            message: "Work item added successfully"
+        });
+    } catch (error) {
+        log.error("Error adding work item:", error);
+        return sendError(res, 500, 'Failed to add work item', error);
+    }
+});
+
+/**
+ * PUT /api/work/item/:itemId
+ * Update a specific work item
+ */
+router.put('/work/item/:itemId', async (req, res) => {
+    try {
+        const { itemId } = req.params;
+        const itemData = req.body;
+
+        if (!itemId || isNaN(parseInt(itemId))) {
+            return ErrorResponses.invalidParameter(res, 'itemId', 'Must be a valid number');
+        }
+
+        // Validate TeethIds if provided
+        if (itemData.TeethIds && !Array.isArray(itemData.TeethIds)) {
+            return ErrorResponses.invalidParameter(res, 'TeethIds', 'Must be an array of tooth IDs');
+        }
+
+        const result = await updateWorkItem(parseInt(itemId), itemData);
+        res.json({
+            success: true,
+            message: "Work item updated successfully",
+            rowsAffected: result.rowCount
+        });
+    } catch (error) {
+        log.error("Error updating work item:", error);
+        return sendError(res, 500, 'Failed to update work item', error);
+    }
+});
+
+/**
+ * DELETE /api/work/item/:itemId
+ * Delete a specific work item
+ */
+router.delete('/work/item/:itemId', async (req, res) => {
+    try {
+        const { itemId } = req.params;
+
+        if (!itemId || isNaN(parseInt(itemId))) {
+            return ErrorResponses.invalidParameter(res, 'itemId', 'Must be a valid number');
+        }
+
+        const result = await deleteWorkItem(parseInt(itemId));
+        res.json({
+            success: true,
+            message: "Work item deleted successfully",
+            rowsAffected: result.rowCount
+        });
+    } catch (error) {
+        log.error("Error deleting work item:", error);
+        return sendError(res, 500, 'Failed to delete work item', error);
     }
 });
 

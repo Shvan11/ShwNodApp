@@ -2,10 +2,9 @@
  * NewVisitComponent - Standalone form for adding/editing visits
  *
  * Compact, space-efficient form with dental chart integration
- * Optimized with React hooks (useCallback, useMemo) for performance
  */
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import DentalChart from './DentalChart.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 
@@ -45,14 +44,6 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
         OperatorID: ''
     });
 
-    // Derive selected teeth from formData using useMemo (prevents unnecessary recalculations)
-    const selectedTeeth = useMemo(() => {
-        const toothPattern = /(UR|UL|LR|LL)[1-8]/g;
-        const othersMatches = (formData.Others || '').match(toothPattern) || [];
-        const nextVisitMatches = (formData.NextVisit || '').match(toothPattern) || [];
-        // Combine and remove duplicates
-        return [...new Set([...othersMatches, ...nextVisitMatches])];
-    }, [formData.Others, formData.NextVisit]);
 
     // Memoized function to load dropdown data
     const loadDropdownData = useCallback(async () => {
@@ -105,7 +96,6 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                 ApplianceRemoved: visit.ApplianceRemoved || false,
                 OperatorID: visit.OperatorID || ''
             });
-            // selectedTeeth is now automatically derived via useMemo
         } catch (err) {
             setError(err.message);
         } finally {
@@ -182,8 +172,6 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
 
             return { ...prevData, [targetField]: newValue };
         });
-
-        // selectedTeeth is automatically updated via useMemo when formData changes
 
         const targetRef = lastFocusedField === 'Others' ? othersTextareaRef : nextVisitTextareaRef;
         if (targetRef.current) {
@@ -405,10 +393,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }) => {
                             <i className="fas fa-arrow-down"></i> Appends to: <strong>{lastFocusedField === 'Others' ? 'Other Notes' : 'Next Visit'}</strong>
                         </span>
                     </label>
-                    <DentalChart
-                        onToothClick={handleToothClick}
-                        selectedTeeth={selectedTeeth}
-                    />
+                    <DentalChart onToothClick={handleToothClick} />
                 </div>
 
                 {/* Notes */}

@@ -4,6 +4,12 @@ import WorkCard from './WorkCard.jsx';
 import PaymentModal from './PaymentModal.jsx';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters.js';
 import { useToast } from '../../contexts/ToastContext.jsx';
+import {
+    getWorkTypeConfig,
+    MATERIAL_OPTIONS,
+    FILLING_TYPE_OPTIONS,
+    FILLING_DEPTH_OPTIONS
+} from '../../config/workTypeConfig.js';
 import '../../../css/components/work-card.css';
 
 /**
@@ -52,23 +58,48 @@ const WorkComponent = ({ patientId }) => {
     const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
     const [workToDelete, setWorkToDelete] = useState(null);
 
-    // Work detail form state
+    // Work detail form state - includes all possible fields for all work types
     const [detailFormData, setDetailFormData] = useState({
         WorkID: null,
-        Tooth: '',
+        TeethIds: [],
         FillingType: '',
         FillingDepth: '',
         CanalsNo: '',
+        WorkingLength: '',      // For Endo - working length per canal
+        ImplantLength: '',      // For Implant
+        ImplantDiameter: '',    // For Implant
+        Material: '',           // For Crown/Bridge/Veneers
+        LabName: '',            // For Crown/Bridge/Veneers
+        ItemCost: '',
+        StartDate: '',
+        CompletedDate: '',
         Note: ''
     });
+
+    // Teeth options for multi-select
+    const [teethOptions, setTeethOptions] = useState([]);
+    const [showTeethPermanent, setShowTeethPermanent] = useState(true);
+    const [showTeethDeciduous, setShowTeethDeciduous] = useState(false);
 
     useEffect(() => {
         if (patientId && patientId !== 'new') {
             loadWorks();
             loadPatientInfo();
             checkAppointmentStatus();
+            loadTeethOptions();
         }
     }, [patientId]);
+
+    const loadTeethOptions = async () => {
+        try {
+            const response = await fetch('/api/teeth');
+            if (!response.ok) throw new Error('Failed to fetch teeth options');
+            const data = await response.json();
+            setTeethOptions(data.teeth || []);
+        } catch (err) {
+            console.error('Error loading teeth options:', err);
+        }
+    };
 
     // Work Status Constants (must match backend)
     const WORK_STATUS = {
@@ -304,10 +335,18 @@ const WorkComponent = ({ patientId }) => {
         setEditingDetail(null);
         setDetailFormData({
             WorkID: selectedWork.workid,
-            Tooth: '',
+            TeethIds: [],
             FillingType: '',
             FillingDepth: '',
             CanalsNo: '',
+            WorkingLength: '',
+            ImplantLength: '',
+            ImplantDiameter: '',
+            Material: '',
+            LabName: '',
+            ItemCost: '',
+            StartDate: '',
+            CompletedDate: '',
             Note: ''
         });
         setShowDetailForm(true);
@@ -317,10 +356,18 @@ const WorkComponent = ({ patientId }) => {
         setEditingDetail(detail);
         setDetailFormData({
             WorkID: detail.WorkID,
-            Tooth: detail.Tooth || '',
+            TeethIds: detail.TeethIds || [],
             FillingType: detail.FillingType || '',
             FillingDepth: detail.FillingDepth || '',
             CanalsNo: detail.CanalsNo || '',
+            WorkingLength: detail.WorkingLength || '',
+            ImplantLength: detail.ImplantLength || '',
+            ImplantDiameter: detail.ImplantDiameter || '',
+            Material: detail.Material || '',
+            LabName: detail.LabName || '',
+            ItemCost: detail.ItemCost || '',
+            StartDate: detail.StartDate ? detail.StartDate.split('T')[0] : '',
+            CompletedDate: detail.CompletedDate ? detail.CompletedDate.split('T')[0] : '',
             Note: detail.Note || ''
         });
         setShowDetailForm(true);
@@ -824,15 +871,18 @@ const WorkComponent = ({ patientId }) => {
                                 )}
                             </div>
 
-                            {/* Work Details Table */}
+                            {/* Work Details Table - Type-specific display */}
                             <div className="details-section">
                                 <div className="section-header">
-                                    <h4>Treatment Details</h4>
+                                    <h4>
+                                        <i className={getWorkTypeConfig(selectedWork.Typeofwork).icon}></i>
+                                        {' '}{getWorkTypeConfig(selectedWork.Typeofwork).name} Details
+                                    </h4>
                                     <button
                                         onClick={handleAddDetail}
                                         className="btn btn-sm btn-primary"
                                     >
-                                        Add Detail
+                                        <i className="fas fa-plus"></i> Add Item
                                     </button>
                                 </div>
 
@@ -840,35 +890,53 @@ const WorkComponent = ({ patientId }) => {
                                     <table className="details-table">
                                         <thead>
                                             <tr>
-                                                <th>Tooth</th>
-                                                <th>Filling Type</th>
-                                                <th>Filling Depth</th>
-                                                <th>Canals No.</th>
-                                                <th>Note</th>
+                                                {getWorkTypeConfig(selectedWork.Typeofwork).displayFields.map(field => (
+                                                    <th key={field.key}>{field.label}</th>
+                                                ))}
+                                                <th>Status</th>
                                                 <th>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {workDetails.map((detail) => (
                                                 <tr key={detail.ID}>
-                                                    <td>{detail.Tooth || '-'}</td>
-                                                    <td>{detail.FillingType || '-'}</td>
-                                                    <td>{detail.FillingDepth || '-'}</td>
-                                                    <td>{detail.CanalsNo || '-'}</td>
-                                                    <td>{detail.Note || '-'}</td>
+                                                    {getWorkTypeConfig(selectedWork.Typeofwork).displayFields.map(field => (
+                                                        <td key={field.key}>
+                                                            {field.key === 'Teeth' ? (
+                                                                <span className="teeth-badge">{detail.Teeth || '-'}</span>
+                                                            ) : field.key === 'CanalsNo' ? (
+                                                                detail.CanalsNo ? `${detail.CanalsNo} canal${detail.CanalsNo > 1 ? 's' : ''}` : '-'
+                                                            ) : field.key === 'ImplantLength' || field.key === 'ImplantDiameter' ? (
+                                                                detail[field.key] ? `${detail[field.key]} mm` : '-'
+                                                            ) : (
+                                                                detail[field.key] || '-'
+                                                            )}
+                                                        </td>
+                                                    ))}
+                                                    <td>
+                                                        {detail.CompletedDate ? (
+                                                            <span className="status-badge status-completed">Completed</span>
+                                                        ) : detail.StartDate ? (
+                                                            <span className="status-badge status-started">Started</span>
+                                                        ) : (
+                                                            <span className="status-badge status-pending">Pending</span>
+                                                        )}
+                                                    </td>
                                                     <td>
                                                         <div className="action-buttons">
                                                             <button
                                                                 onClick={() => handleEditDetail(detail)}
                                                                 className="btn btn-xs btn-secondary"
+                                                                title="Edit"
                                                             >
-                                                                Edit
+                                                                <i className="fas fa-edit"></i>
                                                             </button>
                                                             <button
                                                                 onClick={() => handleDeleteDetail(detail.ID)}
                                                                 className="btn btn-xs btn-danger"
+                                                                title="Delete"
                                                             >
-                                                                Delete
+                                                                <i className="fas fa-trash"></i>
                                                             </button>
                                                         </div>
                                                     </td>
@@ -876,8 +944,8 @@ const WorkComponent = ({ patientId }) => {
                                             ))}
                                             {workDetails.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="6" className="no-data">
-                                                        No treatment details recorded yet
+                                                    <td colSpan={getWorkTypeConfig(selectedWork.Typeofwork).displayFields.length + 2} className="no-data">
+                                                        No treatment items recorded yet
                                                     </td>
                                                 </tr>
                                             )}
@@ -890,12 +958,15 @@ const WorkComponent = ({ patientId }) => {
                 </div>
             )}
 
-            {/* Work Detail Form Modal */}
-            {showDetailForm && (
+            {/* Work Detail Form Modal - Type-specific fields */}
+            {showDetailForm && selectedWork && (
                 <div className="modal-overlay">
                     <div className="work-modal detail-form-modal">
                         <div className="modal-header">
-                            <h3>{editingDetail ? 'Edit Treatment Detail' : 'Add Treatment Detail'}</h3>
+                            <h3>
+                                <i className={getWorkTypeConfig(selectedWork.Typeofwork).icon}></i>
+                                {' '}{editingDetail ? 'Edit' : 'Add'} {getWorkTypeConfig(selectedWork.Typeofwork).name} Item
+                            </h3>
                             <button
                                 onClick={() => setShowDetailForm(false)}
                                 className="modal-close"
@@ -905,71 +976,294 @@ const WorkComponent = ({ patientId }) => {
                         </div>
 
                         <form onSubmit={handleDetailFormSubmit} className="detail-form">
+                            {/* Teeth Selection - shown for all types that need it */}
+                            {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('teeth') && (
+                                <div className="form-group full-width">
+                                    <label>Select Teeth</label>
+                                    <div className="teeth-filter-toggle">
+                                        <label className="checkbox-label">
+                                            <input
+                                                type="checkbox"
+                                                checked={showTeethPermanent}
+                                                onChange={(e) => setShowTeethPermanent(e.target.checked)}
+                                            />
+                                            Permanent
+                                        </label>
+                                        <label className="checkbox-label">
+                                            <input
+                                                type="checkbox"
+                                                checked={showTeethDeciduous}
+                                                onChange={(e) => setShowTeethDeciduous(e.target.checked)}
+                                            />
+                                            Deciduous
+                                        </label>
+                                    </div>
+                                    <div className="teeth-selection-grid">
+                                        {/* Upper Arch */}
+                                        <div className="teeth-arch">
+                                            <span className="arch-label">Upper</span>
+                                            <div className="teeth-row">
+                                                {teethOptions
+                                                    .filter(t => t.Quadrant === 'UR' && ((showTeethPermanent && t.IsPermanent) || (showTeethDeciduous && !t.IsPermanent)))
+                                                    .sort((a, b) => b.SortOrder - a.SortOrder)
+                                                    .map(tooth => (
+                                                        <button
+                                                            key={tooth.ID}
+                                                            type="button"
+                                                            className={`tooth-btn ${detailFormData.TeethIds.includes(tooth.ID) ? 'selected' : ''} ${!tooth.IsPermanent ? 'deciduous' : ''}`}
+                                                            onClick={() => {
+                                                                const newTeethIds = detailFormData.TeethIds.includes(tooth.ID)
+                                                                    ? detailFormData.TeethIds.filter(id => id !== tooth.ID)
+                                                                    : [...detailFormData.TeethIds, tooth.ID];
+                                                                setDetailFormData({ ...detailFormData, TeethIds: newTeethIds });
+                                                            }}
+                                                            title={tooth.ToothName}
+                                                        >
+                                                            {tooth.ToothCode.replace('UR', '')}
+                                                        </button>
+                                                    ))}
+                                                <span className="midline">|</span>
+                                                {teethOptions
+                                                    .filter(t => t.Quadrant === 'UL' && ((showTeethPermanent && t.IsPermanent) || (showTeethDeciduous && !t.IsPermanent)))
+                                                    .sort((a, b) => a.SortOrder - b.SortOrder)
+                                                    .map(tooth => (
+                                                        <button
+                                                            key={tooth.ID}
+                                                            type="button"
+                                                            className={`tooth-btn ${detailFormData.TeethIds.includes(tooth.ID) ? 'selected' : ''} ${!tooth.IsPermanent ? 'deciduous' : ''}`}
+                                                            onClick={() => {
+                                                                const newTeethIds = detailFormData.TeethIds.includes(tooth.ID)
+                                                                    ? detailFormData.TeethIds.filter(id => id !== tooth.ID)
+                                                                    : [...detailFormData.TeethIds, tooth.ID];
+                                                                setDetailFormData({ ...detailFormData, TeethIds: newTeethIds });
+                                                            }}
+                                                            title={tooth.ToothName}
+                                                        >
+                                                            {tooth.ToothCode.replace('UL', '')}
+                                                        </button>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                        {/* Lower Arch */}
+                                        <div className="teeth-arch">
+                                            <span className="arch-label">Lower</span>
+                                            <div className="teeth-row">
+                                                {teethOptions
+                                                    .filter(t => t.Quadrant === 'LR' && ((showTeethPermanent && t.IsPermanent) || (showTeethDeciduous && !t.IsPermanent)))
+                                                    .sort((a, b) => b.SortOrder - a.SortOrder)
+                                                    .map(tooth => (
+                                                        <button
+                                                            key={tooth.ID}
+                                                            type="button"
+                                                            className={`tooth-btn ${detailFormData.TeethIds.includes(tooth.ID) ? 'selected' : ''} ${!tooth.IsPermanent ? 'deciduous' : ''}`}
+                                                            onClick={() => {
+                                                                const newTeethIds = detailFormData.TeethIds.includes(tooth.ID)
+                                                                    ? detailFormData.TeethIds.filter(id => id !== tooth.ID)
+                                                                    : [...detailFormData.TeethIds, tooth.ID];
+                                                                setDetailFormData({ ...detailFormData, TeethIds: newTeethIds });
+                                                            }}
+                                                            title={tooth.ToothName}
+                                                        >
+                                                            {tooth.ToothCode.replace('LR', '')}
+                                                        </button>
+                                                    ))}
+                                                <span className="midline">|</span>
+                                                {teethOptions
+                                                    .filter(t => t.Quadrant === 'LL' && ((showTeethPermanent && t.IsPermanent) || (showTeethDeciduous && !t.IsPermanent)))
+                                                    .sort((a, b) => a.SortOrder - b.SortOrder)
+                                                    .map(tooth => (
+                                                        <button
+                                                            key={tooth.ID}
+                                                            type="button"
+                                                            className={`tooth-btn ${detailFormData.TeethIds.includes(tooth.ID) ? 'selected' : ''} ${!tooth.IsPermanent ? 'deciduous' : ''}`}
+                                                            onClick={() => {
+                                                                const newTeethIds = detailFormData.TeethIds.includes(tooth.ID)
+                                                                    ? detailFormData.TeethIds.filter(id => id !== tooth.ID)
+                                                                    : [...detailFormData.TeethIds, tooth.ID];
+                                                                setDetailFormData({ ...detailFormData, TeethIds: newTeethIds });
+                                                            }}
+                                                            title={tooth.ToothName}
+                                                        >
+                                                            {tooth.ToothCode.replace('LL', '')}
+                                                        </button>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {detailFormData.TeethIds.length > 0 && (
+                                        <div className="selected-teeth-display">
+                                            <strong>Selected:</strong> {detailFormData.TeethIds.map(id => {
+                                                const tooth = teethOptions.find(t => t.ID === id);
+                                                return tooth?.ToothCode;
+                                            }).filter(Boolean).join(', ')}
+                                            <button
+                                                type="button"
+                                                className="btn-clear-teeth"
+                                                onClick={() => setDetailFormData({ ...detailFormData, TeethIds: [] })}
+                                            >
+                                                Clear All
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Type-specific fields */}
+                            <div className="form-row">
+                                {/* Filling fields */}
+                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('fillingType') && (
+                                    <div className="form-group">
+                                        <label>Filling Type</label>
+                                        <select
+                                            value={detailFormData.FillingType}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, FillingType: e.target.value })}
+                                        >
+                                            <option value="">Select Type</option>
+                                            {FILLING_TYPE_OPTIONS.map(opt => (
+                                                <option key={opt} value={opt}>{opt}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('fillingDepth') && (
+                                    <div className="form-group">
+                                        <label>Filling Depth</label>
+                                        <select
+                                            value={detailFormData.FillingDepth}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, FillingDepth: e.target.value })}
+                                        >
+                                            <option value="">Select Depth</option>
+                                            {FILLING_DEPTH_OPTIONS.map(opt => (
+                                                <option key={opt} value={opt}>{opt}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {/* Endo fields */}
+                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('canalsNo') && (
+                                    <div className="form-group">
+                                        <label>Number of Canals</label>
+                                        <input
+                                            type="number"
+                                            value={detailFormData.CanalsNo}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, CanalsNo: e.target.value })}
+                                            min="1"
+                                            max="5"
+                                            placeholder="1-5"
+                                        />
+                                    </div>
+                                )}
+
+                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('workingLength') && (
+                                    <div className="form-group">
+                                        <label>Working Length</label>
+                                        <input
+                                            type="text"
+                                            value={detailFormData.WorkingLength}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, WorkingLength: e.target.value })}
+                                            placeholder="e.g., 20mm, 18mm, 19mm"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Implant fields */}
+                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('implantLength') && (
+                                    <div className="form-group">
+                                        <label>Implant Length (mm)</label>
+                                        <input
+                                            type="number"
+                                            step="0.5"
+                                            value={detailFormData.ImplantLength}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, ImplantLength: e.target.value })}
+                                            placeholder="e.g., 10, 11.5, 13"
+                                        />
+                                    </div>
+                                )}
+
+                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('implantDiameter') && (
+                                    <div className="form-group">
+                                        <label>Implant Diameter (mm)</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            value={detailFormData.ImplantDiameter}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, ImplantDiameter: e.target.value })}
+                                            placeholder="e.g., 3.5, 4.0, 5.0"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Crown/Bridge fields */}
+                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('material') && (
+                                    <div className="form-group">
+                                        <label>Material</label>
+                                        <select
+                                            value={detailFormData.Material}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, Material: e.target.value })}
+                                        >
+                                            <option value="">Select Material</option>
+                                            {MATERIAL_OPTIONS.map(opt => (
+                                                <option key={opt} value={opt}>{opt}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('labName') && (
+                                    <div className="form-group">
+                                        <label>Lab Name</label>
+                                        <input
+                                            type="text"
+                                            value={detailFormData.LabName}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, LabName: e.target.value })}
+                                            placeholder="Enter lab name"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Status Dates */}
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label>Tooth Number</label>
+                                    <label>Start Date</label>
                                     <input
-                                        type="text"
-                                        value={detailFormData.Tooth}
-                                        onChange={(e) => setDetailFormData({ ...detailFormData, Tooth: e.target.value })}
-                                        placeholder="e.g., 14, 27, etc."
+                                        type="date"
+                                        value={detailFormData.StartDate}
+                                        onChange={(e) => setDetailFormData({ ...detailFormData, StartDate: e.target.value })}
                                     />
                                 </div>
 
                                 <div className="form-group">
-                                    <label>Filling Type</label>
-                                    <select
-                                        value={detailFormData.FillingType}
-                                        onChange={(e) => setDetailFormData({ ...detailFormData, FillingType: e.target.value })}
-                                    >
-                                        <option value="">Select Type</option>
-                                        <option value="Composite">Composite</option>
-                                        <option value="Amalgam">Amalgam</option>
-                                        <option value="Crown">Crown</option>
-                                        <option value="Inlay">Inlay</option>
-                                        <option value="Onlay">Onlay</option>
-                                        <option value="Root Canal">Root Canal</option>
-                                        <option value="Extraction">Extraction</option>
-                                        <option value="Other">Other</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Filling Depth</label>
-                                    <select
-                                        value={detailFormData.FillingDepth}
-                                        onChange={(e) => setDetailFormData({ ...detailFormData, FillingDepth: e.target.value })}
-                                    >
-                                        <option value="">Select Depth</option>
-                                        <option value="Superficial">Superficial</option>
-                                        <option value="Medium">Medium</option>
-                                        <option value="Deep">Deep</option>
-                                        <option value="Pulp">Pulp</option>
-                                    </select>
+                                    <label>Completed Date</label>
+                                    <input
+                                        type="date"
+                                        value={detailFormData.CompletedDate}
+                                        onChange={(e) => setDetailFormData({ ...detailFormData, CompletedDate: e.target.value })}
+                                    />
                                 </div>
 
                                 <div className="form-group">
-                                    <label>Number of Canals</label>
+                                    <label>Item Cost</label>
                                     <input
                                         type="number"
-                                        value={detailFormData.CanalsNo}
-                                        onChange={(e) => setDetailFormData({ ...detailFormData, CanalsNo: e.target.value })}
-                                        min="1"
-                                        max="5"
-                                        placeholder="1-5"
+                                        value={detailFormData.ItemCost}
+                                        onChange={(e) => setDetailFormData({ ...detailFormData, ItemCost: e.target.value })}
+                                        placeholder="Optional"
+                                        min="0"
                                     />
                                 </div>
                             </div>
 
+                            {/* Notes - shown for all types */}
                             <div className="form-group full-width">
                                 <label>Notes</label>
                                 <textarea
                                     value={detailFormData.Note}
                                     onChange={(e) => setDetailFormData({ ...detailFormData, Note: e.target.value })}
                                     rows="3"
-                                    placeholder="Additional notes about this treatment..."
+                                    placeholder="Additional notes..."
                                 />
                             </div>
 
@@ -982,7 +1276,7 @@ const WorkComponent = ({ patientId }) => {
                                     Cancel
                                 </button>
                                 <button type="submit" className="btn btn-primary">
-                                    {editingDetail ? 'Update Detail' : 'Add Detail'}
+                                    {editingDetail ? 'Update Item' : 'Add Item'}
                                 </button>
                             </div>
                         </form>
