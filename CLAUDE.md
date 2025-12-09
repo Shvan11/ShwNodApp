@@ -1,975 +1,294 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
-**Shwan Orthodontics Management System** is a comprehensive, enterprise-grade orthodontic practice management platform built with Node.js, Express, and React 19. This application handles the complete patient lifecycle from registration through treatment completion, with advanced features for aligner management, multi-channel patient communication, and financial tracking.
+**Shwan Orthodontics Management System** - Enterprise orthodontic practice management platform built with Node.js, Express, and React 19.
 
-### Core Capabilities
+### Core Features
+- **Patient Management**: Registration, demographics, photo/x-ray imaging, WebCeph/Dolphin integration
+- **Orthodontic Treatment**: Interactive dental chart (Palmer notation), wire tracking, visits, appliances
+- **Aligner Management**: Doctor/partner registration, set lifecycle, batch management, Google Drive PDF storage
+- **Appointments**: Monthly/weekly calendar, daily dashboard, real-time check-in workflow
+- **Multi-Channel Messaging**: WhatsApp (Web.js), SMS (Twilio), Telegram, bulk reminders
+- **Financial**: Multi-currency payments, invoices, receipts, expense tracking
+- **Templates**: GrapesJS visual designer for receipts/invoices/prescriptions
 
-**Patient Management**: Complete patient lifecycle including registration, demographic data, contact management, treatment history, photo/x-ray imaging with time-point organization, and WebCeph integration for cephalometric analysis.
-
-**Orthodontic Treatment**: Interactive dental chart (Palmer notation), wire tracking (upper/lower arch), visit recording with treatment notes, appliance/bracket tracking, treatment planning, progress monitoring with photo milestones, CS Imaging integration, and Dolphin Imaging integration with automatic patient folder configuration.
-
-**Aligner Management**: Comprehensive aligner case management including doctor/partner registration, aligner set lifecycle tracking, batch management, payment tracking, activity logging, doctor communication with notes, and PDF case plan storage via Google Drive integration.
-
-**Appointment System**: Monthly/weekly calendar views, daily appointment dashboard, real-time check-in workflow (Scheduled → Present → Seated → Dismissed), appointment types/categories, and WebSocket-powered live updates.
-
-**Multi-Channel Messaging**: WhatsApp integration (Web.js) with QR authentication, SMS via Twilio, Telegram bot integration, bulk appointment reminders, message status tracking (sent/delivered/read), media sending (photos/x-rays/receipts), and circuit breaker pattern for resilience.
-
-**Financial Management**: Multi-currency payment processing with exchange rates, invoice generation, receipt printing, payment history tracking, outstanding balance calculations, treatment cost management, and daily financial reports.
-
-**Expense Tracking**: Expense recording with categories/subcategories, multi-currency support, date range filtering, category-based analysis, and expense totals reporting.
-
-**Document Templates**: Visual template designer powered by GrapesJS, custom receipt/invoice/prescription templates, drag-and-drop editor, HTML/CSS editing, and template preview.
-
-**Real-Time Features**: WebSocket-based live updates for appointments, messaging status, patient data sync, connection health monitoring, and progress indicators for batch operations.
-
-**System Administration**: Role-based access control (Admin/Secretary/Doctor/Staff), employee management, database configuration and backup, system health monitoring, and application lifecycle control.
-
-### Technology Stack
-
-- **Backend**: Node.js, Express, SQL Server (Tedious), WebSocket, Multer (file uploads)
-- **Frontend**: React 19, React Router v7, Vite, GrapesJS, Chart libraries
-- **External Services**: WhatsApp Web.js, Twilio SMS, Telegram Bot API, Google OAuth/Drive, WebCeph
-- **Architecture**: Single-page application (SPA), RESTful API, real-time WebSocket communication, connection pooling, circuit breaker pattern
+### Tech Stack
+- **Backend**: Node.js, Express 5, SQL Server (Tedious), WebSocket
+- **Frontend**: React 19, React Router v7 (Data Router), Vite
+- **External**: WhatsApp Web.js, Twilio, Telegram Bot API, Google Drive, WebCeph
 
 ### Application Scale
+| Metric | Count |
+|--------|-------|
+| API Endpoints | ~173 |
+| React Components | 91 |
+| CSS Files | 56 (~32,756 lines) |
+| Frontend Routes | 31 |
+| Route Loaders | 7 |
+| Backend Service Categories | 16 |
+| Custom Hooks | 8 |
+| Database Tables | 25+ |
+
+---
+
+## Commands
 
-- **150+ Features** across 18 major categories
-- **100+ API Endpoints** for comprehensive data operations
-- **40+ React Components** for modular UI
-- **45 CSS Files** (~25,576 lines) with custom design system
-- **31 Frontend Routes** with Data Router loaders (5 phases)
-- **7 Route Loaders** with smart caching for optimized data fetching
-- **18+ Backend API Routes** with organized query modules
-- **20+ Database Tables** for complete data modeling
-
-### Navigation Patterns
-
-**This application uses React Router v7 for all internal navigation. NEVER use `window.location.href` for internal routes.**
-
-**Internal Navigation** - Use React Router exclusively:
-- `useNavigate()` hook for programmatic navigation
-- `<Link>` component for declarative navigation
-- Route loaders for auth checks and data prefetching
-- Native scroll restoration (automatic via React Router)
-
-**External Navigation** - Use `window.location.href` ONLY for:
-- External URLs (third-party websites, imaging systems)
-- System protocol handlers (`explorer:`, `csimaging:`, etc.)
-- Security logout (clearing React state intentionally)
-- Route loader 401 redirects (established auth pattern)
-
-**Example (Correct):**
-```javascript
-import { useNavigate } from 'react-router-dom';
-
-function MyComponent() {
-  const navigate = useNavigate();
-
-  return (
-    <button onClick={() => navigate('/patient/123/works')}>
-      View Patient
-    </button>
-  );
-}
-```
-
-**Example (Incorrect):**
-```javascript
-// ❌ WRONG - Causes full page reload, loses React state, bypasses route loaders
-<button onClick={() => window.location.href = '/patient/123/works'}>
-  View Patient
-</button>
-```
-
-**Benefits of using React Router navigation:**
-- ⚡ Instant transitions (no page reload)
-- 🔄 Automatic scroll restoration
-- 📦 Route loader caching works correctly
-- 🔌 WebSocket connections remain stable
-- 🎯 Browser back/forward work seamlessly
-
-## MCP Servers
-
-This project uses Model Context Protocol (MCP) servers to enable AI-assisted development:
-
-- **MSSQL MCP Server** (`@wener/mssql-mcp`) - Provides direct database access for schema exploration, queries, and data analysis
-- **React MCP Server** - Assists with React component development
-
-Configuration is in `.mcp.json`. See `docs/mcp-mssql-setup.md` for MSSQL MCP server usage.
-
-## Core Commands
-
-### Development
-- **Development Mode**: `npm run dev` - Runs Vite dev server (port 5173) + Express API (port 3001)
-- **Backend Only**: `npm run dev:server` - Express server only (port 3001)
-- **Frontend Only**: `npm run dev:client` - Vite dev server only (port 5173)
-
-### Production
-- **Build Application**: `npm run build` - Builds optimized production bundle to `/dist`
-- **Start Production**: `npm start` or `node index.js` - Serves built app from `/dist` (port 3000)
-- **Preview Build**: `npm run preview` - Preview production build locally
-
-### Windows Service
-- **Install as Service**: `npm run service:install`
-- **Uninstall Service**: `npm run service:uninstall`
-
-### Testing
-- **Run Tests**: No test framework configured yet
-
-## Architecture Overview
-
-### Backend Structure
-- **Entry Point**: `index.js` - Main server with enhanced startup, health monitoring, and graceful shutdown
-- **Configuration**: Environment-based config in `/config/` with database and service credentials
-- **Database**: SQL Server via Tedious with connection pooling (`services/database/ConnectionPool.js`)
-- **Messaging Services**: 
-  - WhatsApp Web.js client with persistent authentication (`services/messaging/whatsapp.js`)
-  - SMS via Twilio (`services/messaging/sms.js`)
-  - Telegram Bot API (`services/messaging/telegram.js`)
-- **State Management**: Centralized state manager (`services/state/StateManager.js`) with message state tracking
-- **WebSocket**: Real-time communication for messaging status updates and patient loading events
-
-### Key Services
-- **ResourceManager**: Handles application lifecycle and cleanup
-- **HealthCheck**: Application monitoring and status endpoints
-- **TransactionManager**: Database transaction handling with rollback capability
-- **QR Code Generation**: For WhatsApp authentication and patient records
-
-### Frontend Structure
-- **Architecture**: **Modern React Single-Page Application with Data Router** ✨
-  - **Framework**: React 19 with React Router v7 Data Router (createBrowserRouter)
-  - **Entry Point**: Single HTML file (`/public/index.html`) - loads once, never reloads
-  - **Routing**: React Router v7 Data Router with route loaders, actions, and error boundaries
-  - **State**: React Context API for shared state management
-  - **Loading**: ESM imports from CDN (esm.sh) for core libraries, Vite bundling for application code
-  - **Build Tool**: Vite for fast development and optimized production builds
-
-- **Application Structure** (`/public/js/`):
-  - `App.jsx` - Main application component with RouterProvider
-  - `router/routes.config.jsx` - **Centralized route configuration** (31 routes)
-  - `router/loaders.js` - Route loaders for optimized data fetching
-  - `layouts/` - Layout components (RootLayout, AlignerLayout)
-  - `routes/` - Route components for each section of the application
-  - `components/react/` - Reusable React components
-  - `components/error-boundaries/` - Error boundary components
-  - `services/` - Shared utilities (WebSocket, API client, storage)
-  - `hooks/` - Custom React hooks for shared logic
-
-- **Routing Architecture** (`/public/js/router/`):
-  - `routes.config.jsx` - **Single source of truth for all routes**
-  - `loaders.js` - Route loaders with caching and error handling
-  - **31 Routes Organized in 5 Phases**:
-    - **Phase 1**: Simple routes (Dashboard, Statistics, Expenses, PatientManagement, TestCompiler)
-    - **Phase 2**: Settings & Templates with loaders (3 nested routes)
-    - **Phase 3**: Aligner Management with layout wrapper (6 nested routes)
-    - **Phase 4**: Patient Portal with comprehensive loader (14 nested pages via wildcard routing)
-    - **Phase 5**: Messaging & Appointments (5 WebSocket-heavy routes, no loaders)
-
-- **Route Loaders** (`/public/js/router/loaders.js`):
-  - `apiLoader()` - Base loader with 401 handling and sessionStorage caching
-  - `templateListLoader()` - Pre-fetch template list
-  - `templateDesignerLoader()` - Pre-fetch template for editing
-  - `alignerDoctorsLoader()` - Pre-fetch doctors list
-  - `alignerPatientWorkLoader()` - Pre-fetch patient + work details
-  - `patientShellLoader()` - **Most complex**: Pre-fetch patient, work, timepoints in parallel
-
-- **Layout Components** (`/public/js/layouts/`):
-  - `RootLayout.jsx` - Wraps all routes with GlobalStateProvider, ToastProvider, UniversalHeader
-  - `AlignerLayout.jsx` - Aligner-specific layout with mode toggle and <Outlet />
-
-- **Error Boundaries** (`/public/js/components/error-boundaries/`):
-  - `GlobalErrorBoundary.jsx` - App-level error catching
-  - `RouteErrorBoundary.jsx` - Route-level error catching with recovery
-  - `RouteError.jsx` - User-friendly error pages (404, 401, 500)
-
-- **Route Components** (`/public/js/routes/`):
-  - `Dashboard.jsx` - Navigation hub and landing page
-  - `PatientManagement.jsx` - Patient search and grid view
-  - `Expenses.jsx` - Expense management
-  - `Statistics.jsx` - Financial statistics and reports
-  - `WhatsAppSend.jsx` - WhatsApp messaging
-  - `WhatsAppAuth.jsx` - WhatsApp authentication
-  - `DailyAppointments.jsx` - Daily appointments view
-  - `Calendar.jsx` - Monthly calendar view
-  - `CompilerTest.jsx` - Template compiler test page
-
-- **React Components** (`/public/js/components/react/`):
-  - `UniversalHeader.jsx` - Persistent header with patient search
-  - `PatientShell.jsx` - Patient portal wrapper with sidebar navigation (handles 14 pages)
-  - `SettingsComponent.jsx` - Settings interface with tabs
-  - `PaymentModal.jsx` - Payment processing modal
-  - `EditPatientComponent.jsx` - Patient information editor
-  - And many more specialized components
-
-- **Services Layer** (`/public/js/services/`):
-  - `websocket.js` - **WebSocket singleton** for real-time updates
-  - `http.js` - HTTP client for API requests
-  - `storage.js` - Local storage utilities
-
-- **Hooks** (`/public/js/hooks/`): Custom hooks for shared logic (WebSocket sync, message status, etc.)
-
-- **Context Providers** (`/public/js/contexts/`):
-  - `GlobalStateContext.jsx` - Global state for **WebSocket singleton**, patient data, appointments
-  - `ToastContext.jsx` - **Unified toast notification system** (replaces all alert() calls)
-
-### Toast Notification System
-
-The application uses a **unified toast notification system** to provide modern, non-blocking user feedback throughout the entire application. This system completely replaces traditional `alert()` dialogs.
-
-**Implementation:**
-- **Context Provider**: `ToastContext.jsx` - Global toast management
-- **CSS Styles**: `public/css/components/toast.css` - Modern, responsive toast styles
-- **Global Integration**: Wrapped in `App.jsx` via `<ToastProvider>` for app-wide access
-- **Non-React Support**: Global `window.toast` object for use in non-React code
-
-**Usage in React Components:**
-```javascript
-import { useToast } from '../contexts/ToastContext.jsx';
-
-function MyComponent() {
-  const toast = useToast();
-
-  // Success notification (green, 3s duration)
-  toast.success('Operation completed successfully!');
-
-  // Error notification (red, 4s duration)
-  toast.error('Something went wrong!');
-
-  // Warning notification (orange, 3.5s duration)
-  toast.warning('Please check your input');
-
-  // Info notification (blue, 3s duration)
-  toast.info('Here is some information');
-
-  // Custom duration
-  toast.success('Custom message', 5000); // 5 seconds
-}
-```
-
-**Usage in Non-React JavaScript:**
-```javascript
-// Available globally after ToastProvider mounts
-window.toast?.success('Operation completed!');
-window.toast?.error('Error occurred!');
-window.toast?.warning('Warning message!');
-window.toast?.info('Info message!');
-```
-
-**Toast Types:**
-- **Success** (✓) - Green, for successful operations (saves, deletes, updates)
-- **Error** (✕) - Red, for errors and failures
-- **Warning** (⚠) - Orange, for validation warnings and user constraints
-- **Info** (ℹ) - Blue, for informational messages
-
-**Features:**
-- ✅ Auto-dismiss with configurable duration
-- ✅ Manual close button
-- ✅ Smooth slide-in/slide-out animations
-- ✅ Stacked notifications (multiple toasts simultaneously)
-- ✅ Non-blocking (doesn't interrupt user workflow)
-- ✅ Fully responsive (mobile, tablet, desktop)
-- ✅ RTL support for Kurdish/Arabic languages
-- ✅ Accessible (ARIA labels, keyboard support)
-
-**Migration from alert():**
-All `alert()` calls have been replaced with appropriate toast notifications throughout the application. The global `window.toast` object ensures backward compatibility for non-React code.
-
-**Key Features:**
-- ✅ **Data Router Architecture**: Route loaders eliminate loading flashes (33% faster on patient pages)
-- ✅ **No page reloads**: Instant navigation between routes
-- ✅ **Route Loaders**: Pre-fetch static data before rendering (patient info, settings, work details)
-- ✅ **Native Scroll Restoration**: Automatic scroll position management
-- ✅ **Two-Level Error Handling**: Global + route-level error boundaries with recovery options
-- ✅ **Persistent WebSocket Singleton**: Real-time updates for appointments, messaging, patient data
-- ✅ **Smart Caching**: 5-minute sessionStorage cache for static data with automatic invalidation
-- ✅ **Hybrid Data Strategy**: Loaders for static/cacheable data, components for real-time/WebSocket data
-- ✅ **Layout Wrappers**: Persistent UI elements (headers, mode toggles) with <Outlet /> pattern
-- ✅ **Lazy Loading**: Code splitting with React.lazy() for optimal bundle sizes
-- ✅ **CDN-loaded core libraries**: React, Router from CDN for optimal caching
-- ✅ **Vite build system**: Fast development and optimized production builds
-- ✅ **Native app-like experience**: Smooth transitions, no loading flashes
-- ✅ **React Context API**: State sharing across components
-- ✅ **Server-side rendering ready**: All routes served from Express
-
-## Environment Variables Required
-
-Essential for database connectivity:
-- `DB_SERVER`, `DB_INSTANCE`, `DB_USER`, `DB_PASSWORD`
-- `MACHINE_PATH` - File system path for patient images
-- `PORT` - Server port (3001 in development via `.env.development`, 3000 in production by default)
-
-Optional service integrations:
-- `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`
-- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NAME`
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
-- `QR_HOST_URL`
-
-Sync system configuration (Supabase):
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
-- `REVERSE_SYNC_ENABLED` - Enable/disable reverse sync (default: true)
-- `REVERSE_SYNC_INTERVAL_MINUTES` - Polling interval (default: 60 minutes)
-- `REVERSE_SYNC_LOOKBACK_HOURS` - Startup lookback window (default: 24 hours)
-- `REVERSE_SYNC_MAX_RECORDS` - Max records per poll (default: 500)
-
-See `docs/REVERSE_SYNC_CONFIGURATION.md` for detailed sync configuration guide.
-
-## Testing Credentials
-
-For development and testing, use these admin credentials:
-- **Username**: `Admin`
-- **Password**: `Yarmok11`
-
-These are also stored in `.env` as `TEST_ADMIN_USER` and `TEST_ADMIN_PASSWORD`.
-
-**Testing authenticated API endpoints with curl:**
-```bash
-# Login and save session cookie
-curl -c /tmp/cookies.txt -X POST http://localhost:3001/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"Admin","password":"Yarmok11"}'
-
-# Use the cookie for authenticated requests
-curl -b /tmp/cookies.txt http://localhost:3001/api/admin/lookups/tables
-```
-
-## Key API Patterns
-
-### Patient Data
-- Patient info: `GET /api/getinfos?code={patientId}`
-- Time points: `GET /api/gettimepoints?code={patientId}`
-- Payments: `GET /api/getpayments?code={patientId}`
-
-### Messaging System
-- WhatsApp send: `GET /api/wa/send?date={date}`
-- WhatsApp status: `GET /api/wa/status`
-- Message updates: `GET /api/update` (polling-based status)
-
-### Health Monitoring
-- Basic health: `GET /health/basic`
-- Detailed health: `GET /api/health/detailed`
-
-## Database Queries Structure
-
-Located in `/services/database/queries/`:
-- **Patient queries**: Patient info, payments, visit history
-- **Messaging queries**: Message status tracking with circuit breaker pattern
-- **Appointment queries**: Scheduling and notification data
-- **Visit queries**: Treatment records and wire tracking
-
-## Windows Service Management
-
-The application can run as a Windows service using `node-windows`. Service scripts are in `/utils/windows-service/` with CLI management tools.
-
-## WebSocket Events
-
-The application uses a **universal naming convention** for WebSocket events to ensure consistency across frontend and backend communication. 
-
-### Universal Event Categories:
-
-**Connection Events:**
-- `connection_established` / `connection_lost` / `connection_error`
-- `heartbeat_ping` / `heartbeat_pong` - Connection health monitoring
-
-**Appointment System:**
-- `appointments_updated` / `appointments_data` - Appointment updates
-- `request_appointments` - Client requests appointment data
-
-**Patient Management:**
-- `patient_loaded` / `patient_unloaded` - Patient screen management  
-- `patient_data` / `request_patient` - Patient data exchange
-
-**WhatsApp Messaging:**
-- `whatsapp_client_ready` / `whatsapp_qr_updated` - Client status
-- `whatsapp_message_status` / `whatsapp_message_batch_status` - Message tracking
-- `whatsapp_initial_state_response` - Initial state for status clients
-
-**System Events:**
-- `system_error` / `data_updated` / `broadcast_message` - General system events
-
-### Clean Implementation:
-All WebSocket events use the universal naming convention exclusively. No legacy events are supported, ensuring clean and consistent code throughout the application.
-
-**Key Files:**
-- `services/messaging/websocket-events.js` - Universal event constants
-- `docs/websocket-events.md` - Complete documentation
-
-## Cross-Platform Path Configuration
-
-The application now supports both Windows and WSL environments with automatic path conversion:
-
-### Automatic Detection
-- **WSL**: Detected when running on Linux with `WSL_DISTRO_NAME` environment variable
-- **Windows**: Detected when running on Windows (`win32` platform)
-
-### Path Examples
-- **Windows UNC**: `\\\\server\\share\\folder` → `/mnt/server/share/folder` (WSL)
-- **Windows Drive**: `C:\\folder` → `/mnt/c/folder` (WSL)
-- **WSL Mount**: `/mnt/server/share/folder` → `\\\\server\\share\\folder` (Windows)
-
-### Environment Configuration
-Set `MACHINE_PATH` to your network path:
-- **Windows**: `\\\\your-server\\clinic1` or `C:\\clinic1`
-- **WSL**: `/mnt/your-server/clinic1` or `/mnt/c/clinic1`
-
-### Port Configuration
-
-The application uses environment-specific port configuration:
-
-**Development Mode** (`npm run dev`):
-- Backend (Express): **Port 3001**
-- Frontend (Vite): **Port 5173**
-- Configuration: `.env.development` sets `PORT=3001`
-- Vite proxies API requests to `http://localhost:3001`
-
-**Production Mode** (`npm start`):
-- Backend (Express): **Port 3000** (default)
-- No Vite - Express serves built files from `/dist`
-- Configuration: Falls back to default port 3000 if `PORT` is not set in `.env`
-
-**Custom Port Override**:
-You can override the port by setting the `PORT` environment variable:
 ```bash
 # Development
-export PORT=8080  # Add to .env.development
+npm run dev              # Vite (5173) + Express (3001)
+npm run dev:server       # Express only (3001)
+npm run dev:client       # Vite only (5173)
 
 # Production
-export PORT=8080  # Add to .env or set in environment
+npm run build            # Build to /dist
+npm start                # Serve from /dist (3000)
+
+# Windows Service
+npm run service:install
+npm run service:uninstall
 ```
 
-**Configuration Files**:
-- `.env` - Production settings (shared configuration)
-- `.env.development` - Development-specific overrides (PORT=3001, VITE_DEV_PORT=5173)
-- `config/config.js` - Loads environment-specific files based on NODE_ENV
+---
 
-## Logging with Winston
+## Architecture
 
-This project uses **Winston** for structured logging. **NEVER use `console.log()` or `console.error()` in production code.**
+### Backend Structure
+```
+index.js                 # Entry point, server setup, graceful shutdown
+/config/                 # Environment config, database, SSL
+/routes/api/             # 20 modular route files
+/services/
+  /business/             # Service layer (Patient, Appointment, Aligner, etc.)
+  /database/queries/     # 14 query modules
+  /messaging/            # WhatsApp, SMS, Telegram, WebSocket events
+  /sync/                 # SQL Server ↔ Supabase sync engine
+/middleware/             # Auth, CORS, timeout, upload
+/utils/                  # Logger, WebSocket server, path resolver
+```
 
-**Logger Location**: `utils/logger.js`
+### Frontend Structure
+```
+/public/js/
+  App.jsx                # Root component with RouterProvider
+  /router/
+    routes.config.jsx    # 31 routes in 5 phases
+    loaders.js           # 7 route loaders with caching
+  /layouts/              # RootLayout, AlignerLayout
+  /routes/               # 8 route components
+  /components/react/     # 63 React components
+  /contexts/             # GlobalStateContext, ToastContext
+  /hooks/                # 8 custom hooks
+  /services/             # WebSocket singleton, HTTP client
+```
 
-### Usage
+### CSS Structure
+```
+/public/css/
+  /base/       # 5 files: variables, reset, typography, rtl-support, utilities
+  /layout/     # 2 files: universal-header, sidebar-navigation
+  /components/ # 25 files
+  /pages/      # 24 files
+```
+
+**CSS Guidelines**: See `css-styling-guidelines.skill.md` for comprehensive documentation.
+
+---
+
+## Critical Patterns
+
+### Navigation - React Router ONLY
+
+**NEVER use `window.location.href` for internal routes.**
+
+```javascript
+// CORRECT
+import { useNavigate, Link } from 'react-router-dom';
+const navigate = useNavigate();
+navigate('/patient/123/works');
+
+// WRONG - causes full page reload
+window.location.href = '/patient/123/works';
+```
+
+**Exceptions for window.location.href:**
+- External URLs
+- System protocols (`explorer:`, `csimaging:`)
+- Security logout
+- Route loader 401 redirects
+
+### Toast Notifications
+
+Use `ToastContext` for all user feedback. **Never use `alert()`**.
+
+```javascript
+import { useToast } from '../contexts/ToastContext.jsx';
+const toast = useToast();
+
+toast.success('Saved!');
+toast.error('Failed');
+toast.warning('Check input');
+toast.info('Processing...');
+
+// Non-React: window.toast?.success('Done!');
+```
+
+### Winston Logging
+
+**Never use `console.log()` in production.** Use Winston:
 
 ```javascript
 import { log } from '../utils/logger.js';
 
-// Info level (default)
-log.info('Operation completed', { userId: 123, action: 'login' });
-
-// Error level
-log.error('Database connection failed', {
-  server: config.database.server,
-  error: err.message,
-  code: err.code
-});
-
-// Warning level
-log.warn('Rate limit approaching', { current: 95, max: 100 });
-
-// Debug level (development only)
-log.debug('Cache hit', { key: 'patient:123', ttl: 300 });
+log.info('Completed', { userId: 123 });
+log.error('Failed', { error: err.message });
+log.warn('Warning', { current: 95 });
+log.debug('Debug info', { key: 'value' });
 ```
 
-### Log Levels (in order of priority)
+### WebSocket Events
 
-- **error** - Error messages and exceptions
-- **warn** - Warning messages
-- **info** - Informational messages (default)
-- **http** - HTTP request logs
-- **verbose** - Verbose informational messages
-- **debug** - Debug messages (development only)
-- **silly** - Very detailed debug messages
+Universal naming convention:
+- Connection: `connection_established`, `connection_lost`, `heartbeat_ping/pong`
+- Appointments: `appointments_updated`, `request_appointments`
+- Patient: `patient_loaded`, `patient_unloaded`
+- WhatsApp: `whatsapp_client_ready`, `whatsapp_qr_updated`, `whatsapp_message_status`
 
-### Environment Configuration
+Constants in `services/messaging/websocket-events.js`.
 
-Set in `.env`:
+---
+
+## Environment Variables
+
+**Required:**
+```
+DB_SERVER, DB_INSTANCE, DB_USER, DB_PASSWORD
+MACHINE_PATH    # File system path for patient images
+PORT            # 3001 dev, 3000 prod
+```
+
+**Optional Services:**
+```
+TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
+TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NAME
+GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+```
+
+**Sync (Supabase):**
+```
+SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+REVERSE_SYNC_ENABLED, REVERSE_SYNC_INTERVAL_MINUTES
+```
+
+---
+
+## Key API Endpoints
+
+```
+# Patient
+GET /api/getinfos?code={patientId}
+GET /api/gettimepoints?code={patientId}
+GET /api/getpayments?code={patientId}
+
+# Messaging
+GET /api/wa/send?date={date}
+GET /api/wa/status
+
+# Health
+GET /health/basic
+GET /api/health/detailed
+```
+
+---
+
+## Database
+
+SQL Server via Tedious with connection pooling (max 10 connections).
+
+Key tables: `tblpatients`, `tblappointments`, `tblwork`, `tblVisits`, `tblWires`, `tblInvoice`, `tblExpenses`, `tblUsers`
+
+Query modules in `/services/database/queries/`.
+
+---
+
+## Route Loaders
+
+7 loaders with 5-minute sessionStorage caching:
+1. `patientShellLoader` - Patient + work + timepoints
+2. `patientManagementLoader` - Filter data
+3. `dailyAppointmentsLoader` - Initial appointments
+4. `templateListLoader` / `templateDesignerLoader` - Templates
+5. `alignerDoctorsLoader` / `alignerPatientWorkLoader` - Aligner data
+
+---
+
+## Testing Credentials
+
+```
+Username: Admin
+Password: Yarmok11
+```
 
 ```bash
-LOG_LEVEL=warn        # Production: warn or error | Development: debug
-NODE_ENV=production   # Disables console logging in production
+# Login and test
+curl -c /tmp/cookies.txt -X POST http://localhost:3001/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"Admin","password":"Yarmok11"}'
+
+curl -b /tmp/cookies.txt http://localhost:3001/api/admin/lookups/tables
 ```
 
-### Best Practices
+---
 
-**✅ DO:**
-- Use structured logging with metadata objects
-- Log errors with context (error message, code, stack trace)
-- Use appropriate log levels (error for errors, warn for warnings, debug for verbose)
-- Include relevant IDs (patientId, appointmentId, messageId)
+## MCP Servers
 
-**❌ DON'T:**
-- Use `console.log()` or `console.error()` (replace with Winston)
-- Log sensitive data (passwords, tokens, full credit card numbers)
-- Log every successful operation (use debug level instead)
-- Use emojis in production logs
+- **MSSQL MCP Server** (`@wener/mssql-mcp`) - Database queries
+- **React MCP Server** - React development
 
-**Example (Correct):**
-```javascript
-log.error('Failed to generate appointment PDF', {
-  date,
-  error: error.message,
-  stack: error.stack
-});
-```
-
-**Example (Incorrect):**
-```javascript
-console.log('🚀 PDF generated!'); // ❌ Wrong: console.log + emoji
-```
-
-### Log Files
-
-Production logs are written to:
-- `logs/error.log` - Errors only
-- `logs/combined.log` - All logs
-
-See `docs/PRODUCTION_LOGGING_GUIDE.md` for comprehensive logging guidelines.
+Config in `.mcp.json`. See `docs/mcp-mssql-setup.md`.
 
 ---
 
 ## Development Notes
 
-- Uses ES modules (`"type": "module"` in package.json)
-- No formal test framework currently configured
-- Graceful shutdown handling for all services
-- Circuit breaker pattern for messaging resilience
-- Connection pooling for database operations
-- Cross-platform file system integration with automatic path conversion
+- ES Modules (`"type": "module"`)
+- Graceful shutdown for all services
+- Circuit breaker pattern for messaging
+- Cross-platform paths (Windows/WSL auto-conversion)
+- RTL support for Kurdish/Arabic
 
 ---
 
-## CSS Styling Guidelines
+## Design System Quick Reference
 
-**CRITICAL**: This project uses a custom CSS architecture with strict guidelines. See `css-styling-guidelines.skill.md` for comprehensive documentation.
+Use variables from `/public/css/base/variables.css`:
 
-### Absolute Rules - NEVER VIOLATE
-
-#### ❌ NO Inline Styles
-
-**NEVER use inline styles in JSX/HTML** except for these rare exceptions:
-
-**✅ ONLY Allowed Exceptions:**
-1. **Dynamic runtime values** that cannot be predetermined:
-   ```javascript
-   // ✅ ALLOWED: Value calculated at runtime
-   style={{ height: `${calculatedHeight}px`, top: `${position.y}px` }}
-   ```
-
-2. **Dynamic positioning** for tooltips, popovers, drag-drop:
-   ```javascript
-   // ✅ ALLOWED: Mouse-based positioning
-   style={{ position: 'absolute', left: mouseX, top: mouseY }}
-   ```
-
-**❌ FORBIDDEN: Static styles**
-```javascript
-// ❌ WRONG: This should be a CSS class
-style={{ padding: '20px', background: '#f8f9fa', borderRadius: '8px' }}
-
-// ✅ CORRECT: Use CSS class from appropriate file
-className="card-container"
-```
-
-#### ❌ NO !important Declarations
-
-**NEVER use `!important` in CSS** except for these specific cases:
-
-**✅ ONLY Allowed Exceptions:**
-1. **Print styles** (forcing layouts for printing)
-   ```css
-   @media print {
-     .no-print { display: none !important; }
-   }
-   ```
-
-2. **Accessibility overrides** (user preferences must take precedence)
-   ```css
-   @media (prefers-reduced-motion: reduce) {
-     * { animation: none !important; }
-   }
-   ```
-
-3. **Third-party library overrides** (only when no alternative exists - must be documented)
-   ```css
-   /* Document why !important is needed */
-   .photoswipe-override {
-     z-index: var(--z-index-modal) !important; /* Override PhotoSwipe default */
-   }
-   ```
-
-**❌ FORBIDDEN: Using !important for convenience**
 ```css
-/* ❌ WRONG: Lazy override */
-.text-red { color: red !important; }
-
-/* ✅ CORRECT: Increase specificity properly */
-.error-message .text-red { color: var(--error-color); }
-```
-
-### CSS Architecture: Hybrid Co-location Strategy
-
-This project uses a **Hybrid Co-location Strategy** for CSS, following 2025 Vite/React best practices. CSS is imported at the JavaScript level, enabling Vite's automatic CSS code splitting.
-
-**File Structure** (`/public/css/`):
-```
-├── base/                       # Design system foundation (5 files)
-│   ├── variables.css           # Design tokens (ALWAYS use these)
-│   ├── reset.css               # CSS reset/normalize
-│   ├── typography.css          # Font styles
-│   ├── rtl-support.css         # RTL language support (Kurdish/Arabic)
-│   └── utilities.css           # Utility classes
-├── layout/                     # Layout components (2 files)
-│   ├── universal-header.css
-│   └── sidebar-navigation.css
-├── components/                 # Reusable component styles (25 files)
-│   ├── buttons.css
-│   ├── inputs.css
-│   ├── modal.css
-│   └── [22 more files...]
-└── pages/                      # Page-specific styles (24 files)
-    ├── dashboard.css
-    ├── patient-shell.css
-    └── [22 more files...]
-```
-
-### CSS Import Strategy (3-Tier Ownership Model)
-
-**Tier 1: Global CSS** - Imported in `App.jsx`, loaded immediately:
-```javascript
-// App.jsx - Always loaded
-import '../css/base/reset.css';
-import '../css/base/variables.css';
-import '../css/base/typography.css';
-import '../css/base/rtl-support.css';
-import '../css/base/utilities.css';
-import '../css/layout/universal-header.css';
-import '../css/components/buttons.css';
-import '../css/components/inputs.css';
-import '../css/components/cards.css';
-import '../css/components/modal.css';
-import '../css/components/toast.css';
-import '../css/components/route-error.css';
-```
-
-**Tier 2: Route CSS** - Imported in route/layout components, lazy-loaded with route:
-```javascript
-// Example: AlignerLayout.jsx - loaded when visiting /aligner/*
-import '../../css/pages/aligner.css';
-import '../../css/components/aligner-set-card.css';
-
-// Example: PatientShell.jsx - loaded when visiting /patient/*
-import '../../../css/pages/patient-shell.css';
-import '../../../css/pages/patient-info.css';
-// ... (all patient portal CSS)
-```
-
-**Tier 3: Component CSS** - Imported in component files, loaded on-demand:
-```javascript
-// Example: LookupsSettings.jsx
-import '../../../css/components/lookup-editor.css';
-```
-
-### Where to Import New CSS
-
-| CSS Type | Import Location | When Loaded |
-|----------|-----------------|-------------|
-| Design tokens, shared UI | `App.jsx` | Immediately |
-| Route-specific styles | Route component (e.g., `Dashboard.jsx`) | When route visited |
-| Layout section styles | Layout component (e.g., `AlignerLayout.jsx`) | When section visited |
-| Component-specific styles | Component file (e.g., `LookupEditor.jsx`) | When component renders |
-
-**⚠️ NEVER import CSS in `routes.config.jsx`** - This defeats code splitting!
-
-### Adding New CSS Files
-
-1. **Create the CSS file** in the appropriate directory:
-   - `/css/base/` - Design system additions
-   - `/css/components/` - Reusable component styles
-   - `/css/pages/` - Route-specific styles
-   - `/css/layout/` - Layout component styles
-
-2. **Import in the correct JavaScript file**:
-   - Used across 80%+ of routes? → Add to `App.jsx`
-   - Route-specific? → Add to route component or layout
-   - Component-specific? → Add to component file
-
-3. **Verify code splitting** (optional):
-   ```bash
-   npm run build
-   ls -la dist/assets/*.css  # Check for split chunks
-   ```
-
-### Design System - ALWAYS Use These Variables
-
-**From `/public/css/base/variables.css`:**
-
-**Colors** (NEVER hardcode colors):
-```css
+/* Colors */
 --primary-color: #007bff
---secondary-color: #4CAF50
---accent-color: #55608f
 --success-color: #28a745
 --error-color: #dc3545
 --warning-color: #ffc107
---info-color: #17a2b8
---background-primary: #ffffff
---background-secondary: #f8f9fa
---text-primary: #212529
---text-secondary: #6c757d
---border-color: #dee2e6
 
-/* ❌ WRONG */
-.card { background: #f8f9fa; }
+/* Spacing */
+--spacing-sm: 0.5rem   /* 8px */
+--spacing-md: 1rem     /* 16px */
+--spacing-lg: 1.5rem   /* 24px */
 
-/* ✅ CORRECT */
-.card { background: var(--background-secondary); }
-```
-
-**Spacing** (NEVER hardcode pixel values):
-```css
---spacing-xs: 0.25rem   /* 4px */
---spacing-sm: 0.5rem    /* 8px */
---spacing-md: 1rem      /* 16px */
---spacing-lg: 1.5rem    /* 24px */
---spacing-xl: 2rem      /* 32px */
---spacing-xxl: 3rem     /* 48px */
-
-/* ❌ WRONG */
-.card { padding: 20px; margin-bottom: 16px; }
-
-/* ✅ CORRECT */
-.card {
-  padding: var(--spacing-lg);
-  margin-bottom: var(--spacing-md);
-}
-```
-
-**Border Radius**:
-```css
---radius-sm: 0.125rem   /* 2px */
---radius-md: 0.25rem    /* 4px */
---radius-lg: 0.5rem     /* 8px */
---radius-xl: 1rem       /* 16px */
---radius-full: 9999px   /* Fully rounded */
-```
-
-**Shadows**:
-```css
---shadow-sm, --shadow-md, --shadow-lg, --shadow-xl
-```
-
-**Typography**:
-```css
---font-primary: system-ui, -apple-system, BlinkMacSystemFont...
---font-size-xs: 0.75rem    /* 12px */
---font-size-sm: 0.875rem   /* 14px */
---font-size-base: 1rem     /* 16px */
---font-size-lg: 1.125rem   /* 18px */
---font-size-xl: 1.25rem    /* 20px */
---font-size-2xl: 1.5rem    /* 24px */
---font-size-3xl: 1.875rem  /* 30px */
-```
-
-**Z-Index Layers** (prevents z-index conflicts):
-```css
---z-index-dropdown: 1000
---z-index-sticky: 1020
---z-index-fixed: 1030
+/* Z-index */
 --z-index-modal: 1040
---z-index-popover: 1050
 --z-index-tooltip: 1060
 
-/* ❌ WRONG */
-.modal { z-index: 9999; }
-
-/* ✅ CORRECT */
-.modal { z-index: var(--z-index-modal); }
+/* Breakpoints */
+--breakpoint-md: 768px
+--breakpoint-lg: 1024px
 ```
 
-### Naming Conventions
+**CSS Rules:**
+- NO inline styles (except dynamic values)
+- NO `!important` (except print/accessibility)
+- Use CSS variables from variables.css
+- Mobile-first responsive design
+- BEM-like naming
 
-**Use BEM-like methodology:**
-
-```css
-/* Component block */
-.patient-card { }
-
-/* Element within block */
-.patient-card__header { }
-.patient-card__body { }
-.patient-card__footer { }
-
-/* Modifier for state/variant */
-.patient-card--highlighted { }
-.patient-card--disabled { }
-```
-
-**State classes:**
-- `.active` - Currently active item
-- `.disabled` - Disabled state
-- `.loading` - Loading state
-- `.error` - Error state
-- `.success` - Success state
-- `.hidden` - Hidden state
-
-### Responsive Design - Mobile-First
-
-**ALWAYS write mobile-first styles:**
-
-```css
-/* ✅ CORRECT: Mobile-first */
-.container {
-  padding: var(--spacing-sm);  /* Mobile: small padding */
-}
-
-@media (min-width: 768px) {
-  .container {
-    padding: var(--spacing-lg);  /* Tablet+: larger padding */
-  }
-}
-
-@media (min-width: 1024px) {
-  .container {
-    padding: var(--spacing-xl);  /* Desktop: extra padding */
-  }
-}
-```
-
-**Breakpoints** (from variables.css):
-```css
---breakpoint-xs: 375px   /* Small phones */
---breakpoint-sm: 480px   /* Phones */
---breakpoint-md: 768px   /* Tablets */
---breakpoint-lg: 1024px  /* Desktops */
---breakpoint-xl: 1400px  /* Large screens */
-```
-
-**Common media queries:**
-```css
-@media (max-width: 1024px) { /* Tablet and below */ }
-@media (max-width: 768px) { /* Phone and below */ }
-@media (max-width: 480px) { /* Small phones */ }
-@media (orientation: landscape) { /* Landscape mode */ }
-@media (hover: none) and (pointer: coarse) { /* Touch devices */ }
-```
-
-### RTL (Right-to-Left) Support
-
-**The project has full RTL support for Kurdish/Arabic languages.**
-
-**Use logical properties:**
-
-```css
-/* ❌ AVOID: Directional properties */
-.card {
-  margin-left: var(--spacing-md);
-  text-align: left;
-}
-
-/* ✅ PREFER: Logical properties */
-.card {
-  margin-inline-start: var(--spacing-md);
-  text-align: start;
-}
-
-/* OR use RTL selector: */
-.card {
-  margin-left: var(--spacing-md);
-}
-
-[dir="rtl"] .card {
-  margin-left: 0;
-  margin-right: var(--spacing-md);
-}
-```
-
-### Best Practices Checklist
-
-**Before writing any styles:**
-
-- [ ] Check if a class already exists (search CSS files first)
-- [ ] Use CSS variables for colors, spacing, typography
-- [ ] Add styles to the appropriate file (component/page/base)
-- [ ] Follow BEM-like naming conventions
-- [ ] NO inline styles (except dynamic runtime values)
-- [ ] NO !important (except print/accessibility)
-- [ ] Write mobile-first responsive CSS
-- [ ] Consider RTL support for text-heavy components
-- [ ] Test on multiple screen sizes (375px, 768px, 1024px+)
-
-### Common Patterns
-
-**Button:**
-```css
-/* In /css/components/buttons.css */
-.btn {
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-base);
-  transition: all 0.2s ease;
-}
-
-.btn-primary {
-  background: var(--primary-color);
-  color: white;
-}
-```
-
-**Card:**
-```css
-/* In /css/components/ or /css/pages/ */
-.card {
-  background: var(--background-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
-  box-shadow: var(--shadow-sm);
-}
-
-.card__header {
-  margin-bottom: var(--spacing-md);
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: var(--spacing-md);
-}
-```
-
-**Modal:**
-```css
-/* In /css/components/modal.css */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: var(--z-index-modal);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal-content {
-  background: var(--background-primary);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-xl);
-  max-width: 600px;
-  width: 90%;
-  box-shadow: var(--shadow-xl);
-}
-```
-
-### Quick Reference
-
-**For comprehensive CSS guidelines**, see `css-styling-guidelines.skill.md`.
-
-**Key design system file**: `/public/css/base/variables.css`
-
-**Key rules:**
-1. ✅ CSS classes only - No inline styles except dynamic values
-2. ✅ No !important - Except print/accessibility
-3. ✅ CSS variables always - From variables.css
-4. ✅ Mobile-first responsive - Start small, scale up
-5. ✅ BEM-like naming - Consistent, semantic class names
-6. ✅ Appropriate file location - Components, pages, or base
-7. ✅ RTL support - Use logical properties or RTL selectors
+Full guidelines: `css-styling-guidelines.skill.md`

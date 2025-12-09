@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WorkCard from './WorkCard.jsx';
 import PaymentModal from './PaymentModal.jsx';
+import TeethSelector from './TeethSelector.jsx';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters.js';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import {
@@ -11,6 +12,7 @@ import {
     FILLING_DEPTH_OPTIONS
 } from '../../config/workTypeConfig.js';
 import '../../../css/components/work-card.css';
+import '../../../css/components/teeth-selector.css';
 
 /**
  * Work Component
@@ -980,131 +982,17 @@ const WorkComponent = ({ patientId }) => {
                             {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('teeth') && (
                                 <div className="form-group full-width">
                                     <label>Select Teeth</label>
-                                    <div className="teeth-filter-toggle">
-                                        <label className="checkbox-label">
-                                            <input
-                                                type="checkbox"
-                                                checked={showTeethPermanent}
-                                                onChange={(e) => setShowTeethPermanent(e.target.checked)}
-                                            />
-                                            Permanent
-                                        </label>
-                                        <label className="checkbox-label">
-                                            <input
-                                                type="checkbox"
-                                                checked={showTeethDeciduous}
-                                                onChange={(e) => setShowTeethDeciduous(e.target.checked)}
-                                            />
-                                            Deciduous
-                                        </label>
-                                    </div>
-                                    <div className="teeth-selection-grid">
-                                        {/* Upper Arch */}
-                                        <div className="teeth-arch">
-                                            <span className="arch-label">Upper</span>
-                                            <div className="teeth-row">
-                                                {teethOptions
-                                                    .filter(t => t.Quadrant === 'UR' && ((showTeethPermanent && t.IsPermanent) || (showTeethDeciduous && !t.IsPermanent)))
-                                                    .sort((a, b) => b.SortOrder - a.SortOrder)
-                                                    .map(tooth => (
-                                                        <button
-                                                            key={tooth.ID}
-                                                            type="button"
-                                                            className={`tooth-btn ${detailFormData.TeethIds.includes(tooth.ID) ? 'selected' : ''} ${!tooth.IsPermanent ? 'deciduous' : ''}`}
-                                                            onClick={() => {
-                                                                const newTeethIds = detailFormData.TeethIds.includes(tooth.ID)
-                                                                    ? detailFormData.TeethIds.filter(id => id !== tooth.ID)
-                                                                    : [...detailFormData.TeethIds, tooth.ID];
-                                                                setDetailFormData({ ...detailFormData, TeethIds: newTeethIds });
-                                                            }}
-                                                            title={tooth.ToothName}
-                                                        >
-                                                            {tooth.ToothCode.replace('UR', '')}
-                                                        </button>
-                                                    ))}
-                                                <span className="midline">|</span>
-                                                {teethOptions
-                                                    .filter(t => t.Quadrant === 'UL' && ((showTeethPermanent && t.IsPermanent) || (showTeethDeciduous && !t.IsPermanent)))
-                                                    .sort((a, b) => a.SortOrder - b.SortOrder)
-                                                    .map(tooth => (
-                                                        <button
-                                                            key={tooth.ID}
-                                                            type="button"
-                                                            className={`tooth-btn ${detailFormData.TeethIds.includes(tooth.ID) ? 'selected' : ''} ${!tooth.IsPermanent ? 'deciduous' : ''}`}
-                                                            onClick={() => {
-                                                                const newTeethIds = detailFormData.TeethIds.includes(tooth.ID)
-                                                                    ? detailFormData.TeethIds.filter(id => id !== tooth.ID)
-                                                                    : [...detailFormData.TeethIds, tooth.ID];
-                                                                setDetailFormData({ ...detailFormData, TeethIds: newTeethIds });
-                                                            }}
-                                                            title={tooth.ToothName}
-                                                        >
-                                                            {tooth.ToothCode.replace('UL', '')}
-                                                        </button>
-                                                    ))}
-                                            </div>
-                                        </div>
-                                        {/* Lower Arch */}
-                                        <div className="teeth-arch">
-                                            <span className="arch-label">Lower</span>
-                                            <div className="teeth-row">
-                                                {teethOptions
-                                                    .filter(t => t.Quadrant === 'LR' && ((showTeethPermanent && t.IsPermanent) || (showTeethDeciduous && !t.IsPermanent)))
-                                                    .sort((a, b) => b.SortOrder - a.SortOrder)
-                                                    .map(tooth => (
-                                                        <button
-                                                            key={tooth.ID}
-                                                            type="button"
-                                                            className={`tooth-btn ${detailFormData.TeethIds.includes(tooth.ID) ? 'selected' : ''} ${!tooth.IsPermanent ? 'deciduous' : ''}`}
-                                                            onClick={() => {
-                                                                const newTeethIds = detailFormData.TeethIds.includes(tooth.ID)
-                                                                    ? detailFormData.TeethIds.filter(id => id !== tooth.ID)
-                                                                    : [...detailFormData.TeethIds, tooth.ID];
-                                                                setDetailFormData({ ...detailFormData, TeethIds: newTeethIds });
-                                                            }}
-                                                            title={tooth.ToothName}
-                                                        >
-                                                            {tooth.ToothCode.replace('LR', '')}
-                                                        </button>
-                                                    ))}
-                                                <span className="midline">|</span>
-                                                {teethOptions
-                                                    .filter(t => t.Quadrant === 'LL' && ((showTeethPermanent && t.IsPermanent) || (showTeethDeciduous && !t.IsPermanent)))
-                                                    .sort((a, b) => a.SortOrder - b.SortOrder)
-                                                    .map(tooth => (
-                                                        <button
-                                                            key={tooth.ID}
-                                                            type="button"
-                                                            className={`tooth-btn ${detailFormData.TeethIds.includes(tooth.ID) ? 'selected' : ''} ${!tooth.IsPermanent ? 'deciduous' : ''}`}
-                                                            onClick={() => {
-                                                                const newTeethIds = detailFormData.TeethIds.includes(tooth.ID)
-                                                                    ? detailFormData.TeethIds.filter(id => id !== tooth.ID)
-                                                                    : [...detailFormData.TeethIds, tooth.ID];
-                                                                setDetailFormData({ ...detailFormData, TeethIds: newTeethIds });
-                                                            }}
-                                                            title={tooth.ToothName}
-                                                        >
-                                                            {tooth.ToothCode.replace('LL', '')}
-                                                        </button>
-                                                    ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {detailFormData.TeethIds.length > 0 && (
-                                        <div className="selected-teeth-display">
-                                            <strong>Selected:</strong> {detailFormData.TeethIds.map(id => {
-                                                const tooth = teethOptions.find(t => t.ID === id);
-                                                return tooth?.ToothCode;
-                                            }).filter(Boolean).join(', ')}
-                                            <button
-                                                type="button"
-                                                className="btn-clear-teeth"
-                                                onClick={() => setDetailFormData({ ...detailFormData, TeethIds: [] })}
-                                            >
-                                                Clear All
-                                            </button>
-                                        </div>
-                                    )}
+                                    <TeethSelector
+                                        teethOptions={teethOptions}
+                                        selectedTeethIds={detailFormData.TeethIds}
+                                        onSelectionChange={(newTeethIds) => setDetailFormData({ ...detailFormData, TeethIds: newTeethIds })}
+                                        showPermanent={showTeethPermanent}
+                                        showDeciduous={showTeethDeciduous}
+                                        onFilterChange={(type, value) => {
+                                            if (type === 'permanent') setShowTeethPermanent(value);
+                                            if (type === 'deciduous') setShowTeethDeciduous(value);
+                                        }}
+                                    />
                                 </div>
                             )}
 

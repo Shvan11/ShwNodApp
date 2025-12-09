@@ -4,27 +4,53 @@ import Chart from 'chart.js/auto';
 import DailyInvoicesModal from './DailyInvoicesModal.jsx';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters.js';
 
+// View mode constants
+const VIEW_MODES = { DAILY: 'daily', MONTHLY: 'monthly', YEARLY: 'yearly' };
+
 const StatisticsComponent = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [statistics, setStatistics] = useState(null);
+    const [yearlyData, setYearlyData] = useState(null); // For monthly view - 12 months of data
+    const [loadingYearly, setLoadingYearly] = useState(false); // Loading state for yearly data
+    const [multiYearData, setMultiYearData] = useState(null); // For yearly view - multi-year data
+    const [loadingMultiYear, setLoadingMultiYear] = useState(false); // Loading state for multi-year data
     const [month, setMonth] = useState(parseInt(searchParams.get('month')) || new Date().getMonth() + 1);
     const [year, setYear] = useState(parseInt(searchParams.get('year')) || new Date().getFullYear());
+    // For Monthly view: separate start month/year for 12-month period
+    const [periodStartMonth, setPeriodStartMonth] = useState(1);
+    const [periodStartYear, setPeriodStartYear] = useState(new Date().getFullYear());
+    // For Yearly view: year range
+    const [yearRangeStart, setYearRangeStart] = useState(new Date().getFullYear() - 4);
+    const [yearRangeEnd, setYearRangeEnd] = useState(new Date().getFullYear());
     const [exchangeRate, setExchangeRate] = useState(1450);
     const [selectedDate, setSelectedDate] = useState(null);
+    const [viewMode, setViewMode] = useState(searchParams.get('view') || VIEW_MODES.DAILY);
 
-    // Chart references
-    const revenueTrendChartRef = React.useRef(null);
-    const revenueDistributionChartRef = React.useRef(null);
-    const revenueTrendChartInstance = React.useRef(null);
-    const revenueDistributionChartInstance = React.useRef(null);
+    // Chart reference - single chart for Grand Total (USD)
+    const chartRef = React.useRef(null);
+    const chartInstance = React.useRef(null);
+    // Aliases for backward compatibility
+    const revenueTrendChartRef = chartRef;
+    const revenueTrendChartInstance = chartInstance;
 
     // Month names
     const monthNames = [
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'
     ];
+
+    // Calculate end month/year for the 12-month period
+    const getPeriodEnd = () => {
+        let endMonth = periodStartMonth + 11;
+        let endYear = periodStartYear;
+        if (endMonth > 12) {
+            endMonth -= 12;
+            endYear += 1;
+        }
+        return { endMonth, endYear };
+    };
 
     // Fetch statistics data
     const fetchStatistics = useCallback(async () => {
@@ -49,138 +75,241 @@ const StatisticsComponent = () => {
         }
     }, [month, year, exchangeRate, setSearchParams]);
 
+    // Fetch yearly data for monthly view (12-month period)
+    const fetchYearlyData = useCallback(async () => {
+        setLoadingYearly(true);
+        try {
+            const response = await fetch(`/api/statistics/yearly?startMonth=${periodStartMonth}&startYear=${periodStartYear}&exchangeRate=${exchangeRate}`);
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'Failed to fetch yearly statistics');
+            }
+
+            setYearlyData(data);
+        } catch (err) {
+            console.error('[Statistics] Error fetching yearly statistics:', err);
+            setYearlyData(null);
+        } finally {
+            setLoadingYearly(false);
+        }
+    }, [periodStartMonth, periodStartYear, exchangeRate]);
+
+    // Fetch multi-year data for yearly view
+    const fetchMultiYearData = useCallback(async () => {
+        setLoadingMultiYear(true);
+        try {
+            const response = await fetch(`/api/statistics/multi-year?startYear=${yearRangeStart}&endYear=${yearRangeEnd}&exchangeRate=${exchangeRate}`);
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'Failed to fetch multi-year statistics');
+            }
+
+            setMultiYearData(data);
+        } catch (err) {
+            console.error('[Statistics] Error fetching multi-year statistics:', err);
+            setMultiYearData(null);
+        } finally {
+            setLoadingMultiYear(false);
+        }
+    }, [yearRangeStart, yearRangeEnd, exchangeRate]);
+
     // Load data on mount and when month/year changes
     useEffect(() => {
         fetchStatistics();
     }, [fetchStatistics]);
 
-    // Create/update charts
+    // Fetch yearly data when in monthly view or when period changes
+    useEffect(() => {
+        if (viewMode === VIEW_MODES.MONTHLY) {
+            setYearlyData(null); // Clear previous data before fetching new
+            fetchYearlyData();
+        } else {
+            // Clear yearly data when switching away from monthly view
+            setYearlyData(null);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [viewMode, periodStartMonth, periodStartYear, exchangeRate]);
+
+    // Fetch multi-year data when in yearly view or when year range changes
+    useEffect(() => {
+        if (viewMode === VIEW_MODES.YEARLY) {
+            setMultiYearData(null); // Clear previous data before fetching new
+            fetchMultiYearData();
+        } else {
+            // Clear multi-year data when switching away from yearly view
+            setMultiYearData(null);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [viewMode, yearRangeStart, yearRangeEnd, exchangeRate]);
+
+    // Helper: Aggregate for monthly view (show all months of the year)
+    const aggregateByMonth = (dailyData) => {
+        const months = {};
+        dailyData.forEach(day => {
+            const date = new Date(day.Day);
+            const monthKey = date.getMonth();
+            if (!months[monthKey]) {
+                months[monthKey] = { grandTotal: 0, month: monthKey };
+            }
+            months[monthKey].grandTotal += day.GrandTotal || 0;
+        });
+
+        return Object.values(months)
+            .sort((a, b) => a.month - b.month)
+            .map(m => ({
+                label: monthNames[m.month],
+                grandTotal: m.grandTotal
+            }));
+    };
+
+    // Create/update chart - Grand Total (USD) only
     useEffect(() => {
         if (!statistics || !statistics.dailyData) return;
+        if (!revenueTrendChartRef.current) return;
 
-        // Revenue Trend Chart
-        if (revenueTrendChartRef.current) {
-            const ctx = revenueTrendChartRef.current.getContext('2d');
+        // Wait for yearly data to load before rendering monthly view
+        if (viewMode === VIEW_MODES.MONTHLY && loadingYearly) {
+            return;
+        }
 
-            // Destroy previous chart
-            if (revenueTrendChartInstance.current) {
-                revenueTrendChartInstance.current.destroy();
-            }
+        // Wait for multi-year data to load before rendering yearly view
+        if (viewMode === VIEW_MODES.YEARLY && loadingMultiYear) {
+            return;
+        }
 
-            const labels = statistics.dailyData.map(day => {
-                const date = new Date(day.Day);
-                return `${date.getDate()}/${date.getMonth() + 1}`;
-            });
+        const ctx = revenueTrendChartRef.current.getContext('2d');
 
-            const iqdData = statistics.dailyData.map(day => day.FinalIQDSum || 0);
-            const usdData = statistics.dailyData.map(day => (day.FinalUSDSum || 0) * exchangeRate);
+        // Destroy previous chart
+        if (revenueTrendChartInstance.current) {
+            revenueTrendChartInstance.current.destroy();
+        }
 
-            revenueTrendChartInstance.current = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'IQD Revenue',
-                            data: iqdData,
-                            borderColor: 'rgb(75, 192, 192)',
-                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                            tension: 0.1
-                        },
-                        {
-                            label: 'USD Revenue (in IQD)',
-                            data: usdData,
-                            borderColor: 'rgb(54, 162, 235)',
-                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                            tension: 0.1
-                        }
-                    ]
+        let chartData = [];
+        let chartTitle = 'Grand Total (USD)';
+
+        // Aggregate data based on view mode
+        switch (viewMode) {
+            case VIEW_MODES.DAILY:
+                chartData = statistics.dailyData.map(day => ({
+                    label: `${new Date(day.Day).getDate()}/${new Date(day.Day).getMonth() + 1}`,
+                    grandTotal: day.GrandTotal || 0
+                }));
+                chartTitle = 'Daily Grand Total (USD)';
+                break;
+            case VIEW_MODES.MONTHLY:
+                // Use yearlyData if available (fetched from dedicated API)
+                if (yearlyData && yearlyData.monthlyData && yearlyData.monthlyData.length > 0) {
+                    const { endMonth, endYear } = getPeriodEnd();
+                    chartData = yearlyData.monthlyData.map(m => ({
+                        label: `${monthNames[m.Month - 1].substring(0, 3)} ${m.Year}`,
+                        grandTotal: m.GrandTotal || 0
+                    }));
+                    chartTitle = `Monthly Revenue: ${monthNames[periodStartMonth - 1]} ${periodStartYear} - ${monthNames[endMonth - 1]} ${endYear}`;
+                } else {
+                    // Fallback to aggregating current month's daily data
+                    chartData = aggregateByMonth(statistics.dailyData);
+                    chartTitle = 'Monthly Grand Total (USD)';
+                }
+                break;
+            case VIEW_MODES.YEARLY:
+                // Use multiYearData if available (fetched from dedicated API)
+                if (multiYearData && multiYearData.yearlyData && multiYearData.yearlyData.length > 0) {
+                    chartData = multiYearData.yearlyData.map(y => ({
+                        label: y.Year.toString(),
+                        grandTotal: y.GrandTotal || 0
+                    }));
+                    chartTitle = `Yearly Revenue: ${yearRangeStart} - ${yearRangeEnd}`;
+                } else {
+                    // Fallback to single data point from current month's data
+                    const yearlyTotal = statistics.dailyData.reduce((sum, day) => sum + (day.GrandTotal || 0), 0);
+                    chartData = [{ label: `${monthNames[month-1]} ${year}`, grandTotal: yearlyTotal }];
+                    chartTitle = `Yearly Total (USD) - ${year}`;
+                }
+                break;
+            default:
+                chartData = statistics.dailyData.map(day => ({
+                    label: `${new Date(day.Day).getDate()}/${new Date(day.Day).getMonth() + 1}`,
+                    grandTotal: day.GrandTotal || 0
+                }));
+        }
+
+        const labels = chartData.map(d => d.label);
+        const grandTotals = chartData.map(d => d.grandTotal);
+
+        revenueTrendChartInstance.current = new Chart(ctx, {
+            type: viewMode === VIEW_MODES.YEARLY ? 'bar' : 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Grand Total (USD)',
+                    data: grandTotals,
+                    borderColor: 'rgb(34, 197, 94)',
+                    backgroundColor: viewMode === VIEW_MODES.YEARLY
+                        ? 'rgba(34, 197, 94, 0.8)'
+                        : 'rgba(34, 197, 94, 0.1)',
+                    tension: 0.3,
+                    fill: true,
+                    borderWidth: 3,
+                    pointRadius: viewMode === VIEW_MODES.DAILY ? 4 : 6,
+                    pointBackgroundColor: 'rgb(34, 197, 94)',
+                    pointHoverRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        top: 10,
+                        right: 20,
+                        bottom: 10,
+                        left: 10
+                    }
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                        },
-                        title: {
-                            display: false
-                        }
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: {
+                        display: false
                     },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return formatNumber(value) + ' IQD';
-                                }
-                            }
+                    title: {
+                        display: true,
+                        text: chartTitle,
+                        font: { size: 16, weight: 'bold' },
+                        padding: { top: 10, bottom: 20 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => `$${formatNumber(context.parsed.y)}`
                         }
                     }
-                }
-            });
-        }
-
-        // Revenue Distribution Chart
-        if (revenueDistributionChartRef.current) {
-            const ctx = revenueDistributionChartRef.current.getContext('2d');
-
-            // Destroy previous chart
-            if (revenueDistributionChartInstance.current) {
-                revenueDistributionChartInstance.current.destroy();
-            }
-
-            revenueDistributionChartInstance.current = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['IQD Revenue', 'USD Revenue'],
-                    datasets: [{
-                        data: [
-                            statistics.summary.totalRevenue.IQD,
-                            statistics.summary.totalRevenue.USD * exchangeRate
-                        ],
-                        backgroundColor: [
-                            'rgba(75, 192, 192, 0.8)',
-                            'rgba(54, 162, 235, 0.8)'
-                        ],
-                        borderColor: [
-                            'rgb(75, 192, 192)',
-                            'rgb(54, 162, 235)'
-                        ],
-                        borderWidth: 1
-                    }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (value) => '$' + formatNumber(value)
                         },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const label = context.label || '';
-                                    const value = context.parsed || 0;
-                                    return label + ': ' + formatNumber(value) + ' IQD';
-                                }
-                            }
-                        }
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                    },
+                    x: {
+                        grid: { display: false }
                     }
                 }
-            });
-        }
+            }
+        });
 
-        // Cleanup function
+        // Cleanup
         return () => {
             if (revenueTrendChartInstance.current) {
                 revenueTrendChartInstance.current.destroy();
             }
-            if (revenueDistributionChartInstance.current) {
-                revenueDistributionChartInstance.current.destroy();
-            }
         };
-    }, [statistics, exchangeRate]);
+    }, [statistics, exchangeRate, viewMode, month, year, yearlyData, loadingYearly, multiYearData, loadingMultiYear, yearRangeStart, yearRangeEnd]);
 
     // Navigation handlers
     const handlePrevMonth = () => {
@@ -346,18 +475,124 @@ const StatisticsComponent = () => {
                         </div>
                     </div>
 
-                    {/* Charts */}
-                    <div className="charts-section">
-                        <div className="chart-card">
-                            <h3>Daily Revenue Trend</h3>
-                            <div className="chart-container">
-                                <canvas ref={revenueTrendChartRef}></canvas>
+                    {/* Chart - Grand Total (USD) */}
+                    <div className="charts-section charts-section--single">
+                        <div className="chart-card chart-card--full">
+                            {/* View Mode Selector - Near the chart */}
+                            <div className="chart-controls">
+                                <div className="view-mode-selector">
+                                    {Object.entries(VIEW_MODES).map(([key, value]) => (
+                                        <button
+                                            key={value}
+                                            className={`view-mode-btn ${viewMode === value ? 'active' : ''}`}
+                                            onClick={() => setViewMode(value)}
+                                        >
+                                            {key.charAt(0) + key.slice(1).toLowerCase()}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                        <div className="chart-card">
-                            <h3>Revenue Distribution</h3>
-                            <div className="chart-container">
-                                <canvas ref={revenueDistributionChartRef}></canvas>
+
+                            {/* Period Selector for Monthly View */}
+                            {viewMode === VIEW_MODES.MONTHLY && (
+                                <div className="period-selector">
+                                    <div className="period-selector__label">
+                                        <i className="fas fa-calendar-alt"></i>
+                                        <span>12-Month Period:</span>
+                                    </div>
+                                    <div className="period-selector__controls">
+                                        <div className="period-selector__field">
+                                            <label>From</label>
+                                            <select
+                                                value={periodStartMonth}
+                                                onChange={(e) => setPeriodStartMonth(parseInt(e.target.value))}
+                                                className="form-select"
+                                            >
+                                                {monthNames.map((name, index) => (
+                                                    <option key={index + 1} value={index + 1}>{name}</option>
+                                                ))}
+                                            </select>
+                                            <input
+                                                type="number"
+                                                value={periodStartYear}
+                                                onChange={(e) => setPeriodStartYear(parseInt(e.target.value))}
+                                                min="2000"
+                                                max="2100"
+                                                className="form-input"
+                                            />
+                                        </div>
+                                        <div className="period-selector__arrow">
+                                            <i className="fas fa-arrow-right"></i>
+                                        </div>
+                                        <div className="period-selector__field">
+                                            <label>To</label>
+                                            <span className="period-end-display">
+                                                {monthNames[getPeriodEnd().endMonth - 1]} {getPeriodEnd().endYear}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {loadingYearly && (
+                                        <div className="period-selector__loading">
+                                            <i className="fas fa-spinner fa-spin"></i> Loading...
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Year Range Selector for Yearly View */}
+                            {viewMode === VIEW_MODES.YEARLY && (
+                                <div className="period-selector">
+                                    <div className="period-selector__label">
+                                        <i className="fas fa-calendar-alt"></i>
+                                        <span>Year Range:</span>
+                                    </div>
+                                    <div className="period-selector__controls">
+                                        <div className="period-selector__field">
+                                            <label>From</label>
+                                            <input
+                                                type="number"
+                                                value={yearRangeStart}
+                                                onChange={(e) => {
+                                                    const newStart = parseInt(e.target.value);
+                                                    if (newStart <= yearRangeEnd && newStart >= 2000) {
+                                                        setYearRangeStart(newStart);
+                                                    }
+                                                }}
+                                                min="2000"
+                                                max={yearRangeEnd}
+                                                className="form-input"
+                                            />
+                                        </div>
+                                        <div className="period-selector__arrow">
+                                            <i className="fas fa-arrow-right"></i>
+                                        </div>
+                                        <div className="period-selector__field">
+                                            <label>To</label>
+                                            <input
+                                                type="number"
+                                                value={yearRangeEnd}
+                                                onChange={(e) => {
+                                                    const newEnd = parseInt(e.target.value);
+                                                    if (newEnd >= yearRangeStart && newEnd <= 2100) {
+                                                        setYearRangeEnd(newEnd);
+                                                    }
+                                                }}
+                                                min={yearRangeStart}
+                                                max="2100"
+                                                className="form-input"
+                                            />
+                                        </div>
+                                    </div>
+                                    {loadingMultiYear && (
+                                        <div className="period-selector__loading">
+                                            <i className="fas fa-spinner fa-spin"></i> Loading...
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="chart-container chart-container--large">
+                                <canvas ref={revenueTrendChartRef}></canvas>
                             </div>
                         </div>
                     </div>
