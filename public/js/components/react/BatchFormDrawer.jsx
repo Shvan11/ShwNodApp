@@ -25,6 +25,10 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
     const [saving, setSaving] = useState(false);
     const previousIsOpenRef = useRef(false);
 
+    // Template option - only for first batch (when no existing batches)
+    const [includeTemplate, setIncludeTemplate] = useState(true);
+    const isFirstBatch = existingBatches.length === 0;
+
     useEffect(() => {
         // Only run when drawer opens (isOpen transitions from false to true)
         if (isOpen && !previousIsOpenRef.current) {
@@ -63,6 +67,10 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
 
                     upperStart = (lastBatch.UpperAlignerEndSequence || 0) + 1;
                     lowerStart = (lastBatch.LowerAlignerEndSequence || 0) + 1;
+                } else {
+                    // First batch - start from 0 if includeTemplate is true (default)
+                    upperStart = 0;
+                    lowerStart = 0;
                 }
 
                 // Get today's date in YYYY-MM-DD format
@@ -85,12 +93,27 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                     UpperAlignerEndSequence: null,
                     LowerAlignerEndSequence: null
                 });
+
+                // Reset includeTemplate to true for first batch
+                setIncludeTemplate(true);
             }
             setErrors({});
         }
 
         previousIsOpenRef.current = isOpen;
     }, [isOpen, batch, existingBatches]);
+
+    // Update start sequences when includeTemplate checkbox changes (only for first batch)
+    useEffect(() => {
+        if (!batch && isFirstBatch) {
+            const startValue = includeTemplate ? 0 : 1;
+            setComputedFields(prev => ({
+                ...prev,
+                UpperAlignerStartSequence: startValue,
+                LowerAlignerStartSequence: startValue
+            }));
+        }
+    }, [includeTemplate, batch, isFirstBatch]);
 
     // Auto-calculate end sequences when counts change
     useEffect(() => {
@@ -175,7 +198,8 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                 ...formData,
                 AlignerSetID: set?.AlignerSetID,
                 UpperAlignerStartSequence: computedFields.UpperAlignerStartSequence,
-                LowerAlignerStartSequence: computedFields.LowerAlignerStartSequence
+                LowerAlignerStartSequence: computedFields.LowerAlignerStartSequence,
+                IncludeTemplate: isFirstBatch ? includeTemplate : undefined
             };
 
             const url = batch
@@ -273,6 +297,24 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                     <span className="error-message">{errors.BatchSequence}</span>
                                 )}
                             </div>
+
+                            {/* Template option - only show for first batch */}
+                            {!batch && isFirstBatch && (
+                                <div className="form-field-checkbox">
+                                    <input
+                                        type="checkbox"
+                                        id="IncludeTemplate"
+                                        checked={includeTemplate}
+                                        onChange={(e) => setIncludeTemplate(e.target.checked)}
+                                    />
+                                    <label htmlFor="IncludeTemplate">
+                                        Include Template Aligner (Start from 0)
+                                    </label>
+                                    <small className="field-hint">
+                                        Template aligners are used for initial fitting before treatment begins
+                                    </small>
+                                </div>
+                            )}
                         </div>
 
                         {/* Two-Column Layout Container - Upper and Lower Aligners */}

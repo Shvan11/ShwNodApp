@@ -205,6 +205,13 @@ GET /api/health/detailed
 
 SQL Server via Tedious with connection pooling (max 10 connections).
 
+**Connection Details (from .mcp.json):**
+- Server: `Clinic\DOLPHIN`
+- Port: 1433
+- User: `Staff`
+- Password: `ortho2000`
+- Database: `ShwanNew`
+
 Key tables: `tblpatients`, `tblappointments`, `tblwork`, `tblVisits`, `tblWires`, `tblInvoice`, `tblExpenses`, `tblUsers`
 
 Query modules in `/services/database/queries/`.

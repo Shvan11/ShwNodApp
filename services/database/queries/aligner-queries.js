@@ -765,10 +765,12 @@ export async function getBatchesBySetId(setId) {
 export async function createBatch(batchData) {
     const {
         AlignerSetID, UpperAlignerCount, LowerAlignerCount,
-        ManufactureDate, DeliveredToPatientDate, Days, Notes, IsActive
+        ManufactureDate, DeliveredToPatientDate, Days, Notes, IsActive,
+        IncludeTemplate
     } = batchData;
 
     // Call stored procedure (calculates sequences automatically)
+    // IncludeTemplate: true = start from 0, false = start from 1 (for first batch only)
     const query = `
         DECLARE @NewBatchID INT;
 
@@ -781,6 +783,7 @@ export async function createBatch(batchData) {
             @Days = @Days,
             @Notes = @Notes,
             @IsActive = @IsActive,
+            @IncludeTemplate = @IncludeTemplate,
             @NewBatchID = @NewBatchID OUTPUT;
 
         SELECT @NewBatchID AS BatchID;
@@ -796,7 +799,8 @@ export async function createBatch(batchData) {
             ['DeliveredToPatientDate', TYPES.Date, DeliveredToPatientDate || null],
             ['Days', TYPES.Int, Days ? parseInt(Days) : null],
             ['Notes', TYPES.NVarChar, Notes || null],
-            ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : true]
+            ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : true],
+            ['IncludeTemplate', TYPES.Bit, IncludeTemplate !== undefined ? IncludeTemplate : true]
         ],
         (columns) => columns[0].value
     );
