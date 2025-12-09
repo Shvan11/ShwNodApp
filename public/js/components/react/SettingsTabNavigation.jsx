@@ -17,8 +17,7 @@ const SettingsTabNavigation = ({ tabs, activeTab, onTabChange, tabData }) => {
     return (
         <div className="settings-tab-navigation">
             <div className="tab-header">
-                <h2>System Settings</h2>
-                <p>Configure and manage your system preferences</p>
+                <h2>Settings</h2>
             </div>
             
             <div className="tab-buttons">

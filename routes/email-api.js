@@ -242,8 +242,7 @@ router.post('/test-send', async (req, res) => {
         res.json({
             success: true,
             message: 'Test email sent successfully',
-            messageId: result.messageId,
-            to: to || emailService.config.to_staff
+            messageId: result.messageId
         });
     } catch (error) {
         console.error('Test email failed:', error);

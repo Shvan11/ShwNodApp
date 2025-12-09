@@ -195,7 +195,10 @@ const GeneralSettings = ({ onChangesUpdate }) => {
                             {Object.keys(options).length === 0 ? (
                                 <p className="no-settings">No settings found. Please check your database configuration.</p>
                             ) : (
-                                Object.entries(options).map(([key, value]) => (
+                                Object.entries(options)
+                                    // Filter out email settings - they belong in the Email Settings tab
+                                    .filter(([key]) => !key.startsWith('EMAIL_'))
+                                    .map(([key, value]) => (
                                     <div key={key} className={`setting-group ${pendingChanges[key] !== undefined ? 'pending-change' : ''}`}>
                                         <label htmlFor={`setting_${key.replace(/[^a-zA-Z0-9]/g, '_')}`}>
                                             {formatSettingName(key)}

@@ -290,21 +290,16 @@ const EmailSettings = ({ onChangesUpdate }) => {
                             <small className="form-text">Sender name displayed in emails</small>
                         </div>
 
-                        {/* To Staff Email */}
+                        {/* Info about recipients */}
                         <div className="form-group">
-                            <label htmlFor="to_staff">
-                                Staff Email Address
-                                <span className="required">*</span>
-                            </label>
-                            <input
-                                type="email"
-                                id="to_staff"
-                                className="form-control"
-                                value={getCurrentValue('to_staff')}
-                                onChange={(e) => handleInputChange('to_staff', e.target.value)}
-                                placeholder="staff@example.com"
-                            />
-                            <small className="form-text">Email address to receive appointment notifications</small>
+                            <label>Email Recipients</label>
+                            <div className="info-box">
+                                <i className="fas fa-info-circle"></i>
+                                <span>
+                                    Email notifications are sent to employees with "Receive Email" enabled.
+                                    Manage recipients in <a href="/settings/employees">Settings → Employees</a>.
+                                </span>
+                            </div>
                         </div>
 
                         {/* Action Buttons */}

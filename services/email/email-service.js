@@ -147,9 +147,7 @@ class EmailService {
                     recipients = employees.map(emp => emp.Email).join(', ');
                     console.log(`Sending email to ${employees.length} employee(s):`, employees.map(e => e.employeeName).join(', '));
                 } else if (!recipients) {
-                    // Fallback to config if no employees found and no explicit recipients
-                    recipients = this.config.to_staff;
-                    console.log('No eligible employees found, using fallback recipient from config');
+                    throw new Error('No recipients configured. Please enable "Receive Email" for at least one employee in Settings > Employees.');
                 }
             }
 
@@ -236,7 +234,7 @@ class EmailService {
             const updates = [];
             const validKeys = [
                 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user',
-                'smtp_password', 'from_address', 'from_name', 'to_staff'
+                'smtp_password', 'from_address', 'from_name'
             ];
 
             for (const [key, value] of Object.entries(newConfig)) {
