@@ -394,7 +394,24 @@ const PatientSets = () => {
         setShowPaymentDrawer(true);
     };
 
-    const handlePaymentSaved = () => {
+    const handlePaymentSaved = async (paymentData) => {
+        const response = await fetch('/api/aligner/payments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                workid: patient.workid,
+                AlignerSetID: currentSetForPayment.AlignerSetID,
+                ...paymentData
+            })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to save payment');
+        }
+
+        toast.success('Payment saved successfully');
         setShowPaymentDrawer(false);
         setCurrentSetForPayment(null);
         loadAlignerSets(patient.workid);

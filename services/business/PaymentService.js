@@ -212,58 +212,7 @@ export async function validateAndCreateInvoice(invoiceData) {
     return result;
 }
 
-/**
- * Create aligner payment
- * @param {Object} paymentData
- * @param {number} paymentData.workid - Work ID
- * @param {number} paymentData.AlignerSetID - Aligner set ID (optional)
- * @param {number} paymentData.Amountpaid - Amount paid
- * @param {string} paymentData.Dateofpayment - Date of payment
- * @param {number} paymentData.ActualAmount - Actual amount (optional)
- * @param {string} paymentData.ActualCur - Actual currency (optional)
- * @param {number} paymentData.Change - Change amount (optional)
- * @returns {Promise<Object>} Created payment record with invoiceID
- */
-export async function createAlignerPayment(paymentData) {
-    const { workid, AlignerSetID, Amountpaid, Dateofpayment, ActualAmount, ActualCur, Change } = paymentData;
-
-    log.info(`Creating aligner payment: Work ${workid}, Set ${AlignerSetID || 'general'}, Amount: ${Amountpaid}`);
-
-    // Insert payment into tblInvoice
-    const query = `
-        INSERT INTO tblInvoice (workid, Amountpaid, Dateofpayment, ActualAmount, ActualCur, Change, AlignerSetID)
-        VALUES (@workid, @Amountpaid, @Dateofpayment, @ActualAmount, @ActualCur, @Change, @AlignerSetID);
-        SELECT SCOPE_IDENTITY() AS invoiceID;
-    `;
-
-    const result = await database.executeQuery(
-        query,
-        [
-            ['workid', database.TYPES.Int, parseInt(workid)],
-            ['Amountpaid', database.TYPES.Decimal, parseFloat(Amountpaid)],
-            ['Dateofpayment', database.TYPES.Date, new Date(Dateofpayment)],
-            ['ActualAmount', database.TYPES.Decimal, ActualAmount ? parseFloat(ActualAmount) : null],
-            ['ActualCur', database.TYPES.NVarChar, ActualCur || null],
-            ['Change', database.TYPES.Decimal, Change ? parseFloat(Change) : null],
-            ['AlignerSetID', database.TYPES.Int, AlignerSetID || null]
-        ],
-        (columns) => ({
-            invoiceID: columns[0].value
-        })
-    );
-
-    const invoiceID = result && result.length > 0 ? result[0].invoiceID : null;
-
-    log.info(`Aligner payment created successfully: Invoice ${invoiceID}`);
-
-    return {
-        success: true,
-        invoiceID: invoiceID
-    };
-}
-
 export default {
     validateAndCreateInvoice,
-    createAlignerPayment,
     PaymentValidationError
 };

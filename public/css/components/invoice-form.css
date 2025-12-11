@@ -57,6 +57,580 @@
     max-height: 92vh;
 }
 
+/* ========================================
+   COMPACT PAYMENT MODAL STYLES
+   ======================================== */
+
+.payment-modal-compact {
+    max-width: 720px;
+    padding: 0;
+}
+
+/* Compact Header */
+.payment-header-compact {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) 50px var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--gray-50);
+}
+
+.payment-header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.payment-title-compact {
+    font-size: var(--font-size-lg, 18px);
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs, 8px);
+}
+
+.payment-title-compact i {
+    color: var(--color-purple-light);
+}
+
+.payment-work-type {
+    font-size: var(--font-size-sm, 13px);
+    color: var(--gray-500);
+    padding: 2px var(--spacing-xs, 8px);
+    background: var(--gray-200);
+    border-radius: var(--radius-sm, 4px);
+}
+
+.payment-header-right {
+    display: flex;
+    align-items: center;
+}
+
+.payment-balance-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    padding: var(--spacing-xs, 6px) var(--spacing-sm);
+    background: linear-gradient(135deg, var(--color-purple-light), var(--color-purple-dark));
+    border-radius: var(--radius-md, 8px);
+    color: white;
+}
+
+.balance-label {
+    font-size: var(--font-size-xs, 10px);
+    text-transform: uppercase;
+    opacity: 0.85;
+    letter-spacing: 0.5px;
+}
+
+.balance-amount {
+    font-size: var(--font-size-md, 16px);
+    font-weight: 700;
+}
+
+/* Exchange Rate Compact */
+.exchange-rate-compact {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs, 8px);
+    padding: var(--spacing-xs, 8px) var(--spacing-lg);
+    background: var(--blue-50);
+    font-size: var(--font-size-sm, 13px);
+    color: var(--info-700);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.exchange-rate-compact i {
+    color: var(--info-500);
+}
+
+.exchange-rate-compact .rate-date {
+    color: var(--gray-400);
+    font-size: var(--font-size-xs, 12px);
+}
+
+.exchange-rate-error-compact {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs, 8px);
+    padding: var(--spacing-sm) var(--spacing-lg);
+    background: var(--warning-50);
+    font-size: var(--font-size-sm, 13px);
+    color: var(--warning-800);
+    border-bottom: 1px solid var(--warning-200);
+}
+
+.exchange-rate-error-compact i {
+    color: var(--warning-500);
+}
+
+.rate-input-inline {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs, 6px);
+    margin-left: auto;
+}
+
+.rate-input-small {
+    width: 80px;
+    padding: 4px var(--spacing-xs, 8px);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm, 4px);
+    font-size: var(--font-size-sm, 13px);
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    color: var(--color-purple-light);
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    margin-left: auto;
+}
+
+.btn-sm {
+    padding: 4px var(--spacing-sm);
+    font-size: var(--font-size-xs, 12px);
+    border-radius: var(--radius-sm, 4px);
+    border: none;
+    cursor: pointer;
+}
+
+.btn-sm.btn-primary {
+    background: var(--color-purple-light);
+    color: white;
+}
+
+.btn-sm.btn-ghost {
+    background: transparent;
+    color: var(--gray-500);
+    font-size: var(--font-size-md, 16px);
+    padding: 2px var(--spacing-xs, 6px);
+}
+
+/* Compact Form */
+.payment-form-compact {
+    padding: var(--spacing-md) var(--spacing-lg);
+}
+
+.payment-row-compact {
+    display: flex;
+    align-items: flex-start; /* Align fields at top */
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.payment-field {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.payment-field label {
+    display: block;
+    font-size: var(--font-size-xs, 12px);
+    font-weight: 600;
+    color: var(--gray-600);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.payment-field .required {
+    color: var(--error-color);
+    margin-left: 2px;
+}
+
+.payment-field .auto-badge {
+    display: inline-block;
+    background: var(--info-100);
+    color: var(--info-700);
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: var(--radius-md, 8px);
+    margin-left: 4px;
+    text-transform: uppercase;
+}
+
+.payment-field .na-badge {
+    display: inline-block;
+    background: var(--gray-200);
+    color: var(--gray-500);
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: var(--radius-md, 8px);
+    margin-left: 4px;
+}
+
+/* ========================================
+   PAYMENT MODAL INPUT SIZING
+   All inputs within payment modal share base styles
+   Uses --input-height-sm from variables.css for consistency
+   ======================================== */
+
+/* Base input styles - shared properties */
+.select-compact,
+.input-compact,
+.input-lg,
+.input-md {
+    width: 100%;
+    height: var(--input-height-sm);
+    padding: 0 var(--spacing-sm);
+    border: var(--border-width-thin) solid var(--gray-300);
+    border-radius: var(--radius-lg);
+    background: var(--color-white);
+    box-sizing: border-box;
+    font-size: var(--font-size-sm);
+}
+
+/* Focus state for all inputs */
+.select-compact:focus,
+.input-compact:focus,
+.input-lg:focus,
+.input-md:focus {
+    outline: none;
+    border-color: var(--color-purple-light);
+    box-shadow: var(--shadow-focus);
+}
+
+/* Large inputs - slightly bigger font, bolder */
+.input-lg {
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+}
+
+.input-readonly {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+}
+
+.input-disabled {
+    background: var(--gray-100);
+    color: var(--gray-400);
+    cursor: not-allowed;
+    text-align: center;
+}
+
+.payment-field-lg {
+    flex: 1.5;
+}
+
+/* Entry Mode Field - see consolidated "Entry Mode Toggle" section below */
+.entry-mode-field {
+    flex: 1.2;
+    display: flex;
+    flex-direction: column;
+}
+
+.field-hint {
+    display: block;
+    font-size: var(--font-size-xs, 11px);
+    color: var(--gray-500);
+    margin-top: 2px;
+}
+
+.field-hint.success {
+    color: var(--success-color);
+}
+
+/* Mixed Payment Field Group */
+.payment-field-group {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex: 2;
+}
+
+.payment-field-group .payment-field {
+    flex: 1;
+}
+
+/* Payment Main Row */
+.payment-main-row {
+    padding: var(--spacing-md);
+    background: var(--gray-50);
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--gray-200);
+}
+
+/* Summary Strip */
+.payment-summary-strip {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md, 6px);
+    margin-bottom: var(--spacing-md);
+    font-size: var(--font-size-sm, 13px);
+}
+
+.payment-summary-strip.success {
+    background: var(--success-50);
+    border: 1px solid var(--success-200);
+}
+
+.payment-summary-strip.warning {
+    background: var(--warning-50);
+    border: 1px solid var(--warning-300);
+}
+
+.summary-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs, 6px);
+}
+
+.summary-label {
+    color: var(--gray-600);
+}
+
+.summary-value {
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.summary-total {
+    margin-left: auto;
+    padding-left: var(--spacing-md);
+    border-left: 1px solid var(--gray-300);
+}
+
+.summary-total .summary-value {
+    color: var(--success-700);
+    font-size: var(--font-size-base, 14px);
+}
+
+.payment-summary-strip.warning .summary-total .summary-value {
+    color: var(--warning-700);
+}
+
+.summary-warning {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs, 6px);
+    color: var(--warning-700);
+    font-weight: 600;
+}
+
+.summary-warning i {
+    color: var(--warning-500);
+}
+
+/* Compact Actions */
+.payment-actions-compact {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--gray-200);
+}
+
+/* Success State Compact */
+.payment-success-compact {
+    padding: var(--spacing-xl, 40px) var(--spacing-lg);
+    text-align: center;
+}
+
+.payment-success-compact .success-icon {
+    font-size: 48px;
+    color: var(--success-color);
+    margin-bottom: var(--spacing-sm);
+}
+
+.payment-success-compact h2 {
+    font-size: var(--font-size-xl, 20px);
+    color: var(--gray-900);
+    margin: 0 0 var(--spacing-xs, 8px) 0;
+}
+
+.payment-success-compact .success-amount {
+    font-size: var(--font-size-2xl, 24px);
+    font-weight: 700;
+    color: var(--success-700);
+    margin: 0 0 var(--spacing-lg) 0;
+}
+
+.payment-success-compact .success-actions {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-sm);
+}
+
+/* ========================================
+   RESPONSIVE - Tablet (768px)
+   ======================================== */
+@media (max-width: 768px) {
+    .payment-modal-compact {
+        max-width: 100%;
+    }
+
+    .payment-header-compact {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+        align-items: flex-start;
+        padding-right: var(--spacing-lg);
+    }
+
+    .payment-header-left {
+        flex-wrap: wrap;
+    }
+
+    .payment-header-right {
+        width: 100%;
+    }
+
+    .payment-balance-badge {
+        flex-direction: row;
+        width: 100%;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .payment-row-compact {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    .payment-main-row {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    .payment-field-group {
+        flex-direction: row; /* Keep side by side on tablet */
+    }
+
+    .payment-summary-strip {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-xs, 8px);
+    }
+
+    .summary-total {
+        margin-left: 0;
+        padding-left: 0;
+        border-left: none;
+        padding-top: var(--spacing-xs, 8px);
+        border-top: 1px solid var(--gray-300);
+        width: 100%;
+    }
+
+    .exchange-rate-error-compact {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .rate-input-inline {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .rate-input-small {
+        flex: 1;
+    }
+}
+
+/* ========================================
+   RESPONSIVE - Mobile (480px)
+   ======================================== */
+@media (max-width: 480px) {
+    .payment-header-compact {
+        padding: var(--spacing-sm) var(--spacing-md);
+        padding-right: 40px;
+    }
+
+    .payment-title-compact {
+        font-size: var(--font-size-md, 16px);
+    }
+
+    .payment-work-type {
+        font-size: var(--font-size-xs, 11px);
+    }
+
+    .payment-form-compact {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .payment-main-row {
+        padding: var(--spacing-sm);
+    }
+
+    .payment-field-group {
+        flex-direction: column; /* Stack on small mobile */
+    }
+
+    .payment-actions-compact {
+        flex-direction: column-reverse;
+    }
+
+    .payment-actions-compact .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .payment-success-compact {
+        padding: var(--spacing-lg) var(--spacing-md);
+    }
+
+    .payment-success-compact .success-icon {
+        font-size: 40px;
+    }
+
+    .payment-success-compact .success-amount {
+        font-size: var(--font-size-xl, 20px);
+    }
+
+    .payment-success-compact .success-actions {
+        flex-direction: column;
+    }
+
+    .payment-success-compact .success-actions .btn {
+        width: 100%;
+    }
+
+    /* Consistent height for ALL input fields on mobile - slightly smaller */
+    .select-compact,
+    .input-compact,
+    .input-lg,
+    .input-md {
+        height: calc(var(--input-height-sm) - var(--spacing-xs));
+        font-size: var(--font-size-sm);
+    }
+
+    /* Entry Mode Toggle - Mobile overrides (matches above input heights) */
+    .entry-mode-field .entry-mode-toggle {
+        height: calc(var(--input-height-sm) - var(--spacing-xs));
+        padding: 0 var(--spacing-xs, 6px);
+    }
+
+    .entry-mode-field .entry-mode-toggle .toggle-label {
+        font-size: var(--font-size-xs, 11px);
+    }
+
+    .entry-mode-field .entry-mode-switch {
+        width: 36px;
+        height: 20px;
+    }
+
+    .entry-mode-field .entry-mode-switch .slider:before {
+        height: 14px;
+        width: 14px;
+    }
+
+    .entry-mode-field .entry-mode-switch input:checked + .slider:before {
+        transform: translateX(16px);
+    }
+}
+
 @keyframes slideIn {
     from {
         opacity: 0;
@@ -296,6 +870,137 @@
     font-size: 15px;
     font-weight: 500;
     cursor: pointer;
+}
+
+/* ========================================
+   ENTRY MODE TOGGLE
+   Toggle switch for Amount/Cash entry mode
+   Used in: PaymentModal (.entry-mode-field)
+   ======================================== */
+
+/* Base toggle container - standalone usage (non-payment modal) */
+.entry-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    padding: 8px 12px;
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+}
+
+/* Toggle labels (Amount/Cash text) */
+.entry-mode-toggle .toggle-label {
+    font-size: 13px;
+    color: var(--gray-600);
+    white-space: nowrap;
+    transition: color 0.2s ease;
+}
+
+.entry-mode-toggle .toggle-label.active {
+    color: var(--gray-900);
+    font-weight: 600;
+}
+
+/* Toggle switch - the actual switch control */
+.entry-mode-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+    margin: 0; /* Reset margins to allow flex centering */
+}
+
+.entry-mode-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+/* Switch slider track */
+.entry-mode-switch .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--color-purple-light);
+    transition: 0.3s;
+    border-radius: 24px;
+}
+
+/* Switch slider knob */
+.entry-mode-switch .slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Checked state (Cash mode) */
+.entry-mode-switch input:checked + .slider {
+    background-color: var(--success-color);
+}
+
+.entry-mode-switch input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
+/* Hover effect */
+.entry-mode-switch:hover .slider {
+    filter: brightness(1.05);
+}
+
+/* --- Payment Modal Context --- */
+/* When toggle is used inside .entry-mode-field (payment modal row) */
+.entry-mode-field .entry-mode-toggle {
+    margin: var(--spacing-xs) 0 0 0; /* Match margin-top of adjacent select/input fields */
+    height: var(--input-height-sm);
+    padding: 0 var(--spacing-sm);
+    background: var(--color-white);
+    border: var(--border-width-thin) solid var(--gray-300);
+    border-radius: var(--radius-lg);
+    box-sizing: border-box;
+    justify-content: center;
+    gap: var(--spacing-xs);
+}
+
+.entry-mode-field .entry-mode-toggle .toggle-label {
+    font-size: var(--font-size-sm);
+}
+
+/* Auto-calculated badge */
+.auto-calculated-badge {
+    display: inline-block;
+    background: var(--info-100);
+    color: var(--info-700);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* Read-only amount input in cash mode */
+.form-group input.amount-readonly {
+    background: var(--gray-100);
+    border-color: var(--gray-200);
+    color: var(--gray-600);
+    cursor: not-allowed;
+}
+
+.form-group input.amount-readonly:focus {
+    border-color: var(--gray-200);
+    box-shadow: none;
 }
 
 /* Checkbox Group */

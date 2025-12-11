@@ -11,6 +11,7 @@
  */
 
 import { executeQuery, TYPES } from '../index.js';
+import { log } from '../../../utils/logger.js';
 
 // ==============================
 // ALIGNER DOCTORS QUERIES
@@ -1127,9 +1128,17 @@ export async function markAllActivitiesAsRead(setId) {
 export async function createAlignerPayment(paymentData) {
     const { workid, AlignerSetID, Amountpaid, Dateofpayment, ActualAmount, ActualCur, Change } = paymentData;
 
+    // Determine USD vs IQD based on currency (default to USD for aligner payments)
+    const currency = ActualCur || 'USD';
+    const amount = Math.round(parseFloat(Amountpaid)); // Round to integer for USDReceived/IQDReceived columns
+    const usdReceived = currency === 'USD' ? amount : 0;
+    const iqdReceived = currency === 'IQD' ? amount : 0;
+
+    log.info('Creating aligner payment', { workid, AlignerSetID, Amountpaid, currency, usdReceived, iqdReceived });
+
     const query = `
-        INSERT INTO tblInvoice (workid, Amountpaid, Dateofpayment, ActualAmount, ActualCur, Change, AlignerSetID)
-        VALUES (@workid, @Amountpaid, @Dateofpayment, @ActualAmount, @ActualCur, @Change, @AlignerSetID);
+        INSERT INTO tblInvoice (workid, Amountpaid, Dateofpayment, ActualAmount, ActualCur, Change, AlignerSetID, USDReceived, IQDReceived)
+        VALUES (@workid, @Amountpaid, @Dateofpayment, @ActualAmount, @ActualCur, @Change, @AlignerSetID, @USDReceived, @IQDReceived);
         SELECT SCOPE_IDENTITY() AS invoiceID;
     `;
 
@@ -1142,9 +1151,37 @@ export async function createAlignerPayment(paymentData) {
             ['ActualAmount', TYPES.Decimal, ActualAmount ? parseFloat(ActualAmount) : null],
             ['ActualCur', TYPES.NVarChar, ActualCur || null],
             ['Change', TYPES.Decimal, Change ? parseFloat(Change) : null],
-            ['AlignerSetID', TYPES.Int, AlignerSetID || null]
+            ['AlignerSetID', TYPES.Int, AlignerSetID || null],
+            ['USDReceived', TYPES.Int, usdReceived],
+            ['IQDReceived', TYPES.Int, iqdReceived]
         ],
         (columns) => columns[0].value
+    );
+
+    return result && result.length > 0 ? result[0] : null;
+}
+
+/**
+ * Get aligner set balance information for validation
+ * @param {number} alignerSetId - Aligner Set ID
+ * @returns {Promise<Object|null>} Balance info or null if not found
+ */
+export async function getAlignerSetBalance(alignerSetId) {
+    const query = `
+        SELECT AlignerSetID, SetCost, TotalPaid, Balance
+        FROM vw_AlignerSetPayments
+        WHERE AlignerSetID = @alignerSetId
+    `;
+
+    const result = await executeQuery(
+        query,
+        [['alignerSetId', TYPES.Int, parseInt(alignerSetId)]],
+        (columns) => ({
+            AlignerSetID: columns[0].value,
+            SetCost: columns[1].value,
+            TotalPaid: columns[2].value,
+            Balance: columns[3].value
+        })
     );
 
     return result && result.length > 0 ? result[0] : null;

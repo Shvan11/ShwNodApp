@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import '../../../css/components/invoice-form.css'
-import { formatNumber, parseFormattedNumber, formatCurrency as formatCurrencyUtil } from '../../utils/formatters.js'
+import { parseFormattedNumber } from '../../utils/formatters.js'
 import { useToast } from '../../contexts/ToastContext.jsx'
 
 /**
@@ -19,6 +19,11 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [receiptData, setReceiptData] = useState(null);
     const [completeWorkData, setCompleteWorkData] = useState(null);
+
+    // Entry mode: 'amount' = enter amount first (current), 'cash' = enter cash first (reverse)
+    const [entryMode, setEntryMode] = useState('amount');
+    // Track if mode has been locked (after first input or manual toggle)
+    const [modeLocked, setModeLocked] = useState(false);
 
     // Form state - numeric values for calculations
     const [formData, setFormData] = useState({
@@ -85,12 +90,12 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         }
     }, [formData.paymentDate]);
 
-    // Recalculate when payment currency or amount changes
+    // Recalculate when payment currency or amount changes, or when switching to amount mode
     useEffect(() => {
-        if (formData.amountToRegister && exchangeRate) {
+        if (entryMode === 'amount' && formData.amountToRegister && exchangeRate) {
             calculateSuggestedCash();
         }
-    }, [formData.amountToRegister, formData.paymentCurrency, exchangeRate]);
+    }, [formData.amountToRegister, formData.paymentCurrency, exchangeRate, entryMode]);
 
     // Recalculate when actual cash amounts change
     useEffect(() => {
@@ -292,13 +297,58 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         }));
     };
 
+    // Calculate amount to register from cash received (reverse mode)
+    // Uses same "benefit from conversion" rounding - round DOWN what patient gave
+    const calculateAmountFromCash = useCallback(() => {
+        if (!exchangeRate) return;
+
+        const actualUSD = parseFloat(formData.actualUSD) || 0;
+        const actualIQD = parseFloat(formData.actualIQD) || 0;
+        const accountCurrency = calculations.accountCurrency;
+
+        // Must have at least one currency to calculate
+        if (actualUSD === 0 && actualIQD === 0) {
+            setFormData(prev => ({ ...prev, amountToRegister: '' }));
+            return;
+        }
+
+        // Round DOWN what patient gave (business benefits from conversion)
+        let amountToRegister;
+        if (accountCurrency === 'USD') {
+            // Patient gave IQD, convert to USD - Round DOWN
+            const iqdValueInUSD = Math.floor(actualIQD / exchangeRate);
+            amountToRegister = actualUSD + iqdValueInUSD;
+        } else {
+            // Patient gave USD, convert to IQD - Round DOWN to nearest 1000
+            const usdValueInIQD = Math.floor(actualUSD * exchangeRate / 1000) * 1000;
+            amountToRegister = usdValueInIQD + actualIQD;
+        }
+
+        setFormData(prev => ({ ...prev, amountToRegister }));
+    }, [exchangeRate, formData.actualUSD, formData.actualIQD, calculations.accountCurrency]);
+
+    // Reverse mode: Calculate amount from cash when in cash entry mode
+    useEffect(() => {
+        if (entryMode === 'cash' && exchangeRate) {
+            calculateAmountFromCash();
+        }
+    }, [formData.actualUSD, formData.actualIQD, entryMode, exchangeRate, calculateAmountFromCash]);
+
     // Smart calculation for mixed payments
     const handleMixedUSDChange = (value) => {
         const usd = parseFormattedNumber(value) || 0;
+
+        // Auto-detect mode for mixed payments (only if not locked)
+        if (!modeLocked && usd > 0 && !formData.amountToRegister) {
+            setEntryMode('cash');
+            setModeLocked(true);
+        }
+
         setFormData(prev => ({ ...prev, actualUSD: usd }));
         setDisplayValues(prev => ({ ...prev, actualUSD: value }));
 
-        if (usd > 0 && !formData.actualIQD && exchangeRate) {
+        // Only calculate suggestions in amount mode
+        if (entryMode === 'amount' && usd > 0 && !formData.actualIQD && exchangeRate) {
             // Calculate remaining IQD needed
             const amountToRegister = parseFloat(formData.amountToRegister) || 0;
             const accountCurrency = calculations.accountCurrency;
@@ -325,10 +375,18 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
 
     const handleMixedIQDChange = (value) => {
         const iqd = parseFormattedNumber(value) || 0;
+
+        // Auto-detect mode for mixed payments (only if not locked)
+        if (!modeLocked && iqd > 0 && !formData.amountToRegister) {
+            setEntryMode('cash');
+            setModeLocked(true);
+        }
+
         setFormData(prev => ({ ...prev, actualIQD: iqd }));
         setDisplayValues(prev => ({ ...prev, actualIQD: value }));
 
-        if (iqd > 0 && !formData.actualUSD && exchangeRate) {
+        // Only calculate suggestions in amount mode
+        if (entryMode === 'amount' && iqd > 0 && !formData.actualUSD && exchangeRate) {
             // Calculate remaining USD needed
             const amountToRegister = parseFloat(formData.amountToRegister) || 0;
             const accountCurrency = calculations.accountCurrency;
@@ -355,16 +413,46 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
+
+        // When changing payment currency, clear the irrelevant cash field
+        if (name === 'paymentCurrency') {
+            if (value === 'USD') {
+                // Switching to USD only - clear IQD
+                setFormData(prev => ({ ...prev, paymentCurrency: value, actualIQD: '' }));
+                setDisplayValues(prev => ({ ...prev, actualIQD: '' }));
+                return;
+            } else if (value === 'IQD') {
+                // Switching to IQD only - clear USD
+                setFormData(prev => ({ ...prev, paymentCurrency: value, actualUSD: '' }));
+                setDisplayValues(prev => ({ ...prev, actualUSD: '' }));
+                return;
+            }
+            // For MIXED, keep both values
+        }
+
         setFormData(prev => ({
             ...prev,
             [name]: value
         }));
     };
 
-    // Handle formatted money input changes
+    // Handle formatted money input changes with auto-detect mode (only before mode is locked)
     const handleMoneyInputChange = (fieldName, value) => {
         // Parse the formatted input
         const numericValue = parseFormattedNumber(value);
+
+        // Auto-detect entry mode ONLY if mode is not locked yet
+        if (!modeLocked && numericValue > 0) {
+            if (fieldName === 'amountToRegister') {
+                // User typed in amount field first - lock to amount mode
+                setEntryMode('amount');
+                setModeLocked(true);
+            } else if ((fieldName === 'actualUSD' || fieldName === 'actualIQD') && !formData.amountToRegister) {
+                // User typed in cash field first (with empty amount) - lock to cash mode
+                setEntryMode('cash');
+                setModeLocked(true);
+            }
+        }
 
         // Update formData with numeric value for calculations
         setFormData(prev => ({
@@ -390,7 +478,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
     };
 
     // Handle focus - select all text only when value is "0"
-    const handleMoneyInputFocus = (e, fieldName) => {
+    const handleMoneyInputFocus = (e) => {
         // If value is "0", select it so user can immediately type to replace (no cursor confusion)
         if (e.target.value === '0') {
             e.target.select();
@@ -410,6 +498,50 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         }));
     };
 
+    // Handle entry mode toggle change (always locks mode after manual toggle)
+    const handleEntryModeChange = (newMode) => {
+        if (newMode === entryMode) return;
+
+        // Lock mode after manual toggle
+        setModeLocked(true);
+
+        if (newMode === 'cash') {
+            // Switching to cash mode
+            // Clear amount (auto-calculated in cash mode), keep cash values
+            // useEffect will recalculate amount from cash
+            setFormData(prev => ({
+                ...prev,
+                amountToRegister: '',
+                change: 0,
+                changeManualOverride: false
+            }));
+            setDisplayValues(prev => ({
+                ...prev,
+                amountToRegister: '',
+                change: ''
+            }));
+            setEntryMode(newMode);
+        } else {
+            // Switching to amount mode
+            // Clear cash (auto-calculated in amount mode), keep amount value
+            // useEffect will recalculate cash from amount
+            setFormData(prev => ({
+                ...prev,
+                actualUSD: '',
+                actualIQD: '',
+                change: 0,
+                changeManualOverride: false
+            }));
+            setDisplayValues(prev => ({
+                ...prev,
+                actualUSD: '',
+                actualIQD: '',
+                change: ''
+            }));
+            setEntryMode(newMode);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -417,9 +549,24 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         const actualIQD = parseInt(formData.actualIQD) || 0;
         const amountPaid = parseInt(formData.amountToRegister) || 0;
 
-        if (!amountPaid) {
-            toast.warning('Please enter the amount to register');
-            return;
+        // Validation based on entry mode
+        if (entryMode === 'amount') {
+            // Amount mode: Must have amount entered
+            if (!amountPaid) {
+                toast.warning('Please enter the amount to register');
+                return;
+            }
+        } else {
+            // Cash mode: Must have cash entered (amount will be calculated)
+            if (actualUSD === 0 && actualIQD === 0) {
+                toast.warning('Please enter cash received (USD or IQD)');
+                return;
+            }
+            // In cash mode, amountPaid should have been calculated - validate it exists
+            if (!amountPaid) {
+                toast.warning('Could not calculate amount to register. Please check cash amounts.');
+                return;
+            }
         }
 
         if (actualUSD === 0 && actualIQD === 0) {
@@ -579,521 +726,300 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         return Math.round(num).toLocaleString('en-US');
     };
 
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-    };
-
-    const formatDateTime = (dateString) => {
-        if (!dateString) return 'N/A';
-        const date = new Date(dateString);
-        return date.toLocaleString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
-
     if (!workData) return null;
+
+    // Detect same-currency payment for UI display (based on selected payment currency)
+    // Note: In handleSubmit, we recalculate based on actual values entered for validation
+    const isSameCurrencyPayment =
+        (calculations.accountCurrency === 'USD' && formData.paymentCurrency === 'USD') ||
+        (calculations.accountCurrency === 'IQD' && formData.paymentCurrency === 'IQD');
 
     return (
         <>
             <div className="modal-overlay">
-                <div className="modal-content invoice-modal">
+                <div className="modal-content invoice-modal payment-modal-compact">
                 <button className="modal-close" onClick={paymentSuccess ? handleCloseAfterSuccess : onClose}>×</button>
 
                 {!paymentSuccess ? (
                     <>
-                        <h2 className="modal-title">
-                            Add Payment - {workData.TypeName || `Work #${workData.workid}`}
-                        </h2>
-
-                <div className="modal-description payment-modal-description">
-                    <strong>Account Currency:</strong> {calculations.accountCurrency} |
-                    <strong> Balance:</strong> {formatCurrency(calculations.remainingBalance, calculations.accountCurrency)}
-                </div>
-
-                {/* Top Actions - Redundant buttons for convenience */}
-                <div className="form-actions payment-top-actions">
-                    <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={onClose}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        className="btn btn-primary btn-lg"
-                        disabled={loading || !exchangeRate}
-                        onClick={(e) => {
-                            e.preventDefault();
-                            // Find and trigger the main form submit
-                            const form = document.querySelector('.invoice-form');
-                            if (form) {
-                                form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-                            }
-                        }}
-                    >
-                        {loading ? (
-                            <>
-                                <i className="fas fa-spinner fa-spin"></i>
-                                Saving...
-                            </>
-                        ) : (
-                            <>
-                                <i className="fas fa-save"></i>
-                                Save Payment
-                            </>
-                        )}
-                    </button>
-                </div>
-
-                {/* Exchange Rate Status */}
-                {exchangeRateError && !exchangeRate ? (
-                    <div className="exchange-rate-error-box">
-                        <div className="exchange-rate-error-header">
-                            <i className="fas fa-exclamation-triangle exchange-rate-error-icon"></i>
-                            <strong>Exchange rate not set for {formData.paymentDate}</strong>
-                        </div>
-                        {!showRateInput ? (
-                            <button
-                                type="button"
-                                onClick={() => setShowRateInput(true)}
-                                className="exchange-rate-set-button"
-                            >
-                                <i className="fas fa-plus"></i> Set Exchange Rate
-                            </button>
-                        ) : (
-                            <div className="exchange-rate-input-group">
-                                <input
-                                    type="text"
-                                    value={displayValues.newRateValue}
-                                    onChange={(e) => {
-                                        setNewRateValue(e.target.value);
-                                        setDisplayValues(prev => ({ ...prev, newRateValue: e.target.value }));
-                                    }}
-                                    onBlur={() => {
-                                        const formatted = formatNumber(newRateValue);
-                                        setDisplayValues(prev => ({ ...prev, newRateValue: formatted }));
-                                    }}
-                                    placeholder="Enter rate (e.g., 1,406)"
-                                    className="exchange-rate-input"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleSetExchangeRate}
-                                    disabled={loading}
-                                    className="exchange-rate-save-button"
-                                >
-                                    {loading ? 'Setting...' : 'Save'}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowRateInput(false);
-                                        setNewRateValue('');
-                                    }}
-                                    className="exchange-rate-cancel-button"
-                                >
-                                    Cancel
-                                </button>
+                        {/* Compact Header with Balance Info */}
+                        <div className="payment-header-compact">
+                            <div className="payment-header-left">
+                                <h2 className="payment-title-compact">
+                                    <i className="fas fa-credit-card"></i>
+                                    Add Payment
+                                </h2>
+                                <span className="payment-work-type">{workData.TypeName || `Work #${workData.workid}`}</span>
                             </div>
-                        )}
-                        <p className="exchange-rate-error-note">
-                            Exchange rate is required for currency conversion on {formData.paymentDate}. Enter: 1 USD = ? IQD
-                        </p>
-                    </div>
-                ) : exchangeRate ? (
-                    <div className="exchange-rate-info">
-                        <i className="fas fa-check-circle"></i>
-                        <strong>Exchange Rate for {formData.paymentDate}:</strong> 1 USD = {formatNumber(exchangeRate)} IQD
-                    </div>
-                ) : null}
-
-                <form onSubmit={handleSubmit} className="invoice-form">
-                    {/* Two Column Grid for Steps 1-2 */}
-                    <div className="invoice-form-grid">
-                        {/* STEP 1: Payment Currency */}
-                        <div className="form-section">
-                            <h4 className="section-title">
-                                <span className="step-number">1</span>
-                                Payment Currency
-                            </h4>
-
-                            <div className="form-group">
-                                <label htmlFor="paymentCurrency">How is patient paying?</label>
-                                <select
-                                    id="paymentCurrency"
-                                    name="paymentCurrency"
-                                    value={formData.paymentCurrency}
-                                    onChange={handleInputChange}
-                                    className="currency-select"
-                                >
-                                    <option value="USD">US Dollars (USD) Only</option>
-                                    <option value="IQD">Iraqi Dinar (IQD) Only</option>
-                                    <option value="MIXED">Mixed (USD + IQD)</option>
-                                </select>
+                            <div className="payment-header-right">
+                                <div className="payment-balance-badge">
+                                    <span className="balance-label">Balance</span>
+                                    <span className="balance-amount">{formatCurrency(calculations.remainingBalance, calculations.accountCurrency)}</span>
+                                </div>
                             </div>
                         </div>
 
-                        {/* STEP 2: Amount to Register */}
-                        <div className="form-section">
-                        <h4 className="section-title">
-                            <span className="step-number">2</span>
-                            Amount to Register
-                        </h4>
-
-                        <div className="form-group">
-                            <label htmlFor="amountToRegister">
-                                Amount to Register ({calculations.accountCurrency}): <span className="payment-required-asterisk">*</span>
-                            </label>
-                            <input
-                                id="amountToRegister"
-                                type="text"
-                                name="amountToRegister"
-                                value={displayValues.amountToRegister}
-                                onChange={(e) => handleMoneyInputChange('amountToRegister', e.target.value)}
-                                onBlur={() => handleMoneyInputBlur('amountToRegister')}
-                                onFocus={(e) => handleMoneyInputFocus(e, 'amountToRegister')}
-                                required
-                                placeholder={`Amount to deduct from balance`}
-                                className="large-input"
-                            />
-                            <small className="payment-form-helper">
-                                This amount will be registered to patient's account in {calculations.accountCurrency}
-                            </small>
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="paymentDate">Payment Date: <span className="payment-required-asterisk">*</span></label>
-                            <input
-                                id="paymentDate"
-                                type="date"
-                                name="paymentDate"
-                                value={formData.paymentDate}
-                                onChange={handleInputChange}
-                                required
-                            />
-                        </div>
-                    </div>
-                    </div>
-
-                    {/* Two Column Grid for Steps 3-4 */}
-                    <div className="invoice-form-grid">
-                        {/* STEP 3: Cash Collection */}
-                        <div className="form-section">
-                        <h4 className="section-title">
-                            <span className="step-number">3</span>
-                            Cash Collection
-                        </h4>
-
-                        {formData.paymentCurrency !== 'MIXED' ? (
-                            // Single Currency Payment
-                            <>
-                                {calculations.suggestedUSD > 0 && (
-                                    <div className="suggestion-box">
-                                        <i className="fas fa-lightbulb"></i>
-                                        <span>Suggested: Collect {formatCurrency(calculations.suggestedUSD, 'USD')}</span>
-                                    </div>
-                                )}
-                                {calculations.suggestedIQD > 0 && (
-                                    <div className="suggestion-box">
-                                        <i className="fas fa-lightbulb"></i>
-                                        <span>Suggested: Collect {formatCurrency(calculations.suggestedIQD, 'IQD')}</span>
-                                    </div>
-                                )}
-
-                                {formData.paymentCurrency === 'USD' && (
-                                    <div className="form-group">
-                                        <label htmlFor="actualUSD">
-                                            USD Received: <span className="payment-required-asterisk">*</span>
-                                        </label>
+                        {/* Exchange Rate - Compact Inline */}
+                        {exchangeRateError && !exchangeRate ? (
+                            <div className="exchange-rate-error-compact">
+                                <i className="fas fa-exclamation-triangle"></i>
+                                <span>No rate for {formData.paymentDate}</span>
+                                {!showRateInput ? (
+                                    <button type="button" onClick={() => setShowRateInput(true)} className="btn-link">
+                                        Set Rate
+                                    </button>
+                                ) : (
+                                    <div className="rate-input-inline">
                                         <input
-                                            id="actualUSD"
                                             type="text"
-                                            name="actualUSD"
-                                            value={displayValues.actualUSD}
-                                            onChange={(e) => handleMoneyInputChange('actualUSD', e.target.value)}
-                                            onBlur={() => handleMoneyInputBlur('actualUSD')}
-                                            onFocus={(e) => handleMoneyInputFocus(e, 'actualUSD')}
-                                            required
-                                            placeholder="Enter USD amount"
-                                            className="large-input"
+                                            value={displayValues.newRateValue}
+                                            onChange={(e) => {
+                                                setNewRateValue(e.target.value);
+                                                setDisplayValues(prev => ({ ...prev, newRateValue: e.target.value }));
+                                            }}
+                                            placeholder="1,406"
+                                            className="rate-input-small"
                                         />
-                                    </div>
-                                )}
-
-                                {formData.paymentCurrency === 'IQD' && (
-                                    <div className="form-group">
-                                        <label htmlFor="actualIQD">
-                                            IQD Received: <span className="payment-required-asterisk">*</span>
-                                        </label>
-                                        <input
-                                            id="actualIQD"
-                                            type="text"
-                                            name="actualIQD"
-                                            value={displayValues.actualIQD}
-                                            onChange={(e) => handleMoneyInputChange('actualIQD', e.target.value)}
-                                            onBlur={() => handleMoneyInputBlur('actualIQD')}
-                                            onFocus={(e) => handleMoneyInputFocus(e, 'actualIQD')}
-                                            required
-                                            placeholder="Enter IQD amount"
-                                            className="large-input"
-                                        />
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            // Mixed Payment
-                            <div className="mixed-payment-section">
-                                <div className="mixed-payment-target-box">
-                                    <strong>Target:</strong> {formatCurrency(formData.amountToRegister || 0, calculations.accountCurrency)}
-                                    <br/>
-                                    <small className="payment-form-helper">
-                                        Ask patient: "How much USD and IQD do you have?"
-                                    </small>
-                                </div>
-
-                                <div className="form-group">
-                                    <label htmlFor="actualUSD">USD Received:</label>
-                                    <input
-                                        id="actualUSD"
-                                        type="text"
-                                        value={displayValues.actualUSD}
-                                        onChange={(e) => handleMixedUSDChange(e.target.value)}
-                                        onBlur={() => handleMoneyInputBlur('actualUSD')}
-                                        onFocus={(e) => handleMoneyInputFocus(e, 'actualUSD')}
-                                        placeholder="Enter USD amount"
-                                    />
-                                    {formData.actualUSD && (
-                                        <small className="payment-form-helper-success">
-                                            = {formatCurrency(
-                                                calculations.accountCurrency === 'USD'
-                                                    ? parseFloat(formData.actualUSD)
-                                                    : parseFloat(formData.actualUSD) * exchangeRate,
-                                                calculations.accountCurrency
-                                            )} value
-                                        </small>
-                                    )}
-                                    {calculations.suggestedIQD > 0 && !formData.actualIQD && (
-                                        <small className="payment-form-helper-info">
-                                            💡 Still need: {formatCurrency(calculations.suggestedIQD, 'IQD')}
-                                        </small>
-                                    )}
-                                </div>
-
-                                <div className="form-group">
-                                    <label htmlFor="actualIQD">IQD Received:</label>
-                                    <input
-                                        id="actualIQD"
-                                        type="text"
-                                        value={displayValues.actualIQD}
-                                        onChange={(e) => handleMixedIQDChange(e.target.value)}
-                                        onBlur={() => handleMoneyInputBlur('actualIQD')}
-                                        onFocus={(e) => handleMoneyInputFocus(e, 'actualIQD')}
-                                        placeholder={calculations.suggestedIQD > 0 ? `Suggested: ${formatNumber(calculations.suggestedIQD)}` : "Enter IQD amount"}
-                                    />
-                                    {formData.actualIQD && (
-                                        <small className="payment-form-helper-success">
-                                            = {formatCurrency(
-                                                calculations.accountCurrency === 'IQD'
-                                                    ? parseFloat(formData.actualIQD)
-                                                    : parseFloat(formData.actualIQD) / exchangeRate,
-                                                calculations.accountCurrency
-                                            )} value
-                                        </small>
-                                    )}
-                                    {calculations.suggestedUSD > 0 && !formData.actualUSD && (
-                                        <small className="payment-form-helper-info">
-                                            💡 Still need: {formatCurrency(calculations.suggestedUSD, 'USD')}
-                                        </small>
-                                    )}
-                                </div>
-
-                                {/* Real-time Total Display */}
-                                {(formData.actualUSD || formData.actualIQD) && (
-                                    <div className={`realtime-total-box ${calculations.isShort ? 'short' : calculations.isExact ? 'exact' : 'over'}`}>
-                                        <div className="realtime-total-header">
-                                            <i className={`fas ${calculations.isShort ? 'fa-exclamation-triangle' : calculations.isExact ? 'fa-check-circle' : 'fa-info-circle'}`}></i>
-                                            <strong>Total Received: {formatCurrency(calculations.totalReceived, calculations.accountCurrency)}</strong>
-                                        </div>
-                                        {calculations.isShort && (
-                                            <div className="realtime-total-message short">
-                                                ⚠️ Short by {formatCurrency((formData.amountToRegister || 0) - calculations.totalReceived, calculations.accountCurrency)}
-                                            </div>
-                                        )}
-                                        {calculations.isExact && (
-                                            <div className="realtime-total-message exact">
-                                                ✅ Exact amount
-                                            </div>
-                                        )}
-                                        {calculations.isOver && (
-                                            <div className="realtime-total-message over">
-                                                ✅ Overpaid by {formatCurrency(calculations.totalReceived - (formData.amountToRegister || 0), calculations.accountCurrency)}
-                                            </div>
-                                        )}
+                                        <button type="button" onClick={handleSetExchangeRate} disabled={loading} className="btn-sm btn-primary">
+                                            {loading ? '...' : 'Save'}
+                                        </button>
+                                        <button type="button" onClick={() => { setShowRateInput(false); setNewRateValue(''); }} className="btn-sm btn-ghost">
+                                            ×
+                                        </button>
                                     </div>
                                 )}
                             </div>
-                        )}
-                    </div>
+                        ) : exchangeRate ? (
+                            <div className="exchange-rate-compact">
+                                <i className="fas fa-exchange-alt"></i>
+                                <span>1 USD = {formatNumber(exchangeRate)} IQD</span>
+                                <span className="rate-date">({formData.paymentDate})</span>
+                            </div>
+                        ) : null}
 
-                        {/* STEP 4: Change */}
-                        <div className="form-section">
-                        <h4 className="section-title">
-                            <span className="step-number">4</span>
-                            Change to Give
-                        </h4>
+                        <form onSubmit={handleSubmit} className="invoice-form payment-form-compact">
+                            {/* Row 1: Currency + Entry Mode + Date */}
+                            <div className="payment-row-compact">
+                                <div className="payment-field">
+                                    <label>Payment Currency</label>
+                                    <select
+                                        name="paymentCurrency"
+                                        value={formData.paymentCurrency}
+                                        onChange={handleInputChange}
+                                        className="select-compact"
+                                    >
+                                        <option value="USD">USD Only</option>
+                                        <option value="IQD">IQD Only</option>
+                                        <option value="MIXED">Mixed</option>
+                                    </select>
+                                </div>
 
-                        {(() => {
-                            // Detect same-currency payment
-                            const isSameCurrencyPayment =
-                                (calculations.accountCurrency === 'USD' && formData.paymentCurrency === 'USD') ||
-                                (calculations.accountCurrency === 'IQD' && formData.paymentCurrency === 'IQD');
+                                <div className="payment-field entry-mode-field">
+                                    <label>Entry Mode</label>
+                                    <div className="entry-mode-toggle">
+                                        <span className={`toggle-label ${entryMode === 'amount' ? 'active' : ''}`}>Amount</span>
+                                        <label className="entry-mode-switch">
+                                            <input
+                                                type="checkbox"
+                                                checked={entryMode === 'cash'}
+                                                onChange={(e) => handleEntryModeChange(e.target.checked ? 'cash' : 'amount')}
+                                            />
+                                            <span className="slider"></span>
+                                        </label>
+                                        <span className={`toggle-label ${entryMode === 'cash' ? 'active' : ''}`}>Cash</span>
+                                    </div>
+                                </div>
 
-                            if (isSameCurrencyPayment) {
-                                // Same currency - Hide change field, show explanation
-                                return (
-                                    <div className="same-currency-info-box">
-                                        <div className="same-currency-info-header">
-                                            <i className="fas fa-info-circle"></i>
-                                            <strong>No Change Tracking Needed</strong>
+                                <div className="payment-field">
+                                    <label>Date</label>
+                                    <input
+                                        type="date"
+                                        name="paymentDate"
+                                        value={formData.paymentDate}
+                                        onChange={handleInputChange}
+                                        className="input-compact"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Row 2: Amount + Cash Received + Change */}
+                            <div className="payment-row-compact payment-main-row">
+                                {/* Amount to Register */}
+                                <div className="payment-field payment-field-lg">
+                                    <label>
+                                        Amount to Register ({calculations.accountCurrency})
+                                        {entryMode === 'amount' && <span className="required">*</span>}
+                                        {entryMode === 'cash' && <span className="auto-badge">Auto</span>}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={displayValues.amountToRegister}
+                                        onChange={(e) => handleMoneyInputChange('amountToRegister', e.target.value)}
+                                        onBlur={() => handleMoneyInputBlur('amountToRegister')}
+                                        onFocus={handleMoneyInputFocus}
+                                        readOnly={entryMode === 'cash'}
+                                        placeholder={entryMode === 'cash' ? 'Auto' : 'Enter amount'}
+                                        className={`input-lg ${entryMode === 'cash' ? 'input-readonly' : ''}`}
+                                    />
+                                </div>
+
+                                {/* Cash Received - Dynamic based on currency */}
+                                {formData.paymentCurrency !== 'MIXED' ? (
+                                    <div className="payment-field payment-field-lg">
+                                        <label>
+                                            {formData.paymentCurrency} Received
+                                            {entryMode === 'cash' && <span className="required">*</span>}
+                                            {entryMode === 'amount' && <span className="auto-badge">Auto</span>}
+                                        </label>
+                                        {formData.paymentCurrency === 'USD' ? (
+                                            <input
+                                                type="text"
+                                                value={displayValues.actualUSD}
+                                                onChange={(e) => handleMoneyInputChange('actualUSD', e.target.value)}
+                                                onBlur={() => handleMoneyInputBlur('actualUSD')}
+                                                onFocus={handleMoneyInputFocus}
+                                                placeholder={entryMode === 'cash' ? 'Enter USD' : 'Auto'}
+                                                className="input-lg"
+                                            />
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                value={displayValues.actualIQD}
+                                                onChange={(e) => handleMoneyInputChange('actualIQD', e.target.value)}
+                                                onBlur={() => handleMoneyInputBlur('actualIQD')}
+                                                onFocus={handleMoneyInputFocus}
+                                                placeholder={entryMode === 'cash' ? 'Enter IQD' : 'Auto'}
+                                                className="input-lg"
+                                            />
+                                        )}
+                                        {/* Suggestion hint */}
+                                        {entryMode === 'amount' && calculations.suggestedUSD > 0 && formData.paymentCurrency === 'USD' && (
+                                            <small className="field-hint">Collect {formatNumber(calculations.suggestedUSD)}</small>
+                                        )}
+                                        {entryMode === 'amount' && calculations.suggestedIQD > 0 && formData.paymentCurrency === 'IQD' && (
+                                            <small className="field-hint">Collect {formatNumber(calculations.suggestedIQD)}</small>
+                                        )}
+                                    </div>
+                                ) : (
+                                    /* Mixed Payment - Two smaller fields */
+                                    <div className="payment-field-group">
+                                        <div className="payment-field">
+                                            <label>USD Received</label>
+                                            <input
+                                                type="text"
+                                                value={displayValues.actualUSD}
+                                                onChange={(e) => handleMixedUSDChange(e.target.value)}
+                                                onBlur={() => handleMoneyInputBlur('actualUSD')}
+                                                onFocus={handleMoneyInputFocus}
+                                                placeholder="USD"
+                                                className="input-md"
+                                            />
                                         </div>
-                                        <p className="same-currency-info-text">
-                                            Patient is paying in <strong>{calculations.accountCurrency}</strong> and account is in <strong>{calculations.accountCurrency}</strong>.
-                                            <br/>
-                                            Any cash change given is standard cash handling and doesn't need to be registered in the system.
-                                        </p>
+                                        <div className="payment-field">
+                                            <label>IQD Received</label>
+                                            <input
+                                                type="text"
+                                                value={displayValues.actualIQD}
+                                                onChange={(e) => handleMixedIQDChange(e.target.value)}
+                                                onBlur={() => handleMoneyInputBlur('actualIQD')}
+                                                onFocus={handleMoneyInputFocus}
+                                                placeholder="IQD"
+                                                className="input-md"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Change Field */}
+                                <div className="payment-field">
+                                    <label>
+                                        Change (IQD)
+                                        {isSameCurrencyPayment && <span className="na-badge">N/A</span>}
+                                    </label>
+                                    {isSameCurrencyPayment ? (
                                         <input
                                             type="text"
-                                            value="Not Applicable"
+                                            value="—"
                                             disabled
-                                            className="same-currency-disabled-input"
+                                            className="input-compact input-disabled"
                                         />
-                                    </div>
-                                );
-                            } else {
-                                // Cross-currency or mixed - Show normal change field
-                                return (
-                                    <div className="form-group">
-                                        <label htmlFor="change">
-                                            Change Given (IQD):
-                                        </label>
+                                    ) : (
                                         <input
-                                            id="change"
                                             type="text"
-                                            name="change"
                                             value={displayValues.change}
                                             onChange={(e) => handleChangeOverride(e.target.value)}
                                             onBlur={() => handleMoneyInputBlur('change')}
-                                            onFocus={(e) => handleMoneyInputFocus(e, 'change')}
+                                            onFocus={handleMoneyInputFocus}
                                             placeholder="0"
+                                            className="input-compact"
                                         />
-                                        <small className="payment-form-helper-block">
-                                            Track IQD change given back during currency conversion
-                                        </small>
-                                        {calculations.calculatedChange > 0 && !formData.changeManualOverride && (
-                                            <small className="payment-form-helper-success">
-                                                ✓ Auto-calculated based on overpayment
-                                            </small>
-                                        )}
-                                        {formData.changeManualOverride && (
-                                            <small className="payment-form-helper-warning">
-                                                ✏️ Manually overridden
-                                            </small>
-                                        )}
+                                    )}
+                                    {!isSameCurrencyPayment && calculations.calculatedChange > 0 && !formData.changeManualOverride && (
+                                        <small className="field-hint success">Auto-calculated</small>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Summary Strip - Only show when there's data */}
+                            {(formData.actualUSD || formData.actualIQD) && (
+                                <div className={`payment-summary-strip ${calculations.isShort ? 'warning' : 'success'}`}>
+                                    <div className="summary-item">
+                                        <span className="summary-label">Cash IN:</span>
+                                        <span className="summary-value">
+                                            {formData.actualUSD ? `$${formatNumber(formData.actualUSD)}` : ''}
+                                            {formData.actualUSD && formData.actualIQD ? ' + ' : ''}
+                                            {formData.actualIQD ? `${formatNumber(formData.actualIQD)} IQD` : ''}
+                                        </span>
                                     </div>
-                                );
-                            }
-                        })()}
-                    </div>
-                    </div>
-
-                    {/* Final Summary - Full Width */}
-                    {(formData.actualUSD || formData.actualIQD) && (
-                        <div className="payment-summary-box">
-                            <h4 className="payment-summary-title">✅ Payment Summary</h4>
-
-                            <div className="payment-summary-grid">
-                                <div>
-                                    <strong>Cash IN:</strong>
-                                    <br/>
-                                    USD: {formatCurrency(formData.actualUSD || 0, 'USD')}
-                                    <br/>
-                                    IQD: {formatCurrency(formData.actualIQD || 0, 'IQD')}
+                                    {!isSameCurrencyPayment && formData.change > 0 && (
+                                        <div className="summary-item">
+                                            <span className="summary-label">Change OUT:</span>
+                                            <span className="summary-value">{formatNumber(formData.change)} IQD</span>
+                                        </div>
+                                    )}
+                                    <div className="summary-item summary-total">
+                                        <span className="summary-label">Register:</span>
+                                        <span className="summary-value">{formatCurrency(formData.amountToRegister || 0, calculations.accountCurrency)}</span>
+                                    </div>
+                                    {calculations.isShort && (
+                                        <div className="summary-warning">
+                                            <i className="fas fa-exclamation-triangle"></i>
+                                            Short by {formatCurrency((formData.amountToRegister || 0) - calculations.totalReceived, calculations.accountCurrency)}
+                                        </div>
+                                    )}
                                 </div>
-                                <div>
-                                    <strong>Cash OUT:</strong>
-                                    <br/>
-                                    Change: {formatCurrency(formData.change || 0, 'IQD')}
-                                </div>
-                            </div>
-
-                            <div className="payment-summary-total">
-                                Registered to Account: {formatCurrency(formData.amountToRegister || 0, calculations.accountCurrency)}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Actions */}
-                    <div className="form-actions">
-                        <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={onClose}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="btn btn-primary btn-lg"
-                            disabled={loading || !exchangeRate}
-                        >
-                            {loading ? (
-                                <>
-                                    <i className="fas fa-spinner fa-spin"></i>
-                                    Saving...
-                                </>
-                            ) : (
-                                <>
-                                    <i className="fas fa-save"></i>
-                                    Save Payment
-                                </>
                             )}
-                        </button>
-                    </div>
-                </form>
+
+                            {/* Actions - Compact */}
+                            <div className="payment-actions-compact">
+                                <button type="button" className="btn btn-secondary" onClick={onClose}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary" disabled={loading || !exchangeRate}>
+                                    {loading ? (
+                                        <><i className="fas fa-spinner fa-spin"></i> Saving...</>
+                                    ) : (
+                                        <><i className="fas fa-check"></i> Save Payment</>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
                     </>
                 ) : (
-                    /* Payment Success State with Print Button */
-                    <div className="payment-success-container">
-                        <div className="payment-success-icon">
+                    /* Payment Success State - Compact */
+                    <div className="payment-success-compact">
+                        <div className="success-icon">
                             <i className="fas fa-check-circle"></i>
                         </div>
-                        <h2 className="payment-success-title">
-                            Payment Recorded Successfully!
-                        </h2>
-                        <p className="payment-success-amount-container">
-                            Amount: <strong className="payment-success-amount">
-                                {formatCurrency(receiptData?.amountPaidToday || 0, receiptData?.Currency || 'IQD')}
-                            </strong>
+                        <h2>Payment Recorded!</h2>
+                        <p className="success-amount">
+                            {formatCurrency(receiptData?.amountPaidToday || 0, receiptData?.Currency || 'IQD')}
                         </p>
-                        <div className="payment-success-actions">
-                            <button
-                                onClick={handlePrint}
-                                className="btn btn-primary btn-lg"
-                            >
-                                <i className="fas fa-print"></i>
-                                Print Receipt
+                        <div className="success-actions">
+                            <button onClick={handlePrint} className="btn btn-primary">
+                                <i className="fas fa-print"></i> Print Receipt
                             </button>
-                            <button
-                                onClick={handleCloseAfterSuccess}
-                                className="btn btn-secondary"
-                            >
+                            <button onClick={handleCloseAfterSuccess} className="btn btn-secondary">
                                 Done
                             </button>
                         </div>
@@ -1101,8 +1027,6 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                 )}
             </div>
         </div>
-
-            {/* Toast Notifications now handled globally by ToastProvider in App.jsx */}
         </>
     );
 };

@@ -36,7 +36,6 @@ import {
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
 import {
     validateAndCreateInvoice,
-    createAlignerPayment,
     PaymentValidationError
 } from '../../services/business/PaymentService.js';
 
@@ -324,54 +323,5 @@ router.delete("/deleteInvoice/:invoiceId",
         }
     }
 );
-
-// ============================================================================
-// ALIGNER PAYMENT ROUTES
-// ============================================================================
-
-/**
- * Add payment for aligner set
- * POST /api/aligner/payments
- *
- * Body: {
- *   workid: number,
- *   AlignerSetID: number (optional),
- *   Amountpaid: number,
- *   Dateofpayment: string,
- *   ActualAmount: number (optional),
- *   ActualCur: string (optional),
- *   Change: number (optional)
- * }
- */
-router.post('/aligner/payments', async (req, res) => {
-    try {
-        const { workid, AlignerSetID, Amountpaid, Dateofpayment, ActualAmount, ActualCur, Change } = req.body;
-
-        if (!workid || !Amountpaid || !Dateofpayment) {
-            return ErrorResponses.badRequest(res, 'workid, Amountpaid, and Dateofpayment are required');
-        }
-
-        // Delegate to service layer
-        const result = await createAlignerPayment({
-            workid,
-            AlignerSetID,
-            Amountpaid,
-            Dateofpayment,
-            ActualAmount,
-            ActualCur,
-            Change
-        });
-
-        res.json({
-            success: true,
-            invoiceID: result.invoiceID,
-            message: 'Payment added successfully'
-        });
-
-    } catch (error) {
-        log.error('Error adding payment:', error);
-        return ErrorResponses.internalError(res, 'Failed to add payment', error);
-    }
-});
 
 export default router;

@@ -588,7 +588,7 @@ export async function validateAndDeleteNote(noteId) {
  * @throws {AlignerValidationError} If validation fails
  */
 export async function validateAndCreatePayment(paymentData) {
-    const { workid, Amountpaid, Dateofpayment } = paymentData;
+    const { workid, AlignerSetID, Amountpaid, Dateofpayment } = paymentData;
 
     if (!workid || !Amountpaid || !Dateofpayment) {
         throw new AlignerValidationError(
@@ -597,7 +597,42 @@ export async function validateAndCreatePayment(paymentData) {
         );
     }
 
-    log.info(`Adding payment for work ID: ${workid}, Set ID: ${paymentData.AlignerSetID || 'general'}, Amount: ${Amountpaid}`);
+    // Validate payment doesn't exceed set balance
+    if (AlignerSetID) {
+        const setBalance = await alignerQueries.getAlignerSetBalance(AlignerSetID);
+
+        if (!setBalance) {
+            throw new AlignerValidationError(
+                'Aligner set not found',
+                'SET_NOT_FOUND'
+            );
+        }
+
+        if (setBalance.SetCost === null) {
+            throw new AlignerValidationError(
+                'Set cost must be defined before accepting payments',
+                'SET_COST_NOT_DEFINED'
+            );
+        }
+
+        const paymentAmount = parseFloat(Amountpaid);
+
+        if (paymentAmount <= 0) {
+            throw new AlignerValidationError(
+                'Payment amount must be greater than zero',
+                'INVALID_AMOUNT'
+            );
+        }
+
+        if (paymentAmount > setBalance.Balance) {
+            throw new AlignerValidationError(
+                `Payment amount (${paymentAmount}) exceeds remaining balance (${setBalance.Balance})`,
+                'PAYMENT_EXCEEDS_BALANCE'
+            );
+        }
+    }
+
+    log.info(`Adding payment for work ID: ${workid}, Set ID: ${AlignerSetID || 'general'}, Amount: ${Amountpaid}`);
 
     try {
         const invoiceID = await alignerQueries.createAlignerPayment(paymentData);
