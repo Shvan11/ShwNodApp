@@ -218,7 +218,8 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
 
             // Check for HTTP errors (400, 500, etc.)
             if (!response.ok) {
-                const errorMessage = result.error || result.message || 'Failed to save batch';
+                // Get the most specific error message available
+                const errorMessage = result.details?.message || result.error || result.message || 'Failed to save batch';
                 toast.error(errorMessage);
                 return;
             }

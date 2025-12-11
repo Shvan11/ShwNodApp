@@ -215,18 +215,13 @@ export async function validateAndCreateBatch(batchData) {
 
     log.info('Creating new aligner batch:', batchData);
 
-    try {
-        const newBatchId = await alignerQueries.createBatch(batchData);
-        log.info(`Aligner batch created successfully: Batch ${newBatchId}`);
+    const newBatchId = await alignerQueries.createBatch(batchData);
+    log.info(`Aligner batch created successfully: Batch ${newBatchId}`);
 
-        return {
-            newBatchId,
-            deactivatedBatch
-        };
-    } catch (error) {
-        log.error('Error creating aligner batch:', error);
-        throw error;
-    }
+    return {
+        newBatchId,
+        deactivatedBatch
+    };
 }
 
 /**
@@ -250,20 +245,14 @@ export async function validateAndUpdateBatch(batchId, batchData) {
 
     log.info(`Updating aligner batch ${batchId}:`, batchData);
 
-    try {
-        const result = await alignerQueries.updateBatch(batchId, batchData);
-        log.info(`Aligner batch ${batchId} updated successfully`);
+    const result = await alignerQueries.updateBatch(batchId, batchData);
+    log.info(`Aligner batch ${batchId} updated successfully`);
 
-        // Return any deactivated batch info for user notification
-        if (result && result.deactivatedBatch) {
-            log.info(`Batch #${result.deactivatedBatch.batchSequence} was automatically deactivated`);
-        }
-
-        return result;
-    } catch (error) {
-        log.error('Error updating aligner batch:', error);
-        throw error;
+    if (result && result.deactivatedBatch) {
+        log.info(`Batch #${result.deactivatedBatch.batchSequence} was automatically deactivated`);
     }
+
+    return result;
 }
 
 /**

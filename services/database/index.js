@@ -299,15 +299,25 @@ function executeRawQuery(connection, query, params = []) {
 async function testConnection() {
   try {
     const testResult = await executeQuery(
-      'SELECT @@VERSION as Version, GETDATE() as CurrentTime',
+      `SELECT
+        @@VERSION as Version,
+        GETDATE() as CurrentTime,
+        SESSIONPROPERTY('QUOTED_IDENTIFIER') as QUOTED_IDENTIFIER,
+        SESSIONPROPERTY('ANSI_NULLS') as ANSI_NULLS`,
       [],
       (columns) => ({
         version: columns[0].value,
-        currentTime: columns[1].value
+        currentTime: columns[1].value,
+        quotedIdentifier: columns[2].value,
+        ansiNulls: columns[3].value
       })
     );
 
     console.log('Database connection test successful');
+    console.log('Session settings:', {
+      QUOTED_IDENTIFIER: testResult[0]?.quotedIdentifier,
+      ANSI_NULLS: testResult[0]?.ansiNulls
+    });
     return {
       success: true,
       message: 'Database connection successful',

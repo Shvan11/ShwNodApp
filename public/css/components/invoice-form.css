@@ -269,6 +269,68 @@
     margin-left: 4px;
 }
 
+.payment-field .override-badge {
+    display: inline-block;
+    background: var(--warning-100);
+    color: var(--warning-700);
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: var(--radius-md, 8px);
+    margin-left: 4px;
+    text-transform: uppercase;
+}
+
+/* Input with lock icon toggle */
+.input-with-lock {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-with-lock input {
+    flex: 1;
+    padding-right: 36px; /* Space for lock button */
+}
+
+.lock-toggle-btn {
+    position: absolute;
+    right: 4px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--radius-sm, 4px);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 12px;
+}
+
+.lock-toggle-btn.locked {
+    background: var(--gray-100);
+    color: var(--gray-400);
+}
+
+.lock-toggle-btn.locked:hover {
+    background: var(--warning-100);
+    color: var(--warning-600);
+}
+
+.lock-toggle-btn.unlocked {
+    background: var(--warning-100);
+    color: var(--warning-600);
+}
+
+.lock-toggle-btn.unlocked:hover {
+    background: var(--warning-200);
+    color: var(--warning-700);
+}
+
+.field-hint.override-hint {
+    color: var(--warning-600);
+}
+
 /* ========================================
    PAYMENT MODAL INPUT SIZING
    All inputs within payment modal share base styles

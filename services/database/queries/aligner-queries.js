@@ -10,7 +10,7 @@
  * - Aligner payments
  */
 
-import { executeQuery, TYPES } from '../index.js';
+import { executeQuery, executeStoredProcedure, TYPES } from '../index.js';
 import { log } from '../../../utils/logger.js';
 
 // ==============================
@@ -770,43 +770,38 @@ export async function createBatch(batchData) {
         IncludeTemplate
     } = batchData;
 
-    // Call stored procedure (calculates sequences automatically)
-    // IncludeTemplate: true = start from 0, false = start from 1 (for first batch only)
-    const query = `
-        DECLARE @NewBatchID INT;
+    // Use executeStoredProcedure with callProcedure() - the proper way to call SPs
+    // This ensures correct session settings (QUOTED_IDENTIFIER, ANSI_NULLS) are applied
+    const params = [
+        ['AlignerSetID', TYPES.Int, parseInt(AlignerSetID)],
+        ['UpperAlignerCount', TYPES.Int, UpperAlignerCount ? parseInt(UpperAlignerCount) : 0],
+        ['LowerAlignerCount', TYPES.Int, LowerAlignerCount ? parseInt(LowerAlignerCount) : 0],
+        ['ManufactureDate', TYPES.Date, ManufactureDate || null],
+        ['DeliveredToPatientDate', TYPES.Date, DeliveredToPatientDate || null],
+        ['Days', TYPES.Int, Days ? parseInt(Days) : null],
+        ['Notes', TYPES.NVarChar, Notes || null],
+        ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : true],
+        ['IncludeTemplate', TYPES.Bit, IncludeTemplate !== undefined ? IncludeTemplate : true]
+    ];
 
-        EXEC usp_CreateAlignerBatch
-            @AlignerSetID = @AlignerSetID,
-            @UpperAlignerCount = @UpperAlignerCount,
-            @LowerAlignerCount = @LowerAlignerCount,
-            @ManufactureDate = @ManufactureDate,
-            @DeliveredToPatientDate = @DeliveredToPatientDate,
-            @Days = @Days,
-            @Notes = @Notes,
-            @IsActive = @IsActive,
-            @IncludeTemplate = @IncludeTemplate,
-            @NewBatchID = @NewBatchID OUTPUT;
+    // Add output parameter for NewBatchID
+    const beforeExec = (request) => {
+        request.addOutputParameter('NewBatchID', TYPES.Int);
+    };
 
-        SELECT @NewBatchID AS BatchID;
-    `;
+    // Result mapper to extract output parameter
+    const resultMapper = (rows, outParams) => {
+        const newBatchIdParam = outParams.find(p => p.parameterName === 'NewBatchID');
+        return newBatchIdParam ? newBatchIdParam.value : null;
+    };
 
-    const result = await executeQuery(
-        query,
-        [
-            ['AlignerSetID', TYPES.Int, parseInt(AlignerSetID)],
-            ['UpperAlignerCount', TYPES.Int, UpperAlignerCount ? parseInt(UpperAlignerCount) : 0],
-            ['LowerAlignerCount', TYPES.Int, LowerAlignerCount ? parseInt(LowerAlignerCount) : 0],
-            ['ManufactureDate', TYPES.Date, ManufactureDate || null],
-            ['DeliveredToPatientDate', TYPES.Date, DeliveredToPatientDate || null],
-            ['Days', TYPES.Int, Days ? parseInt(Days) : null],
-            ['Notes', TYPES.NVarChar, Notes || null],
-            ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : true],
-            ['IncludeTemplate', TYPES.Bit, IncludeTemplate !== undefined ? IncludeTemplate : true]
-        ],
-        (columns) => columns[0].value
+    return executeStoredProcedure(
+        'usp_CreateAlignerBatch',
+        params,
+        beforeExec,
+        null,  // rowMapper not needed
+        resultMapper
     );
-
-    return result && result.length > 0 ? result[0] : null;
 }
 
 /**
@@ -821,34 +816,30 @@ export async function updateBatch(batchId, batchData) {
         ManufactureDate, DeliveredToPatientDate, Notes, IsActive, Days
     } = batchData;
 
-    // Call stored procedure (handles resequencing automatically)
-    // Returns info about any deactivated batch when setting IsActive = 1
-    const query = `
-        EXEC usp_UpdateAlignerBatch
-            @AlignerBatchID = @batchId,
-            @AlignerSetID = @AlignerSetID,
-            @UpperAlignerCount = @UpperAlignerCount,
-            @LowerAlignerCount = @LowerAlignerCount,
-            @ManufactureDate = @ManufactureDate,
-            @DeliveredToPatientDate = @DeliveredToPatientDate,
-            @Days = @Days,
-            @Notes = @Notes,
-            @IsActive = @IsActive
-    `;
+    // Use executeStoredProcedure with callProcedure() - the proper way to call SPs
+    const params = [
+        ['AlignerBatchID', TYPES.Int, parseInt(batchId)],
+        ['AlignerSetID', TYPES.Int, parseInt(AlignerSetID)],
+        ['UpperAlignerCount', TYPES.Int, UpperAlignerCount ? parseInt(UpperAlignerCount) : 0],
+        ['LowerAlignerCount', TYPES.Int, LowerAlignerCount ? parseInt(LowerAlignerCount) : 0],
+        ['ManufactureDate', TYPES.Date, ManufactureDate || null],
+        ['DeliveredToPatientDate', TYPES.Date, DeliveredToPatientDate || null],
+        ['Days', TYPES.Int, Days ? parseInt(Days) : null],
+        ['Notes', TYPES.NVarChar, Notes || null],
+        ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : null]
+    ];
 
-    const result = await executeQuery(
-        query,
-        [
-            ['batchId', TYPES.Int, parseInt(batchId)],
-            ['AlignerSetID', TYPES.Int, parseInt(AlignerSetID)],
-            ['UpperAlignerCount', TYPES.Int, UpperAlignerCount ? parseInt(UpperAlignerCount) : 0],
-            ['LowerAlignerCount', TYPES.Int, LowerAlignerCount ? parseInt(LowerAlignerCount) : 0],
-            ['ManufactureDate', TYPES.Date, ManufactureDate || null],
-            ['DeliveredToPatientDate', TYPES.Date, DeliveredToPatientDate || null],
-            ['Days', TYPES.Int, Days ? parseInt(Days) : null],
-            ['Notes', TYPES.NVarChar, Notes || null],
-            ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : null]
-        ]
+    // Row mapper for deactivated batch info (if SP returns a result set)
+    const rowMapper = (columns) => ({
+        DeactivatedBatchID: columns.find(c => c.metadata.colName === 'DeactivatedBatchID')?.value,
+        DeactivatedBatchSequence: columns.find(c => c.metadata.colName === 'DeactivatedBatchSequence')?.value
+    });
+
+    const result = await executeStoredProcedure(
+        'usp_UpdateAlignerBatch',
+        params,
+        null,  // no beforeExec needed
+        rowMapper
     );
 
     // Return deactivated batch info if present
@@ -882,10 +873,10 @@ export async function markBatchAsDelivered(batchId) {
  * @returns {Promise<void>}
  */
 export async function deleteBatch(batchId) {
-    // Call stored procedure (handles remaining count restoration and resequencing)
-    await executeQuery(
-        'EXEC usp_DeleteAlignerBatch @AlignerBatchID = @batchId',
-        [['batchId', TYPES.Int, parseInt(batchId)]]
+    // Use executeStoredProcedure with callProcedure() - the proper way to call SPs
+    await executeStoredProcedure(
+        'usp_DeleteAlignerBatch',
+        [['AlignerBatchID', TYPES.Int, parseInt(batchId)]]
     );
 }
 

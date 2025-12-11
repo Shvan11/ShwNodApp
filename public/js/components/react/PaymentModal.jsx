@@ -33,7 +33,8 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         actualUSD: '',
         actualIQD: '',
         change: 0,
-        changeManualOverride: false
+        changeManualOverride: false,
+        cashOverrideEnabled: false // For USD override in IQD account + Amount mode
     });
 
     // Display state - formatted strings for display
@@ -232,12 +233,14 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
             }
         }
 
-        // Auto-fill suggested amounts
-        setFormData(prev => ({
-            ...prev,
-            actualUSD: suggestedUSD || '',
-            actualIQD: suggestedIQD || ''
-        }));
+        // Auto-fill suggested amounts ONLY if cash override is not enabled
+        if (!formData.cashOverrideEnabled) {
+            setFormData(prev => ({
+                ...prev,
+                actualUSD: suggestedUSD || '',
+                actualIQD: suggestedIQD || ''
+            }));
+        }
 
         setCalculations(prev => ({
             ...prev,
@@ -414,20 +417,22 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
     const handleInputChange = (e) => {
         const { name, value } = e.target;
 
-        // When changing payment currency, clear the irrelevant cash field
+        // When changing payment currency, clear the irrelevant cash field and reset override
         if (name === 'paymentCurrency') {
             if (value === 'USD') {
-                // Switching to USD only - clear IQD
-                setFormData(prev => ({ ...prev, paymentCurrency: value, actualIQD: '' }));
+                // Switching to USD only - clear IQD, reset override
+                setFormData(prev => ({ ...prev, paymentCurrency: value, actualIQD: '', cashOverrideEnabled: false }));
                 setDisplayValues(prev => ({ ...prev, actualIQD: '' }));
                 return;
             } else if (value === 'IQD') {
-                // Switching to IQD only - clear USD
-                setFormData(prev => ({ ...prev, paymentCurrency: value, actualUSD: '' }));
+                // Switching to IQD only - clear USD, reset override
+                setFormData(prev => ({ ...prev, paymentCurrency: value, actualUSD: '', cashOverrideEnabled: false }));
                 setDisplayValues(prev => ({ ...prev, actualUSD: '' }));
                 return;
             }
-            // For MIXED, keep both values
+            // For MIXED, keep both values but reset override
+            setFormData(prev => ({ ...prev, paymentCurrency: value, cashOverrideEnabled: false }));
+            return;
         }
 
         setFormData(prev => ({
@@ -498,6 +503,24 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
         }));
     };
 
+    // Toggle cash override mode (for USD bill override in IQD account + Amount mode)
+    const handleCashOverrideToggle = () => {
+        setFormData(prev => ({
+            ...prev,
+            cashOverrideEnabled: !prev.cashOverrideEnabled
+        }));
+    };
+
+    // Handle USD input when in override mode - recalculates IQD change
+    const handleOverrideUSDChange = (value) => {
+        const usd = parseFormattedNumber(value) || 0;
+
+        setFormData(prev => ({ ...prev, actualUSD: usd }));
+        setDisplayValues(prev => ({ ...prev, actualUSD: value }));
+
+        // Change will be auto-calculated by calculateTotalAndChange useEffect
+    };
+
     // Handle entry mode toggle change (always locks mode after manual toggle)
     const handleEntryModeChange = (newMode) => {
         if (newMode === entryMode) return;
@@ -513,7 +536,8 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                 ...prev,
                 amountToRegister: '',
                 change: 0,
-                changeManualOverride: false
+                changeManualOverride: false,
+                cashOverrideEnabled: false // Reset override when switching modes
             }));
             setDisplayValues(prev => ({
                 ...prev,
@@ -530,7 +554,8 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                 actualUSD: '',
                 actualIQD: '',
                 change: 0,
-                changeManualOverride: false
+                changeManualOverride: false,
+                cashOverrideEnabled: false // Reset override when switching modes
             }));
             setDisplayValues(prev => ({
                 ...prev,
@@ -869,18 +894,44 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                         <label>
                                             {formData.paymentCurrency} Received
                                             {entryMode === 'cash' && <span className="required">*</span>}
-                                            {entryMode === 'amount' && <span className="auto-badge">Auto</span>}
+                                            {entryMode === 'amount' && !formData.cashOverrideEnabled && <span className="auto-badge">Auto</span>}
+                                            {entryMode === 'amount' && formData.cashOverrideEnabled && <span className="override-badge">Override</span>}
                                         </label>
                                         {formData.paymentCurrency === 'USD' ? (
-                                            <input
-                                                type="text"
-                                                value={displayValues.actualUSD}
-                                                onChange={(e) => handleMoneyInputChange('actualUSD', e.target.value)}
-                                                onBlur={() => handleMoneyInputBlur('actualUSD')}
-                                                onFocus={handleMoneyInputFocus}
-                                                placeholder={entryMode === 'cash' ? 'Enter USD' : 'Auto'}
-                                                className="input-lg"
-                                            />
+                                            /* USD field - check if cross-currency override is available */
+                                            (() => {
+                                                // Show lock icon only for: IQD account + USD payment + Amount mode
+                                                const canOverride = calculations.accountCurrency === 'IQD' && entryMode === 'amount';
+                                                const isLocked = canOverride && !formData.cashOverrideEnabled;
+                                                const isOverriding = canOverride && formData.cashOverrideEnabled;
+
+                                                return (
+                                                    <div className="input-with-lock">
+                                                        <input
+                                                            type="text"
+                                                            value={displayValues.actualUSD}
+                                                            onChange={(e) => isOverriding
+                                                                ? handleOverrideUSDChange(e.target.value)
+                                                                : handleMoneyInputChange('actualUSD', e.target.value)}
+                                                            onBlur={() => handleMoneyInputBlur('actualUSD')}
+                                                            onFocus={handleMoneyInputFocus}
+                                                            readOnly={isLocked}
+                                                            placeholder={entryMode === 'cash' ? 'Enter USD' : (isOverriding ? 'Enter bill amount' : 'Auto')}
+                                                            className={`input-lg ${isLocked ? 'input-readonly' : ''}`}
+                                                        />
+                                                        {canOverride && (
+                                                            <button
+                                                                type="button"
+                                                                className={`lock-toggle-btn ${isOverriding ? 'unlocked' : 'locked'}`}
+                                                                onClick={handleCashOverrideToggle}
+                                                                title={isOverriding ? 'Lock (use auto-calculated)' : 'Unlock (enter actual bill amount)'}
+                                                            >
+                                                                <i className={`fas fa-${isOverriding ? 'lock-open' : 'lock'}`}></i>
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()
                                         ) : (
                                             <input
                                                 type="text"
@@ -893,8 +944,11 @@ const PaymentModal = ({ workData, onClose, onSuccess }) => {
                                             />
                                         )}
                                         {/* Suggestion hint */}
-                                        {entryMode === 'amount' && calculations.suggestedUSD > 0 && formData.paymentCurrency === 'USD' && (
+                                        {entryMode === 'amount' && calculations.suggestedUSD > 0 && formData.paymentCurrency === 'USD' && !formData.cashOverrideEnabled && (
                                             <small className="field-hint">Collect {formatNumber(calculations.suggestedUSD)}</small>
+                                        )}
+                                        {entryMode === 'amount' && formData.paymentCurrency === 'USD' && formData.cashOverrideEnabled && (
+                                            <small className="field-hint override-hint">Enter $50, $100, etc.</small>
                                         )}
                                         {entryMode === 'amount' && calculations.suggestedIQD > 0 && formData.paymentCurrency === 'IQD' && (
                                             <small className="field-hint">Collect {formatNumber(calculations.suggestedIQD)}</small>

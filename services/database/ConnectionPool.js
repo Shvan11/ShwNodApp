@@ -113,7 +113,7 @@ class ConnectionPool {
 
       connection.on('connect', (err) => {
         clearTimeout(connectTimeout);
-        
+
         if (err) {
           reject(err);
           return;
