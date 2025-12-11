@@ -6,6 +6,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import '../../css/pages/aligner.css';
 import '../../css/components/aligner-set-card.css';
 import '../../css/components/aligner-drawer-form.css';
+import '../../css/components/label-preview-modal.css';
 import AlignerModeToggle from '../components/react/AlignerModeToggle.jsx';
 
 /**

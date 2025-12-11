@@ -9,8 +9,8 @@ import ConfirmDialog from '../../components/react/ConfirmDialog.jsx';
 import SetFormDrawer from '../../components/react/SetFormDrawer.jsx';
 import BatchFormDrawer from '../../components/react/BatchFormDrawer.jsx';
 import PaymentFormDrawer from '../../components/react/PaymentFormDrawer.jsx';
+import LabelPreviewModal from '../../components/react/LabelPreviewModal.jsx';
 import { copyToClipboard } from '../../core/utils.js';
-import UniversalLauncher from '../../services/UniversalLauncher.js';
 import { useToast } from '../../contexts/ToastContext.jsx';
 
 const PatientSets = () => {
@@ -39,6 +39,11 @@ const PatientSets = () => {
     const [showPaymentDrawer, setShowPaymentDrawer] = useState(false);
     const [currentSetForPayment, setCurrentSetForPayment] = useState(null);
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+
+    // Label preview modal state
+    const [showLabelModal, setShowLabelModal] = useState(false);
+    const [labelModalData, setLabelModalData] = useState({ batch: null, set: null });
+    const [isGeneratingLabels, setIsGeneratingLabels] = useState(false);
 
     // Note states for lab communication
     const [showAddLabNote, setShowAddLabNote] = useState({});
@@ -495,7 +500,7 @@ const PatientSets = () => {
         });
     };
 
-    // Print labels for aligner batch using MS Access
+    // Open label preview modal
     const handlePrintLabels = (batch, set, e) => {
         e.stopPropagation();
 
@@ -504,18 +509,74 @@ const PatientSets = () => {
             return;
         }
 
-        // Get the doctor ID from the set's DoctorID field
-        const drId = set.DoctorID || 1; // Fallback to 1 if not available
+        // Open the modal with batch and set data
+        setLabelModalData({ batch, set });
+        setShowLabelModal(true);
+    };
 
-        // Get patient name with fallback options
-        const patientName = patient.PatientName ||
-                           (patient.FirstName && patient.LastName ? `${patient.FirstName} ${patient.LastName}` : null) ||
-                           'Unknown Patient';
+    // Generate labels from modal data
+    const handleGenerateLabels = async (labelData) => {
+        const { batch, set } = labelModalData;
 
-        const batchId = batch.AlignerBatchID;
+        if (!batch || !set) {
+            toast.error('Missing batch or set information');
+            return;
+        }
 
-        // Launch MS Access with label printing parameters
-        UniversalLauncher.printAlignerLabels(batchId, patientName, drId);
+        // Get the doctor ID from the set's AlignerDrID field
+        const doctorIdForLabels = set.AlignerDrID || 1;
+
+        setIsGeneratingLabels(true);
+
+        try {
+            toast.info('Generating labels...');
+
+            const response = await fetch('/api/aligner/labels/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    batchId: batch.AlignerBatchID,
+                    startingPosition: labelData.startingPosition,
+                    patientName: labelData.patientName,
+                    doctorName: labelData.doctorName,
+                    doctorId: doctorIdForLabels,
+                    includeLogo: labelData.includeLogo,
+                    arabicFont: labelData.arabicFont,
+                    // Pass the custom labels array (fully editable)
+                    customLabels: labelData.customLabels
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to generate labels');
+            }
+
+            // Get metadata from headers
+            const totalLabels = response.headers.get('X-Total-Labels');
+            const nextPosition = response.headers.get('X-Next-Position');
+
+            // Convert response to blob and open in new tab
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
+
+            // Close modal and show success message
+            setShowLabelModal(false);
+            setLabelModalData({ batch: null, set: null });
+            toast.success(`Labels generated! ${totalLabels} labels created. Next position: ${nextPosition}`);
+        } catch (error) {
+            console.error('Error generating labels:', error);
+            toast.error('Failed to generate labels: ' + error.message);
+        } finally {
+            setIsGeneratingLabels(false);
+        }
+    };
+
+    // Close label modal
+    const handleCloseLabelModal = () => {
+        setShowLabelModal(false);
+        setLabelModalData({ batch: null, set: null });
     };
 
     // Quick URL handlers
@@ -1637,7 +1698,7 @@ const PatientSets = () => {
                                                                     <button
                                                                         className="action-icon-btn print-labels bg-purple"
                                                                         onClick={(e) => handlePrintLabels(batch, set, e)}
-                                                                        title="Print Labels in MS Access"
+                                                                        title="Print Labels (PDF)"
                                                                     >
                                                                         <i className="fas fa-print"></i>
                                                                     </button>
@@ -1902,6 +1963,18 @@ const PatientSets = () => {
                 message={confirmDialog.message}
                 onConfirm={confirmDialog.onConfirm}
                 onCancel={() => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null })}
+            />
+
+            {/* Label Preview Modal */}
+            <LabelPreviewModal
+                isOpen={showLabelModal}
+                onClose={handleCloseLabelModal}
+                onGenerate={handleGenerateLabels}
+                batch={labelModalData.batch}
+                set={labelModalData.set}
+                patient={patient}
+                doctorName={labelModalData.set?.AlignerDoctorName}
+                isGenerating={isGeneratingLabels}
             />
         </div>
     );

@@ -1177,3 +1177,79 @@ export async function getAlignerSetBalance(alignerSetId) {
 
     return result && result.length > 0 ? result[0] : null;
 }
+
+// ==============================
+// LABEL GENERATION QUERIES
+// ==============================
+
+/**
+ * Get a single batch by ID
+ * @param {number} batchId - Batch ID
+ * @returns {Promise<Array>} Array with batch data (or empty)
+ */
+export async function getBatchById(batchId) {
+    const query = `
+        SELECT
+            AlignerBatchID,
+            AlignerSetID,
+            BatchSequence,
+            UpperAlignerCount,
+            LowerAlignerCount,
+            UpperAlignerStartSequence,
+            UpperAlignerEndSequence,
+            LowerAlignerStartSequence,
+            LowerAlignerEndSequence,
+            ManufactureDate,
+            DeliveredToPatientDate,
+            Days,
+            Notes,
+            IsActive
+        FROM tblAlignerBatches
+        WHERE AlignerBatchID = @batchId
+    `;
+
+    return executeQuery(
+        query,
+        [['batchId', TYPES.Int, parseInt(batchId)]],
+        (columns) => ({
+            AlignerBatchID: columns[0].value,
+            AlignerSetID: columns[1].value,
+            BatchSequence: columns[2].value,
+            UpperAlignerCount: columns[3].value,
+            LowerAlignerCount: columns[4].value,
+            UpperAlignerStartSequence: columns[5].value,
+            UpperAlignerEndSequence: columns[6].value,
+            LowerAlignerStartSequence: columns[7].value,
+            LowerAlignerEndSequence: columns[8].value,
+            ManufactureDate: columns[9].value,
+            DeliveredToPatientDate: columns[10].value,
+            Days: columns[11].value,
+            Notes: columns[12].value,
+            IsActive: columns[13].value
+        })
+    );
+}
+
+/**
+ * Get a single doctor by ID
+ * @param {number} drId - Doctor ID
+ * @returns {Promise<Array>} Array with doctor data (or empty)
+ */
+export async function getDoctorById(drId) {
+    const query = `
+        SELECT DrID, DoctorName, DoctorEmail, LogoPath
+        FROM AlignerDoctors
+        WHERE DrID = @drId
+    `;
+
+    return executeQuery(
+        query,
+        [['drId', TYPES.Int, parseInt(drId)]],
+        (columns) => ({
+            DrID: columns[0].value,
+            DoctorName: columns[1].value,
+            DoctorEmail: columns[2].value,
+            LogoPath: columns[3].value
+        })
+    );
+}
