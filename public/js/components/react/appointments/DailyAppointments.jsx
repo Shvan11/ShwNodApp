@@ -41,6 +41,7 @@ const DailyAppointments = () => {
 
     const [mobileView, setMobileView] = useState('checked-in');
     const [showFlash, setShowFlash] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
 
     // 5. Pass loader data to hook
     const {
@@ -115,6 +116,14 @@ const DailyAppointments = () => {
         // URL sync happens in useEffect above
     };
 
+    // 12. Handle refresh - reload today's appointments
+    const handleRefresh = () => {
+        const today = getTodayDate();
+        setSelectedDate(today);
+        setSearchTerm(''); // Clear search on refresh
+        loadAppointments(today);
+    };
+
     // Handle check-in
     const handleCheckIn = async (appointmentId) => {
         try {
@@ -154,6 +163,19 @@ const DailyAppointments = () => {
     // Get statistics
     const stats = getStats();
 
+    // Filter appointments by search term
+    const filteredAllAppointments = searchTerm
+        ? allAppointments.filter(apt =>
+            apt.PatientName?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        : allAppointments;
+
+    const filteredCheckedInAppointments = searchTerm
+        ? checkedInAppointments.filter(apt =>
+            apt.PatientName?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        : checkedInAppointments;
+
     // Error state
     if (error) {
         return (
@@ -168,10 +190,14 @@ const DailyAppointments = () => {
 
     return (
         <div className="daily-appointments-view">
-            {/* Header with date picker */}
+            {/* Header with date picker, refresh button, and search */}
             <AppointmentsHeader
                 selectedDate={selectedDate}
                 onDateChange={handleDateChange}
+                onRefresh={handleRefresh}
+                isRefreshing={loading}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
                 connectionStatus={connectionStatus}
                 showFlash={showFlash}
             />
@@ -194,23 +220,23 @@ const DailyAppointments = () => {
             <div className="container full-width">
                 <AppointmentsList
                     title="All Appointments"
-                    appointments={allAppointments}
+                    appointments={filteredAllAppointments}
                     showStatus={false}
                     loading={loading}
                     onCheckIn={handleCheckIn}
-                    emptyMessage="No appointments scheduled for this date."
+                    emptyMessage={searchTerm ? "No matching patients found." : "No appointments scheduled for this date."}
                     className={mobileView === 'all' ? 'active-view' : ''}
                 />
 
                 <AppointmentsList
                     title="Checked-In Patients"
-                    appointments={checkedInAppointments}
+                    appointments={filteredCheckedInAppointments}
                     showStatus={true}
                     loading={loading}
                     onMarkSeated={handleMarkSeated}
                     onMarkDismissed={handleMarkDismissed}
                     onUndoState={handleUndoState}
-                    emptyMessage="No patients checked in yet."
+                    emptyMessage={searchTerm ? "No matching patients found." : "No patients checked in yet."}
                     className={mobileView === 'checked-in' ? 'active-view' : ''}
                 />
             </div>

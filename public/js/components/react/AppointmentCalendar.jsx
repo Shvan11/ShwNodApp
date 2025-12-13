@@ -330,29 +330,6 @@ const AppointmentCalendar = ({
         fetchCalendarData(currentDate, selectedDoctorId);
     }, [currentDate, selectedDoctorId, fetchCalendarData]);
     
-    // WebSocket integration for real-time updates
-    useEffect(() => {
-        const handleWebSocketMessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.type === 'appointments_updated') {
-                    fetchCalendarData(currentDate);
-                }
-            } catch (err) {
-                console.error('WebSocket message parse error:', err);
-            }
-        };
-        
-        // Check if WebSocket is available
-        if (window.socket && window.socket.readyState === WebSocket.OPEN) {
-            window.socket.addEventListener('message', handleWebSocketMessage);
-            
-            return () => {
-                window.socket.removeEventListener('message', handleWebSocketMessage);
-            };
-        }
-    }, [currentDate, fetchCalendarData]);
-    
     // Loading state
     if (loading) {
         return (

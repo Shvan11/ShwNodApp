@@ -235,7 +235,7 @@ router.post("/appointments", async (req, res) => {
                 const day = String(appointmentDate.getDate()).padStart(2, '0');
                 appointmentDay = `${year}-${month}-${day}`;
             }
-            wsEmitter.emit('appointments_updated', appointmentDay);
+            wsEmitter.emit(WebSocketEvents.DATA_UPDATED, appointmentDay);
         }
 
         res.json({
@@ -454,7 +454,7 @@ router.post("/appointments/quick-checkin", async (req, res) => {
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const day = String(now.getDate()).padStart(2, '0');
             const todayDateOnly = `${year}-${month}-${day}`;
-            wsEmitter.emit('appointments_updated', todayDateOnly);
+            wsEmitter.emit(WebSocketEvents.DATA_UPDATED, todayDateOnly);
         }
 
         res.json(result);
