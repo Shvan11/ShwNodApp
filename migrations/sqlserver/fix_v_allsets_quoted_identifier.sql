@@ -30,6 +30,7 @@ SELECT
     dbo.tblAlignerBatches.DeliveredToPatientDate,
     dbo.tblAlignerBatches.NextBatchReadyDate,
     dbo.tblAlignerBatches.Notes,
+    dbo.tblAlignerBatches.IsLast,
     CASE WHEN EXISTS (
         SELECT 1
         FROM dbo.tblAlignerBatches NextBatch

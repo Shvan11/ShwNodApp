@@ -48,6 +48,7 @@ CREATE PROCEDURE dbo.usp_CreateAlignerBatch
     @Days INT = NULL,
     @Notes NVARCHAR(255) = NULL,
     @IsActive BIT = 1,
+    @IsLast BIT = 0,
     @NewBatchID INT OUTPUT
 AS
 BEGIN
@@ -92,6 +93,27 @@ BEGIN
         END
 
         -- ==========================================
+        -- STEP 1B: Handle IsLast auto-activation
+        -- ==========================================
+        -- If IsLast = 1, ensure IsActive is also set to 1
+        IF @IsLast = 1
+        BEGIN
+            SET @IsActive = 1;
+
+            -- Deactivate all other batches in this set (both IsActive and IsLast)
+            UPDATE dbo.tblAlignerBatches
+            SET IsActive = 0, IsLast = 0
+            WHERE AlignerSetID = @AlignerSetID;
+        END
+        ELSE IF @IsActive = 1
+        BEGIN
+            -- If only IsActive (not IsLast), just deactivate other active batches
+            UPDATE dbo.tblAlignerBatches
+            SET IsActive = 0
+            WHERE AlignerSetID = @AlignerSetID AND IsActive = 1;
+        END
+
+        -- ==========================================
         -- STEP 2: Calculate sequences
         -- ==========================================
         DECLARE @UpperStartSeq INT, @LowerStartSeq INT, @BatchSequence INT;
@@ -122,6 +144,7 @@ BEGIN
             Days,
             Notes,
             IsActive,
+            IsLast,
             BatchSequence,
             UpperAlignerStartSequence,
             LowerAlignerStartSequence
@@ -134,6 +157,7 @@ BEGIN
             @Days,
             @Notes,
             @IsActive,
+            @IsLast,
             @BatchSequence,
             @UpperStartSeq,
             @LowerStartSeq
@@ -194,7 +218,8 @@ CREATE PROCEDURE dbo.usp_UpdateAlignerBatch
     @DeliveredToPatientDate DATE = NULL,
     @Days INT = NULL,
     @Notes NVARCHAR(255) = NULL,
-    @IsActive BIT = NULL
+    @IsActive BIT = NULL,
+    @IsLast BIT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -257,6 +282,30 @@ BEGIN
         END
 
         -- ==========================================
+        -- STEP 2B: Handle IsLast auto-activation
+        -- ==========================================
+        IF @IsLast = 1
+        BEGIN
+            -- IsLast implies IsActive
+            SET @IsActive = 1;
+
+            -- Deactivate all other batches (both IsActive and IsLast)
+            UPDATE dbo.tblAlignerBatches
+            SET IsActive = 0, IsLast = 0
+            WHERE AlignerSetID = @AlignerSetID
+            AND AlignerBatchID != @AlignerBatchID;
+        END
+        ELSE IF @IsActive = 1 AND @IsLast IS NULL
+        BEGIN
+            -- Only IsActive changed, don't touch IsLast
+            UPDATE dbo.tblAlignerBatches
+            SET IsActive = 0
+            WHERE AlignerSetID = @AlignerSetID
+            AND AlignerBatchID != @AlignerBatchID
+            AND IsActive = 1;
+        END
+
+        -- ==========================================
         -- STEP 3: Detect changes
         -- ==========================================
         DECLARE @ManufactureDateChanged BIT = 0;
@@ -287,7 +336,8 @@ BEGIN
             DeliveredToPatientDate = @DeliveredToPatientDate,
             Days = @Days,
             Notes = @Notes,
-            IsActive = ISNULL(@IsActive, IsActive)
+            IsActive = ISNULL(@IsActive, IsActive),
+            IsLast = ISNULL(@IsLast, IsLast)
         WHERE AlignerBatchID = @AlignerBatchID;
 
         -- ==========================================
@@ -617,6 +667,7 @@ BEGIN
                OR ISNULL(CAST(i.NextBatchReadyDate AS VARCHAR), '') <> ISNULL(CAST(d.NextBatchReadyDate AS VARCHAR), '')
                OR ISNULL(i.Notes, '') <> ISNULL(d.Notes, '')
                OR ISNULL(i.IsActive, 0) <> ISNULL(d.IsActive, 0)
+               OR ISNULL(i.IsLast, 0) <> ISNULL(d.IsLast, 0)
            )
     )
     RETURN;

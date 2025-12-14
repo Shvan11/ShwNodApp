@@ -486,9 +486,10 @@ router.post('/patients', async (req, res) => {
  * PUT /patients/:personId
  */
 router.put('/patients/:personId', async (req, res) => {
+    const patientData = req.body;
+
     try {
         const personId = parseInt(req.params.personId);
-        const patientData = req.body;
 
         // Basic validation
         if (!patientData.PatientName || !patientData.PatientName.trim()) {
@@ -498,6 +499,17 @@ router.put('/patients/:personId', async (req, res) => {
         const result = await updatePatient(personId, patientData);
         res.json({ success: true, message: 'Patient updated successfully' });
     } catch (error) {
+        // Handle duplicate patient name error (SQL Server error 2601 for unique index violation)
+        if (error.number === 2601 || (error.message && error.message.includes('IX_Name_ID'))) {
+            log.warn(`Duplicate patient name attempted during update: ${patientData.PatientName}`);
+            return res.status(409).json({
+                success: false,
+                error: 'A patient with this name already exists',
+                code: 'DUPLICATE_PATIENT_NAME',
+                duplicateName: patientData.PatientName
+            });
+        }
+
         log.error('Error updating patient:', error);
         return ErrorResponses.internalError(res, 'Failed to update patient', error);
     }

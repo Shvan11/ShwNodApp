@@ -23,8 +23,8 @@ const LABELS_PER_SHEET = 12;
 function buildDefaultLabels(upperStart, upperEnd, lowerStart, lowerEnd) {
     const labelMap = new Map();
 
-    const hasUpper = upperStart != null && upperEnd != null && upperStart > 0;
-    const hasLower = lowerStart != null && lowerEnd != null && lowerStart > 0;
+    const hasUpper = upperStart != null && upperEnd != null && upperStart >= 0;
+    const hasLower = lowerStart != null && lowerEnd != null && lowerStart >= 0;
 
     // Add upper aligners
     if (hasUpper) {

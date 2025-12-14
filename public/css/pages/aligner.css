@@ -2407,6 +2407,12 @@
     font-weight: var(--font-weight-bold);
 }
 
+.section-info-last-batch {
+    margin-left: var(--spacing-md);
+    color: var(--color-purple-medium);
+    font-weight: var(--font-weight-bold);
+}
+
 /* Filter Controls Container */
 .allsets-filter-container {
     display: flex;
@@ -2590,8 +2596,25 @@
     display: table-cell;
 }
 
+/* Last Batch Row - Final batch in treatment (purple/violet) - higher specificity */
+.allsets-table tbody tr.last-batch-row,
+.allsets-table tbody tr.last-batch-row:nth-child(even),
+.allsets-table tbody tr.last-batch-row:nth-child(odd) {
+    background-color: #f3e8ff;
+    display: table-row;
+    border-left: 4px solid var(--color-purple-medium);
+}
+
+.allsets-table tbody tr.last-batch-row:hover {
+    background-color: #e9d5ff;
+}
+
+.allsets-table tbody tr.last-batch-row td {
+    display: table-cell;
+}
+
 /* Normal row hover - only for rows without special classes */
-.allsets-table tbody tr:not(.info-row):not(.warning-row):not(.completed-work-row):hover {
+.allsets-table tbody tr:not(.info-row):not(.warning-row):not(.completed-work-row):not(.last-batch-row):hover {
     background-color: var(--blue-50);
 }
 

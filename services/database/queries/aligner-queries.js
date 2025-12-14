@@ -208,6 +208,7 @@ export async function getAllAlignerSets() {
             v.DeliveredToPatientDate,
             v.NextBatchReadyDate,
             v.Notes,
+            v.IsLast,
             v.NextBatchPresent,
             ad.DoctorName,
             w.Status as WorkStatus,
@@ -238,10 +239,11 @@ export async function getAllAlignerSets() {
             DeliveredToPatientDate: columns[9].value,
             NextBatchReadyDate: columns[10].value,
             Notes: columns[11].value,
-            NextBatchPresent: columns[12].value,
-            DoctorName: columns[13].value,
-            WorkStatus: columns[14].value,
-            WorkStatusName: columns[15].value
+            IsLast: columns[12].value,
+            NextBatchPresent: columns[13].value,
+            DoctorName: columns[14].value,
+            WorkStatus: columns[15].value,
+            WorkStatusName: columns[16].value
         })
     );
 }
@@ -728,7 +730,8 @@ export async function getBatchesBySetId(setId) {
             ValidityPeriod,
             NextBatchReadyDate,
             Notes,
-            IsActive
+            IsActive,
+            IsLast
         FROM tblAlignerBatches
         WHERE AlignerSetID = @setId
         ORDER BY BatchSequence
@@ -753,7 +756,8 @@ export async function getBatchesBySetId(setId) {
             ValidityPeriod: columns[12].value,
             NextBatchReadyDate: columns[13].value,
             Notes: columns[14].value,
-            IsActive: columns[15].value
+            IsActive: columns[15].value,
+            IsLast: columns[16].value
         })
     );
 }
@@ -767,7 +771,7 @@ export async function createBatch(batchData) {
     const {
         AlignerSetID, UpperAlignerCount, LowerAlignerCount,
         ManufactureDate, DeliveredToPatientDate, Days, Notes, IsActive,
-        IncludeTemplate
+        IncludeTemplate, IsLast
     } = batchData;
 
     // Use executeStoredProcedure with callProcedure() - the proper way to call SPs
@@ -781,6 +785,7 @@ export async function createBatch(batchData) {
         ['Days', TYPES.Int, Days ? parseInt(Days) : null],
         ['Notes', TYPES.NVarChar, Notes || null],
         ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : true],
+        ['IsLast', TYPES.Bit, IsLast !== undefined ? IsLast : false],
         ['IncludeTemplate', TYPES.Bit, IncludeTemplate !== undefined ? IncludeTemplate : true]
     ];
 
@@ -813,7 +818,8 @@ export async function createBatch(batchData) {
 export async function updateBatch(batchId, batchData) {
     const {
         AlignerSetID, UpperAlignerCount, LowerAlignerCount,
-        ManufactureDate, DeliveredToPatientDate, Notes, IsActive, Days
+        ManufactureDate, DeliveredToPatientDate, Notes, IsActive, Days,
+        IncludeTemplate, IsLast
     } = batchData;
 
     // Use executeStoredProcedure with callProcedure() - the proper way to call SPs
@@ -826,7 +832,9 @@ export async function updateBatch(batchId, batchData) {
         ['DeliveredToPatientDate', TYPES.Date, DeliveredToPatientDate || null],
         ['Days', TYPES.Int, Days ? parseInt(Days) : null],
         ['Notes', TYPES.NVarChar, Notes || null],
-        ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : null]
+        ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : null],
+        ['IsLast', TYPES.Bit, IsLast !== undefined ? IsLast : null],
+        ['IncludeTemplate', TYPES.Bit, IncludeTemplate !== undefined ? IncludeTemplate : null]
     ];
 
     // Row mapper for deactivated batch info (if SP returns a result set)

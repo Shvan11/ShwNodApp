@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../../contexts/ToastContext.jsx';
 
 const EditPatientComponent = ({ patientId }) => {
     const navigate = useNavigate();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
@@ -270,6 +272,7 @@ const EditPatientComponent = ({ patientId }) => {
 
         if (!formData.PatientName.trim()) {
             setError('Patient Name is required');
+            toast.warning('Patient Name is required');
             return;
         }
 
@@ -287,10 +290,20 @@ const EditPatientComponent = ({ patientId }) => {
 
             if (!response.ok) {
                 const errorData = await response.json();
+
+                // Handle duplicate patient name specifically
+                if (errorData.code === 'DUPLICATE_PATIENT_NAME') {
+                    const duplicateName = errorData.duplicateName || formData.PatientName;
+                    toast.error(`A patient with the name "${duplicateName}" already exists`);
+                    setError(`A patient with the name "${duplicateName}" already exists. Please use a different name.`);
+                    return;
+                }
+
                 throw new Error(errorData.error || 'Failed to update patient');
             }
 
             setSuccessMessage('Patient updated successfully!');
+            toast.success('Patient updated successfully!');
             setTimeout(() => {
                 setSuccessMessage('');
             }, 3000);
@@ -299,6 +312,7 @@ const EditPatientComponent = ({ patientId }) => {
             await loadPatientData();
         } catch (err) {
             setError(err.message);
+            toast.error(err.message);
         } finally {
             setSaving(false);
         }

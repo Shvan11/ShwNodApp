@@ -11,7 +11,8 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
         ManufactureDate: '',
         DeliveredToPatientDate: '',
         Notes: '',
-        IsActive: true
+        IsActive: true,
+        IsLast: false
     });
 
     const [computedFields, setComputedFields] = useState({
@@ -25,9 +26,14 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
     const [saving, setSaving] = useState(false);
     const previousIsOpenRef = useRef(false);
 
-    // Template option - only for first batch (when no existing batches)
+    // Template option - only for first batch (when no existing batches OR editing the first batch)
     const [includeTemplate, setIncludeTemplate] = useState(true);
     const isFirstBatch = existingBatches.length === 0;
+    // When editing, check if this batch is the first one (no other batch has a lower sequence)
+    const isEditingFirstBatch = batch && !existingBatches.some(b =>
+        b.AlignerBatchID !== batch.AlignerBatchID && b.BatchSequence < batch.BatchSequence
+    );
+    const canChangeTemplateOption = isFirstBatch || isEditingFirstBatch;
 
     useEffect(() => {
         // Only run when drawer opens (isOpen transitions from false to true)
@@ -42,14 +48,23 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                     ManufactureDate: batch.ManufactureDate ? batch.ManufactureDate.split('T')[0] : '',
                     DeliveredToPatientDate: batch.DeliveredToPatientDate ? batch.DeliveredToPatientDate.split('T')[0] : '',
                     Notes: batch.Notes || '',
-                    IsActive: batch.IsActive !== undefined ? batch.IsActive : true
+                    IsActive: batch.IsActive !== undefined ? batch.IsActive : true,
+                    IsLast: batch.IsLast !== undefined ? batch.IsLast : false
                 });
                 setComputedFields({
-                    UpperAlignerStartSequence: batch.UpperAlignerStartSequence || 1,
-                    LowerAlignerStartSequence: batch.LowerAlignerStartSequence || 1,
+                    UpperAlignerStartSequence: batch.UpperAlignerStartSequence ?? 1,
+                    LowerAlignerStartSequence: batch.LowerAlignerStartSequence ?? 1,
                     UpperAlignerEndSequence: batch.UpperAlignerEndSequence,
                     LowerAlignerEndSequence: batch.LowerAlignerEndSequence
                 });
+                // When editing first batch, determine includeTemplate from current start sequence
+                // Start sequence of 0 means template was included
+                const isFirstBatchEdit = !existingBatches.some(b =>
+                    b.AlignerBatchID !== batch.AlignerBatchID && b.BatchSequence < batch.BatchSequence
+                );
+                if (isFirstBatchEdit) {
+                    setIncludeTemplate(batch.UpperAlignerStartSequence === 0 || batch.LowerAlignerStartSequence === 0);
+                }
             } else {
                 // Add mode - calculate next batch sequence and start sequences
                 const nextBatchSequence = existingBatches.length > 0
@@ -84,7 +99,8 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                     ManufactureDate: today,
                     DeliveredToPatientDate: '',
                     Notes: '',
-                    IsActive: false
+                    IsActive: false,
+                    IsLast: false
                 });
 
                 setComputedFields({
@@ -103,9 +119,9 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
         previousIsOpenRef.current = isOpen;
     }, [isOpen, batch, existingBatches]);
 
-    // Update start sequences when includeTemplate checkbox changes (only for first batch)
+    // Update start sequences when includeTemplate checkbox changes (for first batch - add or edit)
     useEffect(() => {
-        if (!batch && isFirstBatch) {
+        if (canChangeTemplateOption) {
             const startValue = includeTemplate ? 0 : 1;
             setComputedFields(prev => ({
                 ...prev,
@@ -113,7 +129,7 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                 LowerAlignerStartSequence: startValue
             }));
         }
-    }, [includeTemplate, batch, isFirstBatch]);
+    }, [includeTemplate, canChangeTemplateOption]);
 
     // Auto-calculate end sequences when counts change
     useEffect(() => {
@@ -199,7 +215,7 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                 AlignerSetID: set?.AlignerSetID,
                 UpperAlignerStartSequence: computedFields.UpperAlignerStartSequence,
                 LowerAlignerStartSequence: computedFields.LowerAlignerStartSequence,
-                IncludeTemplate: isFirstBatch ? includeTemplate : undefined
+                IncludeTemplate: canChangeTemplateOption ? includeTemplate : undefined
             };
 
             const url = batch
@@ -299,8 +315,8 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                 )}
                             </div>
 
-                            {/* Template option - only show for first batch */}
-                            {!batch && isFirstBatch && (
+                            {/* Template option - show for first batch (add or edit) */}
+                            {canChangeTemplateOption && (
                                 <div className="form-field-checkbox">
                                     <input
                                         type="checkbox"
@@ -500,6 +516,25 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                 <label htmlFor="IsActive">Active (Being used by patient)</label>
                                 {errors.IsActive && (
                                     <span className="error-message">{errors.IsActive}</span>
+                                )}
+                            </div>
+
+                            <div className="form-field-checkbox">
+                                <input
+                                    type="checkbox"
+                                    id="IsLast"
+                                    name="IsLast"
+                                    checked={formData.IsLast}
+                                    onChange={handleChange}
+                                />
+                                <label htmlFor="IsLast">
+                                    Last Batch (Final batch before new scan or treatment completion)
+                                </label>
+                                <small className="field-hint">
+                                    Marking as last batch will automatically activate this batch
+                                </small>
+                                {errors.IsLast && (
+                                    <span className="error-message">{errors.IsLast}</span>
                                 )}
                             </div>
                         </div>

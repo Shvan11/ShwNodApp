@@ -118,6 +118,7 @@ const AllSetsList = () => {
 
     const initialPhaseCount = activeSets.filter(s => isInitialPhase(s)).length;
     const waitingNextBatchCount = activeSets.filter(s => isWaitingForNextBatch(s)).length;
+    const lastBatchCount = activeSets.filter(s => s.IsLast === true || s.IsLast === 1).length;
     const finishedCount = sets.filter(s => s.WorkStatus === 2 || s.WorkStatus === 3).length;
 
     return (
@@ -150,6 +151,11 @@ const AllSetsList = () => {
                     {waitingNextBatchCount > 0 && (
                         <span className="section-info-warning">
                             <i className="fas fa-exclamation-triangle"></i> {waitingNextBatchCount} waiting for next
+                        </span>
+                    )}
+                    {lastBatchCount > 0 && (
+                        <span className="section-info-last-batch">
+                            <i className="fas fa-flag-checkered"></i> {lastBatchCount} last batch
                         </span>
                     )}
                 </div>
@@ -252,9 +258,13 @@ const AllSetsList = () => {
                                 // Smart conditional formatting based on delivery status
                                 let rowClass = '';
 
-                                // Color code finished and discontinued patients
+                                // Color code finished and discontinued patients (green)
                                 if (set.WorkStatus === 2 || set.WorkStatus === 3) {
                                     rowClass = 'completed-work-row';
+                                }
+                                // Purple for patients with last batch (IsLast = 1)
+                                else if (set.IsLast === true || set.IsLast === 1) {
+                                    rowClass = 'last-batch-row';
                                 }
                                 // Active patients - check batch status
                                 else if (set.NextBatchPresent === 'False') {
