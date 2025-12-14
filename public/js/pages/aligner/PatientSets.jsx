@@ -471,6 +471,27 @@ const PatientSets = () => {
         }
     };
 
+    const handleMarkManufactured = async (batch, e) => {
+        e.stopPropagation();
+        try {
+            const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/manufacture`, {
+                method: 'PATCH'
+            });
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to mark as manufactured');
+            }
+
+            toast.success('Batch marked as manufactured');
+            await loadBatches(batch.AlignerSetID);
+            await loadAlignerSets(patient.workid);
+        } catch (error) {
+            console.error('Error marking as manufactured:', error);
+            toast.error('Failed to mark as manufactured: ' + error.message);
+        }
+    };
+
     const handleDeleteBatch = (batch, e) => {
         e.stopPropagation();
         setConfirmDialog({
@@ -1677,22 +1698,41 @@ const PatientSets = () => {
                                                 <p className="empty-state">No batches found for this set</p>
                                             ) : (
                                                 batchesData[set.AlignerSetID].map((batch) => {
+                                                    const isManufactured = batch.ManufactureDate !== null;
                                                     const isDelivered = batch.DeliveredToPatientDate !== null;
+                                                    // Three states: pending-manufacture, pending-delivery, delivered
+                                                    const batchState = !isManufactured ? 'pending-manufacture'
+                                                        : !isDelivered ? 'pending-delivery'
+                                                        : 'delivered';
+                                                    const batchStateLabel = !isManufactured ? 'Pending Manufacture'
+                                                        : !isDelivered ? 'Pending Delivery'
+                                                        : 'Delivered';
                                                     return (
-                                                        <div key={batch.AlignerBatchID} className={`batch-item ${isDelivered ? 'delivered' : 'pending'}`}>
+                                                        <div key={batch.AlignerBatchID} className={`batch-item ${batchState}`}>
                                                             <div className="batch-header">
                                                                 <div className="batch-title">Batch #{batch.BatchSequence}</div>
                                                                 <div className="batch-actions">
-                                                                    <span className={`batch-status ${isDelivered ? 'delivered' : 'pending'}`}>
-                                                                        {isDelivered ? 'Delivered' : 'Pending'}
+                                                                    <span className={`batch-status ${batchState}`}>
+                                                                        {batchStateLabel}
                                                                     </span>
-                                                                    {!isDelivered && (
+                                                                    {/* Mark Manufactured button - show if not manufactured */}
+                                                                    {!isManufactured && (
+                                                                        <button
+                                                                            className="action-icon-btn manufacture"
+                                                                            onClick={(e) => handleMarkManufactured(batch, e)}
+                                                                            title="Mark as Manufactured (sets today's date)"
+                                                                        >
+                                                                            <i className="fas fa-industry"></i>
+                                                                        </button>
+                                                                    )}
+                                                                    {/* Mark Delivered button - show if manufactured but not delivered */}
+                                                                    {isManufactured && !isDelivered && (
                                                                         <button
                                                                             className="action-icon-btn deliver"
                                                                             onClick={(e) => handleMarkDelivered(batch, e)}
-                                                                            title="Mark as Delivered"
+                                                                            title="Mark as Delivered (sets today's date)"
                                                                         >
-                                                                            <i className="fas fa-check-circle"></i>
+                                                                            <i className="fas fa-truck"></i>
                                                                         </button>
                                                                     )}
                                                                     <button
@@ -1727,9 +1767,15 @@ const PatientSets = () => {
                                                                     <i className="fas fa-teeth"></i>
                                                                     <span>Lower: {batch.LowerAlignerStartSequence}-{batch.LowerAlignerEndSequence} ({batch.LowerAlignerCount})</span>
                                                                 </div>
+                                                                {batch.CreationDate && (
+                                                                    <div className="batch-detail">
+                                                                        <i className="fas fa-plus-circle"></i>
+                                                                        <span>Created: {formatDate(batch.CreationDate)}</span>
+                                                                    </div>
+                                                                )}
                                                                 <div className="batch-detail">
                                                                     <i className="fas fa-industry"></i>
-                                                                    <span>Manufactured: {formatDate(batch.ManufactureDate)}</span>
+                                                                    <span>Manufactured: {batch.ManufactureDate ? formatDate(batch.ManufactureDate) : 'Not yet'}</span>
                                                                 </div>
                                                                 {isDelivered && (
                                                                     <div className="batch-detail">

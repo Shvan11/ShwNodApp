@@ -26,11 +26,17 @@ SELECT
     dbo.tblAlignerSets.SetSequence,
     dbo.tblAlignerSets.CreationDate,
     dbo.tblAlignerBatches.BatchSequence,
+    dbo.tblAlignerBatches.CreationDate AS BatchCreationDate,
     dbo.tblAlignerBatches.ManufactureDate,
     dbo.tblAlignerBatches.DeliveredToPatientDate,
     dbo.tblAlignerBatches.NextBatchReadyDate,
     dbo.tblAlignerBatches.Notes,
     dbo.tblAlignerBatches.IsLast,
+    CASE
+        WHEN dbo.tblAlignerBatches.ManufactureDate IS NULL THEN 'pending_manufacture'
+        WHEN dbo.tblAlignerBatches.DeliveredToPatientDate IS NULL THEN 'pending_delivery'
+        ELSE 'delivered'
+    END AS BatchStatus,
     CASE WHEN EXISTS (
         SELECT 1
         FROM dbo.tblAlignerBatches NextBatch

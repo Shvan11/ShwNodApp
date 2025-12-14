@@ -43,7 +43,7 @@ CREATE PROCEDURE dbo.usp_CreateAlignerBatch
     @AlignerSetID INT,
     @UpperAlignerCount INT,
     @LowerAlignerCount INT,
-    @ManufactureDate DATE,
+    @ManufactureDate DATE = NULL,  -- Optional: NULL = pending manufacture
     @DeliveredToPatientDate DATE = NULL,
     @Days INT = NULL,
     @Notes NVARCHAR(255) = NULL,
@@ -668,6 +668,7 @@ BEGIN
                OR ISNULL(i.Notes, '') <> ISNULL(d.Notes, '')
                OR ISNULL(i.IsActive, 0) <> ISNULL(d.IsActive, 0)
                OR ISNULL(i.IsLast, 0) <> ISNULL(d.IsLast, 0)
+               OR ISNULL(CAST(i.CreationDate AS VARCHAR), '') <> ISNULL(CAST(d.CreationDate AS VARCHAR), '')
            )
     )
     RETURN;

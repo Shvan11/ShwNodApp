@@ -57,6 +57,11 @@ const AllSetsList = () => {
         return Array.from(doctorMap.entries()).map(([id, name]) => ({ id, name }));
     };
 
+    // Check if batch is pending manufacture (created but not manufactured yet)
+    const isPendingManufacture = (set) => {
+        return !set.ManufactureDate && set.BatchCreationDate;
+    };
+
     // Check if patient is in initial phase (no batch delivered yet)
     const isInitialPhase = (set) => {
         return set.NextBatchPresent === 'False' && !set.DeliveredToPatientDate;
@@ -116,6 +121,7 @@ const AllSetsList = () => {
     // Count different patient categories (excluding finished/discontinued if hidden)
     const activeSets = showFinished ? sets : sets.filter(s => s.WorkStatus !== 2 && s.WorkStatus !== 3);
 
+    const pendingManufactureCount = activeSets.filter(s => isPendingManufacture(s)).length;
     const initialPhaseCount = activeSets.filter(s => isInitialPhase(s)).length;
     const waitingNextBatchCount = activeSets.filter(s => isWaitingForNextBatch(s)).length;
     const lastBatchCount = activeSets.filter(s => s.IsLast === true || s.IsLast === 1).length;
@@ -141,6 +147,11 @@ const AllSetsList = () => {
                     {!showFinished && finishedCount > 0 && (
                         <span style={{ color: 'var(--gray-500)', fontSize: '0.9rem' }}>
                             ({finishedCount} finished/discontinued hidden)
+                        </span>
+                    )}
+                    {pendingManufactureCount > 0 && (
+                        <span className="section-info-pending-manufacture">
+                            <i className="fas fa-industry"></i> {pendingManufactureCount} pending manufacture
                         </span>
                     )}
                     {initialPhaseCount > 0 && (
@@ -255,7 +266,7 @@ const AllSetsList = () => {
                         </thead>
                         <tbody>
                             {filteredSets.map((set) => {
-                                // Smart conditional formatting based on delivery status
+                                // Smart conditional formatting based on batch lifecycle status
                                 let rowClass = '';
 
                                 // Color code finished and discontinued patients (green)
@@ -265,6 +276,10 @@ const AllSetsList = () => {
                                 // Purple for patients with last batch (IsLast = 1)
                                 else if (set.IsLast === true || set.IsLast === 1) {
                                     rowClass = 'last-batch-row';
+                                }
+                                // Cyan/Teal for pending manufacture (batch created but not manufactured)
+                                else if (isPendingManufacture(set)) {
+                                    rowClass = 'pending-manufacture-row';
                                 }
                                 // Active patients - check batch status
                                 else if (set.NextBatchPresent === 'False') {

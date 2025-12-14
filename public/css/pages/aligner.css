@@ -970,6 +970,14 @@
     border-left: 4px solid var(--warning-orange);
 }
 
+.batch-item.pending-manufacture {
+    border-left: 4px solid #00acc1;  /* Cyan 600 */
+}
+
+.batch-item.pending-delivery {
+    border-left: 4px solid var(--warning-orange);
+}
+
 .batch-header {
     display: flex;
     justify-content: space-between;
@@ -996,6 +1004,16 @@
 }
 
 .batch-status.pending {
+    background: var(--warning-orange);
+    color: white;
+}
+
+.batch-status.pending-manufacture {
+    background: #00acc1;  /* Cyan 600 */
+    color: white;
+}
+
+.batch-status.pending-delivery {
     background: var(--warning-orange);
     color: white;
 }
@@ -1094,6 +1112,14 @@
 
 .action-icon-btn.deliver:hover {
     background: rgba(76, 175, 80, 0.1);
+}
+
+.action-icon-btn.manufacture {
+    color: #00acc1;  /* Cyan 600 */
+}
+
+.action-icon-btn.manufacture:hover {
+    background: rgba(0, 172, 193, 0.1);
 }
 
 .set-title-actions {
@@ -1430,6 +1456,78 @@
     margin-bottom: 0.25rem;
 }
 
+/* Three-column form row for dates section */
+.form-row-three-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+.form-row-three-col .form-field {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+}
+
+.form-row-three-col .form-field label {
+    min-height: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    margin-bottom: 0.35rem;
+}
+
+.form-row-three-col .form-field .field-optional-text {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--gray-400);
+    margin-top: 0.15rem;
+}
+
+/* Ensure date inputs and regular inputs align */
+.form-row-three-col .date-with-checkbox,
+.form-row-three-col .form-field > input {
+    height: 38px;
+}
+
+.form-row-three-col .date-with-checkbox input[type="date"] {
+    flex: 1;
+    height: 100%;
+}
+
+/* Date input with Today checkbox */
+.date-with-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.date-with-checkbox input[type="date"] {
+    flex: 1;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--gray-300);
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.date-with-checkbox .checkbox-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--text-light);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.date-with-checkbox .checkbox-inline input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
 .form-field-checkbox {
     display: flex;
     align-items: center;
@@ -1661,6 +1759,14 @@
 
     .form-row {
         grid-template-columns: 1fr;
+    }
+
+    .form-row-three-col {
+        grid-template-columns: 1fr;
+    }
+
+    .form-row-three-col .form-field label {
+        min-height: auto;
     }
 
     .set-title {
@@ -2413,6 +2519,12 @@
     font-weight: var(--font-weight-bold);
 }
 
+.section-info-pending-manufacture {
+    margin-left: var(--spacing-md);
+    color: #00acc1;
+    font-weight: var(--font-weight-bold);
+}
+
 /* Filter Controls Container */
 .allsets-filter-container {
     display: flex;
@@ -2613,8 +2725,25 @@
     display: table-cell;
 }
 
+/* Pending Manufacture Row - Batch created but not manufactured yet (cyan/teal) - higher specificity */
+.allsets-table tbody tr.pending-manufacture-row,
+.allsets-table tbody tr.pending-manufacture-row:nth-child(even),
+.allsets-table tbody tr.pending-manufacture-row:nth-child(odd) {
+    background-color: #e0f7fa;  /* Cyan 50 */
+    display: table-row;
+    border-left: 4px solid #00acc1;  /* Cyan 600 */
+}
+
+.allsets-table tbody tr.pending-manufacture-row:hover {
+    background-color: #b2ebf2;  /* Cyan 100 */
+}
+
+.allsets-table tbody tr.pending-manufacture-row td {
+    display: table-cell;
+}
+
 /* Normal row hover - only for rows without special classes */
-.allsets-table tbody tr:not(.info-row):not(.warning-row):not(.completed-work-row):not(.last-batch-row):hover {
+.allsets-table tbody tr:not(.info-row):not(.warning-row):not(.completed-work-row):not(.last-batch-row):not(.pending-manufacture-row):hover {
     background-color: var(--blue-50);
 }
 

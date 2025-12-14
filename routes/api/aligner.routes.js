@@ -619,6 +619,29 @@ router.put('/aligner/batches/:batchId', async (req, res) => {
 });
 
 /**
+ * Mark batch as manufactured (sets ManufactureDate to today)
+ */
+router.patch('/aligner/batches/:batchId/manufacture', async (req, res) => {
+    try {
+        const { batchId } = req.params;
+
+        // Delegate to service layer
+        await AlignerService.markBatchManufactured(batchId);
+
+        res.json({
+            success: true,
+            message: 'Batch marked as manufactured'
+        });
+    } catch (error) {
+        if (error instanceof AlignerValidationError) {
+            return ErrorResponses.badRequest(res, error.message, { code: error.code });
+        }
+        log.error('Error marking batch as manufactured:', error);
+        return ErrorResponses.internalError(res, 'Failed to mark batch as manufactured', error);
+    }
+});
+
+/**
  * Mark batch as delivered
  */
 router.patch('/aligner/batches/:batchId/deliver', async (req, res) => {

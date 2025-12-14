@@ -88,15 +88,12 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                     lowerStart = 0;
                 }
 
-                // Get today's date in YYYY-MM-DD format
-                const today = new Date().toISOString().split('T')[0];
-
                 setFormData({
                     BatchSequence: nextBatchSequence,
                     UpperAlignerCount: '',
                     LowerAlignerCount: '',
                     Days: '',
-                    ManufactureDate: today,
+                    ManufactureDate: '',  // Empty initially - set when manufacturing complete
                     DeliveredToPatientDate: '',
                     Notes: '',
                     IsActive: false,
@@ -446,31 +443,96 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                         {/* Dates Section - Full Width */}
                         <div className="form-section form-section-dates">
                             <h3 className="section-heading-no-top">Dates & Timing</h3>
+
+                            {/* Show CreationDate when editing (read-only) */}
+                            {batch && batch.CreationDate && (
+                                <div className="form-row">
+                                    <div className="form-field">
+                                        <label>Created On</label>
+                                        <input
+                                            type="text"
+                                            value={new Date(batch.CreationDate).toLocaleDateString('en-GB', {
+                                                year: 'numeric', month: 'short', day: 'numeric',
+                                                hour: '2-digit', minute: '2-digit'
+                                            })}
+                                            readOnly
+                                            className="readonly"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="form-row form-row-three-col">
                                 <div className="form-field">
-                                    <label htmlFor="ManufactureDate">Manufacture Date</label>
-                                    <input
-                                        type="date"
-                                        id="ManufactureDate"
-                                        name="ManufactureDate"
-                                        value={formData.ManufactureDate}
-                                        onChange={handleChange}
-                                    />
+                                    <label htmlFor="ManufactureDate">
+                                        Manufacture Date
+                                        <span className="field-optional-text">(when manufacturing completed)</span>
+                                    </label>
+                                    <div className="date-with-checkbox">
+                                        <input
+                                            type="date"
+                                            id="ManufactureDate"
+                                            name="ManufactureDate"
+                                            value={formData.ManufactureDate}
+                                            onChange={handleChange}
+                                        />
+                                        <label className="checkbox-inline" title="Set to today's date">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.ManufactureDate === new Date().toISOString().split('T')[0]}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            ManufactureDate: new Date().toISOString().split('T')[0]
+                                                        }));
+                                                    } else {
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            ManufactureDate: ''
+                                                        }));
+                                                    }
+                                                }}
+                                            />
+                                            Today
+                                        </label>
+                                    </div>
                                 </div>
 
                                 <div className="form-field">
                                     <label htmlFor="DeliveredToPatientDate">
-                                        Delivered Date <span className="field-optional-text">(optional - usually set later)</span>
+                                        Delivered Date <span className="field-optional-text">(when given to patient)</span>
                                     </label>
-                                    <input
-                                        type="date"
-                                        id="DeliveredToPatientDate"
-                                        name="DeliveredToPatientDate"
-                                        value={formData.DeliveredToPatientDate}
-                                        onChange={handleChange}
-                                        className={errors.DeliveredToPatientDate ? 'error' : ''}
-                                        placeholder="Leave empty if not delivered yet"
-                                    />
+                                    <div className="date-with-checkbox">
+                                        <input
+                                            type="date"
+                                            id="DeliveredToPatientDate"
+                                            name="DeliveredToPatientDate"
+                                            value={formData.DeliveredToPatientDate}
+                                            onChange={handleChange}
+                                            className={errors.DeliveredToPatientDate ? 'error' : ''}
+                                        />
+                                        <label className="checkbox-inline" title="Set to today's date">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.DeliveredToPatientDate === new Date().toISOString().split('T')[0]}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            DeliveredToPatientDate: new Date().toISOString().split('T')[0]
+                                                        }));
+                                                    } else {
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            DeliveredToPatientDate: ''
+                                                        }));
+                                                    }
+                                                }}
+                                            />
+                                            Today
+                                        </label>
+                                    </div>
                                     {errors.DeliveredToPatientDate && (
                                         <span className="error-message">{errors.DeliveredToPatientDate}</span>
                                     )}

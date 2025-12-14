@@ -310,6 +310,36 @@ export async function markBatchDelivered(batchId) {
     }
 }
 
+/**
+ * Mark a batch as manufactured (sets ManufactureDate to today)
+ *
+ * Business Rules:
+ * - Batch must exist
+ * - Only updates if ManufactureDate is currently NULL
+ *
+ * @param {number} batchId - Batch ID
+ * @returns {Promise<void>}
+ * @throws {AlignerValidationError} If validation fails
+ */
+export async function markBatchManufactured(batchId) {
+    if (!batchId || isNaN(parseInt(batchId))) {
+        throw new AlignerValidationError(
+            'Valid batchId is required',
+            'INVALID_BATCH_ID'
+        );
+    }
+
+    log.info(`Marking batch ${batchId} as manufactured`);
+
+    try {
+        await alignerQueries.markBatchAsManufactured(batchId);
+        log.info(`Batch ${batchId} marked as manufactured`);
+    } catch (error) {
+        log.error('Error marking batch as manufactured:', error);
+        throw error;
+    }
+}
+
 // ==============================
 // ALIGNER DOCTORS BUSINESS LOGIC
 // ==============================

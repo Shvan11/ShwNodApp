@@ -204,11 +204,13 @@ export async function getAllAlignerSets() {
             v.SetSequence,
             v.BatchSequence,
             v.CreationDate,
+            v.BatchCreationDate,
             v.ManufactureDate,
             v.DeliveredToPatientDate,
             v.NextBatchReadyDate,
             v.Notes,
             v.IsLast,
+            v.BatchStatus,
             v.NextBatchPresent,
             ad.DoctorName,
             w.Status as WorkStatus,
@@ -235,15 +237,17 @@ export async function getAllAlignerSets() {
             SetSequence: columns[5].value,
             BatchSequence: columns[6].value,
             CreationDate: columns[7].value,
-            ManufactureDate: columns[8].value,
-            DeliveredToPatientDate: columns[9].value,
-            NextBatchReadyDate: columns[10].value,
-            Notes: columns[11].value,
-            IsLast: columns[12].value,
-            NextBatchPresent: columns[13].value,
-            DoctorName: columns[14].value,
-            WorkStatus: columns[15].value,
-            WorkStatusName: columns[16].value
+            BatchCreationDate: columns[8].value,
+            ManufactureDate: columns[9].value,
+            DeliveredToPatientDate: columns[10].value,
+            NextBatchReadyDate: columns[11].value,
+            Notes: columns[12].value,
+            IsLast: columns[13].value,
+            BatchStatus: columns[14].value,
+            NextBatchPresent: columns[15].value,
+            DoctorName: columns[16].value,
+            WorkStatus: columns[17].value,
+            WorkStatusName: columns[18].value
         })
     );
 }
@@ -724,6 +728,7 @@ export async function getBatchesBySetId(setId) {
             UpperAlignerEndSequence,
             LowerAlignerStartSequence,
             LowerAlignerEndSequence,
+            CreationDate,
             ManufactureDate,
             DeliveredToPatientDate,
             Days,
@@ -750,14 +755,15 @@ export async function getBatchesBySetId(setId) {
             UpperAlignerEndSequence: columns[6].value,
             LowerAlignerStartSequence: columns[7].value,
             LowerAlignerEndSequence: columns[8].value,
-            ManufactureDate: columns[9].value,
-            DeliveredToPatientDate: columns[10].value,
-            Days: columns[11].value,
-            ValidityPeriod: columns[12].value,
-            NextBatchReadyDate: columns[13].value,
-            Notes: columns[14].value,
-            IsActive: columns[15].value,
-            IsLast: columns[16].value
+            CreationDate: columns[9].value,
+            ManufactureDate: columns[10].value,
+            DeliveredToPatientDate: columns[11].value,
+            Days: columns[12].value,
+            ValidityPeriod: columns[13].value,
+            NextBatchReadyDate: columns[14].value,
+            Notes: columns[15].value,
+            IsActive: columns[16].value,
+            IsLast: columns[17].value
         })
     );
 }
@@ -871,6 +877,18 @@ export async function updateBatch(batchId, batchData) {
 export async function markBatchAsDelivered(batchId) {
     await executeQuery(
         'UPDATE tblAlignerBatches SET DeliveredToPatientDate = GETDATE() WHERE AlignerBatchID = @batchId',
+        [['batchId', TYPES.Int, parseInt(batchId)]]
+    );
+}
+
+/**
+ * Mark batch as manufactured (sets ManufactureDate to today)
+ * @param {number} batchId - Batch ID
+ * @returns {Promise<void>}
+ */
+export async function markBatchAsManufactured(batchId) {
+    await executeQuery(
+        'UPDATE tblAlignerBatches SET ManufactureDate = GETDATE() WHERE AlignerBatchID = @batchId AND ManufactureDate IS NULL',
         [['batchId', TYPES.Int, parseInt(batchId)]]
     );
 }
@@ -1207,11 +1225,13 @@ export async function getBatchById(batchId) {
             UpperAlignerEndSequence,
             LowerAlignerStartSequence,
             LowerAlignerEndSequence,
+            CreationDate,
             ManufactureDate,
             DeliveredToPatientDate,
             Days,
             Notes,
-            IsActive
+            IsActive,
+            IsLast
         FROM tblAlignerBatches
         WHERE AlignerBatchID = @batchId
     `;
@@ -1229,11 +1249,13 @@ export async function getBatchById(batchId) {
             UpperAlignerEndSequence: columns[6].value,
             LowerAlignerStartSequence: columns[7].value,
             LowerAlignerEndSequence: columns[8].value,
-            ManufactureDate: columns[9].value,
-            DeliveredToPatientDate: columns[10].value,
-            Days: columns[11].value,
-            Notes: columns[12].value,
-            IsActive: columns[13].value
+            CreationDate: columns[9].value,
+            ManufactureDate: columns[10].value,
+            DeliveredToPatientDate: columns[11].value,
+            Days: columns[12].value,
+            Notes: columns[13].value,
+            IsActive: columns[14].value,
+            IsLast: columns[15].value
         })
     );
 }
