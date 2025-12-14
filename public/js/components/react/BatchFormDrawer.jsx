@@ -27,7 +27,9 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
     const previousIsOpenRef = useRef(false);
 
     // Template option - only for first batch (when no existing batches OR editing the first batch)
-    const [includeTemplate, setIncludeTemplate] = useState(true);
+    // Separate controls for upper and lower
+    const [includeUpperTemplate, setIncludeUpperTemplate] = useState(true);
+    const [includeLowerTemplate, setIncludeLowerTemplate] = useState(true);
     const isFirstBatch = existingBatches.length === 0;
     // When editing, check if this batch is the first one (no other batch has a lower sequence)
     const isEditingFirstBatch = batch && !existingBatches.some(b =>
@@ -63,7 +65,8 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                     b.AlignerBatchID !== batch.AlignerBatchID && b.BatchSequence < batch.BatchSequence
                 );
                 if (isFirstBatchEdit) {
-                    setIncludeTemplate(batch.UpperAlignerStartSequence === 0 || batch.LowerAlignerStartSequence === 0);
+                    setIncludeUpperTemplate(batch.UpperAlignerStartSequence === 0);
+                    setIncludeLowerTemplate(batch.LowerAlignerStartSequence === 0);
                 }
             } else {
                 // Add mode - calculate next batch sequence and start sequences
@@ -108,7 +111,8 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                 });
 
                 // Reset includeTemplate to true for first batch
-                setIncludeTemplate(true);
+                setIncludeUpperTemplate(true);
+                setIncludeLowerTemplate(true);
             }
             setErrors({});
         }
@@ -116,17 +120,16 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
         previousIsOpenRef.current = isOpen;
     }, [isOpen, batch, existingBatches]);
 
-    // Update start sequences when includeTemplate checkbox changes (for first batch - add or edit)
+    // Update start sequences when includeTemplate checkboxes change (for first batch - add or edit)
     useEffect(() => {
         if (canChangeTemplateOption) {
-            const startValue = includeTemplate ? 0 : 1;
             setComputedFields(prev => ({
                 ...prev,
-                UpperAlignerStartSequence: startValue,
-                LowerAlignerStartSequence: startValue
+                UpperAlignerStartSequence: includeUpperTemplate ? 0 : 1,
+                LowerAlignerStartSequence: includeLowerTemplate ? 0 : 1
             }));
         }
-    }, [includeTemplate, canChangeTemplateOption]);
+    }, [includeUpperTemplate, includeLowerTemplate, canChangeTemplateOption]);
 
     // Auto-calculate end sequences when counts change
     useEffect(() => {
@@ -212,7 +215,8 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                 AlignerSetID: set?.AlignerSetID,
                 UpperAlignerStartSequence: computedFields.UpperAlignerStartSequence,
                 LowerAlignerStartSequence: computedFields.LowerAlignerStartSequence,
-                IncludeTemplate: canChangeTemplateOption ? includeTemplate : undefined
+                IncludeUpperTemplate: canChangeTemplateOption ? includeUpperTemplate : undefined,
+                IncludeLowerTemplate: canChangeTemplateOption ? includeLowerTemplate : undefined
             };
 
             const url = batch
@@ -312,23 +316,6 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                 )}
                             </div>
 
-                            {/* Template option - show for first batch (add or edit) */}
-                            {canChangeTemplateOption && (
-                                <div className="form-field-checkbox">
-                                    <input
-                                        type="checkbox"
-                                        id="IncludeTemplate"
-                                        checked={includeTemplate}
-                                        onChange={(e) => setIncludeTemplate(e.target.checked)}
-                                    />
-                                    <label htmlFor="IncludeTemplate">
-                                        Include Template Aligner (Start from 0)
-                                    </label>
-                                    <small className="field-hint">
-                                        Template aligners are used for initial fitting before treatment begins
-                                    </small>
-                                </div>
-                            )}
                         </div>
 
                         {/* Two-Column Layout Container - Upper and Lower Aligners */}
@@ -343,6 +330,20 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                             </span>
                                         )}
                                     </h3>
+
+                                    {canChangeTemplateOption && (
+                                        <div className="form-field-checkbox form-field-checkbox-compact">
+                                            <input
+                                                type="checkbox"
+                                                id="IncludeUpperTemplate"
+                                                checked={includeUpperTemplate}
+                                                onChange={(e) => setIncludeUpperTemplate(e.target.checked)}
+                                            />
+                                            <label htmlFor="IncludeUpperTemplate">
+                                                Include Template (Start from 0)
+                                            </label>
+                                        </div>
+                                    )}
 
                                     <div className="form-field">
                                         <label htmlFor="UpperAlignerStartSequence">Start Sequence (Auto)</label>
@@ -396,6 +397,20 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                             </span>
                                         )}
                                     </h3>
+
+                                    {canChangeTemplateOption && (
+                                        <div className="form-field-checkbox form-field-checkbox-compact">
+                                            <input
+                                                type="checkbox"
+                                                id="IncludeLowerTemplate"
+                                                checked={includeLowerTemplate}
+                                                onChange={(e) => setIncludeLowerTemplate(e.target.checked)}
+                                            />
+                                            <label htmlFor="IncludeLowerTemplate">
+                                                Include Template (Start from 0)
+                                            </label>
+                                        </div>
+                                    )}
 
                                     <div className="form-field">
                                         <label htmlFor="LowerAlignerStartSequence">Start Sequence (Auto)</label>

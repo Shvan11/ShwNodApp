@@ -777,11 +777,12 @@ export async function createBatch(batchData) {
     const {
         AlignerSetID, UpperAlignerCount, LowerAlignerCount,
         ManufactureDate, DeliveredToPatientDate, Days, Notes, IsActive,
-        IncludeTemplate, IsLast
+        IncludeUpperTemplate, IncludeLowerTemplate, IsLast
     } = batchData;
 
     // Use executeStoredProcedure with callProcedure() - the proper way to call SPs
     // This ensures correct session settings (QUOTED_IDENTIFIER, ANSI_NULLS) are applied
+    // Stored procedure now supports separate @IncludeUpperTemplate and @IncludeLowerTemplate
     const params = [
         ['AlignerSetID', TYPES.Int, parseInt(AlignerSetID)],
         ['UpperAlignerCount', TYPES.Int, UpperAlignerCount ? parseInt(UpperAlignerCount) : 0],
@@ -792,7 +793,8 @@ export async function createBatch(batchData) {
         ['Notes', TYPES.NVarChar, Notes || null],
         ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : true],
         ['IsLast', TYPES.Bit, IsLast !== undefined ? IsLast : false],
-        ['IncludeTemplate', TYPES.Bit, IncludeTemplate !== undefined ? IncludeTemplate : true]
+        ['IncludeUpperTemplate', TYPES.Bit, IncludeUpperTemplate !== undefined ? IncludeUpperTemplate : true],
+        ['IncludeLowerTemplate', TYPES.Bit, IncludeLowerTemplate !== undefined ? IncludeLowerTemplate : true]
     ];
 
     // Add output parameter for NewBatchID
@@ -825,10 +827,11 @@ export async function updateBatch(batchId, batchData) {
     const {
         AlignerSetID, UpperAlignerCount, LowerAlignerCount,
         ManufactureDate, DeliveredToPatientDate, Notes, IsActive, Days,
-        IncludeTemplate, IsLast
+        IncludeUpperTemplate, IncludeLowerTemplate, IsLast
     } = batchData;
 
     // Use executeStoredProcedure with callProcedure() - the proper way to call SPs
+    // Stored procedure now supports separate @IncludeUpperTemplate and @IncludeLowerTemplate
     const params = [
         ['AlignerBatchID', TYPES.Int, parseInt(batchId)],
         ['AlignerSetID', TYPES.Int, parseInt(AlignerSetID)],
@@ -840,7 +843,8 @@ export async function updateBatch(batchId, batchData) {
         ['Notes', TYPES.NVarChar, Notes || null],
         ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : null],
         ['IsLast', TYPES.Bit, IsLast !== undefined ? IsLast : null],
-        ['IncludeTemplate', TYPES.Bit, IncludeTemplate !== undefined ? IncludeTemplate : null]
+        ['IncludeUpperTemplate', TYPES.Bit, IncludeUpperTemplate !== undefined ? IncludeUpperTemplate : null],
+        ['IncludeLowerTemplate', TYPES.Bit, IncludeLowerTemplate !== undefined ? IncludeLowerTemplate : null]
     ];
 
     // Row mapper for deactivated batch info (if SP returns a result set)

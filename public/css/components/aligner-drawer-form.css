@@ -196,6 +196,21 @@
     font-weight: 500;
 }
 
+.form-field-checkbox.form-field-checkbox-compact {
+    margin-bottom: 0.5rem;
+    padding: 0.25rem 0;
+}
+
+.form-field-checkbox.form-field-checkbox-compact input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+.form-field-checkbox.form-field-checkbox-compact label {
+    font-size: 0.85rem;
+    font-weight: 400;
+}
+
 .error-message {
     display: block;
     color: var(--error-color);

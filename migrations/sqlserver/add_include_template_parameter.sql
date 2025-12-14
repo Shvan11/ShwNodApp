@@ -38,6 +38,7 @@ CREATE PROCEDURE dbo.usp_CreateAlignerBatch
     @Days INT = NULL,
     @Notes NVARCHAR(255) = NULL,
     @IsActive BIT = 1,
+    @IsLast BIT = 0,           -- Mark as final batch for the set
     @IncludeTemplate BIT = 1,  -- NEW: Start from 0 (template) by default for first batch
     @NewBatchID INT OUTPUT
 AS
@@ -129,6 +130,7 @@ BEGIN
             Days,
             Notes,
             IsActive,
+            IsLast,
             BatchSequence,
             UpperAlignerStartSequence,
             LowerAlignerStartSequence
@@ -141,6 +143,7 @@ BEGIN
             @Days,
             @Notes,
             @IsActive,
+            @IsLast,
             @BatchSequence,
             @UpperStartSeq,
             @LowerStartSeq
