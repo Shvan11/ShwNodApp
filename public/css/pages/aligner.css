@@ -9,16 +9,14 @@
 .view-mode-toggle,
 .mode-toggle {
     display: flex;
-    gap: 1rem;
-    margin-bottom: 2rem;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
     justify-content: center;
-    padding: 0 1rem;
+    padding: 0.5rem 1rem;
     position: sticky;
     top: 50px;
     z-index: 100;
     background-color: var(--gray-100);
-    padding-top: 1rem;
-    padding-bottom: 1rem;
 }
 
 .mode-btn {
@@ -55,12 +53,12 @@
 .breadcrumb {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-    padding: 1rem;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0.75rem;
     background: var(--gray-50);
     border-radius: 8px;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
 }
 
 .breadcrumb button.breadcrumb-link {
@@ -615,8 +613,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
-    padding-bottom: 1rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
     border-bottom: 2px solid var(--gray-200);
 }
 
@@ -2836,9 +2834,38 @@
 .allsets-filter-container {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
     align-items: center;
+}
+
+.inactive-sets-toggle {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    cursor: pointer;
+}
+
+.inactive-sets-toggle input {
+    cursor: pointer;
+}
+
+.inactive-sets-toggle:hover {
+    color: var(--gray-800);
+}
+
+.allsets-info {
+    font-size: 0.8rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--gray-700);
+}
+
+.allsets-info-hidden {
+    color: var(--gray-500);
+    font-weight: normal;
 }
 
 .allsets-filter-container .patient-filter-box {
@@ -2927,7 +2954,8 @@
 .allsets-table-container {
     background-color: var(--color-white);
     border-radius: var(--radius-lg);
-    overflow: hidden;
+    overflow: auto;
+    max-height: calc(100vh - 160px);
     box-shadow: var(--shadow-sm);
 }
 
@@ -2940,20 +2968,49 @@
 .allsets-table thead {
     background-color: var(--gray-50);
     border-bottom: 2px solid var(--gray-200);
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .allsets-table th {
-    padding: 0.75rem var(--spacing-md);
+    padding: 0.75rem var(--spacing-sm);
     text-align: left;
     font-weight: var(--font-weight-semibold);
     color: var(--gray-700);
     text-transform: uppercase;
     font-size: var(--font-size-xs);
     letter-spacing: var(--letter-spacing-wide);
+    background-color: var(--gray-50);
+}
+
+.allsets-table th.sortable-header {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s;
+}
+
+.allsets-table th.sortable-header:hover {
+    background-color: var(--gray-100);
+}
+
+.allsets-table th .sort-icon {
+    margin-left: 0.25rem;
+    font-size: 0.7rem;
+    color: var(--gray-400);
+}
+
+.allsets-table th.sortable-header:hover .sort-icon {
+    color: var(--gray-600);
+}
+
+.allsets-table th .sort-icon .fa-sort-up,
+.allsets-table th .sort-icon .fa-sort-down {
+    color: var(--primary-color);
 }
 
 .allsets-table td {
-    padding: 0.75rem var(--spacing-md);
+    padding: 0.75rem var(--spacing-sm);
     color: var(--gray-800);
 }
 
@@ -3076,8 +3133,8 @@
 
 /* Batch State Badges - Status Column */
 .allsets-badge-pending-mfg {
-    background-color: #e0f7fa;  /* Cyan 50 */
-    color: #00838f;  /* Cyan 700 */
+    background-color: #fff3e0;  /* Amber 50 - warning but softer than red */
+    color: #e65100;  /* Amber 900 */
 }
 
 .allsets-badge-pending-del {
@@ -3129,12 +3186,12 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--spacing-md);
-    padding: var(--spacing-sm) var(--spacing-md);
+    gap: var(--spacing-sm);
+    padding: 0.25rem var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
     background: var(--gray-50);
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
-    margin-bottom: var(--spacing-md);
     font-size: var(--font-size-sm);
 }
 
@@ -3162,16 +3219,12 @@
     background-color: #6c757d;
 }
 
-.batch-status-legend .legend-dot.cyan {
-    background-color: #00acc1;
-}
-
-.batch-status-legend .legend-dot.orange {
-    background-color: #ff9800;
-}
-
 .batch-status-legend .legend-dot.green {
     background-color: #28a745;
+}
+
+.batch-status-legend .legend-dot.amber {
+    background-color: #e65100;  /* Amber - warning but softer than red */
 }
 
 .batch-status-legend .legend-dot.red {

@@ -12,6 +12,9 @@ const AllSetsList = () => {
     const [showOnlyNeedsMfg, setShowOnlyNeedsMfg] = useState(false);
     const [selectedDoctor, setSelectedDoctor] = useState('all');
     const [showFinished, setShowFinished] = useState(false);
+    const [showInactiveSets, setShowInactiveSets] = useState(false);
+    const [sortColumn, setSortColumn] = useState('NextBatchReadyDate');
+    const [sortDirection, setSortDirection] = useState('asc');
 
     useEffect(() => {
         loadAllSets();
@@ -41,11 +44,10 @@ const AllSetsList = () => {
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
-        return date.toLocaleDateString('en-GB', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}-${month}-${year}`;
     };
 
     // Get unique doctors from sets
@@ -64,69 +66,53 @@ const AllSetsList = () => {
         return set.NextBatchPresent === 'False' && set.DeliveredToPatientDate;
     };
 
-    // Get lab status from the database LabStatus field
-    const getBatchState = (set) => {
-        switch (set.LabStatus) {
-            case 'no_batches': return 'no-batches';
-            case 'in_lab': return 'pending-delivery';
-            case 'needs_mfg': return 'pending-manufacture';
-            case 'all_delivered': return 'delivered';
-            default: return 'no-batches';
-        }
-    };
-
-    // Render batch state badge
+    // Render next batch status badge (combined status + readiness)
     const renderBatchStateBadge = (set) => {
-        const state = getBatchState(set);
-        switch (state) {
-            case 'no-batches':
-                return <span className="allsets-badge allsets-badge-no-batch">No Batches</span>;
-            case 'pending-manufacture':
-                return <span className="allsets-badge allsets-badge-pending-mfg">Needs Mfg</span>;
-            case 'pending-delivery':
-                return <span className="allsets-badge allsets-badge-pending-del">In Lab</span>;
-            case 'delivered':
-                return <span className="allsets-badge allsets-badge-delivered">Delivered</span>;
-            default:
-                return null;
-        }
-    };
+        const isFinal = set.IsLast === true || set.IsLast === 1;
 
-    // Render next batch ready status badge
-    const renderNextBatchReadyBadge = (set) => {
-        // No batches exist at all - use LabStatus which checks all batches
+        // No batches exist
         if (set.LabStatus === 'no_batches') {
-            return <span className="allsets-badge allsets-badge-na">N/A</span>;
+            return <span className="allsets-badge allsets-badge-no-batch">No Batches</span>;
         }
 
-        // Check if next batch is manufactured and ready (check this BEFORE IsLast)
+        // Final batch delivered = treatment complete (flag shown in Active Batch column)
+        if (isFinal && set.DeliveredToPatientDate) {
+            return <span className="allsets-badge allsets-badge-na">—</span>;
+        }
+
+        // Next batch is manufactured and ready in lab
         if (set.NextBatchPresent === 'True') {
             return (
                 <span className="allsets-badge allsets-badge-next-ready">
-                    <i className="fas fa-check-circle"></i> Ready
+                    <i className="fas fa-check-circle"></i> Ready (In Lab)
                 </span>
             );
         }
 
-        // Final batch - no next needed
-        if (set.IsLast === true || set.IsLast === 1) {
+        // Next batch needs manufacturing
+        if (set.LabStatus === 'needs_mfg') {
             return (
-                <span className="allsets-badge allsets-badge-final">
-                    <i className="fas fa-flag-checkered"></i> Final
+                <span className="allsets-badge allsets-badge-pending-mfg">
+                    Pending (Needs Mfg)
                 </span>
             );
         }
 
-        // Not the last batch but no next batch ready - WARNING
+        // All batches delivered but not final = next batch not created yet
         return (
             <span className="allsets-badge allsets-badge-next-warning">
-                <i className="fas fa-exclamation-triangle"></i> Not Ready
+                <i className="fas fa-exclamation-triangle"></i> Not Created
             </span>
         );
     };
 
     const getFilteredSets = () => {
         let filtered = sets;
+
+        // Filter by inactive sets (hide by default)
+        if (!showInactiveSets) {
+            filtered = filtered.filter(s => s.SetIsActive === true || s.SetIsActive === 1);
+        }
 
         // Filter by finished/discontinued status (hide by default)
         if (!showFinished) {
@@ -167,6 +153,70 @@ const AllSetsList = () => {
         return filtered;
     };
 
+    // Handle column header click for sorting
+    const handleSort = (column) => {
+        if (sortColumn === column) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortColumn(column);
+            setSortDirection('asc');
+        }
+    };
+
+    // Sort the filtered sets
+    const sortSets = (setsToSort) => {
+        return [...setsToSort].sort((a, b) => {
+            let aVal = a[sortColumn];
+            let bVal = b[sortColumn];
+
+            // Handle null/undefined values - push them to the end
+            if (aVal == null && bVal == null) return 0;
+            if (aVal == null) return 1;
+            if (bVal == null) return -1;
+
+            // Handle date columns
+            if (sortColumn === 'NextBatchReadyDate' || sortColumn === 'DeliveredToPatientDate') {
+                aVal = new Date(aVal).getTime();
+                bVal = new Date(bVal).getTime();
+            }
+            // Handle string columns
+            else if (typeof aVal === 'string') {
+                aVal = aVal.toLowerCase();
+                bVal = (bVal || '').toLowerCase();
+            }
+            // Handle numeric columns
+            else if (typeof aVal === 'number') {
+                aVal = aVal || 0;
+                bVal = bVal || 0;
+            }
+
+            if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+    };
+
+    // Render sortable header
+    const renderSortableHeader = (label, column) => (
+        <th
+            onClick={() => handleSort(column)}
+            className="sortable-header"
+        >
+            <span>{label}</span>
+            <span className="sort-icon">
+                {sortColumn === column ? (
+                    sortDirection === 'asc' ? (
+                        <i className="fas fa-sort-up"></i>
+                    ) : (
+                        <i className="fas fa-sort-down"></i>
+                    )
+                ) : (
+                    <i className="fas fa-sort"></i>
+                )}
+            </span>
+        </th>
+    );
+
     if (loading) {
         return (
             <div className="aligner-container">
@@ -178,51 +228,33 @@ const AllSetsList = () => {
         );
     }
 
-    const filteredSets = getFilteredSets();
+    const filteredSets = sortSets(getFilteredSets());
     const uniqueDoctors = getUniqueDoctors();
 
-    // Count different patient categories (excluding finished/discontinued if hidden)
-    const activeSets = showFinished ? sets : sets.filter(s => s.WorkStatus !== 2 && s.WorkStatus !== 3);
+    // Count different patient categories (excluding inactive sets and finished/discontinued if hidden)
+    const baseSets = showInactiveSets ? sets : sets.filter(s => s.SetIsActive === true || s.SetIsActive === 1);
+    const activeSets = showFinished ? baseSets : baseSets.filter(s => s.WorkStatus !== 2 && s.WorkStatus !== 3);
 
-    // Use LabStatus directly for accurate counts
+    // Count by next batch status
     const noBatchesCount = activeSets.filter(s => s.LabStatus === 'no_batches').length;
     const pendingManufactureCount = activeSets.filter(s => s.LabStatus === 'needs_mfg').length;
     const pendingDeliveryCount = activeSets.filter(s => s.LabStatus === 'in_lab').length;
-    const deliveredCount = activeSets.filter(s => s.LabStatus === 'all_delivered').length;
     const lastBatchCount = activeSets.filter(s => s.IsLast === true || s.IsLast === 1).length;
-    const finishedCount = sets.filter(s => s.WorkStatus === 2 || s.WorkStatus === 3).length;
-    // Count sets needing next batch manufactured (not last batch, but no manufactured next batch)
-    const notReadyCount = activeSets.filter(s =>
+    const finishedCount = baseSets.filter(s => s.WorkStatus === 2 || s.WorkStatus === 3).length;
+    const inactiveSetsCount = sets.filter(s => s.SetIsActive !== true && s.SetIsActive !== 1).length;
+    const noNextBatchCount = activeSets.filter(s => s.NextBatchPresent === 'False' && s.DeliveredToPatientDate).length;
+    // Count sets that are "Not Created" - all batches delivered but not marked as final
+    const notCreatedCount = activeSets.filter(s =>
         s.BatchSequence &&
         !(s.IsLast === true || s.IsLast === 1) &&
-        s.NextBatchPresent === 'False'
+        s.NextBatchPresent === 'False' &&
+        s.LabStatus === 'all_delivered'
     ).length;
+    // Count sets with next batch ready in lab
+    const readyInLabCount = activeSets.filter(s => s.NextBatchPresent === 'True').length;
 
     return (
         <>
-            {/* Breadcrumb */}
-            <div className="breadcrumb">
-                <button onClick={() => navigate('/aligner')} className="breadcrumb-link">
-                    <i className="fas fa-arrow-left"></i>
-                    Back to Doctors
-                </button>
-            </div>
-
-            <div className="section-header">
-                <h2>
-                    <i className="fas fa-list-ul"></i>
-                    All Aligner Sets
-                </h2>
-                <div className="section-info">
-                    <span>{activeSets.length} active sets</span>
-                    {!showFinished && finishedCount > 0 && (
-                        <span style={{ color: 'var(--gray-500)', fontSize: '0.9rem' }}>
-                            ({finishedCount} finished/discontinued hidden)
-                        </span>
-                    )}
-                </div>
-            </div>
-
             {/* Filter Controls */}
             <div className="allsets-filter-container">
                 <div className="patient-filter-box">
@@ -269,7 +301,7 @@ const AllSetsList = () => {
                             onChange={(e) => setShowFinished(e.target.checked)}
                         />
                         <i className="fas fa-check-circle"></i>
-                        <span>Finished</span>
+                        <span>Finished ({finishedCount})</span>
                     </label>
 
                     {/* No Next Batch Toggle */}
@@ -280,7 +312,7 @@ const AllSetsList = () => {
                             onChange={(e) => setShowOnlyNoNextBatch(e.target.checked)}
                         />
                         <i className="fas fa-exclamation-triangle"></i>
-                        <span>No Next</span>
+                        <span>No Next ({noNextBatchCount})</span>
                     </label>
 
                     {/* In Lab Filter */}
@@ -315,24 +347,37 @@ const AllSetsList = () => {
 
             {/* Status Legend */}
             <div className="batch-status-legend">
-                <span className="legend-title">Lab Status:</span>
+                <span className="legend-title">Next Batch:</span>
                 <span className="legend-item">
                     <span className="legend-dot gray"></span> No Batches ({noBatchesCount})
                 </span>
                 <span className="legend-item">
-                    <span className="legend-dot cyan"></span> Needs Mfg ({pendingManufactureCount})
+                    <span className="legend-dot green"></span> Ready ({readyInLabCount})
                 </span>
                 <span className="legend-item">
-                    <span className="legend-dot orange"></span> In Lab ({pendingDeliveryCount})
+                    <span className="legend-dot amber"></span> Pending ({pendingManufactureCount})
                 </span>
                 <span className="legend-item">
-                    <span className="legend-dot green"></span> Delivered ({deliveredCount})
+                    <i className="fas fa-flag-checkered" style={{ color: '#7c3aed' }}></i> Final ({lastBatchCount})
                 </span>
                 <span className="legend-item">
-                    <i className="fas fa-flag-checkered" style={{ color: '#7c3aed' }}></i> Final Batch ({lastBatchCount})
+                    <span className="legend-dot red"></span> Not Created ({notCreatedCount})
                 </span>
-                <span className="legend-item">
-                    <span className="legend-dot red"></span> Not Ready ({notReadyCount})
+                {inactiveSetsCount > 0 && (
+                    <label className="inactive-sets-toggle">
+                        <input
+                            type="checkbox"
+                            checked={showInactiveSets}
+                            onChange={(e) => setShowInactiveSets(e.target.checked)}
+                        />
+                        <span>Include inactive sets ({inactiveSetsCount})</span>
+                    </label>
+                )}
+                <span className="allsets-info">
+                    {activeSets.length} active
+                    {!showFinished && finishedCount > 0 && (
+                        <span className="allsets-info-hidden"> ({finishedCount} hidden)</span>
+                    )}
                 </span>
             </div>
 
@@ -361,13 +406,13 @@ const AllSetsList = () => {
                     <table className="allsets-table">
                         <thead>
                             <tr>
-                                <th>Patient</th>
-                                <th>Doctor</th>
-                                <th>Active Set</th>
-                                <th>Active Batch</th>
-                                <th>Latest Batch Status</th>
-                                <th>Next Batch Ready</th>
-                                <th>Notes</th>
+                                {renderSortableHeader('Patient', 'PatientName')}
+                                {renderSortableHeader('Doctor', 'DoctorName')}
+                                {renderSortableHeader('Active Set', 'SetSequence')}
+                                {renderSortableHeader('Active Batch', 'BatchSequence')}
+                                {renderSortableHeader('Next Batch Status', 'LabStatus')}
+                                {renderSortableHeader('Next Due', 'NextBatchReadyDate')}
+                                {renderSortableHeader('Notes', 'Notes')}
                             </tr>
                         </thead>
                         <tbody>
@@ -387,16 +432,23 @@ const AllSetsList = () => {
 
                                 // Format active batch with delivery date
                                 const renderActiveBatch = () => {
-                                    if (set.BatchSequence == null) {
-                                        return <span className="allsets-badge allsets-badge-no-batch">—</span>;
+                                    // No batch delivered yet = no active batch
+                                    if (!set.DeliveredToPatientDate) {
+                                        return <span className="allsets-badge allsets-badge-no-batch">No active batch</span>;
                                     }
-                                    const deliveryInfo = set.DeliveredToPatientDate
-                                        ? formatDate(set.DeliveredToPatientDate)
-                                        : 'Pending';
+                                    // Has delivered batch - show batch number and delivery date
+                                    const isFinal = set.IsLast === true || set.IsLast === 1;
                                     return (
-                                        <span className="allsets-badge allsets-badge-batch">
-                                            Batch {set.BatchSequence} · {deliveryInfo}
-                                        </span>
+                                        <>
+                                            <span className="allsets-badge allsets-badge-batch">
+                                                Batch {set.BatchSequence} · {formatDate(set.DeliveredToPatientDate)}
+                                            </span>
+                                            {isFinal && (
+                                                <span className="allsets-badge allsets-badge-final" style={{ marginLeft: '4px' }}>
+                                                    <i className="fas fa-flag-checkered"></i>
+                                                </span>
+                                            )}
+                                        </>
                                     );
                                 };
 
@@ -425,7 +477,9 @@ const AllSetsList = () => {
                                     </td>
                                     <td data-label="Batch">{renderActiveBatch()}</td>
                                     <td data-label="Status">{renderBatchStateBadge(set)}</td>
-                                    <td data-label="Next">{renderNextBatchReadyBadge(set)}</td>
+                                    <td data-label="Next Due">
+                                        {set.NextBatchReadyDate ? formatDate(set.NextBatchReadyDate) : '—'}
+                                    </td>
                                     <td data-label="Notes">
                                         {set.Notes ? (
                                             <span className="allsets-notes">

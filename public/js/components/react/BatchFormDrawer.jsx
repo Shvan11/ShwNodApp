@@ -95,7 +95,7 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                     BatchSequence: nextBatchSequence,
                     UpperAlignerCount: '',
                     LowerAlignerCount: '',
-                    Days: '',
+                    Days: set?.Days || '',
                     ManufactureDate: '',  // Empty initially - set when manufacturing complete
                     DeliveredToPatientDate: '',
                     Notes: '',

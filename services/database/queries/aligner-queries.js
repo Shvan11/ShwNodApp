@@ -202,6 +202,7 @@ export async function getAllAlignerSets() {
             v.AlignerDrID,
             v.AlignerSetID,
             v.SetSequence,
+            v.SetIsActive,
             v.BatchSequence,
             v.CreationDate,
             v.BatchCreationDate,
@@ -220,6 +221,7 @@ export async function getAllAlignerSets() {
         INNER JOIN tblwork w ON v.WorkID = w.workid
         LEFT JOIN tblWorkStatus ws ON w.Status = ws.StatusID
         ORDER BY
+            CASE WHEN v.SetIsActive = 1 THEN 0 ELSE 1 END,
             CASE WHEN v.NextBatchPresent = 'False' THEN 0 ELSE 1 END,
             v.NextBatchReadyDate ASC,
             v.PatientName
@@ -235,19 +237,20 @@ export async function getAllAlignerSets() {
             AlignerDrID: columns[3].value,
             AlignerSetID: columns[4].value,
             SetSequence: columns[5].value,
-            BatchSequence: columns[6].value,
-            CreationDate: columns[7].value,
-            BatchCreationDate: columns[8].value,
-            ManufactureDate: columns[9].value,
-            DeliveredToPatientDate: columns[10].value,
-            NextBatchReadyDate: columns[11].value,
-            Notes: columns[12].value,
-            IsLast: columns[13].value,
-            NextBatchPresent: columns[14].value,
-            LabStatus: columns[15].value,
-            DoctorName: columns[16].value,
-            WorkStatus: columns[17].value,
-            WorkStatusName: columns[18].value
+            SetIsActive: columns[6].value,
+            BatchSequence: columns[7].value,
+            CreationDate: columns[8].value,
+            BatchCreationDate: columns[9].value,
+            ManufactureDate: columns[10].value,
+            DeliveredToPatientDate: columns[11].value,
+            NextBatchReadyDate: columns[12].value,
+            Notes: columns[13].value,
+            IsLast: columns[14].value,
+            NextBatchPresent: columns[15].value,
+            LabStatus: columns[16].value,
+            DoctorName: columns[17].value,
+            WorkStatus: columns[18].value,
+            WorkStatusName: columns[19].value
         })
     );
 }
@@ -474,11 +477,37 @@ export async function updateAlignerSet(setId, setData) {
         SetCost, Currency, Notes, IsActive
     } = setData;
 
+    const newUpperCount = UpperAlignersCount ? parseInt(UpperAlignersCount) : 0;
+    const newLowerCount = LowerAlignersCount ? parseInt(LowerAlignersCount) : 0;
+
+    // First, get current set data to validate the change
+    const currentSet = await getAlignerSetById(setId);
+    if (!currentSet) {
+        throw new Error(`Aligner set ${setId} not found`);
+    }
+
+    // Calculate how many aligners are already used in batches
+    const usedUpper = currentSet.UpperAlignersCount - currentSet.RemainingUpperAligners;
+    const usedLower = currentSet.LowerAlignersCount - currentSet.RemainingLowerAligners;
+
+    // Validate: new total cannot be less than what's already used in batches
+    if (newUpperCount < usedUpper) {
+        throw new Error(`Cannot reduce upper aligners to ${newUpperCount}. ${usedUpper} are already assigned to batches.`);
+    }
+    if (newLowerCount < usedLower) {
+        throw new Error(`Cannot reduce lower aligners to ${newLowerCount}. ${usedLower} are already assigned to batches.`);
+    }
+
+    // Update the set and adjust remaining counts by the delta
+    // RemainingUpperAligners += (NewUpperCount - OldUpperCount)
+    // RemainingLowerAligners += (NewLowerCount - OldLowerCount)
     const query = `
         UPDATE tblAlignerSets
         SET
             SetSequence = @SetSequence,
             Type = @Type,
+            RemainingUpperAligners = RemainingUpperAligners + (@UpperAlignersCount - UpperAlignersCount),
+            RemainingLowerAligners = RemainingLowerAligners + (@LowerAlignersCount - LowerAlignersCount),
             UpperAlignersCount = @UpperAlignersCount,
             LowerAlignersCount = @LowerAlignersCount,
             Days = @Days,
@@ -498,8 +527,8 @@ export async function updateAlignerSet(setId, setData) {
         [
             ['SetSequence', TYPES.Int, SetSequence ? parseInt(SetSequence) : null],
             ['Type', TYPES.NVarChar, Type || null],
-            ['UpperAlignersCount', TYPES.Int, UpperAlignersCount ? parseInt(UpperAlignersCount) : 0],
-            ['LowerAlignersCount', TYPES.Int, LowerAlignersCount ? parseInt(LowerAlignersCount) : 0],
+            ['UpperAlignersCount', TYPES.Int, newUpperCount],
+            ['LowerAlignersCount', TYPES.Int, newLowerCount],
             ['Days', TYPES.Int, Days ? parseInt(Days) : null],
             ['AlignerDrID', TYPES.Int, AlignerDrID ? parseInt(AlignerDrID) : null],
             ['SetUrl', TYPES.NVarChar, SetUrl || null],
