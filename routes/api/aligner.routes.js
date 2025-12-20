@@ -665,6 +665,52 @@ router.patch('/aligner/batches/:batchId/deliver', async (req, res) => {
 });
 
 /**
+ * Undo manufacture - clears ManufactureDate (and DeliveredToPatientDate if set)
+ */
+router.patch('/aligner/batches/:batchId/undo-manufacture', async (req, res) => {
+    try {
+        const { batchId } = req.params;
+
+        // Delegate to service layer
+        await AlignerService.undoManufactureBatch(batchId);
+
+        res.json({
+            success: true,
+            message: 'Manufacture undone successfully'
+        });
+    } catch (error) {
+        if (error instanceof AlignerValidationError) {
+            return ErrorResponses.badRequest(res, error.message, { code: error.code });
+        }
+        log.error('Error undoing manufacture:', error);
+        return ErrorResponses.internalError(res, 'Failed to undo manufacture', error);
+    }
+});
+
+/**
+ * Undo delivery - clears DeliveredToPatientDate only
+ */
+router.patch('/aligner/batches/:batchId/undo-deliver', async (req, res) => {
+    try {
+        const { batchId } = req.params;
+
+        // Delegate to service layer
+        await AlignerService.undoDeliverBatch(batchId);
+
+        res.json({
+            success: true,
+            message: 'Delivery undone successfully'
+        });
+    } catch (error) {
+        if (error instanceof AlignerValidationError) {
+            return ErrorResponses.badRequest(res, error.message, { code: error.code });
+        }
+        log.error('Error undoing delivery:', error);
+        return ErrorResponses.internalError(res, 'Failed to undo delivery', error);
+    }
+});
+
+/**
  * Delete an aligner batch
  */
 router.delete('/aligner/batches/:batchId', async (req, res) => {

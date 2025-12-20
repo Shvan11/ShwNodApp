@@ -45,6 +45,7 @@ import mediaRoutes from './media.routes.js';
 import lookupRoutes from './lookup.routes.js';
 import reportsRoutes from './reports.routes.js';
 import utilityRoutes from './utility.routes.js';
+import dolphinRoutes from './dolphin.routes.js';
 
 // Import template routes (already modular)
 import templateRouter from '../template-api.js';
@@ -106,5 +107,8 @@ router.use('/', lookupRoutes);         // Reference data
 // Reports and utilities
 router.use('/', reportsRoutes);        // Financial reports and statistics
 router.use('/', utilityRoutes);        // Miscellaneous utilities
+
+// External integrations
+router.use('/dolphin', dolphinRoutes); // Dolphin Imaging integration
 
 export default router;

@@ -429,8 +429,8 @@ export async function patientManagementLoader({ request }) {
     }));
 
     const tags = tagsData.map(tag => ({
-      value: tag.ID,
-      label: tag.Tag
+      value: tag.id,
+      label: tag.tag
     }));
 
     // Check if we have search params and need to execute search

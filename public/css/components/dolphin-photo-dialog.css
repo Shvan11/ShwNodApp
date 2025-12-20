@@ -1,0 +1,252 @@
+/**
+ * Dolphin Photo Dialog Styles
+ * Dialog for selecting timepoint and date when importing photos to Dolphin Imaging
+ */
+
+.dolphin-photo-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-index-modal, 1040);
+    animation: fadeIn 0.2s ease;
+}
+
+.dolphin-photo-dialog {
+    background: var(--background-color, white);
+    border-radius: 12px;
+    max-width: 480px;
+    width: 90%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    animation: slideUp 0.3s ease;
+}
+
+/* Header */
+.dolphin-photo-dialog .dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.dolphin-photo-dialog .dialog-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-color, #333);
+}
+
+.dolphin-photo-dialog .close-btn {
+    background: none;
+    border: none;
+    padding: 0.5rem;
+    cursor: pointer;
+    color: var(--text-light, #666);
+    font-size: 1.1rem;
+    border-radius: 4px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.dolphin-photo-dialog .close-btn:hover {
+    background: var(--gray-100, #f5f5f5);
+    color: var(--text-color, #333);
+}
+
+/* Body */
+.dolphin-photo-dialog .dialog-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.dolphin-photo-dialog .form-group {
+    margin-bottom: 1.25rem;
+}
+
+.dolphin-photo-dialog .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.dolphin-photo-dialog .form-group > label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-color, #333);
+    font-size: 0.9rem;
+}
+
+.dolphin-photo-dialog .form-select,
+.dolphin-photo-dialog .form-input {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.95rem;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 6px;
+    background: var(--background-color, white);
+    color: var(--text-color, #333);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.dolphin-photo-dialog .form-select:focus,
+.dolphin-photo-dialog .form-input:focus {
+    outline: none;
+    border-color: var(--primary-color, #007bff);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+}
+
+/* Date Lists */
+.dolphin-photo-dialog .date-list {
+    margin-bottom: 1.25rem;
+}
+
+.dolphin-photo-dialog .date-list > label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-light, #666);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.dolphin-photo-dialog .date-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.dolphin-photo-dialog .date-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.5rem 0.75rem;
+    background: var(--gray-50, #f8f9fa);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.dolphin-photo-dialog .date-item:hover {
+    background: var(--primary-color, #007bff);
+    border-color: var(--primary-color, #007bff);
+    color: white;
+}
+
+.dolphin-photo-dialog .date-item .date-value {
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.dolphin-photo-dialog .date-item .date-desc {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    margin-top: 2px;
+}
+
+/* Checkbox */
+.dolphin-photo-dialog .checkbox-group {
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-color, #e0e0e0);
+}
+
+.dolphin-photo-dialog .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    cursor: pointer;
+    font-weight: normal;
+}
+
+.dolphin-photo-dialog .checkbox-label input[type="checkbox"] {
+    width: 1.125rem;
+    height: 1.125rem;
+    cursor: pointer;
+    accent-color: var(--primary-color, #007bff);
+}
+
+.dolphin-photo-dialog .checkbox-label span {
+    color: var(--text-color, #333);
+    font-size: 0.9rem;
+}
+
+/* Loading */
+.dolphin-photo-dialog .loading-placeholder {
+    padding: 1rem;
+    text-align: center;
+    color: var(--text-light, #666);
+    font-style: italic;
+}
+
+/* Footer */
+.dolphin-photo-dialog .dialog-footer {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color, #e0e0e0);
+    background: var(--gray-50, #f8f9fa);
+    border-radius: 0 0 12px 12px;
+}
+
+.dolphin-photo-dialog .btn {
+    padding: 0.625rem 1.25rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+}
+
+.dolphin-photo-dialog .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.dolphin-photo-dialog .btn-secondary {
+    background: var(--gray-200, #e9ecef);
+    color: var(--text-color, #333);
+}
+
+.dolphin-photo-dialog .btn-secondary:hover:not(:disabled) {
+    background: var(--gray-300, #dee2e6);
+}
+
+.dolphin-photo-dialog .btn-primary {
+    background: var(--primary-color, #007bff);
+    color: white;
+}
+
+.dolphin-photo-dialog .btn-primary:hover:not(:disabled) {
+    background: var(--primary-dark, #0056b3);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

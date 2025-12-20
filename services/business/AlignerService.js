@@ -340,6 +340,66 @@ export async function markBatchManufactured(batchId) {
     }
 }
 
+/**
+ * Undo manufacture - clears ManufactureDate and DeliveredToPatientDate
+ *
+ * Business Rules:
+ * - Batch must exist
+ * - Clears both dates (can't be delivered without being manufactured)
+ *
+ * @param {number} batchId - Batch ID
+ * @returns {Promise<void>}
+ * @throws {AlignerValidationError} If validation fails
+ */
+export async function undoManufactureBatch(batchId) {
+    if (!batchId || isNaN(parseInt(batchId))) {
+        throw new AlignerValidationError(
+            'Valid batchId is required',
+            'INVALID_BATCH_ID'
+        );
+    }
+
+    log.info(`Undoing manufacture for batch ${batchId}`);
+
+    try {
+        await alignerQueries.undoManufactureBatch(batchId);
+        log.info(`Batch ${batchId} manufacture undone`);
+    } catch (error) {
+        log.error('Error undoing manufacture:', error);
+        throw error;
+    }
+}
+
+/**
+ * Undo delivery - clears only DeliveredToPatientDate
+ *
+ * Business Rules:
+ * - Batch must exist
+ * - Only clears delivery date, keeps manufacture date
+ *
+ * @param {number} batchId - Batch ID
+ * @returns {Promise<void>}
+ * @throws {AlignerValidationError} If validation fails
+ */
+export async function undoDeliverBatch(batchId) {
+    if (!batchId || isNaN(parseInt(batchId))) {
+        throw new AlignerValidationError(
+            'Valid batchId is required',
+            'INVALID_BATCH_ID'
+        );
+    }
+
+    log.info(`Undoing delivery for batch ${batchId}`);
+
+    try {
+        await alignerQueries.undoDeliverBatch(batchId);
+        log.info(`Batch ${batchId} delivery undone`);
+    } catch (error) {
+        log.error('Error undoing delivery:', error);
+        throw error;
+    }
+}
+
 // ==============================
 // ALIGNER DOCTORS BUSINESS LOGIC
 // ==============================
@@ -709,6 +769,9 @@ export default {
     validateAndUpdateBatch,
     validateAndDeleteBatch,
     markBatchDelivered,
+    markBatchManufactured,
+    undoManufactureBatch,
+    undoDeliverBatch,
 
     // Doctors
     validateAndCreateDoctor,

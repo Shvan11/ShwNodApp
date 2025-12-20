@@ -75,7 +75,16 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
             const data = await response.json();
 
             if (data.success) {
-                setAvailableSlots(data.slots || []);
+                const slots = data.slots || [];
+                setAvailableSlots(slots);
+
+                // Auto-expand afternoon slots if any have appointments
+                const afternoonWithAppointments = slots.some(slot =>
+                    rareAfternoonTimes.includes(slot.time) &&
+                    slot.appointments &&
+                    slot.appointments.length > 0
+                );
+                setShowAfternoonSlots(afternoonWithAppointments);
             }
         } catch (err) {
             console.error('Error fetching slots:', err);
@@ -92,7 +101,6 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
 
     const handleDateClick = (date) => {
         setSelectedDate(date);
-        setShowAfternoonSlots(false); // Reset afternoon slots when selecting new date
         fetchAvailableSlots(date);
     };
 

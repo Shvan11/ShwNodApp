@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
 
-const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches = [] }) => {
+const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches = [], onUndoManufacture, onUndoDelivery }) => {
     const toast = useToast();
     const [formData, setFormData] = useState({
         BatchSequence: '',
@@ -459,6 +459,7 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                         <div className="form-section form-section-dates">
                             <h3 className="section-heading-no-top">Dates & Timing</h3>
 
+
                             {/* Show CreationDate when editing (read-only) */}
                             {batch && batch.CreationDate && (
                                 <div className="form-row">
@@ -511,6 +512,20 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                             />
                                             Today
                                         </label>
+                                        {/* Undo Manufacture - only if manufactured AND NOT delivered */}
+                                        {batch && batch.ManufactureDate && !batch.DeliveredToPatientDate && onUndoManufacture && (
+                                            <button
+                                                type="button"
+                                                className="undo-link"
+                                                onClick={(e) => {
+                                                    onUndoManufacture(batch, e);
+                                                    onClose();
+                                                }}
+                                                title="Undo manufacture date"
+                                            >
+                                                <i className="fas fa-undo"></i> undo
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 
@@ -547,6 +562,20 @@ const BatchFormDrawer = ({ isOpen, onClose, onSave, batch, set, existingBatches 
                                             />
                                             Today
                                         </label>
+                                        {/* Undo Delivery - only if delivered */}
+                                        {batch && batch.DeliveredToPatientDate && onUndoDelivery && (
+                                            <button
+                                                type="button"
+                                                className="undo-link"
+                                                onClick={(e) => {
+                                                    onUndoDelivery(batch, e);
+                                                    onClose();
+                                                }}
+                                                title="Undo delivery date"
+                                            >
+                                                <i className="fas fa-undo"></i> undo
+                                            </button>
+                                        )}
                                     </div>
                                     {errors.DeliveredToPatientDate && (
                                         <span className="error-message">{errors.DeliveredToPatientDate}</span>

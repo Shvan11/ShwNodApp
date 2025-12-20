@@ -210,8 +210,8 @@ export async function getAllAlignerSets() {
             v.NextBatchReadyDate,
             v.Notes,
             v.IsLast,
-            v.BatchStatus,
             v.NextBatchPresent,
+            v.LabStatus,
             ad.DoctorName,
             w.Status as WorkStatus,
             ws.StatusName as WorkStatusName
@@ -243,8 +243,8 @@ export async function getAllAlignerSets() {
             NextBatchReadyDate: columns[11].value,
             Notes: columns[12].value,
             IsLast: columns[13].value,
-            BatchStatus: columns[14].value,
-            NextBatchPresent: columns[15].value,
+            NextBatchPresent: columns[14].value,
+            LabStatus: columns[15].value,
             DoctorName: columns[16].value,
             WorkStatus: columns[17].value,
             WorkStatusName: columns[18].value
@@ -893,6 +893,30 @@ export async function markBatchAsDelivered(batchId) {
 export async function markBatchAsManufactured(batchId) {
     await executeQuery(
         'UPDATE tblAlignerBatches SET ManufactureDate = GETDATE() WHERE AlignerBatchID = @batchId AND ManufactureDate IS NULL',
+        [['batchId', TYPES.Int, parseInt(batchId)]]
+    );
+}
+
+/**
+ * Undo manufacture - clears ManufactureDate and DeliveredToPatientDate
+ * @param {number} batchId - Batch ID
+ * @returns {Promise<void>}
+ */
+export async function undoManufactureBatch(batchId) {
+    await executeQuery(
+        'UPDATE tblAlignerBatches SET ManufactureDate = NULL, DeliveredToPatientDate = NULL WHERE AlignerBatchID = @batchId',
+        [['batchId', TYPES.Int, parseInt(batchId)]]
+    );
+}
+
+/**
+ * Undo delivery - clears only DeliveredToPatientDate
+ * @param {number} batchId - Batch ID
+ * @returns {Promise<void>}
+ */
+export async function undoDeliverBatch(batchId) {
+    await executeQuery(
+        'UPDATE tblAlignerBatches SET DeliveredToPatientDate = NULL WHERE AlignerBatchID = @batchId',
         [['batchId', TYPES.Int, parseInt(batchId)]]
     );
 }

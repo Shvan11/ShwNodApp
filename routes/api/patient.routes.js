@@ -633,8 +633,8 @@ router.get('/tag-options', async (req, res) => {
             'SELECT ID, Tag FROM dbo.tblTagOptions ORDER BY Tag',
             [],
             (columns) => ({
-                ID: columns[0].value,
-                Tag: columns[1].value
+                id: columns[0].value,
+                tag: columns[1].value
             })
         );
         res.json(tags);

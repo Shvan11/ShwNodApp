@@ -29,7 +29,7 @@ $compiledCount = 0
 $failedCount = 0
 
 # Compile ExplorerProtocolHandler
-Write-Host "[1/4] Compiling ExplorerProtocolHandler.cs..." -ForegroundColor Cyan
+Write-Host "[1/5] Compiling ExplorerProtocolHandler.cs..." -ForegroundColor Cyan
 
 if (-not (Test-Path "source\ExplorerProtocolHandler.cs")) {
     Write-Host "ERROR: source\ExplorerProtocolHandler.cs not found!" -ForegroundColor Red
@@ -49,7 +49,7 @@ if (-not (Test-Path "source\ExplorerProtocolHandler.cs")) {
 Write-Host ""
 
 # Compile CSImagingProtocolHandler
-Write-Host "[2/4] Compiling CSImagingProtocolHandler.cs..." -ForegroundColor Cyan
+Write-Host "[2/5] Compiling CSImagingProtocolHandler.cs..." -ForegroundColor Cyan
 
 if (-not (Test-Path "source\CSImagingProtocolHandler.cs")) {
     Write-Host "ERROR: source\CSImagingProtocolHandler.cs not found!" -ForegroundColor Red
@@ -69,7 +69,7 @@ if (-not (Test-Path "source\CSImagingProtocolHandler.cs")) {
 Write-Host ""
 
 # Compile UniversalProtocolHandler
-Write-Host "[3/4] Compiling UniversalProtocolHandler.cs..." -ForegroundColor Cyan
+Write-Host "[3/5] Compiling UniversalProtocolHandler.cs..." -ForegroundColor Cyan
 
 if (-not (Test-Path "source\UniversalProtocolHandler.cs")) {
     Write-Host "ERROR: source\UniversalProtocolHandler.cs not found!" -ForegroundColor Red
@@ -89,7 +89,7 @@ if (-not (Test-Path "source\UniversalProtocolHandler.cs")) {
 Write-Host ""
 
 # Compile DolphinImagingProtocolHandler
-Write-Host "[4/4] Compiling DolphinImagingProtocolHandler.cs..." -ForegroundColor Cyan
+Write-Host "[4/5] Compiling DolphinImagingProtocolHandler.cs..." -ForegroundColor Cyan
 
 if (-not (Test-Path "source\DolphinImagingProtocolHandler.cs")) {
     Write-Host "ERROR: source\DolphinImagingProtocolHandler.cs not found!" -ForegroundColor Red
@@ -99,6 +99,26 @@ if (-not (Test-Path "source\DolphinImagingProtocolHandler.cs")) {
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "  SUCCESS: DolphinImagingProtocolHandler.exe created" -ForegroundColor Green
+        $compiledCount++
+    } else {
+        Write-Host "  ERROR: Compilation failed" -ForegroundColor Red
+        $failedCount++
+    }
+}
+
+Write-Host ""
+
+# Compile 3ShapeProtocolHandler
+Write-Host "[5/5] Compiling 3ShapeProtocolHandler.cs..." -ForegroundColor Cyan
+
+if (-not (Test-Path "source\3ShapeProtocolHandler.cs")) {
+    Write-Host "ERROR: source\3ShapeProtocolHandler.cs not found!" -ForegroundColor Red
+    $failedCount++
+} else {
+    & $cscPath /target:winexe /out:3ShapeProtocolHandler.exe /reference:System.Web.dll /reference:System.Windows.Forms.dll "source\3ShapeProtocolHandler.cs" 2>&1 | Out-Null
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  SUCCESS: 3ShapeProtocolHandler.exe created" -ForegroundColor Green
         $compiledCount++
     } else {
         Write-Host "  ERROR: Compilation failed" -ForegroundColor Red

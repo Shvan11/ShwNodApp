@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLoaderData } from 'react-router-dom';
 import AsyncSelect from 'react-select/async';
 import Select from 'react-select';
 import { useToast } from '../../contexts/ToastContext.jsx';
@@ -15,7 +15,8 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 const PatientManagement = () => {
     const navigate = useNavigate();
     const toast = useToast();
-    
+    const loaderData = useLoaderData();
+
     // --- 1. Synchronous State Initialization ---
     // We read storage ONCE via a ref/function. By passing this result to useState,
     // React initializes the state with data available on the very first paint.
@@ -52,11 +53,11 @@ const PatientManagement = () => {
     const [selectedPatient, setSelectedPatient] = useState(null);
     const [showQuickSearch, setShowQuickSearch] = useState(true);
 
-    // -- Dropdown Data --
-    const [allPatients, setAllPatients] = useState([]);
-    const [workTypes, setWorkTypes] = useState([]);
-    const [keywords, setKeywords] = useState([]);
-    const [tags, setTags] = useState([]);
+    // -- Dropdown Data (from loader, no state needed) --
+    const allPatients = loaderData?.allPatients || [];
+    const workTypes = loaderData?.workTypes || [];
+    const keywords = loaderData?.keywords || [];
+    const tags = loaderData?.tags || [];
 
     // -- Refs --
     const searchDebounceRef = useRef(null);
@@ -64,10 +65,8 @@ const PatientManagement = () => {
     // Flag to skip the initial auto-search if we just restored valid data
     const isRestoring = useRef(!!savedState); 
 
-    // --- 2. Data Loading (Dropdowns) ---
+    // --- 2. URL Param Handling ---
     useEffect(() => {
-        loadDropdownData();
-        
         // Handle URL Params (Deep linking has priority over Storage)
         const urlParams = new URLSearchParams(window.location.search);
         const urlSearch = urlParams.get('search');
@@ -103,24 +102,6 @@ const PatientManagement = () => {
         patients, hasSearched, searchPatientName, searchFirstName, searchLastName, searchTerm,
         selectedWorkTypes, selectedKeywords, selectedTags, showFilters, sortConfig
     ]);
-
-    const loadDropdownData = async () => {
-        try {
-            const [pRes, wtRes, kwRes, tagsRes] = await Promise.all([
-                fetch('/api/patientsPhones'),
-                fetch('/api/getworktypes'),
-                fetch('/api/getworkkeywords'),
-                fetch('/api/tag-options')
-            ]);
-
-            if (pRes.ok) setAllPatients(await pRes.json());
-            if (wtRes.ok) setWorkTypes((await wtRes.json()).map(x => ({ value: x.ID, label: x.WorkType })));
-            if (kwRes.ok) setKeywords((await kwRes.json()).map(x => ({ value: x.ID, label: x.KeyWord })));
-            if (tagsRes.ok) setTags((await tagsRes.json()).map(x => ({ value: x.ID, label: x.Tag })));
-        } catch (err) {
-            console.error('Error loading dropdown data:', err);
-        }
-    };
 
     // --- Search Logic ---
     const executeSearch = useCallback(async (overrideSort = null) => {

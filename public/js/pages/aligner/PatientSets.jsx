@@ -452,44 +452,119 @@ const PatientSets = () => {
 
     const handleMarkDelivered = async (batch, e) => {
         e.stopPropagation();
-        try {
-            const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/deliver`, {
-                method: 'PATCH'
-            });
-            const data = await response.json();
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Mark as Delivered?',
+            message: `Mark Batch #${batch.BatchSequence} as delivered? This will set the delivery date to today.`,
+            onConfirm: async () => {
+                try {
+                    const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/deliver`, {
+                        method: 'PATCH'
+                    });
+                    const data = await response.json();
 
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to mark as delivered');
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to mark as delivered');
+                    }
+
+                    toast.success('Batch marked as delivered');
+                    await loadBatches(batch.AlignerSetID);
+                    await loadAlignerSets(patient.workid);
+                } catch (error) {
+                    console.error('Error marking as delivered:', error);
+                    toast.error('Failed to mark as delivered: ' + error.message);
+                }
+                setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
             }
-
-            toast.success('Batch marked as delivered');
-            await loadBatches(batch.AlignerSetID);
-            await loadAlignerSets(patient.workid);
-        } catch (error) {
-            console.error('Error marking as delivered:', error);
-            toast.error('Failed to mark as delivered: ' + error.message);
-        }
+        });
     };
 
     const handleMarkManufactured = async (batch, e) => {
         e.stopPropagation();
-        try {
-            const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/manufacture`, {
-                method: 'PATCH'
-            });
-            const data = await response.json();
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Mark as Manufactured?',
+            message: `Mark Batch #${batch.BatchSequence} as manufactured? This will set the manufacture date to today.`,
+            onConfirm: async () => {
+                try {
+                    const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/manufacture`, {
+                        method: 'PATCH'
+                    });
+                    const data = await response.json();
 
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to mark as manufactured');
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to mark as manufactured');
+                    }
+
+                    toast.success('Batch marked as manufactured');
+                    await loadBatches(batch.AlignerSetID);
+                    await loadAlignerSets(patient.workid);
+                } catch (error) {
+                    console.error('Error marking as manufactured:', error);
+                    toast.error('Failed to mark as manufactured: ' + error.message);
+                }
+                setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
             }
+        });
+    };
 
-            toast.success('Batch marked as manufactured');
-            await loadBatches(batch.AlignerSetID);
-            await loadAlignerSets(patient.workid);
-        } catch (error) {
-            console.error('Error marking as manufactured:', error);
-            toast.error('Failed to mark as manufactured: ' + error.message);
-        }
+    const handleUndoManufactured = async (batch, e) => {
+        e.stopPropagation();
+        const hasDelivery = batch.DeliveredToPatientDate !== null;
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Undo Manufacture?',
+            message: `Undo manufacture for Batch #${batch.BatchSequence}?${hasDelivery ? '\n\nWarning: This will also clear the delivery date.' : ''}`,
+            onConfirm: async () => {
+                try {
+                    const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/undo-manufacture`, {
+                        method: 'PATCH'
+                    });
+                    const data = await response.json();
+
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to undo manufacture');
+                    }
+
+                    toast.success('Manufacture undone');
+                    await loadBatches(batch.AlignerSetID);
+                    await loadAlignerSets(patient.workid);
+                } catch (error) {
+                    console.error('Error undoing manufacture:', error);
+                    toast.error('Failed to undo manufacture: ' + error.message);
+                }
+                setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
+            }
+        });
+    };
+
+    const handleUndoDelivered = async (batch, e) => {
+        e.stopPropagation();
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Undo Delivery?',
+            message: `Undo delivery for Batch #${batch.BatchSequence}?`,
+            onConfirm: async () => {
+                try {
+                    const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/undo-deliver`, {
+                        method: 'PATCH'
+                    });
+                    const data = await response.json();
+
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to undo delivery');
+                    }
+
+                    toast.success('Delivery undone');
+                    await loadBatches(batch.AlignerSetID);
+                    await loadAlignerSets(patient.workid);
+                } catch (error) {
+                    console.error('Error undoing delivery:', error);
+                    toast.error('Failed to undo delivery: ' + error.message);
+                }
+                setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
+            }
+        });
     };
 
     const handleDeleteBatch = (batch, e) => {
@@ -1715,7 +1790,7 @@ const PatientSets = () => {
                                                                     <span className={`batch-status ${batchState}`}>
                                                                         {batchStateLabel}
                                                                     </span>
-                                                                    {/* Mark Manufactured button - show if not manufactured */}
+                                                                    {/* Mark Manufactured - only if not yet manufactured */}
                                                                     {!isManufactured && (
                                                                         <button
                                                                             className="action-icon-btn manufacture"
@@ -1725,7 +1800,7 @@ const PatientSets = () => {
                                                                             <i className="fas fa-industry"></i>
                                                                         </button>
                                                                     )}
-                                                                    {/* Mark Delivered button - show if manufactured but not delivered */}
+                                                                    {/* Mark Delivered - only if manufactured but not yet delivered */}
                                                                     {isManufactured && !isDelivered && (
                                                                         <button
                                                                             className="action-icon-btn deliver"
@@ -1735,6 +1810,7 @@ const PatientSets = () => {
                                                                             <i className="fas fa-truck"></i>
                                                                         </button>
                                                                     )}
+                                                                    {/* Undo buttons moved to Edit Batch modal */}
                                                                     <button
                                                                         className="action-icon-btn print-labels bg-purple"
                                                                         onClick={(e) => handlePrintLabels(batch, set, e)}
@@ -1991,6 +2067,8 @@ const PatientSets = () => {
                     batch={editingBatch}
                     set={currentSetForBatch}
                     existingBatches={currentSetForBatch ? (batchesData[currentSetForBatch.AlignerSetID] || []) : []}
+                    onUndoManufacture={handleUndoManufactured}
+                    onUndoDelivery={handleUndoDelivered}
                 />
             )}
 

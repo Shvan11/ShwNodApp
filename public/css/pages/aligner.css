@@ -1122,6 +1122,15 @@
     background: rgba(0, 172, 193, 0.1);
 }
 
+/* Undo action buttons */
+.action-icon-btn.undo {
+    color: var(--warning-orange);
+}
+
+.action-icon-btn.undo:hover {
+    background: rgba(255, 152, 0, 0.1);
+}
+
 .set-title-actions {
     display: flex;
     gap: 0.25rem;
@@ -1546,6 +1555,32 @@
     font-weight: 500;
 }
 
+/* Minimal Undo Link - appears inline next to date field labels */
+.undo-link {
+    background: none;
+    border: none;
+    color: var(--warning-orange);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0.15rem 0.4rem;
+    margin-left: 0.5rem;
+    border-radius: 3px;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.undo-link:hover {
+    background: rgba(255, 152, 0, 0.1);
+    color: var(--warning-600);
+}
+
+.undo-link i {
+    font-size: 0.65rem;
+}
+
 .error-message {
     display: block;
     color: var(--error-color);
@@ -1670,21 +1705,293 @@
     .allsets-filter-container {
         flex-direction: column;
         align-items: stretch;
+        gap: var(--spacing-sm);
     }
 
     .allsets-filter-container .patient-filter-box {
         min-width: 100%;
+        margin: 0;
     }
 
     .doctor-filter {
         min-width: 100%;
     }
 
+    .doctor-filter-select {
+        width: 100%;
+    }
+
+    /* Filter toggles grid on mobile - 2 columns */
+    .allsets-filter-toggles {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--spacing-sm);
+        width: 100%;
+    }
+
     .no-batch-toggle {
         width: 100%;
         justify-content: center;
+        padding: 0.6rem var(--spacing-sm);
+        font-size: 0.85rem;
     }
 
+    .no-batch-toggle span {
+        font-size: 0.8rem;
+    }
+
+    /* Status legend mobile - scrollable horizontal */
+    .batch-status-legend {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding: var(--spacing-sm);
+        gap: var(--spacing-sm);
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+
+    .batch-status-legend .legend-item {
+        white-space: nowrap;
+        font-size: 0.75rem;
+    }
+
+    .batch-status-legend .legend-title {
+        display: none;
+    }
+
+    /* Section header mobile */
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+    }
+
+    .section-header h2 {
+        font-size: 1.1rem;
+    }
+
+    .section-info {
+        flex-wrap: wrap;
+        gap: var(--spacing-sm);
+        font-size: 0.85rem;
+    }
+
+    /* Table to Cards conversion on mobile */
+    .allsets-table-container {
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .allsets-table {
+        display: block;
+    }
+
+    .allsets-table thead {
+        display: none;
+    }
+
+    .allsets-table tbody {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-md);
+    }
+
+    .allsets-table tbody tr {
+        display: flex;
+        flex-direction: column;
+        background: var(--color-white);
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-md);
+        box-shadow: var(--shadow-sm);
+        gap: var(--spacing-sm);
+    }
+
+    .allsets-table tbody tr:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+    }
+
+    .allsets-table tbody tr.no-batches-row {
+        background-color: var(--gray-100);
+        opacity: 0.9;
+    }
+
+    .allsets-table tbody tr.completed-work-row {
+        background-color: #e8f5e9;
+        opacity: 0.8;
+    }
+
+    .allsets-table tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.4rem 0;
+        border-bottom: 1px solid var(--gray-100);
+    }
+
+    .allsets-table tbody td:last-child {
+        border-bottom: none;
+    }
+
+    /* Add labels before each cell */
+    .allsets-table tbody td::before {
+        content: attr(data-label);
+        font-weight: var(--font-weight-semibold);
+        color: var(--gray-600);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        flex-shrink: 0;
+        margin-right: var(--spacing-sm);
+    }
+
+    /* Patient name cell - full width, larger */
+    .allsets-table tbody td:first-child {
+        border-bottom: 2px solid var(--gray-200);
+        padding-bottom: var(--spacing-sm);
+        margin-bottom: var(--spacing-xs);
+    }
+
+    .allsets-table tbody td:first-child::before {
+        display: none;
+    }
+
+    .allsets-patient-name {
+        font-size: 1.1rem;
+        width: 100%;
+    }
+
+    /* Badges on mobile */
+    .allsets-badge {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+    }
+
+    /* Notes on mobile - full width */
+    .allsets-notes {
+        font-size: 0.8rem;
+        text-align: right;
+        max-width: 60%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Empty state on mobile */
+    .empty-patients {
+        padding: 2rem var(--spacing-md);
+    }
+
+    .empty-patients i {
+        font-size: 3rem;
+    }
+
+    .empty-patients h3 {
+        font-size: 1rem;
+    }
+}
+
+/* Extra Small Screens (< 480px) */
+@media (max-width: 480px) {
+    /* Filter toggles - single column on very small screens */
+    .allsets-filter-toggles {
+        grid-template-columns: 1fr;
+    }
+
+    .no-batch-toggle {
+        padding: 0.75rem var(--spacing-md);
+    }
+
+    /* Section header extra small */
+    .section-header h2 {
+        font-size: 1rem;
+    }
+
+    .section-header h2 i {
+        display: none;
+    }
+
+    /* Cards padding reduced */
+    .allsets-table tbody tr {
+        padding: var(--spacing-sm);
+    }
+
+    .allsets-table tbody td {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+
+    .allsets-table tbody td::before {
+        margin-right: 0;
+        margin-bottom: 0.15rem;
+    }
+
+    /* Badges stack on very small screens */
+    .allsets-badge {
+        width: fit-content;
+    }
+
+    /* Notes full width */
+    .allsets-notes {
+        max-width: 100%;
+        text-align: left;
+    }
+
+    /* Status legend hide on very small - users can still see status in cards */
+    .batch-status-legend {
+        display: none;
+    }
+
+    /* Breadcrumb smaller */
+    .breadcrumb {
+        font-size: 0.8rem;
+        padding: 0.75rem;
+    }
+
+    .breadcrumb button.breadcrumb-link {
+        font-size: 0.8rem;
+    }
+
+    /* Patient name in card */
+    .allsets-patient-name {
+        font-size: 1rem;
+    }
+}
+
+/* Touch device improvements */
+@media (hover: none) and (pointer: coarse) {
+    /* Larger touch targets */
+    .no-batch-toggle {
+        min-height: 48px;
+    }
+
+    .doctor-filter-select {
+        min-height: 48px;
+    }
+
+    .patient-filter-box input {
+        min-height: 48px;
+    }
+
+    /* Card tap feedback */
+    .allsets-table tbody tr {
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .allsets-table tbody tr:active {
+        transform: scale(0.98);
+        box-shadow: var(--shadow-sm);
+    }
+
+    /* Remove hover effects on touch */
+    .allsets-table tbody tr:hover {
+        transform: none;
+    }
+}
+
+@media (max-width: 768px) {
     .search-filters {
         flex-direction: column;
         gap: 1rem;
@@ -2565,6 +2872,14 @@
     border-color: var(--gray-300);
 }
 
+/* Filter Toggles Container - Desktop */
+.allsets-filter-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    align-items: center;
+}
+
 /* Toggle Labels (for both no-batch and finished toggles) */
 .no-batch-toggle {
     display: flex;
@@ -2658,35 +2973,21 @@
     background-color: var(--color-white);
 }
 
-/* Info Row - Initial phase (no delivery yet) - higher specificity */
-.allsets-table tbody tr.info-row,
-.allsets-table tbody tr.info-row:nth-child(even),
-.allsets-table tbody tr.info-row:nth-child(odd) {
-    background-color: var(--blue-50);
+/* No Batches Row - Sets without any batches (gray muted) */
+.allsets-table tbody tr.no-batches-row,
+.allsets-table tbody tr.no-batches-row:nth-child(even),
+.allsets-table tbody tr.no-batches-row:nth-child(odd) {
+    background-color: var(--gray-100);
     display: table-row;
+    opacity: 0.85;
 }
 
-.allsets-table tbody tr.info-row:hover {
-    background-color: var(--blue-100);
+.allsets-table tbody tr.no-batches-row:hover {
+    background-color: var(--gray-200);
+    opacity: 0.95;
 }
 
-.allsets-table tbody tr.info-row td {
-    display: table-cell;
-}
-
-/* Warning Row - Active patient waiting for next batch - higher specificity */
-.allsets-table tbody tr.warning-row,
-.allsets-table tbody tr.warning-row:nth-child(even),
-.allsets-table tbody tr.warning-row:nth-child(odd) {
-    background-color: var(--warning-100);
-    display: table-row;
-}
-
-.allsets-table tbody tr.warning-row:hover {
-    background-color: var(--warning-200);
-}
-
-.allsets-table tbody tr.warning-row td {
+.allsets-table tbody tr.no-batches-row td {
     display: table-cell;
 }
 
@@ -2708,42 +3009,8 @@
     display: table-cell;
 }
 
-/* Last Batch Row - Final batch in treatment (purple/violet) - higher specificity */
-.allsets-table tbody tr.last-batch-row,
-.allsets-table tbody tr.last-batch-row:nth-child(even),
-.allsets-table tbody tr.last-batch-row:nth-child(odd) {
-    background-color: #f3e8ff;
-    display: table-row;
-    border-left: 4px solid var(--color-purple-medium);
-}
-
-.allsets-table tbody tr.last-batch-row:hover {
-    background-color: #e9d5ff;
-}
-
-.allsets-table tbody tr.last-batch-row td {
-    display: table-cell;
-}
-
-/* Pending Manufacture Row - Batch created but not manufactured yet (cyan/teal) - higher specificity */
-.allsets-table tbody tr.pending-manufacture-row,
-.allsets-table tbody tr.pending-manufacture-row:nth-child(even),
-.allsets-table tbody tr.pending-manufacture-row:nth-child(odd) {
-    background-color: #e0f7fa;  /* Cyan 50 */
-    display: table-row;
-    border-left: 4px solid #00acc1;  /* Cyan 600 */
-}
-
-.allsets-table tbody tr.pending-manufacture-row:hover {
-    background-color: #b2ebf2;  /* Cyan 100 */
-}
-
-.allsets-table tbody tr.pending-manufacture-row td {
-    display: table-cell;
-}
-
 /* Normal row hover - only for rows without special classes */
-.allsets-table tbody tr:not(.info-row):not(.warning-row):not(.completed-work-row):not(.last-batch-row):not(.pending-manufacture-row):hover {
+.allsets-table tbody tr:not(.completed-work-row):not(.no-batches-row):hover {
     background-color: var(--blue-50);
 }
 
@@ -2805,6 +3072,118 @@
 .allsets-badge-ready {
     background-color: var(--success-100);
     color: var(--success-800);
+}
+
+/* Batch State Badges - Status Column */
+.allsets-badge-pending-mfg {
+    background-color: #e0f7fa;  /* Cyan 50 */
+    color: #00838f;  /* Cyan 700 */
+}
+
+.allsets-badge-pending-del {
+    background-color: var(--warning-100);
+    color: var(--warning-700);
+}
+
+.allsets-badge-delivered {
+    background-color: var(--success-100);
+    color: var(--success-700);
+}
+
+/* Next Batch Ready Column Badges */
+.allsets-badge-next-ready {
+    background-color: var(--success-100);
+    color: var(--success-700);
+}
+
+.allsets-badge-next-warning {
+    background-color: var(--error-100);
+    color: var(--error-700);
+}
+
+.allsets-badge-final {
+    background-color: #f3e8ff;  /* Purple 100 */
+    color: #7c3aed;  /* Purple 600 */
+}
+
+/* Final Batch Badge - replaces purple row coloring */
+.final-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #7c3aed;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-semibold);
+    margin-left: 8px;
+}
+
+.final-badge i {
+    font-size: 0.65rem;
+}
+
+/* Status Legend Bar */
+.batch-status-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-md);
+    font-size: var(--font-size-sm);
+}
+
+.batch-status-legend .legend-title {
+    font-weight: var(--font-weight-semibold);
+    color: var(--gray-700);
+    margin-right: var(--spacing-sm);
+}
+
+.batch-status-legend .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--gray-600);
+}
+
+.batch-status-legend .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.batch-status-legend .legend-dot.gray {
+    background-color: #6c757d;
+}
+
+.batch-status-legend .legend-dot.cyan {
+    background-color: #00acc1;
+}
+
+.batch-status-legend .legend-dot.orange {
+    background-color: #ff9800;
+}
+
+.batch-status-legend .legend-dot.green {
+    background-color: #28a745;
+}
+
+.batch-status-legend .legend-dot.red {
+    background-color: #dc3545;
+}
+
+.batch-status-legend .legend-dot.purple {
+    background-color: #7c3aed;
+}
+
+.batch-status-legend .legend-item i.fa-flag-checkered {
+    color: #7c3aed;
 }
 
 /* Notes Text */

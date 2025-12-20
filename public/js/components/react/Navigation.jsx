@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
+import DolphinPhotoDialog from './DolphinPhotoDialog.jsx';
 
 const Navigation = ({ patientId, currentPage }) => {
     const toast = useToast();
@@ -16,6 +17,7 @@ const Navigation = ({ patientId, currentPage }) => {
     const [moreActionsFlyoutPosition, setMoreActionsFlyoutPosition] = useState({ top: 0 });
     const [patientInfo, setPatientInfo] = useState(null);
     const [patientsFolder, setPatientsFolder] = useState('');
+    const [showDolphinPhotoDialog, setShowDolphinPhotoDialog] = useState(false);
 
     // Check if this is the "new patient" form
     const isNewPatient = patientId === 'new';
@@ -150,6 +152,28 @@ const Navigation = ({ patientId, currentPage }) => {
         } catch (err) {
             console.error('Error opening CS Imaging:', err);
             toast.error('Failed to open CS Imaging: ' + err.message);
+        }
+    };
+
+    const handleOpen3Shape = () => {
+        try {
+            const patientName = patientInfo?.PatientName
+                || patientInfo?.patientName
+                || patientInfo?.Name
+                || patientInfo?.name
+                || '';
+            const names = patientName.trim().split(' ');
+            const firstName = names[0] || '';
+            const lastName = names.slice(1).join(' ') || '';
+
+            // Use dedicated 3shape: protocol handler
+            const url = `3shape:${patientId}?firstname=${encodeURIComponent(firstName)}&lastname=${encodeURIComponent(lastName)}`;
+            window.location.href = url;
+
+            console.log('Opening 3Shape Unite for patient:', patientId, firstName, lastName);
+        } catch (err) {
+            console.error('Error opening 3Shape Unite:', err);
+            toast.error('Failed to open 3Shape Unite: ' + err.message);
         }
     };
 
@@ -443,11 +467,7 @@ const Navigation = ({ patientId, currentPage }) => {
                             e.preventDefault();
                             if (isNewPatient) return;
 
-                            const patientName = patientInfo?.PatientName || 'Unknown';
-                            const formattedName = patientName.replace(/ /g, '_');
-                            const dolphinUrl = `dolphin:${patientId}?name=${encodeURIComponent(formattedName)}`;
-
-                            window.location.href = dolphinUrl;
+                            window.location.href = `dolphin:${patientId}?action=open`;
                             setMoreActionsExpanded(false);
                         }}
                         title={isNewPatient ? "Save patient first to access Dolphin Imaging" : "Launch Dolphin Imaging with patient data"}
@@ -457,8 +477,50 @@ const Navigation = ({ patientId, currentPage }) => {
                         </div>
                         <span className="action-item-label">Dolphin Imaging</span>
                     </Link>
+
+                    <Link
+                        to="#"
+                        className={`flyout-action-item ${isNewPatient ? 'disabled' : ''}`}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            if (isNewPatient) return;
+                            handleOpen3Shape();
+                            setMoreActionsExpanded(false);
+                        }}
+                        title={isNewPatient ? "Save patient first" : "Launch 3Shape Unite with patient data"}
+                    >
+                        <div className="action-item-icon">
+                            <i className="fas fa-cube" />
+                        </div>
+                        <span className="action-item-label">3Shape Unite</span>
+                    </Link>
+
+                    <Link
+                        to="#"
+                        className={`flyout-action-item ${isNewPatient ? 'disabled' : ''}`}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            if (isNewPatient) return;
+                            setShowDolphinPhotoDialog(true);
+                            setMoreActionsExpanded(false);
+                        }}
+                        title={isNewPatient ? "Save patient first" : "Add photos from memory card to Dolphin Imaging"}
+                    >
+                        <div className="action-item-icon">
+                            <i className="fas fa-camera" />
+                        </div>
+                        <span className="action-item-label">Add Photos to Dolphin</span>
+                    </Link>
                 </div>
             </div>
+        )}
+
+        {showDolphinPhotoDialog && (
+            <DolphinPhotoDialog
+                patientId={patientId}
+                patientInfo={patientInfo}
+                onClose={() => setShowDolphinPhotoDialog(false)}
+            />
         )}
         </>
     );

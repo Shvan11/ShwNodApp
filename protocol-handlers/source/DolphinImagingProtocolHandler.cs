@@ -1,311 +1,258 @@
 using System;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using System.Web;
 using System.Windows.Forms;
 
 namespace DolphinImagingProtocolHandler
 {
+    /// <summary>
+    /// Configuration loaded from ProtocolHandlers.ini
+    /// </summary>
+    class Config
+    {
+        public string DolphinPath { get; set; }
+        public string PatientsFolder { get; set; }
+        public string MemoryCardPath { get; set; }
+    }
+
     class Program
     {
-        /// <summary>
-        /// Win32 API for writing to INI files
-        /// Returns non-zero on success, 0 on failure
-        /// </summary>
+        private const string ConfigPath = @"C:\Windows\ProtocolHandlers.ini";
+
         [DllImport("kernel32", CharSet = CharSet.Unicode)]
-        static extern long WritePrivateProfileString(
-            string Section,
-            string Key,
-            string Value,
-            string FilePath
-        );
+        static extern long WritePrivateProfileString(string Section, string Key, string Value, string FilePath);
 
         [STAThread]
         static void Main(string[] args)
         {
+            if (args.Length == 0) return;
+
             try
             {
-                // Get the URL argument passed by Windows
-                if (args.Length == 0)
+                var (patientId, parameters) = ParseUrl(args[0]);
+                var config = LoadConfig();
+
+                switch (parameters["action"])
                 {
-                    return; // No arguments, exit silently
+                    case "open":
+                        OpenDolphin(patientId, config);
+                        break;
+                    case "photos":
+                        ImportPhotos(patientId, parameters, config);
+                        break;
+                    default:
+                        ShowError($"Unknown action: {parameters["action"]}");
+                        break;
                 }
-
-                string url = args[0];
-
-                // Parse the dolphin: URL
-                // Format: dolphin:PatientID?name=PatientName
-                var parsedUrl = ParseDolphinUrl(url);
-
-                if (parsedUrl == null)
-                {
-                    MessageBox.Show(
-                        "Invalid Dolphin Imaging URL format.\n\nExpected: dolphin:PatientID?name=PatientName",
-                        "Invalid URL",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error
-                    );
-                    return;
-                }
-
-                string patientId = parsedUrl.Item1;
-                string patientName = parsedUrl.Item2;
-
-                // Read DolphinPath from configuration file
-                string dolphinPath = GetDolphinPath();
-
-                if (string.IsNullOrEmpty(dolphinPath))
-                {
-                    MessageBox.Show(
-                        "Dolphin Imaging path not configured.\n\n" +
-                        "Please edit C:\\Windows\\ProtocolHandlers.ini and add:\n\n" +
-                        "[Paths]\n" +
-                        "DolphinPath=C:\\Dolphin\\",
-                        "Configuration Error",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error
-                    );
-                    return;
-                }
-
-                // Validate DolCtrl.exe exists
-                string dolCtrlExe = Path.Combine(dolphinPath, "DolCtrl.exe");
-                if (!File.Exists(dolCtrlExe))
-                {
-                    MessageBox.Show(
-                        "Dolphin Imaging executable not found at:\n\n" + dolCtrlExe + "\n\n" +
-                        "Please install Dolphin Imaging software or update DolphinPath in:\n" +
-                        "C:\\Windows\\ProtocolHandlers.ini",
-                        "Dolphin Imaging Not Found",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error
-                    );
-                    return;
-                }
-
-                // Get patient folder path
-                string patientFolder = GetPatientFolder(patientId);
-
-                if (string.IsNullOrEmpty(patientFolder))
-                {
-                    MessageBox.Show(
-                        "Unable to determine patient folder path for patient: " + patientId + "\n\n" +
-                        "Please ensure PatientsFolder is set in C:\\Windows\\ProtocolHandlers.ini",
-                        "Configuration Error",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error
-                    );
-                    return;
-                }
-
-                // Modify Dolphin.ini to set CaptureFromFilePath
-                string dolphinIni = Path.Combine(dolphinPath, "Dolphin.ini");
-
-                long result = WritePrivateProfileString(
-                    "Defaults",
-                    "CaptureFromFilePath",
-                    patientFolder,
-                    dolphinIni
-                );
-
-                if (result == 0)
-                {
-                    MessageBox.Show(
-                        "Failed to write to Dolphin.ini:\n\n" + dolphinIni + "\n\n" +
-                        "Please check file permissions.",
-                        "INI Write Failed",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error
-                    );
-                    return;
-                }
-
-                // Launch DolCtrl.exe with PatientID as argument
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    FileName = dolCtrlExe,
-                    Arguments = patientId,
-                    UseShellExecute = true  // Use shell execute for proper path handling
-                };
-
-                Process.Start(startInfo);
-
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "Error launching Dolphin Imaging:\n\n" + ex.Message,
-                    "Dolphin Imaging Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
+                ShowError($"Error: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// Get Dolphin installation path from configuration file
-        /// Returns path from C:\Windows\ProtocolHandlers.ini [Paths] section
+        /// Parse dolphin:PatientID?action=open&tp=0&date=20251220&skip=0
         /// </summary>
-        private static string GetDolphinPath()
+        static (string patientId, NameValueCollection parameters) ParseUrl(string url)
         {
-            try
+            // Remove protocol prefix
+            string withoutProtocol = url.Substring(url.IndexOf(':') + 1);
+            withoutProtocol = HttpUtility.UrlDecode(withoutProtocol);
+
+            // Split path and query
+            string[] parts = withoutProtocol.Split(new[] { '?' }, 2);
+            string patientId = parts[0].Trim();
+
+            // Parse query parameters
+            NameValueCollection parameters = new NameValueCollection();
+            if (parts.Length > 1)
             {
-                string configPath = @"C:\Windows\ProtocolHandlers.ini";
-                string dolphinPath = ReadConfigValue(configPath, "Paths", "DolphinPath");
-
-                if (string.IsNullOrEmpty(dolphinPath))
-                {
-                    return null;
-                }
-
-                // Ensure path ends with backslash
-                if (!dolphinPath.EndsWith("\\"))
-                {
-                    dolphinPath += "\\";
-                }
-
-                return dolphinPath;
+                parameters = HttpUtility.ParseQueryString(parts[1]);
             }
-            catch
-            {
-                return null;
-            }
+
+            return (patientId, parameters);
         }
 
         /// <summary>
-        /// Get patient folder path
-        /// Constructs: {PatientsFolder}\{PatientID}\
+        /// Load configuration from INI file
         /// </summary>
-        private static string GetPatientFolder(string patientId)
+        static Config LoadConfig()
         {
-            try
+            var config = new Config
             {
-                string configPath = @"C:\Windows\ProtocolHandlers.ini";
-                string patientsFolder = ReadConfigValue(configPath, "Paths", "PatientsFolder");
+                DolphinPath = ReadIniValue("Paths", "DolphinPath"),
+                PatientsFolder = ReadIniValue("Paths", "PatientsFolder"),
+                MemoryCardPath = ReadIniValue("Paths", "MemoryCardPath") ?? @"D:\DCIM"
+            };
 
-                if (string.IsNullOrEmpty(patientsFolder))
-                {
-                    return null;
-                }
+            // Ensure paths end with backslash
+            if (!string.IsNullOrEmpty(config.DolphinPath) && !config.DolphinPath.EndsWith("\\"))
+                config.DolphinPath += "\\";
+            if (!string.IsNullOrEmpty(config.PatientsFolder) && !config.PatientsFolder.EndsWith("\\"))
+                config.PatientsFolder += "\\";
 
-                // Construct patient folder path with trailing backslash
-                string patientFolder = Path.Combine(patientsFolder, patientId) + "\\";
-
-                return patientFolder;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    "Error reading configuration:\n\n" + ex.Message,
-                    "Configuration Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
-                return null;
-            }
+            return config;
         }
 
         /// <summary>
-        /// Parse dolphin: URL
-        /// Format: dolphin:PatientID?name=PatientName
-        /// Returns Tuple of (PatientID, PatientName)
+        /// Open patient in Dolphin Imaging
         /// </summary>
-        private static Tuple<string, string> ParseDolphinUrl(string url)
+        static void OpenDolphin(string patientId, Config config, int? tpCode = null)
         {
-            try
+            if (string.IsNullOrEmpty(config.DolphinPath))
             {
-                // Strip protocol: dolphin:PatientID?name=PatientName
-                string withoutProtocol = Regex.Replace(url, "^dolphin:", "", RegexOptions.IgnoreCase);
-
-                // URL decode
-                withoutProtocol = HttpUtility.UrlDecode(withoutProtocol);
-
-                // Split by ?
-                string[] parts = withoutProtocol.Split('?');
-
-                if (parts.Length < 1)
-                {
-                    return null;
-                }
-
-                string patientId = parts[0].Trim();
-                string patientName = "";
-
-                // Parse query string for name parameter
-                if (parts.Length > 1)
-                {
-                    string query = parts[1];
-                    var queryParams = HttpUtility.ParseQueryString(query);
-                    patientName = queryParams["name"] ?? "";
-                }
-
-                // Replace underscores with spaces in patient name
-                patientName = patientName.Replace("_", " ");
-
-                return new Tuple<string, string>(patientId, patientName);
+                ShowError("DolphinPath not configured in ProtocolHandlers.ini");
+                return;
             }
-            catch
+
+            string dolCtrlExe = Path.Combine(config.DolphinPath, "DolCtrl.exe");
+            if (!File.Exists(dolCtrlExe))
             {
-                return null;
+                ShowError($"DolCtrl.exe not found at: {dolCtrlExe}");
+                return;
             }
+
+            // Set CaptureFromFilePath in Dolphin.ini
+            string patientFolder = Path.Combine(config.PatientsFolder, patientId) + "\\";
+            string dolphinIni = Path.Combine(config.DolphinPath, "Dolphin.ini");
+
+            if (WritePrivateProfileString("Defaults", "CaptureFromFilePath", patientFolder, dolphinIni) == 0)
+            {
+                ShowError($"Failed to write to Dolphin.ini: {dolphinIni}");
+                return;
+            }
+
+            // Build arguments
+            string arguments = patientId;
+            if (tpCode.HasValue)
+            {
+                arguments += $" /tp {tpCode.Value}";
+            }
+
+            // Launch DolCtrl.exe
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = dolCtrlExe,
+                Arguments = arguments,
+                UseShellExecute = true
+            });
         }
 
         /// <summary>
-        /// Read a value from INI config file
+        /// Import photos from memory card, then optionally open Dolphin
         /// </summary>
-        private static string ReadConfigValue(string filePath, string section, string key)
+        static void ImportPhotos(string patientId, NameValueCollection parameters, Config config)
         {
-            try
+            // Parse parameters
+            int tpCode = int.Parse(parameters["tp"] ?? "0");
+            string date = parameters["date"] ?? DateTime.Now.ToString("yyyyMMdd");
+            bool skipDolphin = parameters["skip"] == "1";
+
+            // Create destination folder
+            string destFolder = Path.Combine(config.PatientsFolder, patientId, $"{tpCode}_{date}");
+            Directory.CreateDirectory(destFolder);
+
+            // Show file picker
+            using (var dialog = new OpenFileDialog())
             {
-                if (!File.Exists(filePath))
+                dialog.Title = "Select Photos to Import";
+                dialog.Filter = "Image Files|*.jpg;*.jpeg;*.png;*.bmp|All Files|*.*";
+                dialog.Multiselect = true;
+                dialog.InitialDirectory = Directory.Exists(config.MemoryCardPath)
+                    ? config.MemoryCardPath
+                    : Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+
+                if (dialog.ShowDialog() != DialogResult.OK || dialog.FileNames.Length == 0)
                 {
-                    return null;
+                    return; // User cancelled or no files selected
                 }
 
-                string[] lines = File.ReadAllLines(filePath);
-                bool inSection = false;
-
-                foreach (string line in lines)
+                // Move selected photos to destination
+                int movedCount = 0;
+                foreach (string sourcePath in dialog.FileNames)
                 {
-                    string trimmed = line.Trim();
+                    string fileName = Path.GetFileName(sourcePath);
+                    string destPath = Path.Combine(destFolder, fileName);
 
-                    // Skip empty lines and comments
-                    if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith(";") || trimmed.StartsWith("#"))
+                    // Handle duplicate filenames
+                    if (File.Exists(destPath))
                     {
-                        continue;
-                    }
-
-                    // Check for section header
-                    if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
-                    {
-                        string currentSection = trimmed.Substring(1, trimmed.Length - 2).Trim();
-                        inSection = currentSection.Equals(section, StringComparison.OrdinalIgnoreCase);
-                        continue;
-                    }
-
-                    // If we're in the right section, look for the key
-                    if (inSection && trimmed.Contains("="))
-                    {
-                        string[] parts = trimmed.Split(new[] { '=' }, 2);
-                        if (parts.Length == 2)
+                        string nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
+                        string ext = Path.GetExtension(fileName);
+                        int counter = 1;
+                        do
                         {
-                            string currentKey = parts[0].Trim();
-                            if (currentKey.Equals(key, StringComparison.OrdinalIgnoreCase))
-                            {
-                                return parts[1].Trim();
-                            }
-                        }
+                            destPath = Path.Combine(destFolder, $"{nameWithoutExt}_{counter}{ext}");
+                            counter++;
+                        } while (File.Exists(destPath));
                     }
+
+                    File.Move(sourcePath, destPath);
+                    movedCount++;
                 }
 
-                return null;
+                if (skipDolphin)
+                {
+                    MessageBox.Show(
+                        $"Successfully moved {movedCount} photo(s) to:\n{destFolder}",
+                        "Photos Organized",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information
+                    );
+                }
+                else
+                {
+                    OpenDolphin(patientId, config, tpCode);
+                }
             }
-            catch
+        }
+
+        /// <summary>
+        /// Read value from INI file
+        /// </summary>
+        static string ReadIniValue(string section, string key)
+        {
+            if (!File.Exists(ConfigPath)) return null;
+
+            string[] lines = File.ReadAllLines(ConfigPath);
+            bool inSection = false;
+
+            foreach (string line in lines)
             {
-                return null;
+                string trimmed = line.Trim();
+                if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith(";") || trimmed.StartsWith("#"))
+                    continue;
+
+                if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
+                {
+                    inSection = trimmed.Substring(1, trimmed.Length - 2)
+                        .Equals(section, StringComparison.OrdinalIgnoreCase);
+                    continue;
+                }
+
+                if (inSection && trimmed.Contains("="))
+                {
+                    string[] parts = trimmed.Split(new[] { '=' }, 2);
+                    if (parts[0].Trim().Equals(key, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return parts[1].Trim();
+                    }
+                }
             }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Show error message
+        /// </summary>
+        static void ShowError(string message)
+        {
+            MessageBox.Show(message, "Dolphin Protocol Handler", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }
