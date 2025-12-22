@@ -70,6 +70,7 @@ const WorkComponent = ({ patientId }) => {
         WorkingLength: '',      // For Endo - working length per canal
         ImplantLength: '',      // For Implant
         ImplantDiameter: '',    // For Implant
+        ImplantManufacturerID: '', // For Implant
         Material: '',           // For Crown/Bridge/Veneers
         LabName: '',            // For Crown/Bridge/Veneers
         ItemCost: '',
@@ -83,12 +84,16 @@ const WorkComponent = ({ patientId }) => {
     const [showTeethPermanent, setShowTeethPermanent] = useState(true);
     const [showTeethDeciduous, setShowTeethDeciduous] = useState(false);
 
+    // Implant manufacturers for dropdown
+    const [implantManufacturers, setImplantManufacturers] = useState([]);
+
     useEffect(() => {
         if (patientId && patientId !== 'new') {
             loadWorks();
             loadPatientInfo();
             checkAppointmentStatus();
             loadTeethOptions();
+            loadImplantManufacturers();
         }
     }, [patientId]);
 
@@ -100,6 +105,17 @@ const WorkComponent = ({ patientId }) => {
             setTeethOptions(data.teeth || []);
         } catch (err) {
             console.error('Error loading teeth options:', err);
+        }
+    };
+
+    const loadImplantManufacturers = async () => {
+        try {
+            const response = await fetch('/api/implant-manufacturers');
+            if (!response.ok) throw new Error('Failed to fetch implant manufacturers');
+            const data = await response.json();
+            setImplantManufacturers(data || []);
+        } catch (err) {
+            console.error('Error loading implant manufacturers:', err);
         }
     };
 
@@ -344,6 +360,7 @@ const WorkComponent = ({ patientId }) => {
             WorkingLength: '',
             ImplantLength: '',
             ImplantDiameter: '',
+            ImplantManufacturerID: '',
             Material: '',
             LabName: '',
             ItemCost: '',
@@ -365,6 +382,7 @@ const WorkComponent = ({ patientId }) => {
             WorkingLength: detail.WorkingLength || '',
             ImplantLength: detail.ImplantLength || '',
             ImplantDiameter: detail.ImplantDiameter || '',
+            ImplantManufacturerID: detail.ImplantManufacturerID || '',
             Material: detail.Material || '',
             LabName: detail.LabName || '',
             ItemCost: detail.ItemCost || '',
@@ -1057,6 +1075,21 @@ const WorkComponent = ({ patientId }) => {
                                 )}
 
                                 {/* Implant fields */}
+                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('implantManufacturer') && (
+                                    <div className="form-group">
+                                        <label>Manufacturer</label>
+                                        <select
+                                            value={detailFormData.ImplantManufacturerID}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, ImplantManufacturerID: e.target.value })}
+                                        >
+                                            <option value="">Select Manufacturer...</option>
+                                            {implantManufacturers.map(m => (
+                                                <option key={m.id} value={m.id}>{m.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
                                 {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('implantLength') && (
                                     <div className="form-group">
                                         <label>Implant Length (mm)</label>

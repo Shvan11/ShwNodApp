@@ -8,7 +8,7 @@
 import React from 'react'
 import TimeSlot from './TimeSlot.jsx'
 
-const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', viewMode = 'week', showOnlyAvailable = false, showEarlySlots = false }) => {
+const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, onDayContextMenu, mode = 'view', viewMode = 'week', showOnlyAvailable = false, showEarlySlots = false }) => {
     if (!calendarData || !calendarData.days || !calendarData.timeSlots) {
         return (
             <div className="calendar-grid loading">
@@ -108,10 +108,12 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
             <div className={`calendar-day-headers ${viewMode === 'day' ? 'view-day' : ''}`}>
                 <div className="day-headers-time-label">Time</div>
                 {filteredDays.map(day => {
+                    const isHoliday = day.isHoliday || false;
                     const dayClasses = [
                         'day-header-cell',
                         isToday(day.date) ? 'today' : '',
-                        isWeekend(day.dayOfWeek) ? 'weekend' : ''
+                        isWeekend(day.dayOfWeek) ? 'weekend' : '',
+                        isHoliday ? 'holiday' : ''
                     ].filter(Boolean).join(' ');
 
                     // Calculate total appointments for this day
@@ -130,10 +132,28 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
                     const month = dateObj.getMonth() + 1;
                     const dateText = `${dayName} ${dayNumber}/${month}`;
 
+                    // Right-click handler for context menu (holiday management)
+                    const handleContextMenu = (event) => {
+                        event.preventDefault();
+                        if (onDayContextMenu) {
+                            onDayContextMenu(day, event);
+                        }
+                    };
+
                     return (
-                        <div key={day.date} className={dayClasses}>
+                        <div
+                            key={day.date}
+                            className={dayClasses}
+                            onContextMenu={handleContextMenu}
+                            title={isHoliday ? `Holiday: ${day.holidayName}` : undefined}
+                        >
                             <div className="day-header-date-line">{dateText}</div>
-                            {totalAppointments > 0 && (
+                            {isHoliday && (
+                                <div className="day-header-holiday" title={day.holidayName || 'Holiday'}>
+                                    <i className="fas fa-calendar-times"></i>
+                                </div>
+                            )}
+                            {!isHoliday && totalAppointments > 0 && (
                                 <div className="day-header-count" title={`${totalAppointments} appointment${totalAppointments !== 1 ? 's' : ''}`}>
                                     {totalAppointments}
                                 </div>
@@ -167,10 +187,12 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
 
             {/* Day columns */}
             {filteredDays.map(day => {
+                const isHoliday = day.isHoliday || false;
                 const dayClasses = [
                     'day-column',
                     isToday(day.date) ? 'today' : '',
-                    isWeekend(day.dayOfWeek) ? 'weekend' : ''
+                    isWeekend(day.dayOfWeek) ? 'weekend' : '',
+                    isHoliday ? 'holiday' : ''
                 ].filter(Boolean).join(' ');
 
                 // Calculate total appointments for this day
@@ -187,7 +209,12 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
                         <div className="day-header">
                             <div className="day-name">{day.dayName}</div>
                             <div className="day-date">{new Date(day.date).getDate()}</div>
-                            {totalAppointments > 0 && (
+                            {isHoliday && (
+                                <div className="day-holiday-badge" title={day.holidayName || 'Holiday'}>
+                                    <i className="fas fa-calendar-times"></i>
+                                </div>
+                            )}
+                            {!isHoliday && totalAppointments > 0 && (
                                 <div className="day-appointment-count" title={`${totalAppointments} appointment${totalAppointments !== 1 ? 's' : ''}`}>
                                     {totalAppointments}
                                 </div>
@@ -224,6 +251,8 @@ const CalendarGrid = ({ calendarData, selectedSlot, onSlotClick, mode = 'view', 
                                     uniformHeight={uniformHeight}
                                     mode={mode}
                                     showOnlyAvailable={showOnlyAvailable}
+                                    isHoliday={isHoliday}
+                                    holidayName={day.holidayName}
                                 />
                             );
                         })}

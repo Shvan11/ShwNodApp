@@ -31,6 +31,7 @@ import '../css/components/cards.css';
 import '../css/components/modal.css';
 import '../css/components/toast.css';
 import '../css/components/route-error.css';
+import '../css/components/calendar-holidays.css';
 
 // ===================================
 // END GLOBAL CSS IMPORTS

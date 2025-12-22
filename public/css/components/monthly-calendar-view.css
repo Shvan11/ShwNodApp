@@ -60,9 +60,14 @@
 }
 
 .month-day-cell:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    transform: translateY(-2px);
-    z-index: 10;
+    background: var(--surface-hover, #f8f9fa);
+    border-color: var(--primary-color);
+}
+
+.month-day-cell.expanded {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    border-color: var(--primary-color);
+    z-index: 20;
 }
 
 /* Today Highlight with Pulsing Animation */
@@ -280,6 +285,136 @@
     font-weight: 600;
 }
 
+/* Expanded Panel (shows on click) */
+.day-expanded-panel {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 8px;
+    background: var(--color-white);
+    border: 1px solid var(--primary-color);
+    border-radius: 8px;
+    padding: 12px;
+    min-width: 220px;
+    max-width: 280px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    z-index: var(--z-index-tooltip);
+    animation: expandPanel 0.15s ease-out;
+}
+
+@keyframes expandPanel {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) scale(1);
+    }
+}
+
+/* Panel Arrow */
+.day-expanded-panel::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid var(--primary-color);
+}
+
+.day-expanded-panel::after {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 6px solid white;
+}
+
+.expanded-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.expanded-count {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--primary-color);
+    background: var(--primary-light, #e3f2fd);
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+.expanded-appointments {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.expanded-appointment {
+    display: flex;
+    gap: 10px;
+    padding: 6px 4px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    font-size: 13px;
+    transition: background 0.15s;
+}
+
+.expanded-appointment:hover {
+    background: var(--surface-hover, #f8f9fa);
+}
+
+.expanded-appointment:last-child {
+    border-bottom: none;
+}
+
+.expanded-appointment .apt-time {
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 50px;
+    font-size: 12px;
+}
+
+.expanded-appointment .apt-name {
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.expanded-more {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 6px 0;
+    font-style: italic;
+}
+
+.expanded-action {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-align: center;
+    padding-top: 8px;
+    margin-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
 /* Loading State */
 .monthly-calendar-grid.loading {
     display: flex;
@@ -345,6 +480,20 @@
     .day-tooltip {
         min-width: 200px;
     }
+
+    .day-expanded-panel {
+        min-width: 180px;
+        max-width: 220px;
+        padding: 10px;
+    }
+
+    .expanded-header {
+        font-size: 12px;
+    }
+
+    .expanded-appointment {
+        font-size: 12px;
+    }
 }
 
 /* Print Styles */
@@ -358,7 +507,8 @@
         transform: none;
     }
 
-    .day-tooltip {
+    .day-tooltip,
+    .day-expanded-panel {
         display: none;
     }
 
@@ -372,7 +522,9 @@
     .month-day-cell,
     .appointment-badge,
     .utilization-fill,
-    .day-tooltip {
+    .day-tooltip,
+    .day-expanded-panel,
+    .expanded-appointment {
         transition: none;
         animation: none;
     }

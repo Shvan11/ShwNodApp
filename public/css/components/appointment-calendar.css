@@ -143,17 +143,20 @@ body:has(.appointment-calendar) {
 }
 
 .appointment-calendar .today-button {
-    padding: 4px 12px;
+    padding: 6px 14px;
     border: 1px solid var(--border);
     background: var(--color-white);
     color: var(--color-light-slate);
-    border-radius: 4px;
+    border-radius: var(--radius-lg);
     font-size: var(--font-size-sm);
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    margin-right: var(--spacing-sm);
+    white-space: nowrap;
+    min-width: 90px;
 }
 
 .appointment-calendar .today-button:hover:not(:disabled) {
@@ -405,7 +408,28 @@ body:has(.appointment-calendar) {
     line-height: 1;
 }
 
+/* Holiday indicator in day header */
+.day-header-cell.holiday {
+    background: linear-gradient(135deg, #fff5f5 0%, #ffe0e0 100%);
+    border-color: var(--error-color);
+}
 
+.day-header-cell.holiday .day-header-date-line {
+    color: var(--error-color);
+}
+
+.day-header-holiday {
+    font-size: var(--font-size-xs);
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--error-color);
+    color: var(--color-white);
+    line-height: 1;
+}
+
+.day-header-holiday i {
+    font-size: 10px;
+}
 
 /* Hide old day header elements */
 .day-header-name {
@@ -430,24 +454,127 @@ body:has(.appointment-calendar) {
     /* Updated for wider columns */
 }
 
+/* ===== DAY VIEW - DESKTOP OPTIMIZED LAYOUT ===== */
+/* Day view uses a centered card layout with fixed column widths */
 .calendar-grid.view-day {
-    grid-template-columns: var(--calendar-time-width) 1fr;
+    display: flex;
+    justify-content: center;
+    gap: var(--calendar-gap);
     min-width: auto;
     max-width: 100%;
     overflow-x: hidden;
+    background: var(--background-secondary);
+    padding: var(--spacing-sm) 0;
 }
 
 .calendar-day-headers.view-day {
-    grid-template-columns: var(--calendar-time-width) 1fr;
+    display: flex;
+    justify-content: center;
+    gap: var(--calendar-gap);
+    background: var(--background-secondary);
+    padding: 0;
+    margin-top: var(--spacing-md);
+    border-bottom: none;
 }
 
-/* Day view improvements - wider appointment slots */
+/* Day view - constrained column width */
 .calendar-grid.view-day .day-column {
-    min-width: 300px;
+    width: 500px;
+    min-width: 400px;
+    max-width: 600px;
+    background: var(--color-white);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-color);
+    border-top: none;
+    box-sizing: border-box;
 }
 
+/* Day view - refined time slots */
 .calendar-grid.view-day .time-slot {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+/* Day view - better appointment cards */
+.calendar-grid.view-day .appointment-item {
+    background: var(--info-50);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    border-right: 3px solid var(--info-color);
+    transition: all 0.2s ease;
+}
+
+.calendar-grid.view-day .appointment-item:hover {
+    background: var(--info-100);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Day view - larger, more readable text */
+.calendar-grid.view-day .patient-name,
+.calendar-grid.view-day .patient-name-compact {
+    font-size: var(--font-size-base);
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.calendar-grid.view-day .appointment-detail,
+.calendar-grid.view-day .appointment-detail-compact {
+    font-size: var(--font-size-sm);
+}
+
+/* Day view - time column styling */
+.calendar-grid.view-day .time-column {
+    background: var(--background-secondary);
+}
+
+.calendar-grid.view-day .time-slot-label {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--color-dark-slate);
+    background: transparent;
+    border-bottom: 1px solid var(--border-light);
+    border-right: none;
+}
+
+/* Day view header cell */
+.calendar-day-headers.view-day .day-header-cell {
+    width: 500px;
+    min-width: 400px;
+    max-width: 600px;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border: 1px solid var(--border-color);
+    border-bottom: none;
+    background: linear-gradient(135deg, var(--color-white) 0%, var(--gray-50) 100%);
     padding: 12px;
+    box-sizing: border-box;
+    box-shadow: var(--shadow-md);
+}
+
+/* Day view - last time slot gets rounded bottom */
+.calendar-grid.view-day .day-column .time-slot:last-child {
+    border-bottom: none;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* Day view - time header styling */
+.calendar-day-headers.view-day .day-headers-time-label {
+    background: transparent;
+    width: var(--calendar-time-width);
+    flex-shrink: 0;
+    box-sizing: border-box;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 8px;
+}
+
+/* Day view - time column width */
+.calendar-grid.view-day .time-column {
+    width: var(--calendar-time-width);
+    flex-shrink: 0;
+    box-sizing: border-box;
 }
 
 /* Time Column - Perfect Alignment with Time Slots */

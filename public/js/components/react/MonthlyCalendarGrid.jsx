@@ -5,15 +5,29 @@
  * Week starts from Saturday as per configuration
  */
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 
 const MonthlyCalendarGrid = ({
     calendarData,
     onDayClick,
+    onDayContextMenu,
     currentDate,
     mode = 'view'
 }) => {
-    const [hoveredDay, setHoveredDay] = useState(null);
+    const [expandedDay, setExpandedDay] = useState(null);
+    const gridRef = useRef(null);
+
+    // Close expanded panel when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (expandedDay && gridRef.current && !e.target.closest('.month-day-cell')) {
+                setExpandedDay(null);
+            }
+        };
+
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, [expandedDay]);
 
     if (!calendarData || !calendarData.days) {
         return (
@@ -50,7 +64,7 @@ const MonthlyCalendarGrid = ({
     const dayHeaders = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'];
 
     return (
-        <div className="monthly-calendar-grid">
+        <div className="monthly-calendar-grid" ref={gridRef}>
             {/* Day headers */}
             <div className="month-grid-header">
                 {dayHeaders.map(day => (
@@ -64,77 +78,108 @@ const MonthlyCalendarGrid = ({
             <div className="month-grid-body">
                 {days.map(day => {
                     const appointmentCount = day.appointmentCount || 0;
-                    const utilizationPercent = day.utilizationPercent || 0;
                     const currentMonth = isCurrentMonth(day.date);
                     const todayClass = isToday(day.date);
                     const weekendClass = isWeekend(day.date);
+                    const isHoliday = day.isHoliday || false;
+
+                    const isExpanded = expandedDay === day.date;
 
                     const cellClasses = [
                         'month-day-cell',
                         !currentMonth ? 'other-month' : '',
                         todayClass ? 'today' : '',
                         weekendClass ? 'weekend' : '',
-                        appointmentCount > 0 ? 'has-appointments' : ''
+                        appointmentCount > 0 ? 'has-appointments' : '',
+                        isHoliday ? 'holiday' : '',
+                        isExpanded ? 'expanded' : ''
                     ].filter(Boolean).join(' ');
+
+                    // Single click to expand/collapse appointment list
+                    const handleClick = () => {
+                        if (!currentMonth) return;
+                        if (isHoliday) return; // Don't navigate to holiday dates
+
+                        // Toggle expanded state for this day
+                        if (expandedDay === day.date) {
+                            setExpandedDay(null);
+                        } else {
+                            setExpandedDay(day.date);
+                        }
+                    };
+
+                    // Double click to navigate to day view
+                    const handleDoubleClick = () => {
+                        if (!currentMonth) return;
+                        if (isHoliday) return;
+                        if (onDayClick) onDayClick(day);
+                    };
+
+                    // Right-click handler for context menu (holiday management)
+                    const handleContextMenu = (event) => {
+                        if (!currentMonth) return; // Don't show context menu for other month days
+                        event.preventDefault();
+                        if (onDayContextMenu) {
+                            onDayContextMenu(day, event);
+                        }
+                    };
 
                     return (
                         <div
                             key={day.date}
                             className={cellClasses}
-                            onClick={() => currentMonth && onDayClick && onDayClick(day)}
-                            onMouseEnter={() => setHoveredDay(day.date)}
-                            onMouseLeave={() => setHoveredDay(null)}
+                            onClick={handleClick}
+                            onDoubleClick={handleDoubleClick}
+                            onContextMenu={handleContextMenu}
+                            title={isHoliday ? day.holidayName : undefined}
                         >
                             {/* Day number */}
                             <div className="month-day-number">
                                 {new Date(day.date).getDate()}
                             </div>
 
+                            {/* Holiday badge */}
+                            {currentMonth && isHoliday && (
+                                <div className="holiday-badge" title={day.holidayName}>
+                                    <i className="fas fa-calendar-times"></i>
+                                </div>
+                            )}
+
                             {/* Appointment badge - Clean neutral styling via CSS */}
-                            {currentMonth && appointmentCount > 0 && (
+                            {currentMonth && !isHoliday && appointmentCount > 0 && (
                                 <div className="appointment-badge">
                                     {appointmentCount}
                                 </div>
                             )}
 
-                            {/* Hover tooltip with appointment details */}
-                            {hoveredDay === day.date && currentMonth && appointmentCount > 0 && (
-                                <div className="day-tooltip">
-                                    <div className="tooltip-header">
+                            {/* Expanded appointment list (shows on click) */}
+                            {isExpanded && currentMonth && !isHoliday && appointmentCount > 0 && (
+                                <div className="day-expanded-panel">
+                                    <div className="expanded-header">
                                         {new Date(day.date).toLocaleDateString('en-US', {
                                             weekday: 'short',
                                             month: 'short',
                                             day: 'numeric'
                                         })}
-                                    </div>
-                                    <div className="tooltip-stats">
-                                        <div className="tooltip-stat">
-                                            <span className="stat-label">Appointments:</span>
-                                            <span className="stat-value">{appointmentCount}</span>
-                                        </div>
-                                        <div className="tooltip-stat">
-                                            <span className="stat-label">Utilization:</span>
-                                            <span className="stat-value">{utilizationPercent}%</span>
-                                        </div>
+                                        <span className="expanded-count">{appointmentCount} appts</span>
                                     </div>
                                     {day.appointments && day.appointments.length > 0 && (
-                                        <div className="tooltip-appointments">
-                                            <div className="tooltip-section-title">Patients:</div>
-                                            {day.appointments.slice(0, 5).map((apt, idx) => (
-                                                <div key={idx} className="tooltip-appointment">
+                                        <div className="expanded-appointments">
+                                            {day.appointments.slice(0, 8).map((apt, idx) => (
+                                                <div key={idx} className="expanded-appointment">
                                                     <span className="apt-time">{apt.time}</span>
                                                     <span className="apt-name">{apt.patientName}</span>
                                                 </div>
                                             ))}
-                                            {day.appointments.length > 5 && (
-                                                <div className="tooltip-more">
-                                                    +{day.appointments.length - 5} more
+                                            {day.appointments.length > 8 && (
+                                                <div className="expanded-more">
+                                                    +{day.appointments.length - 8} more
                                                 </div>
                                             )}
                                         </div>
                                     )}
-                                    <div className="tooltip-action">
-                                        Click to view details
+                                    <div className="expanded-action">
+                                        Double-click to open day view
                                     </div>
                                 </div>
                             )}

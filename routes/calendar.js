@@ -8,6 +8,7 @@
 import express from 'express';
 import { executeStoredProcedure, executeQuery, TYPES } from '../services/database/index.js';
 import { logger } from '../services/core/Logger.js';
+import { getHolidaysInRange } from '../services/database/queries/holiday-queries.js';
 
 const router = express.Router();
 
@@ -81,10 +82,21 @@ router.get('/week', async (req, res) => {
             })
         );
 
-        // Transform flat data into structured calendar format
-        const structuredData = transformToCalendarStructure(calendarData, maxAppointmentsPerSlot);
+        // Fetch holidays for the week
+        const holidays = await getHolidaysInRange(weekStart, weekEnd);
+        const holidayMap = new Map(holidays.map(h => {
+            // Format date as YYYY-MM-DD string for comparison
+            // Use local date components to avoid UTC timezone shift
+            const dateStr = h.Holidaydate instanceof Date
+                ? formatLocalDate(h.Holidaydate)
+                : String(h.Holidaydate).split('T')[0];
+            return [dateStr, h];
+        }));
 
-        logger.info(`✅ Calendar data retrieved: ${calendarData.length} slots, ${structuredData.days.length} days`);
+        // Transform flat data into structured calendar format
+        const structuredData = transformToCalendarStructure(calendarData, maxAppointmentsPerSlot, holidayMap);
+
+        logger.info(`✅ Calendar data retrieved: ${calendarData.length} slots, ${structuredData.days.length} days, ${holidays.length} holidays`);
 
         res.json({
             success: true,
@@ -93,6 +105,7 @@ router.get('/week', async (req, res) => {
             totalSlots: calendarData.length,
             doctorId: doctorId || null,
             maxAppointmentsPerSlot,
+            holidays: holidays.length,
             ...structuredData
         });
 
@@ -178,15 +191,27 @@ router.get('/month', async (req, res) => {
             })
         );
 
+        // Fetch holidays for the grid range
+        const holidays = await getHolidaysInRange(gridStart, gridEnd);
+        const holidayMap = new Map(holidays.map(h => {
+            // Format date as YYYY-MM-DD string for comparison
+            // Use local date components to avoid UTC timezone shift
+            const dateStr = h.Holidaydate instanceof Date
+                ? formatLocalDate(h.Holidaydate)
+                : String(h.Holidaydate).split('T')[0];
+            return [dateStr, h];
+        }));
+
         // Transform to monthly structure
         const monthlyData = transformToMonthlyStructure(
             calendarData,
             gridStart,
             gridEnd,
-            maxAppointmentsPerSlot
+            maxAppointmentsPerSlot,
+            holidayMap
         );
 
-        logger.info(`✅ Monthly calendar data retrieved: ${monthlyData.days.length} days`);
+        logger.info(`✅ Monthly calendar data retrieved: ${monthlyData.days.length} days, ${holidays.length} holidays`);
 
         res.json({
             success: true,
@@ -196,6 +221,7 @@ router.get('/month', async (req, res) => {
             gridEnd,
             doctorId: doctorId || null,
             maxAppointmentsPerSlot,
+            holidays: holidays.length,
             ...monthlyData
         });
 
@@ -403,6 +429,18 @@ router.post('/ensure-range', async (req, res) => {
 });
 
 // Helper functions
+
+/**
+ * Format a Date object to YYYY-MM-DD using local timezone
+ * Avoids UTC conversion that can shift dates by a day
+ */
+function formatLocalDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 // Week starts on Saturday (day 6)
 function getWeekStart(date) {
     const d = new Date(date);
@@ -485,7 +523,7 @@ function getCalendarGridEnd(date) {
     return `${year}-${month}-${dayNum}`;
 }
 
-function transformToCalendarStructure(flatData, maxAppointmentsPerSlot = 3) {
+function transformToCalendarStructure(flatData, maxAppointmentsPerSlot = 3, holidayMap = new Map()) {
     const days = {};
     const timeSlots = new Set();
 
@@ -494,11 +532,16 @@ function transformToCalendarStructure(flatData, maxAppointmentsPerSlot = 3) {
         const dateKey = item.calendarDate;
 
         if (!days[dateKey]) {
+            const holiday = holidayMap.get(dateKey);
             days[dateKey] = {
                 date: dateKey,
                 dayName: item.dayName,
                 dayOfWeek: item.dayOfWeek,
-                appointments: {}
+                appointments: {},
+                isHoliday: !!holiday,
+                holidayId: holiday ? holiday.ID : null,
+                holidayName: holiday ? holiday.HolidayName : null,
+                holidayDescription: holiday ? holiday.Description : null
             };
         }
 
@@ -564,7 +607,7 @@ function transformToCalendarStructure(flatData, maxAppointmentsPerSlot = 3) {
     };
 }
 
-function transformToMonthlyStructure(flatData, gridStart, gridEnd, maxAppointmentsPerSlot = 3) {
+function transformToMonthlyStructure(flatData, gridStart, gridEnd, maxAppointmentsPerSlot = 3, holidayMap = new Map()) {
     const dayMap = {};
     const now = new Date();
 
@@ -574,6 +617,7 @@ function transformToMonthlyStructure(flatData, gridStart, gridEnd, maxAppointmen
         const dateKey = item.calendarDate;
 
         if (!dayMap[dateKey]) {
+            const holiday = holidayMap.get(dateKey);
             dayMap[dateKey] = {
                 date: dateKey,
                 dayName: item.dayName,
@@ -582,7 +626,11 @@ function transformToMonthlyStructure(flatData, gridStart, gridEnd, maxAppointmen
                 appointmentCount: 0,
                 totalSlots: 0,
                 availableSlots: 0,
-                bookedSlots: 0
+                bookedSlots: 0,
+                isHoliday: !!holiday,
+                holidayId: holiday ? holiday.ID : null,
+                holidayName: holiday ? holiday.HolidayName : null,
+                holidayDescription: holiday ? holiday.Description : null
             };
         }
 
@@ -622,7 +670,8 @@ function transformToMonthlyStructure(flatData, gridStart, gridEnd, maxAppointmen
     const allDays = [];
 
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const dateKey = d.toISOString().split('T')[0];
+        // Use local date format to avoid timezone shifts
+        const dateKey = formatLocalDate(d);
 
         if (dayMap[dateKey]) {
             // Calculate utilization
@@ -633,7 +682,8 @@ function transformToMonthlyStructure(flatData, gridStart, gridEnd, maxAppointmen
             dayMap[dateKey].utilizationPercent = utilization;
             allDays.push(dayMap[dateKey]);
         } else {
-            // Empty day
+            // Empty day - check if it's a holiday
+            const holiday = holidayMap.get(dateKey);
             allDays.push({
                 date: dateKey,
                 dayName: d.toLocaleDateString('en-US', { weekday: 'short' }),
@@ -643,7 +693,11 @@ function transformToMonthlyStructure(flatData, gridStart, gridEnd, maxAppointmen
                 totalSlots: 0,
                 availableSlots: 0,
                 bookedSlots: 0,
-                utilizationPercent: 0
+                utilizationPercent: 0,
+                isHoliday: !!holiday,
+                holidayId: holiday ? holiday.ID : null,
+                holidayName: holiday ? holiday.HolidayName : null,
+                holidayDescription: holiday ? holiday.Description : null
             });
         }
     }
@@ -830,6 +884,21 @@ router.get('/month-availability', async (req, res) => {
             })
         );
 
+        // Fetch holidays for the date range
+        const holidays = await getHolidaysInRange(startDate, endDate);
+        const holidayMap = {};
+        holidays.forEach(h => {
+            // Use local date components to avoid timezone conversion issues
+            const dateStr = h.Holidaydate instanceof Date
+                ? formatLocalDate(h.Holidaydate)
+                : String(h.Holidaydate).split('T')[0];
+            holidayMap[dateStr] = {
+                id: h.ID,
+                name: h.HolidayName,
+                description: h.Description
+            };
+        });
+
         // Transform data
         const structuredData = transformToCalendarStructure(calendarData, maxAppointmentsPerSlot);
 
@@ -860,21 +929,28 @@ router.get('/month-availability', async (req, res) => {
                 }
             });
 
+            // Check if this day is a holiday
+            const holiday = holidayMap[day.date];
+
             availability[day.date] = {
                 availableCount,
                 totalCount,
                 appointmentCount,
-                hasAvailability: availableCount > 0
+                hasAvailability: availableCount > 0,
+                isHoliday: !!holiday,
+                holidayName: holiday ? holiday.name : null,
+                holidayDescription: holiday ? holiday.description : null
             };
         });
 
-        logger.info(`✅ Month availability calculated for ${Object.keys(availability).length} days`);
+        logger.info(`✅ Month availability calculated for ${Object.keys(availability).length} days, ${holidays.length} holidays`);
 
         res.json({
             success: true,
             startDate,
             endDate,
             availability,
+            holidays: holidayMap,
             maxAppointmentsPerSlot
         });
 

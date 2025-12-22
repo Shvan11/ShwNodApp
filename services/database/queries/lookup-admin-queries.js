@@ -118,6 +118,30 @@ const LOOKUP_TABLE_CONFIG = {
             { name: 'is_active', label: 'Active', type: 'bit', required: false },
             { name: 'sort_order', label: 'Sort Order', type: 'int', required: false }
         ]
+    },
+    tblImplantManufacturer: {
+        tableName: 'tblImplantManufacturer',
+        idColumn: 'ID',
+        displayColumn: 'ManufacturerName',
+        displayName: 'Implant Manufacturers',
+        icon: 'fas fa-industry',
+        idType: 'int',
+        columns: [
+            { name: 'ManufacturerName', label: 'Manufacturer Name', type: 'nvarchar', maxLength: 255, required: true }
+        ]
+    },
+    tblHolidays: {
+        tableName: 'tblHolidays',
+        idColumn: 'ID',
+        displayColumn: 'HolidayName',
+        displayName: 'Holidays',
+        icon: 'fas fa-calendar-times',
+        idType: 'int',
+        columns: [
+            { name: 'Holidaydate', label: 'Date', type: 'date', required: true },
+            { name: 'HolidayName', label: 'Holiday Name', type: 'nvarchar', maxLength: 100, required: true },
+            { name: 'Description', label: 'Description', type: 'nvarchar', maxLength: 255, required: false }
+        ]
     }
 };
 
@@ -132,7 +156,8 @@ function mapSqlType(typeStr) {
         'varchar': TYPES.VarChar,
         'nvarchar': TYPES.NVarChar,
         'bit': TYPES.Bit,
-        'uniqueidentifier': TYPES.UniqueIdentifier
+        'uniqueidentifier': TYPES.UniqueIdentifier,
+        'date': TYPES.Date
     };
     return typeMap[typeStr] || TYPES.NVarChar;
 }

@@ -12,6 +12,7 @@ import { log } from '../../utils/logger.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
 import { getReferralSources, getPatientTypes, getAddresses, getGenders } from '../../services/database/queries/patient-queries.js';
 import { getAlertTypes } from '../../services/database/queries/alert-queries.js';
+import { getImplantManufacturers } from '../../services/database/queries/work-queries.js';
 
 const router = express.Router();
 
@@ -82,6 +83,20 @@ router.get('/alert-types', async (req, res) => {
     } catch (error) {
         log.error('Error fetching alert types:', error);
         return ErrorResponses.internalError(res, 'Failed to fetch alert types', error);
+    }
+});
+
+/**
+ * GET /implant-manufacturers
+ * Fetch all available implant manufacturers for dropdown population
+ */
+router.get('/implant-manufacturers', async (req, res) => {
+    try {
+        const manufacturers = await getImplantManufacturers();
+        res.json(manufacturers);
+    } catch (error) {
+        log.error('Error fetching implant manufacturers:', error);
+        return ErrorResponses.internalError(res, 'Failed to fetch implant manufacturers', error);
     }
 });
 

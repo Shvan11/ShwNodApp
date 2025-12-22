@@ -112,6 +112,20 @@ const AppointmentForm = ({ patientId, onClose, onSuccess }) => {
 
             if (!response.ok) {
                 const errorData = await response.json();
+
+                // Handle holiday conflict specifically
+                if (errorData.code === 'HOLIDAY_CONFLICT') {
+                    const holidayName = errorData.details?.holidayName || 'Holiday';
+                    setError(`Cannot create appointment: ${holidayName} is a holiday. No appointments are allowed on this date.`);
+                    return;
+                }
+
+                // Handle other conflict types
+                if (errorData.code === 'APPOINTMENT_CONFLICT') {
+                    setError('Patient already has an appointment on this date.');
+                    return;
+                }
+
                 throw new Error(errorData.error || 'Failed to create appointment');
             }
 

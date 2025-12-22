@@ -135,6 +135,8 @@ export const getWorkDetailsList = async (workId) => {
             wi.WorkingLength,
             wi.ImplantLength,
             wi.ImplantDiameter,
+            wi.ImplantManufacturerID,
+            im.ManufacturerName AS ImplantManufacturerName,
             wi.Material,
             wi.LabName,
             wi.ItemCost,
@@ -146,9 +148,11 @@ export const getWorkDetailsList = async (workId) => {
         FROM tblWorkItems wi
         LEFT JOIN tblWorkItemTeeth wit ON wi.ID = wit.WorkItemID
         LEFT JOIN tblToothNumber tn ON wit.ToothID = tn.ID
+        LEFT JOIN tblImplantManufacturer im ON wi.ImplantManufacturerID = im.ID
         WHERE wi.WorkID = @WorkID
         GROUP BY wi.ID, wi.WorkID, wi.FillingType, wi.FillingDepth,
                  wi.CanalsNo, wi.WorkingLength, wi.ImplantLength, wi.ImplantDiameter,
+                 wi.ImplantManufacturerID, im.ManufacturerName,
                  wi.Material, wi.LabName, wi.ItemCost, wi.StartDate, wi.CompletedDate, wi.Note
         ORDER BY wi.ID`,
         [['WorkID', TYPES.Int, workId]],
@@ -176,11 +180,11 @@ export const addWorkDetail = async (workDetailData) => {
     const result = await executeQuery(
         `INSERT INTO tblWorkItems (
             WorkID, FillingType, FillingDepth, CanalsNo, WorkingLength,
-            ImplantLength, ImplantDiameter, Material, LabName,
+            ImplantLength, ImplantDiameter, ImplantManufacturerID, Material, LabName,
             ItemCost, StartDate, CompletedDate, Note
         ) VALUES (
             @WorkID, @FillingType, @FillingDepth, @CanalsNo, @WorkingLength,
-            @ImplantLength, @ImplantDiameter, @Material, @LabName,
+            @ImplantLength, @ImplantDiameter, @ImplantManufacturerID, @Material, @LabName,
             @ItemCost, @StartDate, @CompletedDate, @Note
         );
         SELECT SCOPE_IDENTITY() as ID;`,
@@ -192,6 +196,7 @@ export const addWorkDetail = async (workDetailData) => {
             ['WorkingLength', TYPES.NVarChar, workDetailData.WorkingLength || null],
             ['ImplantLength', TYPES.Decimal, workDetailData.ImplantLength || null],
             ['ImplantDiameter', TYPES.Decimal, workDetailData.ImplantDiameter || null],
+            ['ImplantManufacturerID', TYPES.Int, workDetailData.ImplantManufacturerID || null],
             ['Material', TYPES.NVarChar, workDetailData.Material || null],
             ['LabName', TYPES.NVarChar, workDetailData.LabName || null],
             ['ItemCost', TYPES.Int, workDetailData.ItemCost || null],
@@ -226,6 +231,7 @@ export const updateWorkDetail = async (detailId, workDetailData) => {
             WorkingLength = @WorkingLength,
             ImplantLength = @ImplantLength,
             ImplantDiameter = @ImplantDiameter,
+            ImplantManufacturerID = @ImplantManufacturerID,
             Material = @Material,
             LabName = @LabName,
             ItemCost = @ItemCost,
@@ -241,6 +247,7 @@ export const updateWorkDetail = async (detailId, workDetailData) => {
             ['WorkingLength', TYPES.NVarChar, workDetailData.WorkingLength || null],
             ['ImplantLength', TYPES.Decimal, workDetailData.ImplantLength || null],
             ['ImplantDiameter', TYPES.Decimal, workDetailData.ImplantDiameter || null],
+            ['ImplantManufacturerID', TYPES.Int, workDetailData.ImplantManufacturerID || null],
             ['Material', TYPES.NVarChar, workDetailData.Material || null],
             ['LabName', TYPES.NVarChar, workDetailData.LabName || null],
             ['ItemCost', TYPES.Int, workDetailData.ItemCost || null],
@@ -781,6 +788,23 @@ export const getWorkItemTeeth = async (workItemId) => {
             });
             return tooth;
         }
+    );
+};
+
+/**
+ * Get all implant manufacturers for dropdown
+ * @returns {Promise<Array>} Array of manufacturer objects {id, name}
+ */
+export const getImplantManufacturers = async () => {
+    return executeQuery(
+        `SELECT ID as id, ManufacturerName as name
+        FROM tblImplantManufacturer
+        ORDER BY ManufacturerName`,
+        [],
+        (columns) => ({
+            id: columns[0].value,
+            name: columns[1].value
+        })
     );
 };
 

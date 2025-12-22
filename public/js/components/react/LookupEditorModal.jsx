@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
- * Modal for adding/editing lookup table items
- * Dynamically generates form fields based on column configuration
+ * Positioned modal for adding/editing lookup table items
+ * Appears next to the anchor element (edit button or add button)
  */
-const LookupEditorModal = ({ isOpen, onClose, onSave, columns, editingItem, tableName, idColumn }) => {
+const LookupEditorModal = ({ isOpen, onClose, onSave, columns, editingItem, tableName, idColumn, anchorEl }) => {
     const [formData, setFormData] = useState({});
     const [errors, setErrors] = useState({});
     const [isSaving, setIsSaving] = useState(false);
+    const [position, setPosition] = useState(null);
+    const modalRef = useRef(null);
 
     // Initialize form data when modal opens or editingItem changes
     useEffect(() => {
@@ -30,6 +33,63 @@ const LookupEditorModal = ({ isOpen, onClose, onSave, columns, editingItem, tabl
             setErrors({});
         }
     }, [isOpen, editingItem, columns]);
+
+    // Calculate position - runs synchronously before paint to prevent flicker
+    const calculatePosition = (anchor) => {
+        if (!anchor) return null;
+
+        const rect = anchor.getBoundingClientRect();
+        const modalWidth = 420;
+        const modalHeight = 400;
+        const padding = 12;
+
+        let left = rect.left - modalWidth - padding;
+        let top = rect.top;
+
+        if (left < padding) {
+            left = rect.right + padding;
+        }
+
+        if (left + modalWidth > window.innerWidth - padding) {
+            left = Math.max(padding, window.innerWidth - modalWidth - padding);
+        }
+
+        if (top + modalHeight > window.innerHeight - padding) {
+            top = Math.max(padding, window.innerHeight - modalHeight - padding);
+        }
+        top = Math.max(padding, top);
+
+        return { top, left };
+    };
+
+    // Position modal next to anchor element - useLayoutEffect prevents flicker
+    useLayoutEffect(() => {
+        if (!isOpen || !anchorEl) {
+            setPosition(null);
+            return;
+        }
+
+        setPosition(calculatePosition(anchorEl));
+
+        const updatePosition = () => setPosition(calculatePosition(anchorEl));
+        window.addEventListener('resize', updatePosition);
+        window.addEventListener('scroll', updatePosition, true);
+
+        return () => {
+            window.removeEventListener('resize', updatePosition);
+            window.removeEventListener('scroll', updatePosition, true);
+        };
+    }, [isOpen, anchorEl]);
+
+    // Close on escape key
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleEscape = (e) => {
+            if (e.key === 'Escape' && !isSaving) onClose();
+        };
+        document.addEventListener('keydown', handleEscape);
+        return () => document.removeEventListener('keydown', handleEscape);
+    }, [isOpen, isSaving, onClose]);
 
     const handleInputChange = (columnName, value) => {
         setFormData(prev => ({
@@ -94,8 +154,8 @@ const LookupEditorModal = ({ isOpen, onClose, onSave, columns, editingItem, tabl
         }
     };
 
-    const handleOverlayClick = (e) => {
-        if (e.target === e.currentTarget && !isSaving) {
+    const handleBackdropClick = () => {
+        if (!isSaving) {
             onClose();
         }
     };
@@ -125,6 +185,24 @@ const LookupEditorModal = ({ isOpen, onClose, onSave, columns, editingItem, tabl
                         type="number"
                         id={inputId}
                         value={value}
+                        onChange={(e) => handleInputChange(column.name, e.target.value)}
+                        disabled={isSaving}
+                        className={errors[column.name] ? 'input-error' : ''}
+                    />
+                );
+
+            case 'date':
+                // Format date value for input (YYYY-MM-DD)
+                const dateValue = value ? (
+                    value instanceof Date
+                        ? value.toISOString().split('T')[0]
+                        : String(value).split('T')[0]
+                ) : '';
+                return (
+                    <input
+                        type="date"
+                        id={inputId}
+                        value={dateValue}
                         onChange={(e) => handleInputChange(column.name, e.target.value)}
                         disabled={isSaving}
                         className={errors[column.name] ? 'input-error' : ''}
@@ -162,21 +240,27 @@ const LookupEditorModal = ({ isOpen, onClose, onSave, columns, editingItem, tabl
         }
     };
 
-    if (!isOpen) return null;
+    if (!isOpen || !position) return null;
 
     const isEditMode = !!editingItem;
     const singularName = tableName.endsWith('s') ? tableName.slice(0, -1) : tableName;
 
-    return (
-        <div className="modal lookup-editor-modal" onClick={handleOverlayClick}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
+    return createPortal(
+        <>
+            <div className="popover-backdrop" onClick={handleBackdropClick} />
+            <div
+                ref={modalRef}
+                className="lookup-editor-popover"
+                style={{ top: position.top, left: position.left }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="popover-header">
                     <h3>
                         <i className={isEditMode ? 'fas fa-edit' : 'fas fa-plus'}></i>
                         {isEditMode ? `Edit ${singularName}` : `Add ${singularName}`}
                     </h3>
                     <button
-                        className="modal-close"
+                        className="popover-close"
                         onClick={onClose}
                         disabled={isSaving}
                         type="button"
@@ -186,7 +270,7 @@ const LookupEditorModal = ({ isOpen, onClose, onSave, columns, editingItem, tabl
                 </div>
 
                 <form onSubmit={handleSubmit}>
-                    <div className="modal-body">
+                    <div className="popover-body">
                         {columns.map(column => (
                             <div
                                 key={column.name}
@@ -211,10 +295,10 @@ const LookupEditorModal = ({ isOpen, onClose, onSave, columns, editingItem, tabl
                         ))}
                     </div>
 
-                    <div className="modal-footer">
+                    <div className="popover-footer">
                         <button
                             type="button"
-                            className="btn btn-secondary"
+                            className="btn btn-secondary btn-sm"
                             onClick={onClose}
                             disabled={isSaving}
                         >
@@ -222,7 +306,7 @@ const LookupEditorModal = ({ isOpen, onClose, onSave, columns, editingItem, tabl
                         </button>
                         <button
                             type="submit"
-                            className="btn btn-primary"
+                            className="btn btn-primary btn-sm"
                             disabled={isSaving}
                         >
                             {isSaving ? (
@@ -240,7 +324,8 @@ const LookupEditorModal = ({ isOpen, onClose, onSave, columns, editingItem, tabl
                     </div>
                 </form>
             </div>
-        </div>
+        </>,
+        document.body
     );
 };
 

@@ -176,6 +176,8 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
             const isSelected = selectedDate && date.toDateString() === selectedDate.toDateString();
             const hasAvailability = availability.availableCount > 0;
             const appointmentCount = availability.appointmentCount || 0;
+            const isHoliday = availability.isHoliday || false;
+            const holidayName = availability.holidayName || null;
 
             days.push({
                 date,
@@ -186,7 +188,9 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                 isSelected,
                 hasAvailability,
                 availableCount: availability.availableCount,
-                appointmentCount: appointmentCount
+                appointmentCount: appointmentCount,
+                isHoliday,
+                holidayName
             });
         }
 
@@ -249,24 +253,41 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                             return <div key={`empty-${index}`} className="calendar-day empty"></div>;
                         }
 
+                        // Holiday days are not clickable
+                        const isClickable = !dayInfo.isPast && dayInfo.hasAvailability && !dayInfo.isHoliday;
+
                         const classes = [
                             'calendar-day',
                             dayInfo.isPast && 'past',
                             dayInfo.isToday && 'today',
                             dayInfo.isSelected && 'selected',
-                            dayInfo.hasAvailability && 'has-slots',
-                            !dayInfo.isPast && dayInfo.hasAvailability && 'clickable'
+                            dayInfo.isHoliday && 'holiday',
+                            dayInfo.hasAvailability && !dayInfo.isHoliday && 'has-slots',
+                            isClickable && 'clickable'
                         ].filter(Boolean).join(' ');
+
+                        // Build tooltip
+                        let tooltip = '';
+                        if (dayInfo.isHoliday) {
+                            tooltip = dayInfo.holidayName || 'Holiday';
+                        } else if (dayInfo.appointmentCount > 0) {
+                            tooltip = `${dayInfo.appointmentCount} appointments`;
+                        } else {
+                            tooltip = 'No appointments';
+                        }
 
                         return (
                             <div
                                 key={dayInfo.dateStr}
                                 className={classes}
-                                onClick={() => !dayInfo.isPast && dayInfo.hasAvailability && handleDateClick(dayInfo.date)}
-                                title={dayInfo.appointmentCount > 0 ? `${dayInfo.appointmentCount} appointments` : 'No appointments'}
+                                onClick={() => isClickable && handleDateClick(dayInfo.date)}
+                                title={tooltip}
                             >
                                 <span className="day-num">{dayInfo.day}</span>
-                                {dayInfo.appointmentCount > 0 && !dayInfo.isPast && (
+                                {dayInfo.isHoliday && (
+                                    <span className="holiday-indicator"><i className="fas fa-star"></i></span>
+                                )}
+                                {dayInfo.appointmentCount > 0 && !dayInfo.isPast && !dayInfo.isHoliday && (
                                     <span className="slot-count">{dayInfo.appointmentCount}</span>
                                 )}
                             </div>

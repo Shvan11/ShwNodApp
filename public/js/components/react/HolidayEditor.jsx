@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import LookupEditorModal from './LookupEditorModal.jsx';
 
 /**
- * Positioned delete confirmation popover
- * Appears next to the delete button instead of center screen
+ * Positioned delete confirmation popover for holidays
  */
 const DeleteConfirmPopover = ({ anchorEl, itemName, onCancel, onConfirm }) => {
     const [position, setPosition] = useState(null);
@@ -15,8 +14,8 @@ const DeleteConfirmPopover = ({ anchorEl, itemName, onCancel, onConfirm }) => {
         if (!anchor) return null;
 
         const rect = anchor.getBoundingClientRect();
-        const popoverWidth = 280;
-        const popoverHeight = 160;
+        const popoverWidth = 300;
+        const popoverHeight = 180;
         const padding = 8;
 
         let left = rect.left - popoverWidth - padding;
@@ -53,7 +52,6 @@ const DeleteConfirmPopover = ({ anchorEl, itemName, onCancel, onConfirm }) => {
         };
     }, [anchorEl]);
 
-    // Close on escape key
     useEffect(() => {
         const handleEscape = (e) => {
             if (e.key === 'Escape') onCancel();
@@ -78,7 +76,7 @@ const DeleteConfirmPopover = ({ anchorEl, itemName, onCancel, onConfirm }) => {
                 </div>
                 <div className="popover-body">
                     <p>Delete <strong>{itemName}</strong>?</p>
-                    <p className="text-muted">This cannot be undone.</p>
+                    <p className="text-muted">This will allow appointments on this date again.</p>
                 </div>
                 <div className="popover-actions">
                     <button type="button" className="btn btn-sm btn-secondary" onClick={onCancel}>
@@ -95,10 +93,11 @@ const DeleteConfirmPopover = ({ anchorEl, itemName, onCancel, onConfirm }) => {
 };
 
 /**
- * Reusable component for editing any lookup table
- * Displays items in a table with search, add, edit, and delete functionality
+ * Specialized editor for holidays table
+ * Extends LookupEditor with appointment warning functionality
+ * Shows existing appointments when adding a holiday on a date with scheduled appointments
  */
-const LookupEditor = ({ tableKey, tableName, columns, idColumn }) => {
+const HolidayEditor = ({ tableKey, tableName, columns, idColumn }) => {
     const toast = useToast();
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -108,7 +107,11 @@ const LookupEditor = ({ tableKey, tableName, columns, idColumn }) => {
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [anchorEl, setAnchorEl] = useState(null);
     const [deleteAnchorEl, setDeleteAnchorEl] = useState(null);
-    const addButtonRef = useRef(null);
+
+    // Appointment warning state
+    const [appointmentWarning, setAppointmentWarning] = useState(null);
+    const [pendingHolidayData, setPendingHolidayData] = useState(null);
+    const [checkingAppointments, setCheckingAppointments] = useState(false);
 
     const loadItems = useCallback(async () => {
         try {
@@ -170,21 +173,69 @@ const LookupEditor = ({ tableKey, tableName, columns, idColumn }) => {
             });
 
             if (response.ok) {
-                toast.success('Item deleted successfully');
+                toast.success('Holiday deleted successfully');
                 loadItems();
             } else {
                 const error = await response.json();
-                toast.error(error.error || 'Failed to delete item');
+                toast.error(error.error || 'Failed to delete holiday');
             }
         } catch (error) {
-            toast.error('Error deleting item');
+            toast.error('Error deleting holiday');
         } finally {
             setDeleteConfirm(null);
             setDeleteAnchorEl(null);
         }
     };
 
+    // Check for appointments on the selected date
+    const checkAppointmentsOnDate = async (date) => {
+        try {
+            setCheckingAppointments(true);
+            const response = await fetch(`/api/holidays/appointments-on-date?date=${date}`);
+            const data = await response.json();
+
+            if (data.success && data.count > 0) {
+                return {
+                    date,
+                    appointments: data.appointments,
+                    count: data.count
+                };
+            }
+            return null;
+        } catch (error) {
+            console.error('Error checking appointments:', error);
+            return null;
+        } finally {
+            setCheckingAppointments(false);
+        }
+    };
+
+    // Modified save handler with appointment checking
     const handleSave = async (data) => {
+        // If editing, skip appointment check (date can't change the appointment status)
+        // Or if we've already confirmed via warning modal
+        if (editingItem || pendingHolidayData) {
+            await saveHoliday(data);
+            return;
+        }
+
+        // For new holidays, check if there are existing appointments
+        const holidayDate = data.Holidaydate;
+        if (holidayDate) {
+            const warning = await checkAppointmentsOnDate(holidayDate);
+            if (warning) {
+                setAppointmentWarning(warning);
+                setPendingHolidayData(data);
+                return; // Don't save yet, show warning first
+            }
+        }
+
+        // No appointments, save directly
+        await saveHoliday(data);
+    };
+
+    // Actual save function
+    const saveHoliday = async (data) => {
         try {
             const isEdit = !!editingItem;
             const method = isEdit ? 'PUT' : 'POST';
@@ -200,17 +251,32 @@ const LookupEditor = ({ tableKey, tableName, columns, idColumn }) => {
             });
 
             if (response.ok) {
-                toast.success(isEdit ? 'Item updated successfully' : 'Item created successfully');
+                toast.success(isEdit ? 'Holiday updated successfully' : 'Holiday created successfully');
                 setModalOpen(false);
                 setAnchorEl(null);
+                setAppointmentWarning(null);
+                setPendingHolidayData(null);
                 loadItems();
             } else {
                 const error = await response.json();
-                toast.error(error.error || 'Failed to save item');
+                toast.error(error.error || 'Failed to save holiday');
             }
         } catch (error) {
-            toast.error('Error saving item');
+            toast.error('Error saving holiday');
         }
+    };
+
+    // Handle confirmation from warning modal
+    const handleConfirmWithAppointments = async () => {
+        if (pendingHolidayData) {
+            await saveHoliday(pendingHolidayData);
+        }
+    };
+
+    // Handle cancel from warning modal
+    const handleCancelWarning = () => {
+        setAppointmentWarning(null);
+        setPendingHolidayData(null);
     };
 
     // Filter items based on search term
@@ -224,10 +290,27 @@ const LookupEditor = ({ tableKey, tableName, columns, idColumn }) => {
         });
     });
 
-    // Get display value for a cell
+    // Format date for display
+    const formatDate = (dateValue) => {
+        if (!dateValue) return '-';
+        const date = new Date(dateValue);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
+    // Get display value for a cell (specialized for holidays)
     const getCellValue = (item, column) => {
         const value = item[column.name];
         if (value === null || value === undefined) return '-';
+
+        // Format date columns
+        if (column.type === 'date') {
+            return formatDate(value);
+        }
+
         if (column.type === 'bit') {
             return value ? (
                 <i className="fas fa-check text-success"></i>
@@ -238,21 +321,19 @@ const LookupEditor = ({ tableKey, tableName, columns, idColumn }) => {
         return String(value);
     };
 
-    // Get the primary display column (first column usually)
+    // Get the primary display column
     const getDisplayValue = (item) => {
-        if (columns.length === 0) return 'Item';
-        const displayCol = columns[0];
-        return item[displayCol.name] || 'Unnamed';
+        return item.HolidayName || 'Unnamed Holiday';
     };
 
     return (
-        <div className="lookup-editor">
+        <div className="lookup-editor holiday-editor">
             <div className="lookup-editor-toolbar">
                 <div className="search-box">
                     <i className="fas fa-search"></i>
                     <input
                         type="text"
-                        placeholder={`Search ${tableName}...`}
+                        placeholder="Search holidays..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -266,12 +347,8 @@ const LookupEditor = ({ tableKey, tableName, columns, idColumn }) => {
                         </button>
                     )}
                 </div>
-                <button
-                    ref={addButtonRef}
-                    className="btn btn-primary btn-sm"
-                    onClick={handleAdd}
-                >
-                    <i className="fas fa-plus"></i> Add New
+                <button className="btn btn-primary btn-sm" onClick={handleAdd}>
+                    <i className="fas fa-plus"></i> Add Holiday
                 </button>
             </div>
 
@@ -299,12 +376,12 @@ const LookupEditor = ({ tableKey, tableName, columns, idColumn }) => {
                                         {searchTerm ? (
                                             <>
                                                 <i className="fas fa-search"></i>
-                                                <span>No items match your search</span>
+                                                <span>No holidays match your search</span>
                                             </>
                                         ) : (
                                             <>
-                                                <i className="fas fa-inbox"></i>
-                                                <span>No items found</span>
+                                                <i className="fas fa-calendar-times"></i>
+                                                <span>No holidays defined</span>
                                             </>
                                         )}
                                     </td>
@@ -340,7 +417,7 @@ const LookupEditor = ({ tableKey, tableName, columns, idColumn }) => {
 
                     <div className="lookup-table-footer">
                         <span className="item-count">
-                            {filteredItems.length} of {items.length} items
+                            {filteredItems.length} of {items.length} holidays
                         </span>
                     </div>
                 </div>
@@ -358,6 +435,73 @@ const LookupEditor = ({ tableKey, tableName, columns, idColumn }) => {
                 anchorEl={anchorEl}
             />
 
+            {/* Appointment Warning Modal */}
+            {appointmentWarning && (
+                <div className="modal appointment-warning-modal" onClick={handleCancelWarning}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header warning-header">
+                            <h3>
+                                <i className="fas fa-exclamation-triangle"></i>
+                                Existing Appointments Found
+                            </h3>
+                            <button className="modal-close" onClick={handleCancelWarning} type="button">
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <p className="warning-text">
+                                There are <strong>{appointmentWarning.count}</strong> appointment(s)
+                                scheduled on <strong>{formatDate(appointmentWarning.date)}</strong>.
+                            </p>
+                            <p className="warning-subtext">
+                                Adding this date as a holiday will NOT automatically cancel these appointments.
+                                You may need to contact these patients to reschedule:
+                            </p>
+                            <div className="appointment-list">
+                                {appointmentWarning.appointments.slice(0, 10).map((apt, idx) => (
+                                    <div key={idx} className="appointment-item">
+                                        <span className="patient-name">
+                                            <i className="fas fa-user"></i>
+                                            {apt.PatientName}
+                                        </span>
+                                        <span className="appointment-detail">{apt.AppDetail}</span>
+                                        <span className="appointment-time">
+                                            {new Date(apt.AppDate).toLocaleTimeString('en-US', {
+                                                hour: 'numeric',
+                                                minute: '2-digit'
+                                            })}
+                                        </span>
+                                    </div>
+                                ))}
+                                {appointmentWarning.count > 10 && (
+                                    <div className="appointment-item more-items">
+                                        <span>... and {appointmentWarning.count - 10} more</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={handleCancelWarning}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-warning"
+                                onClick={handleConfirmWithAppointments}
+                                disabled={checkingAppointments}
+                            >
+                                <i className="fas fa-calendar-times"></i>
+                                Add Holiday Anyway
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Delete Confirmation Popover */}
             {deleteConfirm && deleteAnchorEl && (
                 <DeleteConfirmPopover
@@ -371,4 +515,4 @@ const LookupEditor = ({ tableKey, tableName, columns, idColumn }) => {
     );
 };
 
-export default LookupEditor;
+export default HolidayEditor;

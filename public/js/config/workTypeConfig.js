@@ -86,13 +86,14 @@ export const WORK_TYPE_FIELDS = {
         ]
     },
 
-    // Implant: tooth, length, diameter, notes
+    // Implant: tooth, manufacturer, length, diameter, notes
     [WORK_TYPE_IDS.IMPLANT]: {
         name: 'Implant',
         icon: 'fas fa-screw',
-        fields: ['teeth', 'implantLength', 'implantDiameter', 'note'],
+        fields: ['teeth', 'implantManufacturer', 'implantLength', 'implantDiameter', 'note'],
         displayFields: [
             { key: 'Teeth', label: 'Tooth Position' },
+            { key: 'ImplantManufacturerName', label: 'Manufacturer' },
             { key: 'ImplantLength', label: 'Length (mm)' },
             { key: 'ImplantDiameter', label: 'Diameter (mm)' },
             { key: 'Note', label: 'Notes' }

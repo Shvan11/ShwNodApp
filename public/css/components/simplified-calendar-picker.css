@@ -283,6 +283,31 @@
     justify-content: center;
 }
 
+/* Holiday day styling */
+.appointment-form-page .calendar-day.holiday {
+    background: var(--error-50);
+    color: var(--error-600);
+    border: 2px solid var(--error-300);
+    cursor: not-allowed;
+}
+
+.appointment-form-page .calendar-day.holiday:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.appointment-form-page .holiday-indicator {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    color: var(--error-500);
+    font-size: 8px;
+}
+
+.appointment-form-page .holiday-indicator i {
+    filter: drop-shadow(0 0 1px rgba(0,0,0,0.3));
+}
+
 .appointment-form-page .today-btn {
     background: var(--gray-50);
     border: none;

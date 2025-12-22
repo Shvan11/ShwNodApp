@@ -22,11 +22,38 @@ const CalendarHeader = ({
     showEarlySlots,
     onToggleEarlySlots
 }) => {
-    
+
+    // Context-aware button text and tooltip based on view mode
+    const getTodayButtonText = () => {
+        switch (viewMode) {
+            case 'day': return 'Today';
+            case 'month': return 'This Month';
+            default: return 'This Week';
+        }
+    };
+
+    const getTodayButtonTitle = () => {
+        switch (viewMode) {
+            case 'day': return 'Go to today';
+            case 'month': return 'Go to current month';
+            default: return 'Go to current week';
+        }
+    };
+
     return (
         <div className="calendar-header">
             {/* Week navigation section */}
             <div className="calendar-navigation">
+                <button
+                    className="today-button"
+                    onClick={onTodayClick}
+                    disabled={loading}
+                    title={getTodayButtonTitle()}
+                    aria-label={getTodayButtonTitle()}
+                >
+                    {getTodayButtonText()}
+                </button>
+
                 <button
                     className="nav-button prev-week"
                     onClick={onPreviousWeek}
@@ -36,20 +63,11 @@ const CalendarHeader = ({
                 >
                     <i className="fas fa-chevron-left" />
                 </button>
-                
+
                 <div className="week-display">
                     <h2 className="week-text">{weekDisplayText}</h2>
-                    <button
-                        className="today-button"
-                        onClick={onTodayClick}
-                        disabled={loading}
-                        title="Go to current week"
-                        aria-label="Navigate to current week"
-                    >
-                        Today
-                    </button>
                 </div>
-                
+
                 <button
                     className="nav-button next-week"
                     onClick={onNextWeek}

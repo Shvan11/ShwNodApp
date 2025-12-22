@@ -3,6 +3,8 @@ import CalendarGrid from './CalendarGrid.jsx'
 import CalendarHeader from './CalendarHeader.jsx'
 import MonthlyCalendarGrid from './MonthlyCalendarGrid.jsx'
 import CalendarContextMenu from './CalendarContextMenu.jsx'
+import CalendarDayContextMenu from './CalendarDayContextMenu.jsx'
+import HolidayQuickModal from './HolidayQuickModal.jsx'
 import Notification from './appointments/Notification.jsx'
 import { useToast } from '../../contexts/ToastContext.jsx';
 
@@ -37,6 +39,11 @@ const AppointmentCalendar = ({
     // Context menu and delete confirmation state
     const [contextMenu, setContextMenu] = useState(null); // { position: {x, y}, appointment }
     const [deleteConfirmation, setDeleteConfirmation] = useState(null); // appointment to delete
+
+    // Day context menu and holiday modal state
+    const [dayContextMenu, setDayContextMenu] = useState(null); // { position: {x, y}, day }
+    const [holidayModal, setHolidayModal] = useState(null); // { date, existingHoliday, appointmentWarning }
+    const [deleteHolidayConfirm, setDeleteHolidayConfirm] = useState(null); // day to remove holiday from
 
     // Use external selected slot if provided (for controlled mode)
     const selectedSlot = externalSelectedSlot || internalSelectedSlot;
@@ -291,6 +298,120 @@ const AppointmentCalendar = ({
         setViewMode('day');
     }, []);
 
+    // Handler for right-clicking on a day in monthly view (holiday management)
+    const handleDayContextMenu = useCallback((day, event) => {
+        setDayContextMenu({
+            position: { x: event.clientX, y: event.clientY },
+            day
+        });
+    }, []);
+
+    // Close day context menu
+    const handleCloseDayContextMenu = useCallback(() => {
+        setDayContextMenu(null);
+    }, []);
+
+    // Add holiday from context menu
+    const handleAddHoliday = useCallback(async (day) => {
+        // Check for existing appointments on this date
+        try {
+            const response = await fetch(`/api/holidays/appointments-on-date?date=${day.date}`);
+            const data = await response.json();
+
+            setHolidayModal({
+                date: day.date,
+                existingHoliday: null,
+                appointmentWarning: data.success && data.count > 0 ? data : null
+            });
+        } catch (error) {
+            // If check fails, still allow adding holiday
+            setHolidayModal({
+                date: day.date,
+                existingHoliday: null,
+                appointmentWarning: null
+            });
+        }
+    }, []);
+
+    // Edit holiday from context menu
+    const handleEditHoliday = useCallback((day) => {
+        setHolidayModal({
+            date: day.date,
+            existingHoliday: {
+                ID: day.holidayId,
+                HolidayName: day.holidayName,
+                Description: day.holidayDescription
+            },
+            appointmentWarning: null
+        });
+    }, []);
+
+    // Remove holiday from context menu
+    const handleRemoveHoliday = useCallback((day) => {
+        setDeleteHolidayConfirm(day);
+    }, []);
+
+    // Close holiday modal
+    const handleCloseHolidayModal = useCallback(() => {
+        setHolidayModal(null);
+    }, []);
+
+    // Save holiday (add or update)
+    const handleSaveHoliday = useCallback(async ({ date, holidayName, description, existingId }) => {
+        try {
+            const isEdit = !!existingId;
+            const url = isEdit
+                ? `/api/admin/lookups/tblHolidays/${existingId}`
+                : '/api/admin/lookups/tblHolidays';
+
+            const response = await fetch(url, {
+                method: isEdit ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    Holidaydate: date,
+                    HolidayName: holidayName,
+                    Description: description
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to save holiday');
+            }
+
+            toast.success(isEdit ? 'Holiday updated' : 'Holiday added');
+            setHolidayModal(null);
+
+            // Refresh calendar to show updated holidays
+            await fetchCalendarData(currentDate, selectedDoctorId);
+        } catch (error) {
+            toast.error(error.message || 'Failed to save holiday');
+        }
+    }, [currentDate, selectedDoctorId, fetchCalendarData, toast]);
+
+    // Confirm delete holiday
+    const handleDeleteHolidayConfirm = useCallback(async () => {
+        if (!deleteHolidayConfirm?.holidayId) return;
+
+        try {
+            const response = await fetch(`/api/admin/lookups/tblHolidays/${deleteHolidayConfirm.holidayId}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to remove holiday');
+            }
+
+            toast.success('Holiday removed');
+            setDeleteHolidayConfirm(null);
+
+            // Refresh calendar
+            await fetchCalendarData(currentDate, selectedDoctorId);
+        } catch (error) {
+            toast.error(error.message || 'Failed to remove holiday');
+        }
+    }, [deleteHolidayConfirm, currentDate, selectedDoctorId, fetchCalendarData, toast]);
+
     // Handler for delete action from context menu
     const handleDeleteRequest = useCallback((appointment) => {
         setDeleteConfirmation(appointment);
@@ -398,6 +519,7 @@ const AppointmentCalendar = ({
                 <MonthlyCalendarGrid
                     calendarData={calendarData}
                     onDayClick={handleDayClick}
+                    onDayContextMenu={handleDayContextMenu}
                     currentDate={currentDate}
                     mode={mode}
                 />
@@ -406,6 +528,7 @@ const AppointmentCalendar = ({
                     calendarData={calendarData}
                     selectedSlot={selectedSlot}
                     onSlotClick={handleSlotClick}
+                    onDayContextMenu={handleDayContextMenu}
                     mode={mode}
                     viewMode={viewMode}
                     showOnlyAvailable={showOnlyAvailable}
@@ -447,6 +570,60 @@ const AppointmentCalendar = ({
                                 onClick={handleDeleteConfirm}
                             >
                                 <i className="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Day Context Menu (for holiday management) */}
+            {dayContextMenu && (
+                <CalendarDayContextMenu
+                    position={dayContextMenu.position}
+                    day={dayContextMenu.day}
+                    onClose={handleCloseDayContextMenu}
+                    onAddHoliday={handleAddHoliday}
+                    onEditHoliday={handleEditHoliday}
+                    onRemoveHoliday={handleRemoveHoliday}
+                />
+            )}
+
+            {/* Holiday Quick Modal */}
+            <HolidayQuickModal
+                isOpen={!!holidayModal}
+                onClose={handleCloseHolidayModal}
+                onSave={handleSaveHoliday}
+                date={holidayModal?.date}
+                existingHoliday={holidayModal?.existingHoliday}
+                appointmentWarning={holidayModal?.appointmentWarning}
+            />
+
+            {/* Delete Holiday Confirmation Modal */}
+            {deleteHolidayConfirm && (
+                <div className="modal-overlay" onClick={() => setDeleteHolidayConfirm(null)}>
+                    <div className="modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
+                        <h3>
+                            <i className="fas fa-exclamation-triangle"></i> Remove Holiday
+                        </h3>
+                        <p>
+                            Are you sure you want to remove{' '}
+                            <strong>{deleteHolidayConfirm.holidayName || 'this holiday'}</strong>?
+                        </p>
+                        <p className="text-muted">
+                            This will allow appointments to be scheduled on this date again.
+                        </p>
+                        <div className="modal-actions">
+                            <button
+                                className="btn btn-cancel"
+                                onClick={() => setDeleteHolidayConfirm(null)}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-delete"
+                                onClick={handleDeleteHolidayConfirm}
+                            >
+                                <i className="fas fa-trash"></i> Remove Holiday
                             </button>
                         </div>
                     </div>

@@ -1,0 +1,388 @@
+/**
+ * Calendar Holidays Styling
+ *
+ * Styles for holiday display in calendar views and related components.
+ */
+
+/* ============================================
+   Monthly Calendar Holiday Styles
+   ============================================ */
+
+.month-day-cell.holiday {
+    background-color: var(--error-50, #fef2f2);
+    border-color: var(--error-200, #fecaca);
+    cursor: not-allowed;
+    opacity: 0.9;
+}
+
+.month-day-cell.holiday:hover {
+    background-color: var(--error-100, #fee2e2);
+    transform: none; /* Disable hover lift effect */
+}
+
+.month-day-cell.holiday .month-day-number {
+    color: var(--error-600, #dc2626);
+}
+
+.holiday-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    color: var(--error-500, #ef4444);
+    font-size: var(--font-size-sm, 0.875rem);
+}
+
+/* Holiday tooltip */
+.day-tooltip.holiday-tooltip {
+    background-color: var(--error-50, #fef2f2);
+    border: 1px solid var(--error-200, #fecaca);
+}
+
+.day-tooltip .holiday-header {
+    color: var(--error-600, #dc2626);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm, 0.5rem);
+}
+
+.day-tooltip .tooltip-holiday-name {
+    font-weight: 600;
+    color: var(--error-700, #b91c1c);
+    padding: var(--spacing-sm, 0.5rem) 0;
+}
+
+.day-tooltip .tooltip-holiday-info {
+    font-size: var(--font-size-sm, 0.875rem);
+    color: var(--error-500, #ef4444);
+    font-style: italic;
+}
+
+/* ============================================
+   Weekly Calendar (CalendarGrid) Holiday Styles
+   ============================================ */
+
+.day-column.holiday {
+    background-color: var(--error-50, #fef2f2);
+}
+
+.day-column.holiday .day-header {
+    background-color: var(--error-100, #fee2e2);
+    border-bottom-color: var(--error-200, #fecaca);
+}
+
+.day-holiday-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--error-500, #ef4444);
+    font-size: var(--font-size-sm, 0.875rem);
+    margin-left: auto;
+}
+
+/* ============================================
+   TimeSlot Holiday Styles
+   ============================================ */
+
+.time-slot.holiday {
+    background-color: var(--error-50, #fef2f2);
+    background-image: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 8px,
+        var(--error-100, #fee2e2) 8px,
+        var(--error-100, #fee2e2) 16px
+    );
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.time-slot.holiday::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    pointer-events: none;
+}
+
+/* ============================================
+   HolidayEditor Appointment Warning Modal
+   ============================================ */
+
+.appointment-warning-modal .modal-content {
+    max-width: 500px;
+}
+
+.appointment-warning-modal .warning-header {
+    background-color: var(--warning-100, #fef3c7);
+    border-bottom: 2px solid var(--warning-400, #fbbf24);
+    color: var(--warning-800, #92400e);
+}
+
+.appointment-warning-modal .warning-header i {
+    color: var(--warning-600, #d97706);
+}
+
+.appointment-warning-modal .warning-text {
+    color: var(--warning-700, #b45309);
+    font-weight: 500;
+    margin-bottom: var(--spacing-sm, 0.5rem);
+}
+
+.appointment-warning-modal .warning-subtext {
+    color: var(--text-secondary, #6b7280);
+    font-size: var(--font-size-sm, 0.875rem);
+    margin-bottom: var(--spacing-md, 1rem);
+}
+
+.appointment-warning-modal .appointment-list {
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: var(--radius-md, 0.375rem);
+    background-color: var(--background-secondary, #f9fafb);
+}
+
+.appointment-warning-modal .appointment-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm, 0.5rem);
+    padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
+    border-bottom: 1px solid var(--border-light, #f3f4f6);
+}
+
+.appointment-warning-modal .appointment-item:last-child {
+    border-bottom: none;
+}
+
+.appointment-warning-modal .appointment-item.more-items {
+    font-style: italic;
+    color: var(--text-muted, #9ca3af);
+    justify-content: center;
+}
+
+.appointment-warning-modal .patient-name {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs, 0.25rem);
+    font-weight: 500;
+    color: var(--text-primary, #111827);
+    flex: 1;
+}
+
+.appointment-warning-modal .patient-name i {
+    color: var(--primary-color, #3b82f6);
+    font-size: var(--font-size-xs, 0.75rem);
+}
+
+.appointment-warning-modal .appointment-detail {
+    color: var(--text-secondary, #6b7280);
+    font-size: var(--font-size-sm, 0.875rem);
+}
+
+.appointment-warning-modal .appointment-time {
+    color: var(--text-muted, #9ca3af);
+    font-size: var(--font-size-sm, 0.875rem);
+    white-space: nowrap;
+}
+
+/* ============================================
+   SimplifiedCalendarPicker Holiday Styles
+   ============================================ */
+
+.simplified-calendar .calendar-day.holiday {
+    background-color: var(--error-50, #fef2f2);
+    border-color: var(--error-200, #fecaca);
+    color: var(--error-600, #dc2626);
+    cursor: not-allowed;
+}
+
+.simplified-calendar .calendar-day.holiday:hover {
+    background-color: var(--error-100, #fee2e2);
+}
+
+.simplified-calendar .calendar-day.holiday.disabled {
+    pointer-events: none;
+}
+
+/* ============================================
+   Settings/Lookup Holiday Table Styles
+   ============================================ */
+
+.holiday-editor .lookup-table td:first-child + td {
+    /* Date column styling */
+    font-weight: 500;
+}
+
+/* Make the date column more prominent */
+.holiday-editor .lookup-table tbody tr td:nth-child(2) {
+    white-space: nowrap;
+}
+
+/* ============================================
+   Calendar Day Context Menu (Holiday Management)
+   ============================================ */
+
+.calendar-day-context-menu {
+    min-width: 180px;
+}
+
+.calendar-day-context-menu .context-menu-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm, 0.5rem);
+    padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
+    font-size: var(--font-size-sm, 0.875rem);
+    font-weight: 600;
+    color: var(--text-primary, #111827);
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    margin-bottom: var(--spacing-xs, 0.25rem);
+}
+
+.calendar-day-context-menu .context-menu-header i {
+    color: var(--primary-color, #3b82f6);
+}
+
+.calendar-day-context-menu .context-menu-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm, 0.5rem);
+    padding: var(--spacing-xs, 0.25rem) var(--spacing-md, 1rem);
+    font-size: var(--font-size-sm, 0.875rem);
+    color: var(--text-secondary, #6b7280);
+    background-color: var(--background-secondary, #f9fafb);
+    border-radius: var(--radius-sm, 0.25rem);
+    margin: 0 var(--spacing-xs, 0.25rem) var(--spacing-xs, 0.25rem);
+}
+
+.calendar-day-context-menu .context-menu-info.holiday-info {
+    background-color: var(--error-50, #fef2f2);
+    color: var(--error-600, #dc2626);
+}
+
+.calendar-day-context-menu .context-menu-info.holiday-info i {
+    color: var(--error-500, #ef4444);
+}
+
+.calendar-day-context-menu .context-menu-info i {
+    width: 16px;
+    text-align: center;
+    font-size: var(--font-size-xs, 0.75rem);
+}
+
+/* ============================================
+   Holiday Quick Modal (Calendar Add/Edit)
+   ============================================ */
+
+.holiday-quick-modal .modal-content {
+    max-width: 400px;
+}
+
+.holiday-quick-modal .modal-header h3 {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm, 0.5rem);
+}
+
+.holiday-quick-modal .modal-header h3 i {
+    color: var(--error-500, #ef4444);
+}
+
+.holiday-date-display {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm, 0.5rem);
+    padding: var(--spacing-md, 1rem);
+    background-color: var(--background-secondary, #f9fafb);
+    border-radius: var(--radius-md, 0.375rem);
+    border: 1px solid var(--border-color, #e5e7eb);
+    margin-bottom: var(--spacing-md, 1rem);
+    font-weight: 500;
+    color: var(--text-primary, #111827);
+}
+
+.holiday-date-display i {
+    color: var(--primary-color, #3b82f6);
+}
+
+.holiday-warning-banner {
+    display: flex;
+    gap: var(--spacing-md, 1rem);
+    padding: var(--spacing-md, 1rem);
+    background-color: var(--warning-50, #fffbeb);
+    border: 1px solid var(--warning-200, #fde68a);
+    border-radius: var(--radius-md, 0.375rem);
+    margin-bottom: var(--spacing-md, 1rem);
+}
+
+.holiday-warning-banner .warning-icon {
+    flex-shrink: 0;
+    color: var(--warning-500, #f59e0b);
+    font-size: 1.25rem;
+}
+
+.holiday-warning-banner .warning-content {
+    flex: 1;
+    font-size: var(--font-size-sm, 0.875rem);
+    color: var(--warning-800, #92400e);
+}
+
+.holiday-warning-banner .warning-content strong {
+    color: var(--warning-700, #b45309);
+}
+
+.holiday-warning-banner .warning-note {
+    font-size: var(--font-size-xs, 0.75rem);
+    color: var(--warning-600, #d97706);
+    margin-top: var(--spacing-xs, 0.25rem);
+    font-style: italic;
+}
+
+.holiday-warning-banner .warning-appointment {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs, 0.25rem);
+    font-size: var(--font-size-xs, 0.75rem);
+    color: var(--warning-700, #b45309);
+    margin-top: var(--spacing-xs, 0.25rem);
+    padding-left: var(--spacing-sm, 0.5rem);
+}
+
+.holiday-warning-banner .warning-appointment i {
+    font-size: 0.625rem;
+}
+
+.holiday-warning-banner .warning-more {
+    font-size: var(--font-size-xs, 0.75rem);
+    color: var(--warning-600, #d97706);
+    font-style: italic;
+    margin-top: var(--spacing-xs, 0.25rem);
+    padding-left: var(--spacing-sm, 0.5rem);
+}
+
+/* Allow right-click cursor on holiday days */
+.month-day-cell.holiday {
+    cursor: context-menu;
+}
+
+/* Visual indicator for right-clickable days */
+.month-day-cell:not(.other-month)::before {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 0 6px 6px;
+    border-color: transparent transparent var(--gray-200, #e5e7eb) transparent;
+    opacity: 0;
+    transition: opacity var(--transition-fast, 0.15s);
+}
+
+.month-day-cell:not(.other-month):hover::before {
+    opacity: 1;
+}

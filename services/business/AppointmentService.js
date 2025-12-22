@@ -15,6 +15,7 @@
 import { log } from '../../utils/logger.js';
 import * as database from '../database/index.js';
 import { getDailyAppointmentsOptimized } from '../database/queries/appointment-queries.js';
+import { isDateHoliday } from '../database/queries/holiday-queries.js';
 
 /**
  * Validation error class for appointment business logic
@@ -115,6 +116,29 @@ export async function checkAppointmentConflict(personID, appDate) {
 }
 
 /**
+ * Check if appointment date falls on a holiday
+ * @param {string} appDate - Appointment date
+ * @throws {AppointmentValidationError} If date is a holiday
+ */
+export async function checkHolidayConflict(appDate) {
+    // Extract date portion (YYYY-MM-DD)
+    const dateOnly = appDate.split('T')[0];
+
+    const holiday = await isDateHoliday(dateOnly);
+    if (holiday) {
+        throw new AppointmentValidationError(
+            `Cannot create appointment on ${holiday.HolidayName} (${dateOnly})`,
+            'HOLIDAY_CONFLICT',
+            {
+                holidayId: holiday.ID,
+                holidayName: holiday.HolidayName,
+                holidayDate: holiday.Holidaydate
+            }
+        );
+    }
+}
+
+/**
  * Format current date/time for appointment operations
  * @returns {Object} Formatted date strings
  */
@@ -149,6 +173,9 @@ export async function validateAndCreateAppointment(appointmentData) {
 
     // Validate required fields
     validateAppointmentRequiredFields(appointmentData);
+
+    // Check if date is a holiday (block appointments on holidays)
+    await checkHolidayConflict(AppDate);
 
     // Verify doctor exists and is actually a doctor
     const doctor = await verifyDoctor(DrID);
@@ -285,6 +312,9 @@ export async function quickCheckIn(checkInData) {
 
     // Scenario 3: No appointment exists - create new with Present time
 
+    // Check if today is a holiday (block walk-in appointments on holidays)
+    await checkHolidayConflict(dateTime);
+
     // If doctor ID provided, verify it's valid
     if (doctorId) {
         await verifyDoctor(doctorId);
@@ -413,6 +443,7 @@ export default {
     validateAndCreateAppointment,
     verifyDoctor,
     checkAppointmentConflict,
+    checkHolidayConflict,
     quickCheckIn,
     getDailyAppointments,
     AppointmentValidationError

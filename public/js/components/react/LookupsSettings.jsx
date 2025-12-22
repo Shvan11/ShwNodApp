@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import LookupEditor from './LookupEditor.jsx';
+import HolidayEditor from './HolidayEditor.jsx';
 
 // Import component-specific CSS
 import '../../../css/components/lookup-editor.css';
@@ -43,9 +44,14 @@ const LookupsSettings = ({ onChangesUpdate }) => {
     // Group tables by category for better organization
     const tableGroups = [
         {
+            name: 'Scheduling',
+            icon: 'fas fa-calendar-alt',
+            keys: ['tblHolidays']
+        },
+        {
             name: 'Clinical',
             icon: 'fas fa-stethoscope',
-            keys: ['tblWorkType', 'tblKeyWord', 'tblDetail']
+            keys: ['tblWorkType', 'tblKeyWord', 'tblDetail', 'tblImplantManufacturer']
         },
         {
             name: 'Patient Information',
@@ -129,12 +135,21 @@ const LookupsSettings = ({ onChangesUpdate }) => {
 
                                         {expandedTable === table.key && (
                                             <div className="lookup-accordion-content">
-                                                <LookupEditor
-                                                    tableKey={table.key}
-                                                    tableName={table.displayName}
-                                                    columns={table.columns}
-                                                    idColumn={table.idColumn}
-                                                />
+                                                {table.key === 'tblHolidays' ? (
+                                                    <HolidayEditor
+                                                        tableKey={table.key}
+                                                        tableName={table.displayName}
+                                                        columns={table.columns}
+                                                        idColumn={table.idColumn}
+                                                    />
+                                                ) : (
+                                                    <LookupEditor
+                                                        tableKey={table.key}
+                                                        tableName={table.displayName}
+                                                        columns={table.columns}
+                                                        idColumn={table.idColumn}
+                                                    />
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -178,12 +193,21 @@ const LookupsSettings = ({ onChangesUpdate }) => {
 
                                         {expandedTable === table.key && (
                                             <div className="lookup-accordion-content">
-                                                <LookupEditor
-                                                    tableKey={table.key}
-                                                    tableName={table.displayName}
-                                                    columns={table.columns}
-                                                    idColumn={table.idColumn}
-                                                />
+                                                {table.key === 'tblHolidays' ? (
+                                                    <HolidayEditor
+                                                        tableKey={table.key}
+                                                        tableName={table.displayName}
+                                                        columns={table.columns}
+                                                        idColumn={table.idColumn}
+                                                    />
+                                                ) : (
+                                                    <LookupEditor
+                                                        tableKey={table.key}
+                                                        tableName={table.displayName}
+                                                        columns={table.columns}
+                                                        idColumn={table.idColumn}
+                                                    />
+                                                )}
                                             </div>
                                         )}
                                     </div>

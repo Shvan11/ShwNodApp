@@ -7,7 +7,7 @@
 
 import React, { useCallback, useMemo } from 'react'
 
-const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view', showOnlyAvailable = false }) => {
+const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view', showOnlyAvailable = false, isHoliday = false, holidayName = null }) => {
     const {
         date,
         time,
@@ -19,42 +19,54 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view',
         appDetail,
         patientName
     } = slotData;
-    
+
     // Determine slot appearance classes - SUPPORTS MULTIPLE APPOINTMENTS
     const slotClass = useMemo(() => {
         const classes = ['time-slot'];
-        
+
+        // Holiday slots get special styling
+        if (isHoliday) {
+            classes.push('holiday');
+            classes.push('non-selectable');
+            return classes.join(' ');
+        }
+
         // Count valid appointments
-        const validAppointmentsCount = appointments.filter(appointment => 
+        const validAppointmentsCount = appointments.filter(appointment =>
             appointment && (appointment.patientName || appointment.appointmentID)
         ).length;
-        
+
         // Add status classes for scheduling decisions
         classes.push(slotStatus); // available, booked (all slots are clickable regardless of status)
-        
+
         if (isSelected) classes.push('selected');
         if (validAppointmentsCount > 0) classes.push('scheduled');
-        
+
         // Add multiple appointments indicator
         if (validAppointmentsCount > 1) classes.push('multiple-appointments');
         if (validAppointmentsCount > 2) classes.push('many-appointments');
-        
+
         // Add selection mode classes
         if (mode === 'selection') {
             classes.push('selection-mode');
-            
+
             if (slotStatus === 'available') {
                 classes.push('selectable');
             } else {
                 classes.push('non-selectable');
             }
         }
-        
+
         return classes.join(' ');
-    }, [slotStatus, isSelected, appointments, mode]);
+    }, [slotStatus, isSelected, appointments, mode, isHoliday]);
     
     // Click handler
     const handleClick = useCallback((event) => {
+        // Block clicks on holidays
+        if (isHoliday) {
+            return;
+        }
+
         // In selection mode, only allow clicking on available slots
         if (mode === 'selection' && slotStatus !== 'available') {
             return;
@@ -62,7 +74,7 @@ const TimeSlot = ({ slotData, onClick, isSelected, uniformHeight, mode = 'view',
 
         // In view mode, always allow clicks (for context menu)
         onClick(slotData, event);
-    }, [onClick, slotData, slotStatus, mode]);
+    }, [onClick, slotData, slotStatus, mode, isHoliday]);
     
     // Render appointment content - SUPPORTS MULTIPLE APPOINTMENTS
     const renderAppointmentContent = () => {
