@@ -17,7 +17,7 @@ const CalendarContextMenu = ({ position, appointments, onClose, onDelete }) => {
     const isSingleAppointment = appointments.length === 1;
     const appointment = isSingleAppointment ? appointments[0] : selectedAppointment;
 
-    // Close on click outside
+    // Close on click outside - use mousedown for more reliable detection
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -25,14 +25,14 @@ const CalendarContextMenu = ({ position, appointments, onClose, onDelete }) => {
             }
         };
 
-        // Add a small delay to prevent immediate closing
-        const timeoutId = setTimeout(() => {
-            document.addEventListener('click', handleClickOutside);
-        }, 100);
+        // Add listener on next frame to avoid catching the opening click
+        const frameId = requestAnimationFrame(() => {
+            document.addEventListener('mousedown', handleClickOutside);
+        });
 
         return () => {
-            clearTimeout(timeoutId);
-            document.removeEventListener('click', handleClickOutside);
+            cancelAnimationFrame(frameId);
+            document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [onClose]);
 
@@ -56,7 +56,8 @@ const CalendarContextMenu = ({ position, appointments, onClose, onDelete }) => {
         };
     }, [onClose, selectedAppointment]);
 
-    const handleEdit = () => {
+    const handleEdit = (e) => {
+        e.stopPropagation();
         if (appointment?.PersonID && appointment?.appointmentID) {
             navigate(`/patient/${appointment.PersonID}/edit-appointment/${appointment.appointmentID}`, {
                 state: { appointment }
@@ -65,7 +66,8 @@ const CalendarContextMenu = ({ position, appointments, onClose, onDelete }) => {
         onClose();
     };
 
-    const handleDelete = () => {
+    const handleDelete = (e) => {
+        e.stopPropagation();
         onDelete(appointment);
         onClose();
     };
@@ -75,7 +77,8 @@ const CalendarContextMenu = ({ position, appointments, onClose, onDelete }) => {
         setSelectedAppointment(apt);
     };
 
-    const handleBack = () => {
+    const handleBack = (e) => {
+        e.stopPropagation();
         setSelectedAppointment(null);
     };
 

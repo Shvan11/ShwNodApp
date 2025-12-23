@@ -78,7 +78,7 @@ const HolidayQuickModal = ({
     };
 
     return (
-        <div className="modal holiday-quick-modal" onClick={handleOverlayClick}>
+        <div className="modal-overlay holiday-quick-modal" onClick={handleOverlayClick}>
             <div className="modal-content modal-sm" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
                     <h3>

@@ -236,7 +236,7 @@ const GeneralSettings = ({ onChangesUpdate }) => {
 
             {/* Modal */}
             {modal.show && (
-                <div className="modal" onClick={hideModal}>
+                <div className="modal-overlay" onClick={hideModal}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3>{modal.title}</h3>

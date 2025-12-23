@@ -127,7 +127,7 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }) {
     const modalTitle = isEditMode ? 'Edit Expense' : 'Add New Expense';
 
     return (
-        <div className="modal active" onClick={handleClose}>
+        <div className="modal-overlay" onClick={handleClose}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
                     <h2>{modalTitle}</h2>

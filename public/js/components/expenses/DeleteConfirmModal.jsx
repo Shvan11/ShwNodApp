@@ -20,7 +20,7 @@ export default function DeleteConfirmModal({ isOpen, expense, onConfirm, onCance
     const currency = (expense.Currency || '').trim();
 
     return (
-        <div className="modal active" onClick={onCancel}>
+        <div className="modal-overlay" onClick={onCancel}>
             <div className="modal-content modal-sm" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
                     <h2>Delete Expense</h2>

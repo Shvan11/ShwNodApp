@@ -16,7 +16,7 @@ const CalendarDayContextMenu = ({
     const menuRef = useRef(null);
     const isHoliday = day?.isHoliday;
 
-    // Close on click outside
+    // Close on click outside - use mousedown for more reliable detection
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -24,14 +24,14 @@ const CalendarDayContextMenu = ({
             }
         };
 
-        // Add a small delay to prevent immediate closing
-        const timeoutId = setTimeout(() => {
-            document.addEventListener('click', handleClickOutside);
-        }, 100);
+        // Add listener on next frame to avoid catching the opening right-click
+        const frameId = requestAnimationFrame(() => {
+            document.addEventListener('mousedown', handleClickOutside);
+        });
 
         return () => {
-            clearTimeout(timeoutId);
-            document.removeEventListener('click', handleClickOutside);
+            cancelAnimationFrame(frameId);
+            document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [onClose]);
 
@@ -73,17 +73,20 @@ const CalendarDayContextMenu = ({
         });
     };
 
-    const handleAddHoliday = () => {
+    const handleAddHoliday = (e) => {
+        e.stopPropagation();
         onAddHoliday(day);
         onClose();
     };
 
-    const handleEditHoliday = () => {
+    const handleEditHoliday = (e) => {
+        e.stopPropagation();
         onEditHoliday(day);
         onClose();
     };
 
-    const handleRemoveHoliday = () => {
+    const handleRemoveHoliday = (e) => {
+        e.stopPropagation();
         onRemoveHoliday(day);
         onClose();
     };

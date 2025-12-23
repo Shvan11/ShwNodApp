@@ -437,7 +437,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }) => {
 
             {/* Appointment Warning Modal */}
             {appointmentWarning && (
-                <div className="modal appointment-warning-modal" onClick={handleCancelWarning}>
+                <div className="modal-overlay appointment-warning-modal" onClick={handleCancelWarning}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header warning-header">
                             <h3>

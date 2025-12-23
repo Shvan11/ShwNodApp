@@ -277,7 +277,7 @@
    Holiday Quick Modal (Calendar Add/Edit)
    ============================================ */
 
-.holiday-quick-modal .modal-content {
+.modal-overlay.holiday-quick-modal .modal-content {
     max-width: 400px;
 }
 
