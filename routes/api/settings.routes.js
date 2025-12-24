@@ -40,6 +40,48 @@ router.get("/options", async (req, res) => {
 });
 
 /**
+ * Bulk update multiple options
+ * PUT /api/options/bulk
+ * NOTE: This route must come BEFORE /options/:optionName to avoid matching "bulk" as optionName
+ */
+router.put("/options/bulk", async (req, res) => {
+    try {
+        const { options } = req.body;
+
+        if (!options || !Array.isArray(options)) {
+            return ErrorResponses.invalidParameter(res, 'options', { reason: 'Options array is required' });
+        }
+
+        const result = await bulkUpdateOptions(options);
+        res.json({
+            status: 'success',
+            message: 'Bulk update completed',
+            updated: result.updated,
+            failed: result.failed
+        });
+    } catch (error) {
+        log.error("Error bulk updating options:", error);
+        return ErrorResponses.internalError(res, 'Failed to bulk update options', error);
+    }
+});
+
+/**
+ * Get options matching a pattern
+ * GET /api/options/pattern/:pattern
+ * NOTE: This route must come BEFORE /options/:optionName to avoid matching "pattern" as optionName
+ */
+router.get("/options/pattern/:pattern", async (req, res) => {
+    try {
+        const { pattern } = req.params;
+        const options = await getOptionsByPattern(pattern);
+        res.json({ status: 'success', options });
+    } catch (error) {
+        log.error("Error getting options by pattern:", error);
+        return ErrorResponses.internalError(res, 'Failed to retrieve options by pattern', error);
+    }
+});
+
+/**
  * Get a specific option by name
  * GET /api/options/:optionName
  */
@@ -82,46 +124,6 @@ router.put("/options/:optionName", async (req, res) => {
     } catch (error) {
         log.error("Error updating option:", error);
         return ErrorResponses.internalError(res, 'Failed to update option', error);
-    }
-});
-
-/**
- * Get options matching a pattern
- * GET /api/options/pattern/:pattern
- */
-router.get("/options/pattern/:pattern", async (req, res) => {
-    try {
-        const { pattern } = req.params;
-        const options = await getOptionsByPattern(pattern);
-        res.json({ status: 'success', options });
-    } catch (error) {
-        log.error("Error getting options by pattern:", error);
-        return ErrorResponses.internalError(res, 'Failed to retrieve options by pattern', error);
-    }
-});
-
-/**
- * Bulk update multiple options
- * PUT /api/options/bulk
- */
-router.put("/options/bulk", async (req, res) => {
-    try {
-        const { options } = req.body;
-
-        if (!options || !Array.isArray(options)) {
-            return ErrorResponses.invalidParameter(res, 'options', { reason: 'Options array is required' });
-        }
-
-        const result = await bulkUpdateOptions(options);
-        res.json({
-            status: 'success',
-            message: 'Bulk update completed',
-            updated: result.updated,
-            failed: result.failed
-        });
-    } catch (error) {
-        log.error("Error bulk updating options:", error);
-        return ErrorResponses.internalError(res, 'Failed to bulk update options', error);
     }
 });
 

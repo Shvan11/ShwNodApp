@@ -809,107 +809,60 @@ router.delete('/aligner/sets/:setId/pdf', async (req, res) => {
 
 /**
  * Generate printable aligner labels PDF
- * Creates a PDF with labels for a specific batch
- * Supports fully customizable labels from the preview modal
+ *
+ * All labels are "rich labels" - each label contains its own patient/doctor info.
+ * This unified format works for both single-batch and multi-batch (queue) printing.
+ *
+ * Request body:
+ * - labels: Array of rich label objects (required)
+ *   - text: string (e.g., "U1/L1")
+ *   - patientName: string
+ *   - doctorName: string (optional)
+ *   - includeLogo: boolean
+ * - startingPosition: number 1-12 (required)
+ * - arabicFont: 'cairo' | 'noto' (optional, default 'cairo')
  */
 router.post('/aligner/labels/generate', async (req, res) => {
     try {
-        const {
-            batchId,
-            startingPosition,
-            patientName,
-            doctorName: customDoctorName,
-            doctorId,
-            includeLogo = true,
-            arabicFont = 'cairo',
-            // Custom labels array (e.g., ["U1/L1", "U2/L2", "U3", "L4"])
-            customLabels
-        } = req.body;
+        const { labels, startingPosition, arabicFont = 'cairo' } = req.body;
 
-        // Validate required fields
-        if (!batchId || isNaN(parseInt(batchId))) {
-            return ErrorResponses.invalidParameter(res, 'batchId', 'Valid batchId is required');
+        // Validate labels array
+        if (!labels || !Array.isArray(labels) || labels.length === 0) {
+            return ErrorResponses.invalidParameter(res, 'labels', 'Labels array is required and cannot be empty');
         }
 
-        if (!startingPosition || isNaN(parseInt(startingPosition))) {
-            return ErrorResponses.invalidParameter(res, 'startingPosition', 'Starting position (1-12) is required');
+        // Validate starting position
+        if (!startingPosition || !Number.isInteger(startingPosition) || startingPosition < 1 || startingPosition > 12) {
+            return ErrorResponses.invalidParameter(res, 'startingPosition', 'Starting position must be between 1 and 12');
         }
 
-        if (!patientName || patientName.trim() === '') {
-            return ErrorResponses.invalidParameter(res, 'patientName', 'Patient name is required');
-        }
-
-        if (!doctorId || isNaN(parseInt(doctorId))) {
-            return ErrorResponses.invalidParameter(res, 'doctorId', 'Valid doctorId is required');
-        }
-
-        // Validate custom labels if provided
-        if (customLabels && (!Array.isArray(customLabels) || customLabels.length === 0)) {
-            return ErrorResponses.invalidParameter(res, 'customLabels', 'Custom labels must be a non-empty array');
+        // Validate each label has required fields
+        for (let i = 0; i < labels.length; i++) {
+            const label = labels[i];
+            if (!label.text) {
+                return ErrorResponses.invalidParameter(res, `labels[${i}].text`, 'Label text is required');
+            }
+            if (!label.patientName) {
+                return ErrorResponses.invalidParameter(res, `labels[${i}].patientName`, 'Patient name is required');
+            }
         }
 
         log.info('Generating aligner labels', {
-            batchId,
+            totalLabels: labels.length,
             startingPosition,
-            patientName,
-            doctorId,
-            includeLogo,
-            customLabelsCount: customLabels ? customLabels.length : 'using batch ranges'
+            arabicFont
         });
 
-        // 1. Get batch data (only needed if not using custom labels)
-        const batches = await alignerQueries.getBatchById(parseInt(batchId));
-        if (!batches || batches.length === 0) {
-            return ErrorResponses.notFound(res, 'Aligner batch');
-        }
-        const batch = batches[0];
+        // Generate PDF
+        const result = await labelGenerator.generate({
+            labels,
+            startingPosition,
+            arabicFont
+        });
 
-        // 2. Get doctor info (for logo path, use custom name if provided)
-        const doctors = await alignerQueries.getDoctorById(parseInt(doctorId));
-        if (!doctors || doctors.length === 0) {
-            return ErrorResponses.notFound(res, 'Doctor');
-        }
-        const doctor = doctors[0];
-
-        // 3. Build label parameters
-        const labelParams = {
-            patientName: patientName.trim(),
-            // Use custom doctor name if provided, otherwise use from DB
-            doctorName: customDoctorName ? customDoctorName.trim() : doctor.DoctorName,
-            startingPosition: parseInt(startingPosition),
-            // Only include logo if flag is true
-            logoPath: includeLogo ? (doctor.LogoPath || null) : null,
-            // Arabic font selection
-            arabicFont: arabicFont,
-        };
-
-        // 4. Handle labels - either custom array or batch ranges
-        if (customLabels && customLabels.length > 0) {
-            // Use custom labels array directly
-            labelParams.customLabels = customLabels;
-            log.info('Using custom labels', { count: customLabels.length, labels: customLabels.slice(0, 5) });
-        } else {
-            // Fall back to batch ranges
-            if (batch.UpperAlignerStartSequence && batch.UpperAlignerEndSequence) {
-                labelParams.upperStart = batch.UpperAlignerStartSequence;
-                labelParams.upperEnd = batch.UpperAlignerEndSequence;
-            }
-            if (batch.LowerAlignerStartSequence && batch.LowerAlignerEndSequence) {
-                labelParams.lowerStart = batch.LowerAlignerStartSequence;
-                labelParams.lowerEnd = batch.LowerAlignerEndSequence;
-            }
-            log.info('Using batch ranges', {
-                upperRange: labelParams.upperStart ? `${labelParams.upperStart}-${labelParams.upperEnd}` : 'none',
-                lowerRange: labelParams.lowerStart ? `${labelParams.lowerStart}-${labelParams.lowerEnd}` : 'none'
-            });
-        }
-
-        // 5. Generate PDF
-        const result = await labelGenerator.generate(labelParams);
-
-        // 6. Send PDF response
-        const safePatientName = patientName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
-        const filename = `Labels_${safePatientName}.pdf`;
+        // Send PDF response
+        const firstPatient = labels[0].patientName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+        const filename = `Labels_${firstPatient}.pdf`;
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="${filename}"`);

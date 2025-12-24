@@ -12,11 +12,13 @@ import PaymentFormDrawer from '../../components/react/PaymentFormDrawer.jsx';
 import LabelPreviewModal from '../../components/react/LabelPreviewModal.jsx';
 import { copyToClipboard } from '../../core/utils.js';
 import { useToast } from '../../contexts/ToastContext.jsx';
+import { usePrintQueue } from '../../contexts/PrintQueueContext.jsx';
 
 const PatientSets = () => {
     const { doctorId, workId } = useParams();
     const navigate = useNavigate();
     const toast = useToast();
+    const { addToQueue, isInQueue, removeByBatchId } = usePrintQueue();
 
     // Determine if we came from doctor browse or direct search
     const isFromDoctorBrowse = doctorId !== undefined;
@@ -673,6 +675,48 @@ const PatientSets = () => {
     const handleCloseLabelModal = () => {
         setShowLabelModal(false);
         setLabelModalData({ batch: null, set: null });
+    };
+
+    // Handle adding batch to print queue
+    const handleToggleQueue = (batch, set, e) => {
+        e.stopPropagation();
+
+        if (!patient || !batch.AlignerBatchID) {
+            toast.error('Missing required information');
+            return;
+        }
+
+        const batchId = batch.AlignerBatchID;
+
+        if (isInQueue(batchId)) {
+            removeByBatchId(batchId);
+            toast.info('Removed from print queue');
+        } else {
+            // Find the doctor info
+            const doctor = doctors.find(d => d.id === set.AlignerDrID) || {
+                id: set.AlignerDrID,
+                name: set.AlignerDoctorName,
+                logoPath: null
+            };
+
+            addToQueue(
+                {
+                    batchId: batch.AlignerBatchID,
+                    batchNumber: batch.BatchSequence,
+                    upperStart: batch.UpperAlignerStartSequence,
+                    upperEnd: batch.UpperAlignerEndSequence,
+                    lowerStart: batch.LowerAlignerStartSequence,
+                    lowerEnd: batch.LowerAlignerEndSequence
+                },
+                {
+                    code: patient.patientID || patient.PersonID,
+                    name: formatPatientName(patient)
+                },
+                doctor,
+                { setId: set.AlignerSetID }
+            );
+            toast.success('Added to print queue');
+        }
     };
 
     // Quick URL handlers
@@ -1811,6 +1855,13 @@ const PatientSets = () => {
                                                                         </button>
                                                                     )}
                                                                     {/* Undo buttons moved to Edit Batch modal */}
+                                                                    <button
+                                                                        className={`action-icon-btn queue-labels ${isInQueue(batch.AlignerBatchID) ? 'in-queue' : ''}`}
+                                                                        onClick={(e) => handleToggleQueue(batch, set, e)}
+                                                                        title={isInQueue(batch.AlignerBatchID) ? 'Remove from print queue' : 'Add to print queue'}
+                                                                    >
+                                                                        <i className={isInQueue(batch.AlignerBatchID) ? 'fas fa-check' : 'fas fa-cart-plus'}></i>
+                                                                    </button>
                                                                     <button
                                                                         className="action-icon-btn print-labels bg-purple"
                                                                         onClick={(e) => handlePrintLabels(batch, set, e)}

@@ -5,8 +5,9 @@
  * Layout: OL291 - 3x4 grid (12 labels per US Letter sheet)
  * Label size: 2.5" x 2.5" (180pt x 180pt)
  *
+ * All labels are "rich labels" containing their own patient/doctor info.
+ *
  * @module AlignerLabelGenerator
- * @version 1.0.0
  */
 
 import PDFDocument from 'pdfkit';
@@ -15,11 +16,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { log } from '../../utils/logger.js';
 
-// Get directory path for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Hardcoded logo path (relative to project root)
+// Default logo path
 const DEFAULT_LOGO_PATH = path.resolve(__dirname, '../../public/shawan logon.png');
 
 // Arabic font paths
@@ -32,31 +32,9 @@ const ARABIC_FONTS = {
 // CONSTANTS - OL291 Label Sheet Specifications
 // =============================================================================
 
-/** Labels per sheet */
 const LABELS_PER_SHEET = 12;
 const LABELS_PER_ROW = 3;
-const LABELS_PER_COL = 4;
 
-/** US Letter page dimensions in points (72 points = 1 inch) */
-const PAGE = {
-    WIDTH: 612,    // 8.5 inches
-    HEIGHT: 792,   // 11 inches
-};
-
-/**
- * OL291 Label dimensions and positioning (in points, 72 points = 1 inch)
- *
- * Official OL291 Specs (US Letter 8.5" x 11"):
- * - Labels per sheet: 12 (3 columns x 4 rows)
- * - Label size: 2.5" x 2.5"
- * - Top margin: 0.25"
- * - Left margin: 0.375"
- * - Horizontal spacing (gap): 0.125"
- * - Vertical spacing (gap): 0.16667"
- * - Corner radius: 0.125"
- * - Horizontal pitch: 2.625" (label width + h gap)
- * - Vertical pitch: 2.66667" (label height + v gap)
- */
 const LABEL = {
     WIDTH: 180,       // 2.5 inches = 180pt
     HEIGHT: 180,      // 2.5 inches = 180pt
@@ -64,19 +42,17 @@ const LABEL = {
     MARGIN_TOP: 18,   // 0.25 inch = 18pt
     GAP_H: 9,         // 0.125 inch = 9pt
     GAP_V: 12,        // 0.16667 inch = 12pt
-    PADDING: 12,      // Internal padding within each label
-    CORNER_RADIUS: 9, // 0.125 inch = 9pt
+    PADDING: 12,
 };
 
-/** Typography settings */
 const TYPOGRAPHY = {
     FONTS: {
         PATIENT_NAME: 14,
         DOCTOR_NAME: 12,
-        SEQUENCE: 16,         // Reduced from 18 to match other text sizes
+        SEQUENCE: 16,
     },
     COLORS: {
-        TEXT: '#000000',      // Pure black for all text
+        TEXT: '#000000',
         BORDER: '#cccccc',
     },
 };
@@ -86,143 +62,7 @@ const TYPOGRAPHY = {
 // =============================================================================
 
 /**
- * Validate label generation parameters
- * @param {Object} params - Parameters to validate
- * @returns {{valid: boolean, error?: string}}
- */
-function validateParams(params) {
-    if (!params.patientName || params.patientName.trim() === '') {
-        return { valid: false, error: 'Patient name is required' };
-    }
-
-    if (!params.doctorName || params.doctorName.trim() === '') {
-        return { valid: false, error: 'Doctor name is required' };
-    }
-
-    const pos = params.startingPosition;
-    if (!Number.isInteger(pos) || pos < 1 || pos > LABELS_PER_SHEET) {
-        return { valid: false, error: `Starting position must be between 1 and ${LABELS_PER_SHEET}` };
-    }
-
-    // If custom labels array is provided, use that instead of ranges
-    if (params.customLabels && Array.isArray(params.customLabels)) {
-        if (params.customLabels.length === 0) {
-            return { valid: false, error: 'Custom labels array cannot be empty' };
-        }
-        return { valid: true };
-    }
-
-    // Otherwise validate ranges
-    const hasUpper = params.upperStart != null && params.upperEnd != null;
-    const hasLower = params.lowerStart != null && params.lowerEnd != null;
-
-    if (!hasUpper && !hasLower) {
-        return { valid: false, error: 'At least one aligner sequence (upper or lower) is required' };
-    }
-
-    if (hasUpper && (params.upperStart < 1 || params.upperEnd < params.upperStart)) {
-        return { valid: false, error: 'Invalid upper aligner range' };
-    }
-
-    if (hasLower && (params.lowerStart < 1 || params.lowerEnd < params.lowerStart)) {
-        return { valid: false, error: 'Invalid lower aligner range' };
-    }
-
-    return { valid: true };
-}
-
-/**
- * Build list of labels from custom array or upper/lower ranges
- * @param {Object} params - Label parameters
- * @returns {Array<{seq: number, type: string, text: string}>}
- */
-function buildLabelQueue(params) {
-    // If custom labels are provided, use them directly
-    if (params.customLabels && Array.isArray(params.customLabels) && params.customLabels.length > 0) {
-        return params.customLabels.map((text, index) => {
-            // Determine type based on text content
-            let type = 'custom';
-            if (text.includes('/')) {
-                type = 'UL';
-            } else if (text.toUpperCase().startsWith('U')) {
-                type = 'U';
-            } else if (text.toUpperCase().startsWith('L')) {
-                type = 'L';
-            }
-            return { seq: index + 1, type, text };
-        });
-    }
-
-    // Otherwise build from upper/lower ranges
-    const labelMap = new Map();
-
-    const hasUpper = params.upperStart != null && params.upperEnd != null;
-    const hasLower = params.lowerStart != null && params.lowerEnd != null;
-
-    // Add upper aligners
-    if (hasUpper) {
-        for (let i = params.upperStart; i <= params.upperEnd; i++) {
-            labelMap.set(i, 'U');
-        }
-    }
-
-    // Add lower aligners (may combine with upper)
-    if (hasLower) {
-        for (let i = params.lowerStart; i <= params.lowerEnd; i++) {
-            if (labelMap.has(i)) {
-                labelMap.set(i, 'UL'); // Both upper and lower
-            } else {
-                labelMap.set(i, 'L');
-            }
-        }
-    }
-
-    // Convert to sorted array
-    const labels = [];
-    const sortedKeys = Array.from(labelMap.keys()).sort((a, b) => a - b);
-
-    for (const seq of sortedKeys) {
-        const type = labelMap.get(seq);
-        let text;
-
-        switch (type) {
-            case 'U':
-                text = `U${seq}`;
-                break;
-            case 'L':
-                text = `L${seq}`;
-                break;
-            case 'UL':
-                text = `U${seq}/L${seq}`;
-                break;
-        }
-
-        labels.push({ seq, type, text });
-    }
-
-    return labels;
-}
-
-/**
- * Calculate X,Y position for a label slot (1-12)
- * @param {number} slot - Slot number (1-12)
- * @returns {{x: number, y: number}}
- */
-function getSlotPosition(slot) {
-    const zeroIndex = slot - 1;
-    const col = zeroIndex % LABELS_PER_ROW;
-    const row = Math.floor(zeroIndex / LABELS_PER_ROW);
-
-    const x = LABEL.MARGIN_LEFT + col * (LABEL.WIDTH + LABEL.GAP_H);
-    const y = LABEL.MARGIN_TOP + row * (LABEL.HEIGHT + LABEL.GAP_V);
-
-    return { x, y };
-}
-
-/**
  * Check if a logo file exists and is readable
- * @param {string} logoPath - Path to logo file
- * @returns {boolean}
  */
 function logoExists(logoPath) {
     if (!logoPath) return false;
@@ -234,132 +74,146 @@ function logoExists(logoPath) {
     }
 }
 
+/**
+ * Get logo path - returns default if provided path doesn't exist
+ */
+function getLogoPath(requestedPath) {
+    if (logoExists(requestedPath)) return requestedPath;
+    if (logoExists(DEFAULT_LOGO_PATH)) return DEFAULT_LOGO_PATH;
+    return null;
+}
+
+/**
+ * Calculate X,Y position for a label slot (1-12)
+ */
+function getSlotPosition(slot) {
+    const zeroIndex = slot - 1;
+    const col = zeroIndex % LABELS_PER_ROW;
+    const row = Math.floor(zeroIndex / LABELS_PER_ROW);
+
+    return {
+        x: LABEL.MARGIN_LEFT + col * (LABEL.WIDTH + LABEL.GAP_H),
+        y: LABEL.MARGIN_TOP + row * (LABEL.HEIGHT + LABEL.GAP_V),
+    };
+}
+
+/**
+ * Detect if text contains Arabic/RTL characters
+ */
+function hasArabic(text) {
+    return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text);
+}
+
+/**
+ * Determine label type from text
+ */
+function getLabelType(text) {
+    if (text.includes('/')) return 'UL';
+    if (text.toUpperCase().startsWith('U')) return 'U';
+    if (text.toUpperCase().startsWith('L')) return 'L';
+    return 'custom';
+}
+
 // =============================================================================
 // LABEL GENERATOR CLASS
 // =============================================================================
 
 class AlignerLabelGenerator {
     constructor(options = {}) {
-        this.showBorders = options.showBorders || false; // Debug: show label borders
+        this.showBorders = options.showBorders || false;
     }
 
     /**
-     * Generate label PDF
-     * @param {Object} params - Label parameters
-     * @param {string} params.patientName - Patient name
-     * @param {string} params.doctorName - Doctor name
+     * Generate label PDF from rich label objects
+     *
+     * @param {Object} params
+     * @param {Array<Object>} params.labels - Array of rich label objects
+     * @param {string} params.labels[].text - Label text (e.g., "U1/L1")
+     * @param {string} params.labels[].patientName - Patient name for this label
+     * @param {string} params.labels[].doctorName - Doctor name for this label
+     * @param {boolean} params.labels[].includeLogo - Whether to show logo on this label
      * @param {number} params.startingPosition - Starting slot (1-12)
-     * @param {number} [params.upperStart] - Upper aligner start sequence
-     * @param {number} [params.upperEnd] - Upper aligner end sequence
-     * @param {number} [params.lowerStart] - Lower aligner start sequence
-     * @param {number} [params.lowerEnd] - Lower aligner end sequence
-     * @param {string} [params.logoPath] - Path to doctor logo
+     * @param {string} [params.arabicFont='cairo'] - Arabic font choice
+     * @param {string} [params.logoPath] - Path to logo file
      * @returns {Promise<{buffer: Buffer, totalLabels: number, totalPages: number, nextPosition: number}>}
      */
     async generate(params) {
+        const { labels, startingPosition, arabicFont = 'cairo', logoPath } = params;
+
         // Validate
-        const validation = validateParams(params);
-        if (!validation.valid) {
-            throw new Error(validation.error);
+        if (!labels || !Array.isArray(labels) || labels.length === 0) {
+            throw new Error('Labels array is required and cannot be empty');
         }
 
-        // Build label queue
-        const labels = buildLabelQueue(params);
-        const totalLabels = labels.length;
-
-        if (totalLabels === 0) {
-            throw new Error('No labels to generate');
+        if (!Number.isInteger(startingPosition) || startingPosition < 1 || startingPosition > LABELS_PER_SHEET) {
+            throw new Error(`Starting position must be between 1 and ${LABELS_PER_SHEET}`);
         }
 
-        // Check logo - only use if explicitly provided (null means user disabled logo)
-        let logoPath = params.logoPath;
-        let hasLogo = false;
-
-        if (logoPath === null || logoPath === undefined || logoPath === false) {
-            // User explicitly chose no logo
-            hasLogo = false;
-            log.info('Logo disabled by user');
-        } else if (!logoExists(logoPath)) {
-            // Logo path provided but file doesn't exist - use default
-            logoPath = DEFAULT_LOGO_PATH;
-            hasLogo = logoExists(logoPath);
-            if (hasLogo) {
-                log.info('Using default logo', { logoPath });
-            } else {
-                log.warn('No logo file found, proceeding without logo');
+        // Validate each label has required fields
+        for (let i = 0; i < labels.length; i++) {
+            const label = labels[i];
+            if (!label.text) {
+                throw new Error(`Label at index ${i} is missing required 'text' field`);
             }
-            params.logoPath = logoPath;
-        } else {
-            // Logo path provided and exists
-            hasLogo = true;
+            if (!label.patientName) {
+                throw new Error(`Label at index ${i} is missing required 'patientName' field`);
+            }
         }
+
+        const totalLabels = labels.length;
+        const resolvedLogoPath = getLogoPath(logoPath);
 
         log.info('Generating aligner labels', {
-            patient: params.patientName,
-            doctor: params.doctorName,
             totalLabels,
-            startingPosition: params.startingPosition,
-            hasLogo,
+            startingPosition,
+            hasLogo: !!resolvedLogoPath,
         });
 
         // Generate PDF
-        const buffer = await this._generatePdf(labels, params, hasLogo);
-
-        // Calculate next position
-        const finalAbsolutePosition = params.startingPosition + totalLabels - 1;
-        const nextPosition = (finalAbsolutePosition % LABELS_PER_SHEET) + 1;
-
-        // Calculate total pages
-        const availableFirstPage = LABELS_PER_SHEET - params.startingPosition + 1;
-        let totalPages;
-        if (totalLabels <= availableFirstPage) {
-            totalPages = 1;
-        } else {
-            const remaining = totalLabels - availableFirstPage;
-            totalPages = 1 + Math.ceil(remaining / LABELS_PER_SHEET);
-        }
-
-        log.info('Labels generated successfully', {
-            patient: params.patientName,
-            totalLabels,
-            totalPages,
-            nextPosition,
+        const buffer = await this._generatePdf(labels, {
+            startingPosition,
+            arabicFont,
+            logoPath: resolvedLogoPath,
         });
 
-        return {
-            buffer,
-            totalLabels,
-            totalPages,
-            nextPosition,
-        };
+        // Calculate stats
+        const finalAbsolutePosition = startingPosition + totalLabels - 1;
+        const nextPosition = (finalAbsolutePosition % LABELS_PER_SHEET) + 1;
+        const availableFirstPage = LABELS_PER_SHEET - startingPosition + 1;
+        const totalPages = totalLabels <= availableFirstPage
+            ? 1
+            : 1 + Math.ceil((totalLabels - availableFirstPage) / LABELS_PER_SHEET);
+
+        log.info('Labels generated successfully', { totalLabels, totalPages, nextPosition });
+
+        return { buffer, totalLabels, totalPages, nextPosition };
     }
 
     /**
      * Generate the PDF document
      * @private
      */
-    async _generatePdf(labels, params, hasLogo) {
+    async _generatePdf(labels, config) {
         return new Promise((resolve, reject) => {
             try {
+                // Get first label info for PDF metadata
+                const firstLabel = labels[0];
+
                 const doc = new PDFDocument({
                     size: 'LETTER',
                     margin: 0,
                     info: {
-                        Title: `Aligner Labels - ${params.patientName}`,
-                        Author: params.doctorName,
+                        Title: `Aligner Labels - ${firstLabel.patientName}`,
                         Subject: 'Aligner Labels',
-                        Creator: 'Aligner Label Generator v1.0',
+                        Creator: 'Aligner Label Generator',
                         CreationDate: new Date(),
                     },
                 });
 
-                // Register Arabic font based on user selection
-                const selectedFontPath = ARABIC_FONTS[params.arabicFont] || ARABIC_FONTS.cairo;
-                if (fs.existsSync(selectedFontPath)) {
-                    doc.registerFont('ArabicFont', selectedFontPath);
-                    log.info('Arabic font registered', { font: params.arabicFont, path: selectedFontPath });
-                } else {
-                    log.warn('Arabic font not found, falling back to Helvetica', { font: params.arabicFont, path: selectedFontPath });
+                // Register Arabic font
+                const fontPath = ARABIC_FONTS[config.arabicFont] || ARABIC_FONTS.cairo;
+                if (fs.existsSync(fontPath)) {
+                    doc.registerFont('ArabicFont', fontPath);
                 }
 
                 const chunks = [];
@@ -368,7 +222,7 @@ class AlignerLabelGenerator {
                 doc.on('error', reject);
 
                 let labelIndex = 0;
-                let currentSlot = params.startingPosition;
+                let currentSlot = config.startingPosition;
                 let isFirstPage = true;
 
                 while (labelIndex < labels.length) {
@@ -378,12 +232,11 @@ class AlignerLabelGenerator {
                     }
                     isFirstPage = false;
 
-                    // Fill labels on this page
                     while (currentSlot <= LABELS_PER_SHEET && labelIndex < labels.length) {
                         const label = labels[labelIndex];
                         const position = getSlotPosition(currentSlot);
 
-                        this._drawLabel(doc, position, label, params, hasLogo);
+                        this._drawLabel(doc, position, label, config);
 
                         if (this.showBorders) {
                             this._drawBorder(doc, position);
@@ -405,35 +258,34 @@ class AlignerLabelGenerator {
      * Draw a single label
      * @private
      */
-    _drawLabel(doc, position, labelData, params, hasLogo) {
+    _drawLabel(doc, position, label, config) {
         const { x, y } = position;
         const contentX = x + LABEL.PADDING;
         const contentY = y + LABEL.PADDING;
         const contentWidth = LABEL.WIDTH - (LABEL.PADDING * 2);
         const contentHeight = LABEL.HEIGHT - (LABEL.PADDING * 2);
 
-        // Calculate vertical layout (increased spacing for Arabic text)
-        const logoHeight = hasLogo ? 35 : 0;
-        const logoSpacing = hasLogo ? 6 : 0;
-        const patientNameHeight = TYPOGRAPHY.FONTS.PATIENT_NAME + 10;
-        const doctorNameHeight = TYPOGRAPHY.FONTS.DOCTOR_NAME + 8;
-        const sequenceHeight = TYPOGRAPHY.FONTS.SEQUENCE;
-        const sequenceSpacing = 6;
+        // Extract label data
+        const { text, patientName, doctorName = '', includeLogo = false } = label;
+        const showLogo = includeLogo && config.logoPath;
 
-        // Total content height
-        const totalTextHeight = logoHeight + logoSpacing + patientNameHeight + doctorNameHeight + sequenceSpacing + sequenceHeight;
+        // Calculate layout
+        const logoHeight = showLogo ? 35 : 0;
+        const logoSpacing = showLogo ? 6 : 0;
+        const totalTextHeight = logoHeight + logoSpacing +
+            TYPOGRAPHY.FONTS.PATIENT_NAME + 10 +
+            TYPOGRAPHY.FONTS.DOCTOR_NAME + 8 +
+            6 + TYPOGRAPHY.FONTS.SEQUENCE;
 
-        // Position content higher (bias towards top, not centered)
-        // Use 35% from top instead of 50% center
         const startY = contentY + (contentHeight - totalTextHeight) * 0.35;
         let currentY = startY;
 
-        // 1. Draw logo (if available)
-        if (hasLogo && params.logoPath) {
+        // 1. Draw logo
+        if (showLogo) {
             try {
                 const logoWidth = 60;
                 const logoX = contentX + (contentWidth - logoWidth) / 2;
-                doc.image(params.logoPath, logoX, currentY, {
+                doc.image(config.logoPath, logoX, currentY, {
                     fit: [logoWidth, logoHeight],
                     align: 'center',
                     valign: 'center',
@@ -444,56 +296,49 @@ class AlignerLabelGenerator {
             currentY += logoHeight + logoSpacing;
         }
 
-        // Helper to detect if text contains Arabic/RTL characters
-        const hasArabic = (text) => /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text);
-
-        // Choose font based on text content (ArabicFont is registered in _generatePdf)
-        const selectedFontPath = ARABIC_FONTS[params.arabicFont] || ARABIC_FONTS.cairo;
-        const arabicFont = fs.existsSync(selectedFontPath) ? 'ArabicFont' : 'Helvetica';
-        const latinFont = 'Helvetica';
+        // Font selection
+        const fontPath = ARABIC_FONTS[config.arabicFont] || ARABIC_FONTS.cairo;
+        const arabicFont = fs.existsSync(fontPath) ? 'ArabicFont' : 'Helvetica';
 
         // 2. Draw patient name
-        const patientIsArabic = hasArabic(params.patientName);
-        const patientFont = patientIsArabic ? arabicFont : latinFont;
-
+        const patientIsArabic = hasArabic(patientName);
         doc.fontSize(TYPOGRAPHY.FONTS.PATIENT_NAME)
             .fillColor(TYPOGRAPHY.COLORS.TEXT)
-            .font(patientFont);
+            .font(patientIsArabic ? arabicFont : 'Helvetica');
 
-        // Get actual text height
-        const patientTextHeight = doc.heightOfString(params.patientName, { width: contentWidth });
-
-        doc.text(params.patientName, contentX, currentY, {
-                width: contentWidth,
-                align: 'center',
-                lineBreak: false,
-                features: patientIsArabic ? ['rtla'] : [],
-            });
+        const patientTextHeight = doc.heightOfString(patientName, { width: contentWidth });
+        doc.text(patientName, contentX, currentY, {
+            width: contentWidth,
+            align: 'center',
+            lineBreak: false,
+            features: patientIsArabic ? ['rtla'] : [],
+        });
         currentY += patientTextHeight + 8;
 
         // 3. Draw doctor name
-        const doctorIsArabic = hasArabic(params.doctorName);
-        const doctorFont = doctorIsArabic ? arabicFont : 'Helvetica';
+        if (doctorName) {
+            const doctorIsArabic = hasArabic(doctorName);
+            doc.fontSize(TYPOGRAPHY.FONTS.DOCTOR_NAME)
+                .fillColor(TYPOGRAPHY.COLORS.TEXT)
+                .font(doctorIsArabic ? arabicFont : 'Helvetica');
 
-        doc.fontSize(TYPOGRAPHY.FONTS.DOCTOR_NAME)
-            .fillColor(TYPOGRAPHY.COLORS.TEXT)
-            .font(doctorFont);
-
-        const doctorTextHeight = doc.heightOfString(params.doctorName, { width: contentWidth });
-
-        doc.text(params.doctorName, contentX, currentY, {
+            const doctorTextHeight = doc.heightOfString(doctorName, { width: contentWidth });
+            doc.text(doctorName, contentX, currentY, {
                 width: contentWidth,
                 align: 'center',
                 lineBreak: false,
                 features: doctorIsArabic ? ['rtla'] : [],
             });
-        currentY += doctorTextHeight + 10;
+            currentY += doctorTextHeight + 10;
+        } else {
+            currentY += 10;
+        }
 
-        // 4. Draw sequence text (largest, most prominent) - always Latin
+        // 4. Draw sequence text
         doc.fontSize(TYPOGRAPHY.FONTS.SEQUENCE)
             .fillColor(TYPOGRAPHY.COLORS.TEXT)
             .font('Helvetica')
-            .text(labelData.text, contentX, currentY, {
+            .text(text, contentX, currentY, {
                 width: contentWidth,
                 align: 'center',
                 lineBreak: false,
@@ -508,7 +353,7 @@ class AlignerLabelGenerator {
         const { x, y } = position;
         doc.strokeColor(TYPOGRAPHY.COLORS.BORDER)
             .lineWidth(0.5)
-            .roundedRect(x, y, LABEL.WIDTH, LABEL.HEIGHT, LABEL.CORNER_RADIUS)
+            .roundedRect(x, y, LABEL.WIDTH, LABEL.HEIGHT, 9)
             .stroke();
     }
 }
@@ -517,12 +362,5 @@ class AlignerLabelGenerator {
 // EXPORTS
 // =============================================================================
 
-export {
-    AlignerLabelGenerator,
-    validateParams,
-    buildLabelQueue,
-    getSlotPosition,
-    LABELS_PER_SHEET,
-};
-
+export { AlignerLabelGenerator, getSlotPosition, getLabelType, LABELS_PER_SHEET };
 export default new AlignerLabelGenerator();

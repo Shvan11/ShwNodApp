@@ -1,0 +1,295 @@
+/**
+ * Print Queue Indicator Styles
+ * Floating UI for multi-batch label printing queue
+ */
+
+/* Main container - fixed position bottom-right */
+.print-queue-indicator {
+    position: fixed;
+    bottom: var(--spacing-lg);
+    right: var(--spacing-lg);
+    z-index: 1030;
+    font-family: var(--font-primary);
+}
+
+/* Collapsed badge button */
+.queue-badge {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    border: none;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    transition: all 0.2s ease;
+}
+
+.queue-badge:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+}
+
+.queue-badge:active {
+    transform: translateY(0);
+}
+
+.queue-badge-icon {
+    flex-shrink: 0;
+}
+
+.queue-badge-text {
+    white-space: nowrap;
+}
+
+.queue-badge-labels {
+    opacity: 0.85;
+    margin-left: var(--spacing-xs);
+    font-weight: 400;
+}
+
+.queue-badge-chevron {
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.queue-badge-chevron.up {
+    transform: rotate(180deg);
+}
+
+/* Expanded panel */
+.queue-panel {
+    position: absolute;
+    bottom: calc(100% + var(--spacing-sm));
+    right: 0;
+    width: 320px;
+    max-height: 400px;
+    background: var(--background-light);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.queue-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.queue-panel-header h3 {
+    margin: 0;
+    font-size: var(--font-size-md);
+    font-weight: 600;
+    color: white;
+}
+
+.queue-panel-subtitle {
+    font-size: var(--font-size-xs);
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+}
+
+.queue-panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-sm);
+    max-height: 250px;
+}
+
+/* Patient group */
+.queue-patient-group {
+    margin-bottom: var(--spacing-sm);
+}
+
+.queue-patient-group:last-child {
+    margin-bottom: 0;
+}
+
+.queue-patient-name {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-color);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--background-color);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-xs);
+}
+
+.queue-patient-batches {
+    padding-left: var(--spacing-sm);
+}
+
+/* Individual queue item */
+.queue-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-md);
+    transition: background-color 0.15s ease;
+}
+
+.queue-item:hover {
+    background: var(--background-color);
+}
+
+.queue-item-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.queue-item-batch {
+    font-size: var(--font-size-sm);
+    color: var(--text-color);
+}
+
+.queue-item-labels {
+    font-size: var(--font-size-xs);
+    color: var(--text-light);
+}
+
+.queue-item-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-lighter);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    opacity: 0;
+}
+
+.queue-item:hover .queue-item-remove {
+    opacity: 1;
+}
+
+.queue-item-remove:hover {
+    background: var(--error-color);
+    color: white;
+}
+
+/* Panel actions */
+.queue-panel-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    border-top: 1px solid var(--border-color);
+    background: var(--background-color);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.queue-btn-clear {
+    flex: 0 0 auto;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-light);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.queue-btn-clear:hover {
+    border-color: var(--error-color);
+    color: var(--error-color);
+}
+
+.queue-btn-clear.confirm {
+    background: var(--error-color);
+    border-color: var(--error-color);
+    color: white;
+}
+
+.queue-btn-print {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.queue-btn-print:hover {
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    transform: translateY(-1px);
+}
+
+.queue-btn-print:active {
+    transform: translateY(0);
+}
+
+/* Animation for adding items */
+@keyframes addPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.5);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+    }
+}
+
+.print-queue-indicator.pulse .queue-badge {
+    animation: addPulse 0.6s ease;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+    .print-queue-indicator {
+        bottom: var(--spacing-md);
+        right: var(--spacing-md);
+        left: var(--spacing-md);
+    }
+
+    .queue-panel {
+        width: 100%;
+        left: 0;
+        right: 0;
+    }
+
+    .queue-badge {
+        width: 100%;
+        justify-content: center;
+    }
+}

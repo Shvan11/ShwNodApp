@@ -31,7 +31,12 @@ function executeQuery(query, params, rowMapper, resultMapper = (result) => resul
         return;
       }
 
-      const request = new Request(query, (err) => {
+      const result = [];
+      const outputParams = [];
+      let selectRowCount = 0;
+
+      // The Request callback receives (error, rowCount, rows) when complete
+      const request = new Request(query, (err, rowCount) => {
         if (err) {
           log.error('Query execution error', {
             error: err.message,
@@ -40,6 +45,27 @@ function executeQuery(query, params, rowMapper, resultMapper = (result) => resul
           });
           reject(err);
           return;
+        }
+
+        // Request completed successfully
+        try {
+          log.debug(`Query completed: ${rowCount} rows affected/returned, ${selectRowCount} rows collected`);
+          // Attach rowsAffected to the result array for UPDATE/INSERT/DELETE queries
+          result.rowsAffected = rowCount;
+          const finalResult = resultMapper(result, outputParams);
+          // If resultMapper returns the same array, rowsAffected is already attached
+          // If it returns a new object, attach rowsAffected to it as well
+          if (finalResult !== result && typeof finalResult === 'object' && finalResult !== null) {
+            finalResult.rowsAffected = rowCount;
+          }
+          resolve(finalResult);
+        } catch (resultMappingError) {
+          log.error('Result mapping error', {
+            error: resultMappingError.message,
+            rowCount: result.length,
+            query: query.substring(0, 50) + '...'
+          });
+          reject(new Error(`Result mapping failed: ${resultMappingError.message}`));
         }
       });
 
@@ -59,23 +85,19 @@ function executeQuery(query, params, rowMapper, resultMapper = (result) => resul
         return;
       }
 
-      const result = [];
-      const outputParams = [];
-      let rowCount = 0;
-
-      // Handle row data
+      // Handle row data (for SELECT queries)
       request.on('row', (columns) => {
         try {
-          rowCount++;
+          selectRowCount++;
           const mappedRow = rowMapper ? rowMapper(columns) : columns;
           result.push(mappedRow);
         } catch (mappingError) {
           log.error('Row mapping error', {
             error: mappingError.message,
-            rowIndex: rowCount - 1,
+            rowIndex: selectRowCount - 1,
             query: query.substring(0, 50) + '...'
           });
-          reject(new Error(`Row mapping failed at row ${rowCount - 1}: ${mappingError.message}`));
+          reject(new Error(`Row mapping failed at row ${selectRowCount - 1}: ${mappingError.message}`));
         }
       });
 
@@ -83,22 +105,6 @@ function executeQuery(query, params, rowMapper, resultMapper = (result) => resul
       request.on('returnValue', (parameterName, value) => {
         outputParams.push({ parameterName, value });
         log.debug(`Output parameter: ${parameterName} = ${value}`);
-      });
-
-      // Handle completion
-      request.on('requestCompleted', (rowCount, more) => {
-        try {
-          log.debug(`Query completed: ${rowCount} rows affected/returned`);
-          const finalResult = resultMapper(result, outputParams);
-          resolve(finalResult);
-        } catch (resultMappingError) {
-          log.error('Result mapping error', {
-            error: resultMappingError.message,
-            rowCount: result.length,
-            query: query.substring(0, 50) + '...'
-          });
-          reject(new Error(`Result mapping failed: ${resultMappingError.message}`));
-        }
       });
 
       // Handle request errors
