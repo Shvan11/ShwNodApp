@@ -200,6 +200,244 @@
 }
 
 /* ===================================
+   ALERT MODAL
+   =================================== */
+.modal-content.alert-modal {
+    background: white;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl);
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-content.alert-modal .modal-header {
+    background: linear-gradient(135deg, var(--warning-500, #f59e0b) 0%, var(--warning-600, #d97706) 100%);
+    color: white;
+    border-bottom: none;
+    padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.modal-content.alert-modal .modal-header h3 {
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm, 0.5rem);
+    font-size: 1.25rem;
+    margin: 0;
+}
+
+.alert-modal .modal-header h3 i {
+    font-size: 1.5rem;
+}
+
+.modal-content.alert-modal .modal-close-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: #ffffff;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md, 0.375rem);
+    font-size: 1.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+}
+
+.alert-modal .modal-close-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.alert-modal .modal-body {
+    padding: var(--spacing-md);
+    overflow-y: auto;
+    flex: 1;
+}
+
+.alert-modal .alert-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.alert-modal .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.alert-modal .form-group > label {
+    font-weight: 600;
+    color: var(--gray-700);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.alert-modal .form-group .required {
+    color: var(--error-color);
+    margin-left: 2px;
+}
+
+.alert-modal .form-group select,
+.alert-modal .form-group textarea {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    font-size: 0.9375rem;
+    font-family: inherit;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.alert-modal .form-group select:focus,
+.alert-modal .form-group textarea:focus {
+    outline: none;
+    border-color: var(--warning-500);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+
+.alert-modal .form-group select.error,
+.alert-modal .form-group textarea.error {
+    border-color: var(--error-color);
+}
+
+.alert-modal .form-group textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.alert-modal .error-message {
+    color: var(--error-color);
+    font-size: 0.8125rem;
+    margin-top: var(--spacing-xs);
+}
+
+/* Severity Options */
+.alert-modal .severity-options {
+    display: flex;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.alert-modal .severity-option {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    cursor: pointer;
+}
+
+.alert-modal .severity-option input[type="radio"] {
+    display: none;
+}
+
+.alert-modal .severity-badge {
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.alert-modal .severity-badge.severity-1 {
+    background: var(--success-100);
+    color: var(--success-700);
+    border-color: var(--success-200);
+}
+
+.alert-modal .severity-option input:checked + .severity-badge.severity-1 {
+    background: var(--success-500);
+    color: white;
+    border-color: var(--success-600);
+}
+
+.alert-modal .severity-badge.severity-2 {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fcd34d;
+}
+
+.alert-modal .severity-option input:checked + .severity-badge.severity-2 {
+    background: #f59e0b;
+    color: #ffffff;
+    border-color: #d97706;
+}
+
+.alert-modal .severity-badge.severity-3 {
+    background: var(--error-100);
+    color: var(--error-700);
+    border-color: var(--error-200);
+}
+
+.alert-modal .severity-option input:checked + .severity-badge.severity-3 {
+    background: var(--error-500);
+    color: white;
+    border-color: var(--error-600);
+}
+
+.alert-modal .severity-badge:hover {
+    transform: scale(1.05);
+}
+
+/* Modal Footer */
+.modal-content.alert-modal .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm, 0.5rem);
+    padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
+    background: var(--gray-50, #f9fafb);
+    border-top: 1px solid var(--gray-200, #e5e7eb);
+}
+
+.modal-content.alert-modal .modal-footer .btn-secondary {
+    padding: var(--spacing-sm, 0.5rem) var(--spacing-lg, 1.5rem);
+    background: var(--gray-200, #e5e7eb);
+    background-color: #e5e7eb;
+    color: var(--gray-700, #374151);
+    border: none;
+    border-radius: var(--radius-md, 0.375rem);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.modal-content.alert-modal .modal-footer .btn-secondary:hover:not(:disabled) {
+    background: var(--gray-300, #d1d5db);
+}
+
+.modal-content.alert-modal .modal-footer .btn-primary {
+    padding: var(--spacing-sm, 0.5rem) var(--spacing-lg, 1.5rem);
+    background: var(--warning-500, #f59e0b);
+    background-color: #f59e0b;
+    color: #ffffff;
+    border: none;
+    border-radius: var(--radius-md, 0.375rem);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs, 0.25rem);
+    transition: background 0.2s ease;
+}
+
+.alert-modal .modal-footer .btn-primary:hover:not(:disabled) {
+    background: var(--warning-600);
+}
+
+.alert-modal .modal-footer .btn-primary:disabled,
+.alert-modal .modal-footer .btn-secondary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ===================================
    RESPONSIVE DESIGN
    =================================== */
 @media (max-width: 768px) {
@@ -216,5 +454,26 @@
     .whatsapp-btn-cancel,
     .whatsapp-btn-send {
         width: 100%;
+    }
+
+    .modal-content.alert-modal {
+        width: 95%;
+        max-width: 95%;
+        margin: var(--spacing-md);
+    }
+
+    .alert-modal .severity-options {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    .alert-modal .modal-footer {
+        flex-direction: column-reverse;
+    }
+
+    .alert-modal .modal-footer .btn-secondary,
+    .alert-modal .modal-footer .btn-primary {
+        width: 100%;
+        justify-content: center;
     }
 }

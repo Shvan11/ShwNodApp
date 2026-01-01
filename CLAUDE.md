@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Shwan Orthodontics Management System** - Enterprise orthodontic practice management platform built with Node.js, Express, and React 19.
+**Shwan Orthodontics Management System** - Enterprise orthodontic practice management platform built with Node.js, Express, React 19, and **TypeScript**.
 
 ### Core Features
 - **Patient Management**: Registration, demographics, photo/x-ray imaging, WebCeph/Dolphin integration
@@ -14,16 +14,16 @@
 - **Templates**: GrapesJS visual designer for receipts/invoices/prescriptions
 
 ### Tech Stack
-- **Backend**: Node.js, Express 5, SQL Server (Tedious), WebSocket
-- **Frontend**: React 19, React Router v7 (Data Router), Vite
+- **Backend**: Node.js, Express 5, **TypeScript**, SQL Server (Tedious), WebSocket
+- **Frontend**: React 19, **TypeScript**, React Router v7 (Data Router), Vite
 - **External**: WhatsApp Web.js, Twilio, Telegram Bot API, Google Drive, WebCeph
 
 ### Application Scale
 | Metric | Count |
 |--------|-------|
-| API Endpoints | ~173 |
-| React Components | 91 |
-| CSS Files | 56 (~32,756 lines) |
+| API Endpoints | ~202 |
+| React Components | 97 |
+| CSS Files | 60 (~36,900 lines) |
 | Frontend Routes | 31 |
 | Route Loaders | 7 |
 | Backend Service Categories | 16 |
@@ -44,6 +44,11 @@ npm run dev:client       # Vite only (5173)
 npm run build            # Build to /dist
 npm start                # Serve from /dist (3000)
 
+# Type Checking
+npm run typecheck            # Check backend types
+npm run typecheck:frontend   # Check frontend types
+npm run typecheck:all        # Check both
+
 # Windows Service
 npm run service:install
 npm run service:uninstall
@@ -55,31 +60,45 @@ npm run service:uninstall
 
 ### Backend Structure
 ```
-index.js                 # Entry point, server setup, graceful shutdown
-/config/                 # Environment config, database, SSL
-/routes/api/             # 20 modular route files
+index.ts                 # Entry point, server setup, graceful shutdown
+/config/                 # Environment config, database, SSL (.ts)
+/routes/api/             # 21 modular route files (.ts)
 /services/
-  /business/             # Service layer (Patient, Appointment, Aligner, etc.)
-  /database/queries/     # 14 query modules
-  /messaging/            # WhatsApp, SMS, Telegram, WebSocket events
-  /sync/                 # SQL Server ↔ Supabase sync engine
-/middleware/             # Auth, CORS, timeout, upload
-/utils/                  # Logger, WebSocket server, path resolver
+  /business/             # Service layer (Patient, Appointment, Aligner, etc.) (.ts)
+  /database/queries/     # 16 query modules (.ts)
+  /messaging/            # WhatsApp, SMS, Telegram, WebSocket events (.ts)
+  /sync/                 # SQL Server ↔ Supabase sync engine (.ts)
+/middleware/             # Auth, CORS, timeout, upload (.ts)
+/utils/                  # Logger, WebSocket server, path resolver (.ts)
+/types/                  # Shared TypeScript type definitions
 ```
 
 ### Frontend Structure
 ```
 /public/js/
-  App.jsx                # Root component with RouterProvider
+  App.tsx                # Root component with RouterProvider
   /router/
-    routes.config.jsx    # 31 routes in 5 phases
-    loaders.js           # 7 route loaders with caching
-  /layouts/              # RootLayout, AlignerLayout
-  /routes/               # 8 route components
-  /components/react/     # 63 React components
-  /contexts/             # GlobalStateContext, ToastContext
-  /hooks/                # 8 custom hooks
-  /services/             # WebSocket singleton, HTTP client
+    routes.config.tsx    # 31 routes in 5 phases
+    loaders.ts           # 7 route loaders with caching
+  /layouts/              # RootLayout, AlignerLayout (.tsx)
+  /routes/               # 8 route components (.tsx)
+  /components/react/     # 69 React components (.tsx)
+  /contexts/             # GlobalStateContext, PrintQueueContext, ToastContext (.tsx)
+  /hooks/                # 8 custom hooks (.ts)
+  /services/             # WebSocket singleton, HTTP client (.ts)
+  /utils/                # Formatters, API clients (.ts)
+```
+
+### Type Definitions
+```
+/types/
+  index.ts               # Re-exports all types
+  api.types.ts           # API request/response types
+  config.types.ts        # Configuration types
+  database.types.ts      # Database entity types
+  services.types.ts      # Service layer types
+  websocket.types.ts     # WebSocket event types
+  express-session.d.ts   # Express session augmentation
 ```
 
 ### CSS Structure
@@ -87,11 +106,45 @@ index.js                 # Entry point, server setup, graceful shutdown
 /public/css/
   /base/       # 5 files: variables, reset, typography, rtl-support, utilities
   /layout/     # 2 files: universal-header, sidebar-navigation
-  /components/ # 25 files
+  /components/ # 29 files
   /pages/      # 24 files
 ```
 
 **CSS Guidelines**: See `css-styling-guidelines.skill.md` for comprehensive documentation.
+
+---
+
+## TypeScript Configuration
+
+### Dual Config Setup
+- **`tsconfig.json`** - Backend (Node.js/Express)
+- **`tsconfig.frontend.json`** - Frontend (React/Vite)
+
+### Strict Mode Status
+| Config | strict | noImplicitAny | Status |
+|--------|--------|---------------|--------|
+| Frontend | `true` | `true` | Full strict mode |
+| Backend | `true` | `true` | Full strict mode |
+
+### Key Compiler Options
+```json
+{
+  "target": "ES2022",
+  "module": "ESNext",
+  "moduleResolution": "bundler",
+  "esModuleInterop": true,
+  "skipLibCheck": true
+}
+```
+
+### Type Import Conventions
+```typescript
+// Use type-only imports for types
+import type { Patient, Appointment } from '../types';
+
+// Regular imports for values
+import { formatDate, formatCurrency } from '../utils/formatters';
+```
 
 ---
 
@@ -101,7 +154,7 @@ index.js                 # Entry point, server setup, graceful shutdown
 
 **NEVER use `window.location.href` for internal routes.**
 
-```javascript
+```typescript
 // CORRECT
 import { useNavigate, Link } from 'react-router-dom';
 const navigate = useNavigate();
@@ -121,8 +174,8 @@ window.location.href = '/patient/123/works';
 
 Use `ToastContext` for all user feedback. **Never use `alert()`**.
 
-```javascript
-import { useToast } from '../contexts/ToastContext.jsx';
+```typescript
+import { useToast } from '../contexts/ToastContext';
 const toast = useToast();
 
 toast.success('Saved!');
@@ -137,8 +190,8 @@ toast.info('Processing...');
 
 **Never use `console.log()` in production.** Use Winston:
 
-```javascript
-import { log } from '../utils/logger.js';
+```typescript
+import { log } from '../utils/logger';
 
 log.info('Completed', { userId: 123 });
 log.error('Failed', { error: err.message });
@@ -154,7 +207,28 @@ Universal naming convention:
 - Patient: `patient_loaded`, `patient_unloaded`
 - WhatsApp: `whatsapp_client_ready`, `whatsapp_qr_updated`, `whatsapp_message_status`
 
-Constants in `services/messaging/websocket-events.js`.
+Constants in `services/messaging/websocket-events.ts`.
+
+### React Component Typing
+
+```typescript
+// Props interface
+interface PatientCardProps {
+  patient: Patient;
+  onSelect: (id: number) => void;
+  isActive?: boolean;
+}
+
+// Functional component
+const PatientCard: React.FC<PatientCardProps> = ({ patient, onSelect, isActive = false }) => {
+  // ...
+};
+
+// Event handlers
+const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+  // ...
+};
+```
 
 ---
 
@@ -185,10 +259,17 @@ REVERSE_SYNC_ENABLED, REVERSE_SYNC_INTERVAL_MINUTES
 ## Key API Endpoints
 
 ```
-# Patient
-GET /api/getinfos?code={patientId}
-GET /api/gettimepoints?code={patientId}
-GET /api/getpayments?code={patientId}
+# Patient (RESTful)
+GET /api/patients/:personId/info
+GET /api/patients/:personId
+GET /api/patients/:personId/timepoints
+GET /api/patients/:personId/timepoints/:tp/images
+GET /api/patients/:personId/gallery/:tp
+GET /api/patients/:personId/alerts
+GET /api/patients/:personId/has-appointment
+GET /api/patients/search?q=...
+GET /api/patients/phones
+GET /api/patients/tag-options
 
 # Messaging
 GET /api/wa/send?date={date}
@@ -214,7 +295,7 @@ SQL Server via Tedious with connection pooling (max 10 connections).
 
 Key tables: `tblpatients`, `tblappointments`, `tblwork`, `tblVisits`, `tblWires`, `tblInvoice`, `tblExpenses`, `tblUsers`
 
-Query modules in `/services/database/queries/`.
+Query modules in `/services/database/queries/` (all `.ts` files).
 
 ---
 
@@ -258,11 +339,14 @@ Config in `.mcp.json`. See `docs/mcp-mssql-setup.md`.
 
 ## Development Notes
 
+- **Full TypeScript** - Both backend and frontend
 - ES Modules (`"type": "module"`)
 - Graceful shutdown for all services
 - Circuit breaker pattern for messaging
 - Cross-platform paths (Windows/WSL auto-conversion)
 - RTL support for Kurdish/Arabic
+- Vite handles `.tsx` compilation for frontend
+- `tsx` or `ts-node` for backend development
 
 ---
 

@@ -14,8 +14,8 @@ export default defineConfig(({ mode }) => {
   },
   plugins: [
     react({
-      // Include all typical React file extensions
-      include: /\.(jsx|tsx|js|ts)$/,
+      // TypeScript React files
+      include: /\.(tsx|ts)$/,
       babel: {
         plugins: [
           ['babel-plugin-react-compiler', {

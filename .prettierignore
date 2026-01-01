@@ -1,0 +1,8 @@
+node_modules
+dist
+dist-ts
+*.min.js
+*.min.css
+public/libs
+public/photoswipe
+package-lock.json
