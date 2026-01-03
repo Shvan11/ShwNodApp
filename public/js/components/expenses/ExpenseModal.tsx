@@ -132,12 +132,12 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
         }
 
         const expenseData: ExpenseData = {
-            ExpenseDate: formData.expenseDate,
-            Amount: parseInt(String(formData.amount)),
-            Currency: formData.currency,
-            Description: formData.note,
-            CategoryID: formData.categoryId ? Number(formData.categoryId) : undefined,
-            SubcategoryID: formData.subcategoryId ? Number(formData.subcategoryId) : undefined
+            expenseDate: formData.expenseDate,
+            amount: parseInt(String(formData.amount)),
+            currency: formData.currency,
+            note: formData.note,
+            categoryId: formData.categoryId ? Number(formData.categoryId) : undefined,
+            subcategoryId: formData.subcategoryId ? Number(formData.subcategoryId) : undefined
         };
 
         onSave(expenseData);

@@ -329,6 +329,7 @@ router.get(
       const { file, detailsDir } = req.query;
 
       if (!file) {
+        log.warn('X-ray request missing file parameter', { personId });
         ErrorResponses.badRequest(
           res,
           'Missing required parameter: file'
@@ -669,12 +670,14 @@ router.get(
     try {
       const { personId } = req.params;
       if (!personId) {
+        log.warn('Get patient request missing personId');
         ErrorResponses.missingParameter(res, 'personId');
         return;
       }
 
       const parsedId = parseInt(personId, 10);
       if (isNaN(parsedId)) {
+        log.warn('Get patient request invalid personId', { personId });
         ErrorResponses.badRequest(res, 'Invalid personId: must be a number');
         return;
       }
@@ -682,6 +685,7 @@ router.get(
       const patient = await getPatientById(parsedId);
 
       if (!patient) {
+        log.warn('Patient not found', { personId: parsedId });
         ErrorResponses.notFound(res, 'Patient');
         return;
       }
@@ -718,6 +722,7 @@ router.post(
     try {
       // Basic validation
       if (!patientData.patientName || !patientData.patientName.trim()) {
+        log.warn('Create patient missing name');
         ErrorResponses.badRequest(res, 'Patient name is required');
         return;
       }
@@ -815,6 +820,7 @@ router.put(
 
       // Basic validation
       if (!patientData.PatientName || !patientData.PatientName.trim()) {
+        log.warn('Update patient missing name', { personId });
         ErrorResponses.badRequest(res, 'Patient name is required');
         return;
       }
@@ -909,6 +915,7 @@ router.put(
       const { estimatedCost, currency } = req.body;
 
       if (isNaN(personId)) {
+        log.warn('Update estimated cost invalid patient ID', { personId: req.params.personId });
         ErrorResponses.badRequest(res, 'Invalid patient ID');
         return;
       }
@@ -960,6 +967,7 @@ router.get(
       const personId = parseInt(req.params.personId, 10);
 
       if (isNaN(personId)) {
+        log.warn('Get alerts invalid patient ID', { personId: req.params.personId });
         ErrorResponses.badRequest(res, 'Invalid patient ID');
         return;
       }
@@ -994,6 +1002,7 @@ router.post(
       const { alertTypeId, alertSeverity, alertDetails } = req.body;
 
       if (!alertDetails) {
+        log.warn('Create alert missing details', { personId });
         ErrorResponses.badRequest(res, 'Alert details are required');
         return;
       }
@@ -1037,6 +1046,7 @@ router.put(
       const { isActive } = req.body;
 
       if (typeof isActive !== 'boolean') {
+        log.warn('Update alert status invalid isActive', { alertId, isActive });
         ErrorResponses.badRequest(res, 'isActive must be a boolean value');
         return;
       }
@@ -1075,11 +1085,13 @@ router.put(
       const { alertTypeId, alertSeverity, alertDetails } = req.body;
 
       if (isNaN(alertId)) {
+        log.warn('Update alert invalid alert ID', { alertId: req.params.alertId });
         ErrorResponses.badRequest(res, 'Invalid alert ID');
         return;
       }
 
       if (!alertDetails) {
+        log.warn('Update alert missing details', { alertId });
         ErrorResponses.badRequest(res, 'Alert details are required');
         return;
       }
@@ -1119,6 +1131,7 @@ router.get(
       const personId = parseInt(req.params.personId, 10);
 
       if (isNaN(personId)) {
+        log.warn('Has appointment check invalid patient ID', { personId: req.params.personId });
         ErrorResponses.badRequest(res, 'Invalid patient ID');
         return;
       }

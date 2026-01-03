@@ -374,7 +374,7 @@ if !ALL_OK! equ 1 (
     echo 1. Edit configuration if needed:
     echo    - Open C:\Windows\ProtocolHandlers.ini with Notepad
     echo    - Update PatientsFolder path if different from \\Clinic\clinic1
-    echo 2. Restart your browser (Chrome/Edge)
+    echo 2. Restart your browser ^(Chrome/Edge^)
     echo 3. Test protocols:
     echo    - Click "Open Folder" on aligner sets
     echo    - Click "CS Imaging" in patient sidebar

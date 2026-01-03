@@ -259,7 +259,7 @@ if %ALL_REMOVED% equ 1 (
     echo All protocol handlers have been removed.
     echo.
     echo Next steps:
-    echo 1. Restart your browser (Chrome/Edge)
+    echo 1. Restart your browser ^(Chrome/Edge^)
     echo 2. The protocols will no longer work
     echo.
     echo To reinstall, run INSTALL.bat

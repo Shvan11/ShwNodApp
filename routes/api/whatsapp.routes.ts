@@ -115,6 +115,7 @@ router.get(
 
       // Validate required parameters
       if (!personId || !appointmentId) {
+        log.warn('Send to patient missing parameters', { personId, appointmentId });
         ErrorResponses.badRequest(res, 'Missing required parameters', {
           required: ['personId', 'appointmentId']
         });
@@ -123,6 +124,7 @@ router.get(
 
       // Validate parameters are numeric
       if (isNaN(parseInt(personId)) || isNaN(parseInt(appointmentId))) {
+        log.warn('Send to patient invalid parameters', { personId, appointmentId });
         ErrorResponses.badRequest(res, 'Invalid input', {
           details: 'personId and appointmentId must be valid numbers'
         });
@@ -166,6 +168,7 @@ router.get(
         );
 
       if (!messageData) {
+        log.warn('WhatsApp message data not found', { personId, appointmentId });
         ErrorResponses.notFound(res, 'Message data', {
           details: 'No data returned from stored procedure'
         });
@@ -181,6 +184,7 @@ router.get(
           errorMessage = 'Invalid phone number';
         }
 
+        log.warn('WhatsApp stored procedure error', { personId, appointmentId, result: messageData.result, errorMessage });
         ErrorResponses.badRequest(res, 'Invalid input', {
           details: errorMessage,
           result: messageData.result
@@ -222,6 +226,7 @@ router.get(
           }
         });
       } else {
+        log.warn('WhatsApp message send failed', { personId, appointmentId, error: result.error });
         ErrorResponses.badRequest(res, 'Operation failed', {
           operation: 'send WhatsApp message',
           details: result.error
@@ -256,6 +261,7 @@ router.get(
     try {
       // Enhanced input validation
       if (!dateparam) {
+        log.warn('WhatsApp batch send missing date parameter');
         ErrorResponses.badRequest(res, 'Missing required parameters', {
           required: ['date']
         });
@@ -265,6 +271,7 @@ router.get(
       // Validate date format (YYYY-MM-DD)
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(dateparam)) {
+        log.warn('WhatsApp batch send invalid date format', { date: dateparam });
         ErrorResponses.badRequest(res, 'Invalid input', {
           details: 'Invalid date format. Expected YYYY-MM-DD'
         });
@@ -277,6 +284,7 @@ router.get(
         isNaN(dateObj.getTime()) ||
         dateObj.toISOString().slice(0, 10) !== dateparam
       ) {
+        log.warn('WhatsApp batch send invalid date value', { date: dateparam });
         ErrorResponses.badRequest(res, 'Invalid input', {
           details: 'Invalid date value'
         });
@@ -345,6 +353,7 @@ router.post(
 
       // Validate required parameter
       if (!workId) {
+        log.warn('WhatsApp receipt send missing workId');
         ErrorResponses.badRequest(res, 'Missing required parameters', {
           required: ['workId']
         });
@@ -353,6 +362,7 @@ router.post(
 
       // Validate workId is numeric
       if (isNaN(parseInt(String(workId)))) {
+        log.warn('WhatsApp receipt send invalid workId', { workId });
         ErrorResponses.badRequest(res, 'Invalid input', {
           details: 'workId must be a valid number'
         });
@@ -490,6 +500,7 @@ router.post(
       await sendImg_(phone, base64Data);
       res.send('OK');
     } catch (error) {
+      log.warn('WhatsApp send image failed', { phone, error: (error as Error).message });
       ErrorResponses.badRequest(res, 'Operation failed', {
         operation: 'send image',
         details: (error as Error).message
@@ -514,6 +525,7 @@ router.get(
       const state = await sendXray_(phone!, file!);
       res.json(state);
     } catch (error) {
+      log.warn('WhatsApp send X-ray failed', { phone, file, error: (error as Error).message });
       ErrorResponses.badRequest(res, 'Operation failed', {
         operation: 'send X-ray file',
         details: (error as Error).message
@@ -546,6 +558,7 @@ router.post(
       );
 
       if (!phone || !prog || !paths.length) {
+        log.warn('Send media2 missing parameters', { phone, prog, pathCount: paths.length });
         ErrorResponses.badRequest(res, 'Missing required parameters', {
           required: ['phone', 'prog', 'file']
         });
@@ -601,6 +614,7 @@ router.post(
           }
         }
       } else {
+        log.warn('Send media2 unsupported program', { prog, phone });
         ErrorResponses.badRequest(res, 'Invalid input', {
           details: `Unsupported program: ${prog}. Use 'WhatsApp' or 'Telegram'`
         });
@@ -635,6 +649,7 @@ router.get('/qr', async (_req: Request, res: Response): Promise<void> => {
   try {
     // Just check if QR code is available
     if (!messageState || !messageState.qr) {
+      log.warn('WhatsApp QR code not available');
       ErrorResponses.notFound(res, 'QR code', {
         details: 'QR code not available yet',
         status: 'waiting',
@@ -769,6 +784,7 @@ router.post(
           authPreserved: true
         });
       } else {
+        log.warn('WhatsApp destroy failed', { error: result.error });
         ErrorResponses.badRequest(res, 'Operation failed', {
           operation: 'destroy WhatsApp client',
           details: result.error || 'Destroy failed'
@@ -802,6 +818,7 @@ router.post('/logout', async (_req: Request, res: Response): Promise<void> => {
         authCleared: true
       });
     } else {
+      log.warn('WhatsApp logout failed', { error: result.error });
       ErrorResponses.badRequest(res, 'Operation failed', {
         operation: 'logout WhatsApp client',
         details: result.error || 'Logout failed'

@@ -12,6 +12,15 @@ import BatchFormDrawer from '../../components/react/BatchFormDrawer';
 import PaymentFormDrawer from '../../components/react/PaymentFormDrawer';
 import LabelPreviewModal from '../../components/react/LabelPreviewModal';
 import { copyToClipboard } from '../../core/utils';
+import {
+    isFileSystemAccessSupported,
+    getDirectoryHandle,
+    saveHandle,
+    checkPermission,
+    showDirectoryPickerDialog,
+    navigateToDirectory,
+    isAbortError
+} from '../../core/fileSystemAccess';
 import { useToast } from '../../contexts/ToastContext';
 import { usePrintQueue } from '../../contexts/PrintQueueContext';
 
@@ -952,17 +961,19 @@ const PatientSets: React.FC = () => {
         }
     };
 
-    // File System Access API helpers
+    // File System Access API helpers - using shared utility
+    const ALIGNER_SETS_HANDLE_KEY = 'base_aligner_sets';
+
     const checkBaseDirectoryAccess = async (): Promise<void> => {
-        if (!('showDirectoryPicker' in window)) {
+        if (!isFileSystemAccessSupported()) {
             setHasBaseDirectoryAccess(false);
             return;
         }
 
         try {
-            const baseHandle = await getBaseDirectoryHandle();
+            const baseHandle = await getDirectoryHandle(ALIGNER_SETS_HANDLE_KEY);
             if (baseHandle) {
-                const permission = await baseHandle.queryPermission({ mode: 'read' });
+                const permission = await checkPermission(baseHandle, 'read');
                 setHasBaseDirectoryAccess(permission === 'granted');
             } else {
                 setHasBaseDirectoryAccess(false);
@@ -973,16 +984,22 @@ const PatientSets: React.FC = () => {
     };
 
     const requestBaseDirectoryAccess = async (): Promise<boolean> => {
-        if (!('showDirectoryPicker' in window)) {
+        if (!isFileSystemAccessSupported()) {
             toast.warning('Your browser does not support the File System Access API. Please use Chrome or Edge.');
             return false;
         }
 
         try {
-            const dirHandle = await (window as Window & { showDirectoryPicker: (opts?: { mode?: string; startIn?: string }) => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker({
-                mode: 'read',
-                startIn: 'desktop'
-            });
+            const result = await showDirectoryPickerDialog({ mode: 'read', startIn: 'desktop' });
+
+            if (!result.success || !result.data) {
+                if (!isAbortError({ name: result.errorName })) {
+                    toast.error(result.error || 'Failed to select folder');
+                }
+                return false;
+            }
+
+            const dirHandle = result.data;
 
             // Verify the folder name is correct
             if (dirHandle.name !== 'Aligner_Sets') {
@@ -994,14 +1011,16 @@ const PatientSets: React.FC = () => {
                 }
             }
 
-            // Save to IndexedDB
-            await saveBaseDirectoryHandle(dirHandle);
+            // Save to IndexedDB using shared utility
+            await saveHandle(ALIGNER_SETS_HANDLE_KEY, dirHandle, {
+                expectedName: 'Aligner_Sets'
+            });
             setHasBaseDirectoryAccess(true);
 
             toast.success('Base folder access granted! You can now open PDFs directly in the correct folders.');
             return true;
         } catch (error) {
-            if ((error as Error).name !== 'AbortError') {
+            if (!isAbortError(error)) {
                 console.error('Error requesting directory access:', error);
                 toast.error('Failed to get directory access: ' + (error as Error).message);
             }
@@ -1009,44 +1028,8 @@ const PatientSets: React.FC = () => {
         }
     };
 
-    const getBaseDirectoryHandle = async (): Promise<FileSystemDirectoryHandle | undefined> => {
-        const db = await openDirectoryDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(['directories'], 'readonly');
-            const store = transaction.objectStore('directories');
-            const request = store.get('base_aligner_sets');
-
-            request.onsuccess = () => resolve(request.result?.handle);
-            request.onerror = () => reject(request.error);
-        });
-    };
-
-    const saveBaseDirectoryHandle = async (handle: FileSystemDirectoryHandle): Promise<void> => {
-        const db = await openDirectoryDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(['directories'], 'readwrite');
-            const store = transaction.objectStore('directories');
-            const request = store.put({ key: 'base_aligner_sets', handle, timestamp: Date.now() });
-
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
-        });
-    };
-
-    const openDirectoryDB = (): Promise<IDBDatabase> => {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open('AlignerDirectoryHandles', 1);
-
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve(request.result);
-
-            request.onupgradeneeded = (event) => {
-                const db = (event.target as IDBOpenDBRequest).result;
-                if (!db.objectStoreNames.contains('directories')) {
-                    db.createObjectStore('directories', { keyPath: 'key' });
-                }
-            };
-        });
+    const getBaseDirectoryHandleFromStorage = async (): Promise<FileSystemDirectoryHandle | undefined> => {
+        return getDirectoryHandle(ALIGNER_SETS_HANDLE_KEY);
     };
 
     const navigateToSetFolder = async (
@@ -1055,16 +1038,9 @@ const PatientSets: React.FC = () => {
         personId: number,
         setSequence: number
     ): Promise<FileSystemDirectoryHandle | null> => {
-        try {
-            // Navigate: Aligner_Sets/{DoctorID}/{PersonID}/{SetSequence}
-            const doctorHandle = await baseHandle.getDirectoryHandle(drId.toString(), { create: false });
-            const personHandle = await doctorHandle.getDirectoryHandle(personId.toString(), { create: false });
-            const setHandle = await personHandle.getDirectoryHandle(setSequence.toString(), { create: false });
-            return setHandle;
-        } catch (error) {
-            console.error('Error navigating to folder:', error);
-            return null;
-        }
+        const path = `${drId}/${personId}/${setSequence}`;
+        const result = await navigateToDirectory(baseHandle, path, false);
+        return result.success && result.data ? result.data : null;
     };
 
     // Quick PDF URL handlers
@@ -1072,7 +1048,7 @@ const PatientSets: React.FC = () => {
         e.stopPropagation();
 
         // Check if File System Access API is supported
-        if (!('showOpenFilePicker' in window)) {
+        if (!isFileSystemAccessSupported()) {
             fallbackToFileInput(set);
             return;
         }
@@ -1087,15 +1063,15 @@ const PatientSets: React.FC = () => {
         }
 
         try {
-            // Get base directory handle
-            const baseHandle = await getBaseDirectoryHandle();
+            // Get base directory handle from shared utility
+            const baseHandle = await getBaseDirectoryHandleFromStorage();
             if (!baseHandle) {
                 fallbackToFileInput(set);
                 return;
             }
 
-            // Verify we still have permission
-            let permission = await baseHandle.queryPermission({ mode: 'read' });
+            // Verify we still have permission using shared utility
+            let permission = await checkPermission(baseHandle, 'read');
             if (permission !== 'granted') {
                 permission = await baseHandle.requestPermission({ mode: 'read' });
                 if (permission !== 'granted') {
@@ -1574,7 +1550,7 @@ const PatientSets: React.FC = () => {
                     </div>
                     <div className="fs-access-container">
                         {/* File System Access Status */}
-                        {'showDirectoryPicker' in window && (
+                        {isFileSystemAccessSupported() && (
                             <div style={{
                                 display: 'flex',
                                 alignItems: 'center',

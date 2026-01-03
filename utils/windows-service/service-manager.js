@@ -13,7 +13,8 @@ const appPath = path.resolve(__dirname, '../../dist-server/index.js');
 
 // Common service configuration
 const serviceConfig = {
-  name: 'Web app',
+  name: 'webapp',
+  displayName: 'Web App',
   description: 'My personal web app for appointments and patients photos.',
   script: appPath,
   nodeOptions: [
@@ -23,7 +24,8 @@ const serviceConfig = {
   env: [{
     name: 'NODE_ENV',
     value: 'production'
-  }]
+  }],
+  stopparentfirst: false
 };
 
 /**

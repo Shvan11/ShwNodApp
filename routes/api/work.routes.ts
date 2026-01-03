@@ -244,11 +244,13 @@ router.get(
     try {
       const { workId } = req.query;
       if (!workId) {
+        log.warn('Work details request missing workId parameter');
         ErrorResponses.missingParameter(res, 'workId');
         return;
       }
       const work = await getWorkDetails(parseInt(workId));
       if (!work) {
+        log.warn('Work not found', { workId });
         ErrorResponses.notFound(res, 'Work');
         return;
       }
@@ -272,6 +274,7 @@ router.get(
     try {
       const { code: personId } = req.query;
       if (!personId) {
+        log.warn('Get works request missing PersonID parameter');
         ErrorResponses.missingParameter(res, 'code (PersonID)');
         return;
       }
@@ -294,6 +297,7 @@ router.get(
     try {
       const { workId } = req.params;
       if (!workId) {
+        log.warn('Get work request missing workId parameter');
         ErrorResponses.missingParameter(res, 'workId');
         return;
       }
@@ -338,6 +342,7 @@ router.get(
       );
 
       if (!work) {
+        log.warn('Work not found by ID', { workId });
         ErrorResponses.notFound(res, 'Work');
         return;
       }
@@ -449,18 +454,21 @@ router.put(
       const { workId, ...workData } = req.body as UpdateWorkBody;
 
       if (!workId) {
+        log.warn('Update work request missing workId');
         ErrorResponses.missingParameter(res, 'workId');
         return;
       }
 
       // Validate DrID is provided
       if (!workData.DrID) {
+        log.warn('Update work request missing DrID', { workId });
         ErrorResponses.badRequest(res, 'DrID is required');
         return;
       }
 
       // Validate data types
       if (isNaN(parseInt(String(workId))) || isNaN(parseInt(String(workData.DrID)))) {
+        log.warn('Update work invalid parameters', { workId, DrID: workData.DrID });
         ErrorResponses.badRequest(res, 'workId and DrID must be valid numbers');
         return;
       }
@@ -478,6 +486,7 @@ router.put(
         if (value && typeof value === 'string') {
           const date = new Date(value);
           if (isNaN(date.getTime())) {
+            log.warn('Update work invalid date format', { workId, field, value });
             ErrorResponses.badRequest(res, `Invalid date format for ${field}`);
             return;
           }
@@ -497,6 +506,7 @@ router.put(
       if (needsCurrentWork) {
         const fetchedWork = await getWorkById(parseInt(String(workId)));
         if (!fetchedWork) {
+          log.warn('Work not found for update', { workId });
           ErrorResponses.notFound(res, 'Work not found');
           return;
         }
@@ -589,11 +599,13 @@ router.post(
       const { workId } = req.body;
 
       if (!workId) {
+        log.warn('Finish work request missing workId');
         ErrorResponses.missingParameter(res, 'workId');
         return;
       }
 
       if (isNaN(parseInt(String(workId)))) {
+        log.warn('Finish work invalid workId', { workId });
         ErrorResponses.badRequest(res, 'workId must be a valid number');
         return;
       }
@@ -624,11 +636,13 @@ router.post(
       const { workId } = req.body;
 
       if (!workId) {
+        log.warn('Discontinue work request missing workId');
         ErrorResponses.missingParameter(res, 'workId');
         return;
       }
 
       if (isNaN(parseInt(String(workId)))) {
+        log.warn('Discontinue work invalid workId', { workId });
         ErrorResponses.badRequest(res, 'workId must be a valid number');
         return;
       }
@@ -659,11 +673,13 @@ router.post(
       const { workId, personId } = req.body;
 
       if (!workId) {
+        log.warn('Reactivate work request missing workId');
         ErrorResponses.missingParameter(res, 'workId');
         return;
       }
 
       if (isNaN(parseInt(String(workId)))) {
+        log.warn('Reactivate work invalid workId', { workId });
         ErrorResponses.badRequest(res, 'workId must be a valid number');
         return;
       }
@@ -742,11 +758,13 @@ router.delete(
       const { workId } = req.body;
 
       if (!workId) {
+        log.warn('Delete work request missing workId');
         ErrorResponses.missingParameter(res, 'workId');
         return;
       }
 
       if (isNaN(parseInt(String(workId)))) {
+        log.warn('Delete work invalid workId', { workId });
         ErrorResponses.badRequest(res, 'workId must be a valid number');
         return;
       }
@@ -785,6 +803,7 @@ router.get(
     try {
       const { code: personId } = req.query;
       if (!personId) {
+        log.warn('Get active work request missing PersonID');
         ErrorResponses.missingParameter(res, 'code (PersonID)');
         return;
       }
@@ -867,6 +886,7 @@ router.get(
       const { itemId } = req.params;
 
       if (!itemId || isNaN(parseInt(itemId))) {
+        log.warn('Get work item teeth invalid itemId', { itemId });
         ErrorResponses.badRequest(res, 'itemId must be a valid number');
         return;
       }
@@ -900,6 +920,7 @@ router.get(
     try {
       const { workId } = req.query;
       if (!workId) {
+        log.warn('Get work details list request missing workId');
         ErrorResponses.missingParameter(res, 'workId');
         return;
       }
@@ -927,12 +948,14 @@ router.post(
 
       // Validate required fields
       if (!workDetailData.WorkID) {
+        log.warn('Add work detail missing WorkID');
         ErrorResponses.missingParameter(res, 'WorkID');
         return;
       }
 
       // Validate data types
       if (isNaN(parseInt(String(workDetailData.WorkID)))) {
+        log.warn('Add work detail invalid WorkID', { WorkID: workDetailData.WorkID });
         ErrorResponses.badRequest(res, 'WorkID must be a valid number');
         return;
       }
@@ -942,6 +965,7 @@ router.post(
         workDetailData.CanalsNo &&
         isNaN(parseInt(String(workDetailData.CanalsNo)))
       ) {
+        log.warn('Add work detail invalid CanalsNo', { CanalsNo: workDetailData.CanalsNo });
         ErrorResponses.badRequest(res, 'CanalsNo must be a valid number');
         return;
       }
@@ -951,12 +975,14 @@ router.post(
         workDetailData.ItemCost &&
         isNaN(parseInt(String(workDetailData.ItemCost)))
       ) {
+        log.warn('Add work detail invalid ItemCost', { ItemCost: workDetailData.ItemCost });
         ErrorResponses.badRequest(res, 'ItemCost must be a valid number');
         return;
       }
 
       // Validate TeethIds if provided
       if (workDetailData.TeethIds && !Array.isArray(workDetailData.TeethIds)) {
+        log.warn('Add work detail invalid TeethIds', { TeethIds: workDetailData.TeethIds });
         ErrorResponses.badRequest(
           res,
           'TeethIds must be an array of tooth IDs'
@@ -998,12 +1024,14 @@ router.put(
       const id = detailId || itemId; // Support both naming conventions
 
       if (!id) {
+        log.warn('Update work detail missing detailId/itemId');
         ErrorResponses.missingParameter(res, 'detailId or itemId');
         return;
       }
 
       // Validate data types
       if (isNaN(parseInt(String(id)))) {
+        log.warn('Update work detail invalid id', { detailId, itemId });
         ErrorResponses.badRequest(
           res,
           'detailId/itemId must be a valid number'
@@ -1016,6 +1044,7 @@ router.put(
         workDetailData.CanalsNo &&
         isNaN(parseInt(String(workDetailData.CanalsNo)))
       ) {
+        log.warn('Update work detail invalid CanalsNo', { id, CanalsNo: workDetailData.CanalsNo });
         ErrorResponses.badRequest(res, 'CanalsNo must be a valid number');
         return;
       }
@@ -1025,12 +1054,14 @@ router.put(
         workDetailData.ItemCost &&
         isNaN(parseInt(String(workDetailData.ItemCost)))
       ) {
+        log.warn('Update work detail invalid ItemCost', { id, ItemCost: workDetailData.ItemCost });
         ErrorResponses.badRequest(res, 'ItemCost must be a valid number');
         return;
       }
 
       // Validate TeethIds if provided
       if (workDetailData.TeethIds && !Array.isArray(workDetailData.TeethIds)) {
+        log.warn('Update work detail invalid TeethIds', { id, TeethIds: workDetailData.TeethIds });
         ErrorResponses.badRequest(
           res,
           'TeethIds must be an array of tooth IDs'
@@ -1065,11 +1096,13 @@ router.delete(
       const id = detailId || itemId; // Support both naming conventions
 
       if (!id) {
+        log.warn('Delete work detail missing detailId/itemId');
         ErrorResponses.missingParameter(res, 'detailId or itemId');
         return;
       }
 
       if (isNaN(parseInt(String(id)))) {
+        log.warn('Delete work detail invalid id', { detailId, itemId });
         ErrorResponses.badRequest(
           res,
           'detailId/itemId must be a valid number'
@@ -1105,6 +1138,7 @@ router.get(
       const { workId } = req.params;
 
       if (!workId || isNaN(parseInt(workId))) {
+        log.warn('Get work items invalid workId', { workId });
         ErrorResponses.badRequest(res, 'workId must be a valid number');
         return;
       }
@@ -1137,12 +1171,14 @@ router.post(
       const itemData = req.body;
 
       if (!workId || isNaN(parseInt(workId))) {
+        log.warn('Add work item invalid workId', { workId });
         ErrorResponses.badRequest(res, 'workId must be a valid number');
         return;
       }
 
       // Validate TeethIds if provided
       if (itemData.TeethIds && !Array.isArray(itemData.TeethIds)) {
+        log.warn('Add work item invalid TeethIds', { workId, TeethIds: itemData.TeethIds });
         ErrorResponses.badRequest(
           res,
           'TeethIds must be an array of tooth IDs'
@@ -1184,12 +1220,14 @@ router.put(
       const itemData = req.body;
 
       if (!itemId || isNaN(parseInt(itemId))) {
+        log.warn('Update work item invalid itemId', { itemId });
         ErrorResponses.badRequest(res, 'itemId must be a valid number');
         return;
       }
 
       // Validate TeethIds if provided
       if (itemData.TeethIds && !Array.isArray(itemData.TeethIds)) {
+        log.warn('Update work item invalid TeethIds', { itemId, TeethIds: itemData.TeethIds });
         ErrorResponses.badRequest(
           res,
           'TeethIds must be an array of tooth IDs'
@@ -1221,6 +1259,7 @@ router.delete(
       const { itemId } = req.params;
 
       if (!itemId || isNaN(parseInt(itemId))) {
+        log.warn('Delete work item invalid itemId', { itemId });
         ErrorResponses.badRequest(res, 'itemId must be a valid number');
         return;
       }
@@ -1253,6 +1292,7 @@ router.get(
       const { workId } = req.params;
 
       if (!workId) {
+        log.warn('Get diagnosis request missing workId');
         ErrorResponses.missingParameter(res, 'workId');
         return;
       }
@@ -1342,14 +1382,17 @@ router.post(
 
       // Validate required fields
       if (!diagnosisData.WorkID) {
+        log.warn('Save diagnosis missing WorkID');
         ErrorResponses.missingParameter(res, 'WorkID');
         return;
       }
       if (!diagnosisData.Diagnosis || !diagnosisData.Diagnosis.trim()) {
+        log.warn('Save diagnosis missing Diagnosis', { WorkID: diagnosisData.WorkID });
         ErrorResponses.missingParameter(res, 'Diagnosis');
         return;
       }
       if (!diagnosisData.TreatmentPlan || !diagnosisData.TreatmentPlan.trim()) {
+        log.warn('Save diagnosis missing TreatmentPlan', { WorkID: diagnosisData.WorkID });
         ErrorResponses.missingParameter(res, 'TreatmentPlan');
         return;
       }
@@ -1611,6 +1654,7 @@ router.delete(
       const { workId } = req.params;
 
       if (!workId) {
+        log.warn('Delete diagnosis request missing workId');
         ErrorResponses.missingParameter(res, 'workId');
         return;
       }

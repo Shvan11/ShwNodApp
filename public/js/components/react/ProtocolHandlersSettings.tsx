@@ -1,13 +1,34 @@
-import { useState, useEffect, ChangeEvent, MouseEvent } from 'react';
+import { useState, useEffect, useCallback, ChangeEvent, MouseEvent } from 'react';
 import styles from './DatabaseSettings.module.css';
+import {
+    isFileSystemAccessSupported,
+    checkBrowserSupport,
+    pickIniFile,
+    readTextFile,
+    writeTextFile,
+    saveHandle,
+    getFileHandle,
+    removeHandle,
+    checkPermission,
+    ensurePermission,
+    isAbortError,
+    isNotFoundError,
+    type BrowserSupportResult,
+    type FileOperationResult
+} from '../../core/fileSystemAccess';
+import {
+    parseIniContent,
+    formatIniContent,
+    mergeConfigs,
+    getProtocolHandlerFormatOptions,
+    type IniConfig,
+    type IniSection
+} from '../../core/iniParser';
+import { useToast } from '../../contexts/ToastContext';
 
-interface IniSection {
-    [key: string]: string;
-}
-
-interface IniConfig {
-    [section: string]: IniSection;
-}
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
 
 interface PendingChanges {
     [section: string]: {
@@ -15,11 +36,10 @@ interface PendingChanges {
     };
 }
 
-interface FileStatus {
-    exists: boolean;
-    backupExists: boolean;
-    modified?: string;
-    size?: number;
+interface FileInfo {
+    name: string;
+    lastModified: Date;
+    size: number;
 }
 
 interface ModalState {
@@ -31,6 +51,12 @@ interface ModalState {
 interface ProtocolHandlersSettingsProps {
     onChangesUpdate?: (hasChanges: boolean) => void;
 }
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const HANDLE_STORAGE_KEY = 'protocol-handlers-ini';
 
 // Key descriptions for documentation
 const KEY_DESCRIPTIONS: Record<string, string> = {
@@ -45,17 +71,42 @@ const KEY_DESCRIPTIONS: Record<string, string> = {
     msaccess: 'Path to Microsoft Access executable'
 };
 
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
 const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsProps) => {
+    const toast = useToast();
+
+    // Configuration state
     const [config, setConfig] = useState<IniConfig>({});
     const [pendingChanges, setPendingChanges] = useState<PendingChanges>({});
+
+    // File System Access state
+    const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
+    const [hasFileAccess, setHasFileAccess] = useState(false);
+    const [browserSupport, setBrowserSupport] = useState<BrowserSupportResult | null>(null);
+    const [permissionState, setPermissionState] = useState<PermissionState>('prompt');
+    const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
+
+    // UI state
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    const [fileStatus, setFileStatus] = useState<FileStatus | null>(null);
     const [modal, setModal] = useState<ModalState>({ show: false, title: '', message: '' });
     const [configError, setConfigError] = useState<string | null>(null);
 
+    // ========================================================================
+    // INITIALIZATION
+    // ========================================================================
+
     useEffect(() => {
-        loadConfig();
+        // Check browser support on mount
+        const support = checkBrowserSupport();
+        setBrowserSupport(support);
+
+        if (support.isSupported) {
+            loadSavedHandle();
+        }
     }, []);
 
     useEffect(() => {
@@ -66,37 +117,319 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
             );
             onChangesUpdate(hasChanges);
         }
-    }, [pendingChanges]);
+    }, [pendingChanges, onChangesUpdate]);
 
-    const loadConfig = async () => {
-        setIsLoading(true);
-        setConfigError(null);
+    // ========================================================================
+    // FILE HANDLE MANAGEMENT
+    // ========================================================================
+
+    const loadSavedHandle = useCallback(async () => {
         try {
-            // Load config and status in parallel
-            const [configResponse, statusResponse] = await Promise.all([
-                fetch('/api/config/protocol-handlers'),
-                fetch('/api/config/protocol-handlers/status')
-            ]);
+            const savedHandle = await getFileHandle(HANDLE_STORAGE_KEY);
+            if (savedHandle) {
+                const permission = await checkPermission(savedHandle, 'readwrite');
+                setPermissionState(permission);
 
-            const configData = await configResponse.json();
-            const statusData = await statusResponse.json();
-
-            if (configData.success) {
-                setConfig(configData.config);
-            } else {
-                setConfigError(configData.message || 'Failed to load configuration');
-            }
-
-            if (statusData.success) {
-                setFileStatus(statusData.status);
+                if (permission === 'granted') {
+                    setFileHandle(savedHandle);
+                    setHasFileAccess(true);
+                    await loadConfigFromFile(savedHandle);
+                } else {
+                    // Handle exists but permission not granted yet
+                    setFileHandle(savedHandle);
+                }
             }
         } catch (error) {
-            console.error('Error loading protocol handler config:', error);
-            setConfigError('Failed to load configuration: ' + (error as Error).message);
+            console.error('Error loading saved handle:', error);
+        }
+    }, []);
+
+    const selectIniFile = async (): Promise<void> => {
+        setIsLoading(true);
+        setConfigError(null);
+
+        try {
+            const result = await pickIniFile();
+
+            if (!result.success) {
+                if (!isAbortError({ name: result.errorName })) {
+                    setConfigError(result.error || 'Failed to select file');
+                }
+                return;
+            }
+
+            if (result.data) {
+                const handle = result.data;
+
+                // Save handle for persistence
+                await saveHandle(HANDLE_STORAGE_KEY, handle, {
+                    fileName: handle.name
+                });
+
+                setFileHandle(handle);
+                setHasFileAccess(true);
+                setPermissionState('granted');
+
+                await loadConfigFromFile(handle);
+                toast.success('INI file loaded successfully');
+            }
+        } catch (error) {
+            console.error('Error selecting INI file:', error);
+            setConfigError('Failed to select file: ' + (error as Error).message);
         } finally {
             setIsLoading(false);
         }
     };
+
+    const requestFilePermission = async (): Promise<void> => {
+        if (!fileHandle) return;
+
+        try {
+            const granted = await ensurePermission(fileHandle, 'readwrite');
+
+            if (granted) {
+                setPermissionState('granted');
+                setHasFileAccess(true);
+                await loadConfigFromFile(fileHandle);
+                toast.success('Permission granted');
+            } else {
+                setPermissionState('denied');
+                toast.warning('Permission denied. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error requesting permission:', error);
+            toast.error('Failed to request permission');
+        }
+    };
+
+    const changeFile = async (): Promise<void> => {
+        // Clear current handle and let user select a new one
+        await removeHandle(HANDLE_STORAGE_KEY);
+        setFileHandle(null);
+        setHasFileAccess(false);
+        setConfig({});
+        setPendingChanges({});
+        setFileInfo(null);
+        setConfigError(null);
+
+        // Immediately prompt for new file
+        await selectIniFile();
+    };
+
+    // ========================================================================
+    // FILE OPERATIONS
+    // ========================================================================
+
+    const loadConfigFromFile = async (handle: FileSystemFileHandle): Promise<void> => {
+        setIsLoading(true);
+        setConfigError(null);
+
+        try {
+            // Get file info
+            const file = await handle.getFile();
+            setFileInfo({
+                name: file.name,
+                lastModified: new Date(file.lastModified),
+                size: file.size
+            });
+
+            // Read and parse content
+            const result = await readTextFile(handle);
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to read file');
+            }
+
+            const parsed = parseIniContent(result.data || '');
+            setConfig(parsed);
+            setPendingChanges({});
+        } catch (error) {
+            console.error('Error loading config from file:', error);
+
+            if (isNotFoundError(error)) {
+                // File was deleted/moved
+                await removeHandle(HANDLE_STORAGE_KEY);
+                setFileHandle(null);
+                setHasFileAccess(false);
+                setConfigError('File not found. Please select the INI file again.');
+            } else {
+                setConfigError('Failed to load configuration: ' + (error as Error).message);
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const saveConfiguration = async (): Promise<void> => {
+        if (!fileHandle) {
+            toast.error('No file selected');
+            return;
+        }
+
+        const totalChanges = Object.values(pendingChanges).reduce(
+            (sum, section) => sum + Object.keys(section).length,
+            0
+        );
+
+        if (totalChanges === 0) {
+            showModal('Info', 'No changes to save.');
+            return;
+        }
+
+        setIsSaving(true);
+
+        try {
+            // Ensure we have write permission
+            const hasPermission = await ensurePermission(fileHandle, 'readwrite');
+            if (!hasPermission) {
+                showModal('Permission Denied', 'Cannot save without write permission. Please grant access and try again.');
+                return;
+            }
+
+            // Merge pending changes with current config
+            const mergedConfig = mergeConfigs(config, pendingChanges);
+
+            // Format and write to file
+            const content = formatIniContent(mergedConfig, getProtocolHandlerFormatOptions());
+            const result = await writeTextFile(fileHandle, content);
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to write file');
+            }
+
+            // Update state
+            setConfig(mergedConfig);
+            setPendingChanges({});
+
+            // Refresh file info
+            const file = await fileHandle.getFile();
+            setFileInfo({
+                name: file.name,
+                lastModified: new Date(file.lastModified),
+                size: file.size
+            });
+
+            showModal('Success', 'Configuration saved successfully.\n\nNote: Protocol handlers will use the new settings immediately.');
+        } catch (error) {
+            console.error('Error saving config:', error);
+            showModal('Error', 'Failed to save configuration: ' + (error as Error).message);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const createBackup = async (): Promise<void> => {
+        if (!browserSupport?.isSupported) {
+            toast.error('File System Access API not supported');
+            return;
+        }
+
+        try {
+            // Merge any pending changes for backup
+            const currentConfig = mergeConfigs(config, pendingChanges);
+            const content = formatIniContent(currentConfig, getProtocolHandlerFormatOptions());
+
+            // Use save file picker for backup
+            const backupHandle = await window.showSaveFilePicker({
+                suggestedName: 'ProtocolHandlers.ini.backup',
+                types: [{
+                    description: 'INI Backup Files',
+                    accept: { 'text/plain': ['.ini', '.backup'] }
+                }]
+            });
+
+            const result = await writeTextFile(backupHandle, content);
+
+            if (result.success) {
+                showModal('Success', 'Backup created successfully.');
+            } else {
+                throw new Error(result.error || 'Failed to create backup');
+            }
+        } catch (error) {
+            if (!isAbortError(error)) {
+                console.error('Error creating backup:', error);
+                showModal('Error', 'Failed to create backup: ' + (error as Error).message);
+            }
+        }
+    };
+
+    const restoreFromBackup = async (): Promise<void> => {
+        if (!fileHandle) {
+            toast.error('No target file selected');
+            return;
+        }
+
+        if (!window.confirm('Are you sure you want to restore from backup? Current configuration will be overwritten.')) {
+            return;
+        }
+
+        try {
+            // Pick a backup file to restore from
+            const result = await pickIniFile();
+
+            if (!result.success || !result.data) {
+                if (!isAbortError({ name: result.errorName })) {
+                    toast.error(result.error || 'Failed to select backup file');
+                }
+                return;
+            }
+
+            // Read backup content
+            const backupContent = await readTextFile(result.data);
+
+            if (!backupContent.success) {
+                throw new Error(backupContent.error || 'Failed to read backup file');
+            }
+
+            // Parse backup
+            const parsed = parseIniContent(backupContent.data || '');
+
+            // Ensure we have write permission for target
+            const hasPermission = await ensurePermission(fileHandle, 'readwrite');
+            if (!hasPermission) {
+                toast.error('Cannot write without permission');
+                return;
+            }
+
+            // Write to target file
+            const content = formatIniContent(parsed, getProtocolHandlerFormatOptions());
+            const writeResult = await writeTextFile(fileHandle, content);
+
+            if (!writeResult.success) {
+                throw new Error(writeResult.error || 'Failed to write restored config');
+            }
+
+            // Update state
+            setConfig(parsed);
+            setPendingChanges({});
+
+            // Refresh file info
+            const file = await fileHandle.getFile();
+            setFileInfo({
+                name: file.name,
+                lastModified: new Date(file.lastModified),
+                size: file.size
+            });
+
+            showModal('Success', 'Configuration restored from backup.');
+        } catch (error) {
+            if (!isAbortError(error)) {
+                console.error('Error restoring from backup:', error);
+                showModal('Error', 'Failed to restore from backup: ' + (error as Error).message);
+            }
+        }
+    };
+
+    const reloadConfig = async (): Promise<void> => {
+        if (fileHandle) {
+            await loadConfigFromFile(fileHandle);
+            toast.info('Configuration reloaded');
+        }
+    };
+
+    // ========================================================================
+    // UI HELPERS
+    // ========================================================================
 
     const showModal = (title: string, message: string) => {
         setModal({ show: true, title, message });
@@ -139,112 +472,6 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
         return pendingChanges[section]?.[key] !== undefined;
     };
 
-    const saveConfiguration = async () => {
-        const totalChanges = Object.values(pendingChanges).reduce(
-            (sum, section) => sum + Object.keys(section).length,
-            0
-        );
-
-        if (totalChanges === 0) {
-            showModal('Info', 'No changes to save.');
-            return;
-        }
-
-        setIsSaving(true);
-        try {
-            // Merge pending changes with current config
-            const mergedConfig: IniConfig = {};
-            for (const section of Object.keys(config)) {
-                mergedConfig[section] = { ...config[section] };
-            }
-            for (const section of Object.keys(pendingChanges)) {
-                if (!mergedConfig[section]) {
-                    mergedConfig[section] = {};
-                }
-                Object.assign(mergedConfig[section], pendingChanges[section]);
-            }
-
-            const response = await fetch('/api/config/protocol-handlers', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ config: mergedConfig })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                setConfig(mergedConfig);
-                setPendingChanges({});
-                showModal('Success', 'Configuration saved successfully.\n\nNote: Protocol handlers will use the new settings immediately.');
-                // Reload status to get updated file info
-                loadFileStatus();
-            } else {
-                throw new Error(data.message || 'Failed to save configuration');
-            }
-        } catch (error) {
-            console.error('Error saving config:', error);
-            showModal('Error', 'Failed to save configuration: ' + (error as Error).message);
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const loadFileStatus = async () => {
-        try {
-            const response = await fetch('/api/config/protocol-handlers/status');
-            const data = await response.json();
-            if (data.success) {
-                setFileStatus(data.status);
-            }
-        } catch (error) {
-            console.error('Error loading file status:', error);
-        }
-    };
-
-    const createBackup = async () => {
-        try {
-            const response = await fetch('/api/config/protocol-handlers/backup', {
-                method: 'POST'
-            });
-            const data = await response.json();
-
-            if (data.success) {
-                showModal('Success', 'Backup created successfully.');
-                loadFileStatus();
-            } else {
-                throw new Error(data.message || 'Failed to create backup');
-            }
-        } catch (error) {
-            console.error('Error creating backup:', error);
-            showModal('Error', 'Failed to create backup: ' + (error as Error).message);
-        }
-    };
-
-    const restoreFromBackup = async () => {
-        if (!window.confirm('Are you sure you want to restore from backup? Current configuration will be overwritten.')) {
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/config/protocol-handlers/restore', {
-                method: 'POST'
-            });
-            const data = await response.json();
-
-            if (data.success) {
-                setConfig(data.config);
-                setPendingChanges({});
-                showModal('Success', 'Configuration restored from backup.');
-                loadFileStatus();
-            } else {
-                throw new Error(data.message || 'Failed to restore from backup');
-            }
-        } catch (error) {
-            console.error('Error restoring from backup:', error);
-            showModal('Error', 'Failed to restore from backup: ' + (error as Error).message);
-        }
-    };
-
     const hasChanges = Object.keys(pendingChanges).some(
         section => Object.keys(pendingChanges[section]).length > 0
     );
@@ -253,6 +480,10 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
         (sum, section) => sum + Object.keys(section).length,
         0
     );
+
+    // ========================================================================
+    // RENDER HELPERS
+    // ========================================================================
 
     const renderSection = (sectionName: string, sectionData: IniSection) => {
         const sectionIcons: Record<string, string> = {
@@ -308,6 +539,120 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
         );
     };
 
+    const renderBrowserNotSupported = () => (
+        <div className={`${styles.connectionStatus} ${styles.error}`}>
+            <div className={styles.statusHeader}>
+                <i className="fas fa-browser"></i>
+                <span>Browser Not Supported</span>
+            </div>
+            <div className={styles.statusDetails}>
+                <p>The File System Access API is required to edit local configuration files.</p>
+                <p style={{ marginTop: 'var(--spacing-md)' }}>Please use one of these browsers:</p>
+                <ul style={{ marginTop: 'var(--spacing-sm)', marginLeft: 'var(--spacing-lg)' }}>
+                    <li><i className="fab fa-chrome" style={{ marginRight: 'var(--spacing-sm)' }}></i>Google Chrome 86+</li>
+                    <li><i className="fab fa-edge" style={{ marginRight: 'var(--spacing-sm)' }}></i>Microsoft Edge 86+</li>
+                </ul>
+                <p style={{ marginTop: 'var(--spacing-md)', color: 'var(--text-secondary)' }}>
+                    Alternatively, you can manually edit the file at:<br />
+                    <code>C:\Windows\ProtocolHandlers.ini</code>
+                </p>
+            </div>
+        </div>
+    );
+
+    const renderFileSelection = () => (
+        <div className={styles.configGroup}>
+            <h4><i className="fas fa-file-alt"></i> Select Configuration File</h4>
+            <p style={{ marginBottom: 'var(--spacing-md)' }}>
+                To edit the protocol handler configuration, you need to select the INI file on your local computer.
+            </p>
+            <p style={{ marginBottom: 'var(--spacing-lg)', color: 'var(--text-secondary)' }}>
+                Default location: <code>C:\Windows\ProtocolHandlers.ini</code>
+            </p>
+            <button
+                className={`${styles.btn} ${styles.btnPrimary}`}
+                onClick={selectIniFile}
+                disabled={isLoading}
+            >
+                {isLoading ? (
+                    <>
+                        <i className="fas fa-spinner fa-spin"></i>
+                        Loading...
+                    </>
+                ) : (
+                    <>
+                        <i className="fas fa-folder-open"></i>
+                        Select INI File
+                    </>
+                )}
+            </button>
+        </div>
+    );
+
+    const renderPermissionRequest = () => (
+        <div className={styles.configGroup}>
+            <h4><i className="fas fa-key"></i> Permission Required</h4>
+            <p style={{ marginBottom: 'var(--spacing-md)' }}>
+                The browser needs permission to access the configuration file.
+            </p>
+            {fileHandle && (
+                <p style={{ marginBottom: 'var(--spacing-lg)', color: 'var(--text-secondary)' }}>
+                    File: <code>{fileHandle.name}</code>
+                </p>
+            )}
+            <button
+                className={`${styles.btn} ${styles.btnPrimary}`}
+                onClick={requestFilePermission}
+            >
+                <i className="fas fa-key"></i>
+                Grant Permission
+            </button>
+            <button
+                className={`${styles.btn} ${styles.btnSecondary}`}
+                onClick={changeFile}
+                style={{ marginLeft: 'var(--spacing-md)' }}
+            >
+                <i className="fas fa-file"></i>
+                Select Different File
+            </button>
+        </div>
+    );
+
+    const renderFileInfo = () => (
+        <div className={styles.configGroup}>
+            <h4><i className="fas fa-file-alt"></i> File Status</h4>
+            <div style={{ display: 'flex', gap: 'var(--spacing-lg)', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div>
+                    <strong>File:</strong>{' '}
+                    <code>{fileInfo?.name || fileHandle?.name || 'Unknown'}</code>
+                </div>
+                {fileInfo?.lastModified && (
+                    <div>
+                        <strong>Last modified:</strong>{' '}
+                        {fileInfo.lastModified.toLocaleString()}
+                    </div>
+                )}
+                {fileInfo?.size !== undefined && (
+                    <div>
+                        <strong>Size:</strong> {fileInfo.size} bytes
+                    </div>
+                )}
+                <button
+                    className={styles.btnLink}
+                    onClick={changeFile}
+                    style={{ marginLeft: 'auto' }}
+                >
+                    <i className="fas fa-exchange-alt"></i>
+                    Change File
+                </button>
+            </div>
+        </div>
+    );
+
+    // ========================================================================
+    // MAIN RENDER
+    // ========================================================================
+
     return (
         <div className={styles.container}>
             <div className={styles.section}>
@@ -323,76 +668,80 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 <div className={styles.restartWarning} style={{ marginBottom: 'var(--spacing-lg)', background: 'var(--info-50, #eff6ff)', borderColor: 'var(--info-200, #bfdbfe)', color: 'var(--info-800, #1e40af)' }}>
                     <i className="fas fa-info-circle" style={{ color: 'var(--info-color)' }}></i>
                     <span>
-                        <strong>Note:</strong> This configuration is for Windows production environment only.
-                        The INI file is located on the Windows system at C:\Windows\ProtocolHandlers.ini.
+                        <strong>Note:</strong> This page edits the INI file on <strong>this computer</strong>.
+                        Each PC has its own configuration file at C:\Windows\ProtocolHandlers.ini.
                     </span>
                 </div>
 
-                {isLoading ? (
-                    <div className={styles.loadingSpinner}>
-                        <i className="fas fa-spinner fa-spin"></i>
-                        <span>Loading protocol handler configuration...</span>
-                    </div>
-                ) : configError ? (
-                    <div className={`${styles.connectionStatus} ${styles.error}`}>
-                        <div className={styles.statusHeader}>
-                            <i className="fas fa-exclamation-circle"></i>
-                            <span>Configuration Error</span>
-                        </div>
-                        <div className={styles.statusDetails}>{configError}</div>
-                        <div style={{ marginTop: 'var(--spacing-md)' }}>
-                            <button
-                                className={`${styles.btn} ${styles.btnSecondary}`}
-                                onClick={loadConfig}
-                            >
-                                <i className="fas fa-redo"></i>
-                                Retry
-                            </button>
-                        </div>
-                    </div>
-                ) : (
+                {/* Browser not supported */}
+                {browserSupport && !browserSupport.isSupported && renderBrowserNotSupported()}
+
+                {/* Browser supported but no file selected */}
+                {browserSupport?.isSupported && !fileHandle && renderFileSelection()}
+
+                {/* File selected but permission not granted */}
+                {browserSupport?.isSupported && fileHandle && permissionState !== 'granted' && renderPermissionRequest()}
+
+                {/* File access granted - show config editor */}
+                {browserSupport?.isSupported && hasFileAccess && (
                     <>
-                        {/* File Status */}
-                        {fileStatus && (
-                            <div className={styles.configGroup}>
-                                <h4><i className="fas fa-file-alt"></i> File Status</h4>
-                                <div style={{ display: 'flex', gap: 'var(--spacing-lg)', flexWrap: 'wrap' }}>
-                                    <div>
-                                        <strong>File exists:</strong>{' '}
-                                        <span style={{ color: fileStatus.exists ? 'var(--success-color)' : 'var(--error-color)' }}>
-                                            {fileStatus.exists ? 'Yes' : 'No'}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <strong>Backup exists:</strong>{' '}
-                                        <span style={{ color: fileStatus.backupExists ? 'var(--success-color)' : 'var(--text-secondary)' }}>
-                                            {fileStatus.backupExists ? 'Yes' : 'No'}
-                                        </span>
-                                    </div>
-                                    {fileStatus.modified && (
-                                        <div>
-                                            <strong>Last modified:</strong>{' '}
-                                            {new Date(fileStatus.modified).toLocaleString()}
-                                        </div>
-                                    )}
-                                    {fileStatus.size !== undefined && (
-                                        <div>
-                                            <strong>Size:</strong> {fileStatus.size} bytes
-                                        </div>
-                                    )}
+                        {isLoading ? (
+                            <div className={styles.loadingSpinner}>
+                                <i className="fas fa-spinner fa-spin"></i>
+                                <span>Loading protocol handler configuration...</span>
+                            </div>
+                        ) : configError ? (
+                            <div className={`${styles.connectionStatus} ${styles.error}`}>
+                                <div className={styles.statusHeader}>
+                                    <i className="fas fa-exclamation-circle"></i>
+                                    <span>Configuration Error</span>
+                                </div>
+                                <div className={styles.statusDetails}>{configError}</div>
+                                <div style={{ marginTop: 'var(--spacing-md)' }}>
+                                    <button
+                                        className={`${styles.btn} ${styles.btnSecondary}`}
+                                        onClick={reloadConfig}
+                                    >
+                                        <i className="fas fa-redo"></i>
+                                        Retry
+                                    </button>
+                                    <button
+                                        className={`${styles.btn} ${styles.btnSecondary}`}
+                                        onClick={changeFile}
+                                        style={{ marginLeft: 'var(--spacing-md)' }}
+                                    >
+                                        <i className="fas fa-file"></i>
+                                        Select Different File
+                                    </button>
                                 </div>
                             </div>
-                        )}
+                        ) : (
+                            <>
+                                {/* File Status */}
+                                {renderFileInfo()}
 
-                        {/* Render each section */}
-                        {Object.entries(config).map(([sectionName, sectionData]) =>
-                            renderSection(sectionName, sectionData)
+                                {/* Render each section */}
+                                {Object.entries(config).map(([sectionName, sectionData]) =>
+                                    renderSection(sectionName, sectionData)
+                                )}
+
+                                {/* Empty config message */}
+                                {Object.keys(config).length === 0 && (
+                                    <div className={styles.configGroup}>
+                                        <p style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>
+                                            <i className="fas fa-info-circle" style={{ marginRight: 'var(--spacing-sm)' }}></i>
+                                            No configuration found in file. The file may be empty or have an invalid format.
+                                        </p>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </>
                 )}
             </div>
 
-            {!configError && (
+            {/* Action buttons - only show when file access is granted and no error */}
+            {browserSupport?.isSupported && hasFileAccess && !configError && !isLoading && (
                 <div className={styles.actions}>
                     <button
                         className={`${styles.btn} ${styles.btnPrimary}`}
@@ -418,7 +767,6 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                     <button
                         className={`${styles.btn} ${styles.btnSecondary}`}
                         onClick={createBackup}
-                        disabled={!fileStatus?.exists}
                     >
                         <i className="fas fa-copy"></i>
                         Create Backup
@@ -427,7 +775,6 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                     <button
                         className={`${styles.btn} ${styles.btnWarning}`}
                         onClick={restoreFromBackup}
-                        disabled={!fileStatus?.backupExists}
                     >
                         <i className="fas fa-undo"></i>
                         Restore from Backup
@@ -435,7 +782,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
 
                     <button
                         className={`${styles.btn} ${styles.btnInfo}`}
-                        onClick={loadConfig}
+                        onClick={reloadConfig}
                         disabled={isLoading}
                     >
                         <i className="fas fa-sync-alt"></i>

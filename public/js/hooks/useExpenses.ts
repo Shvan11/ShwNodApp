@@ -67,15 +67,15 @@ export interface ExpenseSummary {
 }
 
 /**
- * Expense data for create/update
+ * Expense data for create/update (matches backend API)
  */
 export interface ExpenseData {
-  Amount: number;
-  Currency: string;
-  CategoryID?: number;
-  SubcategoryID?: number;
-  Description?: string;
-  ExpenseDate?: string;
+  expenseDate: string;
+  amount: number;
+  currency: string;
+  note?: string;
+  categoryId?: number;
+  subcategoryId?: number;
   [key: string]: unknown;
 }
 
@@ -228,13 +228,18 @@ export function useExpenseMutations(onSuccess?: () => void): {
           body: JSON.stringify(expenseData),
         });
 
-        if (!response.ok) throw new Error('Failed to create expense');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          const errorMessage = errorData?.error || `Failed to create expense (${response.status})`;
+          throw new Error(errorMessage);
+        }
 
         const data = await response.json();
         if (onSuccess) onSuccess();
         return data;
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to create expense');
+        const message = err instanceof Error ? err.message : 'Failed to create expense';
+        setError(message);
         console.error('Error creating expense:', err);
         throw err;
       } finally {
@@ -256,13 +261,18 @@ export function useExpenseMutations(onSuccess?: () => void): {
           body: JSON.stringify(expenseData),
         });
 
-        if (!response.ok) throw new Error('Failed to update expense');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          const errorMessage = errorData?.error || `Failed to update expense (${response.status})`;
+          throw new Error(errorMessage);
+        }
 
         const data = await response.json();
         if (onSuccess) onSuccess();
         return data;
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to update expense');
+        const message = err instanceof Error ? err.message : 'Failed to update expense';
+        setError(message);
         console.error('Error updating expense:', err);
         throw err;
       } finally {
@@ -282,11 +292,16 @@ export function useExpenseMutations(onSuccess?: () => void): {
           method: 'DELETE',
         });
 
-        if (!response.ok) throw new Error('Failed to delete expense');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          const errorMessage = errorData?.error || `Failed to delete expense (${response.status})`;
+          throw new Error(errorMessage);
+        }
 
         if (onSuccess) onSuccess();
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to delete expense');
+        const message = err instanceof Error ? err.message : 'Failed to delete expense';
+        setError(message);
         console.error('Error deleting expense:', err);
         throw err;
       } finally {

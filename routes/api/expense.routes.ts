@@ -180,6 +180,11 @@ router.post(
 
       // Validation
       if (!expenseDate || !amount) {
+        log.warn('Expense creation validation failed', {
+          expenseDate: expenseDate ?? 'missing',
+          amount: amount ?? 'missing',
+          receivedFields: Object.keys(req.body)
+        });
         ErrorResponses.badRequest(
           res,
           'Missing required fields: expenseDate, amount'
@@ -320,6 +325,12 @@ router.put(
 
       // Validation
       if (!expenseDate || !amount) {
+        log.warn('Expense update validation failed', {
+          expenseId,
+          expenseDate: expenseDate ?? 'missing',
+          amount: amount ?? 'missing',
+          receivedFields: Object.keys(req.body)
+        });
         ErrorResponses.badRequest(
           res,
           'Missing required fields: expenseDate, amount'

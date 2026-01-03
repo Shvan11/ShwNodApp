@@ -8,21 +8,71 @@ Write-Host "  Protocol Handlers Compilation" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Find the C# compiler (csc.exe) from .NET Framework
-$cscPath = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+# Find the best available C# compiler
+# Priority: 1) Visual Studio Roslyn, 2) .NET SDK, 3) Legacy .NET Framework
+$cscPath = $null
+$compilerType = "Unknown"
 
-if (-not (Test-Path $cscPath)) {
-    Write-Host "ERROR: C# compiler not found at $cscPath" -ForegroundColor Red
-    Write-Host "Trying to find it in PATH..." -ForegroundColor Yellow
-    $cscPath = (Get-Command csc.exe -ErrorAction SilentlyContinue).Source
-
-    if (-not $cscPath) {
-        Write-Host "ERROR: Could not find csc.exe. Please install .NET Framework." -ForegroundColor Red
-        exit 1
+# 1. Try to find Visual Studio's Roslyn compiler (supports C# 6+)
+$vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+if (Test-Path $vsWhere) {
+    $vsPath = & $vsWhere -latest -requires Microsoft.Component.MSBuild -property installationPath 2>$null
+    if ($vsPath) {
+        # Look for Roslyn csc.exe in VS installation
+        $roslynPath = Get-ChildItem -Path "$vsPath\MSBuild" -Recurse -Filter "csc.exe" -ErrorAction SilentlyContinue |
+                      Where-Object { $_.FullName -like "*Roslyn*" } |
+                      Select-Object -First 1
+        if ($roslynPath) {
+            $cscPath = $roslynPath.FullName
+            $compilerType = "Visual Studio Roslyn (C# 10+)"
+        }
     }
 }
 
+# 2. Try .NET SDK compiler
+if (-not $cscPath) {
+    $dotnetPath = (Get-Command dotnet -ErrorAction SilentlyContinue).Source
+    if ($dotnetPath) {
+        # We can use 'dotnet build' but for simple .cs files, let's find the SDK's csc
+        $sdkPath = Split-Path (Split-Path $dotnetPath)
+        $sdkCsc = Get-ChildItem -Path "$sdkPath\sdk" -Recurse -Filter "csc.dll" -ErrorAction SilentlyContinue |
+                  Sort-Object { [version]($_.Directory.Parent.Name -replace '[^\d.]') } -Descending |
+                  Select-Object -First 1
+        if ($sdkCsc) {
+            # For .NET SDK, we need to use 'dotnet exec' to run csc.dll
+            # But it's easier to just use the legacy compiler for Windows Forms apps
+            Write-Host "  Found .NET SDK but using legacy compiler for Windows Forms compatibility" -ForegroundColor Yellow
+        }
+    }
+}
+
+# 3. Fall back to legacy .NET Framework compiler
+if (-not $cscPath) {
+    $legacyPath = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+    if (Test-Path $legacyPath) {
+        $cscPath = $legacyPath
+        $compilerType = "Legacy .NET Framework (C# 5)"
+        Write-Host "  Note: Using legacy compiler. Code must be C# 5 compatible." -ForegroundColor Yellow
+        Write-Host "  Install Visual Studio for C# 6+ features." -ForegroundColor Yellow
+    }
+}
+
+# 4. Last resort - check PATH
+if (-not $cscPath) {
+    $cscPath = (Get-Command csc.exe -ErrorAction SilentlyContinue).Source
+    if ($cscPath) {
+        $compilerType = "From PATH"
+    }
+}
+
+if (-not $cscPath) {
+    Write-Host "ERROR: Could not find any C# compiler!" -ForegroundColor Red
+    Write-Host "Please install Visual Studio or .NET Framework." -ForegroundColor Red
+    exit 1
+}
+
 Write-Host "Using compiler: $cscPath" -ForegroundColor Green
+Write-Host "Compiler type:  $compilerType" -ForegroundColor Green
 Write-Host ""
 
 $compiledCount = 0

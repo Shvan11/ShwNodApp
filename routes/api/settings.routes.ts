@@ -18,7 +18,6 @@ import {
   bulkUpdateOptions
 } from '../../services/database/queries/options-queries.js';
 import DatabaseConfigService from '../../services/config/DatabaseConfigService.js';
-import ProtocolHandlerConfigService from '../../services/config/ProtocolHandlerConfigService.js';
 import { ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 
@@ -46,14 +45,6 @@ interface UpdateOptionBody {
 
 interface DatabaseConfigBody {
   [key: string]: unknown;
-}
-
-interface ProtocolHandlerConfigBody {
-  config: {
-    [section: string]: {
-      [key: string]: string;
-    };
-  };
 }
 
 interface RestartBody {
@@ -213,7 +204,6 @@ router.put(
 // ===== DATABASE CONFIGURATION ENDPOINTS =====
 
 const dbConfigService = new DatabaseConfigService();
-const protocolConfigService = new ProtocolHandlerConfigService();
 
 /**
  * Get current database configuration
@@ -422,152 +412,6 @@ router.get('/config/database/presets', (_req: Request, res: Response): void => {
     ErrorResponses.internalError(res, 'Failed to get presets', error as Error);
   }
 });
-
-// ===== PROTOCOL HANDLER CONFIGURATION ENDPOINTS =====
-
-/**
- * Get current protocol handler configuration
- * GET /api/config/protocol-handlers
- */
-router.get(
-  '/config/protocol-handlers',
-  async (_req: Request, res: Response): Promise<void> => {
-    try {
-      const result = await protocolConfigService.readConfig();
-
-      if (result.success) {
-        res.json({
-          success: true,
-          config: result.config,
-          timestamp: result.timestamp
-        });
-      } else {
-        res.status(404).json({
-          success: false,
-          error: result.error,
-          message: result.message
-        });
-      }
-    } catch (error) {
-      log.error('Error getting protocol handler configuration:', error);
-      ErrorResponses.internalError(
-        res,
-        'Failed to get protocol handler configuration',
-        error as Error
-      );
-    }
-  }
-);
-
-/**
- * Update protocol handler configuration
- * PUT /api/config/protocol-handlers
- */
-router.put(
-  '/config/protocol-handlers',
-  async (
-    req: Request<unknown, unknown, ProtocolHandlerConfigBody>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { config } = req.body;
-
-      if (!config || typeof config !== 'object') {
-        ErrorResponses.badRequest(res, 'Invalid configuration provided');
-        return;
-      }
-
-      log.info('Updating protocol handler configuration...');
-      const result = await protocolConfigService.updateConfig(config);
-
-      if (result.success) {
-        res.json({
-          success: true,
-          config: result.config,
-          message: result.message,
-          timestamp: result.timestamp
-        });
-      } else {
-        res.status(400).json({
-          success: false,
-          error: result.error,
-          message: result.message
-        });
-      }
-    } catch (error) {
-      log.error('Error updating protocol handler configuration:', error);
-      ErrorResponses.internalError(
-        res,
-        'Failed to update protocol handler configuration',
-        error as Error
-      );
-    }
-  }
-);
-
-/**
- * Get protocol handler configuration file status
- * GET /api/config/protocol-handlers/status
- */
-router.get(
-  '/config/protocol-handlers/status',
-  async (_req: Request, res: Response): Promise<void> => {
-    try {
-      const status = await protocolConfigService.getFileStatus();
-      const paths = protocolConfigService.getPaths();
-
-      res.json({
-        success: true,
-        status,
-        paths,
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      log.error('Error getting protocol handler status:', error);
-      ErrorResponses.internalError(
-        res,
-        'Failed to get configuration status',
-        error as Error
-      );
-    }
-  }
-);
-
-/**
- * Create backup of protocol handler configuration
- * POST /api/config/protocol-handlers/backup
- */
-router.post(
-  '/config/protocol-handlers/backup',
-  async (_req: Request, res: Response): Promise<void> => {
-    try {
-      const result = await protocolConfigService.createBackup();
-      const statusCode = result.success ? 200 : 400;
-      res.status(statusCode).json(result);
-    } catch (error) {
-      log.error('Error creating protocol handler backup:', error);
-      ErrorResponses.internalError(res, 'Backup creation failed', error as Error);
-    }
-  }
-);
-
-/**
- * Restore protocol handler configuration from backup
- * POST /api/config/protocol-handlers/restore
- */
-router.post(
-  '/config/protocol-handlers/restore',
-  async (_req: Request, res: Response): Promise<void> => {
-    try {
-      const result = await protocolConfigService.restoreFromBackup();
-      const statusCode = result.success ? 200 : 400;
-      res.status(statusCode).json(result);
-    } catch (error) {
-      log.error('Error restoring protocol handler configuration:', error);
-      ErrorResponses.internalError(res, 'Restore failed', error as Error);
-    }
-  }
-);
 
 // ===== SYSTEM MANAGEMENT ENDPOINTS =====
 

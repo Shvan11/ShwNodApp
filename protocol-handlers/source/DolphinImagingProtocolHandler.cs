@@ -34,7 +34,9 @@ namespace DolphinImagingProtocolHandler
 
             try
             {
-                var (patientId, parameters) = ParseUrl(args[0]);
+                var parsed = ParseUrl(args[0]);
+                string patientId = parsed.Item1;
+                NameValueCollection parameters = parsed.Item2;
                 var config = LoadConfig();
 
                 switch (parameters["action"])
@@ -46,20 +48,20 @@ namespace DolphinImagingProtocolHandler
                         ImportPhotos(patientId, parameters, config);
                         break;
                     default:
-                        ShowError($"Unknown action: {parameters["action"]}");
+                        ShowError("Unknown action: " + parameters["action"]);
                         break;
                 }
             }
             catch (Exception ex)
             {
-                ShowError($"Error: {ex.Message}");
+                ShowError("Error: " + ex.Message);
             }
         }
 
         /// <summary>
-        /// Parse dolphin:PatientID?action=open&tp=0&date=20251220&skip=0
+        /// Parse dolphin:PatientID?action=open&amp;tp=0&amp;date=20251220&amp;skip=0
         /// </summary>
-        static (string patientId, NameValueCollection parameters) ParseUrl(string url)
+        static Tuple<string, NameValueCollection> ParseUrl(string url)
         {
             // Remove protocol prefix
             string withoutProtocol = url.Substring(url.IndexOf(':') + 1);
@@ -76,7 +78,7 @@ namespace DolphinImagingProtocolHandler
                 parameters = HttpUtility.ParseQueryString(parts[1]);
             }
 
-            return (patientId, parameters);
+            return Tuple.Create(patientId, parameters);
         }
 
         /// <summary>
@@ -84,12 +86,15 @@ namespace DolphinImagingProtocolHandler
         /// </summary>
         static Config LoadConfig()
         {
+            string memoryCardPath = ReadIniValue("Paths", "MemoryCardPath");
+            string useRunAsDateStr = ReadIniValue("Paths", "UseRunAsDate");
+
             var config = new Config
             {
                 DolphinPath = ReadIniValue("Paths", "DolphinPath"),
                 PatientsFolder = ReadIniValue("Paths", "PatientsFolder"),
-                MemoryCardPath = ReadIniValue("Paths", "MemoryCardPath") ?? @"D:\DCIM",
-                UseRunAsDate = ReadIniValue("Paths", "UseRunAsDate")?.ToLowerInvariant() == "true",
+                MemoryCardPath = !string.IsNullOrEmpty(memoryCardPath) ? memoryCardPath : @"D:\DCIM",
+                UseRunAsDate = useRunAsDateStr != null && useRunAsDateStr.ToLowerInvariant() == "true",
                 RunAsDatePath = ReadIniValue("Paths", "RunAsDatePath")
             };
 
@@ -120,7 +125,7 @@ namespace DolphinImagingProtocolHandler
 
             if (WritePrivateProfileString("Defaults", "CaptureFromFilePath", patientFolder, dolphinIni) == 0)
             {
-                ShowError($"Failed to write to Dolphin.ini: {dolphinIni}");
+                ShowError("Failed to write to Dolphin.ini: " + dolphinIni);
                 return;
             }
 
@@ -129,14 +134,14 @@ namespace DolphinImagingProtocolHandler
                 // RunAsDate mode: Launch dolphin64.exe via RunAsDate utility
                 if (string.IsNullOrEmpty(config.RunAsDatePath) || !File.Exists(config.RunAsDatePath))
                 {
-                    ShowError($"RunAsDate.exe not found at: {config.RunAsDatePath}");
+                    ShowError("RunAsDate.exe not found at: " + config.RunAsDatePath);
                     return;
                 }
 
                 string dolphin64Exe = Path.Combine(config.DolphinPath, "dolphin64.exe");
                 if (!File.Exists(dolphin64Exe))
                 {
-                    ShowError($"dolphin64.exe not found at: {dolphin64Exe}");
+                    ShowError("dolphin64.exe not found at: " + dolphin64Exe);
                     return;
                 }
 
@@ -144,12 +149,12 @@ namespace DolphinImagingProtocolHandler
                 string dolphinArgs = patientId;
                 if (tpCode.HasValue)
                 {
-                    dolphinArgs += $" /tp {tpCode.Value}";
+                    dolphinArgs += " /tp " + tpCode.Value;
                 }
 
                 // Launch via RunAsDate
                 // Format: RunAsDate.exe /immediate /movetime 29\07\2021 00:00:00 "path\dolphin64.exe" args
-                string runAsDateArgs = $"/immediate /movetime 29\\07\\2021 00:00:00 \"{dolphin64Exe}\" {dolphinArgs}";
+                string runAsDateArgs = string.Format("/immediate /movetime 29\\07\\2021 00:00:00 \"{0}\" {1}", dolphin64Exe, dolphinArgs);
 
                 Process.Start(new ProcessStartInfo
                 {
@@ -164,14 +169,14 @@ namespace DolphinImagingProtocolHandler
                 string dolCtrlExe = Path.Combine(config.DolphinPath, "DolCtrl.exe");
                 if (!File.Exists(dolCtrlExe))
                 {
-                    ShowError($"DolCtrl.exe not found at: {dolCtrlExe}");
+                    ShowError("DolCtrl.exe not found at: " + dolCtrlExe);
                     return;
                 }
 
                 string arguments = patientId;
                 if (tpCode.HasValue)
                 {
-                    arguments += $" /tp {tpCode.Value}";
+                    arguments += " /tp " + tpCode.Value;
                 }
 
                 Process.Start(new ProcessStartInfo
@@ -189,12 +194,13 @@ namespace DolphinImagingProtocolHandler
         static void ImportPhotos(string patientId, NameValueCollection parameters, Config config)
         {
             // Parse parameters
-            int tpCode = int.Parse(parameters["tp"] ?? "0");
+            string tpStr = parameters["tp"];
+            int tpCode = !string.IsNullOrEmpty(tpStr) ? int.Parse(tpStr) : 0;
             string date = parameters["date"] ?? DateTime.Now.ToString("yyyyMMdd");
             bool skipDolphin = parameters["skip"] == "1";
 
             // Create destination folder
-            string destFolder = Path.Combine(config.PatientsFolder, patientId, $"{tpCode}_{date}");
+            string destFolder = Path.Combine(config.PatientsFolder, patientId, tpCode + "_" + date);
             Directory.CreateDirectory(destFolder);
 
             // Show file picker
@@ -227,7 +233,7 @@ namespace DolphinImagingProtocolHandler
                         int counter = 1;
                         do
                         {
-                            destPath = Path.Combine(destFolder, $"{nameWithoutExt}_{counter}{ext}");
+                            destPath = Path.Combine(destFolder, nameWithoutExt + "_" + counter + ext);
                             counter++;
                         } while (File.Exists(destPath));
                     }
@@ -239,7 +245,7 @@ namespace DolphinImagingProtocolHandler
                 if (skipDolphin)
                 {
                     MessageBox.Show(
-                        $"Successfully moved {movedCount} photo(s) to:\n{destFolder}",
+                        "Successfully moved " + movedCount + " photo(s) to:\n" + destFolder,
                         "Photos Organized",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information
