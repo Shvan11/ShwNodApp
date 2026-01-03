@@ -187,6 +187,12 @@ export function PrintQueueProvider({ children }: PrintQueueProviderProps) {
             }
 
             const labels = buildDefaultLabels(batch);
+            // Format doctor name with "Dr. " prefix if not already present
+            const rawDoctorName = doctor?.name || doctor?.doctorName || '';
+            const formattedDoctorName = rawDoctorName && !rawDoctorName.startsWith('Dr.') && !rawDoctorName.startsWith('Dr ')
+                ? `Dr. ${rawDoctorName}`
+                : rawDoctorName;
+
             const newItem: PrintQueueItem = {
                 id: generateId(),
                 batchId: batch.batchId,
@@ -194,7 +200,7 @@ export function PrintQueueProvider({ children }: PrintQueueProviderProps) {
                 personId: Number(patient.code || patient.personId || 0),
                 patientName: patient.name || patient.patientName || '',
                 doctorId: doctor?.id || doctor?.doctorId,
-                doctorName: doctor?.name || doctor?.doctorName || '',
+                doctorName: formattedDoctorName,
                 setId: set?.setId,
                 labels,
                 includeLogo: !!doctor?.logoPath,
