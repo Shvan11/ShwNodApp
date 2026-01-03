@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import styles from './AddPatientForm.module.css';
 
 interface Props {
     onSuccess: (personId: number) => void;
@@ -15,7 +16,6 @@ interface Props {
 
 interface FormData {
     patientName: string;
-    patientID: string;
     firstName: string;
     lastName: string;
     phone: string;
@@ -67,7 +67,6 @@ interface Tab {
 const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
     const [formData, setFormData] = useState<FormData>({
         patientName: '',
-        patientID: '',
         firstName: '',
         lastName: '',
         phone: '',
@@ -248,12 +247,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
     // Render Basic Information Fields
     const renderBasicInfo = () => (
-        <div className="tab-content-section">
-            <div className="form-row">
-                <div className="form-group full-width">
-                    <label className="form-label">
+        <div className={styles.tabContentSection}>
+            <div className={styles.formRow}>
+                <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
+                    <label className={styles.formLabel}>
                         <i className="fas fa-signature"></i>
-                        Patient Name <span className="required">*</span>
+                        Patient Name <span className={styles.required}>*</span>
                     </label>
                     <input
                         type="text"
@@ -267,9 +266,9 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 </div>
             </div>
 
-            <div className="form-row">
-                <div className="form-group">
-                    <label className="form-label">
+            <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
                         <i className="fas fa-user"></i>
                         First Name
                     </label>
@@ -282,8 +281,8 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         placeholder="First name"
                     />
                 </div>
-                <div className="form-group">
-                    <label className="form-label">
+                <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
                         <i className="fas fa-user"></i>
                         Last Name
                     </label>
@@ -298,9 +297,9 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 </div>
             </div>
 
-            <div className="form-row">
-                <div className="form-group">
-                    <label className="form-label">
+            <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
                         <i className="fas fa-globe"></i>
                         Country Code
                     </label>
@@ -314,8 +313,8 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         maxLength={5}
                     />
                 </div>
-                <div className="form-group">
-                    <label className="form-label">
+                <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
                         <i className="fas fa-phone"></i>
                         Primary Phone
                     </label>
@@ -335,10 +334,10 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
     // Render Contact Information Fields
     const renderContactInfo = () => (
-        <div className="tab-content-section">
-            <div className="form-row">
-                <div className="form-group">
-                    <label className="form-label">
+        <div className={styles.tabContentSection}>
+            <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
                         <i className="fas fa-phone-alt"></i>
                         Secondary Phone
                     </label>
@@ -351,8 +350,8 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         placeholder="Secondary phone number"
                     />
                 </div>
-                <div className="form-group">
-                    <label className="form-label">
+                <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
                         <i className="fas fa-envelope"></i>
                         Email Address
                     </label>
@@ -367,32 +366,15 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 </div>
             </div>
 
-            <div className="form-row">
-                <div className="form-group">
-                    <label className="form-label">
-                        <i className="fas fa-id-card"></i>
-                        Patient ID
-                    </label>
-                    <input
-                        type="text"
-                        name="patientID"
-                        value={formData.patientID}
-                        onChange={handleInputChange}
-                        className="form-control"
-                        placeholder="Auto-generated if empty"
-                        maxLength={6}
-                    />
-                </div>
-            </div>
         </div>
     );
 
     // Render Personal Information Fields
     const renderPersonalInfo = () => (
-        <div className="tab-content-section">
-            <div className="form-row">
-                <div className="form-group">
-                    <label className="form-label">
+        <div className={styles.tabContentSection}>
+            <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
                         <i className="fas fa-calendar"></i>
                         Date of Birth
                     </label>
@@ -404,8 +386,8 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         className="form-control"
                     />
                 </div>
-                <div className="form-group">
-                    <label className="form-label">
+                <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
                         <i className="fas fa-venus-mars"></i>
                         Gender
                     </label>
@@ -425,9 +407,9 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 </div>
             </div>
 
-            <div className="form-row">
-                <div className="form-group">
-                    <label className="form-label">
+            <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
                         <i className="fas fa-language"></i>
                         Language
                     </label>
@@ -448,10 +430,10 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
     // Render Medical Information Fields
     const renderMedicalInfo = () => (
-        <div className="tab-content-section">
-            <div className="form-row">
-                <div className="form-group">
-                    <label className="form-label">
+        <div className={styles.tabContentSection}>
+            <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
                         <i className="fas fa-user-tag"></i>
                         Patient Type
                     </label>
@@ -469,8 +451,8 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         ))}
                     </select>
                 </div>
-                <div className="form-group">
-                    <label className="form-label">
+                <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
                         <i className="fas fa-handshake"></i>
                         Referral Source
                     </label>
@@ -490,9 +472,9 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 </div>
             </div>
 
-            <div className="form-row">
-                <div className="form-group">
-                    <label className="form-label">
+            <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
                         <i className="fas fa-map-marker-alt"></i>
                         Address
                     </label>
@@ -516,10 +498,10 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
     // Render Additional Information Fields
     const renderAdditionalInfo = () => (
-        <div className="tab-content-section">
-            <div className="form-row">
-                <div className="form-group full-width">
-                    <label className="form-label">
+        <div className={styles.tabContentSection}>
+            <div className={styles.formRow}>
+                <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
+                    <label className={styles.formLabel}>
                         <i className="fas fa-sticky-note"></i>
                         Notes
                     </label>
@@ -535,9 +517,9 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 </div>
             </div>
 
-            <div className="form-row">
-                <div className="form-group full-width">
-                    <label className="form-label">
+            <div className={styles.formRow}>
+                <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
+                    <label className={styles.formLabel}>
                         <i className="fas fa-exclamation-triangle"></i>
                         Alerts
                     </label>
@@ -572,22 +554,22 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
     };
 
     return (
-        <div className="add-patient-form-container">
-            <h2 className="add-patient-title">
+        <div className={styles.addPatientFormContainer}>
+            <h2 className={styles.addPatientTitle}>
                 <i className="fas fa-user-plus"></i>
                 Add New Patient
             </h2>
 
             {alert.show && (
-                <div className={`alert alert-${alert.type}`}>
+                <div className={`${styles.alert} ${alert.type === 'success' ? styles.alertSuccess : styles.alertDanger}`}>
                     <i className={`fas ${alert.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'}`}></i>
                     {alert.message}
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className="patient-form">
+            <form onSubmit={handleSubmit} className={styles.patientForm}>
                 {/* Form Actions - Top */}
-                <div className="form-actions form-actions-top">
+                <div className={`${styles.formActions} ${styles.formActionsTop}`}>
                     <button
                         type="button"
                         className="btn btn-secondary"
@@ -595,7 +577,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         disabled={loading}
                     >
                         <i className="fas fa-times"></i>
-                        <span className="btn-text">Cancel</span>
+                        <span>Cancel</span>
                     </button>
                     <button
                         type="submit"
@@ -604,55 +586,55 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                     >
                         {loading ? (
                             <>
-                                <div className="loading-spinner"></div>
-                                <span className="btn-text">Adding Patient...</span>
+                                <div className={styles.loadingSpinner}></div>
+                                <span>Adding Patient...</span>
                             </>
                         ) : (
                             <>
                                 <i className="fas fa-save"></i>
-                                <span className="btn-text">Add Patient</span>
+                                <span>Add Patient</span>
                             </>
                         )}
                     </button>
                 </div>
 
                 {/* Desktop Tabbed View */}
-                <div className="form-tabs-container desktop-only">
-                    <div className="tabs-header">
+                <div className={`${styles.formTabsContainer} ${styles.desktopOnly}`}>
+                    <div className={styles.tabsHeader}>
                         {tabs.map(tab => (
                             <button
                                 key={tab.id}
                                 type="button"
-                                className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
+                                className={`${styles.tabButton} ${activeTab === tab.id ? styles.tabButtonActive : ''}`}
                                 onClick={() => setActiveTab(tab.id)}
                             >
                                 <i className={tab.icon}></i>
-                                <span className="tab-label">{tab.label}</span>
+                                <span className={styles.tabLabel}>{tab.label}</span>
                             </button>
                         ))}
                     </div>
-                    <div className="tabs-content">
+                    <div className={styles.tabsContent}>
                         {renderTabContent(activeTab)}
                     </div>
                 </div>
 
                 {/* Mobile Accordion View */}
-                <div className="form-accordion-container mobile-only">
+                <div className={`${styles.formAccordionContainer} ${styles.mobileOnly}`}>
                     {tabs.map(tab => (
-                        <div key={tab.id} className="accordion-section">
+                        <div key={tab.id} className={styles.accordionSection}>
                             <button
                                 type="button"
-                                className={`accordion-header ${expandedSections[tab.id as keyof ExpandedSections] ? 'expanded' : ''}`}
+                                className={`${styles.accordionHeader} ${expandedSections[tab.id as keyof ExpandedSections] ? styles.accordionHeaderExpanded : ''}`}
                                 onClick={() => toggleAccordion(tab.id as keyof ExpandedSections)}
                             >
-                                <div className="accordion-title">
+                                <div className={styles.accordionTitle}>
                                     <i className={tab.icon}></i>
                                     <span>{tab.label}</span>
                                 </div>
                                 <i className={`fas fa-chevron-${expandedSections[tab.id as keyof ExpandedSections] ? 'up' : 'down'}`}></i>
                             </button>
                             {expandedSections[tab.id as keyof ExpandedSections] && (
-                                <div className="accordion-content">
+                                <div className={styles.accordionContent}>
                                     {renderTabContent(tab.id)}
                                 </div>
                             )}
@@ -661,7 +643,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 </div>
 
                 {/* Form Actions - Bottom */}
-                <div className="form-actions form-actions-bottom">
+                <div className={`${styles.formActions} ${styles.formActionsBottom}`}>
                     <button
                         type="button"
                         className="btn btn-secondary"
@@ -669,7 +651,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         disabled={loading}
                     >
                         <i className="fas fa-times"></i>
-                        <span className="btn-text">Cancel</span>
+                        <span>Cancel</span>
                     </button>
                     <button
                         type="submit"
@@ -678,13 +660,13 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                     >
                         {loading ? (
                             <>
-                                <div className="loading-spinner"></div>
-                                <span className="btn-text">Adding Patient...</span>
+                                <div className={styles.loadingSpinner}></div>
+                                <span>Adding Patient...</span>
                             </>
                         ) : (
                             <>
                                 <i className="fas fa-save"></i>
-                                <span className="btn-text">Add Patient</span>
+                                <span>Add Patient</span>
                             </>
                         )}
                     </button>

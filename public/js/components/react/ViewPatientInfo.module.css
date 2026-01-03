@@ -1,0 +1,499 @@
+/* ===========================================
+   PATIENT INFO PAGE
+   =========================================== */
+
+/* Container */
+.patientInfoContainer {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: var(--spacing-lg);
+}
+
+/* ===========================================
+   STATE SCREENS (Loading, Error, Empty)
+   =========================================== */
+
+.patientInfoLoading,
+.patientInfoError,
+.patientInfoEmpty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+    gap: var(--spacing-md);
+}
+
+.patientLoadingSpinner {
+    font-size: 2.5rem;
+    color: var(--indigo-500);
+}
+
+.patientErrorIcon {
+    font-size: 3rem;
+    color: var(--error-color);
+}
+
+.patientEmptyIcon {
+    font-size: 3rem;
+    color: var(--gray-400);
+}
+
+/* ===========================================
+   HEADER SECTION
+   =========================================== */
+
+.patientInfoHeader {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: 3px solid var(--indigo-500);
+}
+
+.patientAvatar {
+    flex-shrink: 0;
+}
+
+.patientAvatarIcon {
+    font-size: 4rem;
+    color: var(--indigo-500);
+}
+
+.patientHeaderDetails {
+    flex: 1;
+    min-width: 0;
+}
+
+.patientPrimaryName {
+    margin: 0 0 var(--spacing-xs) 0;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--gray-800);
+}
+
+.patientSecondaryName {
+    display: flex;
+    align-items: baseline;
+    gap: var(--spacing-md);
+    margin: 0;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-medium);
+    color: var(--gray-600);
+}
+
+.patientId {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-medium);
+    color: var(--gray-500);
+    font-family: var(--font-family-mono);
+}
+
+.patientHeaderActions {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-shrink: 0;
+}
+
+/* ===========================================
+   ALERTS SECTION
+   =========================================== */
+
+.patientAlertsSection {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.patientAlertHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.patientSectionTitle {
+    display: flex;
+    align-items: center;
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-800);
+}
+
+.patientAlertsEmpty {
+    padding: var(--spacing-md);
+    text-align: center;
+    color: var(--gray-500);
+    font-style: italic;
+}
+
+.alertIcon {
+    color: var(--warning-600);
+}
+
+.patientAlertsList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.patientAlertsLoading {
+    padding: var(--spacing-md);
+    color: var(--gray-500);
+    text-align: center;
+}
+
+.patientAlertItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: white;
+    border-radius: var(--radius-md);
+    border-left: 4px solid var(--warning-500);
+}
+
+.patientAlertContent {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    min-width: 0;
+}
+
+.patientAlertText {
+    color: var(--gray-700);
+}
+
+.patientAlertDate {
+    font-size: var(--font-size-sm);
+    color: var(--gray-500);
+}
+
+.patientAlertActions {
+    display: flex;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+}
+
+.patientAlertEdit,
+.patientAlertDelete {
+    padding: var(--spacing-xs);
+    background: transparent;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.patientAlertEdit:hover {
+    color: var(--primary-color);
+}
+
+.patientAlertDelete:hover {
+    color: var(--error-color);
+}
+
+
+/* ===========================================
+   INFO GRID & CARDS
+   =========================================== */
+
+.patientInfoGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.patientInfoCard {
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.patientInfoCard:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+}
+
+.patientCardTitle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin: 0;
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-100) 100%);
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.patientCardTitle i {
+    font-size: 1.25rem;
+    color: var(--indigo-500);
+}
+
+.patientInfoRows {
+    padding: var(--spacing-lg);
+}
+
+.patientInfoRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: var(--spacing-sm) 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.patientInfoRow:last-child {
+    border-bottom: none;
+}
+
+.patientInfoLabel {
+    font-weight: 600;
+    color: var(--gray-600);
+    flex-shrink: 0;
+    min-width: 130px;
+}
+
+.patientInfoValue {
+    color: var(--gray-800);
+    text-align: right;
+    flex: 1;
+    word-break: break-word;
+}
+
+/* ===========================================
+   TAG BADGE
+   =========================================== */
+
+.patientTag {
+    display: inline-block;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--indigo-100, #e0e7ff);
+    color: var(--indigo-700, #4338ca);
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* ===========================================
+   COST EDITING
+   =========================================== */
+
+.patientCostDisplay {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.patientCostEditBtn {
+    padding: var(--spacing-xs);
+    background: transparent;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.patientCostEditBtn:hover {
+    color: var(--primary-color);
+}
+
+.patientCostEditForm {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) 0;
+    width: 100%;
+}
+
+.patientCostInputGroup {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.patientCostInput {
+    flex: 1;
+    padding: var(--spacing-sm);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    font-size: 0.9375rem;
+}
+
+.patientCostInput:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.patientCostCurrency {
+    width: 5rem;
+    padding: var(--spacing-sm);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+}
+
+.patientCostEditActions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+/* Cost Presets */
+.patientCostPresets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) 0;
+}
+
+.patientCostPresetsLoading {
+    display: flex;
+    justify-content: center;
+    padding: var(--spacing-sm);
+    color: var(--gray-400);
+}
+
+.patientCostPresetBtn {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--gray-100);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.patientCostPresetBtn:hover {
+    background: var(--indigo-50);
+    border-color: var(--indigo-300);
+    color: var(--indigo-700);
+}
+
+.patientCostPresetBtn:active {
+    background: var(--indigo-100);
+}
+
+/* ===========================================
+   NOTES CARD (spans 2 columns)
+   =========================================== */
+
+.patientNotesCard {
+    grid-column: span 2;
+}
+
+.patientNotesContent {
+    padding: var(--spacing-lg);
+    color: var(--gray-700);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    min-height: 60px;
+}
+
+.patientNotesEmpty {
+    color: var(--gray-500);
+    font-style: italic;
+}
+
+/* ===========================================
+   UTILITY CLASSES
+   =========================================== */
+
+.piIconGap {
+    margin-right: var(--spacing-sm);
+}
+
+/* ===========================================
+   RESPONSIVE DESIGN
+   =========================================== */
+
+@media (max-width: 768px) {
+    .patientInfoContainer {
+        padding: var(--spacing-md);
+    }
+
+    .patientInfoHeader {
+        flex-direction: column;
+        text-align: center;
+        gap: var(--spacing-md);
+    }
+
+    .patientHeaderActions {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .patientHeaderActions :global(.btn) {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .patientInfoGrid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+
+    .patientNotesCard {
+        grid-column: span 1;
+    }
+
+    .patientAlertHeader {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+        align-items: flex-start;
+    }
+
+    .patientSecondaryName {
+        flex-direction: column;
+        gap: var(--spacing-xs);
+    }
+
+    .patientInfoRow {
+        flex-direction: column;
+        gap: var(--spacing-xs);
+    }
+
+    .patientInfoLabel {
+        min-width: auto;
+    }
+
+    .patientInfoValue {
+        text-align: left;
+    }
+
+    .patientCostInputGroup {
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 480px) {
+    .patientPrimaryName {
+        font-size: 1.375rem;
+    }
+
+    .patientAvatarIcon {
+        font-size: 3rem;
+    }
+
+    .patientCardTitle {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .patientInfoRows {
+        padding: var(--spacing-md);
+    }
+}

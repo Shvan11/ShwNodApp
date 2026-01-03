@@ -105,6 +105,34 @@ export async function setAlertStatus(alertId: number, isActive: boolean): Promis
 }
 
 /**
+ * Update an alert's details.
+ */
+export async function updateAlert(
+  alertId: number,
+  alertTypeId: number,
+  alertSeverity: number,
+  alertDetails: string
+): Promise<void> {
+  const query = `
+    UPDATE tblAlerts
+    SET AlertTypeID = @alertTypeId,
+        AlertSeverity = @alertSeverity,
+        AlertDetails = @alertDetails
+    WHERE AlertID = @alertId;
+  `;
+  await executeQuery(
+    query,
+    [
+      ['alertId', TYPES.Int, alertId],
+      ['alertTypeId', TYPES.Int, alertTypeId],
+      ['alertSeverity', TYPES.Int, alertSeverity],
+      ['alertDetails', TYPES.NVarChar, alertDetails],
+    ],
+    () => ({})
+  );
+}
+
+/**
  * Get all alert types for dropdown lists.
  */
 export function getAlertTypes(): Promise<AlertType[]> {

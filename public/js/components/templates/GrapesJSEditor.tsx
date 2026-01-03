@@ -14,11 +14,16 @@ interface Template {
     template_file_path: string | null;
 }
 
-interface GrapesJSEditorProps {
-    template: Template | null;
+interface EditorStyles {
+    readonly [key: string]: string;
 }
 
-const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps>(({ template }, ref) => {
+interface GrapesJSEditorProps {
+    template: Template | null;
+    styles: EditorStyles;
+}
+
+const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps>(({ template, styles }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<GrapesJSEditorType | null>(null);
     const isInitializingRef = useRef(false); // Prevent double initialization in StrictMode
@@ -344,11 +349,11 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
                     borderRadius: '8px',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
                 }}>
-                    <div className="loading-spinner"></div>
+                    <div className={styles.loadingSpinner}></div>
                     <p>Loading template designer...</p>
                 </div>
             )}
-            <div ref={containerRef} id="gjs" className="grapesjs-editor-container" />
+            <div ref={containerRef} id="gjs" className={styles.editorContainer} />
         </>
     );
 });

@@ -35,14 +35,19 @@ interface TemplateSubmissionData {
     created_by: string;
 }
 
+interface ModalStyles {
+    readonly [key: string]: string;
+}
+
 interface CreateTemplateModalProps {
     documentTypes: DocumentType[];
     currentDocumentType: number | null;
     onClose: () => void;
     onCreate: (data: TemplateSubmissionData) => void;
+    styles: ModalStyles;
 }
 
-function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCreate }: CreateTemplateModalProps) {
+function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCreate, styles }: CreateTemplateModalProps) {
     const [formData, setFormData] = useState<TemplateFormData>({
         template_name: '',
         description: '',
@@ -85,19 +90,19 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
     };
 
     return (
-        <div className="modal-overlay" onClick={handleOverlayClick}>
-            <div className="modal-dialog">
-                <div className="modal-header">
+        <div className={styles.modalOverlay} onClick={handleOverlayClick}>
+            <div className={styles.modalDialog}>
+                <div className={styles.modalHeader}>
                     <h3>
                         <i className="fas fa-plus"></i> Create New Template
                     </h3>
-                    <button className="modal-close" onClick={onClose}>×</button>
+                    <button className={styles.modalClose} onClick={onClose}>×</button>
                 </div>
                 <form onSubmit={handleSubmit}>
-                    <div className="modal-body">
-                        <div className="form-group">
+                    <div className={styles.modalBody}>
+                        <div className={styles.formGroup}>
                             <label htmlFor="template_name">
-                                Template Name <span className="required">*</span>
+                                Template Name <span className={styles.required}>*</span>
                             </label>
                             <input
                                 type="text"
@@ -111,9 +116,9 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
                             />
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label htmlFor="document_type_id">
-                                Document Type <span className="required">*</span>
+                                Document Type <span className={styles.required}>*</span>
                             </label>
                             <select
                                 id="document_type_id"
@@ -132,7 +137,7 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
                             </select>
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label htmlFor="description">Description</label>
                             <textarea
                                 id="description"
@@ -145,10 +150,10 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
                             />
                         </div>
 
-                        <div className="form-row">
-                            <div className="form-group">
+                        <div className={styles.formRow}>
+                            <div className={styles.formGroup}>
                                 <label htmlFor="paper_width">
-                                    Paper Width (mm) <span className="required">*</span>
+                                    Paper Width (mm) <span className={styles.required}>*</span>
                                 </label>
                                 <input
                                     type="number"
@@ -160,9 +165,9 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
                                     onChange={handleChange}
                                 />
                             </div>
-                            <div className="form-group">
+                            <div className={styles.formGroup}>
                                 <label htmlFor="paper_height">
-                                    Paper Height (mm) <span className="required">*</span>
+                                    Paper Height (mm) <span className={styles.required}>*</span>
                                 </label>
                                 <input
                                     type="number"
@@ -176,7 +181,7 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
                             </div>
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label htmlFor="paper_orientation">Orientation</label>
                             <select
                                 id="paper_orientation"
@@ -190,8 +195,8 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
                             </select>
                         </div>
 
-                        <div className="form-group">
-                            <label className="checkbox-label">
+                        <div className={styles.formGroup}>
+                            <label className={styles.checkboxLabel}>
                                 <input
                                     type="checkbox"
                                     id="is_default"
@@ -203,7 +208,7 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
                             </label>
                         </div>
                     </div>
-                    <div className="modal-footer">
+                    <div className={styles.modalFooter}>
                         <button type="button" className="btn btn-secondary" onClick={onClose}>
                             Cancel
                         </button>

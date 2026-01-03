@@ -1,10 +1,7 @@
 import DailyAppointments from '../components/react/appointments/DailyAppointments';
 
-// Daily appointments styles
-import '../../css/pages/appointments.css';
+// Note: Component styles are now in CSS Modules (co-located with components)
 import '../../css/components/appointment-calendar.css';
-import '../../css/components/appointment-form.css';
-import '../../css/components/simplified-calendar-picker.css';
 
 /**
  * Daily Appointments Route

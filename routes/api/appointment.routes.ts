@@ -425,16 +425,16 @@ router.post(
  * Returns appointment history ordered by date (newest first)
  */
 router.get(
-  '/patient-appointments/:patientId',
+  '/patient-appointments/:personId',
   async (
-    req: Request<{ patientId: string }>,
+    req: Request<{ personId: string }>,
     res: Response
   ): Promise<void> => {
     try {
-      const { patientId } = req.params;
+      const { personId } = req.params;
 
-      if (!patientId || isNaN(parseInt(patientId))) {
-        ErrorResponses.badRequest(res, 'Invalid patient ID');
+      if (!personId || isNaN(parseInt(personId))) {
+        ErrorResponses.badRequest(res, 'Invalid person ID');
         return;
       }
 
@@ -454,7 +454,7 @@ router.get(
 
       const appointments = await database.executeQuery<AppointmentResult>(
         query,
-        [['personID', database.TYPES.Int, parseInt(patientId)]],
+        [['personID', database.TYPES.Int, parseInt(personId)]],
         (columns) => ({
           appointmentID: columns[0].value as number,
           PersonID: columns[1].value as number,

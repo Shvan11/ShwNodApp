@@ -1,0 +1,184 @@
+/* Settings Tab Navigation - Full Width Modern Header */
+
+.navigation {
+    background: var(--color-white);
+    box-shadow: var(--shadow-sm);
+    position: sticky;
+    top: var(--header-height, 50px);
+    z-index: var(--z-index-fixed);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.header {
+    text-align: center;
+    padding: 0.75rem 2rem 0.5rem;
+    background: var(--color-white);
+    color: var(--text-color);
+}
+
+.header h2 {
+    font-size: 1.5rem;
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--color-purple-light);
+}
+
+/* Tab Buttons Container - No Scrollbar, Responsive Wrapping */
+.buttons {
+    display: flex;
+    background: var(--color-white);
+    border-bottom: 2px solid var(--gray-200);
+    overflow-x: visible;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 0 0.5rem;
+}
+
+/* Modern Tab Button Design */
+.button {
+    padding: 0.75rem 1rem;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    position: relative;
+    border-bottom: 2px solid transparent;
+}
+
+.button i {
+    font-size: 0.95rem;
+}
+
+.button:hover:not(.disabled) {
+    background: rgba(102, 126, 234, 0.08);
+    color: var(--color-purple-light);
+    transform: translateY(-2px);
+}
+
+.button.active {
+    color: var(--color-purple-light);
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border-bottom-color: var(--color-purple-light);
+    font-weight: 700;
+}
+
+.button.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    color: var(--gray-400);
+}
+
+.button.disabled:hover {
+    background: transparent;
+    transform: none;
+}
+
+.label {
+    font-size: 0.8rem;
+}
+
+.badge {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    color: var(--warning-300);
+    font-size: 0.6rem;
+    animation: pulse 2s infinite;
+}
+
+.comingSoonBadge {
+    background: var(--warning-400);
+    color: white;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 10px;
+    margin-left: 0.25rem;
+    font-weight: 600;
+}
+
+/* Animation for pulse effect */
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .buttons {
+        padding: 0 0.5rem;
+    }
+
+    .button {
+        padding: 1rem 1.5rem;
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .navigation {
+        top: var(--header-height, 50px);
+    }
+
+    .header {
+        padding: 1rem;
+    }
+
+    .header h2 {
+        font-size: 1.5rem;
+    }
+
+    .buttons {
+        padding: 0.5rem;
+        gap: 0.25rem;
+    }
+
+    .button {
+        padding: 0.9rem 1.2rem;
+        font-size: 0.85rem;
+    }
+
+    .button i {
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .header h2 {
+        font-size: 1.25rem;
+    }
+
+    .buttons {
+        gap: 0.15rem;
+    }
+
+    .button {
+        padding: 0.8rem 1rem;
+        font-size: 0.8rem;
+        gap: 0.4rem;
+    }
+
+    .label {
+        font-size: 0.75rem;
+    }
+
+    .button i {
+        font-size: 0.9rem;
+    }
+
+    .comingSoonBadge {
+        display: none;
+    }
+}

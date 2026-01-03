@@ -1,4 +1,5 @@
 import AppointmentCard, { type DailyAppointment } from './AppointmentCard';
+import styles from './AppointmentsList.module.css';
 
 interface AppointmentsListProps {
     title: string;
@@ -42,16 +43,26 @@ const AppointmentsList = ({
     // Check if we're refreshing (loading with existing data)
     const isRefreshing = loading && sortedAppointments && sortedAppointments.length > 0;
 
+    // Helper to get section class based on state
+    const getSectionClass = (isActiveView: boolean, isRefreshingState: boolean): string => {
+        if (isActiveView) {
+            return isRefreshingState ? `${styles.activeView} ${styles.refreshing}` : styles.activeView;
+        }
+        return isRefreshingState ? styles.refreshing : styles.section;
+    };
+
+    const isActiveView = className.includes('active-view');
+
     // Render loading skeleton (initial load only)
     if (showSkeletons) {
         return (
-            <div className={`appointments-section ${className}`}>
-                <h3>{title}</h3>
-                <div className="appointments-grid">
+            <div className={getSectionClass(isActiveView, false)}>
+                <h3 className={styles.title}>{title}</h3>
+                <div className={styles.grid}>
                     {[1, 2, 3].map(i => (
-                        <div key={i} className="skeleton-card">
-                            <div className="skeleton skeleton-line"></div>
-                            <div className="skeleton skeleton-line"></div>
+                        <div key={i} className={styles.skeletonCard}>
+                            <div className={styles.skeletonLine}></div>
+                            <div className={styles.skeletonLine}></div>
                         </div>
                     ))}
                 </div>
@@ -62,9 +73,9 @@ const AppointmentsList = ({
     // Render empty state
     if (!sortedAppointments || sortedAppointments.length === 0) {
         return (
-            <div className={`appointments-section ${className}`}>
-                <h3>{title}</h3>
-                <p className="no-appointments">{emptyMessage}</p>
+            <div className={getSectionClass(isActiveView, false)}>
+                <h3 className={styles.title}>{title}</h3>
+                <p className={styles.empty}>{emptyMessage}</p>
             </div>
         );
     }
@@ -72,9 +83,9 @@ const AppointmentsList = ({
     // Render appointments grid
     // Add 'refreshing' class during reload to dim list and prevent clicks
     return (
-        <div className={`appointments-section ${className} ${isRefreshing ? 'refreshing' : ''}`}>
-            <h3>{title}</h3>
-            <div className="appointments-grid">
+        <div className={getSectionClass(isActiveView, isRefreshing)}>
+            <h3 className={styles.title}>{title}</h3>
+            <div className={styles.grid}>
                 {sortedAppointments.map(appointment => (
                     <AppointmentCard
                         key={appointment.appointmentID || appointment.AppointmentID}

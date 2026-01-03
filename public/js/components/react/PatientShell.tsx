@@ -1,46 +1,26 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useSearchParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link, useLoaderData } from 'react-router-dom';
 import Navigation from './Navigation';
 import ContentRenderer from './ContentRenderer';
+import type { PatientShellLoaderResult } from '../../router/loaders';
+
+// CSS Module for PatientShell
+import styles from './PatientShell.module.css';
 
 // Patient portal CSS (loaded when any patient route is visited)
-import '../../../css/pages/patient-shell.css';
 import '../../../css/layout/sidebar-navigation.css';
-import '../../../css/pages/patient-info.css';
-import '../../../css/pages/add-patient.css';
-import '../../../css/pages/edit-patient.css';
-import '../../../css/pages/grid.css';
-import '../../../css/pages/xrays.css';
-import '../../../css/pages/canvas.css';
-import '../../../css/pages/work-management.css';
-import '../../../css/pages/work-payments.css';
-import '../../../css/pages/visits-summary.css';
-import '../../../css/pages/visits-spacing.css';
-import '../../../css/components/dental-chart.css';
-import '../../../css/components/timepoints-selector.css';
-import '../../../css/components/comparison-viewer.css';
+// patient-info.css -> ViewPatientInfo.module.css
+// add-patient.css -> AddPatientForm.module.css
+// edit-patient.css -> EditPatientComponent.module.css
+// grid.css -> GridComponent.module.css
+// work-management.css -> WorkComponent.module.css
+// work-payments.css -> merged into WorkComponent.module.css
+// xrays.css -> XraysComponent.module.css
+// canvas.css -> CanvasControlButtons.module.css
+// visits-summary.css and visits-spacing.css deleted - were dead code
 import '../../../css/components/work-card.css';
-import '../../../css/components/new-work-component.css';
-import '../../../css/components/invoice-form.css';
-import '../../../css/components/payment-modal.css';
-import '../../../css/components/visits-component.css';
-import '../../../css/components/new-visit-component.css';
-import '../../../css/components/appointment-form.css';
-import '../../../css/components/simplified-calendar-picker.css';
-import '../../../css/components/patient-appointments.css';
-
-interface PatientData {
-    name: string;
-    loading: boolean;
-    error: string | null;
-}
-
-interface WorkData {
-    typeName: string;
-    workId?: number;
-    loading: boolean;
-    error: string | null;
-}
+// new-work-component.css -> NewWorkComponent.module.css
+// invoice-form.css -> PaymentModal.module.css
+// CSS Modules: visits-component.css, new-visit-component.css, patient-appointments.css migrated
 
 interface ContentParams {
     tpCode?: string;
@@ -51,101 +31,41 @@ interface ContentParams {
 }
 
 const PatientShell = () => {
+    // Get pre-loaded data from route loader (validated before render)
+    const loaderData = useLoaderData() as PatientShellLoaderResult;
+
     // React Router hooks
-    const allParams = useParams<{ patientId?: string; page?: string; workId?: string; '*'?: string }>();
-    const { patientId, page, workId } = allParams;
+    const allParams = useParams<{ personId?: string; page?: string; workId?: string; '*'?: string }>();
+    const { personId, page, workId } = allParams;
     const [searchParams] = useSearchParams();
 
     // Extract tpCode from wildcard path (e.g., "tp1" from /photos/tp1)
     const wildcardPath = allParams['*'] || '';
     const tpCode = wildcardPath.match(/^tp(\d+)$/)?.[0] || null;
 
-    // Detect if this is the diagnosis route (/patient/:patientId/work/:workId/diagnosis)
+    // Detect if this is the diagnosis route (/patient/:personId/work/:workId/diagnosis)
     const isDiagnosisRoute = !!workId && window.location.pathname.endsWith('/diagnosis');
     const effectivePage = isDiagnosisRoute ? 'diagnosis' : page;
 
-    const [patientData, setPatientData] = useState<PatientData>({ name: '', loading: true, error: null });
-    const [workData, setWorkData] = useState<WorkData>({ typeName: '', loading: false, error: null });
+    // Use loader data - already validated and fetched
+    const patient = loaderData?.patient;
+    const work = loaderData?.work;
+    const isNewPatient = loaderData?.isNew ?? (personId === 'new');
 
-    // Fetch patient data when patient ID changes
-    const fetchPatientData = useCallback(async (id: string) => {
-        if (!id) {
-            setPatientData({ name: '', loading: false, error: 'No patient ID provided' });
-            return;
-        }
+    // Validated PersonID from loader data (null if invalid or new patient)
+    const validatedPersonId = patient?.PersonID ?? null;
 
-        try {
-            setPatientData(prev => ({ ...prev, loading: true, error: null }));
-            const response = await fetch(`/api/patients/${id}/info`);
+    // Patient display name from loader data
+    const patientName = isNewPatient
+        ? 'New Patient'
+        : (patient?.name || patient?.PatientName || `Patient ${personId}`);
 
-            if (!response.ok) {
-                throw new Error(`Failed to fetch patient data: ${response.status}`);
-            }
-
-            const data = await response.json();
-            const patientName = data.name || `Patient ${id}`;
-
-            setPatientData({ name: patientName, loading: false, error: null });
-        } catch (error) {
-            console.error('Error fetching patient data:', error);
-            setPatientData({
-                name: `Patient ${id}`,
-                loading: false,
-                error: error instanceof Error ? error.message : 'Unknown error'
-            });
-        }
-    }, []);
-
-    // Fetch work data when workId is in query params
-    const fetchWorkData = useCallback(async (workIdParam: string) => {
-        if (!workIdParam) {
-            setWorkData({ typeName: '', loading: false, error: null });
-            return;
-        }
-
-        try {
-            setWorkData(prev => ({ ...prev, loading: true, error: null }));
-            const response = await fetch(`/api/getworkdetails?workId=${workIdParam}`);
-
-            if (!response.ok) {
-                throw new Error(`Failed to fetch work data: ${response.status}`);
-            }
-
-            const data = await response.json();
-            const workTypeName = data.TypeName || `Work ${workIdParam}`;
-
-            setWorkData({ typeName: workTypeName, workId: parseInt(workIdParam), loading: false, error: null });
-        } catch (error) {
-            console.error('Error fetching work data:', error);
-            setWorkData({
-                typeName: `Work ${workIdParam}`,
-                workId: parseInt(workIdParam),
-                loading: false,
-                error: error instanceof Error ? error.message : 'Unknown error'
-            });
-        }
-    }, []);
-
-    // Fetch patient data when patient ID changes
-    useEffect(() => {
-        // Skip fetching for non-numeric IDs (like "new" for add patient form)
-        if (patientId && !isNaN(parseInt(patientId)) && patientId !== 'new') {
-            fetchPatientData(patientId);
-        } else if (patientId === 'new') {
-            // Set placeholder data for new patient form
-            setPatientData({ name: 'New Patient', loading: false, error: null });
-        }
-    }, [patientId, fetchPatientData]);
+    // Work display name from loader data
+    const workTypeName = work?.TypeName || '';
 
     // Fetch work data when workId (from route or query param) changes
     const workIdFromQuery = searchParams.get('workId');
-    const effectiveWorkId = workId || workIdFromQuery;
-
-    useEffect(() => {
-        if (effectiveWorkId) {
-            fetchWorkData(effectiveWorkId);
-        }
-    }, [effectiveWorkId, fetchWorkData]);
+    const effectiveWorkId = workId || workIdFromQuery || loaderData?.workId || null;
 
     // Extract additional params from URL (convert null to undefined)
     const params: ContentParams = {
@@ -156,48 +76,48 @@ const PatientShell = () => {
     };
 
     return (
-        <div id="patient-shell" className="patient-shell-container">
+        <div id="patient-shell" className={styles.patientShellContainer}>
             {/* Navigation Sidebar - Always Visible */}
-            <div className="navigation-sidebar">
+            <div className={styles.navigationSidebar}>
                 <Navigation
-                    patientId={patientId}
+                    personId={personId}
                     currentPage={effectivePage}
                 />
             </div>
 
             {/* Main Content Area */}
-            <div className="main-content-area">
+            <div className={styles.mainContentArea}>
                 {/* Enhanced Breadcrumb */}
-                <div className="breadcrumb-container">
-                    <nav className="breadcrumb">
+                <div className={styles.breadcrumbContainer}>
+                    <nav className={styles.breadcrumb}>
                         {/* Home Link - Use Link for SPA navigation */}
-                        <Link to="/patient-management" className="breadcrumb-item breadcrumb-link">
+                        <Link to="/patient-management" className={`${styles.breadcrumbItem} ${styles.breadcrumbLink}`}>
                             <i className="fas fa-home"></i> Home
                         </Link>
 
-                        <span className="breadcrumb-separator">/</span>
+                        <span className={styles.breadcrumbSeparator}>/</span>
 
                         {/* Patient Link - Disabled for new patients */}
-                        {patientId === 'new' ? (
-                            <span className="breadcrumb-item active">
+                        {isNewPatient ? (
+                            <span className={`${styles.breadcrumbItem} ${styles.breadcrumbItemActive}`}>
                                 <i className="fas fa-user"></i>
                                 {' '}
-                                {patientData.name}
+                                {patientName}
                             </span>
                         ) : (
-                            <Link to={`/patient/${patientId}/works`} className="breadcrumb-item breadcrumb-link">
+                            <Link to={`/patient/${validatedPersonId || personId}/works`} className={`${styles.breadcrumbItem} ${styles.breadcrumbLink}`}>
                                 <i className="fas fa-user"></i>
                                 {' '}
-                                {patientData.loading ? `Patient ${patientId}` : patientData.name}
+                                {patientName}
                             </Link>
                         )}
 
                         {/* Work Level (if workId is present) */}
-                        {workId && workData.typeName && (
+                        {effectiveWorkId && workTypeName && (
                             <>
-                                <span className="breadcrumb-separator">/</span>
-                                <Link to={`/patient/${patientId}/works`} className="breadcrumb-item breadcrumb-link">
-                                    <i className="fas fa-briefcase-medical"></i> {workData.typeName}
+                                <span className={styles.breadcrumbSeparator}>/</span>
+                                <Link to={`/patient/${validatedPersonId || personId}/works`} className={`${styles.breadcrumbItem} ${styles.breadcrumbLink}`}>
+                                    <i className="fas fa-briefcase-medical"></i> {workTypeName}
                                 </Link>
                             </>
                         )}
@@ -205,8 +125,8 @@ const PatientShell = () => {
                         {/* Current Page */}
                         {effectivePage && effectivePage !== 'photos' && effectivePage !== 'works' && (
                             <>
-                                <span className="breadcrumb-separator">/</span>
-                                <span className="breadcrumb-item active">
+                                <span className={styles.breadcrumbSeparator}>/</span>
+                                <span className={`${styles.breadcrumbItem} ${styles.breadcrumbItemActive}`}>
                                     <i className={`fas fa-${effectivePage === 'visits' ? 'calendar-check' : effectivePage === 'appointments' ? 'calendar-alt' : effectivePage === 'xrays' ? 'x-ray' : effectivePage === 'patient-info' ? 'id-card' : effectivePage === 'diagnosis' ? 'stethoscope' : 'file'}`}></i>
                                     {' '}
                                     {effectivePage.charAt(0).toUpperCase() + effectivePage.slice(1).replace(/-/g, ' ')}
@@ -217,11 +137,12 @@ const PatientShell = () => {
                 </div>
 
                 {/* Page Content */}
-                <div className="page-content">
+                <div className={styles.pageContent}>
                     <ContentRenderer
-                        patientId={patientId}
+                        personId={validatedPersonId}
                         page={effectivePage}
                         params={params}
+                        isNewPatient={isNewPatient}
                     />
                 </div>
             </div>

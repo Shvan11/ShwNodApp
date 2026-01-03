@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import styles from './UserManagement.module.css';
 
 interface UserInfo {
   username: string;
@@ -117,20 +118,20 @@ export default function UserManagement() {
   };
 
   return (
-    <div className="user-management-container">
+    <div className={styles.userManagementContainer}>
 
       {/* User Account Info Section */}
-      <div className="section-card">
-        <h2 className="section-title">
+      <div className={styles.sectionCard}>
+        <h2 className={styles.sectionTitle}>
           <i className="fas fa-user"></i>
           Account Information
         </h2>
-        <p className="section-description">
+        <p className={styles.sectionDescription}>
           Your current account details
         </p>
 
         {userInfo ? (
-          <div className="user-account-info">
+          <div className={styles.userAccountInfo}>
             <strong>Username:</strong>
             <span>{userInfo.username}</span>
 
@@ -138,33 +139,33 @@ export default function UserManagement() {
             <span>{userInfo.fullName || 'Not set'}</span>
 
             <strong>Role:</strong>
-            <span className={`user-role-badge ${userInfo.role}`}>
+            <span className={`${styles.userRoleBadge} ${userInfo.role === 'admin' ? styles.admin : ''}`}>
               {userInfo.role}
             </span>
           </div>
         ) : (
-          <div className="user-loading-text">Loading user information...</div>
+          <div className={styles.userLoadingText}>Loading user information...</div>
         )}
       </div>
 
       {/* Change Password Section */}
-      <div className="section-card">
-        <h2 className="section-title">
+      <div className={styles.sectionCard}>
+        <h2 className={styles.sectionTitle}>
           <i className="fas fa-key"></i>
           Change Password
         </h2>
-        <p className="section-description">
+        <p className={styles.sectionDescription}>
           Update your account password. Make sure to use a strong password for security.
         </p>
 
         {message.text && (
-          <div className={`message ${message.type}`}>
+          <div className={`${styles.message} ${message.type === 'success' ? styles.success : styles.error}`}>
             {message.text}
           </div>
         )}
 
         <form onSubmit={handleChangePassword}>
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="currentPassword">Current Password</label>
             <input
               type="password"
@@ -176,7 +177,7 @@ export default function UserManagement() {
             />
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="newPassword">New Password</label>
             <input
               type="password"
@@ -188,7 +189,7 @@ export default function UserManagement() {
             />
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="confirmPassword">Confirm New Password</label>
             <input
               type="password"
@@ -200,7 +201,7 @@ export default function UserManagement() {
             />
           </div>
 
-          <div className="password-requirements">
+          <div className={styles.passwordRequirements}>
             <strong>Password Requirements:</strong>
             <ul>
               <li>Minimum 6 characters</li>
@@ -210,7 +211,7 @@ export default function UserManagement() {
 
           <button
             type="submit"
-            className="user-mgmt-btn primary"
+            className={`${styles.userMgmtBtn} ${styles.primary}`}
             disabled={loading}
           >
             {loading ? 'Changing Password...' : 'Change Password'}
@@ -218,17 +219,17 @@ export default function UserManagement() {
         </form>
 
         {/* Logout Section */}
-        <div className="logout-section">
-          <h3 className="section-title section-title-small">
+        <div className={styles.logoutSection}>
+          <h3 className={`${styles.sectionTitle} ${styles.sectionTitleSmall}`}>
             <i className="fas fa-sign-out-alt"></i>
             Session Management
           </h3>
-          <p className="section-description">
+          <p className={styles.sectionDescription}>
             Sign out of your account on this device.
           </p>
           <button
             onClick={handleLogout}
-            className="user-mgmt-btn danger"
+            className={`${styles.userMgmtBtn} ${styles.danger}`}
           >
             <i className="fas fa-sign-out-alt"></i>
             <span>Logout</span>

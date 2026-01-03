@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import styles from './CanvasControlButtons.module.css';
 
 interface ComparisonHandler {
     zoomIn?: () => void;
@@ -21,13 +22,13 @@ interface Props {
 
 const CanvasControlButtons = ({ comparison, showWhatsAppModal, setShowWhatsAppModal }: Props) => {
     return (
-        <div className="canvas-controls">
+        <div className={styles.controls}>
             {/* Zoom In Button */}
             <button
                 type="button"
                 onClick={() => comparison && comparison.zoomIn?.()}
                 title="Zoom In"
-                className="btn-zoom-in"
+                className={styles.btnZoomIn}
             >
                 🔍+
             </button>
@@ -37,7 +38,7 @@ const CanvasControlButtons = ({ comparison, showWhatsAppModal, setShowWhatsAppMo
                 type="button"
                 onClick={() => comparison && comparison.zoomOut?.()}
                 title="Zoom Out"
-                className="btn-zoom-out"
+                className={styles.btnZoomOut}
             >
                 🔍-
             </button>
@@ -47,7 +48,7 @@ const CanvasControlButtons = ({ comparison, showWhatsAppModal, setShowWhatsAppMo
                 type="button"
                 onClick={() => comparison && comparison.rotateImage?.('clockwise')}
                 title="Rotate Clockwise"
-                className="btn-rotate"
+                className={styles.btnRotate}
             >
                 ↻
             </button>
@@ -57,7 +58,7 @@ const CanvasControlButtons = ({ comparison, showWhatsAppModal, setShowWhatsAppMo
                 type="button"
                 onClick={() => comparison && comparison.rotateImage?.('counter')}
                 title="Rotate Counter-clockwise"
-                className="btn-rotate"
+                className={styles.btnRotate}
             >
                 ↺
             </button>
@@ -67,7 +68,7 @@ const CanvasControlButtons = ({ comparison, showWhatsAppModal, setShowWhatsAppMo
                 type="button"
                 onClick={() => comparison && comparison.resetImage?.()}
                 title="Reset Image"
-                className="btn-reset"
+                className={styles.btnReset}
             >
                 🔄
             </button>
@@ -77,7 +78,7 @@ const CanvasControlButtons = ({ comparison, showWhatsAppModal, setShowWhatsAppMo
                 type="button"
                 onClick={() => setShowWhatsAppModal(!showWhatsAppModal)}
                 title="Send via WhatsApp"
-                className="btn-whatsapp"
+                className={styles.btnWhatsapp}
             >
                 📱
             </button>

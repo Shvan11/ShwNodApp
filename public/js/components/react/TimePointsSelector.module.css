@@ -1,0 +1,147 @@
+/**
+ * Timepoints Selector Styles (CSS Module)
+ * Horizontal scrollable tab selector for timepoints in the patient gallery
+ */
+
+.selector {
+    display: flex;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0.75rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--gray-300) var(--gray-100);
+}
+
+.selector::-webkit-scrollbar {
+    height: 6px;
+}
+
+.selector::-webkit-scrollbar-track {
+    background: var(--gray-100);
+    border-radius: 3px;
+}
+
+.selector::-webkit-scrollbar-thumb {
+    background: var(--gray-300);
+    border-radius: 3px;
+}
+
+.selector::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-400);
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    background: var(--gray-50);
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 200px;
+    flex-shrink: 0;
+}
+
+.tab:hover {
+    background: var(--gray-100);
+    border-color: var(--gray-300);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tabActive {
+    background: linear-gradient(135deg, var(--indigo-500) 0%, var(--color-purple-medium) 100%);
+    border-color: var(--indigo-600);
+    color: white;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.tabIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 6px;
+    color: var(--indigo-500);
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+
+.tabActive .tabIcon {
+    background: rgba(255, 255, 255, 0.2);
+    color: var(--warning-400);
+}
+
+.tabContent {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    text-align: left;
+}
+
+.tabDesc {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--gray-800);
+    white-space: nowrap;
+}
+
+.tabActive .tabDesc {
+    color: white;
+}
+
+.tabDate {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    white-space: nowrap;
+}
+
+.tabDate::before {
+    content: "•";
+    margin-right: 0.5rem;
+    color: var(--gray-300);
+}
+
+.tabActive .tabDate {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.tabActive .tabDate::before {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .selector {
+        gap: 0.5rem;
+        padding: 0.5rem;
+    }
+
+    .tab {
+        min-width: 160px;
+        padding: 0.5rem 0.75rem;
+    }
+
+    .tabIcon {
+        width: 26px;
+        height: 26px;
+        font-size: 0.8125rem;
+    }
+
+    .tabDesc {
+        font-size: 0.8125rem;
+    }
+
+    .tabDate {
+        font-size: 0.6875rem;
+    }
+}

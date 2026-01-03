@@ -516,19 +516,19 @@ router.get(
 );
 
 /**
- * GET /api/templates/receipt/no-work/:patientId
+ * GET /api/templates/receipt/no-work/:personId
  * Generate appointment confirmation receipt for patients with no works
  */
 router.get(
-  '/receipt/no-work/:patientId',
-  async (req: Request<PatientIdParams>, res: Response): Promise<void> => {
+  '/receipt/no-work/:personId',
+  async (req: Request<{ personId: string }>, res: Response): Promise<void> => {
     try {
-      const { patientId } = req.params;
+      const { personId } = req.params;
       console.log(
-        `[TEMPLATE-API] Generating no-work receipt for patient ${patientId}`
+        `[TEMPLATE-API] Generating no-work receipt for patient ${personId}`
       );
 
-      const html = await generateNoWorkReceiptHTML(parseInt(patientId));
+      const html = await generateNoWorkReceiptHTML(parseInt(personId));
 
       // Prevent caching
       res.setHeader(

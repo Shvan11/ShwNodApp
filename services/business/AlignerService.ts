@@ -25,6 +25,12 @@ export type AlignerErrorCode =
   | 'INVALID_SET_ID'
   | 'SET_NOT_FOUND'
   | 'INVALID_BATCH_ID'
+  | 'BATCH_NOT_FOUND'
+  | 'INVALID_SET_CHANGE'
+  | 'UPPER_ALIGNER_LIMIT_EXCEEDED'
+  | 'LOWER_ALIGNER_LIMIT_EXCEEDED'
+  | 'BATCH_NOT_DELIVERED'
+  | 'VALIDATION_ERROR'
   | 'MISSING_DOCTOR_NAME'
   | 'EMAIL_ALREADY_EXISTS'
   | 'DOCTOR_HAS_SETS'
@@ -124,14 +130,14 @@ export interface BatchCreateData {
 
 /**
  * Batch update data
+ * NOTE: ManufactureDate and DeliveredToPatientDate are managed via markBatchManufactured/markBatchDelivered
  */
 export interface BatchUpdateData {
   AlignerSetID?: number;
   IsActive?: boolean;
   BatchSequence?: number;
   AlignersInBatch?: number;
-  ManufactureDate?: Date | string | null;
-  DeliveredToPatientDate?: Date | string | null;
+  // ManufactureDate and DeliveredToPatientDate are managed via status endpoints
   Notes?: string;
   UpperAlignerCount?: number;
   LowerAlignerCount?: number;
@@ -140,8 +146,8 @@ export interface BatchUpdateData {
   LowerAlignerStartSequence?: number;
   LowerAlignerEndSequence?: number;
   Days?: number;
-  ValidityPeriod?: number;
-  NextBatchReadyDate?: Date | string | null;
+  IsLast?: boolean;
+  // Note: BatchExpiryDate and ValidityPeriod are computed columns - cannot be set directly
 }
 
 /**
@@ -269,15 +275,23 @@ export async function validateAndCreateSet(
     );
   }
 
+  // Sanitize numeric fields - convert empty strings to undefined
+  const sanitizedData: SetCreateData = {
+    ...setData,
+    SetCost: setData.SetCost !== undefined && setData.SetCost !== null && String(setData.SetCost) !== ''
+      ? Number(setData.SetCost)
+      : undefined,
+  };
+
   const afterValidation = Date.now();
   log.info(
     `⏱️  [SERVICE TIMING] Validation took: ${afterValidation - startTime}ms`
   );
-  log.info('Creating new aligner set with business logic:', setData);
+  log.info('Creating new aligner set with business logic:', sanitizedData);
 
   try {
     const dbStartTime = Date.now();
-    const newSetId = (await alignerQueries.createAlignerSet(setData)) as number;
+    const newSetId = (await alignerQueries.createAlignerSet(sanitizedData)) as number;
     const dbEndTime = Date.now();
 
     log.info(
@@ -326,10 +340,18 @@ export async function validateAndUpdateSet(
     });
   }
 
-  log.info(`Updating aligner set ${setId}:`, setData);
+  // Sanitize numeric fields - convert empty strings to undefined
+  const sanitizedData: SetUpdateData = {
+    ...setData,
+    SetCost: setData.SetCost !== undefined && setData.SetCost !== null && String(setData.SetCost) !== ''
+      ? Number(setData.SetCost)
+      : undefined,
+  };
+
+  log.info(`Updating aligner set ${setId}:`, sanitizedData);
 
   try {
-    await alignerQueries.updateAlignerSet(parseInt(String(setId)), setData);
+    await alignerQueries.updateAlignerSet(parseInt(String(setId)), sanitizedData);
     log.info(`Aligner set ${setId} updated successfully`);
   } catch (error) {
     log.error('Error updating aligner set:', { error: error instanceof Error ? error.message : String(error) });
@@ -469,19 +491,43 @@ export async function validateAndUpdateBatch(
 
   log.info(`Updating aligner batch ${batchId}:`, batchData);
 
-  const result = (await alignerQueries.updateBatch(
-    parseInt(String(batchId)),
-    batchData
-  )) as BatchUpdateResult | void;
-  log.info(`Aligner batch ${batchId} updated successfully`);
+  try {
+    const result = (await alignerQueries.updateBatch(
+      parseInt(String(batchId)),
+      batchData
+    )) as BatchUpdateResult | void;
+    log.info(`Aligner batch ${batchId} updated successfully`);
 
-  if (result && result.deactivatedBatch) {
-    log.info(
-      `Batch #${result.deactivatedBatch.batchSequence} was automatically deactivated`
-    );
+    if (result && result.deactivatedBatch) {
+      log.info(
+        `Batch #${result.deactivatedBatch.batchSequence} was automatically deactivated`
+      );
+    }
+
+    return result;
+  } catch (error) {
+    // Convert SQL validation errors (50010-50014) to AlignerValidationError
+    // These are custom THROW errors from usp_UpdateAlignerBatch stored procedure
+    const sqlError = error as { number?: number; message?: string };
+    if (sqlError.number && sqlError.number >= 50010 && sqlError.number <= 50020) {
+      // Map SQL error numbers to error codes
+      const errorCodeMap: Record<number, AlignerErrorCode> = {
+        50010: 'BATCH_NOT_FOUND',
+        50011: 'INVALID_SET_CHANGE',
+        50012: 'UPPER_ALIGNER_LIMIT_EXCEEDED',
+        50013: 'LOWER_ALIGNER_LIMIT_EXCEEDED',
+        50014: 'BATCH_NOT_DELIVERED',
+      };
+      const errorCode = errorCodeMap[sqlError.number] || 'VALIDATION_ERROR';
+      throw new AlignerValidationError(
+        sqlError.message || 'Batch update validation failed',
+        errorCode,
+        { batchId: parseInt(String(batchId)) }
+      );
+    }
+    // Re-throw other errors as-is
+    throw error;
   }
-
-  return result;
 }
 
 /**
@@ -515,14 +561,24 @@ export async function validateAndDeleteBatch(
 }
 
 /**
- * Mark batch as delivered
+ * Mark batch as delivered with automatic activation for latest batch
+ *
+ * Business Logic:
+ * - Sets DeliveredToPatientDate = GETDATE()
+ * - BatchExpiryDate is auto-computed from DeliveredToPatientDate + (Days * AlignerCount)
+ * - If batch is latest (highest BatchSequence) AND not already active:
+ *   - Deactivates other batches in the set
+ *   - Activates this batch
  *
  * @param batchId - Batch ID
+ * @param targetDate - Optional date for backdating/correction. If null, uses today's date
+ * @returns Result with operation info and activation status
  * @throws AlignerValidationError If validation fails
  */
 export async function markBatchDelivered(
-  batchId: number | string
-): Promise<void> {
+  batchId: number | string,
+  targetDate?: Date | null
+): Promise<alignerQueries.UpdateBatchStatusResult> {
   if (!batchId || isNaN(parseInt(String(batchId)))) {
     throw new AlignerValidationError(
       'Valid batchId is required',
@@ -530,11 +586,23 @@ export async function markBatchDelivered(
     );
   }
 
-  log.info(`Marking batch ${batchId} as delivered`);
+  const parsedBatchId = parseInt(String(batchId));
+  log.info(`Marking batch ${parsedBatchId} as delivered`, { targetDate: targetDate?.toISOString() || 'today' });
 
   try {
-    await alignerQueries.markBatchAsDelivered(parseInt(String(batchId)));
-    log.info(`Batch ${batchId} marked as delivered`);
+    const result = await alignerQueries.updateBatchStatus(parsedBatchId, 'DELIVER', targetDate);
+
+    if (result.wasAlreadyDelivered) {
+      log.info(`Batch #${result.batchSequence} was already delivered`);
+    } else if (result.wasActivated) {
+      log.info(`Batch #${result.batchSequence} delivered and auto-activated (latest batch)`);
+    } else if (result.wasAlreadyActive) {
+      log.info(`Batch #${result.batchSequence} delivered (already active)`);
+    } else {
+      log.info(`Batch #${result.batchSequence} delivered (not latest batch)`);
+    }
+
+    return result;
   } catch (error) {
     log.error('Error marking batch as delivered:', { error: error instanceof Error ? error.message : String(error) });
     throw error;
@@ -542,18 +610,22 @@ export async function markBatchDelivered(
 }
 
 /**
- * Mark a batch as manufactured (sets ManufactureDate to today)
+ * Mark a batch as manufactured
  *
  * Business Rules:
  * - Batch must exist
- * - Only updates if ManufactureDate is currently NULL
+ * - If no targetDate and ManufactureDate already set, returns "already manufactured" (idempotent)
+ * - If targetDate provided and ManufactureDate already set, updates date (allows correction)
  *
  * @param batchId - Batch ID
+ * @param targetDate - Optional date for backdating/correction. If null, uses today's date
+ * @returns Result with operation info
  * @throws AlignerValidationError If validation fails
  */
 export async function markBatchManufactured(
-  batchId: number | string
-): Promise<void> {
+  batchId: number | string,
+  targetDate?: Date | null
+): Promise<alignerQueries.UpdateBatchStatusResult> {
   if (!batchId || isNaN(parseInt(String(batchId)))) {
     throw new AlignerValidationError(
       'Valid batchId is required',
@@ -561,11 +633,13 @@ export async function markBatchManufactured(
     );
   }
 
-  log.info(`Marking batch ${batchId} as manufactured`);
+  const parsedBatchId = parseInt(String(batchId));
+  log.info(`Marking batch ${parsedBatchId} as manufactured`, { targetDate: targetDate?.toISOString() || 'today' });
 
   try {
-    await alignerQueries.markBatchAsManufactured(parseInt(String(batchId)));
-    log.info(`Batch ${batchId} marked as manufactured`);
+    const result = await alignerQueries.updateBatchStatus(parsedBatchId, 'MANUFACTURE', targetDate);
+    log.info(`Batch ${parsedBatchId}: ${result.message}`);
+    return result;
   } catch (error) {
     log.error('Error marking batch as manufactured:', { error: error instanceof Error ? error.message : String(error) });
     throw error;
@@ -573,18 +647,19 @@ export async function markBatchManufactured(
 }
 
 /**
- * Undo manufacture - clears ManufactureDate and DeliveredToPatientDate
+ * Undo manufacture - clears ManufactureDate
  *
  * Business Rules:
  * - Batch must exist
- * - Clears both dates (can't be delivered without being manufactured)
+ * - Batch must not be delivered (undo delivery first)
  *
  * @param batchId - Batch ID
+ * @returns Result with operation info
  * @throws AlignerValidationError If validation fails
  */
 export async function undoManufactureBatch(
   batchId: number | string
-): Promise<void> {
+): Promise<alignerQueries.UpdateBatchStatusResult> {
   if (!batchId || isNaN(parseInt(String(batchId)))) {
     throw new AlignerValidationError(
       'Valid batchId is required',
@@ -592,11 +667,13 @@ export async function undoManufactureBatch(
     );
   }
 
-  log.info(`Undoing manufacture for batch ${batchId}`);
+  const parsedBatchId = parseInt(String(batchId));
+  log.info(`Undoing manufacture for batch ${parsedBatchId}`);
 
   try {
-    await alignerQueries.undoManufactureBatch(parseInt(String(batchId)));
-    log.info(`Batch ${batchId} manufacture undone`);
+    const result = await alignerQueries.updateBatchStatus(parsedBatchId, 'UNDO_MANUFACTURE');
+    log.info(`Batch ${parsedBatchId}: ${result.message}`);
+    return result;
   } catch (error) {
     log.error('Error undoing manufacture:', { error: error instanceof Error ? error.message : String(error) });
     throw error;
@@ -604,16 +681,19 @@ export async function undoManufactureBatch(
 }
 
 /**
- * Undo delivery - clears only DeliveredToPatientDate
+ * Undo delivery - clears DeliveredToPatientDate and BatchExpiryDate
  *
  * Business Rules:
  * - Batch must exist
- * - Only clears delivery date, keeps manufacture date
+ * - Clears delivery date and expiry date, keeps manufacture date
  *
  * @param batchId - Batch ID
+ * @returns Result with operation info
  * @throws AlignerValidationError If validation fails
  */
-export async function undoDeliverBatch(batchId: number | string): Promise<void> {
+export async function undoDeliverBatch(
+  batchId: number | string
+): Promise<alignerQueries.UpdateBatchStatusResult> {
   if (!batchId || isNaN(parseInt(String(batchId)))) {
     throw new AlignerValidationError(
       'Valid batchId is required',
@@ -621,11 +701,13 @@ export async function undoDeliverBatch(batchId: number | string): Promise<void> 
     );
   }
 
-  log.info(`Undoing delivery for batch ${batchId}`);
+  const parsedBatchId = parseInt(String(batchId));
+  log.info(`Undoing delivery for batch ${parsedBatchId}`);
 
   try {
-    await alignerQueries.undoDeliverBatch(parseInt(String(batchId)));
-    log.info(`Batch ${batchId} delivery undone`);
+    const result = await alignerQueries.updateBatchStatus(parsedBatchId, 'UNDO_DELIVERY');
+    log.info(`Batch ${parsedBatchId}: ${result.message}`);
+    return result;
   } catch (error) {
     log.error('Error undoing delivery:', { error: error instanceof Error ? error.message : String(error) });
     throw error;

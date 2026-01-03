@@ -1,0 +1,321 @@
+/* ============================================
+   COST PRESETS SETTINGS - CSS Module
+   ============================================ */
+
+.costPresetsSettings {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: var(--spacing-lg);
+}
+
+/* Header */
+.settingsHeader {
+    margin-bottom: var(--spacing-xl);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.settingsHeader h2 {
+    margin: 0 0 var(--spacing-sm) 0;
+    font-size: var(--font-size-2xl);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.settingsHeader p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+}
+
+/* Currency Tabs */
+.currencyTabs {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.currencyTab {
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.currencyTab:hover {
+    background: var(--background-secondary);
+    color: var(--primary-color);
+}
+
+.currencyTab.active,
+.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    font-weight: var(--font-weight-semibold);
+}
+
+/* Content Layout */
+.presetsContent {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: var(--spacing-lg);
+}
+
+/* Form Card */
+.presetFormCard {
+    background: var(--background-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.presetFormCard h3 {
+    margin: 0 0 var(--spacing-md) 0;
+    font-size: var(--font-size-lg);
+    color: var(--text-primary);
+}
+
+.formGroup {
+    margin-bottom: var(--spacing-md);
+}
+
+.formGroup label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+}
+
+.formGroup input,
+.formGroup select {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+    transition: border-color var(--transition-fast);
+}
+
+.formGroup input:focus,
+.formGroup select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.formActions {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-lg);
+}
+
+/* Table Card */
+.presetsTableCard {
+    background: var(--background-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.presetsTableCard h3 {
+    margin: 0 0 var(--spacing-md) 0;
+    font-size: var(--font-size-lg);
+    color: var(--text-primary);
+}
+
+/* Table */
+.presetsTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.presetsTable thead {
+    background: var(--background-secondary);
+}
+
+.presetsTable th {
+    padding: var(--spacing-md);
+    text-align: left;
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.presetsTable td {
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.presetsTable tbody tr:hover {
+    background: var(--background-secondary);
+}
+
+.presetsTable tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Actions Column */
+.actions {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.btnIcon {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+}
+
+.btnIcon:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.btnEdit {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btnEdit:hover {
+    background: var(--primary-color);
+    color: var(--color-white);
+}
+
+.btnDelete {
+    color: var(--error-color);
+    border-color: var(--error-color);
+}
+
+.btnDelete:hover {
+    background: var(--error-color);
+    color: var(--color-white);
+}
+
+/* Empty State */
+.emptyState {
+    text-align: center;
+    padding: var(--spacing-xxl) var(--spacing-lg);
+    color: var(--text-secondary);
+}
+
+.emptyState i {
+    color: var(--text-lighter);
+    margin-bottom: var(--spacing-md);
+}
+
+.emptyState p {
+    margin: var(--spacing-sm) 0;
+}
+
+.hint {
+    font-size: var(--font-size-sm);
+    color: var(--text-lighter);
+}
+
+/* Loading State */
+.loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-xxl);
+    color: var(--text-secondary);
+}
+
+.loading i {
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-md);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .presetsContent {
+        grid-template-columns: 1fr;
+    }
+
+    .presetFormCard {
+        order: 2;
+    }
+
+    .presetsTableCard {
+        order: 1;
+    }
+}
+
+@media (max-width: 768px) {
+    .costPresetsSettings {
+        padding: var(--spacing-md);
+    }
+
+    .currencyTabs {
+        flex-wrap: wrap;
+    }
+
+    .currencyTab {
+        flex: 1;
+        min-width: 100px;
+        justify-content: center;
+    }
+
+    .presetsTable {
+        font-size: var(--font-size-sm);
+    }
+
+    .presetsTable th,
+    .presetsTable td {
+        padding: var(--spacing-sm);
+    }
+}
+
+@media (max-width: 480px) {
+    .presetsTable thead {
+        display: none;
+    }
+
+    .presetsTable,
+    .presetsTable tbody,
+    .presetsTable tr,
+    .presetsTable td {
+        display: block;
+    }
+
+    .presetsTable tr {
+        margin-bottom: var(--spacing-md);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: var(--spacing-sm);
+    }
+
+    .presetsTable td {
+        display: flex;
+        justify-content: space-between;
+        padding: var(--spacing-xs) 0;
+        border: none;
+    }
+
+    .presetsTable td::before {
+        content: attr(data-label);
+        font-weight: var(--font-weight-semibold);
+        color: var(--text-secondary);
+    }
+
+    .actions {
+        justify-content: flex-end;
+    }
+}

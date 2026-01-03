@@ -1,3 +1,5 @@
+import styles from './MobileViewToggle.module.css';
+
 type ViewType = 'all' | 'checked-in';
 
 interface MobileViewToggleProps {
@@ -11,9 +13,9 @@ interface MobileViewToggleProps {
  */
 const MobileViewToggle = ({ activeView, onViewChange }: MobileViewToggleProps) => {
     return (
-        <div className="mobile-view-toggle">
+        <div className={styles.container}>
             <button
-                className={`toggle-btn ${activeView === 'all' ? 'active' : ''}`}
+                className={activeView === 'all' ? styles.buttonActive : styles.button}
                 data-view="all"
                 onClick={() => onViewChange('all')}
             >
@@ -21,7 +23,7 @@ const MobileViewToggle = ({ activeView, onViewChange }: MobileViewToggleProps) =
                 <span>All</span>
             </button>
             <button
-                className={`toggle-btn ${activeView === 'checked-in' ? 'active' : ''}`}
+                className={activeView === 'checked-in' ? styles.buttonActive : styles.button}
                 data-view="checked-in"
                 onClick={() => onViewChange('checked-in')}
             >

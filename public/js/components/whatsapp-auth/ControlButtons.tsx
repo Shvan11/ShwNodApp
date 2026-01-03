@@ -4,6 +4,7 @@
  */
 
 import { AUTH_STATES, AuthState, WhatsAppAuthActions } from '../../hooks/useWhatsAppAuth';
+import styles from '../../routes/WhatsAppAuth.module.css';
 
 interface ControlButtonsProps {
   authState: AuthState;
@@ -23,10 +24,10 @@ export const ControlButtons = ({ authState, actions }: ControlButtonsProps) => {
     authState === AUTH_STATES.AUTHENTICATED || authState === AUTH_STATES.QR_REQUIRED;
 
   return (
-    <div className="auth-actions">
+    <div className={styles.authActions}>
       {showRetry && (
         <button onClick={handleRetry} className="btn btn-secondary">
-          <span className="btn-icon" aria-hidden="true">
+          <span className={styles.btnIcon} aria-hidden="true">
             🔄
           </span>
           <span>Retry Connection</span>
@@ -35,7 +36,7 @@ export const ControlButtons = ({ authState, actions }: ControlButtonsProps) => {
 
       {showRefresh && (
         <button onClick={handleRefreshQR} className="btn btn-primary">
-          <span className="btn-icon" aria-hidden="true">
+          <span className={styles.btnIcon} aria-hidden="true">
             📱
           </span>
           <span>Refresh QR Code</span>
@@ -45,14 +46,14 @@ export const ControlButtons = ({ authState, actions }: ControlButtonsProps) => {
       {showClientControls && (
         <>
           <button onClick={handleRestart} className="btn btn-success">
-            <span className="btn-icon" aria-hidden="true">
+            <span className={styles.btnIcon} aria-hidden="true">
               🔄
             </span>
             <span>Restart Client</span>
           </button>
 
           <button onClick={handleDestroy} className="btn btn-warning">
-            <span className="btn-icon" aria-hidden="true">
+            <span className={styles.btnIcon} aria-hidden="true">
               ⏹️
             </span>
             <span>Close Browser</span>
@@ -62,7 +63,7 @@ export const ControlButtons = ({ authState, actions }: ControlButtonsProps) => {
 
       {showLogout && (
         <button onClick={handleLogout} className="btn btn-danger">
-          <span className="btn-icon" aria-hidden="true">
+          <span className={styles.btnIcon} aria-hidden="true">
             🚪
           </span>
           <span>Logout WhatsApp</span>

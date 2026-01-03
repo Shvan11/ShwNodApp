@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import styles from '../../routes/WhatsAppAuth.module.css';
 
 export const SuccessDisplay = () => {
   const [message, setMessage] = useState('Your WhatsApp client is ready to send messages');
@@ -18,13 +19,13 @@ export const SuccessDisplay = () => {
   }, []);
 
   return (
-    <div className="success-section">
-      <div className="success-icon-container">
-        <span className="success-icon" aria-hidden="true">
+    <div className={styles.successSection}>
+      <div className={styles.successIconContainer}>
+        <span className={styles.successIcon} aria-hidden="true">
           ✅
         </span>
       </div>
-      <div className="success-content">
+      <div className={styles.successContent}>
         <h2>WhatsApp Connected!</h2>
         <p>{message}</p>
       </div>

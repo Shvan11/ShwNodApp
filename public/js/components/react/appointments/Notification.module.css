@@ -1,0 +1,131 @@
+/* Notification.module.css - Toast notification component */
+
+.notification {
+    position: fixed;
+    top: var(--spacing-lg);
+    right: var(--spacing-lg);
+    z-index: 9999;
+    background: white;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    min-width: 300px;
+    max-width: 500px;
+    opacity: 1;
+    transform: translateY(0);
+    animation: slideInDown 0.3s ease-out;
+    border-left: 4px solid;
+}
+
+@keyframes slideInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.success {
+    composes: notification;
+    border-left-color: var(--success-green);
+}
+
+.error {
+    composes: notification;
+    border-left-color: var(--error-red);
+}
+
+.info {
+    composes: notification;
+    border-left-color: var(--primary-blue);
+}
+
+.notification i:first-child,
+.success i:first-child,
+.error i:first-child,
+.info i:first-child {
+    font-size: var(--font-size-xl);
+    flex-shrink: 0;
+}
+
+.success i:first-child {
+    color: var(--success-green);
+}
+
+.error i:first-child {
+    color: var(--error-red);
+}
+
+.info i:first-child {
+    color: var(--primary-blue);
+}
+
+.message {
+    flex: 1;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--gray-700);
+}
+
+.undoButton {
+    background-color: var(--blue-50);
+    border: 1px solid var(--primary-blue);
+    color: var(--primary-blue);
+    padding: var(--spacing-xs) 0.75rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.undoButton:hover {
+    background-color: var(--primary-blue);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.undoButton:active {
+    transform: translateY(0);
+}
+
+.closeButton {
+    background: none;
+    border: none;
+    padding: var(--spacing-xs);
+    cursor: pointer;
+    color: var(--neutral-gray);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.closeButton:hover {
+    background-color: var(--hover-bg);
+    color: var(--gray-800);
+}
+
+/* Responsive - Mobile */
+@media (max-width: 768px) {
+    .notification,
+    .success,
+    .error,
+    .info {
+        left: var(--spacing-md);
+        right: var(--spacing-md);
+        min-width: auto;
+    }
+}

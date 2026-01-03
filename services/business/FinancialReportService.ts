@@ -38,14 +38,17 @@ export interface MonthlyStatistics {
  * Daily data from ProcGrandTotal
  */
 export interface DailyData {
+  Day?: string;
   SumIQD?: number;
   SumUSD?: number;
   ExpensesIQD?: number;
   ExpensesUSD?: number;
   QasaIQD?: number;
   QasaUSD?: number;
-  Date?: string;
-  DayTotal?: number;
+  GrandTotal?: number;
+  GrandTotalIQD?: number;
+  FinalIQDSum?: number;
+  FinalUSDSum?: number;
 }
 
 /**

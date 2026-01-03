@@ -1,0 +1,76 @@
+/* DailyAppointments.module.css - Main container for daily appointments page */
+
+.view {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-primary);
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--gray-800);
+    background-color: var(--page-bg);
+    width: 100%;
+    overflow-x: hidden;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Main container for appointments lists */
+.container {
+    display: flex;
+    gap: var(--spacing-lg);
+    padding: 0 var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+    background: transparent;
+}
+
+/* Error state */
+.errorMessage {
+    text-align: center;
+    padding: var(--spacing-xl);
+    color: var(--error-red);
+    font-size: var(--font-size-lg);
+    background: var(--error-50);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    border: 2px solid var(--error-100);
+}
+
+.errorMessage i {
+    margin-right: var(--spacing-sm);
+}
+
+/* Footer */
+.footer {
+    text-align: center;
+    padding: var(--spacing-xl);
+    color: var(--neutral-gray);
+    font-size: var(--font-size-sm);
+    background-color: white;
+    border-top: 1px solid var(--border-color);
+    margin-top: auto;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .container {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column;
+        gap: var(--spacing-md);
+    }
+}
+
+/* Print styles */
+@media print {
+    .footer {
+        display: none;
+    }
+}

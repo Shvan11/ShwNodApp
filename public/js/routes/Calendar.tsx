@@ -1,9 +1,7 @@
 import AppointmentCalendar from '../components/react/AppointmentCalendar';
 
-// Calendar view styles
+// Calendar view styles - appointment-calendar.css kept global due to :root variables and shared by many components
 import '../../css/components/appointment-calendar.css';
-import '../../css/components/monthly-calendar-view.css';
-import '../../css/components/appointment-form.css';
 
 /**
  * Appointment Calendar Route

@@ -32,8 +32,6 @@ interface BatchFormData {
     UpperAlignerCount: number | string;
     LowerAlignerCount: number | string;
     Days: number | string;
-    ManufactureDate: string;
-    DeliveredToPatientDate: string;
     Notes: string;
     IsActive: boolean;
     IsLast: boolean;
@@ -50,7 +48,6 @@ interface FormErrors {
     BatchSequence?: string;
     UpperAlignerCount?: string;
     LowerAlignerCount?: string;
-    DeliveredToPatientDate?: string;
     IsActive?: string;
     IsLast?: string;
     [key: string]: string | undefined;
@@ -83,12 +80,17 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         UpperAlignerCount: '',
         LowerAlignerCount: '',
         Days: '',
-        ManufactureDate: '',
-        DeliveredToPatientDate: '',
         Notes: '',
-        IsActive: true,
+        IsActive: false,
         IsLast: false
     });
+
+    // State for date editing
+    const [editingManufactureDate, setEditingManufactureDate] = useState<boolean>(false);
+    const [editingDeliveryDate, setEditingDeliveryDate] = useState<boolean>(false);
+    const [tempManufactureDate, setTempManufactureDate] = useState<string>('');
+    const [tempDeliveryDate, setTempDeliveryDate] = useState<string>('');
+    const [savingDate, setSavingDate] = useState<boolean>(false);
 
     const [computedFields, setComputedFields] = useState<ComputedFields>({
         UpperAlignerStartSequence: 1,
@@ -116,18 +118,21 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         // Only run when drawer opens (isOpen transitions from false to true)
         if (isOpen && !previousIsOpenRef.current) {
             if (batch) {
-                // Edit mode - populate form
+                // Edit mode - populate form (dates are handled separately via status endpoints)
                 setFormData({
                     BatchSequence: batch.BatchSequence || '',
                     UpperAlignerCount: batch.UpperAlignerCount || '',
                     LowerAlignerCount: batch.LowerAlignerCount || '',
                     Days: batch.Days || '',
-                    ManufactureDate: batch.ManufactureDate ? batch.ManufactureDate.split('T')[0] : '',
-                    DeliveredToPatientDate: batch.DeliveredToPatientDate ? batch.DeliveredToPatientDate.split('T')[0] : '',
                     Notes: batch.Notes || '',
-                    IsActive: batch.IsActive !== undefined ? batch.IsActive : true,
+                    IsActive: batch.IsActive !== undefined ? batch.IsActive : false,
                     IsLast: batch.IsLast !== undefined ? batch.IsLast : false
                 });
+                // Reset date editing state
+                setEditingManufactureDate(false);
+                setEditingDeliveryDate(false);
+                setTempManufactureDate('');
+                setTempDeliveryDate('');
                 setComputedFields({
                     UpperAlignerStartSequence: batch.UpperAlignerStartSequence ?? 1,
                     LowerAlignerStartSequence: batch.LowerAlignerStartSequence ?? 1,
@@ -171,12 +176,15 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                     UpperAlignerCount: '',
                     LowerAlignerCount: '',
                     Days: set?.Days || '',
-                    ManufactureDate: '',  // Empty initially - set when manufacturing complete
-                    DeliveredToPatientDate: '',
                     Notes: '',
                     IsActive: false,
                     IsLast: false
                 });
+                // Reset date editing state for add mode
+                setEditingManufactureDate(false);
+                setEditingDeliveryDate(false);
+                setTempManufactureDate('');
+                setTempDeliveryDate('');
 
                 setComputedFields({
                     UpperAlignerStartSequence: upperStart,
@@ -235,17 +243,16 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         }
     };
 
-    const validate = (): boolean => {
+    const validate = (): { valid: boolean; errors: FormErrors } => {
         const newErrors: FormErrors = {};
 
         if (!formData.BatchSequence || formData.BatchSequence === '') {
             newErrors.BatchSequence = 'Batch sequence is required';
         }
 
-        // Validate active batch must have delivery date
-        if (formData.IsActive && !formData.DeliveredToPatientDate) {
-            newErrors.DeliveredToPatientDate = 'Delivery date is required when batch is active (being used by patient)';
-            newErrors.IsActive = 'Cannot mark as active without delivery date';
+        // Validate active batch must have delivery date (check batch prop, not formData)
+        if (formData.IsActive && !batch?.DeliveredToPatientDate) {
+            newErrors.IsActive = 'Cannot mark as active: batch must be delivered first';
         }
 
         // Validate upper aligner count doesn't exceed remaining
@@ -273,13 +280,21 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         }
 
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        return { valid: Object.keys(newErrors).length === 0, errors: newErrors };
     };
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
         e.preventDefault();
 
-        if (!validate()) {
+        const validation = validate();
+        if (!validation.valid) {
+            // Show toast for validation errors so user knows what went wrong
+            const errorMessages = Object.values(validation.errors).filter(Boolean);
+            if (errorMessages.length > 0) {
+                toast.error(errorMessages[0] as string);
+            } else {
+                toast.error('Please fix the form errors before saving');
+            }
             return;
         }
 
@@ -341,6 +356,64 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
 
     const getTodayDateString = (): string => {
         return new Date().toISOString().split('T')[0];
+    };
+
+    const formatDisplayDate = (dateStr: string | null | undefined): string => {
+        if (!dateStr) return 'Not set';
+        return new Date(dateStr).toLocaleDateString('en-GB', {
+            year: 'numeric', month: 'short', day: 'numeric'
+        });
+    };
+
+    // Handle date changes via status endpoints
+    const handleSetManufactureDate = async (dateStr: string): Promise<void> => {
+        if (!batch) return;
+        setSavingDate(true);
+        try {
+            const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/manufacture`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetDate: dateStr })
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                toast.error(result.error || result.message || 'Failed to update manufacture date');
+                return;
+            }
+            toast.success(result.message || 'Manufacture date updated');
+            setEditingManufactureDate(false);
+            setTempManufactureDate('');
+            onSave(); // Refresh data
+        } catch (error) {
+            toast.error('Error updating manufacture date: ' + (error as Error).message);
+        } finally {
+            setSavingDate(false);
+        }
+    };
+
+    const handleSetDeliveryDate = async (dateStr: string): Promise<void> => {
+        if (!batch) return;
+        setSavingDate(true);
+        try {
+            const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/deliver`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetDate: dateStr })
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                toast.error(result.error || result.message || 'Failed to update delivery date');
+                return;
+            }
+            toast.success(result.message || 'Delivery date updated');
+            setEditingDeliveryDate(false);
+            setTempDeliveryDate('');
+            onSave(); // Refresh data
+        } catch (error) {
+            toast.error('Error updating delivery date: ' + (error as Error).message);
+        } finally {
+            setSavingDate(false);
+        }
     };
 
     if (!isOpen) return null;
@@ -559,106 +632,159 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                             )}
 
                             <div className="form-row form-row-three-col">
+                                {/* Manufacture Date - Read-only with edit */}
                                 <div className="form-field">
-                                    <label htmlFor="ManufactureDate">
+                                    <label>
                                         Manufacture Date
                                         <span className="field-optional-text">(when manufacturing completed)</span>
                                     </label>
-                                    <div className="date-with-checkbox">
+                                    {batch ? (
+                                        editingManufactureDate ? (
+                                            <div className="date-edit-inline">
+                                                <input
+                                                    type="date"
+                                                    value={tempManufactureDate}
+                                                    onChange={(e: ChangeEvent<HTMLInputElement>) => setTempManufactureDate(e.target.value)}
+                                                    autoFocus
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-primary"
+                                                    onClick={() => handleSetManufactureDate(tempManufactureDate)}
+                                                    disabled={!tempManufactureDate || savingDate}
+                                                >
+                                                    {savingDate ? <i className="fas fa-spinner fa-spin"></i> : 'Apply'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-secondary"
+                                                    onClick={() => { setEditingManufactureDate(false); setTempManufactureDate(''); }}
+                                                    disabled={savingDate}
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="date-display-with-actions">
+                                                <input
+                                                    type="text"
+                                                    value={formatDisplayDate(batch.ManufactureDate)}
+                                                    readOnly
+                                                    className="readonly"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-outline"
+                                                    onClick={() => {
+                                                        setTempManufactureDate(batch.ManufactureDate?.split('T')[0] || getTodayDateString());
+                                                        setEditingManufactureDate(true);
+                                                    }}
+                                                    title={batch.ManufactureDate ? 'Change date' : 'Set manufacture date'}
+                                                >
+                                                    <i className="fas fa-calendar-alt"></i> {batch.ManufactureDate ? 'Edit' : 'Set'}
+                                                </button>
+                                                {batch.ManufactureDate && !batch.DeliveredToPatientDate && onUndoManufacture && (
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-sm btn-outline btn-danger"
+                                                        onClick={(e: MouseEvent<HTMLButtonElement>) => {
+                                                            onUndoManufacture(batch, e);
+                                                            onClose();
+                                                        }}
+                                                        title="Clear manufacture date"
+                                                    >
+                                                        <i className="fas fa-times"></i> Clear
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )
+                                    ) : (
                                         <input
-                                            type="date"
-                                            id="ManufactureDate"
-                                            name="ManufactureDate"
-                                            value={formData.ManufactureDate}
-                                            onChange={handleChange}
+                                            type="text"
+                                            value="Set after creating batch"
+                                            readOnly
+                                            className="readonly"
                                         />
-                                        <label className="checkbox-inline" title="Set to today's date">
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.ManufactureDate === getTodayDateString()}
-                                                onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                                                    if (e.target.checked) {
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            ManufactureDate: getTodayDateString()
-                                                        }));
-                                                    } else {
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            ManufactureDate: ''
-                                                        }));
-                                                    }
-                                                }}
-                                            />
-                                            Today
-                                        </label>
-                                        {/* Undo Manufacture - only if manufactured AND NOT delivered */}
-                                        {batch && batch.ManufactureDate && !batch.DeliveredToPatientDate && onUndoManufacture && (
-                                            <button
-                                                type="button"
-                                                className="undo-link"
-                                                onClick={(e: MouseEvent<HTMLButtonElement>) => {
-                                                    onUndoManufacture(batch, e);
-                                                    onClose();
-                                                }}
-                                                title="Undo manufacture date"
-                                            >
-                                                <i className="fas fa-undo"></i> undo
-                                            </button>
-                                        )}
-                                    </div>
+                                    )}
                                 </div>
 
+                                {/* Delivery Date - Read-only with edit */}
                                 <div className="form-field">
-                                    <label htmlFor="DeliveredToPatientDate">
-                                        Delivered Date <span className="field-optional-text">(when given to patient)</span>
+                                    <label>
+                                        Delivered Date
+                                        <span className="field-optional-text">(when given to patient)</span>
                                     </label>
-                                    <div className="date-with-checkbox">
+                                    {batch ? (
+                                        editingDeliveryDate ? (
+                                            <div className="date-edit-inline">
+                                                <input
+                                                    type="date"
+                                                    value={tempDeliveryDate}
+                                                    onChange={(e: ChangeEvent<HTMLInputElement>) => setTempDeliveryDate(e.target.value)}
+                                                    autoFocus
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-primary"
+                                                    onClick={() => handleSetDeliveryDate(tempDeliveryDate)}
+                                                    disabled={!tempDeliveryDate || savingDate}
+                                                >
+                                                    {savingDate ? <i className="fas fa-spinner fa-spin"></i> : 'Apply'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-secondary"
+                                                    onClick={() => { setEditingDeliveryDate(false); setTempDeliveryDate(''); }}
+                                                    disabled={savingDate}
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="date-display-with-actions">
+                                                <input
+                                                    type="text"
+                                                    value={formatDisplayDate(batch.DeliveredToPatientDate)}
+                                                    readOnly
+                                                    className="readonly"
+                                                />
+                                                {batch.ManufactureDate ? (
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-sm btn-outline"
+                                                        onClick={() => {
+                                                            setTempDeliveryDate(batch.DeliveredToPatientDate?.split('T')[0] || getTodayDateString());
+                                                            setEditingDeliveryDate(true);
+                                                        }}
+                                                        title={batch.DeliveredToPatientDate ? 'Change date' : 'Set delivery date'}
+                                                    >
+                                                        <i className="fas fa-calendar-alt"></i> {batch.DeliveredToPatientDate ? 'Edit' : 'Set'}
+                                                    </button>
+                                                ) : (
+                                                    <span className="field-hint">Requires manufacture date</span>
+                                                )}
+                                                {batch.DeliveredToPatientDate && onUndoDelivery && (
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-sm btn-outline btn-danger"
+                                                        onClick={(e: MouseEvent<HTMLButtonElement>) => {
+                                                            onUndoDelivery(batch, e);
+                                                            onClose();
+                                                        }}
+                                                        title="Clear delivery date"
+                                                    >
+                                                        <i className="fas fa-times"></i> Clear
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )
+                                    ) : (
                                         <input
-                                            type="date"
-                                            id="DeliveredToPatientDate"
-                                            name="DeliveredToPatientDate"
-                                            value={formData.DeliveredToPatientDate}
-                                            onChange={handleChange}
-                                            className={errors.DeliveredToPatientDate ? 'error' : ''}
+                                            type="text"
+                                            value="Set after creating batch"
+                                            readOnly
+                                            className="readonly"
                                         />
-                                        <label className="checkbox-inline" title="Set to today's date">
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.DeliveredToPatientDate === getTodayDateString()}
-                                                onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                                                    if (e.target.checked) {
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            DeliveredToPatientDate: getTodayDateString()
-                                                        }));
-                                                    } else {
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            DeliveredToPatientDate: ''
-                                                        }));
-                                                    }
-                                                }}
-                                            />
-                                            Today
-                                        </label>
-                                        {/* Undo Delivery - only if delivered */}
-                                        {batch && batch.DeliveredToPatientDate && onUndoDelivery && (
-                                            <button
-                                                type="button"
-                                                className="undo-link"
-                                                onClick={(e: MouseEvent<HTMLButtonElement>) => {
-                                                    onUndoDelivery(batch, e);
-                                                    onClose();
-                                                }}
-                                                title="Undo delivery date"
-                                            >
-                                                <i className="fas fa-undo"></i> undo
-                                            </button>
-                                        )}
-                                    </div>
-                                    {errors.DeliveredToPatientDate && (
-                                        <span className="error-message">{errors.DeliveredToPatientDate}</span>
                                     )}
                                 </div>
 
@@ -716,9 +842,6 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                 <label htmlFor="IsLast">
                                     Last Batch (Final batch before new scan or treatment completion)
                                 </label>
-                                <small className="field-hint">
-                                    Marking as last batch will automatically activate this batch
-                                </small>
                                 {errors.IsLast && (
                                     <span className="error-message">{errors.IsLast}</span>
                                 )}

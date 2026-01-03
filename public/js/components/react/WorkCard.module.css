@@ -1,0 +1,393 @@
+/* ===== WORK CARD COMPONENT - CSS Module ===== */
+
+.card {
+    position: relative;
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    transition: all 0.2s ease;
+    border-left: 4px solid transparent;
+    overflow: visible;
+}
+
+.collapsed {
+    padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.expanded {
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-md);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+.active {
+    border-left-color: var(--success-500);
+}
+
+.completed {
+    border-left-color: var(--gray-500);
+    opacity: 0.85;
+}
+
+.discontinued {
+    border-left-color: var(--warning-color);
+    opacity: 0.75;
+    background: linear-gradient(135deg, #fff 0%, #fffbeb 100%);
+}
+
+/* Collapsed Header - Always Visible */
+.collapsedHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.collapsedHeader:hover {
+    opacity: 0.8;
+}
+
+.chevronIcon {
+    font-size: var(--font-size-sm);
+    color: var(--gray-500);
+    margin-right: var(--spacing-sm);
+}
+
+.balanceIndicator {
+    color: var(--error-500);
+    font-weight: 600;
+}
+
+.titleSection {
+    flex: 1;
+}
+
+.title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+}
+
+.title i:global(.fa-tooth) {
+    color: var(--success-500);
+    font-size: var(--font-size-base);
+}
+
+.title h3 {
+    margin: 0;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--gray-800);
+}
+
+/* Status Badge */
+.statusBadge {
+    padding: 0.125rem var(--spacing-sm);
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: var(--letter-spacing-wide);
+}
+
+.statusBadgeActive {
+    background: var(--success-100);
+    color: var(--success-800);
+}
+
+.statusBadgeCompleted {
+    background: var(--gray-200);
+    color: var(--gray-600);
+}
+
+.statusBadgeDiscontinued {
+    background: var(--warning-100);
+    color: var(--warning-900);
+}
+
+.metaMinimal {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    font-size: var(--font-size-sm);
+    color: var(--gray-500);
+    margin-left: 1.375rem;
+}
+
+.metaMinimal span {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.metaMinimal i {
+    font-size: 0.7rem;
+    color: var(--gray-400);
+}
+
+/* Full Content - Only When Expanded */
+.fullContent {
+    position: relative;
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: var(--border-width-thin) solid var(--gray-200);
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-0.625rem);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Actions Menu */
+.actionsMenu {
+    position: absolute;
+    top: var(--spacing-md);
+    right: var(--spacing-md);
+    z-index: var(--z-index-dropdown);
+}
+
+.dropdown {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    min-width: 11.25rem;
+    z-index: var(--z-index-dropdown);
+    overflow: hidden;
+    margin-top: var(--spacing-xs);
+}
+
+.dropdown button {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: none;
+    background: white;
+    color: var(--gray-700);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    text-align: left;
+    transition: background 0.2s;
+}
+
+.dropdown button:hover {
+    background: var(--gray-100);
+}
+
+.dropdown button i {
+    width: 16px;
+    color: var(--gray-500);
+}
+
+/* Delete button styling */
+.dropdownDeleteBtn {
+    color: var(--error-500);
+    border-top: 1px solid var(--gray-100);
+}
+
+.dropdownDeleteBtn:hover {
+    background: var(--error-50);
+    color: var(--error-600);
+}
+
+.dropdownDeleteBtn i {
+    color: var(--error-500);
+}
+
+.dropdownDeleteBtn:hover i {
+    color: var(--error-600);
+}
+
+/* Progress Section */
+.progress {
+    margin-bottom: 1rem;
+}
+
+.progressInfo {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.progressLabel {
+    font-size: 0.875rem;
+    color: var(--gray-500);
+    font-weight: 500;
+}
+
+.progressPercentage {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--success-500);
+}
+
+.progressBarContainer {
+    height: 8px;
+    background: var(--gray-200);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progressBarFill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--success-500) 0%, var(--success-300) 100%);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+/* Financial Summary */
+.financial {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-lg);
+    margin-bottom: 1rem;
+}
+
+.financialItem {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.financialLabel {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.financialValue {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--gray-800);
+}
+
+.financialValuePaid {
+    color: var(--success-500);
+}
+
+.financialValueRemaining {
+    color: var(--error-500);
+}
+
+.financialValuePaidFull {
+    color: var(--success-500);
+}
+
+/* Additional Info Section */
+.additionalInfo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-lg);
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}
+
+.infoItem {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--gray-700);
+}
+
+.infoItemFullWidth {
+    flex-basis: 100%;
+}
+
+.infoItem i {
+    color: var(--gray-500);
+    font-size: 0.75rem;
+}
+
+/* Primary Actions */
+.primaryActions {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+/* Secondary Actions */
+.secondaryActions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .expanded {
+        padding: var(--spacing-md);
+    }
+
+    .financial {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+
+    .primaryActions {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-sm);
+    }
+
+    .secondaryActions {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    .metaMinimal {
+        flex-direction: column;
+        gap: var(--spacing-xs);
+    }
+}
+
+@media (max-width: 480px) {
+    .collapsed {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .expanded {
+        padding: var(--spacing-sm);
+    }
+
+    .title h3 {
+        font-size: var(--font-size-sm);
+    }
+
+    .financial {
+        padding: var(--spacing-sm);
+        gap: var(--spacing-sm);
+    }
+
+    .financialValue {
+        font-size: var(--font-size-sm);
+    }
+
+    .primaryActions {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-xs);
+    }
+}

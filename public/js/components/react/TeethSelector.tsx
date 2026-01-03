@@ -1,4 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
+import cn from 'classnames';
+import styles from './TeethSelector.module.css';
 
 /**
  * TeethSelector - Combined dental chart for teeth selection
@@ -118,17 +120,17 @@ const TeethSelector = React.memo(({
         return (
             <div
                 key={tooth.ID}
-                className={`teeth-selector-tooth ${isSelected ? 'selected' : ''}`}
+                className={cn(styles.tooth, isSelected && styles.toothSelected)}
                 onClick={() => handleToothClick(tooth.ID)}
                 title={tooth.ToothName}
             >
-                {isLower && <span className="teeth-selector-number">{toothNumber}</span>}
+                {isLower && <span className={styles.toothNumber}>{toothNumber}</span>}
                 <img
                     src={`/images/teeth/chart/${tooth.ToothCode}.svg`}
                     alt={tooth.ToothCode}
                     loading="lazy"
                 />
-                {!isLower && <span className="teeth-selector-number">{toothNumber}</span>}
+                {!isLower && <span className={styles.toothNumber}>{toothNumber}</span>}
             </div>
         );
     };
@@ -142,7 +144,7 @@ const TeethSelector = React.memo(({
             <button
                 key={tooth.ID}
                 type="button"
-                className={`teeth-selector-deciduous-btn ${isSelected ? 'selected' : ''}`}
+                className={cn(styles.deciduousBtn, isSelected && styles.deciduousBtnSelected)}
                 onClick={() => handleToothClick(tooth.ID)}
                 title={tooth.ToothName}
             >
@@ -162,14 +164,14 @@ const TeethSelector = React.memo(({
         if (rightTeeth.length === 0 && leftTeeth.length === 0) return null;
 
         return (
-            <div className="teeth-selector-arch">
-                {!isLower && <div className="teeth-selector-arch-label">{label}</div>}
-                <div className="teeth-selector-arch-teeth">
+            <div className={styles.arch}>
+                {!isLower && <div className={styles.archLabel}>{label}</div>}
+                <div className={styles.archTeeth}>
                     {rightTeeth.map(tooth => renderPermanentTooth(tooth, isLower))}
-                    <span className="teeth-selector-midline">|</span>
+                    <span className={styles.midline}>|</span>
                     {leftTeeth.map(tooth => renderPermanentTooth(tooth, isLower))}
                 </div>
-                {isLower && <div className="teeth-selector-arch-label">{label}</div>}
+                {isLower && <div className={styles.archLabel}>{label}</div>}
             </div>
         );
     };
@@ -185,25 +187,25 @@ const TeethSelector = React.memo(({
         if (rightTeeth.length === 0 && leftTeeth.length === 0) return null;
 
         return (
-            <div className="teeth-selector-arch deciduous">
-                {!isLower && <div className="teeth-selector-arch-label">{label}</div>}
-                <div className="teeth-selector-deciduous-row">
+            <div className={cn(styles.arch, styles.archDeciduous)}>
+                {!isLower && <div className={styles.archLabel}>{label}</div>}
+                <div className={styles.deciduousRow}>
                     {rightTeeth.map(tooth => renderDeciduousTooth(tooth))}
-                    <span className="teeth-selector-midline">|</span>
+                    <span className={styles.midline}>|</span>
                     {leftTeeth.map(tooth => renderDeciduousTooth(tooth))}
                 </div>
-                {isLower && <div className="teeth-selector-arch-label">{label}</div>}
+                {isLower && <div className={styles.archLabel}>{label}</div>}
             </div>
         );
     };
 
     return (
-        <div className="teeth-selector-container">
+        <div className={styles.container}>
             {/* Filter toggles */}
             {(hasPermanentTeeth || hasDeciduousTeeth) && onFilterChange && (
-                <div className="teeth-selector-filters">
+                <div className={styles.filters}>
                     {hasPermanentTeeth && (
-                        <label className="teeth-selector-filter">
+                        <label className={styles.filter}>
                             <input
                                 type="checkbox"
                                 checked={showPermanent}
@@ -213,7 +215,7 @@ const TeethSelector = React.memo(({
                         </label>
                     )}
                     {hasDeciduousTeeth && (
-                        <label className="teeth-selector-filter">
+                        <label className={styles.filter}>
                             <input
                                 type="checkbox"
                                 checked={showDeciduous}
@@ -227,7 +229,7 @@ const TeethSelector = React.memo(({
 
             {/* Permanent Teeth - Graphical Chart */}
             {showPermanent && hasPermanentTeeth && (
-                <div className="teeth-selector-permanent">
+                <div className={styles.permanent}>
                     {renderPermanentArch('Upper', false)}
                     {renderPermanentArch('Lower', true)}
                 </div>
@@ -235,8 +237,8 @@ const TeethSelector = React.memo(({
 
             {/* Deciduous Teeth - Letter Grid */}
             {showDeciduous && hasDeciduousTeeth && (
-                <div className="teeth-selector-deciduous">
-                    <div className="teeth-selector-deciduous-label">Deciduous Teeth</div>
+                <div className={styles.deciduous}>
+                    <div className={styles.deciduousLabel}>Deciduous Teeth</div>
                     {renderDeciduousArch('Upper (Primary)', false)}
                     {renderDeciduousArch('Lower (Primary)', true)}
                 </div>
@@ -244,11 +246,11 @@ const TeethSelector = React.memo(({
 
             {/* Selected display */}
             {selectedTeethIds.length > 0 && (
-                <div className="teeth-selector-selected">
+                <div className={styles.selected}>
                     <strong>Selected:</strong> {selectedDisplay}
                     <button
                         type="button"
-                        className="teeth-selector-clear"
+                        className={styles.clearBtn}
                         onClick={handleClearAll}
                     >
                         Clear All

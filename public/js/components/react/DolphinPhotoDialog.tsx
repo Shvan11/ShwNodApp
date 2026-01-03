@@ -1,9 +1,9 @@
 import { useState, useEffect, ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
-import '../../../css/components/dolphin-photo-dialog.css';
+import styles from './DolphinPhotoDialog.module.css';
 
 interface Props {
-    patientId?: string;
+    personId?: string;
     patientInfo: {
         FirstName?: string;
         PatientName?: string;
@@ -32,7 +32,7 @@ const TIMEPOINT_TYPES: TimepointType[] = [
     { value: 'Retention', label: 'Retention' }
 ];
 
-const DolphinPhotoDialog = ({ patientId, patientInfo, onClose }: Props) => {
+const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
     const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -44,12 +44,12 @@ const DolphinPhotoDialog = ({ patientId, patientInfo, onClose }: Props) => {
 
     useEffect(() => {
         loadPhotoDates();
-    }, [patientId]);
+    }, [personId]);
 
     const loadPhotoDates = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`/api/dolphin/photo-dates/${patientId}`);
+            const response = await fetch(`/api/dolphin/photo-dates/${personId}`);
             if (!response.ok) throw new Error('Failed to load dates');
 
             const data = await response.json();
@@ -89,7 +89,7 @@ const DolphinPhotoDialog = ({ patientId, patientInfo, onClose }: Props) => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    personId: patientId,
+                    personId,
                     tpDescription: timepointType,
                     tpDate: selectedDate,
                     skipDolphin
@@ -126,23 +126,23 @@ const DolphinPhotoDialog = ({ patientId, patientInfo, onClose }: Props) => {
     };
 
     return (
-        <div className="dolphin-photo-dialog-overlay" onClick={onClose}>
-            <div className="dolphin-photo-dialog" onClick={(e) => e.stopPropagation()}>
-                <div className="dialog-header">
+        <div className={styles.overlay} onClick={onClose}>
+            <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
+                <div className={styles.header}>
                     <h3>Add Photos to Dolphin</h3>
-                    <button className="close-btn" onClick={onClose}>
+                    <button className={styles.closeBtn} onClick={onClose}>
                         <i className="fas fa-times" />
                     </button>
                 </div>
 
-                <div className="dialog-body">
+                <div className={styles.body}>
                     {/* Timepoint Type */}
-                    <div className="form-group">
+                    <div className={styles.formGroup}>
                         <label>Timepoint Type</label>
                         <select
                             value={timepointType}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setTimepointType(e.target.value)}
-                            className="form-select"
+                            className={styles.formSelect}
                         >
                             {TIMEPOINT_TYPES.map(tp => (
                                 <option key={tp.value} value={tp.value}>{tp.label}</option>
@@ -151,35 +151,35 @@ const DolphinPhotoDialog = ({ patientId, patientInfo, onClose }: Props) => {
                     </div>
 
                     {/* Date Selection */}
-                    <div className="form-group">
+                    <div className={styles.formGroup}>
                         <label>Photo Date</label>
                         <input
                             type="date"
                             value={selectedDate}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setSelectedDate(e.target.value)}
-                            className="form-input"
+                            className={styles.formInput}
                         />
                     </div>
 
                     {/* Appointments List */}
                     {loading ? (
-                        <div className="loading-placeholder">Loading dates...</div>
+                        <div className={styles.loadingPlaceholder}>Loading dates...</div>
                     ) : (
                         <>
                             {appointments.length > 0 && (
-                                <div className="date-list">
+                                <div className={styles.dateList}>
                                     <label>Recent Appointments</label>
-                                    <div className="date-items">
+                                    <div className={styles.dateItems}>
                                         {appointments.slice(0, 5).map((appt, idx) => (
                                             <button
                                                 key={idx}
                                                 type="button"
-                                                className="date-item"
+                                                className={styles.dateItem}
                                                 onClick={() => handleDateSelect(appt.date)}
                                             >
-                                                <span className="date-value">{formatDate(appt.date)}</span>
+                                                <span className={styles.dateValue}>{formatDate(appt.date)}</span>
                                                 {appt.description && (
-                                                    <span className="date-desc">{appt.description}</span>
+                                                    <span className={styles.dateDesc}>{appt.description}</span>
                                                 )}
                                             </button>
                                         ))}
@@ -188,17 +188,17 @@ const DolphinPhotoDialog = ({ patientId, patientInfo, onClose }: Props) => {
                             )}
 
                             {visits.length > 0 && (
-                                <div className="date-list">
+                                <div className={styles.dateList}>
                                     <label>Recent Visits</label>
-                                    <div className="date-items">
+                                    <div className={styles.dateItems}>
                                         {visits.slice(0, 5).map((visit, idx) => (
                                             <button
                                                 key={idx}
                                                 type="button"
-                                                className="date-item"
+                                                className={styles.dateItem}
                                                 onClick={() => handleDateSelect(visit.visitDate)}
                                             >
-                                                <span className="date-value">{formatDate(visit.visitDate)}</span>
+                                                <span className={styles.dateValue}>{formatDate(visit.visitDate)}</span>
                                             </button>
                                         ))}
                                     </div>
@@ -208,8 +208,8 @@ const DolphinPhotoDialog = ({ patientId, patientInfo, onClose }: Props) => {
                     )}
 
                     {/* Skip Dolphin Checkbox */}
-                    <div className="form-group checkbox-group">
-                        <label className="checkbox-label">
+                    <div className={`${styles.formGroup} ${styles.checkboxGroup}`}>
+                        <label className={styles.checkboxLabel}>
                             <input
                                 type="checkbox"
                                 checked={skipDolphin}
@@ -220,7 +220,7 @@ const DolphinPhotoDialog = ({ patientId, patientInfo, onClose }: Props) => {
                     </div>
                 </div>
 
-                <div className="dialog-footer">
+                <div className={styles.footer}>
                     <button
                         type="button"
                         className="btn btn-secondary"

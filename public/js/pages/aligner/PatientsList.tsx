@@ -1,6 +1,7 @@
 // PatientsList.tsx - Show patients for a selected doctor
 import React, { useState, useEffect, ChangeEvent, SyntheticEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import styles from './PatientsList.module.css';
 
 interface Doctor {
     DrID: number | string;
@@ -10,7 +11,6 @@ interface Doctor {
 interface Patient {
     PersonID: number;
     workid: number;
-    patientID?: string;
     PatientName?: string;
     FirstName?: string;
     LastName?: string;
@@ -90,7 +90,7 @@ const PatientsList: React.FC = () => {
         return patients.filter(p => {
             const name = formatPatientName(p).toLowerCase();
             const phone = (p.Phone || '').toLowerCase();
-            const id = (p.patientID || '').toLowerCase();
+            const id = String(p.PersonID);
 
             return name.includes(query) || phone.includes(query) || id.includes(query);
         });
@@ -107,11 +107,9 @@ const PatientsList: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="aligner-container">
-                <div className="loading-container">
-                    <div className="spinner"></div>
-                    <p>Loading patients...</p>
-                </div>
+            <div className={styles.loadingContainer}>
+                <div className={styles.spinner}></div>
+                <p>Loading patients...</p>
             </div>
         );
     }
@@ -119,27 +117,27 @@ const PatientsList: React.FC = () => {
     return (
         <>
             {/* Breadcrumb */}
-            <div className="breadcrumb">
-                <button onClick={backToDoctors} className="breadcrumb-link">
+            <div className={styles.breadcrumb}>
+                <button onClick={backToDoctors} className={styles.breadcrumbLink}>
                     <i className="fas fa-arrow-left"></i>
                     Back to Doctors
                 </button>
             </div>
 
-            <div className="section-header">
+            <div className={styles.sectionHeader}>
                 <h2>
                     <i className="fas fa-user-md"></i>
                     {doctor?.DoctorName === 'Admin' ? doctor.DoctorName : `Dr. ${doctor?.DoctorName}`}'s Patients
                 </h2>
-                <div className="section-info">
+                <div className={styles.sectionInfo}>
                     <span>{patients.length} patient{patients.length !== 1 ? 's' : ''}</span>
                 </div>
             </div>
 
             {/* Patient Filter Search */}
             {patients.length > 0 && (
-                <div className="patient-filter-box">
-                    <i className="fas fa-filter filter-icon"></i>
+                <div className={styles.patientFilterBox}>
+                    <i className={`fas fa-filter ${styles.filterIcon}`}></i>
                     <input
                         type="text"
                         placeholder="Filter patients by name, phone, or ID..."
@@ -148,7 +146,7 @@ const PatientsList: React.FC = () => {
                     />
                     {patientFilter && (
                         <button
-                            className="clear-filter-btn"
+                            className={styles.clearFilterBtn}
                             onClick={() => setPatientFilter('')}
                         >
                             <i className="fas fa-times"></i>
@@ -159,12 +157,12 @@ const PatientsList: React.FC = () => {
 
             {/* Patients Grid */}
             {getFilteredPatients().length === 0 ? (
-                <div className="empty-patients">
+                <div className={styles.emptyPatients}>
                     <i className="fas fa-users"></i>
                     <h3>{patientFilter ? 'No matching patients found' : 'No patients with aligner sets'}</h3>
                     {patientFilter && (
                         <button
-                            className="btn-clear btn-clear-spaced"
+                            className={`${styles.btnClear} ${styles.btnClearSpaced}`}
                             onClick={() => setPatientFilter('')}
                         >
                             Clear Filter
@@ -172,49 +170,49 @@ const PatientsList: React.FC = () => {
                     )}
                 </div>
             ) : (
-                <div className="patients-grid">
+                <div className={styles.patientsGrid}>
                     {getFilteredPatients().map((patient) => (
                         <div
                             key={patient.PersonID}
-                            className={`patient-card ${patient.UnreadDoctorNotes && patient.UnreadDoctorNotes > 0 ? 'has-activity' : ''}`}
+                            className={`${styles.patientCard} ${patient.UnreadDoctorNotes && patient.UnreadDoctorNotes > 0 ? styles.hasActivity : ''}`}
                             onClick={() => selectPatient(patient)}
                         >
                             {patient.UnreadDoctorNotes && patient.UnreadDoctorNotes > 0 && (
-                                <div className="activity-banner">
+                                <div className={styles.activityBanner}>
                                     <i className="fas fa-bell"></i>
                                     <strong>{patient.UnreadDoctorNotes}</strong> unread {patient.UnreadDoctorNotes === 1 ? 'note' : 'notes'}
                                 </div>
                             )}
-                            <div className="patient-card-header">
-                                <div className="patient-card-photo">
+                            <div className={styles.patientCardHeader}>
+                                <div className={styles.patientCardPhoto}>
                                     <img
                                         src={`/DolImgs/${patient.PersonID}00.i13`}
                                         alt={`${formatPatientName(patient)} - Smile`}
                                         onError={handleImageError}
                                     />
-                                    <div className="patient-photo-placeholder patient-photo-placeholder-hidden">
+                                    <div className={`${styles.patientPhotoPlaceholder} ${styles.patientPhotoPlaceholderHidden}`}>
                                         <i className="fas fa-user"></i>
                                     </div>
                                 </div>
                                 <div>
                                     <h3>{formatPatientName(patient)}</h3>
                                     {patient.PatientName && patient.FirstName && (
-                                        <p className="patient-card-subtitle">
+                                        <p className={styles.patientCardSubtitle}>
                                             {patient.FirstName} {patient.LastName}
                                         </p>
                                     )}
                                 </div>
                             </div>
-                            <div className="patient-card-meta">
-                                <span><i className="fas fa-id-card"></i> {patient.patientID || 'N/A'}</span>
+                            <div className={styles.patientCardMeta}>
+                                <span><i className="fas fa-id-card"></i> {patient.PersonID}</span>
                                 <span><i className="fas fa-phone"></i> {patient.Phone || 'N/A'}</span>
                             </div>
-                            <div className="patient-card-stats">
-                                <div className="stat">
+                            <div className={styles.patientCardStats}>
+                                <div className={styles.stat}>
                                     <i className="fas fa-box"></i>
                                     <span>{patient.TotalSets || 0} Sets</span>
                                 </div>
-                                <div className="stat active">
+                                <div className={`${styles.stat} ${styles.active}`}>
                                     <i className="fas fa-check-circle"></i>
                                     <span>{patient.ActiveSets || 0} Active</span>
                                 </div>

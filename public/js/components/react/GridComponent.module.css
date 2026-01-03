@@ -1,0 +1,141 @@
+/* GridComponent.module.css - Patient photo gallery grid */
+
+/* Legacy Dolphin gallery - using ID selector converted to class */
+.dolphGallery {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 0 20px 20px 20px;
+}
+
+.dolphGallery a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background-color: var(--gray-50);
+  border: 1px solid var(--gray-300);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.dolphGallery img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Grid Component Container */
+.container {
+  padding: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Padding-only class for pswp-gallery (works with dynamic inline grid styles) */
+.galleryPadded {
+  padding: 0 var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
+}
+
+/* Gallery Image Styling */
+.galleryImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  background-color: var(--gray-50);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.logoBorder {
+  border: 2px solid var(--gray-300);
+}
+
+/* Loading spinner */
+.loadingSpinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+/* Error message */
+.errorMessage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+  color: var(--error-color);
+  background-color: var(--error-50);
+  border-radius: var(--radius-md);
+  margin: var(--spacing-md);
+}
+
+/* ===== MOBILE RESPONSIVE DESIGN ===== */
+
+/* Tablets and medium screens */
+@media (max-width: 1024px) {
+  .dolphGallery {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 0 16px 16px 16px;
+  }
+
+  .galleryPadded {
+    padding: 0 var(--spacing-md) var(--spacing-md) var(--spacing-md);
+  }
+}
+
+/* Mobile devices */
+@media (max-width: 768px) {
+  .dolphGallery {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    padding: 0 12px 12px 12px;
+  }
+
+  .dolphGallery a {
+    border-radius: 8px;
+    min-height: 150px;
+  }
+
+  .galleryPadded {
+    padding: 0 var(--spacing-sm) var(--spacing-sm) var(--spacing-sm);
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 640px) {
+  .dolphGallery {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 0 16px 16px 16px;
+  }
+
+  .dolphGallery a {
+    min-height: 200px;
+    border-radius: 8px;
+  }
+
+  .dolphGallery img {
+    object-fit: contain;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 480px) {
+  .dolphGallery {
+    padding: 0 12px 12px 12px;
+    gap: 10px;
+  }
+
+  .dolphGallery a {
+    min-height: 180px;
+  }
+}

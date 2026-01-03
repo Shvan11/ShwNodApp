@@ -1,0 +1,151 @@
+/* ConnectionStatus.module.css - WebSocket connection status indicator */
+
+.indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 9999px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    transition: all 0.3s ease;
+    position: relative;
+    margin-left: auto;
+}
+
+.dot {
+    width: var(--spacing-sm);
+    height: var(--spacing-sm);
+    border-radius: 50%;
+    background-color: var(--neutral-gray);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.text {
+    color: var(--neutral-gray-dark);
+    transition: color 0.3s ease;
+}
+
+/* Connected State - Green with pulse animation */
+.connected {
+    composes: indicator;
+    border-color: var(--success-green);
+    background-color: var(--success-50);
+}
+
+.connected .dot {
+    background-color: var(--success-green);
+    box-shadow: 0 0 0 3px var(--success-200);
+    animation: pulseGreen 2s ease-in-out infinite;
+}
+
+.connected .text {
+    color: var(--success-green-dark);
+}
+
+@keyframes pulseGreen {
+    0%, 100% {
+        box-shadow: 0 0 0 3px var(--success-200);
+    }
+    50% {
+        box-shadow: 0 0 0 6px var(--success-50);
+    }
+}
+
+/* Disconnected State - Gray */
+.disconnected {
+    composes: indicator;
+    border-color: var(--neutral-gray);
+    background-color: var(--hover-bg);
+}
+
+.disconnected .dot {
+    background-color: var(--neutral-gray);
+}
+
+.disconnected .text {
+    color: var(--neutral-gray-dark);
+}
+
+/* Reconnecting State - Orange with pulse animation */
+.reconnecting {
+    composes: indicator;
+    border-color: var(--warning-orange);
+    background-color: var(--warning-50);
+}
+
+.reconnecting .dot {
+    background-color: var(--warning-orange);
+    animation: pulseOrange 1.5s ease-in-out infinite;
+}
+
+.reconnecting .text {
+    color: var(--warning-orange-dark);
+}
+
+@keyframes pulseOrange {
+    0%, 100% {
+        box-shadow: 0 0 0 3px var(--warning-200);
+    }
+    50% {
+        box-shadow: 0 0 0 6px var(--warning-50);
+    }
+}
+
+/* Error State - Red */
+.error {
+    composes: indicator;
+    border-color: var(--error-red);
+    background-color: var(--error-50);
+}
+
+.error .dot {
+    background-color: var(--error-red);
+}
+
+.error .text {
+    color: var(--error-red-dark);
+}
+
+/* Connecting State - Default/Gray */
+.connecting {
+    composes: indicator;
+}
+
+/* Flash animation when data updates */
+.flash {
+    animation: flashIndicator 1s ease-in-out;
+}
+
+@keyframes flashIndicator {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: none;
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 20px var(--blue-300);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .indicator,
+    .connected,
+    .disconnected,
+    .reconnecting,
+    .error,
+    .connecting {
+        font-size: var(--font-size-xs);
+        padding: var(--spacing-xs) 0.75rem;
+        gap: var(--spacing-xs);
+    }
+
+    .dot {
+        width: 0.5rem;
+        height: 0.5rem;
+    }
+}

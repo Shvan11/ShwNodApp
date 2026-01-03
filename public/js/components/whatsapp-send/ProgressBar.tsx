@@ -3,6 +3,8 @@
  * Shows message sending progress
  */
 
+import styles from '../../routes/WhatsAppSend.module.css';
+
 export interface SendingProgress {
   started: boolean;
   finished: boolean;
@@ -27,27 +29,27 @@ export default function ProgressBar({ sendingProgress }: ProgressBarProps) {
   return (
     <div
       id="progressContainer"
-      className="sending-progress-container"
+      className={styles.sendingProgressContainer}
       role="progressbar"
       aria-label="Message sending progress"
       aria-valuenow={sent}
       aria-valuemin={0}
       aria-valuemax={total}
     >
-      <div className="sending-progress-header">
-        <span className="sending-progress-title">Sending Messages</span>
-        <span id="progressStats" className="sending-progress-stats">
+      <div className={styles.sendingProgressHeader}>
+        <span className={styles.sendingProgressTitle}>Sending Messages</span>
+        <span id="progressStats" className={styles.sendingProgressStats}>
           {sent}/{total}
         </span>
       </div>
-      <div className="sending-progress-bar-container">
+      <div className={styles.sendingProgressBarContainer}>
         <div
           id="progressBarFill"
-          className="sending-progress-bar-fill"
+          className={styles.sendingProgressBarFill}
           style={{ width: `${percentage}%` }}
         ></div>
       </div>
-      <div id="progressText" className="sending-progress-text">
+      <div id="progressText" className={styles.sendingProgressText}>
         {sent} of {total} messages delivered
       </div>
     </div>

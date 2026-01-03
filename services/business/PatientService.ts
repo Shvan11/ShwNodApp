@@ -26,7 +26,6 @@ import type { Payment } from '../../types/database.types.js';
 interface PatientInfoResult {
   // Full patient details
   PersonID: number;
-  patientID: string | null;
   PatientName: string | null;
   FirstName: string | null;
   LastName: string | null;

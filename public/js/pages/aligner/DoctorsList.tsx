@@ -1,6 +1,7 @@
 // DoctorsList.tsx - Select a doctor to browse their patients
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import styles from './DoctorsList.module.css';
 
 interface Doctor {
     DrID: number;
@@ -39,27 +40,25 @@ const DoctorsList: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="aligner-container">
-                <div className="loading-container">
-                    <div className="spinner"></div>
-                    <p>Loading doctors...</p>
-                </div>
+            <div className={styles.loadingContainer}>
+                <div className={styles.spinner}></div>
+                <p>Loading doctors...</p>
             </div>
         );
     }
 
     return (
         <>
-            <div className="section-header">
+            <div className={styles.sectionHeader}>
                 <h2>
                     <i className="fas fa-user-md"></i>
                     Select a Doctor
                 </h2>
-                <div className="section-info">
+                <div className={styles.sectionInfo}>
                     <span>{doctors.length} doctor{doctors.length !== 1 ? 's' : ''}</span>
                     <Link
                         to="/settings?tab=alignerDoctors"
-                        className="btn-link btn-manage-doctors"
+                        className={styles.btnManageDoctors}
                         title="Manage aligner doctors and portal access"
                     >
                         <i className="fas fa-cog"></i>
@@ -68,34 +67,34 @@ const DoctorsList: React.FC = () => {
                 </div>
             </div>
 
-            <div className="doctors-grid">
+            <div className={styles.doctorsGrid}>
                 {/* All Doctors Card */}
                 <div
-                    className="doctor-card all-doctors"
+                    className={`${styles.doctorCard} ${styles.allDoctors}`}
                     onClick={() => selectDoctor({ DrID: 'all', DoctorName: 'All Doctors' })}
                 >
-                    <i className="fas fa-users doctor-icon"></i>
+                    <i className={`fas fa-users ${styles.doctorIcon}`}></i>
                     <h3>All Doctors</h3>
-                    <span className="doctor-subtitle">View all patients</span>
-                    <i className="fas fa-chevron-right arrow-icon"></i>
+                    <span className={styles.doctorSubtitle}>View all patients</span>
+                    <i className={`fas fa-chevron-right ${styles.arrowIcon}`}></i>
                 </div>
 
                 {/* Individual Doctor Cards */}
                 {doctors.map((doctor) => (
                     <div
                         key={doctor.DrID}
-                        className={`doctor-card ${doctor.UnreadDoctorNotes && doctor.UnreadDoctorNotes > 0 ? 'has-activity' : ''}`}
+                        className={`${styles.doctorCard} ${doctor.UnreadDoctorNotes && doctor.UnreadDoctorNotes > 0 ? styles.hasActivity : ''}`}
                         onClick={() => selectDoctor(doctor)}
                     >
                         {doctor.UnreadDoctorNotes && doctor.UnreadDoctorNotes > 0 && (
-                            <div className="activity-banner">
+                            <div className={styles.activityBanner}>
                                 <i className="fas fa-bell"></i>
                                 <strong>{doctor.UnreadDoctorNotes}</strong> unread {doctor.UnreadDoctorNotes === 1 ? 'note' : 'notes'}
                             </div>
                         )}
-                        <i className="fas fa-user-md doctor-icon"></i>
+                        <i className={`fas fa-user-md ${styles.doctorIcon}`}></i>
                         <h3>{doctor.DoctorName === 'Admin' ? doctor.DoctorName : `Dr. ${doctor.DoctorName}`}</h3>
-                        <i className="fas fa-chevron-right arrow-icon"></i>
+                        <i className={`fas fa-chevron-right ${styles.arrowIcon}`}></i>
                     </div>
                 ))}
             </div>

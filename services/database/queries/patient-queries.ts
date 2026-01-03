@@ -13,7 +13,6 @@ import { log } from '../../../utils/logger.js';
 // Type definitions
 interface PatientInfo {
   PersonID: number;
-  patientID: string | null;
   PatientName: string | null;
   FirstName: string | null;
   LastName: string | null;
@@ -70,7 +69,6 @@ interface PatientPhone {
 }
 
 interface PatientData {
-  patientID?: string;
   patientName: string;
   phone?: string;
   firstName?: string;
@@ -100,7 +98,6 @@ interface LookupItem {
 
 interface PatientDetails {
   PersonID: number;
-  patientID: string | null;
   PatientName: string;
   FirstName: string | null;
   LastName: string | null;
@@ -129,7 +126,6 @@ interface PatientWithRelations extends PatientDetails {
 }
 
 interface UpdatePatientData {
-  patientID?: string;
   PatientName: string;
   FirstName?: string;
   LastName?: string;
@@ -181,7 +177,6 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
   const infos = await executeQuery<PatientInfo>(
     `SELECT
             p.PersonID,
-            p.patientID,
             p.PatientName,
             p.FirstName,
             p.LastName,
@@ -230,40 +225,39 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
     [['PID', TYPES.Int, PID]],
     (columns: ColumnValue[]) => ({
       PersonID: columns[0].value as number,
-      patientID: columns[1].value as string | null,
-      PatientName: columns[2].value as string | null,
-      FirstName: columns[3].value as string | null,
-      LastName: columns[4].value as string | null,
-      Phone: columns[5].value as string | null,
-      Phone2: columns[6].value as string | null,
-      Email: columns[7].value as string | null,
-      DateOfBirth: columns[8].value as string | null,
-      Gender: columns[9].value as number | null,
-      GenderDisplay: columns[10].value as string | null,
-      Address: columns[11].value as string | null,
-      ReferralSource: columns[12].value as string | null,
-      PatientType: columns[13].value as string | null,
-      Tag: columns[14].value as string | null,
-      Notes: columns[15].value as string | null,
-      Language: columns[16].value as number | null,
-      CountryCode: columns[17].value as string | null,
-      EstimatedCost: columns[18].value as number | null,
-      Currency: columns[19].value as string | null,
-      DolphinId: columns[20].value as number | null,
-      DateAdded: columns[21].value as string | null,
-      AlertCount: columns[22].value as number,
-      StartDate: columns[23].value as Date | null,
+      PatientName: columns[1].value as string | null,
+      FirstName: columns[2].value as string | null,
+      LastName: columns[3].value as string | null,
+      Phone: columns[4].value as string | null,
+      Phone2: columns[5].value as string | null,
+      Email: columns[6].value as string | null,
+      DateOfBirth: columns[7].value as string | null,
+      Gender: columns[8].value as number | null,
+      GenderDisplay: columns[9].value as string | null,
+      Address: columns[10].value as string | null,
+      ReferralSource: columns[11].value as string | null,
+      PatientType: columns[12].value as string | null,
+      Tag: columns[13].value as string | null,
+      Notes: columns[14].value as string | null,
+      Language: columns[15].value as number | null,
+      CountryCode: columns[16].value as string | null,
+      EstimatedCost: columns[17].value as number | null,
+      Currency: columns[18].value as string | null,
+      DolphinId: columns[19].value as number | null,
+      DateAdded: columns[20].value as string | null,
+      AlertCount: columns[21].value as number,
+      StartDate: columns[22].value as Date | null,
       // Legacy fields for backwards compatibility
-      name: columns[2].value as string | null,
-      phone: columns[5].value as string | null,
-      estimatedCost: columns[18].value as number | null,
-      currency: columns[19].value as string | null,
-      activeAlert: columns[24].value
+      name: columns[1].value as string | null,
+      phone: columns[4].value as string | null,
+      estimatedCost: columns[17].value as number | null,
+      currency: columns[18].value as string | null,
+      activeAlert: columns[23].value
         ? {
-            alertId: columns[24].value as number,
-            alertType: columns[25].value as string,
-            alertDetails: columns[26].value as string,
-            alertSeverity: columns[27].value as number,
+            alertId: columns[23].value as number,
+            alertType: columns[24].value as string,
+            alertDetails: columns[25].value as string,
+            alertSeverity: columns[26].value as number,
           }
         : null,
     })
@@ -430,13 +424,13 @@ export async function createPatient(patientData: PatientData): Promise<CreatePat
 
   const query = `
     INSERT INTO dbo.tblpatients (
-      patientID, PatientName, Phone, FirstName, LastName,
+      PatientName, Phone, FirstName, LastName,
       DateofBirth, Gender, Phone2, Email, AddressID,
       ReferralSourceID, PatientTypeID, Notes,
       Language, CountryCode, EstimatedCost, Currency
     )
     VALUES (
-      @patientID, @patientName, @phone, @firstName, @lastName,
+      @patientName, @phone, @firstName, @lastName,
       @dateOfBirth, @gender, @phone2, @email, @addressID,
       @referralSourceID, @patientTypeID, @notes,
       @language, @countryCode, @estimatedCost, @currency
@@ -445,7 +439,6 @@ export async function createPatient(patientData: PatientData): Promise<CreatePat
   `;
 
   const parameters: SqlParam[] = [
-    ['patientID', TYPES.NVarChar, patientData.patientID || null],
     ['patientName', TYPES.NVarChar, patientData.patientName],
     ['phone', TYPES.NVarChar, patientData.phone || null],
     ['firstName', TYPES.NVarChar, patientData.firstName || null],
@@ -552,7 +545,7 @@ export function getGenders(): Promise<LookupItem[]> {
  */
 export async function getPatientById(personId: number): Promise<PatientDetails | null> {
   const result = await executeQuery<PatientDetails>(
-    `SELECT p.PersonID, p.patientID, p.PatientName, p.FirstName, p.LastName,
+    `SELECT p.PersonID, p.PatientName, p.FirstName, p.LastName,
             p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
             p.AddressID, p.ReferralSourceID, p.PatientTypeID,
             p.Notes, p.Language, p.CountryCode,
@@ -562,25 +555,24 @@ export async function getPatientById(personId: number): Promise<PatientDetails |
     [['personId', TYPES.Int, personId]],
     (columns: ColumnValue[]) => ({
       PersonID: columns[0].value as number,
-      patientID: columns[1].value as string | null,
-      PatientName: columns[2].value as string,
-      FirstName: columns[3].value as string | null,
-      LastName: columns[4].value as string | null,
-      Phone: columns[5].value as string | null,
-      Phone2: columns[6].value as string | null,
-      Email: columns[7].value as string | null,
-      DateofBirth: columns[8].value as Date | null,
-      Gender: columns[9].value as number | null,
-      AddressID: columns[10].value as number | null,
-      ReferralSourceID: columns[11].value as number | null,
-      PatientTypeID: columns[12].value as number | null,
-      Notes: columns[13].value as string | null,
-      Language: columns[14].value as number | null,
-      CountryCode: columns[15].value as string | null,
-      EstimatedCost: columns[16].value as number | null,
-      Currency: columns[17].value as string | null,
-      TagID: columns[18].value as number | null,
-      DateAdded: columns[19].value as Date | null,
+      PatientName: columns[1].value as string,
+      FirstName: columns[2].value as string | null,
+      LastName: columns[3].value as string | null,
+      Phone: columns[4].value as string | null,
+      Phone2: columns[5].value as string | null,
+      Email: columns[6].value as string | null,
+      DateofBirth: columns[7].value as Date | null,
+      Gender: columns[8].value as number | null,
+      AddressID: columns[9].value as number | null,
+      ReferralSourceID: columns[10].value as number | null,
+      PatientTypeID: columns[11].value as number | null,
+      Notes: columns[12].value as string | null,
+      Language: columns[13].value as number | null,
+      CountryCode: columns[14].value as string | null,
+      EstimatedCost: columns[15].value as number | null,
+      Currency: columns[16].value as string | null,
+      TagID: columns[17].value as number | null,
+      DateAdded: columns[18].value as Date | null,
     })
   );
   return result[0] || null;
@@ -591,7 +583,7 @@ export async function getPatientById(personId: number): Promise<PatientDetails |
  */
 export function getAllPatients(): Promise<PatientWithRelations[]> {
   return executeQuery<PatientWithRelations>(
-    `SELECT p.PersonID, p.patientID, p.PatientName, p.FirstName, p.LastName,
+    `SELECT p.PersonID, p.PatientName, p.FirstName, p.LastName,
             p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
             p.AddressID, p.ReferralSourceID, p.PatientTypeID,
             p.Notes, p.Language, p.CountryCode,
@@ -606,25 +598,24 @@ export function getAllPatients(): Promise<PatientWithRelations[]> {
     [],
     (columns: ColumnValue[]) => ({
       PersonID: columns[0].value as number,
-      patientID: columns[1].value as string | null,
-      PatientName: columns[2].value as string,
-      FirstName: columns[3].value as string | null,
-      LastName: columns[4].value as string | null,
-      Phone: columns[5].value as string | null,
-      Phone2: columns[6].value as string | null,
-      Email: columns[7].value as string | null,
-      DateofBirth: columns[8].value as Date | null,
-      Gender: columns[9].value as number | null,
-      AddressID: columns[10].value as number | null,
-      ReferralSourceID: columns[11].value as number | null,
-      PatientTypeID: columns[12].value as number | null,
-      Notes: columns[13].value as string | null,
-      Language: columns[14].value as number | null,
-      CountryCode: columns[15].value as string | null,
-      GenderName: columns[16].value as string | null,
-      AddressName: columns[17].value as string | null,
-      ReferralSource: columns[18].value as string | null,
-      PatientTypeName: columns[19].value as string | null,
+      PatientName: columns[1].value as string,
+      FirstName: columns[2].value as string | null,
+      LastName: columns[3].value as string | null,
+      Phone: columns[4].value as string | null,
+      Phone2: columns[5].value as string | null,
+      Email: columns[6].value as string | null,
+      DateofBirth: columns[7].value as Date | null,
+      Gender: columns[8].value as number | null,
+      AddressID: columns[9].value as number | null,
+      ReferralSourceID: columns[10].value as number | null,
+      PatientTypeID: columns[11].value as number | null,
+      Notes: columns[12].value as string | null,
+      Language: columns[13].value as number | null,
+      CountryCode: columns[14].value as string | null,
+      GenderName: columns[15].value as string | null,
+      AddressName: columns[16].value as string | null,
+      ReferralSource: columns[17].value as string | null,
+      PatientTypeName: columns[18].value as string | null,
       EstimatedCost: null,
       Currency: null,
       TagID: null,
@@ -642,8 +633,7 @@ export async function updatePatient(
 ): Promise<{ success: boolean }> {
   const query = `
     UPDATE dbo.tblpatients
-    SET patientID = @patientID,
-        PatientName = @patientName,
+    SET PatientName = @patientName,
         FirstName = @firstName,
         LastName = @lastName,
         Phone = @phone,
@@ -665,7 +655,6 @@ export async function updatePatient(
 
   const parameters: SqlParam[] = [
     ['personId', TYPES.Int, personId],
-    ['patientID', TYPES.NVarChar, patientData.patientID || null],
     ['patientName', TYPES.NVarChar, patientData.PatientName],
     ['firstName', TYPES.NVarChar, patientData.FirstName || null],
     ['lastName', TYPES.NVarChar, patientData.LastName || null],

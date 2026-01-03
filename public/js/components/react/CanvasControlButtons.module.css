@@ -1,0 +1,90 @@
+/* CanvasControlButtons.module.css - Canvas control button styles */
+
+.controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    gap: var(--spacing-sm);
+    z-index: var(--z-index-sticky);
+    flex-wrap: wrap;
+}
+
+.controls button {
+    padding: var(--spacing-sm) 12px;
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.controls button:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+/* Button color variants */
+.btnZoomIn {
+    background-color: var(--success-color);
+}
+
+.btnZoomOut {
+    background-color: var(--info-color);
+}
+
+.btnRotate {
+    background-color: var(--warning-orange);
+}
+
+.btnReset {
+    background-color: var(--neutral-gray);
+}
+
+.btnWhatsapp {
+    background-color: var(--success-color);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .controls {
+        top: 5px;
+        right: 5px;
+        gap: 4px;
+    }
+
+    .controls button {
+        padding: 8px 10px;
+        font-size: 12px;
+        min-height: 36px;
+        min-width: 36px;
+    }
+}
+
+@media (max-width: 480px) {
+    .controls {
+        flex-direction: column;
+        top: 5px;
+        right: 5px;
+    }
+
+    .controls button {
+        padding: 10px;
+        font-size: 14px;
+        min-height: 40px;
+    }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .controls button {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    .controls button:active {
+        transform: scale(0.95);
+        opacity: 0.9;
+    }
+}

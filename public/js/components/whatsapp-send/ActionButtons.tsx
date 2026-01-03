@@ -5,6 +5,7 @@
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { SendingProgress } from './ProgressBar';
+import styles from '../../routes/WhatsAppSend.module.css';
 
 interface ActionButtonsProps {
   clientReady: boolean;
@@ -39,16 +40,16 @@ export default function ActionButtons({
   };
 
   return (
-    <div className="action-section">
+    <div className={styles.actionSection}>
       {clientReady ? (
         <button
           id="startButton"
-          className="btn btn-primary primary-action"
+          className={`btn btn-primary ${styles.primaryAction}`}
           onClick={onStartSending}
           disabled={sendingInProgress}
           aria-describedby="send-instructions"
         >
-          <span className="btn-icon" aria-hidden="true">
+          <span className={styles.btnIcon} aria-hidden="true">
             📱
           </span>
           <span>{getButtonText()}</span>
@@ -60,13 +61,13 @@ export default function ActionButtons({
           onClick={handleLoginClick}
           aria-label="Go to WhatsApp Authentication"
         >
-          <span className="btn-icon" aria-hidden="true">
+          <span className={styles.btnIcon} aria-hidden="true">
             🔐
           </span>
           <span>Go to Authentication</span>
         </button>
       )}
-      <p id="send-instructions" className="help-text sr-only">
+      <p id="send-instructions" className={`${styles.helpText} ${styles.srOnly}`}>
         Click to begin sending WhatsApp messages to selected date appointments
       </p>
     </div>

@@ -7,8 +7,8 @@ import { ControlButtons } from '../components/whatsapp-auth/ControlButtons';
 import { ConnectionStatusFooter } from '../components/whatsapp-auth/ConnectionStatusFooter';
 import type { ReactNode } from 'react';
 
-// WhatsApp auth page styles
-import '../../css/components/whatsapp-auth.css';
+// WhatsApp auth page styles - CSS Module
+import styles from './WhatsAppAuth.module.css';
 
 export default function WhatsAppAuth() {
   const {
@@ -43,13 +43,13 @@ export default function WhatsAppAuth() {
   };
 
   return (
-    <div className="auth-container">
-      <header className="auth-header">
+    <div className={styles.authContainer}>
+      <header className={styles.authHeader}>
         <h1>WhatsApp Authentication</h1>
-        <p className="auth-subtitle">Connect your WhatsApp to send messages</p>
+        <p className={styles.authSubtitle}>Connect your WhatsApp to send messages</p>
       </header>
 
-      <main className="auth-content">
+      <main className={styles.authContent}>
         {renderContent()}
         <ControlButtons authState={authState} actions={actions} />
       </main>
@@ -58,7 +58,7 @@ export default function WhatsAppAuth() {
 
       {/* Fallback for JavaScript disabled */}
       <noscript>
-        <div className="noscript-warning" role="alert">
+        <div className={styles.noscriptWarning} role="alert">
           <h2>JavaScript Required</h2>
           <p>WhatsApp authentication requires JavaScript to function properly.</p>
           <p>Please enable JavaScript in your browser and refresh the page.</p>

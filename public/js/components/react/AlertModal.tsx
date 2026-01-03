@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { ChangeEvent, MouseEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -19,19 +19,27 @@ interface FormErrors {
     alertDetails?: string;
 }
 
+interface EditAlertData {
+    AlertID: number;
+    AlertTypeID?: number;
+    AlertSeverity?: number;
+    AlertDetails: string;
+}
+
 interface AlertModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave?: () => Promise<void>;
     personId: number | string;
     alertTypes: AlertType[];
+    editAlert?: EditAlertData | null;
 }
 
 /**
  * Alert Modal Component
- * Modal for creating new patient alerts
+ * Modal for creating or editing patient alerts
  */
-const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes }: AlertModalProps) => {
+const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }: AlertModalProps) => {
     const toast = useToast();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState<AlertFormData>({
@@ -41,6 +49,27 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes }: AlertModa
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
+
+    const isEditMode = !!editAlert;
+
+    // Populate form when editing
+    useEffect(() => {
+        if (editAlert && isOpen) {
+            setFormData({
+                alertTypeId: editAlert.AlertTypeID?.toString() || '',
+                alertSeverity: editAlert.AlertSeverity?.toString() || '2',
+                alertDetails: editAlert.AlertDetails || ''
+            });
+        } else if (!isOpen) {
+            // Reset form when modal closes
+            setFormData({
+                alertTypeId: '',
+                alertSeverity: '2',
+                alertDetails: ''
+            });
+            setErrors({});
+        }
+    }, [editAlert, isOpen]);
 
     // Handle form field changes
     const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -85,8 +114,12 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes }: AlertModa
         setLoading(true);
 
         try {
-            const response = await fetch(`/api/patients/${personId}/alerts`, {
-                method: 'POST',
+            const url = isEditMode
+                ? `/api/alerts/${editAlert!.AlertID}`
+                : `/api/patients/${personId}/alerts`;
+
+            const response = await fetch(url, {
+                method: isEditMode ? 'PUT' : 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
@@ -99,10 +132,10 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes }: AlertModa
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to create alert');
+                throw new Error(errorData.error || `Failed to ${isEditMode ? 'update' : 'create'} alert`);
             }
 
-            toast.success('Alert created successfully');
+            toast.success(`Alert ${isEditMode ? 'updated' : 'created'} successfully`);
 
             // Reset form
             setFormData({
@@ -120,8 +153,8 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes }: AlertModa
             // Close modal
             onClose();
         } catch (error) {
-            console.error('Error creating alert:', error);
-            toast.error(error instanceof Error ? error.message : 'Failed to create alert');
+            console.error(`Error ${isEditMode ? 'updating' : 'creating'} alert:`, error);
+            toast.error(error instanceof Error ? error.message : `Failed to ${isEditMode ? 'update' : 'create'} alert`);
         } finally {
             setLoading(false);
         }
@@ -154,7 +187,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes }: AlertModa
                 <div className="modal-header">
                     <h3>
                         <i className="fas fa-exclamation-triangle"></i>
-                        Add New Alert
+                        {isEditMode ? 'Edit Alert' : 'Add New Alert'}
                     </h3>
                     <button
                         type="button"

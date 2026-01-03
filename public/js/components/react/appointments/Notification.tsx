@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import styles from './Notification.module.css';
 
 type NotificationType = 'success' | 'error' | 'info';
 
@@ -52,6 +53,15 @@ const Notification = ({
         }
     };
 
+    const getNotificationClass = (): string => {
+        const typeStyles: Record<NotificationType, string> = {
+            success: styles.success,
+            error: styles.error,
+            info: styles.info
+        };
+        return typeStyles[type] || styles.notification;
+    };
+
     const handleUndo = (): void => {
         if (onUndo && undoData) {
             onUndo(undoData);
@@ -60,16 +70,16 @@ const Notification = ({
     };
 
     return (
-        <div className={`notification notification-${type}`}>
+        <div className={getNotificationClass()}>
             <i className={`fas ${getIcon()}`}></i>
-            <span>{message}</span>
+            <span className={styles.message}>{message}</span>
             {onUndo && (
-                <button className="notification-undo" onClick={handleUndo}>
+                <button className={styles.undoButton} onClick={handleUndo}>
                     <i className="fas fa-undo"></i>
                     Undo
                 </button>
             )}
-            <button className="notification-close" onClick={onClose}>
+            <button className={styles.closeButton} onClick={onClose}>
                 <i className="fas fa-times"></i>
             </button>
         </div>

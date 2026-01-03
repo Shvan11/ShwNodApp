@@ -4,7 +4,6 @@
 -- Table: Patients (minimal data needed for portal)
 CREATE TABLE IF NOT EXISTS patients (
     person_id INTEGER PRIMARY KEY,
-    patient_id VARCHAR(50),
     patient_name VARCHAR(200),
     first_name VARCHAR(100),
     last_name VARCHAR(100),

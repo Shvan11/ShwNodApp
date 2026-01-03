@@ -1,5 +1,7 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
+import styles from './EmployeeSettings.module.css';
 
 interface Position {
     ID: number;
@@ -205,8 +207,8 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
 
     if (loading) {
         return (
-            <div className="settings-section">
-                <div className="loading-container">
+            <div className={styles.container}>
+                <div className={styles.loadingContainer}>
                     <i className="fas fa-spinner fa-spin"></i>
                     <p>Loading employees...</p>
                 </div>
@@ -216,11 +218,11 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
 
     if (error) {
         return (
-            <div className="settings-section">
-                <div className="error-container">
+            <div className={styles.container}>
+                <div className={styles.errorContainer}>
                     <i className="fas fa-exclamation-triangle"></i>
                     <p>Error: {error}</p>
-                    <button onClick={loadEmployees} className="btn-retry">
+                    <button onClick={loadEmployees} className={styles.btnRetry}>
                         <i className="fas fa-redo"></i> Retry
                     </button>
                 </div>
@@ -229,19 +231,19 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
     }
 
     return (
-        <div className="settings-section employee-settings">
-            <div className="section-header">
-                <div className="header-content">
+        <div className={styles.container}>
+            <div className={styles.sectionHeader}>
+                <div className={styles.headerContent}>
                     <h2>
                         <i className="fas fa-users"></i>
                         Employee Management
                     </h2>
-                    <p className="section-description">
+                    <p className={styles.sectionDescription}>
                         Manage staff members and configure email notification preferences
                     </p>
                 </div>
                 <button
-                    className="btn-add-doctor"
+                    className={styles.btnAdd}
                     onClick={handleAdd}
                     disabled={showAddForm}
                 >
@@ -251,43 +253,43 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
             </div>
 
             {showAddForm && (
-                <div className="modal-overlay">
-                    <div className="modal-content employee-modal">
-                        <div className="modal-header">
+                <div className={styles.modalOverlay}>
+                    <div className={styles.modal}>
+                        <div className={styles.modalHeader}>
                             <h3>
                                 <i className={editingId ? 'fas fa-edit' : 'fas fa-plus'}></i>
                                 {editingId ? 'Edit Employee' : 'Add New Employee'}
                             </h3>
-                            <button className="modal-close" onClick={handleCancel} aria-label="Close">
+                            <button className={styles.modalClose} onClick={handleCancel} aria-label="Close">
                                 <i className="fas fa-times"></i>
                             </button>
                         </div>
                         <form onSubmit={handleSubmit}>
-                            <div className="modal-body">
-                                <div className="employee-tabs">
+                            <div className={styles.modalBody}>
+                                <div className={styles.tabs}>
                                     <button
                                         type="button"
-                                        className={`employee-tab-btn ${activeTab === 'basic' ? 'active' : ''}`}
+                                        className={cn(styles.tabBtn, activeTab === 'basic' && styles.active)}
                                         onClick={() => setActiveTab('basic')}
                                     >
                                         <i className="fas fa-id-card"></i> Basic Info
                                     </button>
                                     <button
                                         type="button"
-                                        className={`employee-tab-btn ${activeTab === 'other' ? 'active' : ''}`}
+                                        className={cn(styles.tabBtn, activeTab === 'other' && styles.active)}
                                         onClick={() => setActiveTab('other')}
                                     >
                                         <i className="fas fa-sliders-h"></i> Other Options
                                     </button>
                                 </div>
 
-                                <div className="employee-tab-content">
+                                <div className={styles.tabContent}>
                                     {activeTab === 'basic' && (
-                                        <div className="tab-pane">
-                                            <div className="employee-form-row">
-                                                <div className="form-group">
+                                        <div>
+                                            <div className={styles.formRow}>
+                                                <div className={styles.formGroup}>
                                                     <label htmlFor="employeeName">
-                                                        Employee Name <span className="required">*</span>
+                                                        Employee Name <span className={styles.required}>*</span>
                                                     </label>
                                                     <input
                                                         type="text"
@@ -300,9 +302,9 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
                                                     />
                                                 </div>
 
-                                                <div className="form-group">
+                                                <div className={styles.formGroup}>
                                                     <label htmlFor="Position">
-                                                        Position <span className="required">*</span>
+                                                        Position <span className={styles.required}>*</span>
                                                     </label>
                                                     <select
                                                         id="Position"
@@ -321,11 +323,11 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
                                                 </div>
                                             </div>
 
-                                            <div className="employee-form-row">
-                                                <div className="form-group">
+                                            <div className={styles.formRow}>
+                                                <div className={styles.formGroup}>
                                                     <label htmlFor="SortOrder">
                                                         Sort Order
-                                                        <span className="field-help">
+                                                        <span className={styles.fieldHelp}>
                                                             (Lower numbers appear first)
                                                         </span>
                                                     </label>
@@ -340,7 +342,7 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
                                                         max="999"
                                                     />
                                                 </div>
-                                                <div className="form-group">
+                                                <div className={styles.formGroup}>
                                                     {/* Empty placeholder for grid alignment */}
                                                 </div>
                                             </div>
@@ -348,12 +350,12 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
                                     )}
 
                                     {activeTab === 'other' && (
-                                        <div className="tab-pane">
-                                            <div className="employee-form-row">
-                                                <div className="form-group">
+                                        <div>
+                                            <div className={styles.formRow}>
+                                                <div className={styles.formGroup}>
                                                     <label htmlFor="Email">
                                                         Email Address
-                                                        <span className="field-help">
+                                                        <span className={styles.fieldHelp}>
                                                             (Required for notifications)
                                                         </span>
                                                     </label>
@@ -366,13 +368,13 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
                                                         placeholder="employee@example.com"
                                                     />
                                                 </div>
-                                                <div className="form-group">
+                                                <div className={styles.formGroup}>
                                                     {/* Empty placeholder */}
                                                 </div>
                                             </div>
 
-                                            <div className="employee-checkbox-group">
-                                                <div className="form-group-checkbox">
+                                            <div className={styles.checkboxGroup}>
+                                                <div className={styles.checkboxItem}>
                                                     <label>
                                                         <input
                                                             type="checkbox"
@@ -380,14 +382,14 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
                                                             checked={formData.receiveEmail}
                                                             onChange={handleInputChange}
                                                         />
-                                                        <span className="checkbox-label">
+                                                        <span className={styles.checkboxLabel}>
                                                             <i className="fas fa-envelope"></i>
                                                             Receive Email Notifications
                                                         </span>
                                                     </label>
                                                 </div>
 
-                                                <div className="form-group-checkbox">
+                                                <div className={styles.checkboxItem}>
                                                     <label>
                                                         <input
                                                             type="checkbox"
@@ -395,14 +397,14 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
                                                             checked={formData.getAppointments}
                                                             onChange={handleInputChange}
                                                         />
-                                                        <span className="checkbox-label">
+                                                        <span className={styles.checkboxLabel}>
                                                             <i className="fas fa-calendar-check"></i>
                                                             Include in Appointment Reports
                                                         </span>
                                                     </label>
                                                 </div>
 
-                                                <div className="form-group-checkbox">
+                                                <div className={styles.checkboxItem}>
                                                     <label>
                                                         <input
                                                             type="checkbox"
@@ -410,7 +412,7 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
                                                             checked={formData.Percentage}
                                                             onChange={handleInputChange}
                                                         />
-                                                        <span className="checkbox-label">
+                                                        <span className={styles.checkboxLabel}>
                                                             <i className="fas fa-percent"></i>
                                                             Percentage-Based Compensation
                                                         </span>
@@ -421,11 +423,11 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
                                     )}
                                 </div>
                             </div>
-                            <div className="modal-footer">
-                                <button type="button" onClick={handleCancel} className="btn-cancel">
+                            <div className={styles.modalFooter}>
+                                <button type="button" onClick={handleCancel} className={styles.btnCancel}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn-save">
+                                <button type="submit" className={styles.btnSave}>
                                     <i className="fas fa-save"></i>
                                     {editingId ? 'Update Employee' : 'Add Employee'}
                                 </button>
@@ -435,16 +437,16 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
                 </div>
             )}
 
-            <div className="doctors-list">
+            <div className={styles.list}>
                 {employees.length === 0 ? (
-                    <div className="empty-state">
+                    <div className={styles.emptyState}>
                         <i className="fas fa-users"></i>
                         <p>No employees found</p>
-                        <p className="empty-state-hint">Click "Add Employee" to create your first employee entry</p>
+                        <p className={styles.emptyStateHint}>Click "Add Employee" to create your first employee entry</p>
                     </div>
                 ) : (
-                    <div className="doctors-table-container">
-                        <table className="doctors-table">
+                    <div className={styles.tableContainer}>
+                        <table className={styles.table}>
                             <thead>
                                 <tr>
                                     <th>ID</th>
@@ -462,38 +464,38 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
                                 {employees.map(employee => (
                                     <tr key={employee.ID}>
                                         <td data-label="ID">{employee.ID}</td>
-                                        <td data-label="Name" className="doctor-name">
+                                        <td data-label="Name" className={styles.employeeName}>
                                             <i className="fas fa-user"></i>
                                             {employee.employeeName}
                                         </td>
                                         <td data-label="Position">
-                                            <span className="position-badge">
+                                            <span className={styles.positionBadge}>
                                                 {getPositionName(employee.Position)}
                                             </span>
                                         </td>
                                         <td data-label="Sort Order">
-                                            <span className="sort-order-value">
+                                            <span className={styles.sortOrderValue}>
                                                 {employee.SortOrder || '—'}
                                             </span>
                                         </td>
                                         <td data-label="Email">
                                             {employee.Email ? (
-                                                <span className="email-value">
+                                                <span className={styles.emailValue}>
                                                     <i className="fas fa-envelope"></i>
                                                     {employee.Email}
                                                 </span>
                                             ) : (
-                                                <span className="no-email">No email</span>
+                                                <span className={styles.noEmail}>No email</span>
                                             )}
                                         </td>
                                         <td data-label="Commission">
                                             {employee.Percentage ? (
-                                                <span className="badge badge-success">
+                                                <span className={`${styles.badge} ${styles.badgeSuccess}`}>
                                                     <i className="fas fa-percent"></i>
                                                     Yes
                                                 </span>
                                             ) : (
-                                                <span className="badge badge-muted">
+                                                <span className={`${styles.badge} ${styles.badgeMuted}`}>
                                                     <i className="fas fa-minus"></i>
                                                     No
                                                 </span>
@@ -501,12 +503,12 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
                                         </td>
                                         <td data-label="Email Notifications">
                                             {employee.receiveEmail ? (
-                                                <span className="badge badge-success">
+                                                <span className={`${styles.badge} ${styles.badgeSuccess}`}>
                                                     <i className="fas fa-check-circle"></i>
                                                     Enabled
                                                 </span>
                                             ) : (
-                                                <span className="badge badge-muted">
+                                                <span className={`${styles.badge} ${styles.badgeMuted}`}>
                                                     <i className="fas fa-times-circle"></i>
                                                     Disabled
                                                 </span>
@@ -514,27 +516,27 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
                                         </td>
                                         <td data-label="Appointments">
                                             {employee.getAppointments ? (
-                                                <span className="badge badge-info">
+                                                <span className={`${styles.badge} ${styles.badgeInfo}`}>
                                                     <i className="fas fa-check"></i>
                                                     Yes
                                                 </span>
                                             ) : (
-                                                <span className="badge badge-muted">
+                                                <span className={`${styles.badge} ${styles.badgeMuted}`}>
                                                     <i className="fas fa-minus"></i>
                                                     No
                                                 </span>
                                             )}
                                         </td>
-                                        <td data-label="Actions" className="actions">
+                                        <td data-label="Actions" className={styles.actions}>
                                             <button
-                                                className="btn-icon btn-edit"
+                                                className={`${styles.btnIcon} ${styles.btnEdit}`}
                                                 onClick={() => handleEdit(employee)}
                                                 title="Edit employee"
                                             >
                                                 <i className="fas fa-edit"></i>
                                             </button>
                                             <button
-                                                className="btn-icon btn-delete"
+                                                className={`${styles.btnIcon} ${styles.btnDelete}`}
                                                 onClick={() => handleDelete(employee.ID, employee.employeeName)}
                                                 title="Delete employee"
                                             >

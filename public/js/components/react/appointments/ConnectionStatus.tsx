@@ -1,3 +1,5 @@
+import styles from './ConnectionStatus.module.css';
+
 type ConnectionStatusType = 'connected' | 'disconnected' | 'reconnecting' | 'error' | 'connecting';
 
 interface ConnectionStatusProps {
@@ -26,13 +28,20 @@ const ConnectionStatus = ({ status, showFlash = false }: ConnectionStatusProps) 
     };
 
     const getStatusClass = (): string => {
-        return `ws-status-indicator ws-${status}${showFlash ? ' ws-flash' : ''}`;
+        const statusStyles: Record<ConnectionStatusType, string> = {
+            connected: styles.connected,
+            disconnected: styles.disconnected,
+            reconnecting: styles.reconnecting,
+            error: styles.error,
+            connecting: styles.connecting
+        };
+        return `${statusStyles[status] || styles.indicator}${showFlash ? ` ${styles.flash}` : ''}`;
     };
 
     return (
         <div className={getStatusClass()}>
-            <span className="ws-status-dot"></span>
-            <span className="ws-status-text">{getStatusText()}</span>
+            <span className={styles.dot}></span>
+            <span className={styles.text}>{getStatusText()}</span>
         </div>
     );
 };

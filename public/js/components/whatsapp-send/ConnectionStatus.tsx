@@ -5,6 +5,7 @@
 
 import { UI_STATES, UIState } from '../../utils/whatsapp-send-constants';
 import type { SendingProgress } from './ProgressBar';
+import styles from '../../routes/WhatsAppSend.module.css';
 
 interface ConnectionStatusProps {
   connectionStatus: UIState;
@@ -55,12 +56,12 @@ export default function ConnectionStatus({
   return (
     <div
       id="state"
-      className={`status-panel ${getStatusClass()}`}
+      className={`${styles.statusPanel} ${getStatusClass()}`}
       role="status"
       aria-live="polite"
       aria-atomic="true"
     >
-      <span className="status-icon" aria-hidden="true"></span>
+      <span className={styles.statusIcon} aria-hidden="true"></span>
       <span>{getStatusText()}</span>
     </div>
   );

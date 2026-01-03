@@ -1,0 +1,377 @@
+/* Settings Section - Shared styles for all settings tabs */
+
+/* Main section container */
+.section {
+    background: white;
+    border-radius: var(--radius-xl);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--gray-200);
+    transition: all 0.3s ease;
+}
+
+.section:hover {
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.section h3 {
+    color: var(--color-purple-light);
+    font-size: 1.8rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 700;
+    padding-bottom: 1rem;
+    border-bottom: 3px solid var(--gray-200);
+}
+
+.section h3 i {
+    font-size: 1.5rem;
+}
+
+/* Section header with title and action button */
+.sectionHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.headerContent h2 {
+    color: var(--primary-color);
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.sectionDescription {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+}
+
+/* Loading state */
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 1rem;
+    height: 200px;
+    color: var(--text-secondary);
+}
+
+.loading i {
+    font-size: 2rem;
+    color: var(--primary-color);
+}
+
+.loadingContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+}
+
+.loadingContainer i {
+    font-size: 3rem;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+/* Error state */
+.errorContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+}
+
+.errorContainer i {
+    font-size: 3rem;
+    color: var(--error-400);
+    margin-bottom: 1rem;
+}
+
+.errorContainer p {
+    color: var(--error-600);
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Empty state */
+.emptyState {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-secondary);
+}
+
+.emptyState i {
+    font-size: 4rem;
+    color: var(--gray-200);
+    margin-bottom: 1rem;
+}
+
+.emptyState p {
+    font-size: 1.1rem;
+    margin: 0.5rem 0;
+}
+
+.emptyStateHint {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* Settings Form */
+.form {
+    min-height: 300px;
+}
+
+.formFields {
+    display: grid;
+    gap: 1.5rem;
+}
+
+/* Settings Actions footer */
+.actions {
+    display: flex;
+    gap: 1rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--gray-200);
+    margin-top: 2rem;
+}
+
+/* Grid layout for settings */
+.grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+/* Setting group (individual field) */
+.settingGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.settingGroup label {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.settingGroup input,
+.settingGroup select,
+.settingGroup textarea {
+    padding: 0.75rem;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+}
+
+.settingGroup input:focus,
+.settingGroup select:focus,
+.settingGroup textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.settingGroup textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.settingDescription {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+/* Success/Error states */
+.settingGroup.success input {
+    border-color: var(--success-300);
+}
+
+.settingGroup.error input {
+    border-color: var(--error-400);
+}
+
+.settingError {
+    color: var(--error-400);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+/* Pending changes styling */
+.settingGroup.pendingChange {
+    background: var(--warning-100);
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--warning-300);
+}
+
+.pendingChange {
+    border-color: var(--warning-300);
+    background-color: var(--warning-50);
+}
+
+.noSettings {
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 2rem;
+}
+
+/* Config group for database settings etc */
+.configGroup {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.configGroup:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.configGroup h4 {
+    color: var(--primary-color);
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Password input group */
+.passwordInputGroup {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.passwordInputGroup input {
+    padding-right: 3rem;
+}
+
+.passwordToggle {
+    position: absolute;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: color 0.3s ease;
+}
+
+.passwordToggle:hover {
+    color: var(--primary-color);
+}
+
+/* Connection test styles */
+.connectionTest {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.connectionStatus {
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid;
+    background: white;
+    width: 100%;
+    max-width: 500px;
+}
+
+.connectionStatus.success {
+    border-left-color: var(--success-300);
+    background: var(--success-50);
+    color: var(--success-800);
+}
+
+.connectionStatus.error {
+    border-left-color: var(--error-400);
+    background: var(--error-50);
+    color: var(--error-600);
+}
+
+.statusHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.statusDetails {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* Restart warning */
+.restartWarning {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--warning-100);
+    color: var(--warning-900);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+    border-left: 4px solid var(--warning-300);
+    font-weight: 500;
+}
+
+/* Quick actions */
+.quickActions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .section h3 {
+        font-size: 1.5rem;
+    }
+
+    .sectionHeader {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+
+    .actions {
+        flex-direction: column;
+    }
+
+    .connectionStatus {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .section h3 {
+        font-size: 1.3rem;
+    }
+}

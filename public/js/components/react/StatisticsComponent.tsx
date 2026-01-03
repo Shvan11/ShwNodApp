@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import Chart from 'chart.js/auto';
 import DailyInvoicesModal from './DailyInvoicesModal';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters';
+import styles from './StatisticsComponent.module.css';
 
 // Types
 interface DailyData {
@@ -411,9 +412,9 @@ const StatisticsComponent = () => {
 
     if (loading && !statistics) {
         return (
-            <div className="statistics-container">
-                <div className="loading-state">
-                    <div className="spinner"></div>
+            <div className={styles.statisticsContainer}>
+                <div className={styles.loadingState}>
+                    <div className={styles.spinner}></div>
                     <p>Loading statistics...</p>
                 </div>
             </div>
@@ -422,11 +423,11 @@ const StatisticsComponent = () => {
 
     if (error && !statistics) {
         return (
-            <div className="statistics-container">
-                <div className="error-state">
+            <div className={styles.statisticsContainer}>
+                <div className={styles.errorState}>
                     <i className="fas fa-exclamation-triangle"></i>
                     <p>{error}</p>
-                    <button className="btn-retry" onClick={fetchStatistics}>Try Again</button>
+                    <button className={styles.btnRetry} onClick={fetchStatistics}>Try Again</button>
                 </div>
             </div>
         );
@@ -434,9 +435,9 @@ const StatisticsComponent = () => {
 
     return (
         <>
-            <div className="statistics-container">
+            <div className={styles.statisticsContainer}>
                 {/* Page Title */}
-                <div className="page-title">
+                <div className={styles.pageTitle}>
                     <h1>
                         <i className="fas fa-chart-bar"></i>
                         Financial Statistics
@@ -444,16 +445,16 @@ const StatisticsComponent = () => {
                 </div>
 
             {/* Controls */}
-            <div className="controls-section">
-                <div className="date-selector">
-                    <button onClick={handlePrevMonth} className="btn-nav" title="Previous Month">
+            <div className={styles.controlsSection}>
+                <div className={styles.dateSelector}>
+                    <button onClick={handlePrevMonth} className={styles.btnNav} title="Previous Month">
                         <i className="fas fa-chevron-left"></i>
                     </button>
-                    <div className="date-display">
+                    <div className={styles.dateDisplay}>
                         <select
                             value={month}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setMonth(parseInt(e.target.value))}
-                            className="form-select"
+                            className={styles.formSelect}
                         >
                             {monthNames.map((name, index) => (
                                 <option key={index + 1} value={index + 1}>{name}</option>
@@ -465,18 +466,18 @@ const StatisticsComponent = () => {
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setYear(parseInt(e.target.value))}
                             min="2000"
                             max="2100"
-                            className="form-input"
+                            className={styles.formInput}
                         />
                     </div>
-                    <button onClick={handleNextMonth} className="btn-nav" title="Next Month">
+                    <button onClick={handleNextMonth} className={styles.btnNav} title="Next Month">
                         <i className="fas fa-chevron-right"></i>
                     </button>
                 </div>
-                <div className="actions">
-                    <button onClick={fetchStatistics} className="btn-action" disabled={loading}>
+                <div className={styles.actions}>
+                    <button onClick={fetchStatistics} className={styles.btnAction} disabled={loading}>
                         <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`}></i> Refresh
                     </button>
-                    <button onClick={handlePrint} className="btn-action">
+                    <button onClick={handlePrint} className={styles.btnAction}>
                         <i className="fas fa-print"></i> Print
                     </button>
                 </div>
@@ -485,69 +486,69 @@ const StatisticsComponent = () => {
             {statistics && (
                 <>
                     {/* Summary Cards - Monthly Totals Only */}
-                    <div className="summary-cards">
-                        <div className="summary-card revenue">
-                            <div className="card-header">
+                    <div className={styles.summaryCards}>
+                        <div className={`${styles.summaryCard} ${styles.revenue}`}>
+                            <div className={styles.cardHeader}>
                                 <i className="fas fa-money-bill-wave"></i>
                                 <h3>Total Revenue (Month)</h3>
                             </div>
-                            <div className="card-content">
-                                <div className="amount-row">
-                                    <span className="currency">IQD</span>
-                                    <span className="amount">{formatCurrency(statistics.summary.totalRevenue.IQD)}</span>
+                            <div className={styles.cardContent}>
+                                <div className={styles.amountRow}>
+                                    <span className={styles.currency}>IQD</span>
+                                    <span className={styles.amount}>{formatCurrency(statistics.summary.totalRevenue.IQD)}</span>
                                 </div>
-                                <div className="amount-row">
-                                    <span className="currency">USD</span>
-                                    <span className="amount">{formatCurrency(statistics.summary.totalRevenue.USD, 'USD')}</span>
+                                <div className={styles.amountRow}>
+                                    <span className={styles.currency}>USD</span>
+                                    <span className={styles.amount}>{formatCurrency(statistics.summary.totalRevenue.USD, 'USD')}</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="summary-card expenses">
-                            <div className="card-header">
+                        <div className={`${styles.summaryCard} ${styles.expenses}`}>
+                            <div className={styles.cardHeader}>
                                 <i className="fas fa-receipt"></i>
                                 <h3>Total Expenses (Month)</h3>
                             </div>
-                            <div className="card-content">
-                                <div className="amount-row">
-                                    <span className="currency">IQD</span>
-                                    <span className="amount">{formatCurrency(statistics.summary.totalExpenses.IQD)}</span>
+                            <div className={styles.cardContent}>
+                                <div className={styles.amountRow}>
+                                    <span className={styles.currency}>IQD</span>
+                                    <span className={styles.amount}>{formatCurrency(statistics.summary.totalExpenses.IQD)}</span>
                                 </div>
-                                <div className="amount-row">
-                                    <span className="currency">USD</span>
-                                    <span className="amount">{formatCurrency(statistics.summary.totalExpenses.USD, 'USD')}</span>
+                                <div className={styles.amountRow}>
+                                    <span className={styles.currency}>USD</span>
+                                    <span className={styles.amount}>{formatCurrency(statistics.summary.totalExpenses.USD, 'USD')}</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="summary-card profit">
-                            <div className="card-header">
+                        <div className={`${styles.summaryCard} ${styles.profit}`}>
+                            <div className={styles.cardHeader}>
                                 <i className="fas fa-chart-line"></i>
                                 <h3>Net Profit (Month)</h3>
                             </div>
-                            <div className="card-content">
-                                <div className="amount-row">
-                                    <span className="currency">IQD</span>
-                                    <span className="amount">{formatCurrency(statistics.summary.netProfit.IQD)}</span>
+                            <div className={styles.cardContent}>
+                                <div className={styles.amountRow}>
+                                    <span className={styles.currency}>IQD</span>
+                                    <span className={styles.amount}>{formatCurrency(statistics.summary.netProfit.IQD)}</span>
                                 </div>
-                                <div className="amount-row">
-                                    <span className="currency">USD</span>
-                                    <span className="amount">{formatCurrency(statistics.summary.netProfit.USD, 'USD')}</span>
+                                <div className={styles.amountRow}>
+                                    <span className={styles.currency}>USD</span>
+                                    <span className={styles.amount}>{formatCurrency(statistics.summary.netProfit.USD, 'USD')}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Chart - Grand Total (USD) */}
-                    <div className="charts-section charts-section--single">
-                        <div className="chart-card chart-card--full">
+                    <div className={`${styles.chartsSection} ${styles.chartsSectionSingle}`}>
+                        <div className={`${styles.chartCard} ${styles.chartCardFull}`}>
                             {/* View Mode Selector - Near the chart */}
-                            <div className="chart-controls">
-                                <div className="view-mode-selector">
+                            <div className={styles.chartControls}>
+                                <div className={styles.viewModeSelector}>
                                     {Object.entries(VIEW_MODES).map(([key, value]) => (
                                         <button
                                             key={value}
-                                            className={`view-mode-btn ${viewMode === value ? 'active' : ''}`}
+                                            className={`${styles.viewModeBtn} ${viewMode === value ? styles.active : ''}`}
                                             onClick={() => setViewMode(value)}
                                         >
                                             {key.charAt(0) + key.slice(1).toLowerCase()}
@@ -558,18 +559,18 @@ const StatisticsComponent = () => {
 
                             {/* Period Selector for Monthly View */}
                             {viewMode === VIEW_MODES.MONTHLY && (
-                                <div className="period-selector">
-                                    <div className="period-selector__label">
+                                <div className={styles.periodSelector}>
+                                    <div className={styles.periodSelectorLabel}>
                                         <i className="fas fa-calendar-alt"></i>
                                         <span>12-Month Period:</span>
                                     </div>
-                                    <div className="period-selector__controls">
-                                        <div className="period-selector__field">
+                                    <div className={styles.periodSelectorControls}>
+                                        <div className={styles.periodSelectorField}>
                                             <label>From</label>
                                             <select
                                                 value={periodStartMonth}
                                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setPeriodStartMonth(parseInt(e.target.value))}
-                                                className="form-select"
+                                                className={styles.formSelect}
                                             >
                                                 {monthNames.map((name, index) => (
                                                     <option key={index + 1} value={index + 1}>{name}</option>
@@ -581,21 +582,21 @@ const StatisticsComponent = () => {
                                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setPeriodStartYear(parseInt(e.target.value))}
                                                 min="2000"
                                                 max="2100"
-                                                className="form-input"
+                                                className={styles.formInput}
                                             />
                                         </div>
-                                        <div className="period-selector__arrow">
+                                        <div className={styles.periodSelectorArrow}>
                                             <i className="fas fa-arrow-right"></i>
                                         </div>
-                                        <div className="period-selector__field">
+                                        <div className={styles.periodSelectorField}>
                                             <label>To</label>
-                                            <span className="period-end-display">
+                                            <span className={styles.periodEndDisplay}>
                                                 {monthNames[getPeriodEnd().endMonth - 1]} {getPeriodEnd().endYear}
                                             </span>
                                         </div>
                                     </div>
                                     {loadingYearly && (
-                                        <div className="period-selector__loading">
+                                        <div className={styles.periodSelectorLoading}>
                                             <i className="fas fa-spinner fa-spin"></i> Loading...
                                         </div>
                                     )}
@@ -604,13 +605,13 @@ const StatisticsComponent = () => {
 
                             {/* Year Range Selector for Yearly View */}
                             {viewMode === VIEW_MODES.YEARLY && (
-                                <div className="period-selector">
-                                    <div className="period-selector__label">
+                                <div className={styles.periodSelector}>
+                                    <div className={styles.periodSelectorLabel}>
                                         <i className="fas fa-calendar-alt"></i>
                                         <span>Year Range:</span>
                                     </div>
-                                    <div className="period-selector__controls">
-                                        <div className="period-selector__field">
+                                    <div className={styles.periodSelectorControls}>
+                                        <div className={styles.periodSelectorField}>
                                             <label>From</label>
                                             <input
                                                 type="number"
@@ -623,13 +624,13 @@ const StatisticsComponent = () => {
                                                 }}
                                                 min="2000"
                                                 max={yearRangeEnd}
-                                                className="form-input"
+                                                className={styles.formInput}
                                             />
                                         </div>
-                                        <div className="period-selector__arrow">
+                                        <div className={styles.periodSelectorArrow}>
                                             <i className="fas fa-arrow-right"></i>
                                         </div>
-                                        <div className="period-selector__field">
+                                        <div className={styles.periodSelectorField}>
                                             <label>To</label>
                                             <input
                                                 type="number"
@@ -642,29 +643,29 @@ const StatisticsComponent = () => {
                                                 }}
                                                 min={yearRangeStart}
                                                 max="2100"
-                                                className="form-input"
+                                                className={styles.formInput}
                                             />
                                         </div>
                                     </div>
                                     {loadingMultiYear && (
-                                        <div className="period-selector__loading">
+                                        <div className={styles.periodSelectorLoading}>
                                             <i className="fas fa-spinner fa-spin"></i> Loading...
                                         </div>
                                     )}
                                 </div>
                             )}
 
-                            <div className="chart-container chart-container--large">
+                            <div className={`${styles.chartContainer} ${styles.chartContainerLarge}`}>
                                 <canvas ref={revenueTrendChartRef}></canvas>
                             </div>
                         </div>
                     </div>
 
                     {/* Daily Data Table */}
-                    <div className="table-section">
+                    <div className={styles.tableSection}>
                         <h3>Daily Breakdown</h3>
-                        <div className="table-wrapper">
-                            <table className="data-table">
+                        <div className={styles.tableWrapper}>
+                            <table className={styles.dataTable}>
                                 <thead>
                                     <tr>
                                         <th>Date</th>
@@ -675,42 +676,42 @@ const StatisticsComponent = () => {
                                         <th>USD Expenses</th>
                                         <th>USD Net</th>
                                         <th>Grand Total (USD)</th>
-                                        <th className="qasa-column">Qasa IQD</th>
-                                        <th className="qasa-column">Qasa USD</th>
+                                        <th className={styles.qasaColumn}>Qasa IQD</th>
+                                        <th className={styles.qasaColumn}>Qasa USD</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {statistics.dailyData.map((day, index) => (
                                         <tr
                                             key={index}
-                                            className="clickable-row"
+                                            className={styles.clickableRow}
                                             onClick={() => setSelectedDate(day)}
                                             title="Click to view daily invoices"
                                         >
                                             <td data-label="Date">{formatDate(day.Day)}</td>
-                                            <td data-label="IQD Revenue" className="amount-cell">{formatCurrency(day.SumIQD)}</td>
-                                            <td data-label="IQD Expenses" className="amount-cell negative">{formatCurrency(Math.abs(day.ExpensesIQD || 0))}</td>
-                                            <td data-label="IQD Net" className="amount-cell">{formatCurrency(day.FinalIQDSum)}</td>
-                                            <td data-label="USD Revenue" className="amount-cell">{formatCurrency(day.SumUSD, 'USD')}</td>
-                                            <td data-label="USD Expenses" className="amount-cell negative">{formatCurrency(Math.abs(day.ExpensesUSD || 0), 'USD')}</td>
-                                            <td data-label="USD Net" className="amount-cell">{formatCurrency(day.FinalUSDSum, 'USD')}</td>
-                                            <td data-label="Grand Total" className="amount-cell grand-total">{formatCurrency(day.GrandTotal, 'USD')}</td>
-                                            <td data-label="Qasa IQD" className="amount-cell qasa-column qasa-iqd">{formatCurrency(day.QasaIQD)}</td>
-                                            <td data-label="Qasa USD" className="amount-cell qasa-column qasa-usd">{formatCurrency(day.QasaUSD, 'USD')}</td>
+                                            <td data-label="IQD Revenue" className={styles.amountCell}>{formatCurrency(day.SumIQD)}</td>
+                                            <td data-label="IQD Expenses" className={`${styles.amountCell} ${styles.negative}`}>{formatCurrency(Math.abs(day.ExpensesIQD || 0))}</td>
+                                            <td data-label="IQD Net" className={styles.amountCell}>{formatCurrency(day.FinalIQDSum)}</td>
+                                            <td data-label="USD Revenue" className={styles.amountCell}>{formatCurrency(day.SumUSD, 'USD')}</td>
+                                            <td data-label="USD Expenses" className={`${styles.amountCell} ${styles.negative}`}>{formatCurrency(Math.abs(day.ExpensesUSD || 0), 'USD')}</td>
+                                            <td data-label="USD Net" className={styles.amountCell}>{formatCurrency(day.FinalUSDSum, 'USD')}</td>
+                                            <td data-label="Grand Total" className={`${styles.amountCell} ${styles.grandTotal}`}>{formatCurrency(day.GrandTotal, 'USD')}</td>
+                                            <td data-label="Qasa IQD" className={`${styles.amountCell} ${styles.qasaColumn} ${styles.qasaIqd}`}>{formatCurrency(day.QasaIQD)}</td>
+                                            <td data-label="Qasa USD" className={`${styles.amountCell} ${styles.qasaColumn} ${styles.qasaUsd}`}>{formatCurrency(day.QasaUSD, 'USD')}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                                 <tfoot>
-                                    <tr className="total-row">
+                                    <tr className={styles.totalRow}>
                                         <td data-label="Period"><strong>MONTH TOTAL</strong></td>
-                                        <td data-label="IQD Revenue" className="amount-cell"><strong>{formatCurrency(statistics.summary.totalRevenue.IQD)}</strong></td>
-                                        <td data-label="IQD Expenses" className="amount-cell negative"><strong>{formatCurrency(statistics.summary.totalExpenses.IQD)}</strong></td>
-                                        <td data-label="IQD Net" className="amount-cell"><strong>{formatCurrency(statistics.summary.netProfit.IQD)}</strong></td>
-                                        <td data-label="USD Revenue" className="amount-cell"><strong>{formatCurrency(statistics.summary.totalRevenue.USD, 'USD')}</strong></td>
-                                        <td data-label="USD Expenses" className="amount-cell negative"><strong>{formatCurrency(statistics.summary.totalExpenses.USD, 'USD')}</strong></td>
-                                        <td data-label="USD Net" className="amount-cell"><strong>{formatCurrency(statistics.summary.netProfit.USD, 'USD')}</strong></td>
-                                        <td data-label="Grand Total" className="amount-cell grand-total"><strong>{formatCurrency(statistics.summary.grandTotal.USD, 'USD')}</strong></td>
-                                        <td data-label="Cash Box Note" className="amount-cell qasa-column" colSpan={2}><em>(Daily Values Only)</em></td>
+                                        <td data-label="IQD Revenue" className={styles.amountCell}><strong>{formatCurrency(statistics.summary.totalRevenue.IQD)}</strong></td>
+                                        <td data-label="IQD Expenses" className={`${styles.amountCell} ${styles.negative}`}><strong>{formatCurrency(statistics.summary.totalExpenses.IQD)}</strong></td>
+                                        <td data-label="IQD Net" className={styles.amountCell}><strong>{formatCurrency(statistics.summary.netProfit.IQD)}</strong></td>
+                                        <td data-label="USD Revenue" className={styles.amountCell}><strong>{formatCurrency(statistics.summary.totalRevenue.USD, 'USD')}</strong></td>
+                                        <td data-label="USD Expenses" className={`${styles.amountCell} ${styles.negative}`}><strong>{formatCurrency(statistics.summary.totalExpenses.USD, 'USD')}</strong></td>
+                                        <td data-label="USD Net" className={styles.amountCell}><strong>{formatCurrency(statistics.summary.netProfit.USD, 'USD')}</strong></td>
+                                        <td data-label="Grand Total" className={`${styles.amountCell} ${styles.grandTotal}`}><strong>{formatCurrency(statistics.summary.grandTotal.USD, 'USD')}</strong></td>
+                                        <td data-label="Cash Box Note" className={`${styles.amountCell} ${styles.qasaColumn}`} colSpan={2}><em>(Daily Values Only)</em></td>
                                     </tr>
                                 </tfoot>
                             </table>

@@ -11,8 +11,7 @@ import {
     FILLING_TYPE_OPTIONS,
     FILLING_DEPTH_OPTIONS
 } from '../../config/workTypeConfig';
-import '../../../css/components/work-card.css';
-import '../../../css/components/teeth-selector.css';
+import styles from './WorkComponent.module.css';
 
 interface PatientInfo {
     PersonID: number;
@@ -92,15 +91,15 @@ interface Payment {
 }
 
 interface WorkComponentProps {
-    patientId?: string;
+    personId?: number | null;
 }
 
 /**
  * Work Component
  * Displays list of patient's treatment works
- * Memoized to prevent unnecessary re-renders when patientId hasn't changed
+ * Memoized to prevent unnecessary re-renders when personId hasn't changed
  */
-const WorkComponent = ({ patientId }: WorkComponentProps) => {
+const WorkComponent = ({ personId }: WorkComponentProps) => {
     const navigate = useNavigate();
     const toast = useToast();
     const [works, setWorks] = useState<Work[]>([]);
@@ -176,14 +175,14 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
     };
 
     useEffect(() => {
-        if (patientId && patientId !== 'new') {
+        if (personId) {
             loadWorks();
             loadPatientInfo();
             checkAppointmentStatus();
             loadTeethOptions();
             loadImplantManufacturers();
         }
-    }, [patientId]);
+    }, [personId]);
 
     const loadTeethOptions = async () => {
         try {
@@ -219,7 +218,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
 
     const loadPatientInfo = async () => {
         try {
-            const response = await fetch(`/api/patients/${patientId}/info`);
+            const response = await fetch(`/api/patients/${personId}/info`);
             if (!response.ok) throw new Error('Failed to fetch patient info');
             const data: PatientInfo = await response.json();
             setPatientInfo(data);
@@ -231,11 +230,11 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
     const checkAppointmentStatus = async () => {
         try {
             setLoadingAppointment(true);
-            const response = await fetch(`/api/patients/${patientId}/has-appointment`);
+            const response = await fetch(`/api/patients/${personId}/has-appointment`);
             if (!response.ok) throw new Error('Failed to check appointment status');
             const data = await response.json();
             setHasNextAppointment(data.hasAppointment);
-            console.log(`[WORK-COMPONENT] Patient ${patientId} has next appointment:`, data.hasAppointment);
+            console.log(`[WORK-COMPONENT] Patient ${personId} has next appointment:`, data.hasAppointment);
         } catch (err) {
             console.error('[WORK-COMPONENT] Error checking appointment status:', err);
             setHasNextAppointment(false);
@@ -245,7 +244,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
     };
 
     const handlePrintNoWorkReceipt = () => {
-        console.log(`[WORK-COMPONENT] Print no-work receipt clicked for patient ${patientId}`);
+        console.log(`[WORK-COMPONENT] Print no-work receipt clicked for patient ${personId}`);
 
         if (!hasNextAppointment) {
             toast.warning('Patient has no scheduled appointment');
@@ -253,7 +252,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
         }
 
         // Open receipt in new window
-        const receiptUrl = `/api/templates/receipt/no-work/${patientId}`;
+        const receiptUrl = `/api/templates/receipt/no-work/${personId}`;
         console.log(`[WORK-COMPONENT] Opening receipt window: ${receiptUrl}`);
 
         const receiptWindow = window.open(receiptUrl, '_blank');
@@ -268,7 +267,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
     const loadWorks = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`/api/getworks?code=${patientId}`);
+            const response = await fetch(`/api/getworks?code=${personId}`);
             if (!response.ok) throw new Error('Failed to fetch works');
             const data: Work[] = await response.json();
             setWorks(data);
@@ -280,11 +279,11 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
     };
 
     const handleAddWork = () => {
-        navigate(`/patient/${patientId}/new-work`);
+        navigate(`/patient/${personId}/new-work`);
     };
 
     const handleEditWork = (work: Work) => {
-        navigate(`/patient/${patientId}/new-work?workId=${work.workid}`);
+        navigate(`/patient/${personId}/new-work?workId=${work.workid}`);
     };
 
     const handleCompleteWork = async (workId: number) => {
@@ -659,7 +658,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    PersonID: patientId
+                    PersonID: personId
                 })
             });
 
@@ -690,82 +689,82 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
         }
     };
 
-    if (loading) return <div className="work-loading">Loading works...</div>;
+    if (loading) return <div className={styles.loading}>Loading works...</div>;
 
     return (
-        <div className="work-component">
+        <div className={styles.component}>
             {/* Patient Info Card with Controls */}
             {patientInfo && (
-                <div className="patient-info-card">
-                    <div className="patient-photo-container">
+                <div className={styles.patientInfoCard}>
+                    <div className={styles.patientPhotoContainer}>
                         <img
-                            src={`/DolImgs/${patientId}00.i13`}
+                            src={`/DolImgs/${personId}00.i13`}
                             alt={`${patientInfo.PatientName} - Smile`}
-                            className="patient-photo"
+                            className={styles.patientPhoto}
                             onError={(e: SyntheticEvent<HTMLImageElement>) => {
                                 e.currentTarget.style.display = 'none';
                                 if (e.currentTarget.parentElement) {
-                                    e.currentTarget.parentElement.innerHTML = '<i class="fas fa-user patient-photo-fallback"></i>';
+                                    e.currentTarget.parentElement.innerHTML = `<i class="fas fa-user ${styles.patientPhotoFallback}"></i>`;
                                 }
                             }}
                         />
                     </div>
-                    <div className="patient-info-details">
-                        <div className="patient-info-row">
-                            <div className="patient-info-header">
-                                <h3 className="patient-name">
+                    <div className={styles.patientInfoDetails}>
+                        <div className={styles.patientInfoRow}>
+                            <div className={styles.patientInfoHeader}>
+                                <h3 className={styles.patientName}>
                                     {patientInfo.PatientName}
                                 </h3>
-                                <div className="patient-meta-info">
+                                <div className={styles.patientMetaInfo}>
                                     <span><i className="fas fa-id-card"></i>{patientInfo.PersonID}</span>
                                     {patientInfo.Phone && (
                                         <span><i className="fas fa-phone"></i>{patientInfo.Phone}</span>
                                     )}
                                     {patientInfo.estimatedCost && (
-                                        <span className="patient-cost-badge">
+                                        <span className={styles.patientCostBadge}>
                                             <i className="fas fa-dollar-sign"></i>
                                             {patientInfo.estimatedCost.toLocaleString()} {patientInfo.currency || 'IQD'}
                                         </span>
                                     )}
                                     {patientInfo.activeAlert && (
-                                        <span className={`patient-alert-badge patient-alert-badge--severity-${patientInfo.activeAlert.alertSeverity}`}>
+                                        <span className={`${styles.patientAlertBadge} ${patientInfo.activeAlert.alertSeverity === 1 ? styles.patientAlertBadgeSeverity1 : patientInfo.activeAlert.alertSeverity === 2 ? styles.patientAlertBadgeSeverity2 : styles.patientAlertBadgeSeverity3}`}>
                                             <i className="fas fa-exclamation-triangle"></i>
                                             {patientInfo.activeAlert.alertType}: {patientInfo.activeAlert.alertDetails}
                                         </span>
                                     )}
                                 </div>
                             </div>
-                            <div className="work-summary-inline">
-                                <div className="summary-card-inline">
-                                    <span className="summary-value-inline">{works.length}</span>
-                                    <span className="summary-label-inline">Total</span>
+                            <div className={styles.workSummaryInline}>
+                                <div className={styles.summaryCardInline}>
+                                    <span className={styles.summaryValueInline}>{works.length}</span>
+                                    <span className={styles.summaryLabelInline}>Total</span>
                                 </div>
-                                <div className="summary-card-inline">
-                                    <span className="summary-value-inline">{works.filter(w => w.Status === WORK_STATUS.ACTIVE).length}</span>
-                                    <span className="summary-label-inline">Active</span>
+                                <div className={styles.summaryCardInline}>
+                                    <span className={styles.summaryValueInline}>{works.filter(w => w.Status === WORK_STATUS.ACTIVE).length}</span>
+                                    <span className={styles.summaryLabelInline}>Active</span>
                                 </div>
-                                <div className="summary-card-inline">
-                                    <span className="summary-value-inline">{works.filter(w => w.Status === WORK_STATUS.FINISHED).length}</span>
-                                    <span className="summary-label-inline">Completed</span>
+                                <div className={styles.summaryCardInline}>
+                                    <span className={styles.summaryValueInline}>{works.filter(w => w.Status === WORK_STATUS.FINISHED).length}</span>
+                                    <span className={styles.summaryLabelInline}>Completed</span>
                                 </div>
-                                <div className="summary-card-inline">
-                                    <span className="summary-value-inline">{works.filter(w => w.Status === WORK_STATUS.DISCONTINUED).length}</span>
-                                    <span className="summary-label-inline">Discontinued</span>
+                                <div className={styles.summaryCardInline}>
+                                    <span className={styles.summaryValueInline}>{works.filter(w => w.Status === WORK_STATUS.DISCONTINUED).length}</span>
+                                    <span className={styles.summaryLabelInline}>Discontinued</span>
                                 </div>
                             </div>
                         </div>
-                        <div className="patient-controls">
+                        <div className={styles.patientControls}>
                             <input
                                 type="text"
                                 placeholder="Search works..."
                                 value={searchTerm}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                                className="search-input"
+                                className={styles.searchInput}
                             />
                             <select
                                 value={filterStatus}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterStatus(e.target.value as typeof filterStatus)}
-                                className="filter-select"
+                                className={styles.filterSelect}
                             >
                                 <option value="all">All Works</option>
                                 <option value="active">Active</option>
@@ -774,7 +773,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                             </select>
                             <button
                                 onClick={handleQuickCheckin}
-                                className={`btn btn-work-checkin ${checkedIn ? 'checked-in' : ''} ${checkingIn ? 'checking-in' : ''}`}
+                                className={`btn btn-work-checkin ${checkedIn ? styles.checkedIn : ''} ${checkingIn ? styles.checkingIn : ''}`}
                                 disabled={checkingIn || checkedIn}
                                 title={checkedIn ? 'Patient already checked in today' : 'Check in patient for today'}
                             >
@@ -800,17 +799,17 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
             )}
 
             {successMessage && newAlignerWorkId && (
-                <div className="work-success">
+                <div className={styles.success}>
                     <div>
                         <strong>{successMessage}</strong>
                         <p>
                             This is an aligner work. Would you like to add aligner sets now?
                         </p>
                     </div>
-                    <div className="work-success-actions">
+                    <div className={styles.successActions}>
                         <button
                             onClick={() => handleAddAlignerSet({ workid: newAlignerWorkId } as Work)}
-                            className="work-btn-success-action"
+                            className={styles.btnSuccessAction}
                         >
                             <i className="fas fa-tooth"></i> Add Aligner Set
                         </button>
@@ -819,7 +818,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                 setSuccessMessage(null);
                                 setNewAlignerWorkId(null);
                             }}
-                            className="work-btn-success-close"
+                            className={styles.btnSuccessClose}
                         >
                             ×
                         </button>
@@ -828,12 +827,12 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
             )}
 
             {/* Works Card Container */}
-            <div className="works-card-container">
+            <div className={styles.worksCardContainer}>
                 {filteredWorks.map((work) => (
                     <WorkCard
                         key={work.workid}
                         work={work}
-                        patientId={patientId}
+                        personId={personId}
                         isAlignerWork={isAlignerWork}
                         isExpanded={expandedWorks.has(work.workid)}
                         onToggleExpanded={() => toggleWorkExpanded(work.workid)}
@@ -846,8 +845,8 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                         onComplete={handleCompleteWork}
                         onDiscontinue={handleDiscontinueWork}
                         onReactivate={handleReactivateWork}
-                        onViewVisits={(work) => navigate(`/patient/${patientId}/visits?workId=${work.workid}`)}
-                        onNewVisit={(work) => navigate(`/patient/${patientId}/new-visit?workId=${work.workid}`)}
+                        onViewVisits={(work) => navigate(`/patient/${personId}/visits?workId=${work.workid}`)}
+                        onNewVisit={(work) => navigate(`/patient/${personId}/new-visit?workId=${work.workid}`)}
                         onPrintReceipt={handlePrintReceipt}
                         formatDate={formatDate}
                         formatCurrency={formatCurrency}
@@ -856,9 +855,9 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                     />
                 ))}
                 {filteredWorks.length === 0 && (
-                    <div className="no-works-message">
-                        <i className="fas fa-tooth no-works-icon"></i>
-                        <p className="no-works-text">
+                    <div className={styles.noWorksMessage}>
+                        <i className={`fas fa-tooth ${styles.noWorksIcon}`}></i>
+                        <p className={styles.noWorksText}>
                             {searchTerm || filterStatus !== 'all'
                                 ? 'No works match your criteria'
                                 : 'No works found for this patient'}
@@ -869,33 +868,33 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
 
             {/* Work Details Modal */}
             {showDetailsModal && selectedWork && (
-                <div className="modal-overlay">
-                    <div className="work-modal details-modal">
-                        <div className="modal-header">
+                <div className={styles.modalOverlay}>
+                    <div className={`${styles.modal} ${styles.detailsModal}`}>
+                        <div className={styles.modalHeader}>
                             <h3>Work Details - {selectedWork.TypeName || 'Work #' + selectedWork.workid}</h3>
                             <button
                                 onClick={() => setShowDetailsModal(false)}
-                                className="modal-close"
+                                className={styles.modalClose}
                             >
                                 ×
                             </button>
                         </div>
 
-                        <div className="work-details-content">
-                            <div className="work-summary-info">
-                                <h4 className="reference-section">
+                        <div className={styles.detailsContent}>
+                            <div className={styles.summaryInfo}>
+                                <h4 className={styles.referenceSection}>
                                     <i className="fas fa-info-circle"></i> Reference Information
                                 </h4>
-                                <div className="info-grid">
-                                    <div className="info-item">
+                                <div className={styles.infoGrid}>
+                                    <div className={styles.infoItem}>
                                         <label>Work ID:</label>
-                                        <span className="work-id">{selectedWork.workid}</span>
+                                        <span className={styles.workId}>{selectedWork.workid}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="details-section">
-                                <div className="section-header">
+                            <div className={styles.detailsSection}>
+                                <div className={styles.sectionHeader}>
                                     <h4>
                                         <i className={getWorkTypeConfig(selectedWork.Typeofwork).icon}></i>
                                         {' '}{getWorkTypeConfig(selectedWork.Typeofwork).name} Details
@@ -908,8 +907,8 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                     </button>
                                 </div>
 
-                                <div className="details-table-container">
-                                    <table className="details-table">
+                                <div className={styles.detailsTableContainer}>
+                                    <table className={styles.detailsTable}>
                                         <thead>
                                             <tr>
                                                 {getWorkTypeConfig(selectedWork.Typeofwork).displayFields.map((field: { key: string; label: string }) => (
@@ -925,7 +924,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                                     {getWorkTypeConfig(selectedWork.Typeofwork).displayFields.map((field: { key: string; label: string }) => (
                                                         <td key={field.key}>
                                                             {field.key === 'Teeth' ? (
-                                                                <span className="teeth-badge">{detail.Teeth || '-'}</span>
+                                                                <span className={styles.teethBadge}>{detail.Teeth || '-'}</span>
                                                             ) : field.key === 'CanalsNo' ? (
                                                                 detail.CanalsNo ? `${detail.CanalsNo} canal${detail.CanalsNo > 1 ? 's' : ''}` : '-'
                                                             ) : field.key === 'ImplantLength' || field.key === 'ImplantDiameter' ? (
@@ -937,15 +936,15 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                                     ))}
                                                     <td>
                                                         {detail.CompletedDate ? (
-                                                            <span className="status-badge status-completed">Completed</span>
+                                                            <span className={`${styles.statusBadge} ${styles.statusCompleted}`}>Completed</span>
                                                         ) : detail.StartDate ? (
-                                                            <span className="status-badge status-started">Started</span>
+                                                            <span className={`${styles.statusBadge} ${styles.statusStarted}`}>Started</span>
                                                         ) : (
-                                                            <span className="status-badge status-pending">Pending</span>
+                                                            <span className={`${styles.statusBadge} ${styles.statusPending}`}>Pending</span>
                                                         )}
                                                     </td>
                                                     <td>
-                                                        <div className="action-buttons">
+                                                        <div className={styles.actionButtons}>
                                                             <button
                                                                 onClick={() => handleEditDetail(detail)}
                                                                 className="btn btn-xs btn-secondary"
@@ -966,7 +965,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                             ))}
                                             {workDetails.length === 0 && (
                                                 <tr>
-                                                    <td colSpan={getWorkTypeConfig(selectedWork.Typeofwork).displayFields.length + 2} className="no-data">
+                                                    <td colSpan={getWorkTypeConfig(selectedWork.Typeofwork).displayFields.length + 2} className={styles.noData}>
                                                         No treatment items recorded yet
                                                     </td>
                                                 </tr>
@@ -982,24 +981,24 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
 
             {/* Work Detail Form Modal */}
             {showDetailForm && selectedWork && (
-                <div className="modal-overlay">
-                    <div className="work-modal detail-form-modal">
-                        <div className="modal-header">
+                <div className={styles.modalOverlay}>
+                    <div className={`${styles.modal} ${styles.detailFormModal}`}>
+                        <div className={styles.modalHeader}>
                             <h3>
                                 <i className={getWorkTypeConfig(selectedWork.Typeofwork).icon}></i>
                                 {' '}{editingDetail ? 'Edit' : 'Add'} {getWorkTypeConfig(selectedWork.Typeofwork).name} Item
                             </h3>
                             <button
                                 onClick={() => setShowDetailForm(false)}
-                                className="modal-close"
+                                className={styles.modalClose}
                             >
                                 ×
                             </button>
                         </div>
 
-                        <form onSubmit={handleDetailFormSubmit} className="detail-form">
+                        <form onSubmit={handleDetailFormSubmit} className={styles.detailForm}>
                             {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('teeth') && (
-                                <div className="form-group full-width">
+                                <div className={`${styles.formGroup} ${styles.fullWidth}`}>
                                     <label>Select Teeth</label>
                                     <TeethSelector
                                         teethOptions={teethOptions}
@@ -1015,9 +1014,9 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                 </div>
                             )}
 
-                            <div className="form-row">
+                            <div className={styles.formRow}>
                                 {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('fillingType') && (
-                                    <div className="form-group">
+                                    <div className={styles.formGroup}>
                                         <label>Filling Type</label>
                                         <select
                                             value={detailFormData.FillingType}
@@ -1032,7 +1031,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                 )}
 
                                 {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('fillingDepth') && (
-                                    <div className="form-group">
+                                    <div className={styles.formGroup}>
                                         <label>Filling Depth</label>
                                         <select
                                             value={detailFormData.FillingDepth}
@@ -1047,7 +1046,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                 )}
 
                                 {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('canalsNo') && (
-                                    <div className="form-group">
+                                    <div className={styles.formGroup}>
                                         <label>Number of Canals</label>
                                         <input
                                             type="number"
@@ -1061,7 +1060,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                 )}
 
                                 {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('workingLength') && (
-                                    <div className="form-group">
+                                    <div className={styles.formGroup}>
                                         <label>Working Length</label>
                                         <input
                                             type="text"
@@ -1073,7 +1072,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                 )}
 
                                 {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('implantManufacturer') && (
-                                    <div className="form-group">
+                                    <div className={styles.formGroup}>
                                         <label>Manufacturer</label>
                                         <select
                                             value={detailFormData.ImplantManufacturerID}
@@ -1088,7 +1087,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                 )}
 
                                 {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('implantLength') && (
-                                    <div className="form-group">
+                                    <div className={styles.formGroup}>
                                         <label>Implant Length (mm)</label>
                                         <input
                                             type="number"
@@ -1101,7 +1100,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                 )}
 
                                 {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('implantDiameter') && (
-                                    <div className="form-group">
+                                    <div className={styles.formGroup}>
                                         <label>Implant Diameter (mm)</label>
                                         <input
                                             type="number"
@@ -1114,7 +1113,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                 )}
 
                                 {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('material') && (
-                                    <div className="form-group">
+                                    <div className={styles.formGroup}>
                                         <label>Material</label>
                                         <select
                                             value={detailFormData.Material}
@@ -1129,7 +1128,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                 )}
 
                                 {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('labName') && (
-                                    <div className="form-group">
+                                    <div className={styles.formGroup}>
                                         <label>Lab Name</label>
                                         <input
                                             type="text"
@@ -1141,8 +1140,8 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                 )}
                             </div>
 
-                            <div className="form-row">
-                                <div className="form-group">
+                            <div className={styles.formRow}>
+                                <div className={styles.formGroup}>
                                     <label>Start Date</label>
                                     <input
                                         type="date"
@@ -1151,7 +1150,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                     />
                                 </div>
 
-                                <div className="form-group">
+                                <div className={styles.formGroup}>
                                     <label>Completed Date</label>
                                     <input
                                         type="date"
@@ -1160,7 +1159,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                     />
                                 </div>
 
-                                <div className="form-group">
+                                <div className={styles.formGroup}>
                                     <label>Item Cost</label>
                                     <input
                                         type="number"
@@ -1172,7 +1171,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                 </div>
                             </div>
 
-                            <div className="form-group full-width">
+                            <div className={`${styles.formGroup} ${styles.fullWidth}`}>
                                 <label>Notes</label>
                                 <textarea
                                     value={detailFormData.Note}
@@ -1182,7 +1181,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                 />
                             </div>
 
-                            <div className="form-actions">
+                            <div className={styles.formActions}>
                                 <button
                                     type="button"
                                     onClick={() => setShowDetailForm(false)}
@@ -1216,39 +1215,39 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
 
             {/* Payment History Modal */}
             {showPaymentHistoryModal && selectedWorkForPayment && (
-                <div className="modal-overlay">
-                    <div className="work-modal details-modal">
-                        <div className="modal-header">
+                <div className={styles.modalOverlay}>
+                    <div className={`${styles.modal} ${styles.detailsModal}`}>
+                        <div className={styles.modalHeader}>
                             <h3>Payment History - {selectedWorkForPayment.TypeName || 'Work #' + selectedWorkForPayment.workid}</h3>
                             <button
                                 onClick={() => {
                                     console.log('CLOSE BUTTON CLICKED!');
                                     setShowPaymentHistoryModal(false);
                                 }}
-                                className="modal-close"
+                                className={styles.modalClose}
                             >
                                 ×
                             </button>
                         </div>
-                        <div className="modal-content-scroll">
+                        <div className={styles.modalContentScroll}>
 
-                            <div className="payment-summary-box">
-                                <div className="payment-summary-grid">
-                                    <div className="payment-summary-item">
-                                        <span className="payment-summary-label">Total Required:</span>
-                                        <span className="payment-summary-value total">
+                            <div className={styles.paymentSummaryBox}>
+                                <div className={styles.paymentSummaryGrid}>
+                                    <div className={styles.paymentSummaryItem}>
+                                        <span className={styles.paymentSummaryLabel}>Total Required:</span>
+                                        <span className={`${styles.paymentSummaryValue} ${styles.paymentSummaryValueTotal}`}>
                                             {formatCurrency(selectedWorkForPayment.TotalRequired, selectedWorkForPayment.Currency)}
                                         </span>
                                     </div>
-                                    <div className="payment-summary-item">
-                                        <span className="payment-summary-label">Total Paid:</span>
-                                        <span className="payment-summary-value paid">
+                                    <div className={styles.paymentSummaryItem}>
+                                        <span className={styles.paymentSummaryLabel}>Total Paid:</span>
+                                        <span className={`${styles.paymentSummaryValue} ${styles.paymentSummaryValuePaid}`}>
                                             {formatCurrency(selectedWorkForPayment.TotalPaid, selectedWorkForPayment.Currency)}
                                         </span>
                                     </div>
-                                    <div className="payment-summary-item">
-                                        <span className="payment-summary-label">Balance Remaining:</span>
-                                        <span className="payment-summary-value balance">
+                                    <div className={styles.paymentSummaryItem}>
+                                        <span className={styles.paymentSummaryLabel}>Balance Remaining:</span>
+                                        <span className={`${styles.paymentSummaryValue} ${styles.paymentSummaryValueBalance}`}>
                                             {formatCurrency((selectedWorkForPayment.TotalRequired || 0) - (selectedWorkForPayment.TotalPaid || 0), selectedWorkForPayment.Currency)}
                                         </span>
                                     </div>
@@ -1256,12 +1255,12 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                             </div>
 
                             {loadingPayments ? (
-                                <div className="work-loading">
+                                <div className={styles.loading}>
                                     Loading payment history...
                                 </div>
                             ) : (
-                                <div className="details-table-container">
-                                    <table className="details-table">
+                                <div className={styles.detailsTableContainer}>
+                                    <table className={styles.detailsTable}>
                                         <thead>
                                             <tr>
                                                 <th>Date</th>
@@ -1276,19 +1275,19 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                             {paymentHistory.map((payment, index) => (
                                                 <tr key={payment.InvoiceID || index}>
                                                     <td>{formatDate(payment.Dateofpayment)}</td>
-                                                    <td className="payment-amount">
+                                                    <td className={styles.paymentAmount}>
                                                         {formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}
                                                     </td>
                                                     <td>{payment.ActualAmount ? formatCurrency(payment.ActualAmount, payment.ActualCur) : '-'}</td>
                                                     <td>{payment.ActualCur || '-'}</td>
                                                     <td>{payment.Change ? formatCurrency(payment.Change, payment.ActualCur) : '-'}</td>
                                                     <td>
-                                                        <div className="payment-actions">
+                                                        <div className={styles.paymentActions}>
                                                             <button
                                                                 onClick={() => {
                                                                     toast.info(`Edit payment functionality coming soon!\n\nPayment ID: ${payment.InvoiceID}\nAmount: ${formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}`);
                                                                 }}
-                                                                className="work-btn-action-edit"
+                                                                className={styles.btnActionEdit}
                                                                 title="Edit Payment"
                                                             >
                                                                 <i className="fas fa-edit"></i>
@@ -1314,7 +1313,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                                                         }
                                                                     }
                                                                 }}
-                                                                className="work-btn-action-delete"
+                                                                className={styles.btnActionDelete}
                                                                 title="Delete Payment"
                                                             >
                                                                 <i className="fas fa-trash"></i>
@@ -1325,7 +1324,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                             ))}
                                             {paymentHistory.length === 0 && (
                                                 <tr>
-                                                    <td colSpan={6} className="no-data">
+                                                    <td colSpan={6} className={styles.noData}>
                                                         No payments recorded yet for this work
                                                     </td>
                                                 </tr>
@@ -1335,7 +1334,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                 </div>
                             )}
 
-                            <div className="payment-history-footer">
+                            <div className={styles.paymentHistoryFooter}>
                                 {((selectedWorkForPayment.TotalRequired || 0) - (selectedWorkForPayment.TotalPaid || 0)) > 0 ? (
                                     <button
                                         onClick={() => {
@@ -1347,7 +1346,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
                                         <i className="fas fa-plus"></i> Add New Payment
                                     </button>
                                 ) : (
-                                    <div className="payment-fully-paid">
+                                    <div className={styles.paymentFullyPaid}>
                                         <i className="fas fa-check-circle"></i> This work is fully paid
                                     </div>
                                 )}
@@ -1359,7 +1358,7 @@ const WorkComponent = ({ patientId }: WorkComponentProps) => {
 
             {/* Delete Confirmation Modal */}
             {showDeleteConfirmation && workToDelete && (
-                <div className="modal-overlay" onClick={cancelDeleteWork}>
+                <div className={styles.modalOverlay} onClick={cancelDeleteWork}>
                     <div className="whatsapp-modal" onClick={(e: MouseEvent) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
                         <div className="whatsapp-modal-header">
                             <h3 className="whatsapp-modal-title" style={{ color: 'var(--error-color)' }}>

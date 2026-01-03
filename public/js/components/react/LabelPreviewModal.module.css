@@ -1,0 +1,1313 @@
+/**
+ * Label Preview Modal Styles (CSS Module)
+ * Modal for previewing and editing aligner labels before printing
+ *
+ * Supports two modes:
+ * - Single batch mode: 3-column layout (form | labels | position)
+ * - Queue mode: 2-column layout (batches | position)
+ */
+
+/* ===========================================
+   CSS CUSTOM PROPERTIES
+   =========================================== */
+
+.overlay {
+    /* Theme Colors */
+    --lpm-primary: #6366f1;
+    --lpm-primary-hover: #4f46e5;
+    --lpm-primary-light: rgba(99, 102, 241, 0.15);
+    --lpm-primary-lighter: rgba(99, 102, 241, 0.05);
+    --lpm-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
+    --lpm-gradient-hover: linear-gradient(135deg, #4f46e5, #7c3aed);
+
+    /* Label Type Colors */
+    --lpm-upper-bg: #eff6ff;
+    --lpm-upper-border: #3b82f6;
+    --lpm-upper-text: #1e40af;
+    --lpm-lower-bg: #f0fdf4;
+    --lpm-lower-border: #22c55e;
+    --lpm-lower-text: #166534;
+    --lpm-combined-bg: #fffbeb;
+    --lpm-combined-border: #f59e0b;
+    --lpm-combined-text: #92400e;
+    --lpm-custom-bg: #f5f3ff;
+    --lpm-custom-border: #8b5cf6;
+    --lpm-custom-text: #5b21b6;
+
+    /* Semantic Colors */
+    --lpm-danger: #dc2626;
+    --lpm-danger-bg: #fee2e2;
+    --lpm-danger-hover: #fecaca;
+    --lpm-reset-bg: #e0e7ff;
+    --lpm-reset-text: #4338ca;
+    --lpm-reset-hover: #c7d2fe;
+
+    /* Typography */
+    --lpm-font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
+    --lpm-font-size-xs: 0.6875rem;
+    --lpm-font-size-sm: 0.75rem;
+    --lpm-font-size-base: 0.8125rem;
+    --lpm-font-size-md: 0.875rem;
+    --lpm-font-size-lg: 0.9375rem;
+    --lpm-font-size-xl: 1rem;
+    --lpm-font-size-2xl: 1.25rem;
+
+    /* Spacing */
+    --lpm-space-xs: 0.25rem;
+    --lpm-space-sm: 0.5rem;
+    --lpm-space-md: 0.75rem;
+    --lpm-space-lg: 1rem;
+    --lpm-space-xl: 1.5rem;
+
+    /* Borders & Radius */
+    --lpm-radius-sm: 4px;
+    --lpm-radius-md: 6px;
+    --lpm-radius-lg: 8px;
+    --lpm-radius-xl: 10px;
+    --lpm-radius-2xl: 12px;
+
+    /* Shadows */
+    --lpm-shadow-sm: 0 2px 8px rgba(99, 102, 241, 0.15);
+    --lpm-shadow-md: 0 4px 12px rgba(99, 102, 241, 0.4);
+    --lpm-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.3);
+
+    /* Transitions */
+    --lpm-transition-fast: 0.15s ease;
+    --lpm-transition-normal: 0.2s ease;
+    --lpm-transition-slow: 0.3s ease-out;
+}
+
+/* ===========================================
+   MODAL OVERLAY & CONTAINER
+   =========================================== */
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-index-modal, 1040);
+    padding: var(--spacing-md, 1rem);
+    animation: lpmFadeIn var(--lpm-transition-normal);
+}
+
+@keyframes lpmFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal {
+    background: var(--bg-color, #ffffff);
+    border-radius: var(--lpm-radius-2xl);
+    box-shadow: var(--lpm-shadow-lg);
+    width: 100%;
+    max-width: 900px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    animation: lpmSlideUp var(--lpm-transition-slow);
+    overflow: hidden;
+}
+
+.modalWide {
+    max-width: 1100px;
+}
+
+@keyframes lpmSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ===========================================
+   HEADER
+   =========================================== */
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--lpm-space-lg) var(--lpm-space-xl);
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    background: var(--lpm-gradient);
+    color: white;
+}
+
+.header h2 {
+    margin: 0;
+    font-size: var(--lpm-font-size-2xl);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: var(--lpm-space-sm);
+}
+
+.header h2 i {
+    font-size: 1.1rem;
+}
+
+.closeBtn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--lpm-radius-lg);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color var(--lpm-transition-normal);
+}
+
+.closeBtn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.closeBtn:focus-visible {
+    outline: 2px solid white;
+    outline-offset: 2px;
+}
+
+/* Queue mode header */
+.queueModeHeader h2 {
+    flex-wrap: wrap;
+    gap: var(--lpm-space-md);
+}
+
+.queueHeaderStats {
+    font-size: var(--lpm-font-size-md);
+    font-weight: 400;
+    opacity: 0.9;
+    margin-left: auto;
+}
+
+/* ===========================================
+   CONTENT LAYOUTS
+   =========================================== */
+
+/* Single batch mode: 3-column grid */
+.content {
+    display: grid;
+    grid-template-columns: 280px 1fr 220px;
+    gap: var(--lpm-space-lg);
+    padding: var(--lpm-space-xl);
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* Queue mode: 2-column grid */
+.queueModeContent {
+    grid-template-columns: 1fr 280px;
+    gap: var(--lpm-space-xl);
+}
+
+@media (max-width: 900px) {
+    .content {
+        grid-template-columns: 1fr;
+    }
+
+    .modalWide {
+        max-width: 95vw;
+    }
+}
+
+@media (max-width: 800px) {
+    .queueModeContent {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===========================================
+   LEFT COLUMN - FORM (Single Batch Mode)
+   =========================================== */
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lpm-space-md);
+}
+
+.form h3 {
+    margin: 0 0 var(--lpm-space-xs) 0;
+    font-size: var(--lpm-font-size-lg);
+    font-weight: 600;
+    color: var(--text-color, #1f2937);
+}
+
+.formGroup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lpm-space-xs);
+}
+
+.formGroup label {
+    font-size: var(--lpm-font-size-base);
+    font-weight: 500;
+    color: var(--text-muted, #6b7280);
+}
+
+.formGroup input {
+    padding: var(--lpm-space-sm) var(--lpm-space-md);
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: var(--lpm-radius-md);
+    font-size: var(--lpm-font-size-md);
+    transition: border-color var(--lpm-transition-normal),
+                box-shadow var(--lpm-transition-normal);
+}
+
+.formGroup input:focus {
+    outline: none;
+    border-color: var(--lpm-primary);
+    box-shadow: 0 0 0 3px var(--lpm-primary-light);
+}
+
+.inputError {
+    border-color: var(--error-color, #ef4444) !important;
+}
+
+.inputDisabled {
+    background: var(--bg-secondary, #f3f4f6);
+    color: var(--text-muted, #6b7280);
+    cursor: not-allowed;
+}
+
+/* Checkbox styling */
+.formGroupInline {
+    flex-direction: row;
+    align-items: center;
+}
+
+.checkboxLabel {
+    display: flex;
+    align-items: center;
+    gap: var(--lpm-space-sm);
+    cursor: pointer;
+    user-select: none;
+}
+
+.checkboxLabel input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--lpm-primary);
+}
+
+.checkboxText {
+    font-size: var(--lpm-font-size-md);
+    color: var(--text-color, #374151);
+}
+
+/* Original ranges info */
+.originalRangesInfo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--lpm-space-sm);
+    padding: var(--lpm-space-md);
+    background: var(--bg-secondary, #f9fafb);
+    border-radius: var(--lpm-radius-md);
+    margin-top: var(--lpm-space-sm);
+}
+
+.infoLabel {
+    font-size: var(--lpm-font-size-sm);
+    color: var(--text-muted, #6b7280);
+}
+
+.rangeBadge {
+    display: inline-flex;
+    padding: var(--lpm-space-xs) var(--lpm-space-sm);
+    border-radius: var(--lpm-radius-sm);
+    font-size: var(--lpm-font-size-sm);
+    font-weight: 600;
+    font-family: var(--lpm-font-mono);
+}
+
+.rangeBadgeUpper {
+    background: #dbeafe;
+    color: var(--lpm-upper-text);
+}
+
+.rangeBadgeLower {
+    background: #dcfce7;
+    color: var(--lpm-lower-text);
+}
+
+/* ===========================================
+   MIDDLE COLUMN - LABELS EDITOR
+   =========================================== */
+
+.middle {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.labelsEditor {
+    background: var(--bg-secondary, #f9fafb);
+    border-radius: var(--lpm-radius-xl);
+    padding: var(--lpm-space-lg);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.labelsEditorHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--lpm-space-sm);
+}
+
+.labelsEditorHeader h3 {
+    margin: 0;
+    font-size: var(--lpm-font-size-lg);
+    font-weight: 600;
+    color: var(--text-color, #1f2937);
+}
+
+.labelsEditorActions {
+    display: flex;
+    gap: var(--lpm-space-sm);
+}
+
+/* Action buttons (Reset/Clear) */
+.btnResetLabels,
+.btnClearLabels {
+    display: flex;
+    align-items: center;
+    gap: var(--lpm-space-xs);
+    padding: 0.375rem 0.625rem;
+    border: none;
+    border-radius: 5px;
+    font-size: var(--lpm-font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color var(--lpm-transition-normal);
+}
+
+.btnResetLabels {
+    background: var(--lpm-reset-bg);
+    color: var(--lpm-reset-text);
+}
+
+.btnResetLabels:hover {
+    background: var(--lpm-reset-hover);
+}
+
+.btnClearLabels {
+    background: var(--lpm-danger-bg);
+    color: var(--lpm-danger);
+}
+
+.btnClearLabels:hover {
+    background: var(--lpm-danger-hover);
+}
+
+.btnResetLabels:focus-visible,
+.btnClearLabels:focus-visible {
+    outline: 2px solid var(--lpm-primary);
+    outline-offset: 2px;
+}
+
+/* Labels hint */
+.labelsHint {
+    margin: 0 0 var(--lpm-space-md) 0;
+    font-size: var(--lpm-font-size-sm);
+    color: var(--text-muted, #6b7280);
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.labelsHint i {
+    color: var(--lpm-primary);
+}
+
+/* Add label row */
+.addLabelRow {
+    display: flex;
+    gap: var(--lpm-space-sm);
+    margin-bottom: var(--lpm-space-md);
+}
+
+.addLabelInput {
+    flex: 1;
+    padding: var(--lpm-space-sm) var(--lpm-space-md);
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: var(--lpm-radius-md);
+    font-size: var(--lpm-font-size-md);
+    transition: border-color var(--lpm-transition-normal),
+                box-shadow var(--lpm-transition-normal);
+}
+
+.addLabelInput:focus {
+    outline: none;
+    border-color: var(--lpm-primary);
+    box-shadow: 0 0 0 3px var(--lpm-primary-light);
+}
+
+.btnAddLabel {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--lpm-radius-md);
+    background: var(--lpm-primary);
+    color: white;
+    cursor: pointer;
+    transition: background-color var(--lpm-transition-normal);
+}
+
+.btnAddLabel:hover:not(:disabled) {
+    background: var(--lpm-primary-hover);
+}
+
+.btnAddLabel:disabled {
+    background: #d1d5db;
+    cursor: not-allowed;
+}
+
+.btnAddLabel:focus-visible {
+    outline: 2px solid var(--lpm-primary);
+    outline-offset: 2px;
+}
+
+/* Labels list */
+.labelsList {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    max-height: 280px;
+    padding-right: var(--lpm-space-xs);
+}
+
+/* Label item - base styles */
+.labelItem {
+    display: flex;
+    align-items: center;
+    gap: var(--lpm-space-sm);
+    padding: var(--lpm-space-sm) var(--lpm-space-md);
+    background: white;
+    border-radius: var(--lpm-radius-md);
+    border: 1px solid transparent;
+    border-left-width: 3px;
+    transition: border-color var(--lpm-transition-normal);
+}
+
+/* Label type variants */
+.labelItemUpper {
+    border-left-color: var(--lpm-upper-border);
+    background: linear-gradient(90deg, var(--lpm-upper-bg) 0%, white 20%);
+}
+
+.labelItemLower {
+    border-left-color: var(--lpm-lower-border);
+    background: linear-gradient(90deg, var(--lpm-lower-bg) 0%, white 20%);
+}
+
+.labelItemCombined {
+    border-left-color: var(--lpm-combined-border);
+    background: linear-gradient(90deg, var(--lpm-combined-bg) 0%, white 20%);
+}
+
+.labelItemCustom {
+    border-left-color: var(--lpm-custom-border);
+    background: linear-gradient(90deg, var(--lpm-custom-bg) 0%, white 20%);
+}
+
+.labelIndex {
+    min-width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-secondary, #f3f4f6);
+    border-radius: var(--lpm-radius-sm);
+    font-size: var(--lpm-font-size-sm);
+    font-weight: 600;
+    color: var(--text-muted, #6b7280);
+}
+
+.labelText {
+    flex: 1;
+    font-size: var(--lpm-font-size-lg);
+    font-weight: 600;
+    font-family: var(--lpm-font-mono);
+    cursor: pointer;
+    padding: var(--lpm-space-xs) var(--lpm-space-sm);
+    border-radius: var(--lpm-radius-sm);
+    transition: background-color var(--lpm-transition-normal);
+}
+
+.labelText:hover {
+    background: var(--lpm-primary-light);
+}
+
+.labelEditInput {
+    flex: 1;
+    padding: var(--lpm-space-xs) var(--lpm-space-sm);
+    border: 2px solid var(--lpm-primary);
+    border-radius: var(--lpm-radius-sm);
+    font-size: var(--lpm-font-size-lg);
+    font-weight: 600;
+    font-family: var(--lpm-font-mono);
+    text-transform: uppercase;
+}
+
+.labelEditInput:focus {
+    outline: none;
+}
+
+.btnRemoveLabel {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--lpm-radius-sm);
+    background: transparent;
+    color: var(--text-muted, #9ca3af);
+    cursor: pointer;
+    transition: background-color var(--lpm-transition-normal),
+                color var(--lpm-transition-normal);
+}
+
+.btnRemoveLabel:hover {
+    background: var(--lpm-danger-bg);
+    color: var(--lpm-danger);
+}
+
+.btnRemoveLabel:focus-visible {
+    outline: 2px solid var(--lpm-danger);
+    outline-offset: 2px;
+}
+
+/* Empty state */
+.noLabels {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    color: var(--text-muted, #9ca3af);
+    text-align: center;
+}
+
+.noLabels i {
+    font-size: 2rem;
+    margin-bottom: var(--lpm-space-sm);
+    opacity: 0.5;
+}
+
+.noLabels p {
+    margin: 0;
+    font-size: var(--lpm-font-size-md);
+}
+
+.noLabelsHint {
+    font-size: var(--lpm-font-size-sm);
+    margin-top: var(--lpm-space-xs);
+}
+
+/* ===========================================
+   RIGHT COLUMN - POSITION & STATS
+   =========================================== */
+
+.right {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lpm-space-lg);
+}
+
+/* Font selector */
+.fontSelector {
+    width: 100%;
+    padding: var(--lpm-space-sm) var(--lpm-space-md);
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: var(--lpm-radius-md);
+    font-size: var(--lpm-font-size-md);
+    cursor: pointer;
+}
+
+.fontSelector:focus {
+    outline: none;
+    border-color: var(--lpm-primary);
+    box-shadow: 0 0 0 3px var(--lpm-primary-light);
+}
+
+/* Position Selector */
+.positionSelector {
+    background: var(--bg-secondary, #f9fafb);
+    border-radius: var(--lpm-radius-xl);
+    padding: var(--lpm-space-lg);
+}
+
+.positionSelector h3 {
+    margin: 0 0 var(--lpm-space-xs) 0;
+    font-size: var(--lpm-font-size-lg);
+    font-weight: 600;
+    color: var(--text-color, #1f2937);
+}
+
+.positionHint {
+    margin: 0 0 var(--lpm-space-md) 0;
+    font-size: var(--lpm-font-size-sm);
+    color: var(--text-muted, #6b7280);
+}
+
+.positionGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-bottom: var(--lpm-space-sm);
+}
+
+.positionCell {
+    aspect-ratio: 1;
+    border: 2px solid var(--border-color, #d1d5db);
+    border-radius: var(--lpm-radius-md);
+    background: white;
+    font-size: var(--lpm-font-size-md);
+    font-weight: 600;
+    color: var(--text-color, #374151);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color var(--lpm-transition-normal),
+                background-color var(--lpm-transition-normal),
+                box-shadow var(--lpm-transition-normal);
+}
+
+.positionCell:hover {
+    border-color: var(--lpm-primary);
+    background: var(--lpm-primary-lighter);
+}
+
+.positionCell:focus-visible {
+    outline: 2px solid var(--lpm-primary);
+    outline-offset: 2px;
+}
+
+.positionCellSelected {
+    background: var(--lpm-primary);
+    border-color: var(--lpm-primary);
+    color: white;
+    box-shadow: var(--lpm-shadow-sm);
+}
+
+.positionCellWillUse {
+    background: var(--lpm-primary-light);
+    border-color: rgba(99, 102, 241, 0.4);
+    color: var(--lpm-primary);
+}
+
+.positionLegend {
+    display: flex;
+    gap: var(--lpm-space-md);
+    flex-wrap: wrap;
+}
+
+.legendItem {
+    display: flex;
+    align-items: center;
+    gap: var(--lpm-space-xs);
+    font-size: var(--lpm-font-size-xs);
+    color: var(--text-muted, #6b7280);
+}
+
+.legendColor {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: 2px solid transparent;
+}
+
+.legendColorSelected {
+    background: var(--lpm-primary);
+}
+
+.legendColorWillUse {
+    background: var(--lpm-primary-light);
+    border-color: rgba(99, 102, 241, 0.4);
+}
+
+/* Print Stats */
+.printStats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--lpm-space-sm);
+}
+
+.statItem {
+    background: var(--bg-secondary, #f9fafb);
+    border-radius: var(--lpm-radius-lg);
+    padding: 0.625rem;
+    text-align: center;
+}
+
+.statLabel {
+    display: block;
+    font-size: var(--lpm-font-size-xs);
+    color: var(--text-muted, #6b7280);
+    margin-bottom: 2px;
+}
+
+.statValue {
+    display: block;
+    font-size: var(--lpm-font-size-2xl);
+    font-weight: 700;
+    color: var(--lpm-primary);
+}
+
+/* ===========================================
+   FOOTER
+   =========================================== */
+
+.footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--lpm-space-md);
+    padding: var(--lpm-space-lg) var(--lpm-space-xl);
+    border-top: 1px solid var(--border-color, #e5e7eb);
+    background: var(--bg-secondary, #f9fafb);
+}
+
+.btnCancel {
+    padding: 0.625rem 1.25rem;
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: var(--lpm-radius-lg);
+    background: white;
+    color: var(--text-color, #374151);
+    font-size: var(--lpm-font-size-lg);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color var(--lpm-transition-normal),
+                border-color var(--lpm-transition-normal);
+}
+
+.btnCancel:hover {
+    background: var(--bg-secondary, #f3f4f6);
+    border-color: var(--text-muted, #9ca3af);
+}
+
+.btnCancel:focus-visible {
+    outline: 2px solid var(--lpm-primary);
+    outline-offset: 2px;
+}
+
+.btnGenerate {
+    padding: 0.625rem 1.5rem;
+    border: none;
+    border-radius: var(--lpm-radius-lg);
+    background: var(--lpm-gradient);
+    color: white;
+    font-size: var(--lpm-font-size-lg);
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--lpm-space-sm);
+    transition: background var(--lpm-transition-normal),
+                transform var(--lpm-transition-normal),
+                box-shadow var(--lpm-transition-normal);
+}
+
+.btnGenerate:hover:not(:disabled) {
+    background: var(--lpm-gradient-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--lpm-shadow-md);
+}
+
+.btnGenerate:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btnGenerate:focus-visible {
+    outline: 2px solid white;
+    outline-offset: 2px;
+}
+
+.btnGenerate i {
+    font-size: 0.9rem;
+}
+
+/* ===========================================
+   QUEUE MODE - BATCHES LIST
+   =========================================== */
+
+.queueBatches {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lpm-space-md);
+    flex: 1;
+    min-height: 0;
+}
+
+.queueBatches h3 {
+    font-size: var(--lpm-font-size-xl);
+    font-weight: 600;
+    color: var(--text-color, #1f2937);
+    margin: 0 0 var(--lpm-space-xs) 0;
+}
+
+.queueHint {
+    font-size: var(--lpm-font-size-base);
+    color: var(--text-muted, #6b7280);
+    margin: 0 0 var(--lpm-space-md) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--lpm-space-sm);
+}
+
+.queueHint i {
+    color: var(--lpm-primary);
+}
+
+/* Patient groups container - scrollable */
+.queuePatientGroups {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lpm-space-lg);
+    flex: 1;
+    min-height: 0;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding-right: var(--lpm-space-sm);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99, 102, 241, 0.3) transparent;
+}
+
+.queuePatientGroups::-webkit-scrollbar {
+    width: 6px;
+}
+
+.queuePatientGroups::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.queuePatientGroups::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.3);
+    border-radius: 3px;
+}
+
+/* Patient group */
+.queuePatientGroup {
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: var(--lpm-radius-xl);
+    background: white;
+}
+
+.queuePatientHeader {
+    display: flex;
+    align-items: center;
+    gap: var(--lpm-space-sm);
+    padding: 0.625rem 0.875rem;
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    border-radius: var(--lpm-radius-xl) var(--lpm-radius-xl) 0 0;
+    font-weight: 600;
+    font-size: var(--lpm-font-size-lg);
+    color: var(--text-color, #1f2937);
+}
+
+.queuePatientHeader i {
+    color: var(--lpm-primary);
+    font-size: var(--lpm-font-size-md);
+}
+
+.queuePatientName {
+    flex: 1;
+}
+
+/* Batches within patient group */
+.queuePatientBatches {
+    padding: var(--lpm-space-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--lpm-space-sm);
+}
+
+/* ===========================================
+   QUEUE MODE - BATCH ITEM
+   =========================================== */
+
+.queueBatchItem {
+    border-radius: var(--lpm-radius-lg);
+    background: var(--bg-secondary, #f9fafb);
+    border: 1px solid transparent;
+    transition: border-color var(--lpm-transition-normal),
+                background-color var(--lpm-transition-normal),
+                box-shadow var(--lpm-transition-normal);
+}
+
+.queueBatchItem:hover {
+    border-color: var(--border-color, #e5e7eb);
+}
+
+.queueBatchItemExpanded {
+    background: white;
+    border-color: var(--lpm-primary);
+    box-shadow: var(--lpm-shadow-sm);
+}
+
+/* Batch header - clickable */
+.queueBatchHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem var(--lpm-space-md);
+    cursor: pointer;
+    border-radius: var(--lpm-radius-lg);
+    transition: background-color var(--lpm-transition-fast);
+}
+
+.queueBatchHeader:hover {
+    background: var(--lpm-primary-lighter);
+}
+
+.queueBatchItemExpanded .queueBatchHeader {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+    border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: var(--lpm-radius-lg) var(--lpm-radius-lg) 0 0;
+}
+
+.queueBatchInfo {
+    display: flex;
+    align-items: center;
+    gap: var(--lpm-space-md);
+    flex: 1;
+}
+
+.expandIcon {
+    font-size: var(--lpm-font-size-sm);
+    color: var(--text-muted, #6b7280);
+    width: 12px;
+    transition: transform var(--lpm-transition-normal);
+}
+
+.queueBatchNumber {
+    font-weight: 600;
+    font-size: var(--lpm-font-size-md);
+    color: var(--text-color, #374151);
+}
+
+.queueBatchLabels {
+    font-size: var(--lpm-font-size-base);
+    color: var(--text-muted, #6b7280);
+    background: white;
+    padding: 2px var(--lpm-space-sm);
+    border-radius: var(--lpm-radius-sm);
+    border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.queueBatchDoctor {
+    font-size: var(--lpm-font-size-base);
+    color: var(--lpm-primary);
+    margin-left: auto;
+}
+
+/* Batch actions */
+.queueBatchActions {
+    display: flex;
+    align-items: center;
+    gap: var(--lpm-space-sm);
+}
+
+/* Logo toggle */
+.queueLogoToggle {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.queueLogoToggle input {
+    display: none;
+}
+
+.checkboxIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--lpm-radius-md);
+    background: white;
+    border: 1px solid var(--border-color, #d1d5db);
+    color: var(--text-muted, #9ca3af);
+    transition: background-color var(--lpm-transition-fast),
+                border-color var(--lpm-transition-fast),
+                color var(--lpm-transition-fast);
+}
+
+.queueLogoToggle input:checked + .checkboxIcon {
+    background: var(--lpm-gradient);
+    border-color: var(--lpm-primary);
+    color: white;
+}
+
+.queueLogoToggle:hover .checkboxIcon {
+    border-color: var(--lpm-primary);
+}
+
+/* Remove batch button */
+.queueBatchRemove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: var(--lpm-radius-md);
+    background: transparent;
+    color: var(--text-muted, #9ca3af);
+    cursor: pointer;
+    transition: background-color var(--lpm-transition-fast),
+                color var(--lpm-transition-fast);
+}
+
+.queueBatchRemove:hover {
+    background: var(--lpm-danger-bg);
+    color: var(--lpm-danger);
+}
+
+.queueBatchRemove:focus-visible {
+    outline: 2px solid var(--lpm-danger);
+    outline-offset: 2px;
+}
+
+/* ===========================================
+   QUEUE MODE - LABEL CHIPS (Collapsed View)
+   =========================================== */
+
+.queueBatchLabelList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    padding: 0 var(--lpm-space-md) 0.625rem;
+}
+
+.queueLabelChip {
+    display: inline-block;
+    padding: 2px var(--lpm-space-sm);
+    font-size: var(--lpm-font-size-sm);
+    font-weight: 600;
+    font-family: var(--lpm-font-mono);
+    border-radius: var(--lpm-radius-sm);
+    background: white;
+    border: 1px solid var(--border-color, #e5e7eb);
+    color: var(--text-color, #374151);
+}
+
+/* Label chip type colors */
+.queueLabelChipUpper {
+    background: var(--lpm-upper-bg);
+    border-color: #93c5fd;
+    color: var(--lpm-upper-text);
+}
+
+.queueLabelChipLower {
+    background: var(--lpm-lower-bg);
+    border-color: #86efac;
+    color: var(--lpm-lower-text);
+}
+
+.queueLabelChipCombined {
+    background: var(--lpm-combined-bg);
+    border-color: #fcd34d;
+    color: var(--lpm-combined-text);
+}
+
+.queueLabelChipCustom {
+    background: var(--lpm-custom-bg);
+    border-color: #c4b5fd;
+    color: var(--lpm-custom-text);
+}
+
+.queueNoLabels {
+    font-size: var(--lpm-font-size-sm);
+    color: var(--text-muted, #9ca3af);
+    font-style: italic;
+}
+
+/* ===========================================
+   QUEUE MODE - BATCH EDITOR (Expanded View)
+   =========================================== */
+
+.queueBatchEditor {
+    padding: var(--lpm-space-md);
+    background: var(--bg-secondary, #f9fafb);
+    border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+/* Combined header row: Title + Add input + Actions */
+.queueEditorHeader {
+    display: flex;
+    align-items: center;
+    gap: var(--lpm-space-sm);
+    margin-bottom: var(--lpm-space-sm);
+}
+
+.editorTitle {
+    font-size: var(--lpm-font-size-base);
+    font-weight: 600;
+    color: var(--text-color, #374151);
+    white-space: nowrap;
+}
+
+/* Add input inline in header */
+.queueBatchEditor .addLabelInput {
+    flex: 1;
+    min-width: 80px;
+    max-width: 140px;
+    font-size: var(--lpm-font-size-base);
+    padding: 0.25rem 0.5rem;
+    height: 26px;
+    border-radius: var(--lpm-radius-sm);
+}
+
+.queueBatchEditor .btnAddLabel {
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    font-size: 0.75rem;
+}
+
+/* Action buttons group */
+.queueEditorActions {
+    display: flex;
+    gap: 0.25rem;
+    margin-left: auto;
+}
+
+/* Icon-only buttons in queue editor */
+.queueBatchEditor .btnResetLabels,
+.queueBatchEditor .btnClearLabels {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--lpm-font-size-sm);
+}
+
+.queueBatchEditor .btnResetLabels i,
+.queueBatchEditor .btnClearLabels i {
+    margin: 0;
+}
+
+/* Queue labels list - dynamic height with scroll when needed */
+.queueLabelsList {
+    display: block;
+    max-height: 180px; /* Scroll after ~4-5 labels */
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: var(--lpm-space-sm);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: var(--lpm-radius-md);
+    background: white;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99, 102, 241, 0.4) #f3f4f6;
+}
+
+.queueLabelsList::-webkit-scrollbar {
+    width: 8px;
+}
+
+.queueLabelsList::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: var(--lpm-radius-sm);
+}
+
+.queueLabelsList::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.4);
+    border-radius: var(--lpm-radius-sm);
+    border: 2px solid #f3f4f6;
+}
+
+.queueLabelsList::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.6);
+}
+
+/* Smaller label items in queue editor */
+.queueBatchEditor .labelItem {
+    padding: 0.375rem var(--lpm-space-sm);
+    font-size: var(--lpm-font-size-base);
+    margin-bottom: var(--lpm-space-xs);
+}
+
+.queueBatchEditor .labelItem:last-child {
+    margin-bottom: 0;
+}
+
+.queueBatchEditor .labelIndex {
+    min-width: 20px;
+    height: 20px;
+    font-size: var(--lpm-font-size-xs);
+}
+
+.queueBatchEditor .labelText {
+    font-size: var(--lpm-font-size-base);
+    padding: 2px 0.375rem;
+}
+
+.queueBatchEditor .labelEditInput {
+    font-size: var(--lpm-font-size-base);
+    padding: 2px 0.375rem;
+}
+
+.queueBatchEditor .btnRemoveLabel {
+    width: 20px;
+    height: 20px;
+}
+
+.queueBatchEditor .noLabels {
+    padding: var(--lpm-space-lg);
+}
+
+.queueBatchEditor .noLabels i {
+    font-size: 1.5rem;
+}
+
+.queueBatchEditor .noLabels p {
+    font-size: var(--lpm-font-size-base);
+}
+
+/* Empty queue state */
+.queueEmpty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    color: var(--text-muted, #9ca3af);
+    text-align: center;
+}
+
+.queueEmpty i {
+    font-size: 2.5rem;
+    margin-bottom: var(--lpm-space-md);
+    opacity: 0.5;
+}
+
+.queueEmpty p {
+    margin: 0;
+    font-size: var(--lpm-font-size-lg);
+}

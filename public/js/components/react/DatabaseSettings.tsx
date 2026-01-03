@@ -1,4 +1,5 @@
 import { useState, useEffect, ChangeEvent, MouseEvent } from 'react';
+import styles from './DatabaseSettings.module.css';
 
 interface DatabaseConfig {
     DB_SERVER: string;
@@ -258,28 +259,28 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
     const hasChanges = Object.keys(pendingChanges).length > 0;
 
     return (
-        <div className="database-settings">
-            <div className="settings-section">
-                <h3>
+        <div className={styles.container}>
+            <div className={styles.section}>
+                <h3 className={styles.sectionTitle}>
                     <i className="fas fa-database"></i>
                     Database Configuration
                 </h3>
-                <p className="section-description">
+                <p className={styles.sectionDescription}>
                     Configure database connection settings. Changes require application restart.
                 </p>
 
                 {isLoading ? (
-                    <div className="loading-spinner">
+                    <div className={styles.loadingSpinner}>
                         <i className="fas fa-spinner fa-spin"></i>
                         <span>Loading database configuration...</span>
                     </div>
                 ) : (
                     <>
                         {/* Connection Information */}
-                        <div className="config-group">
-                            <h4>Connection Information</h4>
+                        <div className={styles.configGroup}>
+                            <h4><i className="fas fa-server"></i> Connection Information</h4>
 
-                            <div className="setting-group">
+                            <div className={styles.settingGroup}>
                                 <label htmlFor="db_server">Database Server</label>
                                 <input
                                     type="text"
@@ -287,12 +288,12 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                                     value={getCurrentValue('DB_SERVER')}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('DB_SERVER', e.target.value)}
                                     placeholder="e.g., localhost, CLINIC"
-                                    className={pendingChanges.DB_SERVER !== undefined ? 'pending-change' : ''}
+                                    className={pendingChanges.DB_SERVER !== undefined ? styles.pendingChange : ''}
                                 />
-                                <div className="setting-description">SQL Server name or IP address</div>
+                                <div className={styles.settingDescription}>SQL Server name or IP address</div>
                             </div>
 
-                            <div className="setting-group">
+                            <div className={styles.settingGroup}>
                                 <label htmlFor="db_instance">Instance Name</label>
                                 <input
                                     type="text"
@@ -300,12 +301,12 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                                     value={getCurrentValue('DB_INSTANCE')}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('DB_INSTANCE', e.target.value)}
                                     placeholder="e.g., SQLEXPRESS, DOLPHIN"
-                                    className={pendingChanges.DB_INSTANCE !== undefined ? 'pending-change' : ''}
+                                    className={pendingChanges.DB_INSTANCE !== undefined ? styles.pendingChange : ''}
                                 />
-                                <div className="setting-description">SQL Server instance name</div>
+                                <div className={styles.settingDescription}>SQL Server instance name</div>
                             </div>
 
-                            <div className="setting-group">
+                            <div className={styles.settingGroup}>
                                 <label htmlFor="db_database">Database Name</label>
                                 <input
                                     type="text"
@@ -313,17 +314,17 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                                     value={getCurrentValue('DB_DATABASE')}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('DB_DATABASE', e.target.value)}
                                     placeholder="e.g., ShwanNew, ShwanOrtho"
-                                    className={pendingChanges.DB_DATABASE !== undefined ? 'pending-change' : ''}
+                                    className={pendingChanges.DB_DATABASE !== undefined ? styles.pendingChange : ''}
                                 />
-                                <div className="setting-description">Database name to connect to</div>
+                                <div className={styles.settingDescription}>Database name to connect to</div>
                             </div>
                         </div>
 
                         {/* Authentication */}
-                        <div className="config-group">
-                            <h4>Authentication</h4>
+                        <div className={styles.configGroup}>
+                            <h4><i className="fas fa-key"></i> Authentication</h4>
 
-                            <div className="setting-group">
+                            <div className={styles.settingGroup}>
                                 <label htmlFor="db_user">Username</label>
                                 <input
                                     type="text"
@@ -331,25 +332,25 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                                     value={getCurrentValue('DB_USER')}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('DB_USER', e.target.value)}
                                     placeholder="Database username"
-                                    className={pendingChanges.DB_USER !== undefined ? 'pending-change' : ''}
+                                    className={pendingChanges.DB_USER !== undefined ? styles.pendingChange : ''}
                                 />
-                                <div className="setting-description">SQL Server login username</div>
+                                <div className={styles.settingDescription}>SQL Server login username</div>
                             </div>
 
-                            <div className="setting-group">
+                            <div className={styles.settingGroup}>
                                 <label htmlFor="db_password">Password</label>
-                                <div className="password-input-group">
+                                <div className={styles.passwordInputGroup}>
                                     <input
                                         type={showPassword ? "text" : "password"}
                                         id="db_password"
                                         value={getCurrentValue('DB_PASSWORD')}
                                         onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('DB_PASSWORD', e.target.value)}
                                         placeholder="Database password"
-                                        className={pendingChanges.DB_PASSWORD !== undefined ? 'pending-change' : ''}
+                                        className={pendingChanges.DB_PASSWORD !== undefined ? styles.pendingChange : ''}
                                     />
                                     <button
                                         type="button"
-                                        className="password-toggle"
+                                        className={styles.passwordToggle}
                                         onClick={(e: MouseEvent<HTMLButtonElement>) => {
                                             e.preventDefault();
                                             e.stopPropagation();
@@ -359,50 +360,50 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                                         <i className={showPassword ? "fas fa-eye-slash" : "fas fa-eye"}></i>
                                     </button>
                                 </div>
-                                <div className="setting-description">SQL Server login password</div>
+                                <div className={styles.settingDescription}>SQL Server login password</div>
                             </div>
                         </div>
 
                         {/* Security Settings */}
-                        <div className="config-group">
-                            <h4>Security Settings</h4>
+                        <div className={styles.configGroup}>
+                            <h4><i className="fas fa-shield-alt"></i> Security Settings</h4>
 
-                            <div className="setting-group">
+                            <div className={styles.settingGroup}>
                                 <label htmlFor="db_encrypt">Encrypt Connection</label>
                                 <select
                                     id="db_encrypt"
                                     value={getCurrentValue('DB_ENCRYPT')}
                                     onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('DB_ENCRYPT', e.target.value)}
-                                    className={pendingChanges.DB_ENCRYPT !== undefined ? 'pending-change' : ''}
+                                    className={pendingChanges.DB_ENCRYPT !== undefined ? styles.pendingChange : ''}
                                 >
                                     <option value="true">Enabled</option>
                                     <option value="false">Disabled</option>
                                 </select>
-                                <div className="setting-description">Enable SSL/TLS encryption for database connection</div>
+                                <div className={styles.settingDescription}>Enable SSL/TLS encryption for database connection</div>
                             </div>
 
-                            <div className="setting-group">
+                            <div className={styles.settingGroup}>
                                 <label htmlFor="db_trust_cert">Trust Server Certificate</label>
                                 <select
                                     id="db_trust_cert"
                                     value={getCurrentValue('DB_TRUST_CERTIFICATE')}
                                     onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('DB_TRUST_CERTIFICATE', e.target.value)}
-                                    className={pendingChanges.DB_TRUST_CERTIFICATE !== undefined ? 'pending-change' : ''}
+                                    className={pendingChanges.DB_TRUST_CERTIFICATE !== undefined ? styles.pendingChange : ''}
                                 >
                                     <option value="true">Trust</option>
                                     <option value="false">Verify</option>
                                 </select>
-                                <div className="setting-description">Trust the server certificate without validation</div>
+                                <div className={styles.settingDescription}>Trust the server certificate without validation</div>
                             </div>
                         </div>
 
                         {/* Connection Test */}
-                        <div className="config-group">
-                            <h4>Connection Test</h4>
+                        <div className={styles.configGroup}>
+                            <h4><i className="fas fa-plug"></i> Connection Test</h4>
 
-                            <div className="connection-test">
+                            <div className={styles.connectionTest}>
                                 <button
-                                    className="btn btn-secondary"
+                                    className={`${styles.btn} ${styles.btnSecondary}`}
                                     onClick={testConnection}
                                     disabled={isTestingConnection}
                                 >
@@ -420,12 +421,12 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                                 </button>
 
                                 {connectionStatus && (
-                                    <div className={`connection-status ${connectionStatus.success ? 'success' : 'error'}`}>
-                                        <div className="status-header">
+                                    <div className={`${styles.connectionStatus} ${connectionStatus.success ? styles.success : styles.error}`}>
+                                        <div className={styles.statusHeader}>
                                             <i className={connectionStatus.success ? "fas fa-check-circle" : "fas fa-exclamation-circle"}></i>
                                             <span>{connectionStatus.message}</span>
                                         </div>
-                                        <div className="status-details">{connectionStatus.details}</div>
+                                        <div className={styles.statusDetails}>{connectionStatus.details}</div>
                                     </div>
                                 )}
                             </div>
@@ -434,9 +435,9 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                 )}
             </div>
 
-            <div className="settings-actions">
+            <div className={styles.actions}>
                 <button
-                    className="btn btn-primary"
+                    className={`${styles.btn} ${styles.btnPrimary}`}
                     onClick={saveConfiguration}
                     disabled={!hasChanges}
                 >
@@ -448,7 +449,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                 </button>
 
                 <button
-                    className="btn btn-warning"
+                    className={`${styles.btn} ${styles.btnWarning}`}
                     onClick={exportConfiguration}
                 >
                     <i className="fas fa-download"></i>
@@ -456,7 +457,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                 </button>
 
                 <button
-                    className="btn btn-info"
+                    className={`${styles.btn} ${styles.btnInfo}`}
                     onClick={restartApplication}
                     title="Restart application to apply configuration changes"
                 >
@@ -466,7 +467,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
             </div>
 
             {hasChanges && (
-                <div className="restart-warning">
+                <div className={styles.restartWarning}>
                     <i className="fas fa-exclamation-triangle"></i>
                     <span>Application restart required after saving database configuration changes.</span>
                 </div>
@@ -474,19 +475,19 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
 
             {/* Modal */}
             {modal.show && (
-                <div className="modal-overlay" onClick={hideModal}>
-                    <div className="modal-content" onClick={(e: MouseEvent) => e.stopPropagation()}>
-                        <div className="modal-header">
+                <div className={styles.modalOverlay} onClick={hideModal}>
+                    <div className={styles.modalContent} onClick={(e: MouseEvent) => e.stopPropagation()}>
+                        <div className={styles.modalHeader}>
                             <h3>{modal.title}</h3>
-                            <button className="modal-close" onClick={hideModal}>
+                            <button className={styles.modalClose} onClick={hideModal}>
                                 <i className="fas fa-times"></i>
                             </button>
                         </div>
-                        <div className="modal-body">
-                            <pre className="whitespace-pre-wrap">{modal.message}</pre>
+                        <div className={styles.modalBody}>
+                            <pre>{modal.message}</pre>
                         </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-primary" onClick={hideModal}>OK</button>
+                        <div className={styles.modalFooter}>
+                            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={hideModal}>OK</button>
                         </div>
                     </div>
                 </div>

@@ -1,0 +1,516 @@
+/* Aligner Doctors Settings - Styles for aligner doctors management */
+
+/* Main container */
+.container {
+    background: white;
+    border-radius: var(--radius-xl);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--gray-200);
+    transition: all 0.3s ease;
+}
+
+.container:hover {
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+/* Section header */
+.sectionHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.headerContent h2 {
+    color: var(--primary-color);
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.sectionDescription {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+/* Add Doctor Button */
+.btnAdd {
+    background: var(--primary-color);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.btnAdd:hover:not(:disabled) {
+    background: var(--blue-300);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+}
+
+.btnAdd:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Doctor Form Container */
+.formContainer {
+    background: var(--gray-50);
+    border: 2px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.formHeader {
+    margin-bottom: 1.5rem;
+}
+
+.formHeader h3 {
+    color: var(--primary-color);
+    font-size: 1.3rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.formGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.formGroup label {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.required {
+    color: var(--error-400);
+}
+
+.fieldHelp {
+    font-weight: 400;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-left: 0.25rem;
+}
+
+.form input {
+    padding: 0.75rem;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+}
+
+.form input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+/* Form actions */
+.formActions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    padding-top: 1rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.btnCancel {
+    background: var(--gray-500);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.btnCancel:hover {
+    background: var(--gray-600);
+}
+
+.btnSave {
+    background: var(--success-300);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.btnSave:hover {
+    background: var(--success-500);
+}
+
+/* Doctors List */
+.list {
+    margin-top: 2rem;
+}
+
+/* Empty state */
+.emptyState {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-secondary);
+}
+
+.emptyState i {
+    font-size: 4rem;
+    color: var(--gray-200);
+    margin-bottom: 1rem;
+}
+
+.emptyState p {
+    font-size: 1.1rem;
+    margin: 0.5rem 0;
+}
+
+.emptyStateHint {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* Table container */
+.tableContainer {
+    overflow-x: auto;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table thead {
+    background: var(--gray-50);
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.table tbody tr {
+    border-bottom: 1px solid var(--gray-200);
+    transition: background-color 0.2s ease;
+}
+
+.table tbody tr:hover {
+    background: var(--gray-50);
+}
+
+.table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.table td {
+    padding: 1rem;
+    color: var(--text-primary);
+}
+
+.doctorName {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.doctorName i {
+    color: var(--primary-color);
+}
+
+.emailValue {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-primary);
+}
+
+.emailValue i {
+    color: var(--info-500);
+}
+
+.noEmail {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.logoPath {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.textMuted {
+    color: var(--text-secondary);
+}
+
+/* Badges */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badgeSuccess {
+    background: var(--success-100);
+    color: var(--success-800);
+}
+
+.badgeWarning {
+    background: var(--warning-100);
+    color: var(--warning-900);
+}
+
+/* Actions column */
+.actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.btnIcon {
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btnEdit {
+    background: var(--info-100);
+    color: var(--info-700);
+}
+
+.btnEdit:hover {
+    background: var(--info-200);
+    transform: scale(1.1);
+}
+
+.btnDelete {
+    background: var(--error-50);
+    color: var(--error-600);
+}
+
+.btnDelete:hover {
+    background: var(--error-100);
+    transform: scale(1.1);
+}
+
+/* Loading and error states */
+.loadingContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+}
+
+.loadingContainer i {
+    font-size: 3rem;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.errorContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+}
+
+.errorContainer i {
+    font-size: 3rem;
+    color: var(--error-400);
+    margin-bottom: 1rem;
+}
+
+.errorContainer p {
+    color: var(--error-600);
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+}
+
+.btnRetry {
+    background: var(--primary-color);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.btnRetry:hover {
+    background: var(--blue-300);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .sectionHeader {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+
+    .btnAdd {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .table th,
+    .table td {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .logoPath {
+        max-width: 150px;
+    }
+
+    .formActions {
+        flex-direction: column;
+    }
+
+    .btnCancel,
+    .btnSave {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Mobile card layout */
+@media (max-width: 480px) {
+    .table thead {
+        display: none;
+    }
+
+    .table,
+    .table tbody,
+    .table tr,
+    .table td {
+        display: block;
+        width: 100%;
+    }
+
+    .table tbody tr {
+        margin-bottom: var(--spacing-md);
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-md);
+        background: white;
+    }
+
+    .table tbody tr:hover {
+        background: var(--gray-50);
+        box-shadow: var(--shadow-md);
+    }
+
+    .table td {
+        padding: var(--spacing-xs) 0;
+        border: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .table td::before {
+        content: attr(data-label);
+        font-weight: var(--font-weight-semibold);
+        color: var(--text-secondary);
+        font-size: var(--font-size-sm);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        flex-shrink: 0;
+        margin-right: var(--spacing-md);
+    }
+
+    /* Hide ID column on mobile */
+    .table td:first-child {
+        display: none;
+    }
+
+    /* Make name more prominent */
+    .doctorName {
+        font-size: var(--font-size-lg);
+        font-weight: var(--font-weight-bold);
+    }
+
+    /* Actions row */
+    .actions {
+        justify-content: flex-end;
+        gap: var(--spacing-sm);
+        margin-top: var(--spacing-sm);
+        padding-top: var(--spacing-sm);
+        border-top: 1px solid var(--gray-200);
+    }
+
+    .btnIcon {
+        padding: var(--spacing-md);
+        font-size: var(--font-size-lg);
+    }
+
+    .headerContent h2 {
+        font-size: var(--font-size-xl);
+    }
+
+    .btnAdd {
+        padding: var(--spacing-md) var(--spacing-lg);
+        font-size: var(--font-size-sm);
+    }
+}

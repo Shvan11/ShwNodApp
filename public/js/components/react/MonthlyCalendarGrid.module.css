@@ -1,0 +1,560 @@
+/**
+ * Monthly Calendar View Styles - CSS Module
+ *
+ * Clean, modern monthly calendar layout with creative appointment indicators
+ * Week starts from Saturday, excludes Friday (6-day work week)
+ */
+
+/* Monthly Calendar Grid Container */
+.monthlyCalendarGrid {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--calendar-background, white);
+    overflow: auto;
+    padding: var(--spacing-md);
+}
+
+/* Month Grid Header - Day Names */
+.monthGridHeader {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr); /* 6 days: Sat-Thu */
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+    padding: var(--spacing-md) 0;
+    border-bottom: 2px solid var(--calendar-border, var(--gray-200));
+}
+
+.monthDayHeader {
+    text-align: center;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px;
+}
+
+/* Month Grid Body - Calendar Days */
+.monthGridBody {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr); /* 6 days: Sat-Thu */
+    gap: var(--spacing-sm);
+    flex: 1;
+    align-content: start;
+}
+
+/* Individual Day Cell */
+.monthDayCell {
+    position: relative;
+    min-height: 100px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    background: var(--color-white);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+}
+
+.monthDayCell:hover {
+    background: var(--surface-hover, #f8f9fa);
+    border-color: var(--primary-color);
+}
+
+.monthDayCell.expanded {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    border-color: var(--primary-color);
+    z-index: 20;
+}
+
+/* Today Highlight with Pulsing Animation */
+.today {
+    background: linear-gradient(135deg, var(--calendar-today-highlight) 0%, var(--color-white) 100%);
+    border: 2px solid var(--primary-color);
+    box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.1);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.1);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(33, 150, 243, 0.2);
+    }
+}
+
+/* Weekend Styling */
+.weekend {
+    background: linear-gradient(135deg, var(--surface-elevated) 0%, var(--color-white) 100%);
+}
+
+/* Holiday Styling */
+.holiday {
+    background: linear-gradient(135deg, #fff5f5 0%, #ffe0e0 100%);
+    border-color: var(--error-color);
+}
+
+/* Has Appointments */
+.hasAppointments {
+    /* Can add specific styles for days with appointments */
+}
+
+/* Other Month Days (Dimmed) */
+.otherMonth {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.otherMonth:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* Day Number */
+.monthDayNumber {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    min-height: 24px;
+}
+
+.today .monthDayNumber {
+    color: var(--primary-color);
+    font-size: 20px;
+}
+
+/* Holiday Badge */
+.holidayBadge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    background: var(--error-color);
+    color: var(--color-white);
+    border: 2px solid var(--error-color);
+}
+
+/* Appointment Badge - Clean Neutral Design */
+.appointmentBadge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    background: var(--primary-color);
+    color: var(--color-white);
+    border: 2px solid var(--primary-color);
+    transition: all 0.3s ease;
+    animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.appointmentBadge:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+}
+
+/* Hover Tooltip */
+.dayTooltip {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 8px;
+    background: var(--color-white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    min-width: 250px;
+    max-width: 300px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    z-index: var(--z-index-tooltip);
+    animation: tooltipSlideIn 0.2s ease-out;
+}
+
+@keyframes tooltipSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* Tooltip Arrow */
+.dayTooltip::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid white;
+}
+
+.tooltipHeader {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.tooltipStats {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.tooltipStat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.tooltipStat .statLabel {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.tooltipStat .statValue {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.tooltipSectionTitle {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+}
+
+.tooltipAppointments {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 8px;
+}
+
+.tooltipAppointment {
+    display: flex;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    font-size: 13px;
+}
+
+.tooltipAppointment:last-child {
+    border-bottom: none;
+}
+
+.aptTime {
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 45px;
+}
+
+.aptName {
+    color: var(--text-secondary);
+}
+
+.tooltipMore {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-style: italic;
+    text-align: center;
+    padding: 4px 0;
+}
+
+.tooltipAction {
+    font-size: 11px;
+    color: var(--primary-color);
+    text-align: center;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    font-weight: 600;
+}
+
+/* Expanded Panel (shows on click) */
+.dayExpandedPanel {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 8px;
+    background: var(--color-white);
+    border: 1px solid var(--primary-color);
+    border-radius: 8px;
+    padding: 12px;
+    min-width: 220px;
+    max-width: 280px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    z-index: var(--z-index-tooltip);
+    animation: expandPanel 0.15s ease-out;
+}
+
+@keyframes expandPanel {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) scale(1);
+    }
+}
+
+/* Panel Arrow */
+.dayExpandedPanel::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid var(--primary-color);
+}
+
+.dayExpandedPanel::after {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 6px solid white;
+}
+
+.expandedHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.expandedCount {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--primary-color);
+    background: var(--primary-light, #e3f2fd);
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+.expandedAppointments {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.expandedAppointment {
+    display: flex;
+    gap: 10px;
+    padding: 6px 4px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    font-size: 13px;
+    transition: background 0.15s;
+}
+
+.expandedAppointment:hover {
+    background: var(--surface-hover, #f8f9fa);
+}
+
+.expandedAppointment:last-child {
+    border-bottom: none;
+}
+
+.expandedAppointment .aptTime {
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 50px;
+    font-size: 12px;
+}
+
+.expandedAppointment .aptName {
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.expandedMore {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 6px 0;
+    font-style: italic;
+}
+
+.expandedAction {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-align: center;
+    padding-top: 8px;
+    margin-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+/* Loading State */
+.monthlyCalendarGrid.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    font-size: 16px;
+    color: var(--text-secondary);
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .monthDayCell {
+        min-height: 80px;
+    }
+
+    .monthDayNumber {
+        font-size: 16px;
+    }
+
+    .appointmentBadge {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    .monthlyCalendarGrid {
+        padding: 8px;
+    }
+
+    .monthGridHeader {
+        gap: 4px;
+    }
+
+    .monthGridBody {
+        gap: 4px;
+    }
+
+    .monthDayHeader {
+        font-size: 12px;
+        padding: 6px;
+    }
+
+    .monthDayCell {
+        min-height: 60px;
+        padding: 6px;
+    }
+
+    .monthDayNumber {
+        font-size: 14px;
+    }
+
+    .appointmentBadge {
+        width: 24px;
+        height: 24px;
+        font-size: 11px;
+        top: 6px;
+        right: 6px;
+    }
+
+    .dayTooltip {
+        min-width: 200px;
+    }
+
+    .dayExpandedPanel {
+        min-width: 180px;
+        max-width: 220px;
+        padding: 10px;
+    }
+
+    .expandedHeader {
+        font-size: 12px;
+    }
+
+    .expandedAppointment {
+        font-size: 12px;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .monthlyCalendarGrid {
+        padding: 0;
+    }
+
+    .monthDayCell:hover {
+        box-shadow: none;
+        transform: none;
+    }
+
+    .dayTooltip,
+    .dayExpandedPanel {
+        display: none;
+    }
+
+    .appointmentBadge:hover {
+        transform: none;
+    }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    .monthDayCell,
+    .appointmentBadge,
+    .utilizationFill,
+    .dayTooltip,
+    .dayExpandedPanel,
+    .expandedAppointment {
+        transition: none;
+        animation: none;
+    }
+
+    .monthDayCell.today {
+        animation: none;
+    }
+}

@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef, useCallback, ChangeEvent } from 're
 import { useNavigate, useLoaderData } from 'react-router-dom';
 import AsyncSelect from 'react-select/async';
 import Select, { MultiValue, StylesConfig } from 'react-select';
+import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
+import styles from './PatientManagement.module.css';
 
 interface Patient {
     PersonID: number;
@@ -309,65 +311,65 @@ const PatientManagement = () => {
     };
 
     return (
-        <div className="page-patient-management">
-            <div className="patient-management-header">
+        <div className={styles.page}>
+            <div className={styles.header}>
                 <h2>Patient Management</h2>
-                <div className="patient-management-header-actions">
+                <div className={styles.headerActions}>
                     <button type="button" onClick={() => setShowQuickSearch(!showQuickSearch)} className="btn btn-secondary whitespace-nowrap">
-                        <i className={`fas fa-${showQuickSearch ? 'chevron-up' : 'chevron-down'} pm-icon-gap`}></i>
+                        <i className={cn('fas', showQuickSearch ? 'fa-chevron-up' : 'fa-chevron-down', styles.iconGap)}></i>
                         {showQuickSearch ? 'Hide' : 'Show'} Quick Search
                     </button>
                     <button type="button" onClick={() => navigate('/patient/new/edit-patient')} className="btn btn-primary">
-                        <i className="fas fa-plus pm-icon-gap"></i> Add New Patient
+                        <i className={cn('fas fa-plus', styles.iconGap)}></i> Add New Patient
                     </button>
                 </div>
             </div>
 
             {showQuickSearch && (
-                <div className="pm-quick-search-container">
-                    <div className="pm-quick-search-header"><i className="fas fa-bolt"></i><h3>Quick Search - Select & Go</h3></div>
-                    <div className="pm-quick-search-grid">
-                        <div className="pm-quick-search-field">
-                            <label><i className="fas fa-user pm-icon-gap"></i>Search by Name (Arabic)</label>
+                <div className={styles.quickSearchContainer}>
+                    <div className={styles.quickSearchHeader}><i className="fas fa-bolt"></i><h3>Quick Search - Select & Go</h3></div>
+                    <div className={styles.quickSearchGrid}>
+                        <div className={styles.quickSearchField}>
+                            <label><i className={cn('fas fa-user', styles.iconGap)}></i>Search by Name (Arabic)</label>
                             <AsyncSelect cacheOptions defaultOptions={false} loadOptions={loadNameOptions} onChange={handleQuickSearchSelect} placeholder="اكتب للبحث..." isClearable classNamePrefix="pm-select" styles={selectStylesRTL} />
                         </div>
-                        <div className="pm-quick-search-field">
-                            <label><i className="fas fa-phone pm-icon-gap"></i>Search by Phone</label>
+                        <div className={styles.quickSearchField}>
+                            <label><i className={cn('fas fa-phone', styles.iconGap)}></i>Search by Phone</label>
                             <AsyncSelect cacheOptions defaultOptions={false} loadOptions={loadPhoneOptions} onChange={handleQuickSearchSelect} placeholder="Search phone..." isClearable classNamePrefix="pm-select" />
                         </div>
-                        <div className="pm-quick-search-field">
-                            <label><i className="fas fa-id-card pm-icon-gap"></i>Search by ID</label>
+                        <div className={styles.quickSearchField}>
+                            <label><i className={cn('fas fa-id-card', styles.iconGap)}></i>Search by ID</label>
                             <AsyncSelect cacheOptions defaultOptions={false} loadOptions={loadIdOptions} onChange={handleQuickSearchSelect} placeholder="Search ID..." isClearable classNamePrefix="pm-select" />
                         </div>
                     </div>
                 </div>
             )}
 
-            <hr className="pm-section-divider" />
-            <div className="pm-search-section-header"><h3><i className="fas fa-search"></i>Advanced Search</h3></div>
+            <hr className={styles.sectionDivider} />
+            <div className={styles.searchSectionHeader}><h3><i className="fas fa-search"></i>Advanced Search</h3></div>
 
-            <div className="pm-name-search-grid">
+            <div className={styles.nameSearchGrid}>
                 <div><label>Name (Arabic)</label><input type="text" value={searchPatientName} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchPatientName(e.target.value)} className="form-control text-rtl" dir="rtl"/></div>
                 <div><label>First Name</label><input type="text" value={searchFirstName} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchFirstName(e.target.value)} className="form-control"/></div>
                 <div><label>Last Name</label><input type="text" value={searchLastName} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchLastName(e.target.value)} className="form-control"/></div>
                 <div><label>Phone/ID</label><input type="text" value={searchTerm} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && executeSearch()} className="form-control"/></div>
             </div>
 
-            <div className="pm-search-form">
-                <button type="button" onClick={handleSearchBtnClick} className="btn btn-primary" disabled={loading}><i className="fas fa-search pm-icon-gap"></i>Search</button>
-                <button type="button" onClick={handleShowAll} className="btn btn-secondary" disabled={loading}><i className="fas fa-list pm-icon-gap"></i>Show All</button>
-                <button type="button" onClick={handleReset} className="btn btn-secondary" disabled={loading}><i className="fas fa-redo pm-icon-gap"></i>Reset</button>
+            <div className={styles.searchForm}>
+                <button type="button" onClick={handleSearchBtnClick} className="btn btn-primary" disabled={loading}><i className={cn('fas fa-search', styles.iconGap)}></i>Search</button>
+                <button type="button" onClick={handleShowAll} className="btn btn-secondary" disabled={loading}><i className={cn('fas fa-list', styles.iconGap)}></i>Show All</button>
+                <button type="button" onClick={handleReset} className="btn btn-secondary" disabled={loading}><i className={cn('fas fa-redo', styles.iconGap)}></i>Reset</button>
             </div>
 
-            <div className="pm-advanced-filters">
-                <div className="pm-advanced-filters__header" onClick={() => setShowFilters(!showFilters)}>
-                    <h4><i className="fas fa-filter pm-icon-gap"></i>Filters {(selectedWorkTypes.length + selectedKeywords.length + selectedTags.length > 0) && <span className="pm-filter-badge">{selectedWorkTypes.length + selectedKeywords.length + selectedTags.length}</span>}</h4>
+            <div className={styles.advancedFilters}>
+                <div className={styles.advancedFiltersHeader} onClick={() => setShowFilters(!showFilters)}>
+                    <h4><i className={cn('fas fa-filter', styles.iconGap)}></i>Filters {(selectedWorkTypes.length + selectedKeywords.length + selectedTags.length > 0) && <span className={styles.filterBadge}>{selectedWorkTypes.length + selectedKeywords.length + selectedTags.length}</span>}</h4>
                     <i className={`fas fa-chevron-${showFilters ? 'up' : 'down'}`}></i>
                 </div>
                 {showFilters && (
-                    <div className="pm-advanced-filters__content">
-                        <div className="pm-advanced-filters__grid">
-                            <div className="pm-filter-group">
+                    <div className={styles.advancedFiltersContent}>
+                        <div className={styles.advancedFiltersGrid}>
+                            <div className={styles.filterGroup}>
                                 <label>Work Type</label>
                                 <Select
                                     isMulti
@@ -377,7 +379,7 @@ const PatientManagement = () => {
                                     classNamePrefix="pm-select"
                                 />
                             </div>
-                            <div className="pm-filter-group">
+                            <div className={styles.filterGroup}>
                                 <label>Keywords</label>
                                 <Select
                                     isMulti
@@ -387,7 +389,7 @@ const PatientManagement = () => {
                                     classNamePrefix="pm-select"
                                 />
                             </div>
-                            <div className="pm-filter-group">
+                            <div className={styles.filterGroup}>
                                 <label>Tags</label>
                                 <Select
                                     isMulti
@@ -403,24 +405,24 @@ const PatientManagement = () => {
             </div>
 
             {hasSearched && (
-                <div className="pm-results-summary">
-                    <div className="summary-card"><h3>Results</h3><span className="summary-value">{patients.length}</span>{loading && <span className="pm-refreshing-badge"><i className="fas fa-spinner fa-spin"></i></span>}</div>
-                    <div className="pm-sort-controls">
-                        <span className="pm-sort-label">Sort:</span>
-                        <div className="pm-sort-toggle">
-                            <button className={`pm-sort-btn ${sortConfig.key === 'name' ? 'active' : ''}`} onClick={() => handleSortToggle('name')}>Name</button>
-                            <button className={`pm-sort-btn ${sortConfig.key === 'date' ? 'active' : ''}`} onClick={() => handleSortToggle('date')}>Date</button>
+                <div className={styles.resultsSummary}>
+                    <div className="summary-card"><h3>Results</h3><span className="summary-value">{patients.length}</span>{loading && <span className={styles.refreshingBadge}><i className="fas fa-spinner fa-spin"></i></span>}</div>
+                    <div className={styles.sortControls}>
+                        <span className={styles.sortLabel}>Sort:</span>
+                        <div className={styles.sortToggle}>
+                            <button className={cn(styles.sortBtn, sortConfig.key === 'name' && styles.sortBtnActive)} onClick={() => handleSortToggle('name')}>Name</button>
+                            <button className={cn(styles.sortBtn, sortConfig.key === 'date' && styles.sortBtnActive)} onClick={() => handleSortToggle('date')}>Date</button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {!hasSearched && !loading && <div className="pm-empty-state"><i className="fas fa-search"></i><h3>Start Typing to Search</h3></div>}
-            {loading && !hasSearched && <div className="pm-loading-container"><i className="fas fa-spinner fa-spin pm-loading-spinner"></i></div>}
+            {!hasSearched && !loading && <div className={styles.emptyState}><i className="fas fa-search"></i><h3>Start Typing to Search</h3></div>}
+            {loading && !hasSearched && <div className={styles.loadingContainer}><i className={cn('fas fa-spinner fa-spin', styles.loadingSpinner)}></i></div>}
 
             {hasSearched && (
-                <div className={`pm-table-container ${loading ? 'pm-table-loading-overlay' : ''}`}>
-                    <table className="pm-table">
+                <div className={cn(styles.tableContainer, loading && styles.tableLoadingOverlay)}>
+                    <table className={styles.table}>
                         <thead><tr><th>ID</th><th>Name</th><th>Phone</th><th>Date</th><th>Tag</th><th>Actions</th></tr></thead>
                         <tbody>
                             {patients.map(p => (
@@ -429,9 +431,9 @@ const PatientManagement = () => {
                                     <td data-label="Name"><strong>{p.PatientName}</strong>{p.FirstName && <div>{p.FirstName} {p.LastName}</div>}</td>
                                     <td data-label="Phone">{p.Phone || '-'}</td>
                                     <td data-label="Date">{p.DateAdded ? new Date(p.DateAdded).toLocaleDateString() : '-'}</td>
-                                    <td data-label="Tag">{p.TagName ? <span className="pm-tag-badge">{p.TagName}</span> : '-'}</td>
+                                    <td data-label="Tag">{p.TagName ? <span className={styles.tagBadge}>{p.TagName}</span> : '-'}</td>
                                     <td data-label="Actions">
-                                        <div className="pm-action-buttons">
+                                        <div className={styles.actionButtons}>
                                             <button onClick={(e) => handleQuickCheckin(e, p)} className="btn btn-icon btn-outline-success"><i className="fas fa-user-check"></i></button>
                                             <button onClick={() => navigate(`/patient/${p.PersonID}/works`)} className="btn btn-icon btn-outline-primary"><i className="fas fa-eye"></i></button>
                                             <button onClick={() => navigate(`/patient/${p.PersonID}/edit-patient`)} className="btn btn-icon btn-outline-warning"><i className="fas fa-edit"></i></button>
@@ -440,7 +442,7 @@ const PatientManagement = () => {
                                     </td>
                                 </tr>
                             ))}
-                            {patients.length === 0 && <tr><td colSpan={6} className="no-data">No results</td></tr>}
+                            {patients.length === 0 && <tr><td colSpan={6} className={styles.noData}>No results</td></tr>}
                         </tbody>
                     </table>
                 </div>
@@ -448,9 +450,9 @@ const PatientManagement = () => {
 
             {showDeleteConfirm && selectedPatient && (
                 <div className="modal-overlay">
-                    <div className="work-modal pm-modal-narrow">
+                    <div className={cn('work-modal', styles.modalNarrow)}>
                         <div className="modal-header"><h3>Confirm Delete</h3><button onClick={() => setShowDeleteConfirm(false)} className="modal-close">×</button></div>
-                        <div className="pm-delete-modal-content">
+                        <div className={styles.deleteModalContent}>
                             <p>Are you sure you want to delete <strong>{selectedPatient.PatientName}</strong>?</p>
                             <div className="form-actions">
                                 <button onClick={() => setShowDeleteConfirm(false)} className="btn btn-secondary">Cancel</button>

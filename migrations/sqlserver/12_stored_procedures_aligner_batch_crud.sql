@@ -204,9 +204,20 @@ IF OBJECT_ID('dbo.usp_UpdateAlignerBatch', 'P') IS NOT NULL
     DROP PROCEDURE dbo.usp_UpdateAlignerBatch;
 GO
 
+-- Required SET options for tables with persisted computed columns
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
+GO
+SET ANSI_PADDING ON
+GO
+SET ANSI_WARNINGS ON
+GO
+SET ARITHABORT ON
+GO
+SET CONCAT_NULL_YIELDS_NULL ON
+GO
+SET NUMERIC_ROUNDABORT OFF
 GO
 
 CREATE PROCEDURE dbo.usp_UpdateAlignerBatch
@@ -214,15 +225,19 @@ CREATE PROCEDURE dbo.usp_UpdateAlignerBatch
     @AlignerSetID INT,
     @UpperAlignerCount INT,
     @LowerAlignerCount INT,
-    @ManufactureDate DATE,
-    @DeliveredToPatientDate DATE = NULL,
     @Days INT = NULL,
     @Notes NVARCHAR(255) = NULL,
     @IsActive BIT = NULL,
     @IsLast BIT = NULL
+    -- NOTE: ManufactureDate and DeliveredToPatientDate are managed via usp_UpdateBatchStatus
 AS
 BEGIN
     SET NOCOUNT ON;
+    -- Ensure correct settings for computed columns at runtime
+    SET ANSI_WARNINGS ON;
+    SET ARITHABORT ON;
+    SET CONCAT_NULL_YIELDS_NULL ON;
+    SET NUMERIC_ROUNDABORT OFF;
 
     BEGIN TRY
         BEGIN TRANSACTION;
@@ -231,14 +246,15 @@ BEGIN
         -- STEP 1: Fetch old values
         -- ==========================================
         DECLARE @OldAlignerSetID INT, @OldUpperCount INT, @OldLowerCount INT;
-        DECLARE @OldManufactureDate DATE, @OldDays INT;
+        DECLARE @OldDays INT;
+        DECLARE @CurrentDeliveredToPatientDate DATE;  -- For IsActive validation
 
         SELECT
             @OldAlignerSetID = AlignerSetID,
             @OldUpperCount = UpperAlignerCount,
             @OldLowerCount = LowerAlignerCount,
-            @OldManufactureDate = ManufactureDate,
-            @OldDays = Days
+            @OldDays = Days,
+            @CurrentDeliveredToPatientDate = DeliveredToPatientDate
         FROM dbo.tblAlignerBatches
         WHERE AlignerBatchID = @AlignerBatchID;
 
@@ -282,22 +298,32 @@ BEGIN
         END
 
         -- ==========================================
-        -- STEP 2B: Handle IsLast auto-activation
+        -- STEP 2B: Handle IsLast and IsActive
         -- ==========================================
+        -- IsLast: Only one batch can be marked as last (planning purposes)
+        -- IsActive: Only one batch can be active, and must be delivered first
+
+        -- IsLast does NOT auto-activate anymore
         IF @IsLast = 1
         BEGIN
-            -- IsLast implies IsActive
-            SET @IsActive = 1;
-
-            -- Deactivate all other batches (both IsActive and IsLast)
+            -- Only clear IsLast from other batches (one batch can be "last")
             UPDATE dbo.tblAlignerBatches
-            SET IsActive = 0, IsLast = 0
+            SET IsLast = 0
             WHERE AlignerSetID = @AlignerSetID
-            AND AlignerBatchID != @AlignerBatchID;
+            AND AlignerBatchID != @AlignerBatchID
+            AND IsLast = 1;
         END
-        ELSE IF @IsActive = 1 AND @IsLast IS NULL
+
+        -- IsActive requires DeliveredToPatientDate
+        IF @IsActive = 1
         BEGIN
-            -- Only IsActive changed, don't touch IsLast
+            -- Validate: must be delivered first
+            IF @CurrentDeliveredToPatientDate IS NULL
+            BEGIN
+                THROW 50014, 'Cannot set IsActive: batch must be delivered first', 1;
+            END
+
+            -- Deactivate other batches
             UPDATE dbo.tblAlignerBatches
             SET IsActive = 0
             WHERE AlignerSetID = @AlignerSetID
@@ -308,12 +334,9 @@ BEGIN
         -- ==========================================
         -- STEP 3: Detect changes
         -- ==========================================
-        DECLARE @ManufactureDateChanged BIT = 0;
+        -- NOTE: ManufactureDate changes are now handled via usp_UpdateBatchStatus
         DECLARE @CountsChanged BIT = 0;
         DECLARE @DaysChanged BIT = 0;
-
-        IF @ManufactureDate != @OldManufactureDate
-            SET @ManufactureDateChanged = 1;
 
         IF @UpperAlignerCount != @OldUpperCount OR @LowerAlignerCount != @OldLowerCount
             SET @CountsChanged = 1;
@@ -326,14 +349,14 @@ BEGIN
         -- ==========================================
         -- STEP 4: Update the batch
         -- ==========================================
-        -- Note: ValidityPeriod and NextBatchReadyDate are computed columns
+        -- Note: ValidityPeriod and BatchExpiryDate are computed columns
         --       and will be automatically recalculated by SQL Server
+        -- NOTE: ManufactureDate and DeliveredToPatientDate are NOT updated here
+        --       They are managed via usp_UpdateBatchStatus
         UPDATE dbo.tblAlignerBatches
         SET
             UpperAlignerCount = @UpperAlignerCount,
             LowerAlignerCount = @LowerAlignerCount,
-            ManufactureDate = @ManufactureDate,
-            DeliveredToPatientDate = @DeliveredToPatientDate,
             Days = @Days,
             Notes = @Notes,
             IsActive = ISNULL(@IsActive, IsActive),
@@ -341,9 +364,9 @@ BEGIN
         WHERE AlignerBatchID = @AlignerBatchID;
 
         -- ==========================================
-        -- STEP 5: Resequence if ManufactureDate changed
+        -- STEP 5: Resequence if counts changed
         -- ==========================================
-        IF @ManufactureDateChanged = 1 OR @CountsChanged = 1
+        IF @CountsChanged = 1
         BEGIN
             -- Resequence ALL batches in the set
             WITH OrderedBatches AS (

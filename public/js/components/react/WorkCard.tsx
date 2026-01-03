@@ -1,6 +1,8 @@
 import { useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import cn from 'classnames';
 import { isOrthoWork, needsDetails } from '../../config/workTypeConfig';
+import styles from './WorkCard.module.css';
 
 export interface Work {
     workid: number;
@@ -33,7 +35,7 @@ export interface WorkStatus {
 
 interface WorkCardProps {
     work: Work;
-    patientId?: string;
+    personId?: number | null;
     isAlignerWork: (work: Work) => boolean;
     isExpanded: boolean;
     onToggleExpanded: () => void;
@@ -57,7 +59,7 @@ interface WorkCardProps {
 
 const WorkCard = ({
     work,
-    patientId,
+    personId,
     isAlignerWork,
     isExpanded,
     onToggleExpanded,
@@ -83,12 +85,12 @@ const WorkCard = ({
 
     const getStatusBadge = () => {
         if (work.Status === WORK_STATUS.FINISHED) {
-            return <span className="work-status-badge completed">Completed</span>;
+            return <span className={cn(styles.statusBadge, styles.statusBadgeCompleted)}>Completed</span>;
         }
         if (work.Status === WORK_STATUS.DISCONTINUED) {
-            return <span className="work-status-badge discontinued">Discontinued</span>;
+            return <span className={cn(styles.statusBadge, styles.statusBadgeDiscontinued)}>Discontinued</span>;
         }
-        return <span className="work-status-badge active">Active</span>;
+        return <span className={cn(styles.statusBadge, styles.statusBadgeActive)}>Active</span>;
     };
 
     const isActive = work.Status === WORK_STATUS.ACTIVE;
@@ -104,27 +106,27 @@ const WorkCard = ({
     };
 
     const getCardClass = (): string => {
-        if (isDiscontinued) return 'work-card-discontinued';
-        if (isFinished) return 'work-card-completed';
-        return 'work-card-active';
+        if (isDiscontinued) return styles.discontinued;
+        if (isFinished) return styles.completed;
+        return styles.active;
     };
 
     return (
-        <div className={`work-card ${getCardClass()} ${isExpanded ? 'expanded' : 'collapsed'}`}>
+        <div className={cn(styles.card, getCardClass(), isExpanded ? styles.expanded : styles.collapsed)}>
             {/* Minimal Header - Always Visible */}
-            <div className="work-card-collapsed-header" onClick={onToggleExpanded}>
-                <div className="work-card-title-section">
-                    <div className="work-card-title">
-                        <i className={`fas fa-chevron-${isExpanded ? 'down' : 'right'} chevron-icon`}></i>
+            <div className={styles.collapsedHeader} onClick={onToggleExpanded}>
+                <div className={styles.titleSection}>
+                    <div className={styles.title}>
+                        <i className={cn('fas', isExpanded ? 'fa-chevron-down' : 'fa-chevron-right', styles.chevronIcon)}></i>
                         <i className="fas fa-tooth"></i>
                         <h3>{work.TypeName || 'Other Treatment'}</h3>
                         {getStatusBadge()}
                     </div>
-                    <div className="work-card-meta-minimal">
+                    <div className={styles.metaMinimal}>
                         <span><i className="fas fa-user-md"></i> {work.DoctorName ? (work.DoctorName === 'Admin' ? work.DoctorName : `Dr. ${work.DoctorName}`) : 'Not assigned'}</span>
                         <span><i className="fas fa-calendar-plus"></i> {formatDate(work.AdditionDate)}</span>
                         {!isExpanded && getRemainingBalance() > 0 && (
-                            <span className="balance-indicator">
+                            <span className={styles.balanceIndicator}>
                                 <i className="fas fa-exclamation-circle"></i> Balance: {formatCurrency(getRemainingBalance(), work.Currency)}
                             </span>
                         )}
@@ -134,7 +136,7 @@ const WorkCard = ({
 
             {/* Actions Menu - Show when expanded */}
             {isExpanded && (
-                <div className="work-card-actions-menu">
+                <div className={styles.actionsMenu}>
                     <button
                         type="button"
                         className="btn-icon"
@@ -147,7 +149,7 @@ const WorkCard = ({
                         <i className="fas fa-ellipsis-v"></i>
                     </button>
                     {showActions && (
-                        <div className="work-card-dropdown">
+                        <div className={styles.dropdown}>
                             <button type="button" onClick={() => { onEdit(work); setShowActions(false); }}>
                                 <i className="fas fa-edit"></i> Edit Work
                             </button>
@@ -168,7 +170,7 @@ const WorkCard = ({
                             )}
                             <button
                                 type="button"
-                                className="dropdown-delete-btn"
+                                className={styles.dropdownDeleteBtn}
                                 onClick={() => { onDelete(work); setShowActions(false); }}
                             >
                                 <i className="fas fa-trash-alt"></i> Delete Work
@@ -180,34 +182,34 @@ const WorkCard = ({
 
             {/* Full Content - Only Visible When Expanded */}
             {isExpanded && (
-                <div className="work-card-full-content">
+                <div className={styles.fullContent}>
                     {/* Progress Section */}
-                    <div className="work-card-progress">
-                        <div className="progress-info">
-                            <span className="progress-label">Treatment Progress</span>
-                            <span className="progress-percentage">{getProgressPercentage(work)}%</span>
+                    <div className={styles.progress}>
+                        <div className={styles.progressInfo}>
+                            <span className={styles.progressLabel}>Treatment Progress</span>
+                            <span className={styles.progressPercentage}>{getProgressPercentage(work)}%</span>
                         </div>
-                        <div className="progress-bar-container">
+                        <div className={styles.progressBarContainer}>
                             <div
-                                className="progress-bar-fill"
+                                className={styles.progressBarFill}
                                 style={{ width: `${getProgressPercentage(work)}%` }}
                             ></div>
                         </div>
                     </div>
 
                     {/* Financial Summary */}
-                    <div className="work-card-financial">
-                        <div className="financial-item">
-                            <span className="financial-label">Total Cost</span>
-                            <span className="financial-value">{formatCurrency(work.TotalRequired, work.Currency)}</span>
+                    <div className={styles.financial}>
+                        <div className={styles.financialItem}>
+                            <span className={styles.financialLabel}>Total Cost</span>
+                            <span className={styles.financialValue}>{formatCurrency(work.TotalRequired, work.Currency)}</span>
                         </div>
-                        <div className="financial-item">
-                            <span className="financial-label">Paid</span>
-                            <span className="financial-value paid">{formatCurrency(work.TotalPaid, work.Currency)}</span>
+                        <div className={styles.financialItem}>
+                            <span className={styles.financialLabel}>Paid</span>
+                            <span className={cn(styles.financialValue, styles.financialValuePaid)}>{formatCurrency(work.TotalPaid, work.Currency)}</span>
                         </div>
-                        <div className="financial-item">
-                            <span className="financial-label">Remaining</span>
-                            <span className={`financial-value ${isFullyPaid() ? 'paid-full' : 'remaining'}`}>
+                        <div className={styles.financialItem}>
+                            <span className={styles.financialLabel}>Remaining</span>
+                            <span className={cn(styles.financialValue, isFullyPaid() ? styles.financialValuePaidFull : styles.financialValueRemaining)}>
                                 {formatCurrency(getRemainingBalance(), work.Currency)}
                             </span>
                         </div>
@@ -215,27 +217,27 @@ const WorkCard = ({
 
                     {/* Additional Details */}
                     {(work.Notes || work.EstimatedDuration || work.DebondDate || work.StartDate) && (
-                        <div className="work-card-additional-info">
+                        <div className={styles.additionalInfo}>
                             {work.StartDate && (
-                                <div className="info-item">
+                                <div className={styles.infoItem}>
                                     <i className="fas fa-play-circle"></i>
                                     <span>Started: {formatDate(work.StartDate)}</span>
                                 </div>
                             )}
                             {work.EstimatedDuration && (
-                                <div className="info-item">
+                                <div className={styles.infoItem}>
                                     <i className="fas fa-clock"></i>
                                     <span>Duration: {work.EstimatedDuration} months</span>
                                 </div>
                             )}
                             {work.DebondDate && (
-                                <div className="info-item">
+                                <div className={styles.infoItem}>
                                     <i className="fas fa-calendar-check"></i>
                                     <span>Debond: {formatDate(work.DebondDate)}</span>
                                 </div>
                             )}
                             {work.Notes && (
-                                <div className="info-item full-width">
+                                <div className={cn(styles.infoItem, styles.infoItemFullWidth)}>
                                     <i className="fas fa-sticky-note"></i>
                                     <span>{work.Notes}</span>
                                 </div>
@@ -244,7 +246,7 @@ const WorkCard = ({
                     )}
 
                     {/* Primary Actions - Conditionally show based on work type */}
-                    <div className="work-card-primary-actions">
+                    <div className={styles.primaryActions}>
                         {/* Visits & Diagnosis only for ortho-related works */}
                         {isOrthoWork(work.Typeofwork) && (
                             <>
@@ -269,7 +271,7 @@ const WorkCard = ({
                                 <button
                                     type="button"
                                     className="btn btn-card-action btn-diagnosis"
-                                    onClick={() => navigate(`/patient/${patientId}/work/${work.workid}/diagnosis`)}
+                                    onClick={() => navigate(`/patient/${personId}/work/${work.workid}/diagnosis`)}
                                     title="View diagnosis and treatment plan"
                                 >
                                     <i className="fas fa-stethoscope"></i>
@@ -304,10 +306,10 @@ const WorkCard = ({
                     </div>
 
                     {/* Secondary Actions */}
-                    <div className="work-card-secondary-actions">
+                    <div className={styles.secondaryActions}>
                         <button
                             type="button"
-                            className={`btn btn-card-secondary btn-add-payment ${isFullyPaid() ? 'disabled' : ''}`}
+                            className={cn('btn btn-card-secondary btn-add-payment', isFullyPaid() && 'disabled')}
                             onClick={() => !isFullyPaid() && onAddPayment(work)}
                             disabled={isFullyPaid()}
                             title={isFullyPaid() ? "No balance remaining" : "Add payment for this work"}

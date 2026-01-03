@@ -6,6 +6,7 @@
 
 import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
+import styles from './NewWorkComponent.module.css';
 
 interface WorkType {
     ID: number;
@@ -77,7 +78,7 @@ interface WorkResponse {
 }
 
 interface NewWorkComponentProps {
-    patientId?: string;
+    personId?: number | null;
     workId?: number | null;
     onSave?: (result: WorkResponse) => void;
     onCancel?: () => void;
@@ -85,7 +86,7 @@ interface NewWorkComponentProps {
 
 type TabType = 'basic' | 'dates' | 'keywords';
 
-const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWorkComponentProps) => {
+const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWorkComponentProps) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
@@ -99,7 +100,7 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
 
     // Form state
     const [formData, setFormData] = useState<WorkFormData>({
-        PersonID: patientId ?? '',
+        PersonID: personId ? String(personId) : '',
         TotalRequired: 0, // Default to 0 instead of empty string (matches DB default)
         Currency: 'USD',
         Typeofwork: '',
@@ -130,7 +131,7 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
         if (workId) {
             loadWorkData();
         }
-    }, [patientId, workId]);
+    }, [personId, workId]);
 
     // Auto-format display value when formData changes
     useEffect(() => {
@@ -165,14 +166,14 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
     };
 
     const loadWorkData = async () => {
-        if (!patientId || patientId === 'new') {
+        if (!personId) {
             setLoading(false);
             return;
         }
 
         try {
             setLoading(true);
-            const response = await fetch(`/api/getworks?code=${patientId}`);
+            const response = await fetch(`/api/getworks?code=${personId}`);
             if (!response.ok) throw new Error('Failed to fetch work data');
             const works: WorkResponse[] = await response.json();
             const work = works.find(w => w.workid === workId);
@@ -357,16 +358,16 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
 
     if (loading && workId) {
         return (
-            <div className="new-work-loading">
+            <div className={styles.newWorkLoading}>
                 <i className="fas fa-spinner fa-spin"></i> Loading work data...
             </div>
         );
     }
 
     return (
-        <div className="new-work-component">
+        <div className={styles.newWorkComponent}>
             {/* Header */}
-            <div className="new-work-header">
+            <div className={styles.newWorkHeader}>
                 <h3>
                     <i className="fas fa-tooth"></i> {workId ? 'Edit Work' : 'Add New Work'}
                 </h3>
@@ -374,41 +375,41 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
 
             {/* Error Display */}
             {error && (
-                <div className="new-work-error">
+                <div className={styles.newWorkError}>
                     <i className="fas fa-exclamation-circle"></i> {error}
-                    <button onClick={() => setError(null)} className="error-close">×</button>
+                    <button onClick={() => setError(null)} className={styles.errorClose}>×</button>
                 </div>
             )}
 
             {/* Confirmation Dialog for Duplicate Active Work */}
             {showConfirmDialog && existingWorkData && (
-                <div className="confirmation-dialog-overlay">
-                    <div className="confirmation-dialog">
-                        <div className="confirmation-header">
+                <div className={styles.confirmationDialogOverlay}>
+                    <div className={styles.confirmationDialog}>
+                        <div className={styles.confirmationHeader}>
                             <i className="fas fa-exclamation-triangle"></i>
                             <h3>Active Work Already Exists</h3>
                         </div>
-                        <div className="confirmation-body">
+                        <div className={styles.confirmationBody}>
                             <p>This patient already has an active work record:</p>
-                            <div className="existing-work-details">
-                                <div className="detail-row">
+                            <div className={styles.existingWorkDetails}>
+                                <div className={styles.detailRow}>
                                     <strong>Work Type:</strong> {existingWorkData.typeName || `Type ${existingWorkData.typeOfWork}`}
                                 </div>
-                                <div className="detail-row">
+                                <div className={styles.detailRow}>
                                     <strong>Doctor:</strong> {existingWorkData.doctor || 'N/A'}
                                 </div>
-                                <div className="detail-row">
+                                <div className={styles.detailRow}>
                                     <strong>Total Required:</strong> {existingWorkData.totalRequired} {existingWorkData.currency}
                                 </div>
-                                <div className="detail-row">
+                                <div className={styles.detailRow}>
                                     <strong>Added:</strong> {existingWorkData.additionDate ? new Date(existingWorkData.additionDate).toLocaleDateString() : 'N/A'}
                                 </div>
                             </div>
-                            <p className="confirmation-question">
+                            <p className={styles.confirmationQuestion}>
                                 Would you like to finish the existing work and add this new one?
                             </p>
                         </div>
-                        <div className="confirmation-actions">
+                        <div className={styles.confirmationActions}>
                             <button
                                 onClick={handleFinishExistingAndAddNew}
                                 className="btn btn-primary"
@@ -430,45 +431,45 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
 
             {/* Confirmation Dialog for Finished Work with Invoice */}
             {showFinishedWorkConfirm && (
-                <div className="confirmation-dialog-overlay">
-                    <div className="confirmation-dialog">
-                        <div className="confirmation-header">
+                <div className={styles.confirmationDialogOverlay}>
+                    <div className={styles.confirmationDialog}>
+                        <div className={styles.confirmationHeader}>
                             <i className="fas fa-check-circle"></i>
                             <h3>Confirm Completed Work Creation</h3>
                         </div>
-                        <div className="confirmation-body">
+                        <div className={styles.confirmationBody}>
                             <p>You are about to create:</p>
-                            <div className="existing-work-details">
-                                <div className="detail-section">
+                            <div className={styles.existingWorkDetails}>
+                                <div className={styles.detailSection}>
                                     <h4><i className="fas fa-tooth"></i> New Work (FINISHED)</h4>
-                                    <div className="detail-row">
+                                    <div className={styles.detailRow}>
                                         <strong>Type:</strong> {workTypes.find(t => String(t.ID) === formData.Typeofwork)?.WorkType || 'N/A'}
                                     </div>
-                                    <div className="detail-row">
+                                    <div className={styles.detailRow}>
                                         <strong>Doctor:</strong> {doctors.find(d => String(d.ID) === formData.DrID)?.employeeName || 'N/A'}
                                     </div>
-                                    <div className="detail-row">
+                                    <div className={styles.detailRow}>
                                         <strong>Total:</strong> {formData.TotalRequired} {formData.Currency}
                                     </div>
-                                    <div className="detail-row">
-                                        <strong>Status:</strong> <span className="status-completed">Completed</span>
+                                    <div className={styles.detailRow}>
+                                        <strong>Status:</strong> <span className={styles.statusCompleted}>Completed</span>
                                     </div>
                                 </div>
-                                <div className="detail-section">
+                                <div className={styles.detailSection}>
                                     <h4><i className="fas fa-file-invoice-dollar"></i> Full Payment Invoice</h4>
-                                    <div className="detail-row">
+                                    <div className={styles.detailRow}>
                                         <strong>Amount:</strong> {formData.TotalRequired} {formData.Currency}
                                     </div>
-                                    <div className="detail-row">
+                                    <div className={styles.detailRow}>
                                         <strong>Date:</strong> Today ({new Date().toLocaleDateString()})
                                     </div>
                                 </div>
                             </div>
-                            <p className="confirmation-question">
+                            <p className={styles.confirmationQuestion}>
                                 <strong>This work will be marked as fully paid and finished immediately.</strong>
                             </p>
                         </div>
-                        <div className="confirmation-actions">
+                        <div className={styles.confirmationActions}>
                             <button
                                 onClick={handleConfirmFinishedWork}
                                 className="btn btn-primary"
@@ -489,9 +490,9 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
             )}
 
             {/* Form */}
-            <form onSubmit={handleFormSubmit} className="new-work-form">
+            <form onSubmit={handleFormSubmit} className={styles.newWorkForm}>
                 {/* Top Action Buttons */}
-                <div className="form-actions top-actions">
+                <div className={`${styles.formActions} ${styles.topActions}`}>
                     <button type="submit" className="btn btn-primary" disabled={loading}>
                         <i className="fas fa-save"></i> {loading ? 'Saving...' : (workId ? 'Update' : 'Add Work')}
                     </button>
@@ -503,24 +504,24 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                 </div>
 
                 {/* Tabs */}
-                <div className="work-tabs">
+                <div className={styles.workTabs}>
                     <button
                         type="button"
-                        className={`work-tab ${activeTab === 'basic' ? 'active' : ''}`}
+                        className={`${styles.workTab} ${activeTab === 'basic' ? styles.workTabActive : ''}`}
                         onClick={() => setActiveTab('basic')}
                     >
                         <i className="fas fa-info-circle"></i> Basic Info
                     </button>
                     <button
                         type="button"
-                        className={`work-tab ${activeTab === 'dates' ? 'active' : ''}`}
+                        className={`${styles.workTab} ${activeTab === 'dates' ? styles.workTabActive : ''}`}
                         onClick={() => setActiveTab('dates')}
                     >
                         <i className="fas fa-calendar"></i> Dates
                     </button>
                     <button
                         type="button"
-                        className={`work-tab ${activeTab === 'keywords' ? 'active' : ''}`}
+                        className={`${styles.workTab} ${activeTab === 'keywords' ? styles.workTabActive : ''}`}
                         onClick={() => setActiveTab('keywords')}
                     >
                         <i className="fas fa-tags"></i> Keywords
@@ -528,10 +529,10 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                 </div>
 
                 {/* Tab 1: Basic Information */}
-                <div className={`tab-content ${activeTab === 'basic' ? 'active' : ''}`}>
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label>Work Type <span className="required">*</span></label>
+                <div className={`${styles.tabContent} ${activeTab === 'basic' ? styles.tabContentActive : ''}`}>
+                    <div className={styles.formRow}>
+                        <div className={styles.formGroup}>
+                            <label>Work Type <span className={styles.required}>*</span></label>
                             <select
                                 value={formData.Typeofwork}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, Typeofwork: e.target.value})}
@@ -546,8 +547,8 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                             </select>
                         </div>
 
-                        <div className="form-group">
-                            <label>Doctor <span className="required">*</span></label>
+                        <div className={styles.formGroup}>
+                            <label>Doctor <span className={styles.required}>*</span></label>
                             <select
                                 value={formData.DrID}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, DrID: e.target.value})}
@@ -564,9 +565,9 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                     </div>
 
                     {workId && (
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label>Status <span className="required">*</span></label>
+                        <div className={styles.formRow}>
+                            <div className={styles.formGroup}>
+                                <label>Status <span className={styles.required}>*</span></label>
                                 <select
                                     value={formData.Status}
                                     onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, Status: parseInt(e.target.value)})}
@@ -577,12 +578,12 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                                     <option value={3}>Discontinued</option>
                                 </select>
                                 {formData.Status === 2 && (
-                                    <small className="form-hint text-warning">
+                                    <small className={`${styles.formHint} ${styles.textWarning}`}>
                                         <i className="fas fa-exclamation-triangle"></i> Finishing a work marks the treatment as completed
                                     </small>
                                 )}
                                 {formData.Status === 3 && (
-                                    <small className="form-hint text-warning">
+                                    <small className={`${styles.formHint} ${styles.textWarning}`}>
                                         <i className="fas fa-exclamation-triangle"></i> Discontinuing a work indicates the patient abandoned treatment
                                     </small>
                                 )}
@@ -590,8 +591,8 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                         </div>
                     )}
 
-                    <div className="form-row">
-                        <div className="form-group">
+                    <div className={styles.formRow}>
+                        <div className={styles.formGroup}>
                             <label>Total Required</label>
                             <input
                                 type="text"
@@ -608,7 +609,7 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                             />
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label>Currency</label>
                             <select
                                 value={formData.Currency}
@@ -622,9 +623,9 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                     </div>
 
                     {!workId && (
-                        <div className="form-row">
-                            <div className="form-group full-width">
-                                <label className="checkbox-label">
+                        <div className={styles.formRow}>
+                            <div className={`${styles.formGroup} ${styles.fullWidth}`}>
+                                <label className={styles.checkboxLabel}>
                                     <input
                                         type="checkbox"
                                         checked={formData.createAsFinished}
@@ -635,15 +636,15 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                                         <i className="fas fa-check-circle"></i> Mark as fully paid and finished
                                     </span>
                                 </label>
-                                <small className="form-hint">
+                                <small className={styles.formHint}>
                                     Creates an invoice for the full amount and marks the work as completed
                                 </small>
                             </div>
                         </div>
                     )}
 
-                    <div className="form-row">
-                        <div className="form-group">
+                    <div className={styles.formRow}>
+                        <div className={styles.formGroup}>
                             <label>Start Date</label>
                             <input
                                 type="date"
@@ -652,7 +653,7 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                             />
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label>Estimated Duration (months)</label>
                             <input
                                 type="number"
@@ -664,7 +665,7 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                         </div>
                     </div>
 
-                    <div className="form-group full-width">
+                    <div className={`${styles.formGroup} ${styles.fullWidth}`}>
                         <label>Notes</label>
                         <textarea
                             value={formData.Notes}
@@ -676,9 +677,9 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                 </div>
 
                 {/* Tab 2: Dates */}
-                <div className={`tab-content ${activeTab === 'dates' ? 'active' : ''}`}>
-                    <div className="form-row">
-                        <div className="form-group">
+                <div className={`${styles.tabContent} ${activeTab === 'dates' ? styles.tabContentActive : ''}`}>
+                    <div className={styles.formRow}>
+                        <div className={styles.formGroup}>
                             <label>Initial Photo Date</label>
                             <input
                                 type="date"
@@ -687,7 +688,7 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                             />
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label>Final Photo Date</label>
                             <input
                                 type="date"
@@ -697,8 +698,8 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                         </div>
                     </div>
 
-                    <div className="form-row">
-                        <div className="form-group">
+                    <div className={styles.formRow}>
+                        <div className={styles.formGroup}>
                             <label>Debond Date</label>
                             <input
                                 type="date"
@@ -707,7 +708,7 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                             />
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label>Notes Date</label>
                             <input
                                 type="date"
@@ -719,18 +720,18 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                 </div>
 
                 {/* Tab 3: Keywords */}
-                <div className={`tab-content ${activeTab === 'keywords' ? 'active' : ''}`}>
-                    <div className="keywords-section">
-                        <p className="section-hint">
+                <div className={`${styles.tabContent} ${activeTab === 'keywords' ? styles.tabContentActive : ''}`}>
+                    <div className={styles.keywordsSection}>
+                        <p className={styles.sectionHint}>
                             <i className="fas fa-info-circle"></i> Select up to 5 keywords to categorize this work
                         </p>
-                        <div className="keywords-grid">
+                        <div className={styles.keywordsGrid}>
                             {([1, 2, 3, 4, 5] as const).map(num => {
                                 // Get the keyword field value with proper type handling
                                 const keywordField = num === 3 ? 'KeywordID3' : `KeyWordID${num}` as keyof WorkFormData;
                                 const keywordValue = String(formData[keywordField] || '');
                                 return (
-                                <div key={num} className="form-group">
+                                <div key={num} className={styles.formGroup}>
                                     <label>Keyword {num}</label>
                                     <select
                                         value={keywordValue}
@@ -754,7 +755,7 @@ const NewWorkComponent = ({ patientId, workId = null, onSave, onCancel }: NewWor
                 </div>
 
                 {/* Bottom Form Actions */}
-                <div className="form-actions">
+                <div className={styles.formActions}>
                     <button type="submit" className="btn btn-primary" disabled={loading}>
                         <i className="fas fa-save"></i> {loading ? 'Saving...' : (workId ? 'Update Work' : 'Add Work')}
                     </button>

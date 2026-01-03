@@ -12,6 +12,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import styles from './LabelPreviewModal.module.css';
 
 const LABELS_PER_SHEET = 12;
 
@@ -48,7 +49,7 @@ interface Patient {
 interface QueuedItem {
     id: string;
     batchNumber: number;
-    patientId: string | number;
+    personId: number;
     patientName: string;
     doctorName?: string;
     doctorLogoPath?: string;
@@ -63,7 +64,7 @@ interface QueueBatch extends QueuedItem {
 }
 
 interface PatientGroup {
-    patientId: string | number;
+    personId: number;
     patientName: string;
     batches: QueueBatch[];
 }
@@ -263,16 +264,16 @@ const LabelPreviewModal = ({
     // Group queue batches by patient
     const groupedQueueBatches = useMemo((): PatientGroup[] => {
         if (!queueMode) return [];
-        const groups: Record<string | number, PatientGroup> = {};
+        const groups: Record<number, PatientGroup> = {};
         queueBatches.forEach(batch => {
-            if (!groups[batch.patientId]) {
-                groups[batch.patientId] = {
-                    patientId: batch.patientId,
+            if (!groups[batch.personId]) {
+                groups[batch.personId] = {
+                    personId: batch.personId,
                     patientName: batch.patientName,
                     batches: []
                 };
             }
-            groups[batch.patientId].batches.push(batch);
+            groups[batch.personId].batches.push(batch);
         });
         return Object.values(groups);
     }, [queueMode, queueBatches]);
@@ -282,7 +283,7 @@ const LabelPreviewModal = ({
         if (!queueMode) return null;
         return {
             batchCount: queueBatches.length,
-            patientCount: new Set(queueBatches.map(b => b.patientId)).size,
+            patientCount: new Set(queueBatches.map(b => b.personId)).size,
             totalLabels
         };
     }, [queueMode, queueBatches, totalLabels]);
@@ -536,12 +537,20 @@ const LabelPreviewModal = ({
         }
     };
 
-    // Get label type for styling
-    const getQueueLabelType = (text: string): string => {
-        if (text.includes('/')) return 'combined';
-        if (text.toUpperCase().startsWith('U')) return 'upper';
-        if (text.toUpperCase().startsWith('L')) return 'lower';
-        return 'custom';
+    // Get label type class for styling
+    const getQueueLabelTypeClass = (text: string): string => {
+        if (text.includes('/')) return styles.queueLabelChipCombined;
+        if (text.toUpperCase().startsWith('U')) return styles.queueLabelChipUpper;
+        if (text.toUpperCase().startsWith('L')) return styles.queueLabelChipLower;
+        return styles.queueLabelChipCustom;
+    };
+
+    // Get label item type class for styling
+    const getLabelItemTypeClass = (text: string): string => {
+        if (text.includes('/')) return styles.labelItemCombined;
+        if (text.toUpperCase().startsWith('U')) return styles.labelItemUpper;
+        if (text.toUpperCase().startsWith('L')) return styles.labelItemLower;
+        return styles.labelItemCustom;
     };
 
     if (!isModalOpen) return null;
@@ -556,14 +565,14 @@ const LabelPreviewModal = ({
 
     // Shared: Position selector and stats
     const renderPositionAndStats = () => (
-        <div className="label-preview-right">
+        <div className={styles.right}>
             {/* Arabic Font Selector */}
-            <div className="form-group">
+            <div className={styles.formGroup}>
                 <label>Arabic Font</label>
                 <select
                     value={arabicFont}
                     onChange={(e: ChangeEvent<HTMLSelectElement>) => setArabicFont(e.target.value)}
-                    className="font-selector"
+                    className={styles.fontSelector}
                 >
                     {ARABIC_FONTS.map(font => (
                         <option key={font.id} value={font.id}>
@@ -574,11 +583,11 @@ const LabelPreviewModal = ({
             </div>
 
             {/* Starting Position Selector */}
-            <div className="position-selector">
+            <div className={styles.positionSelector}>
                 <h3>Starting Position</h3>
-                <p className="position-hint">Select where to start on the label sheet (OL291)</p>
+                <p className={styles.positionHint}>Select where to start on the label sheet (OL291)</p>
 
-                <div className="position-grid">
+                <div className={styles.positionGrid}>
                     {Array.from({ length: LABELS_PER_SHEET }, (_, i) => i + 1).map(pos => {
                         const isSelected = pos === startingPosition;
                         const labelsOnFirstPage = Math.min(totalLabels, LABELS_PER_SHEET - startingPosition + 1);
@@ -587,7 +596,7 @@ const LabelPreviewModal = ({
                         return (
                             <button
                                 key={pos}
-                                className={`position-cell ${isSelected ? 'selected' : ''} ${isUsed && !isSelected ? 'will-use' : ''}`}
+                                className={`${styles.positionCell} ${isSelected ? styles.positionCellSelected : ''} ${isUsed && !isSelected ? styles.positionCellWillUse : ''}`}
                                 onClick={() => setStartingPosition(pos)}
                                 title={`Position ${pos}`}
                             >
@@ -597,31 +606,31 @@ const LabelPreviewModal = ({
                     })}
                 </div>
 
-                <div className="position-legend">
-                    <span className="legend-item">
-                        <span className="legend-color selected"></span>
+                <div className={styles.positionLegend}>
+                    <span className={styles.legendItem}>
+                        <span className={`${styles.legendColor} ${styles.legendColorSelected}`}></span>
                         Start
                     </span>
-                    <span className="legend-item">
-                        <span className="legend-color will-use"></span>
+                    <span className={styles.legendItem}>
+                        <span className={`${styles.legendColor} ${styles.legendColorWillUse}`}></span>
                         Used
                     </span>
                 </div>
             </div>
 
             {/* Stats */}
-            <div className="print-stats">
-                <div className="stat-item">
-                    <span className="stat-label">Total Labels</span>
-                    <span className="stat-value">{totalLabels}</span>
+            <div className={styles.printStats}>
+                <div className={styles.statItem}>
+                    <span className={styles.statLabel}>Total Labels</span>
+                    <span className={styles.statValue}>{totalLabels}</span>
                 </div>
-                <div className="stat-item">
-                    <span className="stat-label">Pages</span>
-                    <span className="stat-value">{totalPages}</span>
+                <div className={styles.statItem}>
+                    <span className={styles.statLabel}>Pages</span>
+                    <span className={styles.statValue}>{totalPages}</span>
                 </div>
-                <div className="stat-item">
-                    <span className="stat-label">Next Pos</span>
-                    <span className="stat-value">{nextPosition}</span>
+                <div className={styles.statItem}>
+                    <span className={styles.statLabel}>Next Pos</span>
+                    <span className={styles.statValue}>{nextPosition}</span>
                 </div>
             </div>
         </div>
@@ -630,70 +639,70 @@ const LabelPreviewModal = ({
     // Queue mode render
     if (queueMode) {
         return (
-            <div className="label-preview-modal-overlay" onClick={handleOverlayClick}>
-                <div className="label-preview-modal label-preview-modal-wide" onClick={e => e.stopPropagation()}>
+            <div className={styles.overlay} onClick={handleOverlayClick}>
+                <div className={`${styles.modal} ${styles.modalWide}`} onClick={e => e.stopPropagation()}>
                     {/* Header */}
-                    <div className="label-preview-header queue-mode-header">
+                    <div className={`${styles.header} ${styles.queueModeHeader}`}>
                         <h2>
                             <i className="fas fa-layer-group"></i>
                             Print Queue
-                            <span className="queue-header-stats">
+                            <span className={styles.queueHeaderStats}>
                                 {queueStats?.patientCount} {queueStats?.patientCount === 1 ? 'patient' : 'patients'} &bull; {queueStats?.batchCount} {queueStats?.batchCount === 1 ? 'batch' : 'batches'} &bull; {queueStats?.totalLabels} labels
                             </span>
                         </h2>
-                        <button className="modal-close-btn" onClick={onClose}>
+                        <button className={styles.closeBtn} onClick={onClose}>
                             <i className="fas fa-times"></i>
                         </button>
                     </div>
 
                     {/* Content */}
-                    <div className="label-preview-content queue-mode-content">
+                    <div className={`${styles.content} ${styles.queueModeContent}`}>
                         {/* Left: Queue batches */}
-                        <div className="label-preview-queue-batches">
+                        <div className={styles.queueBatches}>
                             <h3>Batches to Print</h3>
-                            <p className="queue-hint">
+                            <p className={styles.queueHint}>
                                 <i className="fas fa-info-circle"></i>
                                 Click batch to expand and edit labels. Labels are printed in order shown.
                             </p>
 
-                            <div className="queue-patient-groups">
+                            <div className={styles.queuePatientGroups}>
                                 {groupedQueueBatches.map(group => (
-                                    <div key={group.patientId} className="queue-patient-group">
-                                        <div className="queue-patient-header">
+                                    <div key={group.personId} className={styles.queuePatientGroup}>
+                                        <div className={styles.queuePatientHeader}>
                                             <i className="fas fa-user"></i>
-                                            <span className="queue-patient-name">{group.patientName}</span>
+                                            <span className={styles.queuePatientName}>{group.patientName}</span>
                                         </div>
-                                        <div className="queue-patient-batches">
+                                        <div className={styles.queuePatientBatches}>
                                             {group.batches.map(batchItem => {
                                                 const isExpanded = expandedBatchId === batchItem.id;
                                                 return (
-                                                    <div key={batchItem.id} className={`queue-batch-item ${isExpanded ? 'expanded' : ''}`}>
+                                                    <div key={batchItem.id} className={`${styles.queueBatchItem} ${isExpanded ? styles.queueBatchItemExpanded : ''}`}>
                                                         {/* Batch header - clickable to expand */}
                                                         <div
-                                                            className="queue-batch-header"
+                                                            className={styles.queueBatchHeader}
                                                             onClick={() => toggleBatchExpansion(batchItem.id)}
                                                         >
-                                                            <div className="queue-batch-info">
-                                                                <i className={`fas fa-chevron-${isExpanded ? 'down' : 'right'} expand-icon`}></i>
-                                                                <span className="queue-batch-number">Batch #{batchItem.batchNumber}</span>
-                                                                <span className="queue-batch-labels">{batchItem.labels.length} labels</span>
+                                                            <div className={styles.queueBatchInfo}>
+                                                                <i className={`fas fa-chevron-${isExpanded ? 'down' : 'right'} ${styles.expandIcon}`}></i>
+                                                                <span className={styles.queueBatchNumber}>Batch #{batchItem.batchNumber}</span>
+                                                                <span className={styles.queueBatchLabels}>{batchItem.labels.length} labels</span>
                                                                 {batchItem.doctorName && (
-                                                                    <span className="queue-batch-doctor">{batchItem.doctorName}</span>
+                                                                    <span className={styles.queueBatchDoctor}>{batchItem.doctorName}</span>
                                                                 )}
                                                             </div>
-                                                            <div className="queue-batch-actions" onClick={e => e.stopPropagation()}>
-                                                                <label className="queue-logo-toggle" title="Include logo">
+                                                            <div className={styles.queueBatchActions} onClick={e => e.stopPropagation()}>
+                                                                <label className={styles.queueLogoToggle} title="Include logo">
                                                                     <input
                                                                         type="checkbox"
                                                                         checked={batchItem.includeLogo}
                                                                         onChange={() => toggleQueueBatchLogo(batchItem.id)}
                                                                     />
-                                                                    <span className="checkbox-icon">
+                                                                    <span className={styles.checkboxIcon}>
                                                                         <i className={batchItem.includeLogo ? 'fas fa-image' : 'far fa-image'}></i>
                                                                     </span>
                                                                 </label>
                                                                 <button
-                                                                    className="queue-batch-remove"
+                                                                    className={styles.queueBatchRemove}
                                                                     onClick={() => removeQueueBatch(batchItem.id)}
                                                                     title="Remove batch"
                                                                 >
@@ -704,48 +713,48 @@ const LabelPreviewModal = ({
 
                                                         {/* Collapsed view - show label chips */}
                                                         {!isExpanded && (
-                                                            <div className="queue-batch-label-list">
+                                                            <div className={styles.queueBatchLabelList}>
                                                                 {batchItem.labels.map((label, idx) => (
-                                                                    <span key={idx} className={`queue-label-chip ${getQueueLabelType(label)}`}>{label}</span>
+                                                                    <span key={idx} className={`${styles.queueLabelChip} ${getQueueLabelTypeClass(label)}`}>{label}</span>
                                                                 ))}
                                                                 {batchItem.labels.length === 0 && (
-                                                                    <span className="queue-no-labels">No labels</span>
+                                                                    <span className={styles.queueNoLabels}>No labels</span>
                                                                 )}
                                                             </div>
                                                         )}
 
                                                         {/* Expanded view - full label editor */}
                                                         {isExpanded && (
-                                                            <div className="queue-batch-editor">
+                                                            <div className={styles.queueBatchEditor}>
                                                                 {/* Combined header */}
-                                                                <div className="queue-editor-header">
-                                                                    <span className="editor-title">Labels ({batchItem.labels.length})</span>
+                                                                <div className={styles.queueEditorHeader}>
+                                                                    <span className={styles.editorTitle}>Labels ({batchItem.labels.length})</span>
                                                                     <input
                                                                         type="text"
                                                                         value={queueNewLabelText}
                                                                         onChange={(e) => setQueueNewLabelText(e.target.value)}
                                                                         onKeyDown={(e) => handleQueueNewLabelKeyDown(e, batchItem.id)}
                                                                         placeholder="Add (U7, L5...)"
-                                                                        className="add-label-input"
+                                                                        className={styles.addLabelInput}
                                                                     />
                                                                     <button
-                                                                        className="btn-add-label"
+                                                                        className={styles.btnAddLabel}
                                                                         onClick={() => addLabelToQueueBatch(batchItem.id)}
                                                                         disabled={!queueNewLabelText.trim()}
                                                                         title="Add label"
                                                                     >
                                                                         <i className="fas fa-plus"></i>
                                                                     </button>
-                                                                    <div className="queue-editor-actions">
+                                                                    <div className={styles.queueEditorActions}>
                                                                         <button
-                                                                            className="btn-reset-labels"
+                                                                            className={styles.btnResetLabels}
                                                                             onClick={() => resetQueueBatchLabels(batchItem.id)}
                                                                             title="Reset to original"
                                                                         >
                                                                             <i className="fas fa-undo"></i>
                                                                         </button>
                                                                         <button
-                                                                            className="btn-clear-labels"
+                                                                            className={styles.btnClearLabels}
                                                                             onClick={() => clearQueueBatchLabels(batchItem.id)}
                                                                             title="Clear all"
                                                                         >
@@ -755,12 +764,12 @@ const LabelPreviewModal = ({
                                                                 </div>
 
                                                                 {/* Labels list */}
-                                                                <div className="queue-labels-list">
+                                                                <div className={styles.queueLabelsList}>
                                                                     {batchItem.labels.length === 0 ? (
-                                                                        <div className="no-labels">
+                                                                        <div className={styles.noLabels}>
                                                                             <i className="fas fa-inbox"></i>
                                                                             <p>No labels</p>
-                                                                            <p className="hint">Add labels above or click Reset</p>
+                                                                            <p className={styles.noLabelsHint}>Add labels above or click Reset</p>
                                                                         </div>
                                                                     ) : (
                                                                         batchItem.labels.map((label, idx) => {
@@ -768,9 +777,9 @@ const LabelPreviewModal = ({
                                                                             return (
                                                                                 <div
                                                                                     key={idx}
-                                                                                    className={`label-item ${getQueueLabelType(label)}`}
+                                                                                    className={`${styles.labelItem} ${getLabelItemTypeClass(label)}`}
                                                                                 >
-                                                                                    <span className="label-index">{idx + 1}</span>
+                                                                                    <span className={styles.labelIndex}>{idx + 1}</span>
                                                                                     {isEditing ? (
                                                                                         <input
                                                                                             type="text"
@@ -778,12 +787,12 @@ const LabelPreviewModal = ({
                                                                                             onChange={(e) => setQueueEditLabelText(e.target.value)}
                                                                                             onKeyDown={handleQueueEditLabelKeyDown}
                                                                                             onBlur={saveQueueLabelEdit}
-                                                                                            className="label-edit-input"
+                                                                                            className={styles.labelEditInput}
                                                                                             autoFocus
                                                                                         />
                                                                                     ) : (
                                                                                         <span
-                                                                                            className="label-text"
+                                                                                            className={styles.labelText}
                                                                                             onClick={() => startQueueLabelEdit(batchItem.id, idx, label)}
                                                                                             title="Click to edit"
                                                                                         >
@@ -791,7 +800,7 @@ const LabelPreviewModal = ({
                                                                                         </span>
                                                                                     )}
                                                                                     <button
-                                                                                        className="btn-remove-label"
+                                                                                        className={styles.btnRemoveLabel}
                                                                                         onClick={() => removeLabelFromQueueBatch(batchItem.id, idx)}
                                                                                         title="Remove"
                                                                                     >
@@ -813,7 +822,7 @@ const LabelPreviewModal = ({
                             </div>
 
                             {queueBatches.length === 0 && (
-                                <div className="queue-empty">
+                                <div className={styles.queueEmpty}>
                                     <i className="fas fa-inbox"></i>
                                     <p>No batches in queue</p>
                                 </div>
@@ -825,10 +834,10 @@ const LabelPreviewModal = ({
                     </div>
 
                     {/* Footer */}
-                    <div className="label-preview-footer">
-                        <button className="btn-cancel" onClick={onClose}>Cancel</button>
+                    <div className={styles.footer}>
+                        <button className={styles.btnCancel} onClick={onClose}>Cancel</button>
                         <button
-                            className="btn-generate"
+                            className={styles.btnGenerate}
                             onClick={handleGenerate}
                             disabled={!isValid || currentIsGenerating}
                         >
@@ -846,77 +855,77 @@ const LabelPreviewModal = ({
 
     // Single batch mode render
     return (
-        <div className="label-preview-modal-overlay" onClick={handleOverlayClick}>
-            <div className="label-preview-modal label-preview-modal-wide" onClick={e => e.stopPropagation()}>
+        <div className={styles.overlay} onClick={handleOverlayClick}>
+            <div className={`${styles.modal} ${styles.modalWide}`} onClick={e => e.stopPropagation()}>
                 {/* Header */}
-                <div className="label-preview-header">
+                <div className={styles.header}>
                     <h2>
                         <i className="fas fa-print"></i>
                         Print Aligner Labels
                     </h2>
-                    <button className="modal-close-btn" onClick={onClose}>
+                    <button className={styles.closeBtn} onClick={onClose}>
                         <i className="fas fa-times"></i>
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="label-preview-content">
+                <div className={styles.content}>
                     {/* Left: Form */}
-                    <div className="label-preview-form">
+                    <div className={styles.form}>
                         <h3>Label Information</h3>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label>Patient Name</label>
                             <input
                                 type="text"
                                 value={patientName}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setPatientName(e.target.value)}
                                 placeholder="Enter patient name"
-                                className={!patientName.trim() ? 'input-error' : ''}
+                                className={!patientName.trim() ? styles.inputError : ''}
                             />
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label>Doctor Name</label>
                             <input
                                 type="text"
                                 value={doctorName}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setDoctorName(e.target.value)}
                                 placeholder="Enter doctor name"
-                                className={!doctorName.trim() ? 'input-error' : ''}
+                                className={!doctorName.trim() ? styles.inputError : ''}
                             />
                         </div>
 
-                        <div className="form-group form-group-inline">
-                            <label className="checkbox-label">
+                        <div className={`${styles.formGroup} ${styles.formGroupInline}`}>
+                            <label className={styles.checkboxLabel}>
                                 <input
                                     type="checkbox"
                                     checked={includeLogo}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => setIncludeLogo(e.target.checked)}
                                 />
-                                <span className="checkbox-text">Include Logo on Labels</span>
+                                <span className={styles.checkboxText}>Include Logo on Labels</span>
                             </label>
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label>Source Batch</label>
                             <input
                                 type="text"
                                 value={`Batch #${batch?.BatchSequence || 'N/A'} (Set #${set?.SetSequence || 'N/A'})`}
                                 disabled
-                                className="input-disabled"
+                                className={styles.inputDisabled}
                             />
                         </div>
 
-                        <div className="original-ranges-info">
-                            <span className="info-label">Original ranges:</span>
+                        <div className={styles.originalRangesInfo}>
+                            <span className={styles.infoLabel}>Original ranges:</span>
                             {batch?.UpperAlignerStartSequence != null && batch?.UpperAlignerEndSequence != null && (
-                                <span className="range-badge upper">
+                                <span className={`${styles.rangeBadge} ${styles.rangeBadgeUpper}`}>
                                     U{batch.UpperAlignerStartSequence}-{batch.UpperAlignerEndSequence}
                                 </span>
                             )}
                             {batch?.LowerAlignerStartSequence != null && batch?.LowerAlignerEndSequence != null && (
-                                <span className="range-badge lower">
+                                <span className={`${styles.rangeBadge} ${styles.rangeBadgeLower}`}>
                                     L{batch.LowerAlignerStartSequence}-{batch.LowerAlignerEndSequence}
                                 </span>
                             )}
@@ -924,53 +933,53 @@ const LabelPreviewModal = ({
                     </div>
 
                     {/* Middle: Labels Editor */}
-                    <div className="label-preview-middle">
-                        <div className="labels-editor">
-                            <div className="labels-editor-header">
+                    <div className={styles.middle}>
+                        <div className={styles.labelsEditor}>
+                            <div className={styles.labelsEditorHeader}>
                                 <h3>Labels to Print ({totalLabels})</h3>
-                                <div className="labels-editor-actions">
-                                    <button className="btn-reset-labels" onClick={resetToDefault} title="Reset">
+                                <div className={styles.labelsEditorActions}>
+                                    <button className={styles.btnResetLabels} onClick={resetToDefault} title="Reset">
                                         <i className="fas fa-undo"></i> Reset
                                     </button>
-                                    <button className="btn-clear-labels" onClick={() => setLabels([])} title="Clear">
+                                    <button className={styles.btnClearLabels} onClick={() => setLabels([])} title="Clear">
                                         <i className="fas fa-trash"></i> Clear
                                     </button>
                                 </div>
                             </div>
 
-                            <p className="labels-hint">
+                            <p className={styles.labelsHint}>
                                 <i className="fas fa-info-circle"></i>
                                 Click to edit, x to remove. Use U#/L# format
                             </p>
 
-                            <div className="add-label-row">
+                            <div className={styles.addLabelRow}>
                                 <input
                                     type="text"
                                     value={newLabelText}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => setNewLabelText(e.target.value)}
                                     onKeyPress={handleNewLabelKeyPress}
                                     placeholder="Add label (e.g., U7, L5, U3/L3)"
-                                    className="add-label-input"
+                                    className={styles.addLabelInput}
                                 />
-                                <button className="btn-add-label" onClick={addLabel} disabled={!newLabelText.trim()}>
+                                <button className={styles.btnAddLabel} onClick={addLabel} disabled={!newLabelText.trim()}>
                                     <i className="fas fa-plus"></i>
                                 </button>
                             </div>
 
-                            <div className="labels-list">
+                            <div className={styles.labelsList}>
                                 {labels.length === 0 ? (
-                                    <div className="no-labels">
+                                    <div className={styles.noLabels}>
                                         <i className="fas fa-inbox"></i>
                                         <p>No labels to print</p>
-                                        <p className="hint">Add labels above or click Reset</p>
+                                        <p className={styles.noLabelsHint}>Add labels above or click Reset</p>
                                     </div>
                                 ) : (
                                     labels.map((label, idx) => (
                                         <div
                                             key={label.id}
-                                            className={`label-item ${label.type === 'UL' ? 'combined' : label.type === 'U' ? 'upper' : label.type === 'L' ? 'lower' : 'custom'}`}
+                                            className={`${styles.labelItem} ${label.type === 'UL' ? styles.labelItemCombined : label.type === 'U' ? styles.labelItemUpper : label.type === 'L' ? styles.labelItemLower : styles.labelItemCustom}`}
                                         >
-                                            <span className="label-index">{idx + 1}</span>
+                                            <span className={styles.labelIndex}>{idx + 1}</span>
                                             {editingLabelId === label.id ? (
                                                 <input
                                                     type="text"
@@ -978,15 +987,15 @@ const LabelPreviewModal = ({
                                                     onChange={(e: ChangeEvent<HTMLInputElement>) => setEditLabelText(e.target.value)}
                                                     onKeyDown={handleEditLabelKeyPress}
                                                     onBlur={saveEditLabel}
-                                                    className="label-edit-input"
+                                                    className={styles.labelEditInput}
                                                     autoFocus
                                                 />
                                             ) : (
-                                                <span className="label-text" onClick={() => startEditLabel(label)} title="Click to edit">
+                                                <span className={styles.labelText} onClick={() => startEditLabel(label)} title="Click to edit">
                                                     {label.text}
                                                 </span>
                                             )}
-                                            <button className="btn-remove-label" onClick={() => removeLabel(label.id)} title="Remove">
+                                            <button className={styles.btnRemoveLabel} onClick={() => removeLabel(label.id)} title="Remove">
                                                 <i className="fas fa-times"></i>
                                             </button>
                                         </div>
@@ -1001,10 +1010,10 @@ const LabelPreviewModal = ({
                 </div>
 
                 {/* Footer */}
-                <div className="label-preview-footer">
-                    <button className="btn-cancel" onClick={onClose}>Cancel</button>
+                <div className={styles.footer}>
+                    <button className={styles.btnCancel} onClick={onClose}>Cancel</button>
                     <button
-                        className="btn-generate"
+                        className={styles.btnGenerate}
                         onClick={handleGenerate}
                         disabled={!isValid || currentIsGenerating}
                     >

@@ -5,8 +5,10 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, type FormEvent, type ChangeEvent } from 'react';
+import cn from 'classnames';
 import DentalChart from './DentalChart';
 import { useToast } from '../../contexts/ToastContext';
+import styles from './NewVisitComponent.module.css';
 
 interface Wire {
     id: number;
@@ -265,16 +267,16 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
 
     if (loading && visitId) {
         return (
-            <div className="new-visit-loading">
+            <div className={styles.loading}>
                 <i className="fas fa-spinner fa-spin"></i> Loading visit data...
             </div>
         );
     }
 
     return (
-        <div className="new-visit-component">
+        <div className={styles.container}>
             {/* Header */}
-            <div className="new-visit-header">
+            <div className={styles.header}>
                 <h3>
                     <i className="fas fa-calendar-plus"></i> {visitId ? 'Edit Visit' : 'Add New Visit'}
                 </h3>
@@ -282,16 +284,16 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
 
             {/* Error Display */}
             {error && (
-                <div className="new-visit-error">
+                <div className={styles.error}>
                     <i className="fas fa-exclamation-circle"></i> {error}
-                    <button onClick={handleClearError} className="error-close">×</button>
+                    <button onClick={handleClearError} className={styles.errorClose}>×</button>
                 </div>
             )}
 
             {/* Form */}
-            <form onSubmit={handleFormSubmit} className="new-visit-form">
+            <form onSubmit={handleFormSubmit} className={styles.form}>
                 {/* Top Action Buttons */}
-                <div className="form-actions top-actions">
+                <div className={cn(styles.formActions, styles.topActions)}>
                     <button type="submit" className="btn btn-primary" disabled={loading}>
                         <i className="fas fa-save"></i> {loading ? 'Saving...' : (visitId ? 'Update' : 'Add Visit')}
                     </button>
@@ -303,17 +305,17 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 </div>
 
                 {/* Tabs */}
-                <div className="visit-tabs">
+                <div className={styles.tabs}>
                     <button
                         type="button"
-                        className={`visit-tab ${activeTab === 'basic' ? 'active' : ''}`}
+                        className={cn(styles.tab, { [styles.active]: activeTab === 'basic' })}
                         onClick={() => handleTabChange('basic')}
                     >
                         <i className="fas fa-calendar"></i> Basic Info
                     </button>
                     <button
                         type="button"
-                        className={`visit-tab ${activeTab === 'treatment' ? 'active' : ''}`}
+                        className={cn(styles.tab, { [styles.active]: activeTab === 'treatment' })}
                         onClick={() => handleTabChange('treatment')}
                     >
                         <i className="fas fa-teeth"></i> Treatment Details
@@ -321,11 +323,11 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 </div>
 
                 {/* Tab 1: Basic Information */}
-                <div className={`tab-content ${activeTab === 'basic' ? 'active' : ''}`}>
+                <div className={cn(styles.tabContent, { [styles.active]: activeTab === 'basic' })}>
                     {/* Basic Information */}
-                    <div className="form-row">
-                    <div className="form-group">
-                        <label>Visit Date <span className="required">*</span></label>
+                    <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
+                        <label>Visit Date <span className={styles.required}>*</span></label>
                         <input
                             type="date"
                             value={formData.VisitDate}
@@ -333,7 +335,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                             required
                         />
                     </div>
-                    <div className="form-group">
+                    <div className={styles.formGroup}>
                         <label>Operator</label>
                         <select
                             value={formData.OperatorID}
@@ -351,29 +353,29 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
 
                 {/* Latest Wires - Quick Select (only for new visits) */}
                 {!visitId && (latestWires.UpperWireName || latestWires.LowerWireName) && (
-                    <div className="latest-wires-section">
-                        <div className="section-label">
+                    <div className={styles.latestWiresSection}>
+                        <div className={styles.sectionLabel}>
                             <i className="fas fa-info-circle"></i> Most Recent Wires:
                         </div>
-                        <div className="wires-grid">
+                        <div className={styles.wiresGrid}>
                             {latestWires.UpperWireName && (
                                 <button
                                     type="button"
                                     onClick={() => handleFieldChange('UpperWireID', latestWires.UpperWireID!)}
-                                    className={`wire-btn ${formData.UpperWireID === latestWires.UpperWireID ? 'active upper' : 'upper'}`}
+                                    className={cn(styles.wireBtn, styles.upper, { [styles.active]: formData.UpperWireID === latestWires.UpperWireID })}
                                 >
-                                    <div className="wire-label">Upper:</div>
-                                    <div className="wire-name">{latestWires.UpperWireName}</div>
+                                    <div className={styles.wireLabel}>Upper:</div>
+                                    <div className={styles.wireName}>{latestWires.UpperWireName}</div>
                                 </button>
                             )}
                             {latestWires.LowerWireName && (
                                 <button
                                     type="button"
                                     onClick={() => handleFieldChange('LowerWireID', latestWires.LowerWireID!)}
-                                    className={`wire-btn ${formData.LowerWireID === latestWires.LowerWireID ? 'active lower' : 'lower'}`}
+                                    className={cn(styles.wireBtn, styles.lower, { [styles.active]: formData.LowerWireID === latestWires.LowerWireID })}
                                 >
-                                    <div className="wire-label">Lower:</div>
-                                    <div className="wire-name">{latestWires.LowerWireName}</div>
+                                    <div className={styles.wireLabel}>Lower:</div>
+                                    <div className={styles.wireName}>{latestWires.LowerWireName}</div>
                                 </button>
                             )}
                         </div>
@@ -381,8 +383,8 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 )}
 
                     {/* Wire Information */}
-                    <div className="form-row">
-                        <div className="form-group">
+                    <div className={styles.formRow}>
+                        <div className={styles.formGroup}>
                             <label>Upper Wire</label>
                             <select
                                 value={formData.UpperWireID}
@@ -396,7 +398,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                                 ))}
                             </select>
                         </div>
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label>Lower Wire</label>
                             <select
                                 value={formData.LowerWireID}
@@ -414,9 +416,9 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 </div>
 
                 {/* Tab 2: Treatment Details */}
-                <div className={`tab-content ${activeTab === 'treatment' ? 'active' : ''}`}>
+                <div className={cn(styles.tabContent, { [styles.active]: activeTab === 'treatment' })}>
                     {/* Treatment Details */}
-                    <div className="form-group">
+                    <div className={styles.formGroup}>
                         <label>Bracket Change</label>
                         <input
                             type="text"
@@ -426,7 +428,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         />
                     </div>
 
-                    <div className="form-group">
+                    <div className={styles.formGroup}>
                         <label>Wire Bending</label>
                         <input
                             type="text"
@@ -436,7 +438,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         />
                     </div>
 
-                    <div className="form-group">
+                    <div className={styles.formGroup}>
                         <label>Elastics</label>
                         <input
                             type="text"
@@ -448,12 +450,12 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 </div>
 
                 {/* Dental Chart */}
-                <div className="dental-chart-section">
-                    <label className="chart-label">
+                <div className={styles.dentalChartSection}>
+                    <label className={styles.chartLabel}>
                         <span>
                             <i className="fas fa-tooth"></i> Select Teeth
                         </span>
-                        <span className="chart-hint">
+                        <span className={styles.chartHint}>
                             <i className="fas fa-arrow-down"></i> Appends to: <strong>{lastFocusedField === 'Others' ? 'Other Notes' : 'Next Visit'}</strong>
                         </span>
                     </label>
@@ -461,11 +463,11 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 </div>
 
                 {/* Notes */}
-                <div className="form-group full-width">
+                <div className={cn(styles.formGroup, styles.fullWidth)}>
                     <label>
                         Other Notes
                         {lastFocusedField === 'Others' && (
-                            <span className="active-indicator">
+                            <span className={styles.activeIndicator}>
                                 <i className="fas fa-tooth"></i> Active
                             </span>
                         )}
@@ -477,16 +479,16 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         onFocus={() => handleFieldFocus('Others')}
                         rows={4}
                         placeholder="Any additional notes about this visit..."
-                        className={lastFocusedField === 'Others' ? 'active' : ''}
+                        className={lastFocusedField === 'Others' ? styles.active : ''}
                     />
                 </div>
 
                 {/* Next Visit Instructions */}
-                <div className="form-group full-width">
+                <div className={cn(styles.formGroup, styles.fullWidth)}>
                     <label>
                         Next Visit Instructions
                         {lastFocusedField === 'NextVisit' && (
-                            <span className="active-indicator">
+                            <span className={styles.activeIndicator}>
                                 <i className="fas fa-tooth"></i> Active
                             </span>
                         )}
@@ -498,13 +500,13 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         onFocus={() => handleFieldFocus('NextVisit')}
                         rows={4}
                         placeholder="Instructions or notes for the next visit..."
-                        className={lastFocusedField === 'NextVisit' ? 'active' : ''}
+                        className={lastFocusedField === 'NextVisit' ? styles.active : ''}
                     />
                 </div>
 
                 {/* Checkboxes - Moved to bottom */}
-                <div className="checkboxes-grid">
-                    <label className="checkbox-label">
+                <div className={styles.checkboxesGrid}>
+                    <label className={styles.checkboxLabel}>
                         <input
                             type="checkbox"
                             checked={formData.OPG}
@@ -512,7 +514,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         />
                         <span>OPG Taken</span>
                     </label>
-                    <label className="checkbox-label">
+                    <label className={styles.checkboxLabel}>
                         <input
                             type="checkbox"
                             checked={formData.IPhoto}
@@ -520,7 +522,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         />
                         <span>Initial Photo</span>
                     </label>
-                    <label className="checkbox-label">
+                    <label className={styles.checkboxLabel}>
                         <input
                             type="checkbox"
                             checked={formData.PPhoto}
@@ -528,7 +530,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         />
                         <span>Progress Photo</span>
                     </label>
-                    <label className="checkbox-label">
+                    <label className={styles.checkboxLabel}>
                         <input
                             type="checkbox"
                             checked={formData.FPhoto}
@@ -536,7 +538,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         />
                         <span>Final Photo</span>
                     </label>
-                    <label className="checkbox-label">
+                    <label className={styles.checkboxLabel}>
                         <input
                             type="checkbox"
                             checked={formData.ApplianceRemoved}
@@ -547,7 +549,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 </div>
 
                 {/* Bottom Form Actions */}
-                <div className="form-actions">
+                <div className={styles.formActions}>
                     <button type="submit" className="btn btn-primary" disabled={loading}>
                         <i className="fas fa-save"></i> {loading ? 'Saving...' : (visitId ? 'Update Visit' : 'Add Visit')}
                     </button>

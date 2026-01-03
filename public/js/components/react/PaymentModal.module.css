@@ -1,0 +1,1665 @@
+/* Invoice Form / Payment Modal Component Styles - CSS Module */
+
+/* Modal overlay */
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-index-modal);
+    padding: 20px;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* Modal content */
+.modalContent {
+    background: white;
+    border-radius: var(--radius-xl);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    animation: slideIn 0.3s ease;
+}
+
+.invoiceModal {
+    max-width: 1000px;
+    max-height: 92vh;
+}
+
+/* ========================================
+   COMPACT PAYMENT MODAL STYLES
+   ======================================== */
+
+.paymentModalCompact {
+    max-width: 720px;
+    padding: 0;
+}
+
+/* Compact Header */
+.paymentHeaderCompact {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) calc(var(--spacing-xxl) + var(--spacing-md)) var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--gray-50);
+}
+
+.paymentHeaderLeft {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.paymentTitleCompact {
+    font-size: var(--font-size-lg, 18px);
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs, 8px);
+}
+
+.paymentTitleCompact i {
+    color: var(--color-purple-light);
+}
+
+.paymentWorkType {
+    font-size: var(--font-size-sm, 13px);
+    color: var(--gray-500);
+    padding: 2px var(--spacing-xs, 8px);
+    background: var(--gray-200);
+    border-radius: var(--radius-sm, 4px);
+}
+
+.paymentHeaderRight {
+    display: flex;
+    align-items: center;
+}
+
+.paymentBalanceBadge {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    padding: var(--spacing-xs, 6px) var(--spacing-sm);
+    background: linear-gradient(135deg, var(--color-purple-light), var(--color-purple-dark));
+    border-radius: var(--radius-md, 8px);
+    color: white;
+}
+
+.balanceLabel {
+    font-size: var(--font-size-xs, 10px);
+    text-transform: uppercase;
+    opacity: 0.85;
+    letter-spacing: 0.5px;
+}
+
+.balanceAmount {
+    font-size: var(--font-size-md, 16px);
+    font-weight: 700;
+}
+
+/* Exchange Rate Compact */
+.exchangeRateCompact {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs, 8px);
+    padding: var(--spacing-xs, 8px) var(--spacing-lg);
+    background: var(--blue-50);
+    font-size: var(--font-size-sm, 13px);
+    color: var(--info-700);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.exchangeRateCompact i {
+    color: var(--info-500);
+}
+
+.rateDate {
+    color: var(--gray-400);
+    font-size: var(--font-size-xs, 12px);
+}
+
+.exchangeRateErrorCompact {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs, 8px);
+    padding: var(--spacing-sm) var(--spacing-lg);
+    background: var(--warning-50);
+    font-size: var(--font-size-sm, 13px);
+    color: var(--warning-800);
+    border-bottom: 1px solid var(--warning-200);
+}
+
+.exchangeRateErrorCompact i {
+    color: var(--warning-500);
+}
+
+.rateInputInline {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs, 6px);
+    margin-left: auto;
+}
+
+.rateInputSmall {
+    width: 80px;
+    padding: 4px var(--spacing-xs, 8px);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm, 4px);
+    font-size: var(--font-size-sm, 13px);
+}
+
+.btnLink {
+    background: none;
+    border: none;
+    color: var(--color-purple-light);
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    margin-left: auto;
+}
+
+.btnSm {
+    padding: 4px var(--spacing-sm);
+    font-size: var(--font-size-xs, 12px);
+    border-radius: var(--radius-sm, 4px);
+    border: none;
+    cursor: pointer;
+}
+
+.btnSmPrimary {
+    composes: btnSm;
+    background: var(--color-purple-light);
+    color: white;
+}
+
+.btnSmGhost {
+    composes: btnSm;
+    background: transparent;
+    color: var(--gray-500);
+    font-size: var(--font-size-md, 16px);
+    padding: 2px var(--spacing-xs, 6px);
+}
+
+/* Compact Form */
+.paymentFormCompact {
+    padding: var(--spacing-md) var(--spacing-lg);
+}
+
+.paymentRowCompact {
+    display: flex;
+    align-items: flex-start; /* Align fields at top */
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.paymentField {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.paymentField label {
+    display: block;
+    font-size: var(--font-size-xs, 12px);
+    font-weight: 600;
+    color: var(--gray-600);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.required {
+    color: var(--error-color);
+    margin-left: 2px;
+}
+
+.autoBadge {
+    display: inline-block;
+    background: var(--info-100);
+    color: var(--info-700);
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: var(--radius-md, 8px);
+    margin-left: 4px;
+    text-transform: uppercase;
+}
+
+.naBadge {
+    display: inline-block;
+    background: var(--gray-200);
+    color: var(--gray-500);
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: var(--radius-md, 8px);
+    margin-left: 4px;
+}
+
+.overrideBadge {
+    display: inline-block;
+    background: var(--warning-100);
+    color: var(--warning-700);
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: var(--radius-md, 8px);
+    margin-left: 4px;
+    text-transform: uppercase;
+}
+
+/* Input with lock icon toggle */
+.inputWithLock {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.inputWithLock input {
+    flex: 1;
+    padding-right: 36px; /* Space for lock button */
+}
+
+.lockToggleBtn {
+    position: absolute;
+    right: 4px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--radius-sm, 4px);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 12px;
+}
+
+.locked {
+    background: var(--gray-100);
+    color: var(--gray-400);
+}
+
+.locked:hover {
+    background: var(--warning-100);
+    color: var(--warning-600);
+}
+
+.unlocked {
+    background: var(--warning-100);
+    color: var(--warning-600);
+}
+
+.unlocked:hover {
+    background: var(--warning-200);
+    color: var(--warning-700);
+}
+
+.fieldHint {
+    display: block;
+    font-size: var(--font-size-xs, 11px);
+    color: var(--gray-500);
+    margin-top: 2px;
+}
+
+.overrideHint {
+    color: var(--warning-600);
+}
+
+.fieldHintSuccess {
+    color: var(--success-color);
+}
+
+/* ========================================
+   PAYMENT MODAL INPUT SIZING
+   All inputs within payment modal share base styles
+   Uses --input-height-sm from variables.css for consistency
+   ======================================== */
+
+/* Base input styles - shared properties */
+.selectCompact,
+.inputCompact,
+.inputLg,
+.inputMd {
+    width: 100%;
+    height: var(--input-height-sm);
+    padding: 0 var(--spacing-sm);
+    border: var(--border-width-thin) solid var(--gray-300);
+    border-radius: var(--radius-lg);
+    background: var(--color-white);
+    box-sizing: border-box;
+    font-size: var(--font-size-sm);
+}
+
+/* Focus state for all inputs */
+.selectCompact:focus,
+.inputCompact:focus,
+.inputLg:focus,
+.inputMd:focus {
+    outline: none;
+    border-color: var(--color-purple-light);
+    box-shadow: var(--shadow-focus);
+}
+
+/* Large inputs - slightly bigger font, bolder */
+.inputLg {
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+}
+
+.inputReadonly {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+}
+
+.inputDisabled {
+    background: var(--gray-100);
+    color: var(--gray-400);
+    cursor: not-allowed;
+    text-align: center;
+}
+
+.paymentFieldLg {
+    flex: 1.5;
+}
+
+/* Entry Mode Field - see consolidated "Entry Mode Toggle" section below */
+.entryModeField {
+    flex: 1.2;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Mixed Payment Field Group */
+.paymentFieldGroup {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex: 2;
+}
+
+.paymentFieldGroup .paymentField {
+    flex: 1;
+}
+
+/* Payment Main Row */
+.paymentMainRow {
+    padding: var(--spacing-md);
+    background: var(--gray-50);
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--gray-200);
+}
+
+/* Summary Strip */
+.paymentSummaryStrip {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md, 6px);
+    margin-bottom: var(--spacing-md);
+    font-size: var(--font-size-sm, 13px);
+}
+
+.summarySuccess {
+    background: var(--success-50);
+    border: 1px solid var(--success-200);
+}
+
+.summaryWarning {
+    background: var(--warning-50);
+    border: 1px solid var(--warning-300);
+}
+
+.summaryItem {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs, 6px);
+}
+
+.summaryLabel {
+    color: var(--gray-600);
+}
+
+.summaryValue {
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.summaryTotal {
+    margin-left: auto;
+    padding-left: var(--spacing-md);
+    border-left: 1px solid var(--gray-300);
+}
+
+.summaryTotal .summaryValue {
+    color: var(--success-700);
+    font-size: var(--font-size-base, 14px);
+}
+
+.summaryWarning .summaryTotal .summaryValue {
+    color: var(--warning-700);
+}
+
+.summaryWarningText {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs, 6px);
+    color: var(--warning-700);
+    font-weight: 600;
+}
+
+.summaryWarningText i {
+    color: var(--warning-500);
+}
+
+/* Compact Actions */
+.paymentActionsCompact {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--gray-200);
+}
+
+/* Success State Compact */
+.paymentSuccessCompact {
+    padding: var(--spacing-xl, 40px) var(--spacing-lg);
+    text-align: center;
+}
+
+.successIcon {
+    font-size: 48px;
+    color: var(--success-color);
+    margin-bottom: var(--spacing-sm);
+}
+
+.paymentSuccessCompact h2 {
+    font-size: var(--font-size-xl, 20px);
+    color: var(--gray-900);
+    margin: 0 0 var(--spacing-xs, 8px) 0;
+}
+
+.successAmount {
+    font-size: var(--font-size-2xl, 24px);
+    font-weight: 700;
+    color: var(--success-700);
+    margin: 0 0 var(--spacing-lg) 0;
+}
+
+.successActions {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-sm);
+}
+
+/* ========================================
+   RESPONSIVE - Tablet (768px)
+   ======================================== */
+@media (max-width: 768px) {
+    .paymentModalCompact {
+        max-width: 100%;
+    }
+
+    .paymentHeaderCompact {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+        align-items: flex-start;
+        padding-right: var(--spacing-lg);
+    }
+
+    .paymentHeaderLeft {
+        flex-wrap: wrap;
+    }
+
+    .paymentHeaderRight {
+        width: 100%;
+    }
+
+    .paymentBalanceBadge {
+        flex-direction: row;
+        width: 100%;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .paymentRowCompact {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    .paymentMainRow {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    .paymentFieldGroup {
+        flex-direction: row; /* Keep side by side on tablet */
+    }
+
+    .paymentSummaryStrip {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-xs, 8px);
+    }
+
+    .summaryTotal {
+        margin-left: 0;
+        padding-left: 0;
+        border-left: none;
+        padding-top: var(--spacing-xs, 8px);
+        border-top: 1px solid var(--gray-300);
+        width: 100%;
+    }
+
+    .exchangeRateErrorCompact {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .rateInputInline {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .rateInputSmall {
+        flex: 1;
+    }
+}
+
+/* ========================================
+   RESPONSIVE - Mobile (480px)
+   ======================================== */
+@media (max-width: 480px) {
+    .paymentHeaderCompact {
+        padding: var(--spacing-sm) var(--spacing-md);
+        padding-right: 40px;
+    }
+
+    .paymentTitleCompact {
+        font-size: var(--font-size-md, 16px);
+    }
+
+    .paymentWorkType {
+        font-size: var(--font-size-xs, 11px);
+    }
+
+    .paymentFormCompact {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .paymentMainRow {
+        padding: var(--spacing-sm);
+    }
+
+    .paymentFieldGroup {
+        flex-direction: column; /* Stack on small mobile */
+    }
+
+    .paymentActionsCompact {
+        flex-direction: column-reverse;
+    }
+
+    .paymentActionsCompact :global(.btn) {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .paymentSuccessCompact {
+        padding: var(--spacing-lg) var(--spacing-md);
+    }
+
+    .successIcon {
+        font-size: 40px;
+    }
+
+    .successAmount {
+        font-size: var(--font-size-xl, 20px);
+    }
+
+    .successActions {
+        flex-direction: column;
+    }
+
+    .successActions :global(.btn) {
+        width: 100%;
+    }
+
+    /* Consistent height for ALL input fields on mobile - slightly smaller */
+    .selectCompact,
+    .inputCompact,
+    .inputLg,
+    .inputMd {
+        height: calc(var(--input-height-sm) - var(--spacing-xs));
+        font-size: var(--font-size-sm);
+    }
+
+    /* Entry Mode Toggle - Mobile overrides (matches above input heights) */
+    .entryModeField .entryModeToggle {
+        height: calc(var(--input-height-sm) - var(--spacing-xs));
+        padding: 0 var(--spacing-xs, 6px);
+    }
+
+    .entryModeField .entryModeToggle .toggleLabel {
+        font-size: var(--font-size-xs, 11px);
+    }
+
+    .entryModeField .entryModeSwitch {
+        width: 36px;
+        height: 20px;
+    }
+
+    .entryModeField .entryModeSwitch .slider:before {
+        height: 14px;
+        width: 14px;
+    }
+
+    .entryModeField .entryModeSwitch input:checked + .slider:before {
+        transform: translateX(16px);
+    }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Modal close button */
+.modalClose {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: var(--gray-400);
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    z-index: 10;
+}
+
+.modalClose:hover {
+    background-color: var(--gray-100);
+    color: var(--gray-700);
+}
+
+/* Modal title */
+.modalTitle {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0 0 24px 0;
+    padding: 24px 24px 0 24px;
+}
+
+.modalDescription {
+    font-size: 14px;
+    color: var(--gray-500);
+    margin: 0 24px 20px 24px;
+}
+
+.summaryGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.summaryItemDetail {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.summaryItemDetail label {
+    font-size: 12px;
+    opacity: 0.85;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.summaryItemDetail .value {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.highlight {
+    grid-column: span 2;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.negative {
+    color: var(--warning-400);
+}
+
+.positive {
+    color: var(--success-200);
+}
+
+/* Invoice Form */
+.invoiceForm {
+    padding: 0 24px 24px 24px;
+}
+
+/* Full width sections */
+.formSectionFullWidth {
+    grid-column: 1 / -1;
+}
+
+/* Form Sections (Steps) */
+.formSection {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.sectionTitle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0 0 20px 0;
+}
+
+.stepNumber {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
+    color: white;
+    border-radius: 50%;
+    font-size: 16px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* Form Groups */
+.formGroup {
+    margin-bottom: 20px;
+}
+
+.formGroup:last-child {
+    margin-bottom: 0;
+}
+
+.formGroup label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--gray-700);
+    margin-bottom: 8px;
+}
+
+.formGroup input[type="text"],
+.formGroup input[type="number"],
+.formGroup input[type="date"],
+.formGroup select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    font-size: 14px;
+    color: var(--gray-900);
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.formGroup input:focus,
+.formGroup select:focus {
+    outline: none;
+    border-color: var(--color-purple-light);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.largeInput {
+    font-size: 18px;
+    font-weight: 600;
+    padding: 14px 16px;
+}
+
+.currencySelect {
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+/* ========================================
+   ENTRY MODE TOGGLE
+   Toggle switch for Amount/Cash entry mode
+   Used in: PaymentModal (.entry-mode-field)
+   ======================================== */
+
+/* Base toggle container - standalone usage (non-payment modal) */
+.entryModeToggle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    padding: 8px 12px;
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+}
+
+/* Toggle labels (Amount/Cash text) */
+.toggleLabel {
+    font-size: 13px;
+    color: var(--gray-600);
+    white-space: nowrap;
+    transition: color 0.2s ease;
+}
+
+.toggleLabelActive {
+    color: var(--gray-900);
+    font-weight: 600;
+}
+
+/* Toggle switch - the actual switch control */
+.entryModeSwitch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+    margin: 0; /* Reset margins to allow flex centering */
+}
+
+.entryModeSwitch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+/* Switch slider track */
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--color-purple-light);
+    transition: 0.3s;
+    border-radius: 24px;
+}
+
+/* Switch slider knob */
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Checked state (Cash mode) */
+.entryModeSwitch input:checked + .slider {
+    background-color: var(--success-color);
+}
+
+.entryModeSwitch input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
+/* Hover effect */
+.entryModeSwitch:hover .slider {
+    filter: brightness(1.05);
+}
+
+/* --- Payment Modal Context --- */
+/* When toggle is used inside .entry-mode-field (payment modal row) */
+.entryModeField .entryModeToggle {
+    margin: var(--spacing-xs) 0 0 0; /* Match margin-top of adjacent select/input fields */
+    height: var(--input-height-sm);
+    padding: 0 var(--spacing-sm);
+    background: var(--color-white);
+    border: var(--border-width-thin) solid var(--gray-300);
+    border-radius: var(--radius-lg);
+    box-sizing: border-box;
+    justify-content: center;
+    gap: var(--spacing-xs);
+}
+
+.entryModeField .entryModeToggle .toggleLabel {
+    font-size: var(--font-size-sm);
+}
+
+/* Auto-calculated badge */
+.autoCalculatedBadge {
+    display: inline-block;
+    background: var(--info-100);
+    color: var(--info-700);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* Read-only amount input in cash mode */
+.amountReadonly {
+    background: var(--gray-100);
+    border-color: var(--gray-200);
+    color: var(--gray-600);
+    cursor: not-allowed;
+}
+
+.amountReadonly:focus {
+    border-color: var(--gray-200);
+    box-shadow: none;
+}
+
+/* Checkbox Group */
+.checkboxGroup {
+    margin-bottom: 16px;
+}
+
+.checkboxLabel {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--gray-700);
+    padding: 12px;
+    background: white;
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.checkboxLabel:hover {
+    background: var(--gray-50);
+    border-color: var(--color-purple-light);
+}
+
+.checkboxLabel input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--color-purple-light);
+}
+
+/* Suggested Payment Box */
+.suggestedPaymentBox {
+    background: linear-gradient(135deg, var(--warning-100) 0%, var(--warning-400) 100%);
+    border: 2px solid var(--warning-300);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-top: 20px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);
+}
+
+.suggestionIcon {
+    flex-shrink: 0;
+}
+
+.suggestionIcon i {
+    font-size: 32px;
+    color: var(--warning-600);
+}
+
+.suggestionContent {
+    flex: 1;
+}
+
+.suggestionLabel {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--warning-900);
+    margin: 0 0 8px 0;
+    letter-spacing: 0.5px;
+}
+
+.suggestionAmount {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--warning-900);
+    margin: 0 0 4px 0;
+    line-height: 1.2;
+}
+
+.conversionDetail {
+    font-size: 12px;
+    color: var(--warning-900);
+    margin: 0;
+    opacity: 0.8;
+}
+
+/* Conversion Info */
+.conversionInfo {
+    background: var(--info-100);
+    border: 1px solid var(--info-300);
+    border-radius: 6px;
+    padding: 12px;
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--info-700);
+}
+
+.conversionInfo i {
+    color: var(--blue-300);
+    font-size: 14px;
+}
+
+.conversionInfo strong {
+    font-weight: 600;
+    color: var(--info-800);
+}
+
+/* Form Actions */
+.formActions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--gray-200);
+}
+
+/* Button styles use global definitions from /css/components/buttons.css */
+/* Loading State */
+.loadingState {
+    text-align: center;
+    padding: 40px;
+    color: var(--gray-500);
+    font-size: 16px;
+}
+
+.loadingState i {
+    font-size: 32px;
+    margin-bottom: 12px;
+    color: var(--color-purple-light);
+}
+
+/* Suggestion Box - Compact for two columns */
+.suggestionBox {
+    background: var(--warning-50);
+    border: 1px solid var(--warning-400);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--warning-900);
+}
+
+.suggestionBox i {
+    color: var(--warning-300);
+    font-size: 16px;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .formSectionFullWidth {
+        grid-column: 1;
+    }
+}
+
+@media (max-width: 768px) {
+    .modalOverlay {
+        padding: 10px;
+    }
+
+    .modalContent {
+        max-height: 95vh;
+    }
+
+    .invoiceModal {
+        max-width: 100%;
+    }
+
+    .summaryGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .highlight {
+        grid-column: span 1;
+    }
+
+    .suggestedPaymentBox {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .suggestionAmount {
+        font-size: 24px;
+    }
+
+    .formActions {
+        flex-direction: column-reverse;
+    }
+
+    /* Button styles use global definitions from /css/components/buttons.css */
+}
+
+/* Print-Only Receipt */
+.printOnly {
+    display: none;
+}
+
+/* Print Styles for Thermal Printer Receipt - 80mm x 210mm Landscape */
+@media print {
+
+    /* Page Setup - Landscape 210mm wide x 80mm tall */
+    @page {
+        size: 210mm 80mm landscape;
+        margin: 3mm 4mm;
+    }
+
+    /* Hide everything except receipt */
+    body * {
+        visibility: hidden;
+    }
+
+    .printOnly,
+    .printOnly * {
+        visibility: visible;
+    }
+
+    .printOnly {
+        display: block;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 210mm;
+        height: 80mm;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* New Thermal Receipt Styles */
+    .receiptThermal {
+        width: 210mm;
+        height: 80mm;
+        padding: 2mm 3mm;
+        font-family: 'Arial', sans-serif;
+        font-size: 9pt;
+        color: var(--black);
+        background: white;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Clinic Header */
+    .receiptClinicHeader {
+        text-align: center;
+        margin-bottom: 1.5mm;
+    }
+
+    .receiptClinicHeader h1 {
+        font-size: 14pt;
+        font-weight: bold;
+        margin: 0 0 0.5mm 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--black);
+    }
+
+    .clinicDetails {
+        font-size: 8pt;
+        line-height: 1.3;
+        color: var(--black);
+    }
+
+    /* Divider */
+    .receiptDivider {
+        border-top: 1px dashed var(--black);
+        margin: 1mm 0;
+    }
+
+    /* Invoice Header Info */
+    .invoiceHeaderInfo {
+        text-align: center;
+        margin-bottom: 1mm;
+    }
+
+    .invoiceTitlePrint {
+        font-size: 11pt;
+        font-weight: bold;
+        margin-bottom: 0.5mm;
+        color: var(--black);
+    }
+
+    .invoiceMeta {
+        font-size: 8pt;
+        line-height: 1.2;
+        color: var(--black);
+    }
+
+    /* Main Content Grid - Two Columns */
+    .receiptContentGrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2mm;
+        flex: 1;
+        margin-bottom: 1mm;
+    }
+
+    .receiptCol {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5mm;
+    }
+
+    /* Info Sections */
+    .infoSection {
+        background: white;
+        padding: 1mm 1.5mm;
+        border-radius: 0;
+        border: 1px solid var(--black);
+    }
+
+    .sectionLabelPrint {
+        font-size: 9pt;
+        font-weight: bold;
+        text-transform: uppercase;
+        margin-bottom: 0.5mm;
+        border-bottom: 1px solid var(--black);
+        padding-bottom: 0.5mm;
+        color: var(--black);
+    }
+
+    .infoItem {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5mm;
+        font-size: 8.5pt;
+        line-height: 1.2;
+    }
+
+    .infoItem:last-child {
+        margin-bottom: 0;
+    }
+
+    .infoLabel {
+        font-weight: 600;
+        color: var(--black);
+    }
+
+    .infoValue {
+        font-weight: bold;
+        text-align: right;
+        color: var(--black);
+        max-width: 60%;
+        word-wrap: break-word;
+    }
+
+    /* Appointment Info */
+    .appointmentInfo {
+        font-size: 9pt;
+        font-weight: bold;
+        text-align: center;
+        padding: 1mm;
+        background: white;
+        border: 1px solid var(--black);
+        border-radius: 0;
+        color: var(--black);
+    }
+
+    /* Payment Section */
+    .paymentSection {
+        background: white;
+        border: 2px solid var(--black);
+        padding: 1mm 1.5mm !important;
+    }
+
+    .paymentRow {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5mm;
+        font-size: 8.5pt;
+        line-height: 1.2;
+        color: var(--black);
+    }
+
+    .paymentRow span:first-child {
+        font-weight: 600;
+        color: var(--black);
+    }
+
+    .paymentRow span:last-child {
+        font-weight: bold;
+        text-align: right;
+        color: var(--black);
+    }
+
+    .paymentRowDivider {
+        border-top: 1px solid var(--black);
+        margin: 0.5mm 0;
+    }
+
+    .highlightPayment {
+        background: white;
+        padding: 1mm 1.5mm;
+        margin: 0.5mm -1.5mm;
+        font-size: 10pt;
+        border-radius: 0;
+        border: 1px solid var(--black);
+    }
+
+    .totalRow {
+        border-top: 1.5px solid var(--black);
+        padding-top: 0.5mm;
+        margin-top: 0.5mm;
+        font-size: 10pt;
+    }
+
+    .balanceRow {
+        border-top: 2px solid var(--black);
+        padding-top: 1mm;
+        margin-top: 1mm;
+        font-size: 11pt;
+        font-weight: bold;
+        background: white;
+        padding: 1mm 1.5mm;
+        margin-left: -1.5mm;
+        margin-right: -1.5mm;
+        border-radius: 0;
+    }
+
+    .amountBig {
+        font-size: 11pt !important;
+        font-weight: bold !important;
+        color: var(--black) !important;
+    }
+
+    .paidFull {
+        color: var(--black) !important;
+    }
+
+    .balanceDue {
+        color: var(--black) !important;
+    }
+
+    /* Footer */
+    .receiptFooterSection {
+        text-align: center;
+        border-top: 2px solid var(--black);
+        padding-top: 1mm;
+        margin-top: auto;
+    }
+
+    .thankYou {
+        font-size: 10pt;
+        font-weight: bold;
+        margin-bottom: 0.5mm;
+        color: var(--black);
+    }
+
+    .footerNote {
+        font-size: 7.5pt;
+        font-style: italic;
+        color: var(--black);
+    }
+
+    /* Hide old receipt container and modal elements */
+    .receiptContainerWork,
+    .modalOverlay,
+    .modalClose,
+    .formActions,
+    :global(.btn) {
+        display: none !important;
+    }
+}
+
+/* OLD STYLES - Keep for backwards compatibility but hide in print */
+@media print {
+    .receiptContainerWork {
+        display: none !important;
+        width: 210mm;
+        height: 80mm;
+        margin: 0;
+        padding: 4mm 6mm;
+        font-family: 'Arial', sans-serif;
+        font-size: 8pt;
+        color: var(--black);
+        background: white;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Header - Compact */
+    .receiptHeaderWork {
+        text-align: center;
+        border-bottom: 2px solid var(--black);
+        padding-bottom: 2mm;
+        margin-bottom: 2mm;
+    }
+
+    .receiptHeaderWork h1 {
+        font-size: 13pt;
+        font-weight: bold;
+        margin: 0 0 1mm 0;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .receiptHeaderWork h2 {
+        font-size: 9pt;
+        margin: 0 0 1mm 0;
+        font-weight: 600;
+    }
+
+    .receiptHeaderWork .receiptDate {
+        font-size: 7pt;
+        margin-top: 1mm;
+    }
+
+    /* Divider */
+    .receiptDividerWork {
+        display: none;
+    }
+
+    /* Body - Two Column Layout */
+    .receiptBodyWork {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3mm;
+        flex: 1;
+    }
+
+    .receiptColumnWork {
+        display: flex;
+        flex-direction: column;
+        gap: 2mm;
+    }
+
+    .receiptColumnWork:first-child {
+        border-right: 1px dashed var(--black);
+        padding-right: 3mm;
+    }
+
+    .receiptColumnWork:last-child {
+        padding-left: 3mm;
+    }
+
+    /* Section Styles */
+    .receiptSectionWork {
+        margin-bottom: 2mm;
+    }
+
+    .receiptSectionWork h3 {
+        font-size: 9pt;
+        font-weight: bold;
+        margin: 0 0 1mm 0;
+        text-decoration: underline;
+        text-transform: uppercase;
+    }
+
+    /* Info Rows */
+    .infoRowWork {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 1.5mm;
+        font-size: 7.5pt;
+        line-height: 1.2;
+    }
+
+    .labelWork {
+        font-weight: 600;
+        color: var(--text-color);
+        flex: 0 0 auto;
+        padding-right: 2mm;
+    }
+
+    .valueWork {
+        font-weight: bold;
+        text-align: right;
+        flex: 1;
+        color: var(--black);
+    }
+
+    /* Highlighted Payment Row */
+    .highlightWork {
+        background: var(--gray-200);
+        padding: 1.5mm 2mm;
+        margin: 1.5mm -2mm;
+        border-radius: 1mm;
+        font-size: 8pt;
+    }
+
+    /* Total Row */
+    .totalWork {
+        border-top: 1.5px solid var(--black);
+        padding-top: 1.5mm;
+        margin-top: 1.5mm;
+        font-size: 8.5pt;
+    }
+
+    /* Balance Row */
+    .balanceRowWork {
+        border-top: 2px double var(--black);
+        padding-top: 1.5mm;
+        margin-top: 1.5mm;
+        font-size: 9pt;
+        font-weight: bold;
+        background: var(--gray-100);
+        padding: 1.5mm 2mm;
+        margin-left: -2mm;
+        margin-right: -2mm;
+    }
+
+    .amountLargeWork {
+        font-size: 9pt !important;
+        font-weight: bold !important;
+    }
+
+    .paidFullWork {
+        color: var(--black) !important;
+        font-weight: bold !important;
+    }
+
+    .balanceDueWork {
+        font-weight: bold !important;
+        color: var(--black) !important;
+    }
+
+    /* Footer */
+    .receiptFooterWork {
+        text-align: center;
+        border-top: 2px solid var(--black);
+        padding-top: 2mm;
+        margin-top: 2mm;
+        font-size: 7pt;
+    }
+
+    .receiptFooterWork p {
+        margin: 0.5mm 0;
+    }
+
+    .receiptFooterWork .small {
+        font-size: 6pt;
+        font-style: italic;
+        color: var(--text-light);
+    }
+
+    /* RTL Support for Arabic */
+    .patientInfoWork .valueWork {
+        direction: rtl;
+        unicode-bidi: embed;
+        font-weight: bold;
+    }
+
+    /* Prevent page breaks */
+    .receiptContainerWork {
+        page-break-inside: avoid;
+        page-break-after: always;
+    }
+
+    .receiptSectionWork {
+        page-break-inside: avoid;
+    }
+
+    /* Hide modal elements */
+    .modalOverlay {
+        position: relative;
+        background: none;
+    }
+
+    .modalClose,
+    .formActions,
+    :global(.btn) {
+        display: none !important;
+    }
+}

@@ -12,8 +12,8 @@ import MessageStatusTable from '../components/whatsapp-send/MessageStatusTable';
 import { API_ENDPOINTS } from '../utils/whatsapp-send-constants';
 import { APIClient } from '../utils/whatsapp-api-client';
 
-// WhatsApp send page styles
-import '../../css/pages/send.css';
+// WhatsApp send page styles - CSS Module
+import styles from './WhatsAppSend.module.css';
 
 /**
  * API response for reset endpoint
@@ -173,17 +173,17 @@ export default function WhatsAppSend() {
 
   return (
     <div id="app">
-      <main className="container main-layout" role="main">
-        <div className="page-header-area">
+      <main className={`${styles.container} ${styles.mainLayout}`} role="main">
+        <div className={styles.pageHeaderArea}>
           <h2>WhatsApp Messaging</h2>
-          <div className="connection-status" aria-live="polite">
+          <div className={styles.connectionStatus} aria-live="polite">
             <span
-              className={`connection-indicator ${
-                clientReady ? 'connected' : 'disconnected'
+              className={`${styles.connectionIndicator} ${
+                clientReady ? styles.connected : styles.disconnected
               }`}
               aria-hidden="true"
             ></span>
-            <span className="connection-text">
+            <span className={styles.connectionText}>
               {clientReady ? 'Client Ready' : 'Authentication Required'}
             </span>
           </div>
@@ -204,7 +204,7 @@ export default function WhatsAppSend() {
         />
 
         {/* Status and Action Area */}
-        <section className="status-area">
+        <section className={styles.statusArea}>
           <ConnectionStatus
             connectionStatus={connectionStatus}
             clientReady={clientReady}
@@ -224,8 +224,8 @@ export default function WhatsAppSend() {
         </section>
 
         {/* Results and Content Area */}
-        <section className="content-area">
-          <div id="tableContainer" className="results-container" role="region" aria-label="Message sending results">
+        <section className={styles.contentArea}>
+          <div id="tableContainer" className={styles.resultsContainer} role="region" aria-label="Message sending results">
             <MessageStatusTable
               messages={messages}
               loading={statusLoading}

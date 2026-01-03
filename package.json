@@ -19,6 +19,8 @@
     "typecheck": "tsc --noEmit",
     "typecheck:frontend": "tsc --noEmit -p tsconfig.frontend.json",
     "typecheck:all": "npm run typecheck && npm run typecheck:frontend",
+    "css:types": "tcm public/js -p \"**/*.module.css\"",
+    "css:types:watch": "tcm public/js -p \"**/*.module.css\" --watch",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
     "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
@@ -37,6 +39,7 @@
     "bcryptjs": "^3.0.3",
     "chalk": "^5.6.2",
     "chart.js": "^4.5.1",
+    "classnames": "^2.5.1",
     "connect-sqlite3": "^0.9.16",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
@@ -70,6 +73,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@types/bcryptjs": "^2.4.6",
+    "@types/classnames": "^2.3.0",
     "@types/express": "^5.0.6",
     "@types/express-session": "^1.18.2",
     "@types/multer": "^2.0.0",
@@ -92,6 +96,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "prettier": "^3.7.4",
     "tsx": "^4.21.0",
+    "typed-css-modules": "^0.9.1",
     "typescript": "^5.9.3",
     "vite": "^7.2.2"
   }

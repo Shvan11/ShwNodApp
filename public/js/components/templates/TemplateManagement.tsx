@@ -5,9 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-// Template management CSS
-import '../../../css/pages/template-management.css';
+import styles from './TemplateManagement.module.css';
 import TemplateCard from './TemplateCard';
 import CreateTemplateModal from './CreateTemplateModal';
 import TemplateStats from './TemplateStats';
@@ -195,11 +193,11 @@ function TemplateManagement() {
     );
 
     return (
-        <main className="main-content">
-            <div className="container">
+        <main className={styles.mainContent}>
+            <div className={styles.container}>
                 {/* Page Header */}
-                <div className="page-header">
-                    <div className="header-content">
+                <div className={styles.pageHeader}>
+                    <div className={styles.headerContent}>
                         <h2>
                             <i className="fas fa-file-alt"></i> Document Template Management
                         </h2>
@@ -214,11 +212,11 @@ function TemplateManagement() {
                 </div>
 
                 {/* Statistics */}
-                <TemplateStats stats={stats} />
+                <TemplateStats stats={stats} styles={styles} />
 
                 {/* Document Type Tabs */}
-                <div className="tabs-container">
-                    <div className="tabs">
+                <div className={styles.tabsContainer}>
+                    <div className={styles.tabs}>
                         {documentTypes.map(docType => {
                             const templateCount = allTemplates.filter(
                                 t => t.document_type_id === docType.type_id
@@ -227,12 +225,12 @@ function TemplateManagement() {
                             return (
                                 <button
                                     key={docType.type_id}
-                                    className={`tab ${currentDocumentType === docType.type_id ? 'active' : ''}`}
+                                    className={`${styles.tab} ${currentDocumentType === docType.type_id ? styles.tabActive : ''}`}
                                     onClick={() => setCurrentDocumentType(docType.type_id)}
                                 >
                                     <i className={`fas ${docType.icon}`}></i>
                                     {docType.type_name}
-                                    <span className="tab-badge">{templateCount}</span>
+                                    <span className={styles.tabBadge}>{templateCount}</span>
                                 </button>
                             );
                         })}
@@ -240,14 +238,14 @@ function TemplateManagement() {
                 </div>
 
                 {/* Templates List */}
-                <div className="templates-container">
+                <div className={styles.templatesContainer}>
                     {isLoading ? (
-                        <div className="loading-state">
+                        <div className={styles.loadingState}>
                             <i className="fas fa-spinner fa-spin"></i>
                             <p>Loading templates...</p>
                         </div>
                     ) : error ? (
-                        <div className="error-state">
+                        <div className={styles.errorState}>
                             <i className="fas fa-exclamation-circle"></i>
                             <p>{error}</p>
                             <button className="btn btn-primary" onClick={loadAllTemplates}>
@@ -255,7 +253,7 @@ function TemplateManagement() {
                             </button>
                         </div>
                     ) : filteredTemplates.length === 0 ? (
-                        <div className="empty-state">
+                        <div className={styles.emptyState}>
                             <i className="fas fa-file-alt"></i>
                             <h3>No templates found</h3>
                             <p>Create your first template to get started</p>
@@ -267,7 +265,7 @@ function TemplateManagement() {
                             </button>
                         </div>
                     ) : (
-                        <div className="templates-grid">
+                        <div className={styles.templatesGrid}>
                             {filteredTemplates.map(template => (
                                 <TemplateCard
                                     key={template.template_id}
@@ -275,6 +273,7 @@ function TemplateManagement() {
                                     onEdit={handleEditTemplate}
                                     onSetDefault={handleSetDefault}
                                     onDelete={handleDeleteTemplate}
+                                    styles={styles}
                                 />
                             ))}
                         </div>
@@ -289,6 +288,7 @@ function TemplateManagement() {
                     currentDocumentType={currentDocumentType}
                     onClose={() => setIsCreateModalOpen(false)}
                     onCreate={handleCreateTemplate}
+                    styles={styles}
                 />
             )}
         </main>

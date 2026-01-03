@@ -20,7 +20,7 @@ import LabelPreviewModal from '../components/react/LabelPreviewModal';
 interface QueuedItem {
   id: string;
   batchNumber: number;
-  patientId: string | number;
+  personId: number;
   patientName: string;
   doctorName?: string;
   doctorLogoPath?: string;

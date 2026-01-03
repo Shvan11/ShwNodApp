@@ -1,5 +1,6 @@
 import type { ChangeEvent } from 'react';
 import ConnectionStatus, { type ConnectionStatusType } from './ConnectionStatus';
+import styles from './AppointmentsHeader.module.css';
 
 interface AppointmentsHeaderProps {
     selectedDate: string;
@@ -48,40 +49,41 @@ const AppointmentsHeader = ({
     };
 
     return (
-        <div className="header-section">
-            <h1 id="title">Appointments for {formatDateForDisplay(selectedDate)}</h1>
-            <div className="header-controls">
-                <div className="date-picker-container">
-                    <div className="date-picker-left">
-                        <label htmlFor="date-picker">Select Date:</label>
+        <div className={styles.header}>
+            <h1 className={styles.title}>Appointments for {formatDateForDisplay(selectedDate)}</h1>
+            <div className={styles.controls}>
+                <div className={styles.datePickerContainer}>
+                    <div className={styles.datePickerLeft}>
+                        <label htmlFor="date-picker" className={styles.datePickerLabel}>Select Date:</label>
                         <input
                             type="date"
                             id="date-picker"
+                            className={styles.dateInput}
                             value={selectedDate}
                             onChange={handleDateInputChange}
                         />
                         <button
-                            className="btn-refresh"
+                            className={styles.refreshButton}
                             onClick={onRefresh}
                             disabled={isRefreshing}
                             title="Refresh today's appointments"
                         >
-                            <i className={`fas fa-sync-alt ${isRefreshing ? 'spinning' : ''}`}></i>
+                            <i className={`fas fa-sync-alt ${isRefreshing ? styles.spinning : ''}`}></i>
                         </button>
                     </div>
                 </div>
-                <div className="search-input-wrapper">
-                    <i className="fas fa-search search-icon"></i>
+                <div className={styles.searchWrapper}>
+                    <i className={`fas fa-search ${styles.searchIcon}`}></i>
                     <input
                         type="text"
-                        className="search-input"
+                        className={styles.searchInput}
                         placeholder="Search patient..."
                         value={searchTerm}
                         onChange={handleSearchInputChange}
                     />
                     {searchTerm && (
                         <button
-                            className="search-clear"
+                            className={styles.searchClear}
                             onClick={() => onSearchChange('')}
                             title="Clear search"
                         >

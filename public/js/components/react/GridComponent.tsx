@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
+import tpStyles from './TimePointsSelector.module.css';
+import styles from './GridComponent.module.css';
 
 interface Props {
-    patientId?: string;
+    personId?: number | null;
     tpCode?: string;
 }
 
@@ -73,7 +75,7 @@ declare global {
     }
 }
 
-const GridComponent = ({ patientId, tpCode = '0' }: Props) => {
+const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     const navigate = useNavigate();
     const toast = useToast();
     const [images, setImages] = useState<GalleryImage[]>([]);
@@ -120,7 +122,7 @@ const GridComponent = ({ patientId, tpCode = '0' }: Props) => {
         const fileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
         const extensionMatch = fileName.match(/\.([^.]+)$/);
         const extension = extensionMatch ? extensionMatch[1] : '';
-        return fileNameMap[extension] || `patient_${patientId}_photo.jpg`;
+        return fileNameMap[extension] || `patient_${personId}_photo.jpg`;
     };
 
     // Pre-fetch blob for current slide (called on slide change, mobile only)
@@ -190,15 +192,15 @@ const GridComponent = ({ patientId, tpCode = '0' }: Props) => {
     };
 
     const loadTimepoints = async () => {
-        // Skip loading if patientId is not a valid number
-        if (!patientId || isNaN(parseInt(patientId))) {
+        // Skip loading if personId is not valid
+        if (!personId) {
             setLoadingTimepoints(false);
             return;
         }
 
         try {
             setLoadingTimepoints(true);
-            const response = await fetch(`/api/patients/${patientId}/timepoints`);
+            const response = await fetch(`/api/patients/${personId}/timepoints`);
 
             if (!response.ok) {
                 throw new Error('Failed to load timepoints');
@@ -214,8 +216,8 @@ const GridComponent = ({ patientId, tpCode = '0' }: Props) => {
     };
 
     const loadGalleryImages = async () => {
-        // Skip loading if patientId is not a valid number
-        if (!patientId || isNaN(parseInt(patientId))) {
+        // Skip loading if personId is not valid
+        if (!personId) {
             setLoading(false);
             return;
         }
@@ -223,7 +225,7 @@ const GridComponent = ({ patientId, tpCode = '0' }: Props) => {
         try {
             setLoading(true);
 
-            const response = await fetch(`/api/patients/${patientId}/gallery/${tpCode}`);
+            const response = await fetch(`/api/patients/${personId}/gallery/${tpCode}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -500,17 +502,17 @@ const GridComponent = ({ patientId, tpCode = '0' }: Props) => {
 
     // Load timepoints when component mounts
     useEffect(() => {
-        if (patientId) {
+        if (personId) {
             loadTimepoints();
         }
-    }, [patientId]);
+    }, [personId]);
 
     // Load images when component mounts or dependencies change
     useEffect(() => {
-        if (patientId) {
+        if (personId) {
             loadGalleryImages();
         }
-    }, [patientId, tpCode]);
+    }, [personId, tpCode]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -603,7 +605,7 @@ const GridComponent = ({ patientId, tpCode = '0' }: Props) => {
 
     if (loading) {
         return (
-            <div className="loading-spinner">
+            <div className={styles.loadingSpinner}>
                 Loading gallery...
             </div>
         );
@@ -611,7 +613,7 @@ const GridComponent = ({ patientId, tpCode = '0' }: Props) => {
 
     if (error) {
         return (
-            <div className="error-message">
+            <div className={styles.errorMessage}>
                 Error: {error}
             </div>
         );
@@ -623,7 +625,7 @@ const GridComponent = ({ patientId, tpCode = '0' }: Props) => {
     };
 
     const handleTimepointClick = (tp: string) => {
-        navigate(`/patient/${patientId}/photos/tp${tp}`);
+        navigate(`/patient/${personId}/photos/tp${tp}`);
     };
 
     const handleImageMouseEnter = (e: ReactMouseEvent<HTMLImageElement>) => {
@@ -637,23 +639,23 @@ const GridComponent = ({ patientId, tpCode = '0' }: Props) => {
     return (
         <div
             ref={componentRef}
-            className="grid-component-container"
+            className={styles.container}
         >
             {/* Timepoints Selector */}
             {!loadingTimepoints && timepoints.length > 0 && (
-                <div className="timepoints-selector">
+                <div className={tpStyles.selector}>
                     {timepoints.map((timepoint, index) => (
                         <button
                             key={`tp-${timepoint.tpCode}-${index}`}
-                            className={`timepoint-tab ${tpCode === timepoint.tpCode ? 'active' : ''}`}
+                            className={`${tpStyles.tab} ${tpCode === timepoint.tpCode ? tpStyles.tabActive : ''}`}
                             onClick={() => handleTimepointClick(timepoint.tpCode)}
                         >
-                            <div className="timepoint-tab-icon">
+                            <div className={tpStyles.tabIcon}>
                                 <i className="fas fa-camera"></i>
                             </div>
-                            <div className="timepoint-tab-content">
-                                <div className="timepoint-tab-desc">{timepoint.tpDescription}</div>
-                                <div className="timepoint-tab-date">{formatDate(timepoint.tpDateTime)}</div>
+                            <div className={tpStyles.tabContent}>
+                                <div className={tpStyles.tabDesc}>{timepoint.tpDescription}</div>
+                                <div className={tpStyles.tabDate}>{formatDate(timepoint.tpDateTime)}</div>
                             </div>
                         </button>
                     ))}
@@ -662,7 +664,7 @@ const GridComponent = ({ patientId, tpCode = '0' }: Props) => {
 
             <div
                 id="dolph_gallery"
-                className="pswp-gallery pswp-gallery-padded"
+                className={`pswp-gallery ${styles.galleryPadded}`}
                 style={calculateGridStyle()}
             >
                 {imageElements.map(element => {
@@ -684,7 +686,7 @@ const GridComponent = ({ patientId, tpCode = '0' }: Props) => {
                                 id={element.id}
                                 src={imageSrc}
                                 alt={element.alt}
-                                className={`gallery-image ${element.isLogo ? 'logo-border' : ''}`}
+                                className={`${styles.galleryImage} ${element.isLogo ? styles.logoBorder : ''}`}
                                 onMouseEnter={handleImageMouseEnter}
                                 onMouseLeave={handleImageMouseLeave}
                             />

@@ -3,14 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import DolphinPhotoDialog from './DolphinPhotoDialog';
 import AlertModal from './AlertModal';
 import { useToast } from '../../contexts/ToastContext';
+import styles from './ViewPatientInfo.module.css';
 
 interface Props {
-    patientId?: string;
+    personId?: number | null;  // Validated PersonID from loader (null if invalid)
 }
 
 interface Alert {
     AlertID: number;
     AlertDetails: string;
+    AlertTypeID?: number;
+    AlertSeverity?: number;
+    CreationDate?: string;
 }
 
 interface PatientInfo {
@@ -30,7 +34,6 @@ interface PatientInfo {
     Tag?: string;
     Notes?: string;
     DateAdded?: string;
-    patientID?: string;
     CountryCode?: string;
     DolphinId?: number | null;
     EstimatedCost?: string | number;
@@ -58,7 +61,7 @@ interface AlertType {
     TypeName: string;
 }
 
-const ViewPatientInfo = ({ patientId }: Props) => {
+const ViewPatientInfo = ({ personId }: Props) => {
     const navigate = useNavigate();
     const toast = useToast();
     const [patientInfo, setPatientInfo] = useState<PatientInfo | null>(null);
@@ -70,12 +73,16 @@ const ViewPatientInfo = ({ patientId }: Props) => {
     const [showAlertModal, setShowAlertModal] = useState(false);
     const [deletingAlertId, setDeletingAlertId] = useState<number | null>(null);
     const [showDolphinDialog, setShowDolphinDialog] = useState(false);
+    const [editingAlert, setEditingAlert] = useState<Alert | null>(null);
 
     // Cost editing state
     const [editingCost, setEditingCost] = useState<EditingCostState | null>(null);
     const [savingCost, setSavingCost] = useState(false);
     const [costPresets, setCostPresets] = useState<CostPreset[]>([]);
     const [presetsLoading, setPresetsLoading] = useState(false);
+
+    // Use validated PersonID from loader, fallback to patientInfo.PersonID
+    const validPersonId = personId ?? patientInfo?.PersonID ?? null;
 
     const formatPhoneDisplay = (countryCode: string | undefined, phone: string | undefined): string => {
         if (!phone) return '-';
@@ -145,14 +152,15 @@ const ViewPatientInfo = ({ patientId }: Props) => {
     };
 
     const loadPatientInfo = useCallback(async () => {
-        if (!patientId) {
+        // Use validated personId from loader
+        if (!personId) {
             setLoading(false);
             return;
         }
 
         try {
             setLoading(true);
-            const response = await fetch(`/api/patients/${patientId}/info`);
+            const response = await fetch(`/api/patients/${personId}/info`);
 
             if (!response.ok) {
                 throw new Error('Failed to load patient info');
@@ -166,14 +174,15 @@ const ViewPatientInfo = ({ patientId }: Props) => {
         } finally {
             setLoading(false);
         }
-    }, [patientId]);
+    }, [personId]);
 
     const loadAlerts = useCallback(async () => {
-        if (!patientId) return;
+        // Use validated personId from loader
+        if (!personId) return;
 
         try {
             setAlertsLoading(true);
-            const response = await fetch(`/api/patients/${patientId}/alerts`);
+            const response = await fetch(`/api/patients/${personId}/alerts`);
 
             if (response.ok) {
                 const data = await response.json();
@@ -184,7 +193,7 @@ const ViewPatientInfo = ({ patientId }: Props) => {
         } finally {
             setAlertsLoading(false);
         }
-    }, [patientId]);
+    }, [personId]);
 
     const loadCostPresets = useCallback(async () => {
         try {
@@ -218,7 +227,7 @@ const ViewPatientInfo = ({ patientId }: Props) => {
         loadAlerts();
         loadCostPresets();
         loadAlertTypes();
-    }, [patientId, loadPatientInfo, loadAlerts, loadCostPresets, loadAlertTypes]);
+    }, [personId, loadPatientInfo, loadAlerts, loadCostPresets, loadAlertTypes]);
 
     // Handle alert modal save - refresh alerts list
     const handleAlertSaved = async () => {
@@ -257,12 +266,12 @@ const ViewPatientInfo = ({ patientId }: Props) => {
     };
 
     const handleSaveCost = async () => {
-        if (!editingCost) return;
+        if (!editingCost || !validPersonId) return;
 
         try {
             setSavingCost(true);
 
-            const response = await fetch(`/api/patients/${patientId}/estimated-cost`, {
+            const response = await fetch(`/api/patients/${validPersonId}/estimated-cost`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -313,8 +322,8 @@ const ViewPatientInfo = ({ patientId }: Props) => {
 
     if (loading) {
         return (
-            <div className="patient-info-loading">
-                <i className="fas fa-spinner fa-spin patient-loading-spinner"></i>
+            <div className={styles.patientInfoLoading}>
+                <i className={`fas fa-spinner fa-spin ${styles.patientLoadingSpinner}`}></i>
                 <p>Loading patient information...</p>
             </div>
         );
@@ -322,8 +331,8 @@ const ViewPatientInfo = ({ patientId }: Props) => {
 
     if (error) {
         return (
-            <div className="patient-info-error">
-                <i className="fas fa-exclamation-triangle patient-error-icon"></i>
+            <div className={styles.patientInfoError}>
+                <i className={`fas fa-exclamation-triangle ${styles.patientErrorIcon}`}></i>
                 <p>{error}</p>
                 <button onClick={loadPatientInfo}>Retry</button>
             </div>
@@ -332,69 +341,104 @@ const ViewPatientInfo = ({ patientId }: Props) => {
 
     if (!patientInfo) {
         return (
-            <div className="patient-info-empty">
-                <i className="fas fa-user patient-empty-icon"></i>
+            <div className={styles.patientInfoEmpty}>
+                <i className={`fas fa-user ${styles.patientEmptyIcon}`}></i>
                 <p>No patient information found</p>
             </div>
         );
     }
 
     return (
-        <div className="patient-info-container">
+        <div className={styles.patientInfoContainer}>
             {/* Header Section */}
-            <div className="patient-info-header">
-                <div className="patient-avatar">
-                    <i className="fas fa-user-circle patient-avatar-icon"></i>
+            <div className={styles.patientInfoHeader}>
+                <div className={styles.patientAvatar}>
+                    <i className={`fas fa-user-circle ${styles.patientAvatarIcon}`}></i>
                 </div>
-                <div className="patient-header-details">
-                    <h2 className="patient-primary-name">{patientInfo.PatientName}</h2>
-                    {(patientInfo.FirstName || patientInfo.LastName) && (
-                        <p className="patient-secondary-name">
-                            {patientInfo.FirstName} {patientInfo.LastName}
-                        </p>
-                    )}
-                    <p className="patient-id">ID: {patientInfo.patientID || patientInfo.PersonID}</p>
+                <div className={styles.patientHeaderDetails}>
+                    <h2 className={styles.patientPrimaryName}>{patientInfo.PatientName}</h2>
+                    <p className={styles.patientSecondaryName}>
+                        {(patientInfo.FirstName || patientInfo.LastName) && (
+                            <span>{patientInfo.FirstName} {patientInfo.LastName}</span>
+                        )}
+                        <span className={styles.patientId}>ID: {patientInfo.PersonID}</span>
+                    </p>
                 </div>
-                <div className="patient-header-actions">
+                <div className={styles.patientHeaderActions}>
                     <button
-                        onClick={() => navigate(`/patient/${patientId}/edit-patient`)}
+                        onClick={() => navigate(`/patient/${validPersonId}/edit-patient`)}
                         className="btn btn-primary"
+                        disabled={!validPersonId}
                     >
-                        <i className="fas fa-edit pi-icon-gap"></i>
+                        <i className={`fas fa-edit ${styles.piIconGap}`}></i>
                         Edit Patient
                     </button>
                     <button
                         onClick={() => setShowDolphinDialog(true)}
                         className="btn btn-secondary"
                     >
-                        <i className="fas fa-camera pi-icon-gap"></i>
+                        <i className={`fas fa-camera ${styles.piIconGap}`}></i>
                         Add Photos
                     </button>
                 </div>
             </div>
 
             {/* Alerts Section */}
-            {(alerts.length > 0 || (patientInfo.AlertCount != null && patientInfo.AlertCount > 0)) && (
-                <div className="patient-alerts-section">
-                    <h3 className="patient-section-title">
-                        <i className="fas fa-exclamation-triangle alert-icon pi-icon-gap"></i>
-                        Important Alerts
+            <div className={styles.patientAlertsSection}>
+                <div className={styles.patientAlertHeader}>
+                    <h3 className={styles.patientSectionTitle}>
+                        <i className={`fas fa-exclamation-triangle ${styles.alertIcon} ${styles.piIconGap}`}></i>
+                        Alerts
                     </h3>
-                    <div className="patient-alerts-list">
-                        {alertsLoading ? (
-                            <div className="patient-alerts-loading">
-                                <i className="fas fa-spinner fa-spin"></i>
-                                Loading alerts...
-                            </div>
-                        ) : (
-                            alerts.map(alert => (
-                                <div key={alert.AlertID} className="patient-alert-item">
-                                    <span className="patient-alert-text">{alert.AlertDetails}</span>
+                    <button
+                        onClick={() => {
+                            setEditingAlert(null);
+                            setShowAlertModal(true);
+                        }}
+                        className="btn btn-warning btn-sm"
+                        disabled={!validPersonId}
+                    >
+                        <i className={`fas fa-plus ${styles.piIconGap}`}></i>
+                        Add Alert
+                    </button>
+                </div>
+                {alertsLoading ? (
+                    <div className={styles.patientAlertsLoading}>
+                        <i className="fas fa-spinner fa-spin"></i>
+                        Loading alerts...
+                    </div>
+                ) : alerts.length > 0 ? (
+                    <div className={styles.patientAlertsList}>
+                        {alerts.map(alert => (
+                            <div key={alert.AlertID} className={styles.patientAlertItem}>
+                                <div className={styles.patientAlertContent}>
+                                    <span className={styles.patientAlertText}>{alert.AlertDetails}</span>
+                                    {alert.CreationDate && (
+                                        <span className={styles.patientAlertDate}>
+                                            {new Date(alert.CreationDate).toLocaleDateString('en-US', {
+                                                year: 'numeric',
+                                                month: 'short',
+                                                day: 'numeric'
+                                            })}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className={styles.patientAlertActions}>
+                                    <button
+                                        onClick={() => {
+                                            setEditingAlert(alert);
+                                            setShowAlertModal(true);
+                                        }}
+                                        className={styles.patientAlertEdit}
+                                        title="Edit alert"
+                                    >
+                                        <i className="fas fa-pencil-alt"></i>
+                                    </button>
                                     <button
                                         onClick={() => handleDeleteAlert(alert.AlertID)}
                                         disabled={deletingAlertId === alert.AlertID}
-                                        className="patient-alert-delete"
-                                        title="Delete alert"
+                                        className={styles.patientAlertDelete}
+                                        title="Archive alert"
                                     >
                                         {deletingAlertId === alert.AlertID ? (
                                             <i className="fas fa-spinner fa-spin"></i>
@@ -403,83 +447,76 @@ const ViewPatientInfo = ({ patientId }: Props) => {
                                         )}
                                     </button>
                                 </div>
-                            ))
-                        )}
+                            </div>
+                        ))}
                     </div>
-                </div>
-            )}
-
-            {/* Add Alert Button */}
-            <div className="patient-add-alert-section">
-                <button
-                    onClick={() => setShowAlertModal(true)}
-                    className="btn btn-warning"
-                >
-                    <i className="fas fa-plus pi-icon-gap"></i>
-                    Add New Alert
-                </button>
+                ) : (
+                    <div className={styles.patientAlertsEmpty}>
+                        No alerts for this patient
+                    </div>
+                )}
             </div>
 
             {/* Info Grid */}
-            <div className="patient-info-grid">
+            <div className={styles.patientInfoGrid}>
                 {/* Contact Information */}
-                <div className="patient-info-card">
-                    <h3 className="patient-card-title">
-                        <i className="fas fa-address-book pi-icon-gap"></i>
+                <div className={styles.patientInfoCard}>
+                    <h3 className={styles.patientCardTitle}>
+                        <i className={`fas fa-address-book ${styles.piIconGap}`}></i>
                         Contact Information
                     </h3>
-                    <div className="patient-info-rows">
-                        <div className="patient-info-row">
-                            <span className="patient-info-label">Phone:</span>
-                            <span className="patient-info-value">
+                    <div className={styles.patientInfoRows}>
+                        <div className={styles.patientInfoRow}>
+                            <span className={styles.patientInfoLabel}>Phone:</span>
+                            <span className={styles.patientInfoValue}>
                                 {formatPhoneDisplay(patientInfo.CountryCode, patientInfo.Phone)}
                             </span>
                         </div>
                         {patientInfo.Phone2 && (
-                            <div className="patient-info-row">
-                                <span className="patient-info-label">Phone 2:</span>
-                                <span className="patient-info-value">{patientInfo.Phone2}</span>
+                            <div className={styles.patientInfoRow}>
+                                <span className={styles.patientInfoLabel}>Phone 2:</span>
+                                <span className={styles.patientInfoValue}>{patientInfo.Phone2}</span>
                             </div>
                         )}
-                        <div className="patient-info-row">
-                            <span className="patient-info-label">Email:</span>
-                            <span className="patient-info-value">{patientInfo.Email || '-'}</span>
+                        <div className={styles.patientInfoRow}>
+                            <span className={styles.patientInfoLabel}>Email:</span>
+                            <span className={styles.patientInfoValue}>{patientInfo.Email || '-'}</span>
                         </div>
-                        <div className="patient-info-row">
-                            <span className="patient-info-label">Address:</span>
-                            <span className="patient-info-value">{patientInfo.Address || '-'}</span>
+                        <div className={styles.patientInfoRow}>
+                            <span className={styles.patientInfoLabel}>Address:</span>
+                            <span className={styles.patientInfoValue}>{patientInfo.Address || '-'}</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Personal Information */}
-                <div className="patient-info-card">
-                    <h3 className="patient-card-title">
-                        <i className="fas fa-user pi-icon-gap"></i>
+                <div className={styles.patientInfoCard}>
+                    <h3 className={styles.patientCardTitle}>
+                        <i className={`fas fa-user ${styles.piIconGap}`}></i>
                         Personal Information
                     </h3>
-                    <div className="patient-info-rows">
-                        <div className="patient-info-row">
-                            <span className="patient-info-label">Date of Birth:</span>
-                            <span className="patient-info-value">
+                    <div className={styles.patientInfoRows}>
+                        <div className={styles.patientInfoRow}>
+                            <span className={styles.patientInfoLabel}>Date of Birth:</span>
+                            <span className={styles.patientInfoValue}>
                                 {formatDateDisplay(patientInfo.DateOfBirth)}
                             </span>
                         </div>
-                        <div className="patient-info-row">
-                            <span className="patient-info-label">Age:</span>
-                            <span className="patient-info-value">
+                        <div className={styles.patientInfoRow}>
+                            <span className={styles.patientInfoLabel}>Age:</span>
+                            <span className={styles.patientInfoValue}>
                                 {calculateAge(patientInfo.DateOfBirth)}
                             </span>
                         </div>
-                        <div className="patient-info-row">
-                            <span className="patient-info-label">Gender:</span>
-                            <span className="patient-info-value">
+                        <div className={styles.patientInfoRow}>
+                            <span className={styles.patientInfoLabel}>Gender:</span>
+                            <span className={styles.patientInfoValue}>
                                 {patientInfo.GenderDisplay || patientInfo.Gender || '-'}
                             </span>
                         </div>
-                        <div className="patient-info-row">
-                            <span className="patient-info-label">Language:</span>
-                            <span className="patient-info-value">
+                        <div className={styles.patientInfoRow}>
+                            <span className={styles.patientInfoLabel}>Language:</span>
+                            <span className={styles.patientInfoValue}>
                                 {getLanguageDisplay(patientInfo.Language)}
                             </span>
                         </div>
@@ -487,35 +524,35 @@ const ViewPatientInfo = ({ patientId }: Props) => {
                 </div>
 
                 {/* Additional Information */}
-                <div className="patient-info-card">
-                    <h3 className="patient-card-title">
-                        <i className="fas fa-info-circle pi-icon-gap"></i>
+                <div className={styles.patientInfoCard}>
+                    <h3 className={styles.patientCardTitle}>
+                        <i className={`fas fa-info-circle ${styles.piIconGap}`}></i>
                         Additional Information
                     </h3>
-                    <div className="patient-info-rows">
-                        <div className="patient-info-row">
-                            <span className="patient-info-label">Patient Type:</span>
-                            <span className="patient-info-value">{patientInfo.PatientType || '-'}</span>
+                    <div className={styles.patientInfoRows}>
+                        <div className={styles.patientInfoRow}>
+                            <span className={styles.patientInfoLabel}>Patient Type:</span>
+                            <span className={styles.patientInfoValue}>{patientInfo.PatientType || '-'}</span>
                         </div>
-                        <div className="patient-info-row">
-                            <span className="patient-info-label">Referral Source:</span>
-                            <span className="patient-info-value">{patientInfo.ReferralSource || '-'}</span>
+                        <div className={styles.patientInfoRow}>
+                            <span className={styles.patientInfoLabel}>Referral Source:</span>
+                            <span className={styles.patientInfoValue}>{patientInfo.ReferralSource || '-'}</span>
                         </div>
                         {patientInfo.Tag && (
-                            <div className="patient-info-row">
-                                <span className="patient-info-label">Tag:</span>
-                                <span className="patient-info-value patient-tag">{patientInfo.Tag}</span>
+                            <div className={styles.patientInfoRow}>
+                                <span className={styles.patientInfoLabel}>Tag:</span>
+                                <span className={`${styles.patientInfoValue} ${styles.patientTag}`}>{patientInfo.Tag}</span>
                             </div>
                         )}
-                        <div className="patient-info-row">
-                            <span className="patient-info-label">Dolphin ID:</span>
-                            <span className="patient-info-value">
+                        <div className={styles.patientInfoRow}>
+                            <span className={styles.patientInfoLabel}>Dolphin ID:</span>
+                            <span className={styles.patientInfoValue}>
                                 {patientInfo.DolphinId || '-'}
                             </span>
                         </div>
-                        <div className="patient-info-row">
-                            <span className="patient-info-label">Date Added:</span>
-                            <span className="patient-info-value">
+                        <div className={styles.patientInfoRow}>
+                            <span className={styles.patientInfoLabel}>Date Added:</span>
+                            <span className={styles.patientInfoValue}>
                                 {formatDateDisplay(patientInfo.DateAdded)}
                             </span>
                         </div>
@@ -523,15 +560,15 @@ const ViewPatientInfo = ({ patientId }: Props) => {
                 </div>
 
                 {/* Cost Information */}
-                <div className="patient-info-card">
-                    <h3 className="patient-card-title">
-                        <i className="fas fa-dollar-sign pi-icon-gap"></i>
+                <div className={styles.patientInfoCard}>
+                    <h3 className={styles.patientCardTitle}>
+                        <i className={`fas fa-dollar-sign ${styles.piIconGap}`}></i>
                         Estimated Cost
                     </h3>
-                    <div className="patient-info-rows">
+                    <div className={styles.patientInfoRows}>
                         {editingCost ? (
-                            <div className="patient-cost-edit-form">
-                                <div className="patient-cost-input-group">
+                            <div className={styles.patientCostEditForm}>
+                                <div className={styles.patientCostInputGroup}>
                                     <input
                                         type="text"
                                         value={formatCostInput(editingCost.value)}
@@ -539,7 +576,7 @@ const ViewPatientInfo = ({ patientId }: Props) => {
                                             ...editingCost,
                                             value: parseCostInput(e.target.value)
                                         })}
-                                        className="patient-cost-input"
+                                        className={styles.patientCostInput}
                                         placeholder="Enter cost..."
                                     />
                                     <select
@@ -548,7 +585,7 @@ const ViewPatientInfo = ({ patientId }: Props) => {
                                             ...editingCost,
                                             currency: e.target.value
                                         })}
-                                        className="patient-cost-currency"
+                                        className={styles.patientCostCurrency}
                                     >
                                         <option value="IQD">IQD</option>
                                         <option value="USD">USD</option>
@@ -557,24 +594,24 @@ const ViewPatientInfo = ({ patientId }: Props) => {
                                 </div>
                                 {/* Cost Presets */}
                                 {presetsLoading ? (
-                                    <div className="patient-cost-presets-loading">
+                                    <div className={styles.patientCostPresetsLoading}>
                                         <i className="fas fa-spinner fa-spin"></i>
                                     </div>
                                 ) : getFilteredPresets().length > 0 && (
-                                    <div className="patient-cost-presets">
+                                    <div className={styles.patientCostPresets}>
                                         {getFilteredPresets().map(preset => (
                                             <button
                                                 key={preset.PresetID}
                                                 type="button"
                                                 onClick={() => handleSelectPreset(preset)}
-                                                className="patient-cost-preset-btn"
+                                                className={styles.patientCostPresetBtn}
                                             >
                                                 {formatPresetAmount(preset.Amount)}
                                             </button>
                                         ))}
                                     </div>
                                 )}
-                                <div className="patient-cost-edit-actions">
+                                <div className={styles.patientCostEditActions}>
                                     <button
                                         onClick={handleSaveCost}
                                         disabled={savingCost}
@@ -596,13 +633,13 @@ const ViewPatientInfo = ({ patientId }: Props) => {
                                 </div>
                             </div>
                         ) : (
-                            <div className="patient-info-row">
-                                <span className="patient-info-label">Estimated Cost:</span>
-                                <span className="patient-info-value patient-cost-display">
+                            <div className={styles.patientInfoRow}>
+                                <span className={styles.patientInfoLabel}>Estimated Cost:</span>
+                                <span className={`${styles.patientInfoValue} ${styles.patientCostDisplay}`}>
                                     {formatCostDisplay(patientInfo.EstimatedCost, patientInfo.Currency)}
                                     <button
                                         onClick={handleStartEditingCost}
-                                        className="patient-cost-edit-btn"
+                                        className={styles.patientCostEditBtn}
                                         title="Edit cost"
                                     >
                                         <i className="fas fa-pencil-alt"></i>
@@ -612,38 +649,42 @@ const ViewPatientInfo = ({ patientId }: Props) => {
                         )}
                     </div>
                 </div>
-            </div>
 
-            {/* Notes Section */}
-            {patientInfo.Notes && (
-                <div className="patient-notes-section">
-                    <h3 className="patient-section-title">
-                        <i className="fas fa-sticky-note pi-icon-gap"></i>
+                {/* Notes */}
+                <div className={`${styles.patientInfoCard} ${styles.patientNotesCard}`}>
+                    <h3 className={styles.patientCardTitle}>
+                        <i className={`fas fa-sticky-note ${styles.piIconGap}`}></i>
                         Notes
                     </h3>
-                    <div className="patient-notes-content">
-                        {patientInfo.Notes}
+                    <div className={styles.patientNotesContent}>
+                        {patientInfo.Notes || <span className={styles.patientNotesEmpty}>No notes for this patient</span>}
                     </div>
                 </div>
-            )}
+            </div>
 
             {/* Dolphin Photo Dialog */}
-            {showDolphinDialog && (
+            {showDolphinDialog && validPersonId && (
                 <DolphinPhotoDialog
-                    patientId={patientId}
+                    personId={String(validPersonId)}
                     patientInfo={patientInfo}
                     onClose={() => setShowDolphinDialog(false)}
                 />
             )}
 
             {/* Alert Modal */}
-            <AlertModal
-                isOpen={showAlertModal}
-                onClose={() => setShowAlertModal(false)}
-                onSave={handleAlertSaved}
-                personId={patientId || ''}
-                alertTypes={alertTypes}
-            />
+            {validPersonId && (
+                <AlertModal
+                    isOpen={showAlertModal}
+                    onClose={() => {
+                        setShowAlertModal(false);
+                        setEditingAlert(null);
+                    }}
+                    onSave={handleAlertSaved}
+                    personId={validPersonId}
+                    alertTypes={alertTypes}
+                    editAlert={editingAlert}
+                />
+            )}
         </div>
     );
 };

@@ -1,11 +1,11 @@
 // SearchPatient.tsx - Quick search for patients by name/ID/phone
 import React, { useState, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import styles from './SearchPatient.module.css';
 
 interface AlignerPatient {
     workid: number;
     PersonID: number;
-    patientID: string;
     PatientName?: string;
     FirstName?: string;
     LastName?: string;
@@ -73,9 +73,9 @@ const SearchPatient: React.FC = () => {
     return (
         <>
             {/* Search Box */}
-            <div className="search-section">
-                <div className="search-box">
-                    <i className="fas fa-search search-icon"></i>
+            <div className={styles.searchSection}>
+                <div className={styles.searchBox}>
+                    <i className={`fas fa-search ${styles.searchIcon}`}></i>
                     <input
                         type="text"
                         id="patient-search"
@@ -84,14 +84,14 @@ const SearchPatient: React.FC = () => {
                         value={searchQuery}
                         onChange={handleSearchChange}
                     />
-                    <span className="search-info">Minimum 2 characters</span>
+                    <span className={styles.searchInfo}>Minimum 2 characters</span>
                 </div>
 
                 {/* Search Results */}
                 {showResults && (
-                    <div className="search-results">
+                    <div className={styles.searchResults}>
                         {searchResults.length === 0 ? (
-                            <div className="search-no-results">
+                            <div className={styles.searchNoResults}>
                                 <i className="fas fa-user-slash"></i>
                                 <p>No aligner patients found</p>
                             </div>
@@ -99,19 +99,19 @@ const SearchPatient: React.FC = () => {
                             searchResults.map((patient, index) => (
                                 <div
                                     key={index}
-                                    className="search-result-item"
+                                    className={styles.searchResultItem}
                                     onClick={() => selectPatient(patient)}
                                 >
-                                    <div className="result-name">
+                                    <div className={styles.resultName}>
                                         {formatPatientName(patient)}
                                         {patient.PatientName && patient.FirstName && (
-                                            <span className="result-name-secondary">
+                                            <span className={styles.resultNameSecondary}>
                                                 ({patient.FirstName} {patient.LastName})
                                             </span>
                                         )}
                                     </div>
-                                    <div className="result-meta">
-                                        <span><i className="fas fa-id-card"></i> {patient.patientID || 'N/A'}</span>
+                                    <div className={styles.resultMeta}>
+                                        <span><i className="fas fa-id-card"></i> {patient.PersonID}</span>
                                         <span><i className="fas fa-phone"></i> {patient.Phone || 'N/A'}</span>
                                         <span><i className="fas fa-tooth"></i> {patient.WorkType}</span>
                                     </div>
@@ -123,7 +123,7 @@ const SearchPatient: React.FC = () => {
 
                 {/* Empty State */}
                 {!loading && !showResults && (
-                    <div className="empty-state">
+                    <div className={styles.emptyState}>
                         <i className="fas fa-search"></i>
                         <h3>Quick Search</h3>
                         <p>Enter a patient name, phone number, or ID to find their aligner records</p>

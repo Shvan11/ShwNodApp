@@ -1,5 +1,6 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import styles from './CostPresetsSettings.module.css';
 
 type Currency = 'IQD' | 'USD' | 'EUR';
 
@@ -178,7 +179,7 @@ const CostPresetsSettings = () => {
 
     if (loading) {
         return (
-            <div className="cost-presets-settings loading">
+            <div className={`${styles.costPresetsSettings} ${styles.loading}`}>
                 <i className="fas fa-spinner fa-spin fa-2x"></i>
                 <p>Loading cost presets...</p>
             </div>
@@ -186,8 +187,8 @@ const CostPresetsSettings = () => {
     }
 
     return (
-        <div className="cost-presets-settings">
-            <div className="settings-header">
+        <div className={styles.costPresetsSettings}>
+            <div className={styles.settingsHeader}>
                 <h2>
                     <i className="fas fa-dollar-sign"></i> Estimated Cost Presets
                 </h2>
@@ -195,33 +196,33 @@ const CostPresetsSettings = () => {
             </div>
 
             {/* Currency Tabs */}
-            <div className="currency-tabs">
+            <div className={styles.currencyTabs}>
                 <button
-                    className={`currency-tab ${activeCurrency === 'IQD' ? 'active' : ''}`}
+                    className={`${styles.currencyTab} ${activeCurrency === 'IQD' ? styles.active : ''}`}
                     onClick={() => setActiveCurrency('IQD')}
                 >
                     <i className="fas fa-coins"></i> IQD
                 </button>
                 <button
-                    className={`currency-tab ${activeCurrency === 'USD' ? 'active' : ''}`}
+                    className={`${styles.currencyTab} ${activeCurrency === 'USD' ? styles.active : ''}`}
                     onClick={() => setActiveCurrency('USD')}
                 >
                     <i className="fas fa-dollar-sign"></i> USD
                 </button>
                 <button
-                    className={`currency-tab ${activeCurrency === 'EUR' ? 'active' : ''}`}
+                    className={`${styles.currencyTab} ${activeCurrency === 'EUR' ? styles.active : ''}`}
                     onClick={() => setActiveCurrency('EUR')}
                 >
                     <i className="fas fa-euro-sign"></i> EUR
                 </button>
             </div>
 
-            <div className="presets-content">
+            <div className={styles.presetsContent}>
                 {/* Add/Edit Form */}
-                <div className="preset-form-card">
+                <div className={styles.presetFormCard}>
                     <h3>{editingPreset ? 'Edit Preset' : 'Add New Preset'}</h3>
                     <form onSubmit={editingPreset ? handleUpdatePreset : handleCreatePreset}>
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label htmlFor="amount">Amount</label>
                             <input
                                 type="number"
@@ -234,7 +235,7 @@ const CostPresetsSettings = () => {
                             />
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label htmlFor="currency">Currency</label>
                             <select
                                 id="currency"
@@ -248,7 +249,7 @@ const CostPresetsSettings = () => {
                             </select>
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label htmlFor="displayOrder">Display Order</label>
                             <input
                                 type="number"
@@ -260,7 +261,7 @@ const CostPresetsSettings = () => {
                             />
                         </div>
 
-                        <div className="form-actions">
+                        <div className={styles.formActions}>
                             {editingPreset ? (
                                 <>
                                     <button type="submit" className="btn btn-primary">
@@ -280,10 +281,10 @@ const CostPresetsSettings = () => {
                 </div>
 
                 {/* Presets Table */}
-                <div className="presets-table-card">
+                <div className={styles.presetsTableCard}>
                     <h3>{activeCurrency} Presets ({filteredPresets.length})</h3>
                     {filteredPresets.length > 0 ? (
-                        <table className="presets-table">
+                        <table className={styles.presetsTable}>
                             <thead>
                                 <tr>
                                     <th>Amount</th>
@@ -298,16 +299,16 @@ const CostPresetsSettings = () => {
                                         <td>{formatNumber(preset.Amount)}</td>
                                         <td>{preset.Currency}</td>
                                         <td>{preset.DisplayOrder}</td>
-                                        <td className="actions">
+                                        <td className={styles.actions}>
                                             <button
-                                                className="btn-icon btn-edit"
+                                                className={`${styles.btnIcon} ${styles.btnEdit}`}
                                                 onClick={() => handleEditPreset(preset)}
                                                 title="Edit"
                                             >
                                                 <i className="fas fa-edit"></i>
                                             </button>
                                             <button
-                                                className="btn-icon btn-delete"
+                                                className={`${styles.btnIcon} ${styles.btnDelete}`}
                                                 onClick={() => handleDeletePreset(preset.PresetID)}
                                                 title="Delete"
                                             >
@@ -319,10 +320,10 @@ const CostPresetsSettings = () => {
                             </tbody>
                         </table>
                     ) : (
-                        <div className="empty-state">
+                        <div className={styles.emptyState}>
                             <i className="fas fa-inbox fa-3x"></i>
                             <p>No presets found for {activeCurrency}</p>
-                            <p className="hint">Add a preset using the form above</p>
+                            <p className={styles.hint}>Add a preset using the form above</p>
                         </div>
                     )}
                 </div>

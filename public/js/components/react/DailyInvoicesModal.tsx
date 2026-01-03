@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { formatCurrency as formatCurrencyUtil } from '../../utils/formatters';
+import styles from './StatisticsComponent.module.css';
 
 interface Invoice {
     invoiceID: number;
@@ -121,30 +122,30 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
     if (!selectedDate) return null;
 
     return (
-        <div className="statistics-modal-overlay" onClick={onClose}>
-            <div className="statistics-modal-container" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+        <div className={styles.statisticsModalOverlay} onClick={onClose}>
+            <div className={styles.statisticsModalContainer} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                 {/* Modal Header */}
-                <div className="statistics-modal-header">
+                <div className={styles.statisticsModalHeader}>
                     <h2>
                         <i className="fas fa-file-invoice-dollar"></i>
                         Daily Invoices - {formatDate(dateValue)}
                     </h2>
-                    <button className="statistics-modal-close" onClick={onClose}>
+                    <button className={styles.statisticsModalClose} onClick={onClose}>
                         <i className="fas fa-times"></i>
                     </button>
                 </div>
 
                 {/* Modal Content */}
-                <div className="statistics-modal-body">
+                <div className={styles.statisticsModalBody}>
                     {loading && (
-                        <div className="loading-state">
-                            <div className="spinner"></div>
+                        <div className={styles.loadingState}>
+                            <div className={styles.spinner}></div>
                             <p>Loading invoices...</p>
                         </div>
                     )}
 
                     {error && (
-                        <div className="error-state">
+                        <div className={styles.errorState}>
                             <i className="fas fa-exclamation-triangle"></i>
                             <p>{error}</p>
                             <button onClick={fetchDailyInvoices}>Retry</button>
@@ -152,7 +153,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                     )}
 
                     {!loading && !error && invoices.length === 0 && (
-                        <div className="empty-state">
+                        <div className={styles.emptyState}>
                             <i className="fas fa-inbox"></i>
                             <p>No invoices found for this date</p>
                         </div>
@@ -162,45 +163,45 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                         <>
                             {/* Summary Cards */}
                             {totals && (
-                                <div className="statistics-invoice-summary">
-                                    <div className="summary-item">
-                                        <span className="label">Total IQD Received:</span>
-                                        <span className="value">{formatCurrency(totals.totalIQD, 'IQD')}</span>
+                                <div className={styles.statisticsInvoiceSummary}>
+                                    <div className={styles.summaryItem}>
+                                        <span className={styles.label}>Total IQD Received:</span>
+                                        <span className={styles.value}>{formatCurrency(totals.totalIQD, 'IQD')}</span>
                                     </div>
-                                    <div className="summary-item">
-                                        <span className="label">Total USD Received:</span>
-                                        <span className="value">{formatCurrency(totals.totalUSD, 'USD')}</span>
+                                    <div className={styles.summaryItem}>
+                                        <span className={styles.label}>Total USD Received:</span>
+                                        <span className={styles.value}>{formatCurrency(totals.totalUSD, 'USD')}</span>
                                     </div>
-                                    <div className="summary-item">
-                                        <span className="label">Change Given (IQD):</span>
-                                        <span className="value negative">{formatCurrency(totals.totalChangeIQD, 'IQD')}</span>
+                                    <div className={styles.summaryItem}>
+                                        <span className={styles.label}>Change Given (IQD):</span>
+                                        <span className={`${styles.value} ${styles.negative}`}>{formatCurrency(totals.totalChangeIQD, 'IQD')}</span>
                                     </div>
                                     {selectedDateObj?.ExpensesIQD !== undefined && (
-                                        <div className="summary-item">
-                                            <span className="label">Expenses (IQD):</span>
-                                            <span className="value negative">{formatCurrency(Math.abs(selectedDateObj.ExpensesIQD || 0), 'IQD')}</span>
+                                        <div className={styles.summaryItem}>
+                                            <span className={styles.label}>Expenses (IQD):</span>
+                                            <span className={`${styles.value} ${styles.negative}`}>{formatCurrency(Math.abs(selectedDateObj.ExpensesIQD || 0), 'IQD')}</span>
                                         </div>
                                     )}
                                     {selectedDateObj?.ExpensesUSD !== undefined && (
-                                        <div className="summary-item">
-                                            <span className="label">Expenses (USD):</span>
-                                            <span className="value negative">{formatCurrency(Math.abs(selectedDateObj.ExpensesUSD || 0), 'USD')}</span>
+                                        <div className={styles.summaryItem}>
+                                            <span className={styles.label}>Expenses (USD):</span>
+                                            <span className={`${styles.value} ${styles.negative}`}>{formatCurrency(Math.abs(selectedDateObj.ExpensesUSD || 0), 'USD')}</span>
                                         </div>
                                     )}
-                                    <div className="summary-item highlight">
-                                        <span className="label">Net IQD (Qasa):</span>
-                                        <span className="value">{formatCurrency(selectedDateObj?.QasaIQD || totals.netIQD, 'IQD')}</span>
+                                    <div className={`${styles.summaryItem} ${styles.highlight}`}>
+                                        <span className={styles.label}>Net IQD (Qasa):</span>
+                                        <span className={styles.value}>{formatCurrency(selectedDateObj?.QasaIQD || totals.netIQD, 'IQD')}</span>
                                     </div>
-                                    <div className="summary-item highlight">
-                                        <span className="label">Net USD (Qasa):</span>
-                                        <span className="value">{formatCurrency(selectedDateObj?.QasaUSD || totals.netUSD, 'USD')}</span>
+                                    <div className={`${styles.summaryItem} ${styles.highlight}`}>
+                                        <span className={styles.label}>Net USD (Qasa):</span>
+                                        <span className={styles.value}>{formatCurrency(selectedDateObj?.QasaUSD || totals.netUSD, 'USD')}</span>
                                     </div>
                                 </div>
                             )}
 
                             {/* Invoices Table */}
-                            <div className="statistics-table-wrapper">
-                                <table className="statistics-invoices-table">
+                            <div className={styles.statisticsTableWrapper}>
+                                <table className={styles.statisticsInvoicesTable}>
                                     <thead>
                                         <tr>
                                             <th>Invoice #</th>
@@ -216,26 +217,26 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                                     <tbody>
                                         {invoices.map((invoice) => (
                                             <tr key={invoice.invoiceID}>
-                                                <td data-label="Invoice #" className="invoice-id">{invoice.invoiceID}</td>
-                                                <td data-label="Patient Name" className="patient-name text-rtl">
+                                                <td data-label="Invoice #" className={styles.invoiceId}>{invoice.invoiceID}</td>
+                                                <td data-label="Patient Name" className={`${styles.patientName} text-rtl`}>
                                                     {invoice.PatientName}
                                                 </td>
-                                                <td data-label="Time" className="time">{formatTime(invoice.SysStartTime)}</td>
-                                                <td data-label="Treatment Currency" className="currency-badge">
+                                                <td data-label="Time" className={styles.time}>{formatTime(invoice.SysStartTime)}</td>
+                                                <td data-label="Treatment Currency" className={styles.currencyBadge}>
                                                     <span className={`badge ${invoice.currency}`}>
                                                         {invoice.currency}
                                                     </span>
                                                 </td>
-                                                <td data-label="Amount Paid" className="amount">
+                                                <td data-label="Amount Paid" className={styles.amount}>
                                                     {invoice.Amountpaid} {invoice.currency}
                                                 </td>
-                                                <td data-label="IQD Received" className="amount iqd">
+                                                <td data-label="IQD Received" className={`${styles.amount} ${styles.iqd}`}>
                                                     {invoice.IQDReceived ? formatCurrency(invoice.IQDReceived, 'IQD') : '-'}
                                                 </td>
-                                                <td data-label="USD Received" className="amount usd">
+                                                <td data-label="USD Received" className={`${styles.amount} ${styles.usd}`}>
                                                     {invoice.USDReceived ? formatCurrency(invoice.USDReceived, 'USD') : '-'}
                                                 </td>
-                                                <td data-label="Change Given" className="amount change">
+                                                <td data-label="Change Given" className={`${styles.amount} ${styles.change}`}>
                                                     {invoice.Change ? formatCurrency(invoice.Change, 'IQD') : '-'}
                                                 </td>
                                             </tr>
@@ -248,8 +249,8 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                 </div>
 
                 {/* Modal Footer */}
-                <div className="statistics-modal-footer">
-                    <button className="statistics-btn-close" onClick={onClose}>
+                <div className={styles.statisticsModalFooter}>
+                    <button className={styles.statisticsBtnClose} onClick={onClose}>
                         Close
                     </button>
                 </div>

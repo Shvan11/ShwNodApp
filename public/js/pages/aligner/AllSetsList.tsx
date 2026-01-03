@@ -1,6 +1,7 @@
 // AllSetsList.tsx - Simple list view of all aligner sets from v_allsets
 import React, { useState, useEffect, ChangeEvent, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import styles from './AllSetsList.module.css';
 
 interface AlignerSetView {
     PersonID: number;
@@ -12,7 +13,7 @@ interface AlignerSetView {
     SetSequence: number | null;
     BatchSequence: number | null;
     DeliveredToPatientDate: string | null;
-    NextBatchReadyDate: string | null;
+    NextDueDate: string | null;
     NextBatchPresent: 'True' | 'False';
     LabStatus: 'no_batches' | 'needs_mfg' | 'in_lab' | 'all_delivered';
     IsLast: boolean | number;
@@ -21,7 +22,7 @@ interface AlignerSetView {
     Notes: string | null;
 }
 
-type SortColumn = 'PatientName' | 'DoctorName' | 'SetSequence' | 'BatchSequence' | 'LabStatus' | 'NextBatchReadyDate' | 'Notes';
+type SortColumn = 'PatientName' | 'DoctorName' | 'SetSequence' | 'BatchSequence' | 'LabStatus' | 'NextDueDate' | 'Notes';
 type SortDirection = 'asc' | 'desc';
 
 const AllSetsList: React.FC = () => {
@@ -35,7 +36,7 @@ const AllSetsList: React.FC = () => {
     const [selectedDoctor, setSelectedDoctor] = useState<string>('all');
     const [showFinished, setShowFinished] = useState<boolean>(false);
     const [showInactiveSets, setShowInactiveSets] = useState<boolean>(false);
-    const [sortColumn, setSortColumn] = useState<SortColumn>('NextBatchReadyDate');
+    const [sortColumn, setSortColumn] = useState<SortColumn>('NextDueDate');
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
     useEffect(() => {
@@ -94,18 +95,18 @@ const AllSetsList: React.FC = () => {
 
         // No batches exist
         if (set.LabStatus === 'no_batches') {
-            return <span className="allsets-badge allsets-badge-no-batch">No Batches</span>;
+            return <span className={`${styles.badge} ${styles.badgeNoBatch}`}>No Batches</span>;
         }
 
         // Final batch delivered = treatment complete (flag shown in Active Batch column)
         if (isFinal && set.DeliveredToPatientDate) {
-            return <span className="allsets-badge allsets-badge-na">—</span>;
+            return <span className={`${styles.badge} ${styles.badgeNa}`}>—</span>;
         }
 
         // Next batch is manufactured and ready in lab
         if (set.NextBatchPresent === 'True') {
             return (
-                <span className="allsets-badge allsets-badge-next-ready">
+                <span className={`${styles.badge} ${styles.badgeNextReady}`}>
                     <i className="fas fa-check-circle"></i> Ready (In Lab)
                 </span>
             );
@@ -114,7 +115,7 @@ const AllSetsList: React.FC = () => {
         // Next batch needs manufacturing
         if (set.LabStatus === 'needs_mfg') {
             return (
-                <span className="allsets-badge allsets-badge-pending-mfg">
+                <span className={`${styles.badge} ${styles.badgePendingMfg}`}>
                     Pending (Needs Mfg)
                 </span>
             );
@@ -122,7 +123,7 @@ const AllSetsList: React.FC = () => {
 
         // All batches delivered but not final = next batch not created yet
         return (
-            <span className="allsets-badge allsets-badge-next-warning">
+            <span className={`${styles.badge} ${styles.badgeNextWarning}`}>
                 <i className="fas fa-exclamation-triangle"></i> Not Created
             </span>
         );
@@ -197,7 +198,7 @@ const AllSetsList: React.FC = () => {
             if (bVal == null) return -1;
 
             // Handle date columns
-            if (sortColumn === 'NextBatchReadyDate') {
+            if (sortColumn === 'NextDueDate') {
                 aVal = new Date(aVal as string).getTime();
                 bVal = new Date(bVal as string).getTime();
             }
@@ -222,10 +223,10 @@ const AllSetsList: React.FC = () => {
     const renderSortableHeader = (label: string, column: SortColumn): ReactNode => (
         <th
             onClick={() => handleSort(column)}
-            className="sortable-header"
+            className={styles.sortableHeader}
         >
             <span>{label}</span>
-            <span className="sort-icon">
+            <span className={styles.sortIcon}>
                 {sortColumn === column ? (
                     sortDirection === 'asc' ? (
                         <i className="fas fa-sort-up"></i>
@@ -241,11 +242,9 @@ const AllSetsList: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="aligner-container">
-                <div className="loading-container">
-                    <div className="spinner"></div>
-                    <p>Loading aligner sets...</p>
-                </div>
+            <div className={styles.loadingContainer}>
+                <div className={styles.spinner}></div>
+                <p>Loading aligner sets...</p>
             </div>
         );
     }
@@ -278,9 +277,9 @@ const AllSetsList: React.FC = () => {
     return (
         <>
             {/* Filter Controls */}
-            <div className="allsets-filter-container">
-                <div className="patient-filter-box">
-                    <i className="fas fa-filter filter-icon"></i>
+            <div className={styles.filterContainer}>
+                <div className={styles.patientFilterBox}>
+                    <i className={`fas fa-filter ${styles.filterIcon}`}></i>
                     <input
                         type="text"
                         placeholder="Filter by patient or doctor..."
@@ -289,7 +288,7 @@ const AllSetsList: React.FC = () => {
                     />
                     {filter && (
                         <button
-                            className="clear-filter-btn"
+                            className={styles.clearFilterBtn}
                             onClick={() => setFilter('')}
                         >
                             <i className="fas fa-times"></i>
@@ -298,11 +297,11 @@ const AllSetsList: React.FC = () => {
                 </div>
 
                 {/* Doctor Filter Dropdown */}
-                <div className="doctor-filter">
+                <div className={styles.doctorFilter}>
                     <select
                         value={selectedDoctor}
                         onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedDoctor(e.target.value)}
-                        className="doctor-filter-select"
+                        className={styles.doctorFilterSelect}
                     >
                         <option value="all">All Doctors</option>
                         {uniqueDoctors.map(doctor => (
@@ -314,9 +313,9 @@ const AllSetsList: React.FC = () => {
                 </div>
 
                 {/* Filter Toggles - wrapped for mobile grid */}
-                <div className="allsets-filter-toggles">
+                <div className={styles.filterToggles}>
                     {/* Show Finished Toggle */}
-                    <label className={`no-batch-toggle ${showFinished ? 'active' : ''}`}>
+                    <label className={`${styles.filterToggle} ${showFinished ? styles.active : ''}`}>
                         <input
                             type="checkbox"
                             checked={showFinished}
@@ -327,7 +326,7 @@ const AllSetsList: React.FC = () => {
                     </label>
 
                     {/* No Next Batch Toggle */}
-                    <label className={`no-batch-toggle ${showOnlyNoNextBatch ? 'active' : ''}`}>
+                    <label className={`${styles.filterToggle} ${showOnlyNoNextBatch ? styles.active : ''}`}>
                         <input
                             type="checkbox"
                             checked={showOnlyNoNextBatch}
@@ -338,7 +337,7 @@ const AllSetsList: React.FC = () => {
                     </label>
 
                     {/* In Lab Filter */}
-                    <label className={`no-batch-toggle ${showOnlyInLab ? 'active' : ''}`}>
+                    <label className={`${styles.filterToggle} ${showOnlyInLab ? styles.active : ''}`}>
                         <input
                             type="checkbox"
                             checked={showOnlyInLab}
@@ -352,7 +351,7 @@ const AllSetsList: React.FC = () => {
                     </label>
 
                     {/* Needs Mfg Filter */}
-                    <label className={`no-batch-toggle ${showOnlyNeedsMfg ? 'active' : ''}`}>
+                    <label className={`${styles.filterToggle} ${showOnlyNeedsMfg ? styles.active : ''}`}>
                         <input
                             type="checkbox"
                             checked={showOnlyNeedsMfg}
@@ -368,25 +367,25 @@ const AllSetsList: React.FC = () => {
             </div>
 
             {/* Status Legend */}
-            <div className="batch-status-legend">
-                <span className="legend-title">Next Batch:</span>
-                <span className="legend-item">
-                    <span className="legend-dot gray"></span> No Batches ({noBatchesCount})
+            <div className={styles.statusLegend}>
+                <span className={styles.legendTitle}>Next Batch:</span>
+                <span className={styles.legendItem}>
+                    <span className={`${styles.legendDot} ${styles.gray}`}></span> No Batches ({noBatchesCount})
                 </span>
-                <span className="legend-item">
-                    <span className="legend-dot green"></span> Ready ({readyInLabCount})
+                <span className={styles.legendItem}>
+                    <span className={`${styles.legendDot} ${styles.green}`}></span> Ready ({readyInLabCount})
                 </span>
-                <span className="legend-item">
-                    <span className="legend-dot amber"></span> Pending ({pendingManufactureCount})
+                <span className={styles.legendItem}>
+                    <span className={`${styles.legendDot} ${styles.amber}`}></span> Pending ({pendingManufactureCount})
                 </span>
-                <span className="legend-item">
+                <span className={styles.legendItem}>
                     <i className="fas fa-flag-checkered" style={{ color: '#7c3aed' }}></i> Final ({lastBatchCount})
                 </span>
-                <span className="legend-item">
-                    <span className="legend-dot red"></span> Not Created ({notCreatedCount})
+                <span className={styles.legendItem}>
+                    <span className={`${styles.legendDot} ${styles.red}`}></span> Not Created ({notCreatedCount})
                 </span>
                 {inactiveSetsCount > 0 && (
-                    <label className="inactive-sets-toggle">
+                    <label className={styles.inactiveSetsToggle}>
                         <input
                             type="checkbox"
                             checked={showInactiveSets}
@@ -395,22 +394,22 @@ const AllSetsList: React.FC = () => {
                         <span>Include inactive sets ({inactiveSetsCount})</span>
                     </label>
                 )}
-                <span className="allsets-info">
+                <span className={styles.info}>
                     {activeSets.length} active
                     {!showFinished && finishedCount > 0 && (
-                        <span className="allsets-info-hidden"> ({finishedCount} hidden)</span>
+                        <span className={styles.infoHidden}> ({finishedCount} hidden)</span>
                     )}
                 </span>
             </div>
 
             {/* Table View */}
             {filteredSets.length === 0 ? (
-                <div className="empty-patients">
+                <div className={styles.emptyPatients}>
                     <i className="fas fa-inbox"></i>
                     <h3>{filter || showOnlyNoNextBatch || showOnlyInLab || showOnlyNeedsMfg || selectedDoctor !== 'all' ? 'No matching sets found' : 'No aligner sets'}</h3>
                     {(filter || showOnlyNoNextBatch || showOnlyInLab || showOnlyNeedsMfg || selectedDoctor !== 'all') && (
                         <button
-                            className="btn-clear btn-clear-filters"
+                            className={styles.btnClearFilters}
                             onClick={() => {
                                 setFilter('');
                                 setShowOnlyNoNextBatch(false);
@@ -424,8 +423,8 @@ const AllSetsList: React.FC = () => {
                     )}
                 </div>
             ) : (
-                <div className="allsets-table-container">
-                    <table className="allsets-table">
+                <div className={styles.tableContainer}>
+                    <table className={styles.table}>
                         <thead>
                             <tr>
                                 {renderSortableHeader('Patient', 'PatientName')}
@@ -433,7 +432,7 @@ const AllSetsList: React.FC = () => {
                                 {renderSortableHeader('Active Set', 'SetSequence')}
                                 {renderSortableHeader('Active Batch', 'BatchSequence')}
                                 {renderSortableHeader('Next Batch Status', 'LabStatus')}
-                                {renderSortableHeader('Next Due', 'NextBatchReadyDate')}
+                                {renderSortableHeader('Next Due', 'NextDueDate')}
                                 {renderSortableHeader('Notes', 'Notes')}
                             </tr>
                         </thead>
@@ -444,11 +443,11 @@ const AllSetsList: React.FC = () => {
 
                                 // Keep green tint for finished/discontinued patients
                                 if (set.WorkStatus === 2 || set.WorkStatus === 3) {
-                                    rowClass = 'completed-work-row';
+                                    rowClass = styles.completedWorkRow;
                                 }
                                 // Gray muted for sets without any batches
                                 else if (set.LabStatus === 'no_batches') {
-                                    rowClass = 'no-batches-row';
+                                    rowClass = styles.noBatchesRow;
                                 }
                                 // All other rows remain neutral - status shown via badge only
 
@@ -456,17 +455,17 @@ const AllSetsList: React.FC = () => {
                                 const renderActiveBatch = (): ReactNode => {
                                     // No batch delivered yet = no active batch
                                     if (!set.DeliveredToPatientDate) {
-                                        return <span className="allsets-badge allsets-badge-no-batch">No active batch</span>;
+                                        return <span className={`${styles.badge} ${styles.badgeNoBatch}`}>No active batch</span>;
                                     }
                                     // Has delivered batch - show batch number and delivery date
                                     const isFinal = set.IsLast === true || set.IsLast === 1;
                                     return (
                                         <>
-                                            <span className="allsets-badge allsets-badge-batch">
+                                            <span className={`${styles.badge} ${styles.badgeBatch}`}>
                                                 Batch {set.BatchSequence} · {formatDate(set.DeliveredToPatientDate)}
                                             </span>
                                             {isFinal && (
-                                                <span className="allsets-badge allsets-badge-final" style={{ marginLeft: '4px' }}>
+                                                <span className={`${styles.badge} ${styles.badgeFinal}`} style={{ marginLeft: '4px' }}>
                                                     <i className="fas fa-flag-checkered"></i>
                                                 </span>
                                             )}
@@ -481,18 +480,18 @@ const AllSetsList: React.FC = () => {
                                     className={rowClass}
                                 >
                                     <td data-label="Patient">
-                                        <div className="allsets-patient-name">
+                                        <div className={styles.patientName}>
                                             {set.PatientName}
                                         </div>
                                     </td>
                                     <td data-label="Doctor">{set.DoctorName === 'Admin' ? set.DoctorName : `Dr. ${set.DoctorName}`}</td>
                                     <td data-label="Set">
                                         {set.SetSequence != null ? (
-                                            <span className="allsets-badge allsets-badge-set">
+                                            <span className={`${styles.badge} ${styles.badgeSet}`}>
                                                 Set {set.SetSequence}
                                             </span>
                                         ) : (
-                                            <span className="allsets-badge allsets-badge-no-set">
+                                            <span className={`${styles.badge} ${styles.badgeNoSet}`}>
                                                 No active set
                                             </span>
                                         )}
@@ -500,15 +499,15 @@ const AllSetsList: React.FC = () => {
                                     <td data-label="Batch">{renderActiveBatch()}</td>
                                     <td data-label="Status">{renderBatchStateBadge(set)}</td>
                                     <td data-label="Next Due">
-                                        {set.NextBatchReadyDate ? formatDate(set.NextBatchReadyDate) : '—'}
+                                        {set.NextDueDate ? formatDate(set.NextDueDate) : '—'}
                                     </td>
                                     <td data-label="Notes">
                                         {set.Notes ? (
-                                            <span className="allsets-notes">
+                                            <span className={styles.notes}>
                                                 {set.Notes}
                                             </span>
                                         ) : (
-                                            <span className="allsets-notes-empty">—</span>
+                                            <span className={styles.notesEmpty}>—</span>
                                         )}
                                     </td>
                                 </tr>

@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import type { Expense } from '../../hooks/useExpenses';
+import styles from '../../routes/Expenses.module.css';
 
 // Re-export the Expense type for convenience
 export type { Expense } from '../../hooks/useExpenses';
@@ -27,8 +28,8 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
 
     if (loading) {
         return (
-            <div className="loading-state">
-                <div className="loading-spinner"></div>
+            <div className={styles.loadingState}>
+                <div className={styles.loadingSpinner}></div>
                 <p>Loading expenses...</p>
             </div>
         );
@@ -36,15 +37,22 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
 
     if (!expenses || expenses.length === 0) {
         return (
-            <div className="empty-state">
+            <div className={styles.emptyState}>
                 <p>No expenses found</p>
             </div>
         );
     }
 
+    // Get currency style class
+    const getCurrencyClass = (currency: string): string => {
+        if (currency === 'iqd') return styles.tableCurrencyIqd;
+        if (currency === 'usd') return styles.tableCurrencyUsd;
+        return '';
+    };
+
     return (
-        <div className="table-container">
-            <table className="expenses-table">
+        <div className={styles.tableContainer}>
+            <table className={styles.expensesTable}>
                 <thead>
                     <tr>
                         <th>Date</th>
@@ -61,6 +69,7 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
                         const date = formatDate(expense.ExpenseDate);
                         const amount = formatNumber(expense.Amount);
                         const currency = (expense.Currency || '').trim();
+                        const currencyLower = currency.toLowerCase();
                         const category = expense.CategoryName || '-';
                         const subcategory = expense.SubcategoryName || '-';
                         const note = expense.Description || '-';
@@ -68,21 +77,21 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
                         return (
                             <tr key={expense.ExpenseID} data-expense-id={expense.ExpenseID}>
                                 <td>{date}</td>
-                                <td className={`amount-cell currency-${currency.toLowerCase()}`}>
+                                <td className={`${styles.amountCell} ${getCurrencyClass(currencyLower)}`}>
                                     {amount}
                                 </td>
                                 <td>
-                                    <span className={`currency-${currency.toLowerCase()}`}>
+                                    <span className={getCurrencyClass(currencyLower)}>
                                         {currency}
                                     </span>
                                 </td>
                                 <td>{category}</td>
                                 <td>{subcategory}</td>
-                                <td className="note-cell" title={note}>
+                                <td className={styles.noteCell} title={note}>
                                     {note}
                                 </td>
                                 <td>
-                                    <div className="action-buttons">
+                                    <div className={styles.actionButtons}>
                                         <button
                                             className="btn-edit"
                                             onClick={() => onEdit(expense.ExpenseID)}

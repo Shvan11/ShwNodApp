@@ -1,8 +1,6 @@
 import PatientManagement from '../components/react/PatientManagement';
 
-// Patient management styles
-import '../../css/pages/patient-management.css';
-import '../../css/pages/grid.css';
+// grid.css -> GridComponent.module.css
 
 /**
  * Patient Management Route

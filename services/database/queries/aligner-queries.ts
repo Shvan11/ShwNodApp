@@ -80,7 +80,7 @@ interface AlignerSetFromView {
   BatchCreationDate: Date | null;
   ManufactureDate: Date | null;
   DeliveredToPatientDate: Date | null;
-  NextBatchReadyDate: Date | null;
+  NextDueDate: Date | null;
   Notes: string | null;
   IsLast: boolean | null;
   NextBatchPresent: string | null;
@@ -128,7 +128,6 @@ interface AlignerPatient {
   LastName: string | null;
   PatientName: string;
   Phone: string | null;
-  patientID: string | null;
   workid: number;
   WorkType: string;
   WorkTypeID: number;
@@ -154,7 +153,7 @@ interface AlignerBatch {
   DeliveredToPatientDate: Date | null;
   Days: number | null;
   ValidityPeriod: number | null;
-  NextBatchReadyDate: Date | null;
+  BatchExpiryDate: Date | null;
   Notes: string | null;
   IsActive: boolean;
   IsLast: boolean;
@@ -164,8 +163,7 @@ interface BatchData {
   AlignerSetID: number;
   UpperAlignerCount?: number;
   LowerAlignerCount?: number;
-  ManufactureDate?: Date | string | null;
-  DeliveredToPatientDate?: Date | string | null;
+  // NOTE: ManufactureDate and DeliveredToPatientDate are managed via updateBatchStatus()
   Days?: number | null;
   Notes?: string | null;
   IsActive?: boolean;
@@ -178,8 +176,7 @@ interface BatchData {
   UpperAlignerEndSequence?: number;
   LowerAlignerStartSequence?: number;
   LowerAlignerEndSequence?: number;
-  ValidityPeriod?: number;
-  NextBatchReadyDate?: Date | string | null;
+  // Note: BatchExpiryDate and ValidityPeriod are computed columns - cannot be set directly
 }
 
 interface BatchUpdateData extends Omit<BatchData, 'AlignerSetID'> {
@@ -234,6 +231,64 @@ interface DeactivatedBatchInfo {
     batchId: number;
     batchSequence: number;
   };
+}
+
+/**
+ * Result from usp_MarkBatchDelivered stored procedure
+ */
+interface MarkBatchDeliveredRow {
+  AlignerBatchID: number;
+  BatchSequence: number;
+  AlignerSetID: number;
+  WasActivated: boolean;
+  WasAlreadyActive: boolean;
+  WasAlreadyDelivered: boolean;
+  PreviouslyActiveBatchSequence: number | null;
+}
+
+/**
+ * Parsed result from marking batch as delivered
+ */
+export interface MarkBatchDeliveredResult {
+  batchId: number;
+  batchSequence: number;
+  alignerSetId: number;
+  wasActivated: boolean;
+  wasAlreadyActive: boolean;
+  wasAlreadyDelivered: boolean;
+  previouslyActiveBatchSequence: number | null;
+}
+
+/**
+ * Result from usp_UpdateBatchStatus stored procedure (consolidated batch operations)
+ */
+interface UpdateBatchStatusRow {
+  AlignerBatchID: number;
+  BatchSequence: number;
+  AlignerSetID: number;
+  ActionPerformed: string;
+  Success: boolean;
+  Message: string;
+  WasActivated: boolean;
+  WasAlreadyActive: boolean;
+  WasAlreadyDelivered: boolean;
+  PreviouslyActiveBatchSequence: number | null;
+}
+
+/**
+ * Parsed result from batch status update
+ */
+export interface UpdateBatchStatusResult {
+  batchId: number;
+  batchSequence: number;
+  setId: number;
+  action: string;
+  success: boolean;
+  message: string;
+  wasActivated: boolean;
+  wasAlreadyActive: boolean;
+  wasAlreadyDelivered: boolean;
+  previouslyActiveBatchSequence: number | null;
 }
 
 // ==============================
@@ -407,7 +462,7 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
       v.BatchCreationDate,
       v.ManufactureDate,
       v.DeliveredToPatientDate,
-      v.NextBatchReadyDate,
+      v.NextDueDate,
       v.Notes,
       v.IsLast,
       v.NextBatchPresent,
@@ -422,7 +477,7 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
     ORDER BY
       CASE WHEN v.SetIsActive = 1 THEN 0 ELSE 1 END,
       CASE WHEN v.NextBatchPresent = 'False' THEN 0 ELSE 1 END,
-      v.NextBatchReadyDate ASC,
+      v.NextDueDate ASC,
       v.PatientName
   `;
 
@@ -439,7 +494,7 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
     BatchCreationDate: columns[9].value as Date | null,
     ManufactureDate: columns[10].value as Date | null,
     DeliveredToPatientDate: columns[11].value as Date | null,
-    NextBatchReadyDate: columns[12].value as Date | null,
+    NextDueDate: columns[12].value as Date | null,
     Notes: columns[13].value as string | null,
     IsLast: columns[14].value as boolean | null,
     NextBatchPresent: columns[15].value as string | null,
@@ -784,7 +839,6 @@ export async function getAllAlignerPatients(): Promise<AlignerPatient[]> {
       p.LastName,
       p.PatientName,
       p.Phone,
-      p.patientID,
       w.workid,
       wt.WorkType,
       w.Typeofwork as WorkTypeID,
@@ -797,7 +851,7 @@ export async function getAllAlignerPatients(): Promise<AlignerPatient[]> {
     WHERE wt.ID IN (19, 20, 21)
     GROUP BY
       p.PersonID, p.FirstName, p.LastName, p.PatientName,
-      p.Phone, p.patientID, w.workid, wt.WorkType, w.Typeofwork
+      p.Phone, w.workid, wt.WorkType, w.Typeofwork
     ORDER BY p.PatientName, p.FirstName, p.LastName
   `;
 
@@ -807,12 +861,11 @@ export async function getAllAlignerPatients(): Promise<AlignerPatient[]> {
     LastName: columns[2].value as string | null,
     PatientName: columns[3].value as string,
     Phone: columns[4].value as string | null,
-    patientID: columns[5].value as string | null,
-    workid: columns[6].value as number,
-    WorkType: columns[7].value as string,
-    WorkTypeID: columns[8].value as number,
-    TotalSets: columns[9].value as number,
-    ActiveSets: columns[10].value as number,
+    workid: columns[5].value as number,
+    WorkType: columns[6].value as string,
+    WorkTypeID: columns[7].value as number,
+    TotalSets: columns[8].value as number,
+    ActiveSets: columns[9].value as number,
   }));
 }
 
@@ -827,7 +880,6 @@ export async function getAlignerPatientsByDoctor(doctorId: number): Promise<Alig
       p.LastName,
       p.PatientName,
       p.Phone,
-      p.patientID,
       w.workid,
       wt.WorkType,
       w.Typeofwork as WorkTypeID,
@@ -848,7 +900,7 @@ export async function getAlignerPatientsByDoctor(doctorId: number): Promise<Alig
       AND s.AlignerDrID = @doctorId
     GROUP BY
       p.PersonID, p.FirstName, p.LastName, p.PatientName,
-      p.Phone, p.patientID, w.workid, wt.WorkType, w.Typeofwork
+      p.Phone, w.workid, wt.WorkType, w.Typeofwork
     ORDER BY p.PatientName, p.FirstName, p.LastName
   `;
 
@@ -861,13 +913,12 @@ export async function getAlignerPatientsByDoctor(doctorId: number): Promise<Alig
       LastName: columns[2].value as string | null,
       PatientName: columns[3].value as string,
       Phone: columns[4].value as string | null,
-      patientID: columns[5].value as string | null,
-      workid: columns[6].value as number,
-      WorkType: columns[7].value as string,
-      WorkTypeID: columns[8].value as number,
-      TotalSets: columns[9].value as number,
-      ActiveSets: columns[10].value as number,
-      UnreadDoctorNotes: (columns[11].value as number) || 0,
+      workid: columns[5].value as number,
+      WorkType: columns[6].value as string,
+      WorkTypeID: columns[7].value as number,
+      TotalSets: columns[8].value as number,
+      ActiveSets: columns[9].value as number,
+      UnreadDoctorNotes: (columns[10].value as number) || 0,
     })
   );
 }
@@ -886,7 +937,6 @@ export async function searchAlignerPatients(
       p.LastName,
       p.PatientName,
       p.Phone,
-      p.patientID,
       w.workid,
       wt.WorkType,
       w.Typeofwork as WorkTypeID
@@ -900,7 +950,6 @@ export async function searchAlignerPatients(
         OR p.LastName LIKE @search
         OR p.PatientName LIKE @search
         OR p.Phone LIKE @search
-        OR p.patientID LIKE @search
         OR (p.FirstName + ' ' + p.LastName) LIKE @search
       )
   `;
@@ -920,10 +969,9 @@ export async function searchAlignerPatients(
     LastName: columns[2].value as string | null,
     PatientName: columns[3].value as string,
     Phone: columns[4].value as string | null,
-    patientID: columns[5].value as string | null,
-    workid: columns[6].value as number,
-    WorkType: columns[7].value as string,
-    WorkTypeID: columns[8].value as number,
+    workid: columns[5].value as number,
+    WorkType: columns[6].value as string,
+    WorkTypeID: columns[7].value as number,
   }));
 }
 
@@ -951,7 +999,7 @@ export async function getBatchesBySetId(setId: number): Promise<AlignerBatch[]> 
       DeliveredToPatientDate,
       Days,
       ValidityPeriod,
-      NextBatchReadyDate,
+      BatchExpiryDate,
       Notes,
       IsActive,
       IsLast
@@ -978,7 +1026,7 @@ export async function getBatchesBySetId(setId: number): Promise<AlignerBatch[]> 
       DeliveredToPatientDate: columns[11].value as Date | null,
       Days: columns[12].value as number | null,
       ValidityPeriod: columns[13].value as number | null,
-      NextBatchReadyDate: columns[14].value as Date | null,
+      BatchExpiryDate: columns[14].value as Date | null,
       Notes: columns[15].value as string | null,
       IsActive: columns[16].value as boolean,
       IsLast: columns[17].value as boolean,
@@ -988,14 +1036,14 @@ export async function getBatchesBySetId(setId: number): Promise<AlignerBatch[]> 
 
 /**
  * Create a new aligner batch using optimized stored procedure
+ * Note: ManufactureDate and DeliveredToPatientDate are not set during creation
+ * They should be set via usp_UpdateBatchStatus (MANUFACTURE/DELIVER actions)
  */
 export async function createBatch(batchData: BatchData): Promise<number | null> {
   const {
     AlignerSetID,
     UpperAlignerCount,
     LowerAlignerCount,
-    ManufactureDate,
-    DeliveredToPatientDate,
     Days,
     Notes,
     IsActive,
@@ -1008,11 +1056,11 @@ export async function createBatch(batchData: BatchData): Promise<number | null> 
     ['AlignerSetID', TYPES.Int, AlignerSetID],
     ['UpperAlignerCount', TYPES.Int, UpperAlignerCount ?? 0],
     ['LowerAlignerCount', TYPES.Int, LowerAlignerCount ?? 0],
-    ['ManufactureDate', TYPES.Date, ManufactureDate || null],
-    ['DeliveredToPatientDate', TYPES.Date, DeliveredToPatientDate || null],
+    ['ManufactureDate', TYPES.Date, null],  // Set via status endpoint
+    ['DeliveredToPatientDate', TYPES.Date, null],  // Set via status endpoint
     ['Days', TYPES.Int, Days ?? null],
     ['Notes', TYPES.NVarChar, Notes || null],
-    ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : true],
+    ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : false],  // Default false, set when delivered
     ['IsLast', TYPES.Bit, IsLast !== undefined ? IsLast : false],
     ['IncludeUpperTemplate', TYPES.Bit, IncludeUpperTemplate !== undefined ? IncludeUpperTemplate : true],
     ['IncludeLowerTemplate', TYPES.Bit, IncludeLowerTemplate !== undefined ? IncludeLowerTemplate : true],
@@ -1048,6 +1096,7 @@ interface DeactivatedBatchRow {
 
 /**
  * Update an aligner batch using optimized stored procedure
+ * NOTE: ManufactureDate and DeliveredToPatientDate are managed via updateBatchStatus()
  */
 export async function updateBatch(
   batchId: number,
@@ -1057,13 +1106,9 @@ export async function updateBatch(
     AlignerSetID,
     UpperAlignerCount,
     LowerAlignerCount,
-    ManufactureDate,
-    DeliveredToPatientDate,
     Notes,
     IsActive,
     Days,
-    IncludeUpperTemplate,
-    IncludeLowerTemplate,
     IsLast,
   } = batchData;
 
@@ -1072,14 +1117,10 @@ export async function updateBatch(
     ['AlignerSetID', TYPES.Int, AlignerSetID],
     ['UpperAlignerCount', TYPES.Int, UpperAlignerCount ?? 0],
     ['LowerAlignerCount', TYPES.Int, LowerAlignerCount ?? 0],
-    ['ManufactureDate', TYPES.Date, ManufactureDate || null],
-    ['DeliveredToPatientDate', TYPES.Date, DeliveredToPatientDate || null],
     ['Days', TYPES.Int, Days ?? null],
     ['Notes', TYPES.NVarChar, Notes || null],
     ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : null],
     ['IsLast', TYPES.Bit, IsLast !== undefined ? IsLast : null],
-    ['IncludeUpperTemplate', TYPES.Bit, IncludeUpperTemplate !== undefined ? IncludeUpperTemplate : null],
-    ['IncludeLowerTemplate', TYPES.Bit, IncludeLowerTemplate !== undefined ? IncludeLowerTemplate : null],
   ];
 
   // Row mapper for deactivated batch info (if SP returns a result set)
@@ -1112,43 +1153,120 @@ export async function updateBatch(
 }
 
 /**
- * Mark batch as delivered
+ * Update batch status using consolidated stored procedure
+ *
+ * Actions:
+ * - MANUFACTURE: Sets ManufactureDate = @targetDate or GETDATE()
+ *                If @targetDate provided and already manufactured, updates date
+ * - DELIVER: Sets DeliveredToPatientDate = @targetDate or GETDATE()
+ *            BatchExpiryDate is auto-computed from DeliveredToPatientDate + (Days * AlignerCount)
+ *            If batch is latest (highest BatchSequence) AND not already active:
+ *            - Deactivates other batches in the set
+ *            - Activates this batch
+ * - UNDO_MANUFACTURE: Clears ManufactureDate (requires batch not yet delivered)
+ * - UNDO_DELIVERY: Clears DeliveredToPatientDate (BatchExpiryDate auto-clears as computed)
+ *
+ * @param batchId - The batch ID to update
+ * @param action - The action to perform
+ * @param targetDate - Optional date for backdating/correction. If null, uses GETDATE()
+ * @returns Result with operation info and activation status
  */
-export async function markBatchAsDelivered(batchId: number): Promise<void> {
-  await executeQuery(
-    'UPDATE tblAlignerBatches SET DeliveredToPatientDate = GETDATE() WHERE AlignerBatchID = @batchId',
-    [['batchId', TYPES.Int, batchId]]
+export async function updateBatchStatus(
+  batchId: number,
+  action: 'MANUFACTURE' | 'DELIVER' | 'UNDO_MANUFACTURE' | 'UNDO_DELIVERY',
+  targetDate?: Date | null
+): Promise<UpdateBatchStatusResult> {
+  const params: SqlParam[] = [
+    ['AlignerBatchID', TYPES.Int, batchId],
+    ['Action', TYPES.VarChar, action],
+    ['TargetDate', TYPES.DateTime, targetDate || null],
+  ];
+
+  const rowMapper = (columns: ColumnValue[]): UpdateBatchStatusRow => ({
+    AlignerBatchID: columns.find((c) => c.metadata.colName === 'AlignerBatchID')?.value as number,
+    BatchSequence: columns.find((c) => c.metadata.colName === 'BatchSequence')?.value as number,
+    AlignerSetID: columns.find((c) => c.metadata.colName === 'AlignerSetID')?.value as number,
+    ActionPerformed: columns.find((c) => c.metadata.colName === 'ActionPerformed')?.value as string,
+    Success: columns.find((c) => c.metadata.colName === 'Success')?.value as boolean,
+    Message: columns.find((c) => c.metadata.colName === 'Message')?.value as string,
+    WasActivated: columns.find((c) => c.metadata.colName === 'WasActivated')?.value as boolean,
+    WasAlreadyActive: columns.find((c) => c.metadata.colName === 'WasAlreadyActive')?.value as boolean,
+    WasAlreadyDelivered: columns.find((c) => c.metadata.colName === 'WasAlreadyDelivered')?.value as boolean,
+    PreviouslyActiveBatchSequence: columns.find((c) => c.metadata.colName === 'PreviouslyActiveBatchSequence')
+      ?.value as number | null,
+  });
+
+  const resultMapper = (rows: UpdateBatchStatusRow[]): UpdateBatchStatusResult => {
+    if (!rows || rows.length === 0) {
+      throw new Error('No result returned from stored procedure');
+    }
+
+    const row = rows[0];
+    return {
+      batchId: row.AlignerBatchID,
+      batchSequence: row.BatchSequence,
+      setId: row.AlignerSetID,
+      action: row.ActionPerformed,
+      success: row.Success,
+      message: row.Message,
+      wasActivated: row.WasActivated,
+      wasAlreadyActive: row.WasAlreadyActive,
+      wasAlreadyDelivered: row.WasAlreadyDelivered,
+      previouslyActiveBatchSequence: row.PreviouslyActiveBatchSequence,
+    };
+  };
+
+  return executeStoredProcedure<UpdateBatchStatusRow, UpdateBatchStatusResult>(
+    'usp_UpdateBatchStatus',
+    params,
+    undefined,
+    rowMapper,
+    resultMapper
   );
+}
+
+/**
+ * Mark batch as delivered using consolidated stored procedure
+ * @deprecated Use updateBatchStatus(batchId, 'DELIVER') instead
+ */
+export async function markBatchAsDelivered(
+  batchId: number
+): Promise<MarkBatchDeliveredResult> {
+  const result = await updateBatchStatus(batchId, 'DELIVER');
+  // Map to legacy result format for backwards compatibility
+  return {
+    batchId: result.batchId,
+    batchSequence: result.batchSequence,
+    alignerSetId: result.setId,
+    wasActivated: result.wasActivated,
+    wasAlreadyActive: result.wasAlreadyActive,
+    wasAlreadyDelivered: result.wasAlreadyDelivered,
+    previouslyActiveBatchSequence: result.previouslyActiveBatchSequence,
+  };
 }
 
 /**
  * Mark batch as manufactured (sets ManufactureDate to today)
+ * @deprecated Use updateBatchStatus(batchId, 'MANUFACTURE') instead
  */
-export async function markBatchAsManufactured(batchId: number): Promise<void> {
-  await executeQuery(
-    'UPDATE tblAlignerBatches SET ManufactureDate = GETDATE() WHERE AlignerBatchID = @batchId AND ManufactureDate IS NULL',
-    [['batchId', TYPES.Int, batchId]]
-  );
+export async function markBatchAsManufactured(batchId: number): Promise<UpdateBatchStatusResult> {
+  return updateBatchStatus(batchId, 'MANUFACTURE');
 }
 
 /**
- * Undo manufacture - clears ManufactureDate and DeliveredToPatientDate
+ * Undo manufacture - clears ManufactureDate
+ * @deprecated Use updateBatchStatus(batchId, 'UNDO_MANUFACTURE') instead
  */
-export async function undoManufactureBatch(batchId: number): Promise<void> {
-  await executeQuery(
-    'UPDATE tblAlignerBatches SET ManufactureDate = NULL, DeliveredToPatientDate = NULL WHERE AlignerBatchID = @batchId',
-    [['batchId', TYPES.Int, batchId]]
-  );
+export async function undoManufactureBatch(batchId: number): Promise<UpdateBatchStatusResult> {
+  return updateBatchStatus(batchId, 'UNDO_MANUFACTURE');
 }
 
 /**
- * Undo delivery - clears only DeliveredToPatientDate
+ * Undo delivery - clears DeliveredToPatientDate and BatchExpiryDate
+ * @deprecated Use updateBatchStatus(batchId, 'UNDO_DELIVERY') instead
  */
-export async function undoDeliverBatch(batchId: number): Promise<void> {
-  await executeQuery(
-    'UPDATE tblAlignerBatches SET DeliveredToPatientDate = NULL WHERE AlignerBatchID = @batchId',
-    [['batchId', TYPES.Int, batchId]]
-  );
+export async function undoDeliverBatch(batchId: number): Promise<UpdateBatchStatusResult> {
+  return updateBatchStatus(batchId, 'UNDO_DELIVERY');
 }
 
 /**
@@ -1494,7 +1612,7 @@ export async function getBatchById(batchId: number): Promise<AlignerBatch[]> {
       DeliveredToPatientDate: columns[11].value as Date | null,
       Days: columns[12].value as number | null,
       ValidityPeriod: null,
-      NextBatchReadyDate: null,
+      BatchExpiryDate: null,
       Notes: columns[13].value as string | null,
       IsActive: columns[14].value as boolean,
       IsLast: columns[15].value as boolean,

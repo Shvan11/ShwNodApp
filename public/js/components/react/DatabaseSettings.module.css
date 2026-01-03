@@ -1,0 +1,420 @@
+/* DatabaseSettings.module.css - Database Configuration Styles */
+
+/* ===================================
+   CONTAINER
+   =================================== */
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: var(--spacing-lg);
+}
+
+/* ===================================
+   SECTION CARD
+   =================================== */
+.section {
+    background: var(--background-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.sectionTitle {
+    font-size: var(--font-size-xl);
+    color: var(--text-primary);
+    margin: 0 0 var(--spacing-sm) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.sectionTitle i {
+    color: var(--primary-color);
+}
+
+.sectionDescription {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    margin: 0 0 var(--spacing-xl) 0;
+}
+
+/* ===================================
+   LOADING STATE
+   =================================== */
+.loadingSpinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-xxl);
+    color: var(--text-secondary);
+}
+
+.loadingSpinner i {
+    font-size: var(--font-size-xl);
+    color: var(--primary-color);
+}
+
+/* ===================================
+   CONFIG GROUP (subsections)
+   =================================== */
+.configGroup {
+    background: var(--gray-50);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.configGroup:last-child {
+    margin-bottom: 0;
+}
+
+.configGroup h4 {
+    margin: 0 0 var(--spacing-md) 0;
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* ===================================
+   SETTING GROUP (individual fields)
+   =================================== */
+.settingGroup {
+    margin-bottom: var(--spacing-lg);
+}
+
+.settingGroup:last-child {
+    margin-bottom: 0;
+}
+
+.settingGroup label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+}
+
+.settingGroup input,
+.settingGroup select {
+    width: 100%;
+    max-width: 400px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+    background: var(--background-primary);
+    transition: var(--transition-fast);
+}
+
+.settingGroup input:focus,
+.settingGroup select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.settingGroup input.pendingChange,
+.settingGroup select.pendingChange {
+    border-color: var(--warning-color);
+    background: var(--warning-50, #fffbeb);
+}
+
+.settingDescription {
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+    margin-top: var(--spacing-xs);
+}
+
+/* ===================================
+   PASSWORD INPUT GROUP
+   =================================== */
+.passwordInputGroup {
+    position: relative;
+    display: flex;
+    align-items: center;
+    max-width: 400px;
+}
+
+.passwordInputGroup input {
+    flex: 1;
+    padding-right: calc(var(--spacing-md) + 32px);
+}
+
+.passwordToggle {
+    position: absolute;
+    right: var(--spacing-sm);
+    background: transparent;
+    border: none;
+    padding: var(--spacing-xs);
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: color var(--transition-fast);
+}
+
+.passwordToggle:hover {
+    color: var(--text-primary);
+}
+
+/* ===================================
+   CONNECTION TEST
+   =================================== */
+.connectionTest {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.connectionStatus {
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    border: 1px solid;
+}
+
+.connectionStatus.success {
+    background: var(--success-50, #f0fdf4);
+    border-color: var(--success-200);
+    color: var(--success-800);
+}
+
+.connectionStatus.error {
+    background: var(--error-50);
+    border-color: var(--error-200);
+    color: var(--error-700);
+}
+
+.statusHeader {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-weight: var(--font-weight-semibold);
+    margin-bottom: var(--spacing-xs);
+}
+
+.statusHeader i {
+    font-size: var(--font-size-lg);
+}
+
+.statusDetails {
+    font-size: var(--font-size-sm);
+    opacity: 0.9;
+}
+
+/* ===================================
+   ACTIONS BAR
+   =================================== */
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: var(--gray-50);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+/* ===================================
+   BUTTONS
+   =================================== */
+.btn {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: var(--transition-base);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btnPrimary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btnPrimary:hover:not(:disabled) {
+    background: var(--blue-700);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.btnSecondary {
+    background: var(--gray-100);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btnSecondary:hover:not(:disabled) {
+    background: var(--gray-200);
+}
+
+.btnWarning {
+    background: var(--warning-color);
+    color: var(--gray-900);
+}
+
+.btnWarning:hover:not(:disabled) {
+    background: var(--warning-600, #d97706);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.btnInfo {
+    background: var(--info-color);
+    color: white;
+}
+
+.btnInfo:hover:not(:disabled) {
+    background: var(--info-700);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+/* ===================================
+   RESTART WARNING
+   =================================== */
+.restartWarning {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    background: var(--warning-50, #fffbeb);
+    border: 1px solid var(--warning-200, #fde68a);
+    border-radius: var(--radius-md);
+    color: var(--warning-800, #92400e);
+    font-size: var(--font-size-sm);
+}
+
+.restartWarning i {
+    color: var(--warning-color);
+    font-size: var(--font-size-lg);
+}
+
+/* ===================================
+   MODAL
+   =================================== */
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-index-modal);
+}
+
+.modalContent {
+    background: var(--background-primary);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.modalHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modalHeader h3 {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    color: var(--text-primary);
+}
+
+.modalClose {
+    background: transparent;
+    border: none;
+    padding: var(--spacing-xs);
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: var(--font-size-lg);
+    transition: color var(--transition-fast);
+}
+
+.modalClose:hover {
+    color: var(--text-primary);
+}
+
+.modalBody {
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modalBody pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+}
+
+.modalFooter {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--gray-50);
+    border-top: 1px solid var(--border-color);
+}
+
+/* ===================================
+   RESPONSIVE
+   =================================== */
+@media (max-width: 768px) {
+    .container {
+        padding: var(--spacing-md);
+    }
+
+    .section {
+        padding: var(--spacing-md);
+    }
+
+    .configGroup {
+        padding: var(--spacing-md);
+    }
+
+    .settingGroup input,
+    .settingGroup select,
+    .passwordInputGroup {
+        max-width: 100%;
+    }
+
+    .actions {
+        flex-direction: column;
+    }
+
+    .actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}

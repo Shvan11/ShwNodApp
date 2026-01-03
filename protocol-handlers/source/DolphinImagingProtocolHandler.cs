@@ -16,6 +16,8 @@ namespace DolphinImagingProtocolHandler
         public string DolphinPath { get; set; }
         public string PatientsFolder { get; set; }
         public string MemoryCardPath { get; set; }
+        public bool UseRunAsDate { get; set; }
+        public string RunAsDatePath { get; set; }
     }
 
     class Program
@@ -86,7 +88,9 @@ namespace DolphinImagingProtocolHandler
             {
                 DolphinPath = ReadIniValue("Paths", "DolphinPath"),
                 PatientsFolder = ReadIniValue("Paths", "PatientsFolder"),
-                MemoryCardPath = ReadIniValue("Paths", "MemoryCardPath") ?? @"D:\DCIM"
+                MemoryCardPath = ReadIniValue("Paths", "MemoryCardPath") ?? @"D:\DCIM",
+                UseRunAsDate = ReadIniValue("Paths", "UseRunAsDate")?.ToLowerInvariant() == "true",
+                RunAsDatePath = ReadIniValue("Paths", "RunAsDatePath")
             };
 
             // Ensure paths end with backslash
@@ -100,19 +104,13 @@ namespace DolphinImagingProtocolHandler
 
         /// <summary>
         /// Open patient in Dolphin Imaging
+        /// Uses RunAsDate if configured, otherwise DolCtrl.exe
         /// </summary>
         static void OpenDolphin(string patientId, Config config, int? tpCode = null)
         {
             if (string.IsNullOrEmpty(config.DolphinPath))
             {
                 ShowError("DolphinPath not configured in ProtocolHandlers.ini");
-                return;
-            }
-
-            string dolCtrlExe = Path.Combine(config.DolphinPath, "DolCtrl.exe");
-            if (!File.Exists(dolCtrlExe))
-            {
-                ShowError($"DolCtrl.exe not found at: {dolCtrlExe}");
                 return;
             }
 
@@ -126,20 +124,63 @@ namespace DolphinImagingProtocolHandler
                 return;
             }
 
-            // Build arguments
-            string arguments = patientId;
-            if (tpCode.HasValue)
+            if (config.UseRunAsDate)
             {
-                arguments += $" /tp {tpCode.Value}";
-            }
+                // RunAsDate mode: Launch dolphin64.exe via RunAsDate utility
+                if (string.IsNullOrEmpty(config.RunAsDatePath) || !File.Exists(config.RunAsDatePath))
+                {
+                    ShowError($"RunAsDate.exe not found at: {config.RunAsDatePath}");
+                    return;
+                }
 
-            // Launch DolCtrl.exe
-            Process.Start(new ProcessStartInfo
+                string dolphin64Exe = Path.Combine(config.DolphinPath, "dolphin64.exe");
+                if (!File.Exists(dolphin64Exe))
+                {
+                    ShowError($"dolphin64.exe not found at: {dolphin64Exe}");
+                    return;
+                }
+
+                // Build arguments for dolphin64.exe
+                string dolphinArgs = patientId;
+                if (tpCode.HasValue)
+                {
+                    dolphinArgs += $" /tp {tpCode.Value}";
+                }
+
+                // Launch via RunAsDate
+                // Format: RunAsDate.exe /immediate /movetime 29\07\2021 00:00:00 "path\dolphin64.exe" args
+                string runAsDateArgs = $"/immediate /movetime 29\\07\\2021 00:00:00 \"{dolphin64Exe}\" {dolphinArgs}";
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = config.RunAsDatePath,
+                    Arguments = runAsDateArgs,
+                    UseShellExecute = true
+                });
+            }
+            else
             {
-                FileName = dolCtrlExe,
-                Arguments = arguments,
-                UseShellExecute = true
-            });
+                // Standard mode: Use DolCtrl.exe
+                string dolCtrlExe = Path.Combine(config.DolphinPath, "DolCtrl.exe");
+                if (!File.Exists(dolCtrlExe))
+                {
+                    ShowError($"DolCtrl.exe not found at: {dolCtrlExe}");
+                    return;
+                }
+
+                string arguments = patientId;
+                if (tpCode.HasValue)
+                {
+                    arguments += $" /tp {tpCode.Value}";
+                }
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = dolCtrlExe,
+                    Arguments = arguments,
+                    UseShellExecute = true
+                });
+            }
         }
 
         /// <summary>

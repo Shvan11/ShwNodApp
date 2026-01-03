@@ -1,0 +1,632 @@
+/* Add Patient Page - Beautiful Form Styling */
+
+/* Main container with improved spacing and centering */
+.addPatientContainer {
+    min-height: 100vh;
+    background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-200) 100%);
+    padding: var(--spacing-xl) var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Header styling */
+.addPatientHeader {
+    background: linear-gradient(135deg, var(--color-dark-blue) 0%, var(--color-dark-blue) 100%);
+    color: white;
+    padding: var(--spacing-lg) 0;
+    width: 100%;
+    margin-bottom: var(--spacing-xl);
+    box-shadow: var(--shadow-lg);
+}
+
+.addPatientHeader .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-md);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.addPatientLogo {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.addPatientLogo img {
+    height: 50px;
+    width: auto;
+}
+
+.addPatientLogo h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: var(--font-weight-bold);
+}
+
+.addPatientNav {
+    font-size: 0.9rem;
+}
+
+.addPatientNav a {
+    color: white;
+    text-decoration: none;
+    opacity: 0.9;
+    transition: opacity 0.3s ease;
+}
+
+.addPatientNav a:hover {
+    opacity: 1;
+}
+
+/* Form container with beautiful card design - optimized for PC */
+.addPatientFormContainer {
+    background: var(--background-light);
+    border-radius: 16px;
+    padding: var(--spacing-xl);
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle background pattern */
+.addPatientFormContainer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color), var(--accent-color));
+}
+
+/* Form title styling */
+.addPatientTitle {
+    text-align: center;
+    margin-bottom: var(--spacing-xl);
+    color: var(--text-color);
+    font-size: 2rem;
+    font-weight: var(--font-weight-bold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+}
+
+.addPatientTitle i {
+    color: var(--primary-color);
+    font-size: 1.8rem;
+}
+
+/* Main form layout - two columns on desktop */
+.formContent {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: calc(var(--spacing-xl) * 1.5);
+    margin-top: var(--spacing-xl);
+}
+
+/* Form sections for better organization */
+.formSection {
+    margin-bottom: var(--spacing-xl);
+    position: relative;
+}
+
+/* Full width sections that span both columns */
+.formSectionFullWidth {
+    grid-column: 1 / -1;
+}
+
+.formSectionTitle {
+    font-size: 1.2rem;
+    font-weight: var(--font-weight-medium);
+    color: var(--text-color);
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 2px solid var(--gray-100);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.formSectionTitle i {
+    color: var(--primary-color);
+    font-size: 1rem;
+}
+
+/* Improved form rows with better alignment */
+.formRow {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.formRowSingleColumn {
+    grid-template-columns: 1fr;
+}
+
+.formRowThreeColumns {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+/* Beautiful form groups */
+.formGroup {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.formGroupFullWidth {
+    grid-column: 1 / -1;
+}
+
+.formLabel {
+    font-weight: var(--font-weight-medium);
+    color: var(--text-color);
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.formLabel i {
+    color: var(--text-light);
+    font-size: 0.85rem;
+}
+
+.required {
+    color: var(--error-color);
+    font-weight: var(--font-weight-bold);
+}
+
+/* Alert messages with better styling */
+.alert {
+    padding: var(--spacing-md) var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-weight: var(--font-weight-medium);
+    box-shadow: var(--shadow-sm);
+}
+
+.alert i {
+    font-size: 1.1rem;
+}
+
+.alertSuccess {
+    background-color: var(--success-100);
+    color: var(--success-800);
+    border: 1px solid var(--success-200);
+}
+
+.alertDanger {
+    background-color: var(--error-50);
+    color: var(--error-700);
+    border: 1px solid var(--error-100);
+}
+
+/* Beautiful form actions - spans full width */
+.formActions {
+    margin-top: var(--spacing-xl);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--gray-100);
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: center;
+    flex-wrap: wrap;
+    grid-column: 1 / -1;
+}
+
+.formActionsTop {
+    margin-top: 0;
+    margin-bottom: var(--spacing-xl);
+    padding-top: 0;
+    padding-bottom: var(--spacing-lg);
+    border-top: none;
+    border-bottom: 2px solid var(--gray-100);
+}
+
+.formActionsBottom {
+    margin-top: var(--spacing-xl);
+    padding-top: var(--spacing-lg);
+    border-top: 2px solid var(--gray-100);
+}
+
+/* Loading spinner animation */
+.loadingSpinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ========================================
+   TABBED FORM LAYOUT (Desktop)
+   ======================================== */
+
+.patientForm {
+    width: 100%;
+}
+
+/* Desktop Tabs Container */
+.formTabsContainer {
+    width: 100%;
+    margin: var(--spacing-lg) 0;
+}
+
+/* Tabs Header - Horizontal Tab Buttons */
+.tabsHeader {
+    display: flex;
+    gap: var(--spacing-xs);
+    margin-bottom: 0;
+    border-bottom: 3px solid var(--gray-200);
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-color) var(--gray-100);
+}
+
+.tabsHeader::-webkit-scrollbar {
+    height: 6px;
+}
+
+.tabsHeader::-webkit-scrollbar-track {
+    background: var(--gray-100);
+    border-radius: 3px;
+}
+
+.tabsHeader::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 3px;
+}
+
+/* Individual Tab Button */
+.tabButton {
+    flex-shrink: 0;
+    padding: var(--spacing-md) var(--spacing-xl);
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--text-light);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    position: relative;
+    margin-bottom: -3px;
+}
+
+.tabButton i {
+    font-size: 1rem;
+}
+
+.tabButton:hover {
+    color: var(--primary-color);
+    background: rgba(0, 123, 255, 0.05);
+}
+
+.tabButtonActive {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    font-weight: var(--font-weight-bold);
+}
+
+.tabButtonActive i {
+    color: var(--primary-color);
+}
+
+.tabLabel {
+    /* Tab label styling */
+}
+
+/* Tab Content Area */
+.tabsContent {
+    padding: var(--spacing-xl);
+    background: var(--background-light);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    min-height: 400px;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.tabContentSection {
+    animation: fadeInScale 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ========================================
+   MOBILE ACCORDION LAYOUT
+   ======================================== */
+
+.formAccordionContainer {
+    width: 100%;
+    margin: var(--spacing-lg) 0;
+}
+
+.accordionSection {
+    margin-bottom: var(--spacing-md);
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--background-light);
+    transition: all 0.3s ease;
+}
+
+.accordionSection:hover {
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Accordion Header Button */
+.accordionHeader {
+    width: 100%;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-200) 100%);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-color);
+    transition: all 0.3s ease;
+}
+
+.accordionHeader:hover {
+    background: linear-gradient(135deg, var(--gray-200) 0%, var(--border-color) 100%);
+}
+
+.accordionHeaderExpanded {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
+    color: white;
+}
+
+.accordionHeaderExpanded i {
+    color: white;
+}
+
+.accordionTitle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.accordionTitle i {
+    font-size: 1.1rem;
+    color: var(--primary-color);
+    transition: color 0.3s ease;
+}
+
+/* Accordion Content */
+.accordionContent {
+    padding: var(--spacing-lg);
+    background: var(--background-light);
+    border-top: 1px solid var(--gray-200);
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        max-height: 1000px;
+        transform: translateY(0);
+    }
+}
+
+/* ========================================
+   RESPONSIVE BREAKPOINTS
+   ======================================== */
+
+/* Hide desktop tabs on mobile, show accordion */
+.desktopOnly {
+    display: block;
+}
+
+.mobileOnly {
+    display: none;
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+    .addPatientFormContainer {
+        max-width: 1000px;
+    }
+
+    .formContent {
+        gap: var(--spacing-xl);
+    }
+}
+
+@media (max-width: 992px) {
+    .tabButton .tabLabel {
+        display: none;
+    }
+
+    .tabButton {
+        padding: var(--spacing-md);
+        justify-content: center;
+    }
+
+    .tabButton i {
+        font-size: 1.2rem;
+    }
+
+    .tabsContent {
+        padding: var(--spacing-lg);
+    }
+}
+
+@media (max-width: 900px) {
+    /* Switch to single column on tablets */
+    .formContent {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-lg);
+    }
+
+    .formSectionFullWidth {
+        grid-column: 1;
+    }
+}
+
+/* Mobile Breakpoint (768px and below) - Switch to Accordion */
+@media (max-width: 768px) {
+    .desktopOnly {
+        display: none;
+    }
+
+    .mobileOnly {
+        display: block;
+    }
+
+    .addPatientContainer {
+        padding: var(--spacing-md);
+    }
+
+    .addPatientFormContainer {
+        padding: var(--spacing-lg);
+        margin: 0;
+        max-width: none;
+    }
+
+    .formRow {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+
+    .formRowThreeColumns {
+        grid-template-columns: 1fr;
+    }
+
+    .addPatientTitle {
+        font-size: 1.5rem;
+    }
+
+    .formActions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-sm);
+    }
+
+    .formActions > * {
+        width: 100%;
+    }
+
+    .addPatientHeader .container {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+        text-align: center;
+    }
+
+    .accordionContent .formRow {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Small Mobile (480px and below) */
+@media (max-width: 480px) {
+    .addPatientLogo {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    .addPatientLogo img {
+        height: 40px;
+    }
+
+    .addPatientLogo h1 {
+        font-size: 1.25rem;
+    }
+
+    .addPatientTitle {
+        font-size: 1.3rem;
+        flex-direction: column;
+        gap: var(--spacing-xs);
+    }
+
+    .addPatientTitle i {
+        font-size: 1.5rem;
+    }
+
+    .accordionHeader {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .accordionContent {
+        padding: var(--spacing-md);
+    }
+
+    .accordionTitle {
+        font-size: var(--font-size-sm);
+    }
+}
+
+/* Focus management for accessibility */
+.formControl:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* Enhanced visual hierarchy */
+.formSection:not(:last-child) {
+    margin-bottom: calc(var(--spacing-xl) + var(--spacing-md));
+}
+
+/* Subtle hover effects for better UX */
+.formGroup:hover .formLabel {
+    color: var(--primary-color);
+    transition: color 0.3s ease;
+}

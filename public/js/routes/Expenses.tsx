@@ -7,9 +7,7 @@ import ExpenseSummary from '../components/expenses/ExpenseSummary';
 import ExpenseModal from '../components/expenses/ExpenseModal';
 import DeleteConfirmModal from '../components/expenses/DeleteConfirmModal';
 import { useToast } from '../contexts/ToastContext';
-
-// Expenses page styles
-import '../../css/pages/expenses.css';
+import styles from './Expenses.module.css';
 
 /**
  * Filters state with optional category/subcategory IDs (undefined for unset)
@@ -166,11 +164,11 @@ export default function Expenses() {
   };
 
   return (
-    <div className="expenses-container">
-      <div className="expenses-page-header">
+    <div className={styles.expensesContainer}>
+      <div className={styles.expensesPageHeader}>
         <h1>Expense Management</h1>
         <button
-          className="btn-action btn-primary"
+          className="btn btn-primary"
           onClick={handleAddExpense}
           disabled={mutationLoading}
         >
@@ -195,9 +193,9 @@ export default function Expenses() {
 
       {/* Error Display */}
       {error && (
-        <div className="error-banner">
+        <div className={styles.errorBanner}>
           <p>Error loading expenses: {error}</p>
-          <button onClick={refetch} className="btn-action btn-secondary">
+          <button onClick={refetch} className="btn btn-secondary">
             Retry
           </button>
         </div>

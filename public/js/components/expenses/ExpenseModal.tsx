@@ -6,6 +6,7 @@ import React, { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
 import { useCategories, useSubcategories } from '../../hooks/useExpenses';
 import type { Expense, ExpenseData } from '../../hooks/useExpenses';
+import styles from '../../routes/Expenses.module.css';
 
 // Types
 interface Category {
@@ -169,36 +170,36 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
 
     return (
         <div className="modal-overlay" onClick={handleOverlayClick}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
+            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+                <div className={styles.modalHeader}>
                     <h2>{modalTitle}</h2>
-                    <button className="close" onClick={handleClose} aria-label="Close modal">
+                    <button className={styles.closeBtn} onClick={handleClose} aria-label="Close modal">
                         &times;
                     </button>
                 </div>
 
                 <form onSubmit={handleSubmit}>
-                    <div className="modal-body">
-                        <div className="form-group">
+                    <div className={styles.modalBody}>
+                        <div className={styles.formGroup}>
                             <label htmlFor="expense-date">
-                                Date <span className="required">*</span>
+                                Date <span className={styles.required}>*</span>
                             </label>
                             <input
                                 type="date"
                                 id="expense-date"
                                 value={formData.expenseDate}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('expenseDate', e.target.value)}
-                                className={errors.expenseDate ? 'error' : ''}
+                                className={`${styles.formInput} ${errors.expenseDate ? styles.inputError : ''}`}
                             />
                             {errors.expenseDate && (
-                                <span className="error-message">{errors.expenseDate}</span>
+                                <span className={styles.errorMessage}>{errors.expenseDate}</span>
                             )}
                         </div>
 
-                        <div className="form-row">
-                            <div className="form-group">
+                        <div className={styles.formRow}>
+                            <div className={styles.formGroup}>
                                 <label htmlFor="expense-amount">
-                                    Amount <span className="required">*</span>
+                                    Amount <span className={styles.required}>*</span>
                                 </label>
                                 <input
                                     type="number"
@@ -207,38 +208,39 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                                     step="1"
                                     value={formData.amount}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('amount', e.target.value)}
-                                    className={errors.amount ? 'error' : ''}
+                                    className={`${styles.formInput} ${errors.amount ? styles.inputError : ''}`}
                                 />
                                 {errors.amount && (
-                                    <span className="error-message">{errors.amount}</span>
+                                    <span className={styles.errorMessage}>{errors.amount}</span>
                                 )}
                             </div>
 
-                            <div className="form-group">
+                            <div className={styles.formGroup}>
                                 <label htmlFor="expense-currency">
-                                    Currency <span className="required">*</span>
+                                    Currency <span className={styles.required}>*</span>
                                 </label>
                                 <select
                                     id="expense-currency"
                                     value={formData.currency}
                                     onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('currency', e.target.value)}
-                                    className={errors.currency ? 'error' : ''}
+                                    className={`${styles.formInput} ${errors.currency ? styles.inputError : ''}`}
                                 >
                                     <option value="IQD">IQD</option>
                                     <option value="USD">USD</option>
                                 </select>
                                 {errors.currency && (
-                                    <span className="error-message">{errors.currency}</span>
+                                    <span className={styles.errorMessage}>{errors.currency}</span>
                                 )}
                             </div>
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label htmlFor="expense-category">Category</label>
                             <select
                                 id="expense-category"
                                 value={String(formData.categoryId)}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => handleCategoryChange(e.target.value)}
+                                className={styles.formInput}
                             >
                                 <option value="">Select Category</option>
                                 {categories.map(cat => (
@@ -249,13 +251,14 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                             </select>
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label htmlFor="expense-subcategory">Subcategory</label>
                             <select
                                 id="expense-subcategory"
                                 value={String(formData.subcategoryId)}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('subcategoryId', e.target.value)}
                                 disabled={!formData.categoryId}
+                                className={styles.formInput}
                             >
                                 <option value="">Select Subcategory</option>
                                 {subcategories.map(sub => (
@@ -266,7 +269,7 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                             </select>
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label htmlFor="expense-note">Note</label>
                             <textarea
                                 id="expense-note"
@@ -274,21 +277,22 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                                 value={formData.note}
                                 onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleInputChange('note', e.target.value)}
                                 placeholder="Add any notes about this expense..."
+                                className={styles.formInput}
                             />
                         </div>
                     </div>
 
-                    <div className="modal-footer">
+                    <div className={styles.modalFooter}>
                         <button
                             type="button"
-                            className="btn-action btn-secondary cancel-btn"
+                            className="btn btn-secondary"
                             onClick={handleClose}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="btn-action btn-primary"
+                            className="btn btn-primary"
                         >
                             {isEditMode ? 'Update Expense' : 'Add Expense'}
                         </button>

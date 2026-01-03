@@ -1,0 +1,208 @@
+/* Template Designer Page Styles */
+/* Using global CSS variables from /public/css/base/variables.css */
+
+/* Template Designer Container */
+.templateDesigner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    z-index: 1001; /* Above universal header */
+    overflow: hidden;
+}
+
+/* Designer Header/Toolbar */
+.designerHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: white;
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    height: 71px;
+    flex-shrink: 0;
+    z-index: 101;
+}
+
+.designerTitle {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.designerTitle h1 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.templateInfo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--bg-light);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.templateInfo i {
+    color: var(--primary-color);
+}
+
+.designerActions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* Loading State */
+.designerLoading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background: white;
+    text-align: center;
+}
+
+.designerLoading i {
+    font-size: 3rem;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.designerLoading p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 1rem;
+}
+
+/* Error State */
+.designerError {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background: white;
+    text-align: center;
+    padding: 2rem;
+}
+
+.designerError i {
+    font-size: 4rem;
+    color: var(--danger-color);
+    margin-bottom: 1.5rem;
+}
+
+.designerError p {
+    margin: 0 0 1.5rem 0;
+    color: var(--text-dark);
+    font-size: 1.125rem;
+}
+
+/* GrapesJS Editor Container - minimal styling, let GrapesJS handle its own layout */
+.editorContainer {
+    height: calc(100vh - 71px);
+    width: 100%;
+}
+
+/* Loading Overlay for Save Operation */
+.loadingOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.loadingOverlayActive {
+    display: flex;
+}
+
+.loadingContent {
+    background: white;
+    padding: 2rem 3rem;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    text-align: center;
+}
+
+.loadingSpinner {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    animation: spin 1s linear infinite;
+}
+
+.loadingMessage {
+    margin-top: var(--spacing-md);
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .designerHeader {
+        flex-direction: column;
+        height: auto;
+        gap: 1rem;
+        padding: 1rem;
+    }
+
+    .designerTitle {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+        width: 100%;
+    }
+
+    .designerTitle h1 {
+        font-size: 1.125rem;
+    }
+
+    .designerActions {
+        width: 100%;
+    }
+}
+
+/* Override some GrapesJS default styles for better integration */
+/* These need to be global since they target GrapesJS library classes */
+:global(.gjs-one-bg) {
+    background-color: var(--gray-50);
+}
+
+:global(.gjs-two-color) {
+    color: var(--text-dark);
+}
+
+:global(.gjs-three-bg) {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+:global(.gjs-four-color),
+:global(.gjs-four-color-h:hover) {
+    color: var(--primary-color);
+}

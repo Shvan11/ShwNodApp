@@ -1,0 +1,428 @@
+/* ===== DIAGNOSIS PAGE STYLES ===== */
+/* Comprehensive diagnosis and treatment plan page */
+
+.diagnosisPage {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--background-secondary);
+}
+
+/* ===== HEADER ===== */
+.diagnosisHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-lg) var(--spacing-xl);
+    background: var(--background-primary);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    gap: var(--spacing-lg);
+}
+
+.diagnosisHeaderContent {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex: 1;
+}
+
+.btnBack {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: var(--background-secondary);
+    color: var(--text-secondary);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btnBack:hover {
+    background: var(--primary-color);
+    color: var(--background-primary);
+    transform: translateX(-2px);
+}
+
+.diagnosisHeaderInfo {
+    flex: 1;
+}
+
+.diagnosisHeaderInfo h1 {
+    margin: 0;
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.diagnosisHeaderInfo h1 i {
+    color: var(--primary-color);
+}
+
+.diagnosisMeta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.diagnosisMeta span {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.diagnosisMeta i {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.patientName {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.workType {
+    color: var(--success-color);
+    font-weight: 500;
+}
+
+.workId {
+    font-family: monospace;
+    font-weight: 500;
+}
+
+.diagnosisHeaderActions {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+/* ===== TAB NAVIGATION ===== */
+.diagnosisTabs {
+    display: flex;
+    background: var(--background-primary);
+    border-bottom: 2px solid var(--border-color);
+    padding: 0 var(--spacing-xl);
+    overflow-x: auto;
+}
+
+.diagnosisTab {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.diagnosisTab:hover {
+    color: var(--primary-color);
+    background: var(--background-secondary);
+}
+
+.diagnosisTabActive {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    font-weight: 600;
+}
+
+.diagnosisTab i {
+    font-size: var(--font-size-lg);
+}
+
+/* ===== CONTENT AREA ===== */
+.diagnosisContent {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-xl);
+}
+
+.diagnosisTabContent {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: var(--background-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    box-shadow: var(--shadow-sm);
+}
+
+.sectionTitle {
+    margin: 0 0 var(--spacing-lg) 0;
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: var(--spacing-sm);
+}
+
+/* ===== FORM STYLING ===== */
+.formGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-lg);
+}
+
+.formGroup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.fullWidth {
+    grid-column: 1 / -1;
+}
+
+.formGroup label {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.required {
+    color: var(--error-color);
+    margin-left: var(--spacing-xs);
+}
+
+.formInput,
+.formTextarea {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+    font-family: var(--font-primary);
+    color: var(--text-primary);
+    background: var(--background-primary);
+    transition: all 0.2s ease;
+}
+
+.formInput:focus,
+.formTextarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px var(--primary-alpha);
+}
+
+.formTextarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.formInput::placeholder,
+.formTextarea::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.6;
+}
+
+/* ===== CEPHALOMETRIC SECTIONS ===== */
+.cephSection {
+    margin-bottom: var(--spacing-xl);
+}
+
+.cephSection:last-child {
+    margin-bottom: 0;
+}
+
+.cephSection h3 {
+    margin: 0 0 var(--spacing-md) 0;
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--accent-color);
+    padding-left: var(--spacing-sm);
+    border-left: 4px solid var(--accent-color);
+}
+
+.cephGrid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+/* ===== FOOTER ACTIONS ===== */
+.diagnosisFooter {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg) var(--spacing-xl);
+    background: var(--background-primary);
+    border-top: 1px solid var(--border-color);
+    box-shadow: var(--shadow-md);
+}
+
+.btnCancel,
+.btnSave {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-xl);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btnCancel {
+    background: var(--background-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btnCancel:hover:not(:disabled) {
+    background: var(--error-color);
+    color: var(--background-primary);
+    border-color: var(--error-color);
+}
+
+.btnSave {
+    background: var(--success-color);
+    color: var(--background-primary);
+}
+
+.btnSave:hover:not(:disabled) {
+    background: var(--success-dark);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.btnCancel:disabled,
+.btnSave:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ===== LOADING STATE ===== */
+.diagnosisLoading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-xxl);
+    gap: var(--spacing-md);
+    color: var(--text-secondary);
+}
+
+.diagnosisLoading i {
+    font-size: var(--font-size-3xl);
+    color: var(--primary-color);
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 1024px) {
+    .diagnosisHeader {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-md);
+    }
+
+    .diagnosisHeaderActions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .formGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .diagnosisTab span {
+        display: none;
+    }
+
+    .diagnosisTab {
+        padding: var(--spacing-md);
+    }
+}
+
+@media (max-width: 768px) {
+    .diagnosisHeader {
+        padding: var(--spacing-md);
+    }
+
+    .diagnosisHeaderInfo h1 {
+        font-size: var(--font-size-xl);
+    }
+
+    .diagnosisContent {
+        padding: var(--spacing-md);
+    }
+
+    .diagnosisTabContent {
+        padding: var(--spacing-md);
+    }
+
+    .diagnosisFooter {
+        padding: var(--spacing-md);
+    }
+
+    .btnCancel,
+    .btnSave {
+        flex: 1;
+    }
+
+    .diagnosisMeta {
+        flex-direction: column;
+        gap: var(--spacing-xs);
+    }
+
+    .diagnosisTabs {
+        padding: 0 var(--spacing-md);
+    }
+}
+
+@media (max-width: 480px) {
+    .diagnosisHeaderInfo h1 {
+        font-size: var(--font-size-lg);
+    }
+
+    .btnBack {
+        width: 36px;
+        height: 36px;
+    }
+
+    .formGrid {
+        gap: var(--spacing-md);
+    }
+
+    .sectionTitle {
+        font-size: var(--font-size-lg);
+    }
+
+    .cephSection h3 {
+        font-size: var(--font-size-base);
+    }
+}
+
+/* ===== RTL SUPPORT ===== */
+[dir="rtl"] .diagnosisHeaderContent {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .btnBack:hover {
+    transform: translateX(2px);
+}
+
+[dir="rtl"] .diagnosisMeta {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .cephSection h3 {
+    padding-left: 0;
+    padding-right: var(--spacing-sm);
+    border-left: none;
+    border-right: 4px solid var(--accent-color);
+}

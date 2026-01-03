@@ -1,0 +1,326 @@
+/* ===== VISITS COMPONENT - CSS MODULE ===== */
+
+.container {
+    padding: 0;
+    margin: 0;
+}
+
+.formContainer {
+    margin-bottom: 0.375rem;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.375rem;
+    margin-top: 0;
+    padding: 0;
+}
+
+.header h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-800);
+}
+
+.controls {
+    display: flex;
+    gap: 0.375rem;
+}
+
+/* Summary Cards */
+.summary {
+    display: flex;
+    gap: 0.375rem;
+    margin-bottom: 0.5rem;
+}
+
+.summaryCard {
+    flex: 1;
+    background: white;
+    padding: 0.375rem 0.5rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
+}
+
+.summaryCard h3 {
+    font-size: 0.6875rem;
+    margin: 0 0 0.125rem 0;
+    color: var(--gray-500);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.summaryValue {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--indigo-600);
+}
+
+/* Visit Cards */
+.cardsContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.card {
+    background-color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--gray-200);
+}
+
+.cardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.375rem;
+    padding-bottom: 0.375rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.cardTitle {
+    margin: 0 0 0.1875rem 0;
+    color: var(--indigo-600);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.cardTitle i {
+    font-size: 0.75rem;
+    margin-inline-end: 0.25rem;
+}
+
+.cardMeta {
+    display: flex;
+    gap: 0.5rem;
+    font-size: var(--font-size-sm);
+    color: var(--gray-500);
+    line-height: 1.2;
+}
+
+.cardMeta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.1875rem;
+}
+
+.cardMeta i {
+    font-size: 0.6875rem;
+}
+
+.metaSuccess {
+    color: var(--success-500);
+}
+
+.metaDanger {
+    color: var(--error-500);
+}
+
+/* Action Buttons Container */
+.actionButtons {
+    display: flex;
+    gap: 0.25rem;
+}
+
+/* Wire Info Section */
+.wireInfo {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+    padding: 0.375rem 0.5rem;
+    background-color: var(--blue-50);
+    border-radius: 3px;
+}
+
+.wireInfoItem {
+    flex: 1;
+}
+
+.wireInfoLabel {
+    font-size: var(--font-size-xs);
+    color: var(--gray-500);
+    margin-bottom: 0.0625rem;
+    font-weight: 500;
+}
+
+.wireInfoValue {
+    font-size: var(--font-size-sm);
+    color: var(--info-700);
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+/* Treatment Info */
+.treatmentInfo {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.375rem;
+    margin-bottom: 0.375rem;
+}
+
+.treatmentInfoItem {
+    font-size: var(--font-size-sm);
+    line-height: 1.3;
+}
+
+.treatmentInfoLabel {
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.treatmentInfoValue {
+    color: var(--gray-500);
+}
+
+/* Notes Section & Next Visit Section - Merged Styles */
+.notesSection,
+.nextVisitSection {
+    padding: 0.375rem 0.5rem;
+    border-radius: 3px;
+    margin-bottom: 0.25rem;
+}
+
+.notesSection {
+    background-color: var(--warning-100);
+}
+
+.nextVisitSection {
+    background-color: var(--info-100);
+}
+
+.notesSection strong,
+.nextVisitSection strong {
+    display: block;
+    font-size: var(--font-size-xs);
+    margin-bottom: 0.1875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.notesSection strong {
+    color: var(--warning-900);
+}
+
+.nextVisitSection strong {
+    color: var(--info-800);
+}
+
+.notesSection p,
+.nextVisitSection p {
+    margin: 0;
+    font-size: var(--font-size-base);
+    line-height: 1.4;
+}
+
+.notesSection p {
+    color: var(--warning-900);
+}
+
+.nextVisitSection p {
+    color: var(--info-700);
+}
+
+/* Photo Badges */
+.photoBadges {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.photoBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.1875rem;
+    padding: 0.1875rem 0.375rem;
+    font-size: 0.6875rem;
+    border-radius: 3px;
+    background-color: var(--success-50);
+    color: var(--success-700);
+    font-weight: 500;
+    line-height: 1;
+}
+
+.photoBadge i {
+    font-size: 0.625rem;
+}
+
+/* Error/Loading States */
+.error {
+    background-color: var(--error-50);
+    color: var(--error-600);
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    font-size: 0.8125rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.errorClose {
+    background: none;
+    border: none;
+    color: var(--error-600);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.loading {
+    padding: 1rem;
+    text-align: center;
+    color: var(--gray-500);
+    font-size: 0.875rem;
+}
+
+/* Empty State */
+.emptyState {
+    text-align: center;
+    padding: 2rem;
+    background-color: var(--gray-50);
+    border-radius: 6px;
+    border: 2px dashed var(--gray-300);
+}
+
+.emptyState i {
+    font-size: 2rem;
+    color: var(--gray-400);
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.emptyState p {
+    color: var(--gray-500);
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.375rem;
+    }
+
+    .wireInfo {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .treatmentInfo {
+        grid-template-columns: 1fr;
+    }
+
+    .actionButtons {
+        width: 100%;
+    }
+}

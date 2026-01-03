@@ -1,5 +1,6 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import styles from './AlignerDoctorsSettings.module.css';
 
 interface AlignerDoctor {
     DrID: number;
@@ -145,8 +146,8 @@ const AlignerDoctorsSettings = ({ onChangesUpdate }: AlignerDoctorsSettingsProps
 
     if (loading) {
         return (
-            <div className="settings-section">
-                <div className="loading-container">
+            <div className={styles.container}>
+                <div className={styles.loadingContainer}>
                     <i className="fas fa-spinner fa-spin"></i>
                     <p>Loading doctors...</p>
                 </div>
@@ -156,11 +157,11 @@ const AlignerDoctorsSettings = ({ onChangesUpdate }: AlignerDoctorsSettingsProps
 
     if (error) {
         return (
-            <div className="settings-section">
-                <div className="error-container">
+            <div className={styles.container}>
+                <div className={styles.errorContainer}>
                     <i className="fas fa-exclamation-triangle"></i>
                     <p>Error: {error}</p>
-                    <button onClick={loadDoctors} className="btn-retry">
+                    <button onClick={loadDoctors} className={styles.btnRetry}>
                         <i className="fas fa-redo"></i> Retry
                     </button>
                 </div>
@@ -169,19 +170,19 @@ const AlignerDoctorsSettings = ({ onChangesUpdate }: AlignerDoctorsSettingsProps
     }
 
     return (
-        <div className="settings-section aligner-doctors-settings">
-            <div className="section-header">
-                <div className="header-content">
+        <div className={styles.container}>
+            <div className={styles.sectionHeader}>
+                <div className={styles.headerContent}>
                     <h2>
                         <i className="fas fa-user-md"></i>
                         Aligner Doctors
                     </h2>
-                    <p className="section-description">
+                    <p className={styles.sectionDescription}>
                         Manage doctors who can access the aligner portal and their contact information
                     </p>
                 </div>
                 <button
-                    className="btn-add-doctor"
+                    className={styles.btnAdd}
                     onClick={handleAdd}
                     disabled={showAddForm}
                 >
@@ -191,17 +192,17 @@ const AlignerDoctorsSettings = ({ onChangesUpdate }: AlignerDoctorsSettingsProps
             </div>
 
             {showAddForm && (
-                <div className="doctor-form-container">
-                    <div className="form-header">
+                <div className={styles.formContainer}>
+                    <div className={styles.formHeader}>
                         <h3>
                             <i className={editingId ? 'fas fa-edit' : 'fas fa-plus'}></i>
                             {editingId ? 'Edit Doctor' : 'Add New Doctor'}
                         </h3>
                     </div>
-                    <form onSubmit={handleSubmit} className="doctor-form">
-                        <div className="form-group">
+                    <form onSubmit={handleSubmit} className={styles.form}>
+                        <div className={styles.formGroup}>
                             <label htmlFor="DoctorName">
-                                Doctor Name <span className="required">*</span>
+                                Doctor Name <span className={styles.required}>*</span>
                             </label>
                             <input
                                 type="text"
@@ -214,10 +215,10 @@ const AlignerDoctorsSettings = ({ onChangesUpdate }: AlignerDoctorsSettingsProps
                             />
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label htmlFor="DoctorEmail">
                                 Email Address
-                                <span className="field-help">
+                                <span className={styles.fieldHelp}>
                                     (Required for portal access)
                                 </span>
                             </label>
@@ -231,10 +232,10 @@ const AlignerDoctorsSettings = ({ onChangesUpdate }: AlignerDoctorsSettingsProps
                             />
                         </div>
 
-                        <div className="form-group">
+                        <div className={styles.formGroup}>
                             <label htmlFor="LogoPath">
                                 Logo Path
-                                <span className="field-help">
+                                <span className={styles.fieldHelp}>
                                     (Optional - path to doctor's logo image)
                                 </span>
                             </label>
@@ -248,12 +249,12 @@ const AlignerDoctorsSettings = ({ onChangesUpdate }: AlignerDoctorsSettingsProps
                             />
                         </div>
 
-                        <div className="form-actions">
-                            <button type="button" onClick={handleCancel} className="btn-cancel">
+                        <div className={styles.formActions}>
+                            <button type="button" onClick={handleCancel} className={styles.btnCancel}>
                                 <i className="fas fa-times"></i>
                                 Cancel
                             </button>
-                            <button type="submit" className="btn-save">
+                            <button type="submit" className={styles.btnSave}>
                                 <i className="fas fa-save"></i>
                                 {editingId ? 'Update Doctor' : 'Add Doctor'}
                             </button>
@@ -262,16 +263,16 @@ const AlignerDoctorsSettings = ({ onChangesUpdate }: AlignerDoctorsSettingsProps
                 </div>
             )}
 
-            <div className="doctors-list">
+            <div className={styles.list}>
                 {doctors.length === 0 ? (
-                    <div className="empty-state">
+                    <div className={styles.emptyState}>
                         <i className="fas fa-user-md"></i>
                         <p>No doctors found</p>
-                        <p className="empty-state-hint">Click "Add Doctor" to create your first doctor entry</p>
+                        <p className={styles.emptyStateHint}>Click "Add Doctor" to create your first doctor entry</p>
                     </div>
                 ) : (
-                    <div className="doctors-table-container">
-                        <table className="doctors-table">
+                    <div className={styles.tableContainer}>
+                        <table className={styles.table}>
                             <thead>
                                 <tr>
                                     <th>ID</th>
@@ -286,46 +287,46 @@ const AlignerDoctorsSettings = ({ onChangesUpdate }: AlignerDoctorsSettingsProps
                                 {doctors.map(doctor => (
                                     <tr key={doctor.DrID}>
                                         <td>{doctor.DrID}</td>
-                                        <td className="doctor-name">
+                                        <td className={styles.doctorName}>
                                             <i className="fas fa-user-md"></i>
                                             {doctor.DoctorName === 'Admin' ? doctor.DoctorName : `Dr. ${doctor.DoctorName}`}
                                         </td>
                                         <td>
                                             {doctor.DoctorEmail ? (
-                                                <span className="email-value">
+                                                <span className={styles.emailValue}>
                                                     <i className="fas fa-envelope"></i>
                                                     {doctor.DoctorEmail}
                                                 </span>
                                             ) : (
-                                                <span className="no-email">No email</span>
+                                                <span className={styles.noEmail}>No email</span>
                                             )}
                                         </td>
                                         <td>
                                             {doctor.DoctorEmail ? (
-                                                <span className="badge badge-success">
+                                                <span className={`${styles.badge} ${styles.badgeSuccess}`}>
                                                     <i className="fas fa-check-circle"></i>
                                                     Enabled
                                                 </span>
                                             ) : (
-                                                <span className="badge badge-warning">
+                                                <span className={`${styles.badge} ${styles.badgeWarning}`}>
                                                     <i className="fas fa-exclamation-triangle"></i>
                                                     No Access
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="logo-path">
-                                            {doctor.LogoPath || <span className="text-muted">—</span>}
+                                        <td className={styles.logoPath}>
+                                            {doctor.LogoPath || <span className={styles.textMuted}>—</span>}
                                         </td>
-                                        <td className="actions">
+                                        <td className={styles.actions}>
                                             <button
-                                                className="btn-icon btn-edit"
+                                                className={`${styles.btnIcon} ${styles.btnEdit}`}
                                                 onClick={() => handleEdit(doctor)}
                                                 title="Edit doctor"
                                             >
                                                 <i className="fas fa-edit"></i>
                                             </button>
                                             <button
-                                                className="btn-icon btn-delete"
+                                                className={`${styles.btnIcon} ${styles.btnDelete}`}
                                                 onClick={() => handleDelete(doctor.DrID, doctor.DoctorName)}
                                                 title="Delete doctor"
                                             >

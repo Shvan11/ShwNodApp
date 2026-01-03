@@ -4,6 +4,7 @@
  */
 
 import { AUTH_STATES, AuthState } from '../../hooks/useWhatsAppAuth';
+import styles from '../../routes/WhatsAppAuth.module.css';
 
 interface ConnectionStatus {
   text: string;
@@ -38,13 +39,13 @@ export const ConnectionStatusFooter = ({ authState }: ConnectionStatusFooterProp
   const status = getConnectionStatus();
 
   return (
-    <footer className="auth-footer">
-      <div className="connection-status" aria-live="polite">
+    <footer className={styles.authFooter}>
+      <div className={styles.connectionStatus} aria-live="polite">
         <span
-          className={`connection-indicator ${status.connected ? 'connected' : 'disconnected'}`}
+          className={`${styles.connectionIndicator} ${status.connected ? styles.connected : ''}`}
           aria-hidden="true"
         />
-        <span className="connection-text">{status.text}</span>
+        <span className={styles.connectionText}>{status.text}</span>
       </div>
     </footer>
   );

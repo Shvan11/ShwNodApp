@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
+import styles from './EditPatientComponent.module.css';
 
 interface Props {
-    patientId?: string;
+    personId?: number | null;  // Validated PersonID from loader (null if invalid)
 }
 
 interface Gender {
@@ -44,7 +45,6 @@ interface WebcephData {
 
 interface PatientData {
     PersonID: number;
-    patientID?: string;
     PatientName?: string;
     FirstName?: string;
     LastName?: string;
@@ -66,7 +66,6 @@ interface PatientData {
 
 interface FormData {
     PersonID: string | number;
-    patientID: string;
     PatientName: string;
     FirstName: string;
     LastName: string;
@@ -92,7 +91,7 @@ interface UploadData {
     imageFile: File | null;
 }
 
-const EditPatientComponent = ({ patientId }: Props) => {
+const EditPatientComponent = ({ personId }: Props) => {
     const navigate = useNavigate();
     const toast = useToast();
     const [loading, setLoading] = useState(true);
@@ -100,6 +99,9 @@ const EditPatientComponent = ({ patientId }: Props) => {
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState('');
     const [patientData, setPatientData] = useState<PatientData | null>(null);
+
+    // Use validated PersonID from loader, fallback to patientData.PersonID
+    const validPersonId = personId ?? patientData?.PersonID ?? null;
 
     // Dropdown data
     const [genders, setGenders] = useState<Gender[]>([]);
@@ -123,7 +125,6 @@ const EditPatientComponent = ({ patientId }: Props) => {
     // Form data
     const [formData, setFormData] = useState<FormData>({
         PersonID: '',
-        patientID: '',
         PatientName: '',
         FirstName: '',
         LastName: '',
@@ -164,14 +165,15 @@ const EditPatientComponent = ({ patientId }: Props) => {
     }, []);
 
     const loadPatientData = useCallback(async () => {
-        if (!patientId) {
+        // Use validated personId from loader
+        if (!personId) {
             setLoading(false);
             return;
         }
 
         try {
             setLoading(true);
-            const response = await fetch(`/api/patients/${patientId}`);
+            const response = await fetch(`/api/patients/${personId}`);
 
             if (!response.ok) throw new Error('Failed to load patient data');
 
@@ -181,7 +183,6 @@ const EditPatientComponent = ({ patientId }: Props) => {
             // Populate form
             setFormData({
                 PersonID: data.PersonID,
-                patientID: data.patientID || '',
                 PatientName: data.PatientName || '',
                 FirstName: data.FirstName || '',
                 LastName: data.LastName || '',
@@ -206,21 +207,21 @@ const EditPatientComponent = ({ patientId }: Props) => {
         } finally {
             setLoading(false);
         }
-    }, [patientId]);
+    }, [personId]);
 
     useEffect(() => {
         loadDropdownData();
         loadPatientData();
         loadWebcephData();
         loadPhotoTypes();
-    }, [patientId, loadDropdownData, loadPatientData]);
+    }, [personId, loadDropdownData, loadPatientData]);
 
     // Load WebCeph data for patient
     const loadWebcephData = async () => {
-        if (!patientId) return;
+        if (!personId) return;
 
         try {
-            const response = await fetch(`/api/webceph/patient-link/${patientId}`);
+            const response = await fetch(`/api/webceph/patient-link/${personId}`);
             const data = await response.json();
 
             if (data.success && data.data) {
@@ -260,8 +261,8 @@ const EditPatientComponent = ({ patientId }: Props) => {
                 genderName = gender ? gender.name : '';
             }
 
-            // Pad patient ID with zeros to meet 6-character minimum
-            let paddedPatientID = formData.patientID || patientData.PersonID.toString();
+            // Pad PersonID with zeros to meet 6-character minimum
+            let paddedPatientID = patientData.PersonID.toString();
             if (paddedPatientID.length < 6) {
                 paddedPatientID = paddedPatientID.padStart(6, '0');
             }
@@ -321,7 +322,7 @@ const EditPatientComponent = ({ patientId }: Props) => {
 
             const formDataObj = new FormData();
             formDataObj.append('image', uploadData.imageFile);
-            formDataObj.append('patientID', formData.patientID || patientData?.PersonID.toString() || '');
+            formDataObj.append('patientID', patientData?.PersonID.toString() || '');
             formDataObj.append('recordDate', uploadData.recordDate);
             formDataObj.append('targetClass', uploadData.targetClass);
 
@@ -366,11 +367,19 @@ const EditPatientComponent = ({ patientId }: Props) => {
             return;
         }
 
+        // Use validated PersonID for API call
+        const pid = validPersonId ?? formData.PersonID;
+        if (!pid) {
+            setError('Invalid patient ID');
+            toast.error('Invalid patient ID');
+            return;
+        }
+
         try {
             setSaving(true);
             setError(null);
 
-            const response = await fetch(`/api/patients/${formData.PersonID}`, {
+            const response = await fetch(`/api/patients/${pid}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -411,73 +420,69 @@ const EditPatientComponent = ({ patientId }: Props) => {
 
     const handleCancel = () => {
         // Navigate back to works page using React Router
-        navigate(`/patient/${patientId}/works`);
+        if (validPersonId) {
+            navigate(`/patient/${validPersonId}/works`);
+        } else {
+            navigate('/patient-management');
+        }
     };
 
     if (loading) {
         return (
-            <div className="edit-patient-loading">
-                <i className="fas fa-spinner fa-spin edit-patient-loading-spinner"></i>
+            <div className={styles.editPatientLoading}>
+                <i className={`fas fa-spinner fa-spin ${styles.editPatientLoadingSpinner}`}></i>
                 <p>Loading patient data...</p>
             </div>
         );
     }
 
     return (
-        <div className="edit-patient-container">
-            <div className="edit-patient-header">
-                <h2 className="edit-patient-title">
-                    <i className="fas fa-user-edit edit-patient-title-icon"></i>
+        <div className={styles.editPatientContainer}>
+            <div className={styles.editPatientHeader}>
+                <h2 className={styles.editPatientTitle}>
+                    <i className="fas fa-user-edit"></i>
                     Edit Patient
                 </h2>
                 {patientData && (
-                    <p className="edit-patient-description">
-                        Editing: <strong>{patientData.PatientName}</strong> (ID: {patientData.patientID || patientData.PersonID})
+                    <p className={styles.editPatientDescription}>
+                        Editing: <strong>{patientData.PatientName}</strong> (ID: {patientData.PersonID})
                     </p>
                 )}
             </div>
 
             {error && (
-                <div className="edit-patient-error">
+                <div className={styles.editPatientError}>
                     <div>
-                        <i className="fas fa-exclamation-circle pm-icon-gap"></i>
+                        <i className="fas fa-exclamation-circle"></i>
                         {error}
                     </div>
-                    <button onClick={() => setError(null)} className="edit-patient-error-close">×</button>
+                    <button onClick={() => setError(null)} className={styles.editPatientErrorClose}>×</button>
                 </div>
             )}
 
             {successMessage && (
-                <div className="edit-patient-success">
+                <div className={styles.editPatientSuccess}>
                     <i className="fas fa-check-circle"></i>
                     {successMessage}
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className="work-form edit-patient-form">
-                <div className="form-row">
-                    <div className="form-group">
-                        <label>Patient ID</label>
-                        <input
-                            type="text"
-                            value={formData.patientID}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, patientID: e.target.value})}
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label>Patient Name (Arabic) <span className="required-asterisk">*</span></label>
+            <form onSubmit={handleSubmit} className={styles.editPatientForm}>
+                <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
+                        <label>Patient Name (Arabic) <span className={styles.requiredAsterisk}>*</span></label>
                         <input
                             type="text"
                             value={formData.PatientName}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, PatientName: e.target.value})}
                             required
-                            className="input-height-consistent"
+                            className={styles.inputHeightConsistent}
                         />
                     </div>
                 </div>
 
-                <div className="form-row">
-                    <div className="form-group">
+                <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
                         <label>First Name</label>
                         <input
                             type="text"
@@ -485,7 +490,7 @@ const EditPatientComponent = ({ patientId }: Props) => {
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, FirstName: e.target.value})}
                         />
                     </div>
-                    <div className="form-group">
+                    <div className={styles.formGroup}>
                         <label>Last Name</label>
                         <input
                             type="text"
@@ -495,8 +500,8 @@ const EditPatientComponent = ({ patientId }: Props) => {
                     </div>
                 </div>
 
-                <div className="form-row phone-row">
-                    <div className="form-group">
+                <div className={`${styles.formRow} ${styles.formRowPhone}`}>
+                    <div className={styles.formGroup}>
                         <label>Country Code</label>
                         <input
                             type="text"
@@ -505,7 +510,7 @@ const EditPatientComponent = ({ patientId }: Props) => {
                             placeholder="+964"
                         />
                     </div>
-                    <div className="form-group">
+                    <div className={styles.formGroup}>
                         <label>Phone</label>
                         <input
                             type="tel"
@@ -513,7 +518,7 @@ const EditPatientComponent = ({ patientId }: Props) => {
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, Phone: e.target.value})}
                         />
                     </div>
-                    <div className="form-group">
+                    <div className={styles.formGroup}>
                         <label>Phone 2</label>
                         <input
                             type="tel"
@@ -523,8 +528,8 @@ const EditPatientComponent = ({ patientId }: Props) => {
                     </div>
                 </div>
 
-                <div className="form-row">
-                    <div className="form-group">
+                <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
                         <label>Email</label>
                         <input
                             type="email"
@@ -532,7 +537,7 @@ const EditPatientComponent = ({ patientId }: Props) => {
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, Email: e.target.value})}
                         />
                     </div>
-                    <div className="form-group">
+                    <div className={styles.formGroup}>
                         <label>Date of Birth</label>
                         <input
                             type="date"
@@ -542,8 +547,8 @@ const EditPatientComponent = ({ patientId }: Props) => {
                     </div>
                 </div>
 
-                <div className="form-row">
-                    <div className="form-group">
+                <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
                         <label>Gender</label>
                         <select
                             value={formData.Gender}
@@ -557,7 +562,7 @@ const EditPatientComponent = ({ patientId }: Props) => {
                             ))}
                         </select>
                     </div>
-                    <div className="form-group">
+                    <div className={styles.formGroup}>
                         <label>Language</label>
                         <select
                             value={formData.Language}
@@ -570,8 +575,8 @@ const EditPatientComponent = ({ patientId }: Props) => {
                     </div>
                 </div>
 
-                <div className="form-row">
-                    <div className="form-group">
+                <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
                         <label>Address/Zone</label>
                         <select
                             value={formData.AddressID}
@@ -585,7 +590,7 @@ const EditPatientComponent = ({ patientId }: Props) => {
                             ))}
                         </select>
                     </div>
-                    <div className="form-group">
+                    <div className={styles.formGroup}>
                         <label>Referral Source</label>
                         <select
                             value={formData.ReferralSourceID}
@@ -601,8 +606,8 @@ const EditPatientComponent = ({ patientId }: Props) => {
                     </div>
                 </div>
 
-                <div className="form-row">
-                    <div className="form-group">
+                <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
                         <label>Patient Type</label>
                         <select
                             value={formData.PatientTypeID}
@@ -616,7 +621,7 @@ const EditPatientComponent = ({ patientId }: Props) => {
                             ))}
                         </select>
                     </div>
-                    <div className="form-group">
+                    <div className={styles.formGroup}>
                         <label>Tag</label>
                         <select
                             value={formData.TagID}
@@ -632,8 +637,8 @@ const EditPatientComponent = ({ patientId }: Props) => {
                     </div>
                 </div>
 
-                <div className="form-row">
-                    <div className="form-group">
+                <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
                         <label>Estimated Cost (Consultation)</label>
                         <input
                             type="text"
@@ -647,7 +652,7 @@ const EditPatientComponent = ({ patientId }: Props) => {
                             placeholder="Cost quoted at consultation"
                         />
                     </div>
-                    <div className="form-group">
+                    <div className={styles.formGroup}>
                         <label>Currency</label>
                         <select
                             value={formData.Currency}
@@ -660,7 +665,7 @@ const EditPatientComponent = ({ patientId }: Props) => {
                     </div>
                 </div>
 
-                <div className="form-group full-width">
+                <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
                     <label>Notes</label>
                     <textarea
                         value={formData.Notes}
@@ -670,43 +675,43 @@ const EditPatientComponent = ({ patientId }: Props) => {
                 </div>
 
                 {/* WebCeph AI X-Ray Analysis Section */}
-                <div className="webceph-integration-section">
-                    <h3 className="webceph-section-header">
-                        <i className="fas fa-brain webceph-header-icon"></i>
+                <div className={styles.webcephIntegrationSection}>
+                    <h3 className={styles.webcephSectionHeader}>
+                        <i className={`fas fa-brain ${styles.webcephHeaderIcon}`}></i>
                         WebCeph AI X-Ray Analysis
                     </h3>
 
                     {webcephError && (
-                        <div className="webceph-error">
+                        <div className={styles.webcephError}>
                             <div>
-                                <i className="fas fa-exclamation-circle pm-icon-gap"></i>
+                                <i className="fas fa-exclamation-circle"></i>
                                 {webcephError}
                             </div>
-                            <button onClick={() => setWebcephError(null)} className="webceph-error-close">×</button>
+                            <button onClick={() => setWebcephError(null)} className={styles.webcephErrorClose}>×</button>
                         </div>
                     )}
 
                     {webcephSuccess && (
-                        <div className="edit-patient-success">
+                        <div className={styles.editPatientSuccess}>
                             <i className="fas fa-check-circle"></i>
                             {webcephSuccess}
                         </div>
                     )}
 
                     {!webcephData ? (
-                        <div className="webceph-create-card">
-                            <i className="fas fa-user-plus webceph-create-icon"></i>
-                            <h4 className="webceph-create-title">
+                        <div className={styles.webcephCreateCard}>
+                            <i className={`fas fa-user-plus ${styles.webcephCreateIcon}`}></i>
+                            <h4 className={styles.webcephCreateTitle}>
                                 Create Patient in WebCeph
                             </h4>
-                            <p className="webceph-create-description">
+                            <p className={styles.webcephCreateDescription}>
                                 Get AI-powered cephalometric analysis by creating this patient in WebCeph
                             </p>
                             <button
                                 type="button"
                                 onClick={handleCreateWebcephPatient}
                                 disabled={webcephLoading}
-                                className="webceph-btn-send"
+                                className={styles.webcephBtnSend}
                             >
                                 {webcephLoading ? (
                                     <>
@@ -722,21 +727,21 @@ const EditPatientComponent = ({ patientId }: Props) => {
                             </button>
                         </div>
                     ) : (
-                        <div className="webceph-status-container">
+                        <div className={styles.webcephStatusContainer}>
                             {/* Patient Link Card */}
-                            <div className="webceph-patient-created-card">
-                                <div className="webceph-card-header">
-                                    <div className="webceph-card-title-group">
-                                        <i className="fas fa-check-circle webceph-success-icon"></i>
-                                        <span className="webceph-card-title">Patient Created in WebCeph</span>
+                            <div className={styles.webcephPatientCreatedCard}>
+                                <div className={styles.webcephCardHeader}>
+                                    <div className={styles.webcephCardTitleGroup}>
+                                        <i className={`fas fa-check-circle ${styles.webcephSuccessIcon}`}></i>
+                                        <span className={styles.webcephCardTitle}>Patient Created in WebCeph</span>
                                     </div>
-                                    <span className="webceph-card-subtitle">
+                                    <span className={styles.webcephCardSubtitle}>
                                         {webcephData.createdAt ? new Date(webcephData.createdAt).toLocaleDateString() : ''}
                                     </span>
                                 </div>
-                                <div className="webceph-info-section">
-                                    <div className="webceph-info-label">WebCeph Patient ID</div>
-                                    <div className="webceph-info-value">
+                                <div className={styles.webcephInfoSection}>
+                                    <div className={styles.webcephInfoLabel}>WebCeph Patient ID</div>
+                                    <div className={styles.webcephInfoValue}>
                                         {webcephData.webcephPatientId}
                                     </div>
                                 </div>
@@ -744,7 +749,7 @@ const EditPatientComponent = ({ patientId }: Props) => {
                                     href={webcephData.link}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="webceph-btn-send inline-flex-link"
+                                    className={`${styles.webcephBtnSend} ${styles.inlineFlexLink}`}
                                 >
                                     <i className="fas fa-external-link-alt"></i>
                                     Open in WebCeph
@@ -752,32 +757,32 @@ const EditPatientComponent = ({ patientId }: Props) => {
                             </div>
 
                             {/* Upload X-Ray Card */}
-                            <div className="webceph-analysis-card">
-                                <h4 className="webceph-analysis-title">
-                                    <i className="fas fa-upload webceph-header-icon"></i>
+                            <div className={styles.webcephAnalysisCard}>
+                                <h4 className={styles.webcephAnalysisTitle}>
+                                    <i className={`fas fa-upload ${styles.webcephHeaderIcon}`}></i>
                                     Upload X-Ray Image
                                 </h4>
 
-                                <div className="webceph-form-row">
+                                <div className={styles.webcephFormRow}>
                                     <div>
-                                        <label className="whatsapp-form-label">
+                                        <label className={styles.webcephUploadLabel}>
                                             Record Date
                                         </label>
                                         <input
                                             type="date"
                                             value={uploadData.recordDate}
                                             onChange={(e: ChangeEvent<HTMLInputElement>) => setUploadData({...uploadData, recordDate: e.target.value})}
-                                            className="input-height-consistent w-full"
+                                            className={styles.inputHeightConsistent}
                                         />
                                     </div>
                                     <div>
-                                        <label className="whatsapp-form-label">
+                                        <label className={styles.webcephUploadLabel}>
                                             Photo Type
                                         </label>
                                         <select
                                             value={uploadData.targetClass}
                                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setUploadData({...uploadData, targetClass: e.target.value})}
-                                            className="input-height-consistent w-full"
+                                            className={styles.inputHeightConsistent}
                                         >
                                             {photoTypes.map(type => (
                                                 <option key={type.class} value={type.class}>{type.name}</option>
@@ -786,8 +791,8 @@ const EditPatientComponent = ({ patientId }: Props) => {
                                     </div>
                                 </div>
 
-                                <div className="webceph-upload-section">
-                                    <label className="webceph-upload-label">
+                                <div className={styles.webcephUploadSection}>
+                                    <label className={styles.webcephUploadLabel}>
                                         X-Ray Image
                                     </label>
                                     <input
@@ -795,9 +800,9 @@ const EditPatientComponent = ({ patientId }: Props) => {
                                         type="file"
                                         accept="image/jpeg,image/png,image/jpg"
                                         onChange={(e: ChangeEvent<HTMLInputElement>) => setUploadData({...uploadData, imageFile: e.target.files?.[0] || null})}
-                                        className="webceph-file-input-styled"
+                                        className={styles.webcephFileInputStyled}
                                     />
-                                    <div className="webceph-help-text">
+                                    <div className={styles.webcephHelpText}>
                                         Accepted formats: JPEG, PNG (Max 10MB)
                                     </div>
                                 </div>
@@ -806,7 +811,7 @@ const EditPatientComponent = ({ patientId }: Props) => {
                                     type="button"
                                     onClick={handleUploadImage}
                                     disabled={webcephLoading || !uploadData.imageFile}
-                                    className="webceph-btn-upload"
+                                    className={styles.webcephBtnUpload}
                                 >
                                     {webcephLoading ? (
                                         <>
@@ -825,7 +830,7 @@ const EditPatientComponent = ({ patientId }: Props) => {
                     )}
                 </div>
 
-                <div className="modal-actions flex-end-actions mt-4">
+                <div className={`${styles.modalActions} ${styles.flexEndActions}`}>
                     <button
                         type="button"
                         onClick={handleCancel}

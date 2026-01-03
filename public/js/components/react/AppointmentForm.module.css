@@ -1,0 +1,306 @@
+/**
+ * AppointmentForm - CSS Module
+ * Page wrapper and form column styles
+ */
+
+/* ==================== PAGE LAYOUT ==================== */
+
+.page {
+    background: var(--gray-50);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Page Header - HIDDEN (using universal header instead) */
+.pageHeader {
+    display: none;
+}
+
+.pageHeader h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.pageHeader p {
+    margin: 4px 0 0 0;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.closeButton {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.closeButton:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+/* Main Content: 3 Columns */
+.pageContent {
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(280px, 25%) 1fr minmax(300px, 30%);
+    gap: 0;
+    overflow: hidden;
+}
+
+/* ==================== RIGHT COLUMN: FORM ==================== */
+
+.formColumn {
+    background: white;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+}
+
+.formHeader {
+    background: var(--gray-50);
+    padding: 20px;
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.formHeader h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--gray-700);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.form {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+    min-width: 0;
+}
+
+.alert {
+    padding: 12px 14px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+}
+
+.alertError {
+    background: var(--error-50);
+    border: 1px solid var(--error-300);
+    color: var(--error-500);
+}
+
+.formField {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.formField label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-600);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.formField label i {
+    color: var(--color-purple-light);
+    font-size: 14px;
+}
+
+.selectedTime {
+    background: var(--gray-50);
+    border: 2px solid var(--gray-200);
+    padding: 12px 14px;
+    border-radius: 8px;
+    color: var(--gray-500);
+    font-size: 14px;
+}
+
+.selectedTime.hasValue {
+    background: var(--success-50);
+    border-color: var(--success-color);
+    color: var(--success-600);
+    font-weight: 600;
+}
+
+.formField select {
+    background: white;
+    border: 2px solid var(--gray-200);
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--gray-700);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.formField select:focus {
+    outline: none;
+    border-color: var(--color-purple-light);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.error {
+    border-color: var(--error-300);
+    background: var(--error-50);
+}
+
+.fieldError {
+    color: var(--error-500);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.formActions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 2px solid var(--gray-200);
+    flex-wrap: wrap;
+}
+
+/* Loading State */
+.loadingState {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.loadingState i {
+    font-size: var(--font-size-3xl);
+    color: var(--primary-color);
+}
+
+/* ==================== RESPONSIVE ==================== */
+
+@media (max-width: 1600px) {
+    .pageContent {
+        grid-template-columns: 340px minmax(450px, 700px) 330px;
+    }
+}
+
+@media (max-width: 1400px) {
+    .pageContent {
+        grid-template-columns: 320px minmax(400px, 600px) 320px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .pageContent {
+        grid-template-columns: 300px 1fr 300px;
+    }
+}
+
+@media (max-width: 992px) {
+    .pageContent {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .pageContent {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .formColumn {
+        width: 100%;
+        border-bottom: none;
+        padding: 16px;
+        max-height: none;
+        overflow-y: visible;
+    }
+
+    .formHeader {
+        padding: 16px 12px;
+    }
+
+    .formHeader h2 {
+        font-size: 16px;
+    }
+
+    .form {
+        padding: 12px;
+        gap: 14px;
+    }
+
+    .formField label {
+        font-size: 14px;
+    }
+
+    .formField select,
+    .selectedTime {
+        padding: 14px 12px;
+        font-size: 16px; /* Prevents iOS zoom */
+        min-height: 48px; /* Touch-friendly */
+    }
+
+    .formActions {
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 16px;
+        padding-top: 12px;
+    }
+
+    /* Touch-friendly buttons */
+    .formActions :global(.btn-cancel),
+    .formActions :global(.btn-create) {
+        width: 100%;
+        min-height: 48px;
+        font-size: 16px;
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .pageHeader h1 {
+        font-size: 18px;
+    }
+
+    .pageHeader p {
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 480px) {
+    .formColumn {
+        padding: 12px 8px;
+    }
+
+    .form {
+        padding: 8px;
+    }
+}

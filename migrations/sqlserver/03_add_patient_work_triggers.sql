@@ -27,7 +27,6 @@ BEGIN
         END,
         (SELECT
             i.PersonID as person_id,
-            i.patientID as patient_id,
             i.PatientName as patient_name,
             i.FirstName as first_name,
             i.LastName as last_name,

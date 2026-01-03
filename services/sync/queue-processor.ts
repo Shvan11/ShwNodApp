@@ -64,7 +64,6 @@ interface WorkRecord {
  */
 interface PatientRecord {
   person_id: number;
-  patient_id: string;
   patient_name: string;
   first_name: string;
   last_name: string;
@@ -123,7 +122,7 @@ interface AlignerBatchRecord {
   delivered_to_patient_date: Date | null;
   days: number;
   validity_period: number;
-  next_batch_ready_date: Date | null;
+  batch_expiry_date: Date | null;
   notes: string;
   is_active: boolean;
   creation_date?: Date;
@@ -271,7 +270,6 @@ class QueueProcessor {
     const query = `
             SELECT
                 PersonID as person_id,
-                patientID as patient_id,
                 PatientName as patient_name,
                 FirstName as first_name,
                 LastName as last_name,
@@ -285,11 +283,10 @@ class QueueProcessor {
       [['personId', TYPES.Int, personId]],
       (columns) => ({
         person_id: columns[0].value as number,
-        patient_id: columns[1].value as string,
-        patient_name: columns[2].value as string,
-        first_name: columns[3].value as string,
-        last_name: columns[4].value as string,
-        phone: columns[5].value as string,
+        patient_name: columns[1].value as string,
+        first_name: columns[2].value as string,
+        last_name: columns[3].value as string,
+        phone: columns[4].value as string,
       })
     );
 
@@ -378,7 +375,7 @@ class QueueProcessor {
                 DeliveredToPatientDate as delivered_to_patient_date,
                 Days as days,
                 ValidityPeriod as validity_period,
-                NextBatchReadyDate as next_batch_ready_date,
+                BatchExpiryDate as batch_expiry_date,
                 Notes as notes,
                 IsActive as is_active
             FROM tblAlignerBatches
@@ -402,7 +399,7 @@ class QueueProcessor {
         delivered_to_patient_date: columns[10].value as Date | null,
         days: columns[11].value as number,
         validity_period: columns[12].value as number,
-        next_batch_ready_date: columns[13].value as Date | null,
+        batch_expiry_date: columns[13].value as Date | null,
         notes: columns[14].value as string,
         is_active: columns[15].value as boolean,
       })

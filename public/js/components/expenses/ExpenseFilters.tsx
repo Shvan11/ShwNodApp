@@ -6,6 +6,7 @@ import React from 'react';
 import type { ChangeEvent } from 'react';
 import { useCategories, useSubcategories } from '../../hooks/useExpenses';
 import type { ExpenseFilters as ExpenseFiltersType } from '../../hooks/useExpenses';
+import styles from '../../routes/Expenses.module.css';
 
 // Re-export for convenience
 export type { ExpenseFilters as ExpenseFiltersState } from '../../hooks/useExpenses';
@@ -45,15 +46,15 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
     };
 
     return (
-        <div className="modern-filter-card">
-            <div className="filter-card-header">
-                <div className="filter-header-content">
+        <div className={styles.modernFilterCard}>
+            <div className={styles.filterCardHeader}>
+                <div className={styles.filterHeaderContent}>
                     <i className="fas fa-filter"></i>
                     <h3>Filter Expenses</h3>
                 </div>
                 <button
                     type="button"
-                    className="btn-reset-inline"
+                    className={styles.btnResetInline}
                     onClick={onReset}
                     title="Reset all filters"
                 >
@@ -61,8 +62,8 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                 </button>
             </div>
 
-            <div className="modern-filter-grid">
-                <div className="modern-filter-group">
+            <div className={styles.modernFilterGrid}>
+                <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-start-date">
                         <i className="fas fa-calendar-alt"></i>
                         Start Date
@@ -70,13 +71,13 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                     <input
                         type="date"
                         id="filter-start-date"
-                        className="modern-input"
+                        className={styles.modernInput}
                         value={filters.startDate || ''}
                         onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('startDate', e.target.value)}
                     />
                 </div>
 
-                <div className="modern-filter-group">
+                <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-end-date">
                         <i className="fas fa-calendar-alt"></i>
                         End Date
@@ -84,21 +85,21 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                     <input
                         type="date"
                         id="filter-end-date"
-                        className="modern-input"
+                        className={styles.modernInput}
                         value={filters.endDate || ''}
                         onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('endDate', e.target.value)}
                     />
                 </div>
 
-                <div className="modern-filter-group">
+                <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-category">
                         <i className="fas fa-folder"></i>
                         Category
                     </label>
-                    <div className="select-wrapper">
+                    <div className={styles.selectWrapper}>
                         <select
                             id="filter-category"
-                            className="modern-select"
+                            className={styles.modernSelect}
                             value={String(filters.categoryId || '')}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => handleCategoryChange(e.target.value)}
                         >
@@ -109,19 +110,19 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                                 </option>
                             ))}
                         </select>
-                        <i className="fas fa-chevron-down select-icon"></i>
+                        <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
                     </div>
                 </div>
 
-                <div className="modern-filter-group">
+                <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-subcategory">
                         <i className="fas fa-tag"></i>
                         Subcategory
                     </label>
-                    <div className="select-wrapper">
+                    <div className={styles.selectWrapper}>
                         <select
                             id="filter-subcategory"
-                            className="modern-select"
+                            className={styles.modernSelect}
                             value={String(filters.subcategoryId || '')}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('subcategoryId', e.target.value)}
                             disabled={!filters.categoryId}
@@ -133,19 +134,19 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                                 </option>
                             ))}
                         </select>
-                        <i className="fas fa-chevron-down select-icon"></i>
+                        <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
                     </div>
                 </div>
 
-                <div className="modern-filter-group">
+                <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-currency">
                         <i className="fas fa-dollar-sign"></i>
                         Currency
                     </label>
-                    <div className="select-wrapper">
+                    <div className={styles.selectWrapper}>
                         <select
                             id="filter-currency"
-                            className="modern-select"
+                            className={styles.modernSelect}
                             value={filters.currency || ''}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('currency', e.target.value)}
                         >
@@ -153,14 +154,14 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                             <option value="IQD">IQD</option>
                             <option value="USD">USD</option>
                         </select>
-                        <i className="fas fa-chevron-down select-icon"></i>
+                        <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
                     </div>
                 </div>
 
-                <div className="modern-filter-actions">
+                <div className={styles.modernFilterActions}>
                     <button
                         type="button"
-                        className="btn-modern btn-modern-primary"
+                        className={`${styles.btnModern} ${styles.btnModernPrimary}`}
                         onClick={onApply}
                     >
                         <i className="fas fa-check"></i>

@@ -1,0 +1,1055 @@
+/* aligner-common.css - Shared styles for aligner components */
+/* These styles are used by PatientSets.tsx, drawer components, and payment forms */
+
+/* ===========================================
+   DRAWER STYLES
+   =========================================== */
+
+.drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    z-index: 1999;
+    animation: fadeIn 0.3s ease;
+}
+
+.drawer-container {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 900px;
+    max-width: 100%;
+    background: white;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    animation: slideInRight 0.3s ease;
+    z-index: 2000;
+    overflow: hidden;
+    height: 100vh;
+}
+
+.drawer-header {
+    padding: 0.9rem 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
+    color: white;
+    flex-shrink: 0;
+    flex-grow: 0;
+}
+
+.drawer-header h2 {
+    margin: 0;
+    font-size: 1.15rem;
+}
+
+.close-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: all 0.2s;
+}
+
+.close-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.drawer-body {
+    flex: 1 1 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.drawer-body > form {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: min-content;
+}
+
+.drawer-body .form-section {
+    padding: 0 1.5rem;
+}
+
+.drawer-body .form-section:first-child {
+    padding-top: 1.25rem;
+}
+
+.drawer-footer {
+    padding: 0.9rem 1.5rem;
+    border-top: 1px solid var(--gray-200);
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    background: var(--gray-50);
+    flex-shrink: 0;
+    flex-grow: 0;
+    margin-top: auto;
+}
+
+/* ===========================================
+   FORM STYLES
+   =========================================== */
+
+.form-section {
+    margin-bottom: 1.1rem;
+    padding-bottom: 1.1rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.form-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.form-section h3 {
+    margin: 0 0 0.7rem 0;
+    font-size: 1rem;
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+.form-field {
+    margin-bottom: 0.7rem;
+}
+
+.form-field label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-weight: 500;
+    color: var(--text-color);
+    font-size: 0.875rem;
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+    width: 100%;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--gray-300);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+    outline: none;
+    border-color: var(--blue-300);
+    box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.1);
+}
+
+.form-field input.error,
+.form-field select.error {
+    border-color: var(--error-color);
+}
+
+.form-field input.readonly {
+    background: var(--gray-100);
+    cursor: not-allowed;
+}
+
+.form-field textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.7rem;
+    margin-bottom: 0.25rem;
+}
+
+/* Three-column form row for dates section */
+.form-row-three-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+.form-row-three-col .form-field {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+}
+
+.form-row-three-col .form-field label {
+    min-height: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    margin-bottom: 0.35rem;
+}
+
+.form-row-three-col .form-field .field-optional-text {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--gray-400);
+    margin-top: 0.15rem;
+}
+
+.form-row-three-col .date-with-checkbox,
+.form-row-three-col .form-field > input {
+    height: 38px;
+}
+
+.form-row-three-col .date-with-checkbox input[type="date"] {
+    flex: 1;
+    height: 100%;
+}
+
+/* Date input with Today checkbox */
+.date-with-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.date-with-checkbox input[type="date"] {
+    flex: 1;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--gray-300);
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.date-with-checkbox .checkbox-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--text-light);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.date-with-checkbox .checkbox-inline input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.form-field-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.form-field-checkbox input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.form-field-checkbox label {
+    margin: 0;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.error-message {
+    display: block;
+    color: var(--error-color);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+.required {
+    color: var(--error-color);
+}
+
+/* ===========================================
+   CONFIRM DIALOG
+   =========================================== */
+
+.confirm-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    animation: fadeIn 0.2s ease;
+}
+
+.confirm-dialog {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    max-width: 450px;
+    width: 90%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    animation: slideUp 0.3s ease;
+}
+
+.confirm-dialog-header h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-color);
+    font-size: 1.3rem;
+}
+
+.confirm-dialog-body p {
+    margin: 0 0 1.5rem 0;
+    color: var(--text-light);
+    line-height: 1.5;
+}
+
+.confirm-dialog-footer {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+/* ===========================================
+   BUTTON VARIANTS (Drawer-specific)
+   =========================================== */
+
+.btn-primary {
+    background: var(--blue-300);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--blue-800);
+}
+
+.btn-primary:disabled {
+    background: var(--gray-300);
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background: var(--gray-200);
+    color: var(--text-color);
+}
+
+.btn-secondary:hover {
+    background: var(--gray-300);
+}
+
+.btn-danger {
+    background: var(--error-color);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: var(--error-500);
+}
+
+/* ===========================================
+   TAB NAVIGATION
+   =========================================== */
+
+.form-tabs {
+    display: flex;
+    gap: 0;
+    background: var(--gray-50);
+    padding: 0;
+    border-bottom: 2px solid var(--gray-200);
+    flex-shrink: 0;
+}
+
+.form-tab {
+    flex: 1;
+    padding: 0.9rem 1rem;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-light);
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.form-tab:hover {
+    background: rgba(0, 115, 230, 0.05);
+    color: var(--blue-300);
+}
+
+.form-tab.active {
+    background: white;
+    color: var(--blue-300);
+    border-bottom-color: var(--blue-300);
+    font-weight: 600;
+}
+
+.form-tab i {
+    font-size: 1rem;
+}
+
+/* Tab Content */
+.tab-content {
+    display: none;
+    padding: 1.5rem;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.tab-content .form-field {
+    margin-bottom: 1rem;
+}
+
+.tab-content .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 0;
+}
+
+.tab-content .form-field label {
+    margin-bottom: 0.4rem;
+    font-size: 0.875rem;
+}
+
+.tab-content .form-field input,
+.tab-content .form-field select,
+.tab-content .form-field textarea {
+    font-size: 0.9rem;
+    padding: 0.55rem 0.7rem;
+}
+
+/* ===========================================
+   ANIMATIONS
+   =========================================== */
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+/* ===========================================
+   PAYMENT DRAWER
+   =========================================== */
+
+.aligner-payment-drawer.drawer-container {
+    max-width: 450px;
+}
+
+.aligner-payment-summary {
+    background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1.5rem;
+    color: white;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.aligner-payment-summary .summary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.aligner-payment-summary .summary-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.aligner-payment-summary .set-currency {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.aligner-payment-summary .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.aligner-payment-summary .summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.aligner-payment-summary .summary-item .label {
+    font-size: 0.75rem;
+    opacity: 0.85;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.aligner-payment-summary .summary-item .value {
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.aligner-payment-summary .summary-item.highlight {
+    grid-column: span 3;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    margin-top: 0.5rem;
+}
+
+.aligner-payment-summary .summary-item.highlight .label {
+    font-size: 0.85rem;
+}
+
+.aligner-payment-summary .summary-item.highlight .value {
+    font-size: 1.75rem;
+    color: var(--warning-400);
+}
+
+.aligner-payment-form {
+    padding: 1.5rem;
+}
+
+.aligner-payment-form .form-field {
+    margin-bottom: 1.5rem;
+}
+
+.aligner-payment-form .form-field:last-of-type {
+    margin-bottom: 1rem;
+}
+
+.aligner-payment-form label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+.aligner-payment-form .required {
+    color: var(--error-400);
+}
+
+.aligner-payment-form .input-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.aligner-payment-form .input-group input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    transition: all 0.2s;
+}
+
+.aligner-payment-form .input-group input:focus {
+    outline: none;
+    border-color: var(--color-purple-light);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.aligner-payment-form .input-group input.error {
+    border-color: var(--error-400);
+}
+
+.aligner-payment-form .currency-badge {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 1rem;
+    min-width: 60px;
+    text-align: center;
+}
+
+.aligner-payment-form input[type="date"] {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    font-size: 1rem;
+    color: var(--gray-900);
+    transition: all 0.2s;
+}
+
+.aligner-payment-form input[type="date"]:focus {
+    outline: none;
+    border-color: var(--color-purple-light);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.aligner-payment-form input[type="date"].error {
+    border-color: var(--error-400);
+}
+
+.aligner-payment-form .error-message {
+    display: block;
+    color: var(--error-400);
+    font-size: 0.75rem;
+    margin-top: 0.4rem;
+    font-weight: 500;
+}
+
+.balance-preview {
+    background: var(--success-50);
+    border: 2px solid var(--success-200);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.balance-preview .preview-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--success-700);
+}
+
+.balance-preview .preview-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--success-600);
+}
+
+.balance-preview .preview-value.paid-full {
+    color: var(--success-500);
+}
+
+.balance-preview .badge-success {
+    background: var(--success-500);
+    color: white;
+    padding: 0.35rem 0.875rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.aligner-payment-form .error-alert {
+    background: var(--error-50);
+    border: 1px solid var(--error-100);
+    border-radius: 8px;
+    padding: 1rem;
+    color: var(--error-600);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.aligner-payment-form .error-alert i {
+    font-size: 1.25rem;
+}
+
+.aligner-payment-drawer .drawer-footer .btn-cancel {
+    background: white;
+    color: var(--gray-500);
+    border: 2px solid var(--gray-200);
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.aligner-payment-drawer .drawer-footer .btn-cancel:hover {
+    border-color: var(--gray-300);
+    background: var(--gray-50);
+}
+
+.aligner-payment-drawer .drawer-footer .btn-submit {
+    background: linear-gradient(135deg, var(--success-500), var(--success-600));
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s;
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+}
+
+.aligner-payment-drawer .drawer-footer .btn-submit:hover {
+    background: linear-gradient(135deg, var(--success-600), var(--success-700));
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(22, 163, 74, 0.4);
+}
+
+.aligner-payment-drawer .drawer-footer .btn-submit:disabled {
+    background: var(--gray-400);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.aligner-payment-drawer .drawer-footer .btn-submit i {
+    font-size: 1rem;
+}
+
+/* ===========================================
+   COMMUNICATION SECTION
+   =========================================== */
+
+.communication-section {
+    margin-top: 1rem;
+    border-top: 1px solid var(--gray-200);
+    padding-top: 0.75rem;
+}
+
+.communication-toggle-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.communication-toggle-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.communication-toggle-btn i:first-child {
+    font-size: 1.1rem;
+}
+
+.communication-toggle-btn i:last-child {
+    margin-left: auto;
+    transition: transform 0.3s ease;
+}
+
+.communication-toggle-btn.expanded i:last-child {
+    transform: rotate(180deg);
+}
+
+.communication-content {
+    display: none;
+    padding: 1rem;
+    background: var(--gray-50);
+    border-radius: 0 0 8px 8px;
+    margin-top: 0.5rem;
+}
+
+.communication-content.expanded {
+    display: block;
+}
+
+.empty-communication {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text-light);
+}
+
+.empty-communication i {
+    font-size: 3rem;
+    color: var(--gray-300);
+    margin-bottom: 1rem;
+}
+
+.empty-communication p {
+    margin: 0.5rem 0;
+}
+
+.empty-communication .hint {
+    font-size: 0.85rem;
+    color: var(--gray-400);
+}
+
+/* Notes Timeline */
+.notes-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.note-item {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 1rem;
+    transition: all 0.2s ease;
+}
+
+.note-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.note-item.lab-note {
+    border-left: 4px solid var(--color-purple-light);
+}
+
+.note-item.doctor-note {
+    border-left: 4px solid var(--success-300);
+}
+
+.note-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.note-author {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.note-author.lab {
+    color: var(--color-purple-light);
+}
+
+.note-author.doctor {
+    color: var(--success-300);
+}
+
+.note-author i {
+    font-size: 1rem;
+}
+
+.note-date {
+    font-size: 0.8rem;
+    color: var(--text-light);
+}
+
+.note-text {
+    margin: 0;
+    line-height: 1.6;
+    color: var(--text-color);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Loading State for Communication */
+.communication-content .loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    gap: 1rem;
+}
+
+.communication-content .spinner {
+    border: 3px solid var(--gray-100);
+    border-top: 3px solid var(--color-purple-light);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ===========================================
+   EDIT BUTTON
+   =========================================== */
+
+.edit-set-btn {
+    background: linear-gradient(135deg, var(--blue-300), var(--blue-800));
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: all 0.3s;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 115, 230, 0.3);
+}
+
+.edit-set-btn:hover {
+    background: linear-gradient(135deg, var(--blue-800), var(--blue-800));
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 115, 230, 0.4);
+}
+
+.edit-set-btn i {
+    font-size: 1rem;
+}
+
+/* Delete button in action row */
+.delete-set-btn {
+    background: var(--error-color);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.delete-set-btn:hover {
+    background: var(--error-500);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
+}
+
+.delete-set-btn i {
+    font-size: 0.95rem;
+}
+
+/* ===========================================
+   RESPONSIVE STYLES
+   =========================================== */
+
+@media (max-width: 991px) {
+    .form-two-column-container {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+}
+
+@media (max-width: 768px) {
+    .drawer-container {
+        width: 100%;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .form-row-three-col {
+        grid-template-columns: 1fr;
+    }
+
+    .form-row-three-col .form-field label {
+        min-height: auto;
+    }
+
+    .aligner-payment-drawer.drawer-container {
+        max-width: 100%;
+    }
+
+    .aligner-payment-summary .summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .aligner-payment-summary .summary-item.highlight {
+        grid-column: span 1;
+    }
+}
+
+/* ===========================================
+   UTILITY CLASSES
+   =========================================== */
+
+.hidden {
+    display: none;
+}
+
+/* Two-Column Layout for Forms */
+.form-two-column-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    padding: 0 1.5rem;
+}
+
+.form-column {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-column .form-section {
+    padding: 0;
+}
+
+/* Ensure tab content with two-column layout has proper padding */
+.tab-content .form-two-column-container {
+    padding-top: 1.25rem;
+}

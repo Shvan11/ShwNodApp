@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
-import '../../../css/components/patient-appointments.css';
+import styles from './PatientAppointments.module.css';
 
 interface PatientAppointment {
     appointmentID: number;
@@ -11,14 +12,14 @@ interface PatientAppointment {
 }
 
 interface PatientAppointmentsProps {
-    patientId?: number | string;
+    personId?: number | null;
 }
 
 /**
  * PatientAppointments Component
  * Display and manage all appointments for a specific patient
  */
-const PatientAppointments = ({ patientId }: PatientAppointmentsProps) => {
+const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
     const navigate = useNavigate();
     const toast = useToast();
     const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
@@ -28,13 +29,13 @@ const PatientAppointments = ({ patientId }: PatientAppointmentsProps) => {
 
     useEffect(() => {
         loadAppointments();
-    }, [patientId]);
+    }, [personId]);
 
     const loadAppointments = async (): Promise<void> => {
         try {
             setLoading(true);
             setError(null);
-            const response = await fetch(`/api/patient-appointments/${patientId}`);
+            const response = await fetch(`/api/patient-appointments/${personId}`);
 
             if (!response.ok) {
                 throw new Error('Failed to load appointments');
@@ -52,7 +53,7 @@ const PatientAppointments = ({ patientId }: PatientAppointmentsProps) => {
 
     const handleEdit = (appointment: PatientAppointment): void => {
         // Navigate to edit page with appointment data as state
-        navigate(`/patient/${patientId}/edit-appointment/${appointment.appointmentID}`, {
+        navigate(`/patient/${personId}/edit-appointment/${appointment.appointmentID}`, {
             state: { appointment }
         });
     };
@@ -104,8 +105,8 @@ const PatientAppointments = ({ patientId }: PatientAppointmentsProps) => {
 
     if (loading) {
         return (
-            <div className="patient-appointments-container">
-                <div className="loading-state">
+            <div className={styles.container}>
+                <div className={styles.loadingState}>
                     <i className="fas fa-spinner fa-spin"></i>
                     <p>Loading appointments...</p>
                 </div>
@@ -115,11 +116,11 @@ const PatientAppointments = ({ patientId }: PatientAppointmentsProps) => {
 
     if (error) {
         return (
-            <div className="patient-appointments-container">
-                <div className="error-state">
+            <div className={styles.container}>
+                <div className={styles.errorState}>
                     <i className="fas fa-exclamation-circle"></i>
                     <p>{error}</p>
-                    <button onClick={loadAppointments} className="btn btn-retry">
+                    <button onClick={loadAppointments} className={cn('btn', styles.btnRetry)}>
                         <i className="fas fa-redo"></i> Retry
                     </button>
                 </div>
@@ -128,60 +129,60 @@ const PatientAppointments = ({ patientId }: PatientAppointmentsProps) => {
     }
 
     return (
-        <div className="patient-appointments-container">
-            <div className="appointments-header">
+        <div className={styles.container}>
+            <div className={styles.header}>
                 <h2>
                     <i className="fas fa-calendar-check"></i> Patient Appointments
                 </h2>
                 <button
-                    className="btn btn-new-appointment"
-                    onClick={() => navigate(`/patient/${patientId}/new-appointment`)}
+                    className={cn('btn', styles.btnNewAppointment)}
+                    onClick={() => navigate(`/patient/${personId}/new-appointment`)}
                 >
                     <i className="fas fa-plus"></i> New Appointment
                 </button>
             </div>
 
             {appointments.length === 0 ? (
-                <div className="empty-state">
+                <div className={styles.emptyState}>
                     <i className="fas fa-calendar-times"></i>
                     <h3>No Appointments</h3>
                     <p>This patient has no appointments scheduled.</p>
                     <button
-                        className="btn btn-new-appointment"
-                        onClick={() => navigate(`/patient/${patientId}/new-appointment`)}
+                        className={cn('btn', styles.btnNewAppointment)}
+                        onClick={() => navigate(`/patient/${personId}/new-appointment`)}
                     >
                         <i className="fas fa-plus"></i> Schedule First Appointment
                     </button>
                 </div>
             ) : (
-                <div className="appointments-list">
+                <div className={styles.list}>
                     {appointments.map(appointment => {
                         const isPast = isPastAppointment(appointment.AppDate);
 
                         return (
                             <div
                                 key={appointment.appointmentID}
-                                className={`appointment-card ${isPast ? 'past' : 'upcoming'}`}
+                                className={cn(styles.card, isPast ? styles.past : styles.upcoming)}
                             >
-                                <div className="appointment-main">
-                                    <div className="appointment-icon">
+                                <div className={styles.main}>
+                                    <div className={styles.icon}>
                                         <i className={`fas ${isPast ? 'fa-check-circle' : 'fa-calendar'}`}></i>
                                     </div>
-                                    <div className="appointment-details">
-                                        <div className="appointment-date">
+                                    <div className={styles.details}>
+                                        <div className={styles.date}>
                                             {formatDateTime(appointment.AppDate)}
                                         </div>
-                                        <div className="appointment-type">
+                                        <div className={styles.type}>
                                             {appointment.AppDetail || 'No details'}
                                         </div>
                                         {appointment.DrName && (
-                                            <div className="appointment-doctor">
+                                            <div className={styles.doctor}>
                                                 <i className="fas fa-user-md"></i> {appointment.DrName}
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                                <div className="appointment-actions">
+                                <div className={styles.actions}>
                                     {!isPast && (
                                         <button
                                             className="btn-edit"
@@ -207,15 +208,15 @@ const PatientAppointments = ({ patientId }: PatientAppointmentsProps) => {
 
             {/* Delete Confirmation Modal */}
             {deleteConfirm && (
-                <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
-                    <div className="modal-content" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                <div className={styles.modalOverlay} onClick={() => setDeleteConfirm(null)}>
+                    <div className={styles.modalContent} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         <h3>
                             <i className="fas fa-exclamation-triangle"></i> Confirm Delete
                         </h3>
                         <p>Are you sure you want to delete this appointment?</p>
-                        <div className="modal-actions">
+                        <div className={styles.modalActions}>
                             <button
-                                className="btn btn-cancel"
+                                className={cn('btn', styles.btnCancel)}
                                 onClick={() => setDeleteConfirm(null)}
                             >
                                 Cancel

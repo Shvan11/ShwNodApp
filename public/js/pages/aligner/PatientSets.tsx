@@ -4,7 +4,8 @@
  * Memoized to prevent unnecessary re-renders
  */
 import React, { useState, useEffect, useRef, ChangeEvent, MouseEvent } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLoaderData } from 'react-router-dom';
+import type { AlignerPatientWorkLoaderResult } from '../../router/loaders';
 import ConfirmDialog from '../../components/react/ConfirmDialog';
 import SetFormDrawer from '../../components/react/SetFormDrawer';
 import BatchFormDrawer from '../../components/react/BatchFormDrawer';
@@ -25,7 +26,6 @@ interface AlignerDoctor {
 
 interface Patient {
     PersonID: number;
-    patientID?: string;
     PatientName?: string;
     FirstName?: string;
     LastName?: string;
@@ -75,7 +75,7 @@ interface AlignerBatch {
     ValidityPeriod?: number;
     ManufactureDate?: string | null;
     DeliveredToPatientDate?: string | null;
-    NextBatchReadyDate?: string | null;
+    BatchExpiryDate?: string | null;
     Notes?: string;
     CreationDate?: string;
 }
@@ -96,6 +96,32 @@ interface ConfirmDialogState {
     title: string;
     message: string;
     onConfirm: (() => void) | null;
+}
+
+interface MarkDeliveredResponse {
+    success: boolean;
+    message?: string;
+    data?: {
+        batchId: number;
+        batchSequence: number;
+        setId: number;
+        wasActivated: boolean;
+        wasAlreadyActive: boolean;
+        wasAlreadyDelivered: boolean;
+        previouslyActiveBatchSequence: number | null;
+    };
+    error?: string;
+}
+
+interface BatchStatusResponse {
+    success: boolean;
+    message?: string;
+    data?: {
+        batchId: number;
+        batchSequence: number;
+        action?: string;
+    };
+    error?: string;
 }
 
 interface LabelModalData {
@@ -127,6 +153,7 @@ interface LabelGenerationData {
 
 const PatientSets: React.FC = () => {
     const { doctorId, workId } = useParams<{ doctorId?: string; workId?: string }>();
+    const loaderData = useLoaderData() as AlignerPatientWorkLoaderResult;
     const navigate = useNavigate();
     const toast = useToast();
     const { addToQueue, isInQueue, removeByBatchId } = usePrintQueue();
@@ -134,7 +161,18 @@ const PatientSets: React.FC = () => {
     // Determine if we came from doctor browse or direct search
     const isFromDoctorBrowse = doctorId !== undefined;
 
-    const [patient, setPatient] = useState<Patient | null>(null);
+    // Initialize patient from loader data (already validated in loader)
+    const initialPatient: Patient | null = loaderData?.patient && loaderData?.work ? {
+        PersonID: loaderData.patient.PersonID ?? 0,
+        PatientName: loaderData.patient.PatientName,
+        FirstName: loaderData.patient.FirstName,
+        LastName: loaderData.patient.LastName,
+        Phone: loaderData.patient.Phone,
+        WorkType: loaderData.work.TypeName,
+        workid: parseInt(workId || '0'),
+    } : null;
+
+    const [patient, setPatient] = useState<Patient | null>(initialPatient);
     const [alignerSets, setAlignerSets] = useState<AlignerSet[]>([]);
     const [doctors, setDoctors] = useState<AlignerDoctor[]>([]);
     const [expandedSets, setExpandedSets] = useState<Record<number, boolean>>({});
@@ -189,9 +227,9 @@ const PatientSets: React.FC = () => {
         checkBaseDirectoryAccess();
     }, []);
 
-    // Load patient and sets on mount
+    // Load aligner sets on mount (patient data comes from loader)
     useEffect(() => {
-        loadPatientAndSets();
+        loadAlignerSetsOnly();
         loadDoctors();
     }, [workId]);
 
@@ -208,31 +246,14 @@ const PatientSets: React.FC = () => {
         }
     };
 
-    const loadPatientAndSets = async (): Promise<void> => {
+    const loadAlignerSetsOnly = async (): Promise<void> => {
+        // Patient data is already loaded from route loader (useLoaderData)
+        // Only need to load aligner sets here
         try {
             setLoading(true);
-
-            // Load patient info from work
-            const workResponse = await fetch(`/api/getwork/${workId}`);
-            const workData = await workResponse.json();
-
-            if (workData.success && workData.work) {
-                const patientResponse = await fetch(`/api/patients/${workData.work.PersonID}`);
-                const patientData = await patientResponse.json();
-
-                const patientWithWork: Patient = {
-                    ...patientData,
-                    workid: parseInt(workId || '0'),
-                    WorkType: workData.work.TypeOfWork
-                };
-                setPatient(patientWithWork);
-            }
-
-            // Load aligner sets
             await loadAlignerSets(parseInt(workId || '0'));
-
         } catch (error) {
-            console.error('Error loading patient:', error);
+            console.error('Error loading aligner sets:', error);
         } finally {
             setLoading(false);
         }
@@ -522,8 +543,8 @@ const PatientSets: React.FC = () => {
             body: JSON.stringify({
                 workid: patient.workid,
                 AlignerSetID: currentSetForPayment.AlignerSetID,
-                Amount: paymentData.Amountpaid,
-                PaymentDate: paymentData.Dateofpayment,
+                Amountpaid: paymentData.Amountpaid,
+                Dateofpayment: paymentData.Dateofpayment,
                 PaymentMethod: 'Cash', // Default method
                 ActualAmount: paymentData.ActualAmount,
                 ActualCur: paymentData.ActualCur,
@@ -584,13 +605,23 @@ const PatientSets: React.FC = () => {
                     const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/deliver`, {
                         method: 'PATCH'
                     });
-                    const data = await response.json();
+                    const data: MarkDeliveredResponse = await response.json();
 
                     if (!data.success) {
                         throw new Error(data.error || 'Failed to mark as delivered');
                     }
 
-                    toast.success('Batch marked as delivered');
+                    // Show appropriate toast based on what happened
+                    if (data.data?.wasAlreadyDelivered) {
+                        toast.info('Batch was already delivered');
+                    } else if (data.data?.wasActivated) {
+                        toast.success(`Batch #${data.data.batchSequence} delivered and activated (latest batch)`);
+                    } else if (data.data?.wasAlreadyActive) {
+                        toast.success(`Batch #${data.data.batchSequence} delivered (already active)`);
+                    } else {
+                        toast.success('Batch marked as delivered');
+                    }
+
                     await loadBatches(batch.AlignerSetID);
                     if (patient) {
                         await loadAlignerSets(patient.workid);
@@ -615,13 +646,19 @@ const PatientSets: React.FC = () => {
                     const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/manufacture`, {
                         method: 'PATCH'
                     });
-                    const data = await response.json();
+                    const data: BatchStatusResponse = await response.json();
 
                     if (!data.success) {
                         throw new Error(data.error || 'Failed to mark as manufactured');
                     }
 
-                    toast.success('Batch marked as manufactured');
+                    // Handle idempotent case where batch was already manufactured
+                    if (data.message?.includes('already manufactured')) {
+                        toast.info('Batch was already manufactured');
+                    } else {
+                        toast.success('Batch marked as manufactured');
+                    }
+
                     await loadBatches(batch.AlignerSetID);
                     if (patient) {
                         await loadAlignerSets(patient.workid);
@@ -638,16 +675,23 @@ const PatientSets: React.FC = () => {
     const handleUndoManufactured = async (batch: AlignerBatch, e: MouseEvent<HTMLButtonElement>): Promise<void> => {
         e.stopPropagation();
         const hasDelivery = batch.DeliveredToPatientDate !== null;
+
+        // Prevent undo manufacture if batch is delivered - show error instead of confirmation
+        if (hasDelivery) {
+            toast.error('Cannot undo manufacture: batch is already delivered. Undo delivery first.');
+            return;
+        }
+
         setConfirmDialog({
             isOpen: true,
             title: 'Undo Manufacture?',
-            message: `Undo manufacture for Batch #${batch.BatchSequence}?${hasDelivery ? '\n\nWarning: This will also clear the delivery date.' : ''}`,
+            message: `Undo manufacture for Batch #${batch.BatchSequence}?`,
             onConfirm: async () => {
                 try {
                     const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/undo-manufacture`, {
                         method: 'PATCH'
                     });
-                    const data = await response.json();
+                    const data: BatchStatusResponse = await response.json();
 
                     if (!data.success) {
                         throw new Error(data.error || 'Failed to undo manufacture');
@@ -660,7 +704,13 @@ const PatientSets: React.FC = () => {
                     }
                 } catch (error) {
                     console.error('Error undoing manufacture:', error);
-                    toast.error('Failed to undo manufacture: ' + (error as Error).message);
+                    // Handle specific validation error from SP
+                    const errorMessage = (error as Error).message;
+                    if (errorMessage.includes('already delivered')) {
+                        toast.error('Cannot undo manufacture: batch is already delivered. Undo delivery first.');
+                    } else {
+                        toast.error('Failed to undo manufacture: ' + errorMessage);
+                    }
                 }
                 setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
             }
@@ -672,13 +722,13 @@ const PatientSets: React.FC = () => {
         setConfirmDialog({
             isOpen: true,
             title: 'Undo Delivery?',
-            message: `Undo delivery for Batch #${batch.BatchSequence}?`,
+            message: `Undo delivery for Batch #${batch.BatchSequence}? This will also clear the batch expiry date.`,
             onConfirm: async () => {
                 try {
                     const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/undo-deliver`, {
                         method: 'PATCH'
                     });
-                    const data = await response.json();
+                    const data: BatchStatusResponse = await response.json();
 
                     if (!data.success) {
                         throw new Error(data.error || 'Failed to undo delivery');
@@ -840,7 +890,7 @@ const PatientSets: React.FC = () => {
                     lowerEnd: batch.LowerAlignerEndSequence || 0
                 },
                 {
-                    code: patient.patientID || String(patient.PersonID),
+                    code: String(patient.PersonID),
                     name: formatPatientName(patient)
                 },
                 doctor,
@@ -1517,7 +1567,7 @@ const PatientSets: React.FC = () => {
                             )}
                         </h2>
                         <div className="patient-meta">
-                            <span><i className="fas fa-id-card"></i> {patient.patientID || 'N/A'}</span>
+                            <span><i className="fas fa-id-card"></i> {patient.PersonID}</span>
                             <span><i className="fas fa-phone"></i> {patient.Phone || 'N/A'}</span>
                             <span><i className="fas fa-tooth"></i> {patient.WorkType}</span>
                         </div>
@@ -1550,20 +1600,20 @@ const PatientSets: React.FC = () => {
                         )}
 
                         <button
-                            className="btn-add-set bg-success"
+                            className="btn btn-success"
                             onClick={() => navigate(`/patient/${patient.PersonID}/edit-patient`)}
                         >
                             <i className="fas fa-edit"></i>
                             Edit Patient
                         </button>
                         <button
-                            className="btn-add-set bg-info"
+                            className="btn btn-info"
                             onClick={() => navigate(`/patient/${patient.PersonID}/new-work?workId=${patient.workid}`)}
                         >
                             <i className="fas fa-tooth"></i>
                             Edit Work
                         </button>
-                        <button className="btn-add-set" onClick={openAddSetDrawer}>
+                        <button className="btn btn-success" onClick={openAddSetDrawer}>
                             <i className="fas fa-plus"></i>
                             Add New Set
                         </button>
@@ -1668,7 +1718,7 @@ const PatientSets: React.FC = () => {
                                             )}
                                             {set.SetCost && (set.Balance || 0) > 0 && (
                                                 <button
-                                                    className="payment-btn"
+                                                    className="btn btn-primary btn-sm"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         openPaymentDrawer(set);
@@ -1680,7 +1730,7 @@ const PatientSets: React.FC = () => {
                                                 </button>
                                             )}
                                             <button
-                                                className="delete-set-btn"
+                                                className="btn btn-danger btn-sm"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleDeleteSet(set, e);
@@ -1953,7 +2003,7 @@ const PatientSets: React.FC = () => {
                                             <div className="batches-header">
                                                 <h5>Batches</h5>
                                                 <button
-                                                    className="add-batch-btn"
+                                                    className="btn btn-success btn-sm"
                                                     onClick={() => openAddBatchDrawer(set)}
                                                     disabled={!set.IsActive}
                                                     title={!set.IsActive ? 'Cannot add batches to inactive sets' : 'Add new batch'}
@@ -2071,10 +2121,10 @@ const PatientSets: React.FC = () => {
                                                                     <i className="fas fa-hourglass-half"></i>
                                                                     <span>Validity: {batch.ValidityPeriod || 'N/A'} days</span>
                                                                 </div>
-                                                                {batch.NextBatchReadyDate && (
+                                                                {batch.BatchExpiryDate && (
                                                                     <div className="batch-detail">
                                                                         <i className="fas fa-calendar-check"></i>
-                                                                        <span>Next Batch: {formatDate(batch.NextBatchReadyDate)}</span>
+                                                                        <span>Batch Expiry: {formatDate(batch.BatchExpiryDate)}</span>
                                                                     </div>
                                                                 )}
                                                                 {batch.Notes && (
@@ -2115,7 +2165,7 @@ const PatientSets: React.FC = () => {
                                                         <div className="add-note-section">
                                                             {!showAddLabNote[set.AlignerSetID] ? (
                                                                 <button
-                                                                    className="add-batch-btn btn-auto-width"
+                                                                    className="btn btn-primary btn-sm"
                                                                     onClick={() => setShowAddLabNote(prev => ({ ...prev, [set.AlignerSetID]: true }))}
                                                                 >
                                                                     <i className="fas fa-plus"></i> Send Note to Doctor
@@ -2123,14 +2173,14 @@ const PatientSets: React.FC = () => {
                                                             ) : (
                                                                 <div className="note-form">
                                                                     <textarea
-                                                                        className="note-textarea note-textarea-input"
+                                                                        className="note-textarea"
                                                                         placeholder="Type your message to the doctor..."
                                                                         value={labNoteText}
                                                                         onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setLabNoteText(e.target.value)}
                                                                     />
-                                                                    <div className="flex-justify-end">
+                                                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
                                                                         <button
-                                                                            className="btn-cancel btn-sm-icon"
+                                                                            className="btn btn-secondary btn-sm"
                                                                             onClick={() => {
                                                                                 setShowAddLabNote(prev => ({ ...prev, [set.AlignerSetID]: false }));
                                                                                 setLabNoteText('');
@@ -2139,7 +2189,7 @@ const PatientSets: React.FC = () => {
                                                                             Cancel
                                                                         </button>
                                                                         <button
-                                                                            className="add-batch-btn btn-auto-width"
+                                                                            className="btn btn-primary btn-sm"
                                                                             onClick={() => handleAddLabNote(set.AlignerSetID)}
                                                                         >
                                                                             <i className="fas fa-paper-plane"></i> Send Note

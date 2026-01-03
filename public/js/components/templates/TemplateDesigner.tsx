@@ -7,8 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Editor as GrapesJSEditorType } from 'grapesjs';
 
-// Template designer CSS
-import '../../../css/pages/template-designer.css';
+import styles from './TemplateDesigner.module.css';
 import GrapesJSEditor from './GrapesJSEditor';
 import DesignerToolbar from './DesignerToolbar';
 import { useToast } from '../../contexts/ToastContext';
@@ -229,7 +228,7 @@ function TemplateDesigner() {
 
     if (isLoading) {
         return (
-            <div className="designer-loading">
+            <div className={styles.designerLoading}>
                 <i className="fas fa-spinner fa-spin"></i>
                 <p>Loading template designer...</p>
             </div>
@@ -238,7 +237,7 @@ function TemplateDesigner() {
 
     if (error) {
         return (
-            <div className="designer-error">
+            <div className={styles.designerError}>
                 <i className="fas fa-exclamation-circle"></i>
                 <p>{error}</p>
                 <button className="btn btn-primary" onClick={handleBack}>
@@ -249,25 +248,27 @@ function TemplateDesigner() {
     }
 
     return (
-        <div className="template-designer">
+        <div className={styles.templateDesigner}>
             <DesignerToolbar
                 templateName={template?.template_name || 'New Template'}
                 onBack={handleBack}
                 onPreview={handlePreview}
                 onSave={handleSave}
                 isSaving={isSaving}
+                styles={styles}
             />
 
             <GrapesJSEditor
                 ref={editorRef}
                 template={template}
+                styles={styles}
             />
 
             {isSaving && (
-                <div className="loading-overlay active">
-                    <div className="loading-content">
-                        <i className="fas fa-spinner loading-spinner"></i>
-                        <p className="loading-message">Saving template...</p>
+                <div className={`${styles.loadingOverlay} ${styles.loadingOverlayActive}`}>
+                    <div className={styles.loadingContent}>
+                        <i className={`fas fa-spinner ${styles.loadingSpinner}`}></i>
+                        <p className={styles.loadingMessage}>Saving template...</p>
                     </div>
                 </div>
             )}

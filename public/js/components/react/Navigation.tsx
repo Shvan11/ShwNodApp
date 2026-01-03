@@ -36,11 +36,11 @@ interface NavItem {
 }
 
 interface NavigationProps {
-    patientId?: string;
+    personId?: string;
     currentPage?: string;
 }
 
-const Navigation = ({ patientId, currentPage }: NavigationProps) => {
+const Navigation = ({ personId, currentPage }: NavigationProps) => {
     const toast = useToast();
     const { tpCode } = useParams<{ tpCode?: string }>();
     const [timepoints, setTimepoints] = useState<Timepoint[]>([]);
@@ -57,21 +57,21 @@ const Navigation = ({ patientId, currentPage }: NavigationProps) => {
     const [showDolphinPhotoDialog, setShowDolphinPhotoDialog] = useState(false);
 
     // Check if this is the "new patient" form
-    const isNewPatient = patientId === 'new';
+    const isNewPatient = personId === 'new';
 
     // Cache for timepoints
     const [cache, setCache] = useState<Map<string, CacheEntry>>(new Map());
     const cacheTimeout = 5 * 60 * 1000; // 5 minutes
 
-    const loadTimepoints = useCallback(async (patientIdParam: string) => {
-        if (!patientIdParam || patientIdParam === 'new') return;
+    const loadTimepoints = useCallback(async (personIdParam: string) => {
+        if (!personIdParam || personIdParam === 'new') return;
 
-        const cacheKey = `patient_${patientIdParam}`;
+        const cacheKey = `patient_${personIdParam}`;
         const cached = cache.get(cacheKey);
 
         // Check cache first
         if (cached && (Date.now() - cached.timestamp) < cacheTimeout) {
-            console.log('Using cached timepoints for patient', patientIdParam);
+            console.log('Using cached timepoints for patient', personIdParam);
             setTimepoints(cached.data);
             setLoading(false);
             return;
@@ -79,9 +79,9 @@ const Navigation = ({ patientId, currentPage }: NavigationProps) => {
 
         try {
             setLoading(true);
-            console.log('Fetching timepoints for patient', patientIdParam);
+            console.log('Fetching timepoints for patient', personIdParam);
 
-            const response = await fetch(`/api/patients/${patientIdParam}/timepoints`);
+            const response = await fetch(`/api/patients/${personIdParam}/timepoints`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -109,12 +109,12 @@ const Navigation = ({ patientId, currentPage }: NavigationProps) => {
 
     useEffect(() => {
         // Skip API calls for new patient form
-        if (patientId && patientId !== 'new') {
-            loadTimepoints(patientId);
-            loadPatientInfo(patientId);
+        if (personId && personId !== 'new') {
+            loadTimepoints(personId);
+            loadPatientInfo(personId);
         }
         loadPatientsFolder();
-    }, [patientId, loadTimepoints]);
+    }, [personId, loadTimepoints]);
 
     const loadPatientsFolder = async () => {
         try {
@@ -144,11 +144,11 @@ const Navigation = ({ patientId, currentPage }: NavigationProps) => {
         }
     };
 
-    const loadPatientInfo = async (patientIdParam: string) => {
-        if (!patientIdParam || patientIdParam === 'new') return;
+    const loadPatientInfo = async (personIdParam: string) => {
+        if (!personIdParam || personIdParam === 'new') return;
 
         try {
-            const response = await fetch(`/api/patients/${patientIdParam}/info`);
+            const response = await fetch(`/api/patients/${personIdParam}/info`);
             if (!response.ok) {
                 throw new Error('Failed to fetch patient info');
             }
@@ -180,12 +180,12 @@ const Navigation = ({ patientId, currentPage }: NavigationProps) => {
             const formattedName = String(patientName).replace(/ /g, '_');
 
             // Construct csimaging: URL
-            const csimagingUrl = `csimaging:${patientId}?name=${encodeURIComponent(formattedName)}`;
+            const csimagingUrl = `csimaging:${personId}?name=${encodeURIComponent(formattedName)}`;
 
             // Trigger the protocol handler
             window.location.href = csimagingUrl;
 
-            console.log('Opening CS Imaging for patient:', patientId, formattedName);
+            console.log('Opening CS Imaging for patient:', personId, formattedName);
         } catch (err) {
             console.error('Error opening CS Imaging:', err);
             toast.error('Failed to open CS Imaging: ' + (err instanceof Error ? err.message : 'Unknown error'));
@@ -204,10 +204,10 @@ const Navigation = ({ patientId, currentPage }: NavigationProps) => {
             const lastName = names.slice(1).join(' ') || '';
 
             // Use dedicated 3shape: protocol handler
-            const url = `3shape:${patientId}?firstname=${encodeURIComponent(firstName)}&lastname=${encodeURIComponent(lastName)}`;
+            const url = `3shape:${personId}?firstname=${encodeURIComponent(firstName)}&lastname=${encodeURIComponent(lastName)}`;
             window.location.href = url;
 
-            console.log('Opening 3Shape Unite for patient:', patientId, firstName, lastName);
+            console.log('Opening 3Shape Unite for patient:', personId, firstName, lastName);
         } catch (err) {
             console.error('Error opening 3Shape Unite:', err);
             toast.error('Failed to open 3Shape Unite: ' + (err instanceof Error ? err.message : 'Unknown error'));
@@ -248,7 +248,7 @@ const Navigation = ({ patientId, currentPage }: NavigationProps) => {
         return (
             <Link
                 key={item.key}
-                to={`/patient/${patientId}/${item.page}`}
+                to={`/patient/${personId}/${item.page}`}
                 className={className}
                 title={item.label}
             >
@@ -268,7 +268,7 @@ const Navigation = ({ patientId, currentPage }: NavigationProps) => {
         return (
             <Link
                 key={timepoint.tpCode}
-                to={`/patient/${patientId}/photos/tp${timepoint.tpCode}`}
+                to={`/patient/${personId}/photos/tp${timepoint.tpCode}`}
                 className={`sidebar-nav-item timepoint-subitem ${isActive ? 'active' : ''}`}
                 onClick={() => setPhotosExpanded(false)}
             >
@@ -332,8 +332,8 @@ const Navigation = ({ patientId, currentPage }: NavigationProps) => {
             toast.error('Patients folder path is not configured. Please check settings.');
             return;
         }
-        // Construct full path: PatientsFolder + PatientID
-        const fullPath = `${patientsFolder}${patientId}`;
+        // Construct full path: PatientsFolder + PersonID
+        const fullPath = `${patientsFolder}${personId}`;
         window.location.href = `explorer:${fullPath}`;
     };
 
@@ -370,7 +370,7 @@ const Navigation = ({ patientId, currentPage }: NavigationProps) => {
                                 </div>
                             ) : (
                                 <Link
-                                    to={`/patient/${patientId}/photos/tp0`}
+                                    to={`/patient/${personId}/photos/tp0`}
                                     className={`sidebar-nav-item photos-main-btn ${isPhotosPageActive ? 'active' : ''}`}
                                     title="Photos"
                                 >
@@ -479,7 +479,7 @@ const Navigation = ({ patientId, currentPage }: NavigationProps) => {
                 >
                     <div className="flyout-content">
                         <Link
-                            to={`/patient/${patientId}/compare`}
+                            to={`/patient/${personId}/compare`}
                             className={`flyout-action-item ${currentPage === 'compare' ? 'active' : ''}`}
                             onClick={() => setMoreActionsExpanded(false)}
                         >
@@ -490,7 +490,7 @@ const Navigation = ({ patientId, currentPage }: NavigationProps) => {
                         </Link>
 
                         <Link
-                            to={`/patient/${patientId}/xrays`}
+                            to={`/patient/${personId}/xrays`}
                             className={`flyout-action-item ${currentPage === 'xrays' ? 'active' : ''}`}
                             onClick={() => setMoreActionsExpanded(false)}
                         >
@@ -507,7 +507,7 @@ const Navigation = ({ patientId, currentPage }: NavigationProps) => {
                                 e.preventDefault();
                                 if (isNewPatient) return;
 
-                                window.location.href = `dolphin:${patientId}?action=open`;
+                                window.location.href = `dolphin:${personId}?action=open`;
                                 setMoreActionsExpanded(false);
                             }}
                             title={isNewPatient ? "Save patient first to access Dolphin Imaging" : "Launch Dolphin Imaging with patient data"}
@@ -557,7 +557,7 @@ const Navigation = ({ patientId, currentPage }: NavigationProps) => {
 
             {showDolphinPhotoDialog && (
                 <DolphinPhotoDialog
-                    patientId={patientId}
+                    personId={personId}
                     patientInfo={patientInfo}
                     onClose={() => setShowDolphinPhotoDialog(false)}
                 />

@@ -1,0 +1,318 @@
+/* ===== TEETH SELECTOR COMPONENT - CSS Module ===== */
+/* Combined graphical dental chart for permanent teeth + letter grid for deciduous */
+
+.container {
+    background-color: var(--background-secondary);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ===== FILTER TOGGLES ===== */
+.filters {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.filter {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.filter input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary-color);
+}
+
+.filter span {
+    user-select: none;
+}
+
+/* ===== PERMANENT TEETH - GRAPHICAL CHART ===== */
+.permanent {
+    margin-bottom: var(--spacing-md);
+}
+
+.arch {
+    margin-bottom: var(--spacing-sm);
+}
+
+.arch:last-child {
+    margin-bottom: 0;
+}
+
+.archLabel {
+    text-align: center;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+}
+
+.archTeeth {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+/* Individual graphical tooth */
+.tooth {
+    width: 34px;
+    height: 80px;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: var(--background-primary);
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+    margin: 0 1px;
+}
+
+.tooth:hover {
+    border-color: var(--info-color);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-2px);
+}
+
+.tooth:active {
+    transform: scale(0.95);
+}
+
+/* Selected tooth state */
+.toothSelected {
+    border-color: var(--primary-color);
+    background: var(--primary-50, #e3f2fd);
+    box-shadow: 0 0 0 2px var(--primary-100, #bbdefb);
+}
+
+.toothSelected:hover {
+    background: var(--primary-100, #bbdefb);
+}
+
+.tooth img {
+    width: 28px;
+    height: 60px;
+    object-fit: contain;
+}
+
+.toothNumber {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.toothSelected .toothNumber {
+    color: var(--primary-color);
+}
+
+/* Midline separator */
+.midline {
+    font-size: var(--font-size-lg);
+    font-weight: bold;
+    color: var(--error-color);
+    margin: 0 var(--spacing-xs);
+    flex-shrink: 0;
+}
+
+/* ===== DECIDUOUS TEETH - LETTER GRID ===== */
+.deciduous {
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--border-color);
+}
+
+.deciduousLabel {
+    text-align: center;
+    font-weight: 600;
+    color: var(--warning-600, #d97706);
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+}
+
+.archDeciduous {
+    margin-bottom: var(--spacing-sm);
+}
+
+.deciduousRow {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-xs);
+    flex-wrap: nowrap;
+}
+
+/* Deciduous tooth button (letter-based) */
+.deciduousBtn {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--warning-300, #fcd34d);
+    border-radius: var(--radius-md);
+    background: var(--warning-50, #fffbeb);
+    color: var(--warning-700, #b45309);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    font-style: italic;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.deciduousBtn:hover {
+    border-color: var(--warning-500, #f59e0b);
+    background: var(--warning-100, #fef3c7);
+    transform: translateY(-1px);
+}
+
+.deciduousBtn:active {
+    transform: scale(0.95);
+}
+
+/* Selected deciduous tooth */
+.deciduousBtnSelected {
+    border-color: var(--warning-600, #d97706);
+    background: var(--warning-500, #f59e0b);
+    color: white;
+    box-shadow: 0 0 0 2px var(--warning-200, #fde68a);
+}
+
+.deciduousBtnSelected:hover {
+    background: var(--warning-600, #d97706);
+}
+
+/* ===== SELECTED DISPLAY ===== */
+.selected {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--success-50, #f0fdf4);
+    border: 1px solid var(--success-200, #bbf7d0);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    flex-wrap: wrap;
+}
+
+.selected strong {
+    color: var(--success-700, #15803d);
+}
+
+.clearBtn {
+    margin-inline-start: auto;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border: 1px solid var(--error-300, #fca5a5);
+    border-radius: var(--radius-sm);
+    background: var(--error-50, #fef2f2);
+    color: var(--error-600, #dc2626);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.clearBtn:hover {
+    background: var(--error-100, #fee2e2);
+    border-color: var(--error-400, #f87171);
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 768px) {
+    .container {
+        padding: var(--spacing-sm);
+    }
+
+    .tooth {
+        width: 28px;
+        height: 70px;
+    }
+
+    .tooth img {
+        width: 22px;
+        height: 50px;
+    }
+
+    .deciduousBtn {
+        width: 28px;
+        height: 28px;
+        font-size: var(--font-size-xs);
+    }
+}
+
+@media (max-width: 640px) {
+    .tooth {
+        width: 22px;
+        height: 58px;
+    }
+
+    .tooth img {
+        width: 18px;
+        height: 42px;
+    }
+
+    .toothNumber {
+        font-size: 10px;
+    }
+
+    .deciduousBtn {
+        width: 24px;
+        height: 24px;
+        font-size: 11px;
+    }
+
+    .midline {
+        margin: 0 2px;
+    }
+}
+
+@media (max-width: 480px) {
+    .filters {
+        flex-direction: column;
+        gap: var(--spacing-xs);
+    }
+
+    .tooth {
+        width: 18px;
+        height: 50px;
+        margin: 0;
+    }
+
+    .tooth img {
+        width: 14px;
+        height: 35px;
+    }
+
+    .toothNumber {
+        font-size: 9px;
+    }
+
+    .deciduousBtn {
+        width: 22px;
+        height: 22px;
+        font-size: 10px;
+    }
+
+    .selected {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .clearBtn {
+        margin-inline-start: 0;
+        margin-top: var(--spacing-xs);
+    }
+}

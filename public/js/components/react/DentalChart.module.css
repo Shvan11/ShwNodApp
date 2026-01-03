@@ -1,0 +1,154 @@
+/* ===== DENTAL CHART COMPONENT - CSS Module ===== */
+
+.container {
+    background-color: var(--background-secondary);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-sm) var(--spacing-md);
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.arch {
+    margin-bottom: var(--spacing-sm);
+}
+
+.arch:last-of-type {
+    margin-bottom: 0;
+}
+
+.archLabel {
+    text-align: center;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+}
+
+.archTeeth {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Individual Tooth */
+.tooth {
+    width: 34px;
+    height: 80px;
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: var(--background-primary);
+    flex-shrink: 0;
+}
+
+.tooth:hover {
+    border-color: var(--info-color);
+    box-shadow: var(--shadow-sm);
+}
+
+.tooth:active {
+    transform: scale(0.95);
+}
+
+.tooth img {
+    width: 28px;
+    height: 60px;
+    object-fit: contain;
+}
+
+.toothNumber {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* Between-teeth clickable area */
+.between {
+    width: 8px;
+    height: 80px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.betweenIndicator {
+    width: 2px;
+    height: 70%;
+    background: var(--border-color);
+    border-radius: var(--radius-sm);
+}
+
+.between:hover .betweenIndicator {
+    background: var(--primary-color);
+    width: 3px;
+}
+
+.between:active .betweenIndicator {
+    transform: scale(1.2);
+}
+
+/* Midline */
+.midline {
+    width: 12px;
+}
+
+.midline .betweenIndicator {
+    background: var(--error-color);
+    width: 3px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container {
+        padding: var(--spacing-xs);
+    }
+    .tooth {
+        width: 30px;
+        height: 70px;
+    }
+    .tooth img {
+        width: 24px;
+        height: 55px;
+    }
+    .between {
+        width: 6px;
+        height: 70px;
+    }
+}
+
+@media (max-width: 640px) {
+    .tooth {
+        width: 20px;
+        height: 55px;
+    }
+    .tooth img {
+        width: 16px;
+        height: 40px;
+    }
+    .between {
+        width: 4px;
+        height: 55px;
+    }
+}
+
+@media (max-width: 480px) {
+    .tooth {
+        width: 18px;
+        height: 50px;
+    }
+    .tooth img {
+        width: 14px;
+        height: 35px;
+    }
+    .between {
+        width: 3px;
+        height: 50px;
+    }
+}

@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useRef, type MouseEvent } from 'react';
 import type { CalendarDay, CalendarData, CalendarAppointment, CalendarMode } from './calendar.types';
+import styles from './MonthlyCalendarGrid.module.css';
 
 interface MonthlyCalendarGridProps {
     calendarData: CalendarData | null;
@@ -40,7 +41,7 @@ const MonthlyCalendarGrid = ({
 
     if (!calendarData || !calendarData.days) {
         return (
-            <div className="monthly-calendar-grid loading">
+            <div className={`${styles.monthlyCalendarGrid} ${styles.loading}`}>
                 <p>Loading monthly data...</p>
             </div>
         );
@@ -73,18 +74,18 @@ const MonthlyCalendarGrid = ({
     const dayHeaders = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'];
 
     return (
-        <div className="monthly-calendar-grid" ref={gridRef}>
+        <div className={styles.monthlyCalendarGrid} ref={gridRef}>
             {/* Day headers */}
-            <div className="month-grid-header">
+            <div className={styles.monthGridHeader}>
                 {dayHeaders.map(day => (
-                    <div key={day} className="month-day-header">
+                    <div key={day} className={styles.monthDayHeader}>
                         {day}
                     </div>
                 ))}
             </div>
 
             {/* Calendar days */}
-            <div className="month-grid-body">
+            <div className={styles.monthGridBody}>
                 {days.map(day => {
                     const appointmentCount = day.appointmentCount || 0;
                     const currentMonth = isCurrentMonth(day.date);
@@ -95,13 +96,13 @@ const MonthlyCalendarGrid = ({
                     const isExpanded = expandedDay === day.date;
 
                     const cellClasses = [
-                        'month-day-cell',
-                        !currentMonth ? 'other-month' : '',
-                        todayClass ? 'today' : '',
-                        weekendClass ? 'weekend' : '',
-                        appointmentCount > 0 ? 'has-appointments' : '',
-                        isHoliday ? 'holiday' : '',
-                        isExpanded ? 'expanded' : ''
+                        styles.monthDayCell,
+                        !currentMonth ? styles.otherMonth : '',
+                        todayClass ? styles.today : '',
+                        weekendClass ? styles.weekend : '',
+                        appointmentCount > 0 ? styles.hasAppointments : '',
+                        isHoliday ? styles.holiday : '',
+                        isExpanded ? styles.expanded : ''
                     ].filter(Boolean).join(' ');
 
                     // Single click to expand/collapse appointment list
@@ -143,51 +144,51 @@ const MonthlyCalendarGrid = ({
                             title={isHoliday ? day.holidayName : undefined}
                         >
                             {/* Day number */}
-                            <div className="month-day-number">
+                            <div className={styles.monthDayNumber}>
                                 {new Date(day.date).getDate()}
                             </div>
 
                             {/* Holiday badge */}
                             {currentMonth && isHoliday && (
-                                <div className="holiday-badge" title={day.holidayName}>
+                                <div className={styles.holidayBadge} title={day.holidayName}>
                                     <i className="fas fa-calendar-times"></i>
                                 </div>
                             )}
 
                             {/* Appointment badge - Clean neutral styling via CSS */}
                             {currentMonth && !isHoliday && appointmentCount > 0 && (
-                                <div className="appointment-badge">
+                                <div className={styles.appointmentBadge}>
                                     {appointmentCount}
                                 </div>
                             )}
 
                             {/* Expanded appointment list (shows on click) */}
                             {isExpanded && currentMonth && !isHoliday && appointmentCount > 0 && (
-                                <div className="day-expanded-panel">
-                                    <div className="expanded-header">
+                                <div className={styles.dayExpandedPanel}>
+                                    <div className={styles.expandedHeader}>
                                         {new Date(day.date).toLocaleDateString('en-US', {
                                             weekday: 'short',
                                             month: 'short',
                                             day: 'numeric'
                                         })}
-                                        <span className="expanded-count">{appointmentCount} appts</span>
+                                        <span className={styles.expandedCount}>{appointmentCount} appts</span>
                                     </div>
                                     {day.appointments && Array.isArray(day.appointments) && day.appointments.length > 0 && (
-                                        <div className="expanded-appointments">
+                                        <div className={styles.expandedAppointments}>
                                             {(day.appointments as CalendarAppointment[]).slice(0, 8).map((apt, idx) => (
-                                                <div key={idx} className="expanded-appointment">
-                                                    <span className="apt-time">{apt.time || ''}</span>
-                                                    <span className="apt-name">{apt.patientName || ''}</span>
+                                                <div key={idx} className={styles.expandedAppointment}>
+                                                    <span className={styles.aptTime}>{apt.time || ''}</span>
+                                                    <span className={styles.aptName}>{apt.patientName || ''}</span>
                                                 </div>
                                             ))}
                                             {day.appointments.length > 8 && (
-                                                <div className="expanded-more">
+                                                <div className={styles.expandedMore}>
                                                     +{day.appointments.length - 8} more
                                                 </div>
                                             )}
                                         </div>
                                     )}
-                                    <div className="expanded-action">
+                                    <div className={styles.expandedAction}>
                                         Double-click to open day view
                                     </div>
                                 </div>

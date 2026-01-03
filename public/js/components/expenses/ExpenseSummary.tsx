@@ -5,6 +5,7 @@
 import React from 'react';
 import { useExpenseSummary } from '../../hooks/useExpenses';
 import type { Expense } from '../../hooks/useExpenses';
+import styles from '../../routes/Expenses.module.css';
 
 // Types
 interface SummaryTotal {
@@ -67,33 +68,33 @@ export default function ExpenseSummary({ startDate, endDate, expenses }: Expense
 
     if (loading) {
         return (
-            <div className="summary-container">
-                <div className="loading-state">
-                    <div className="loading-spinner"></div>
+            <div className={styles.summaryContainer}>
+                <div className={styles.loadingState}>
+                    <div className={styles.loadingSpinner}></div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="summary-container">
-            <div className="summary-grid">
-                <div className="summary-card total-count">
-                    <div className="summary-label">Total Expenses</div>
-                    <div className="summary-value">{count}</div>
+        <div className={styles.summaryContainer}>
+            <div className={styles.summaryGrid}>
+                <div className={`${styles.summaryCard} ${styles.totalCount}`}>
+                    <div className={styles.summaryLabel}>Total Expenses</div>
+                    <div className={styles.summaryValue}>{count}</div>
                 </div>
 
-                <div className="summary-card currency-iqd">
-                    <div className="summary-label">Total IQD</div>
-                    <div className="summary-value">
-                        {formatNumber(iqd)} <span className="currency-label">IQD</span>
+                <div className={`${styles.summaryCard} ${styles.currencyIqd}`}>
+                    <div className={styles.summaryLabel}>Total IQD</div>
+                    <div className={styles.summaryValue}>
+                        {formatNumber(iqd)} <span className={styles.currencyLabel}>IQD</span>
                     </div>
                 </div>
 
-                <div className="summary-card currency-usd">
-                    <div className="summary-label">Total USD</div>
-                    <div className="summary-value">
-                        {formatNumber(usd)} <span className="currency-label">USD</span>
+                <div className={`${styles.summaryCard} ${styles.currencyUsd}`}>
+                    <div className={styles.summaryLabel}>Total USD</div>
+                    <div className={styles.summaryValue}>
+                        {formatNumber(usd)} <span className={styles.currencyLabel}>USD</span>
                     </div>
                 </div>
             </div>

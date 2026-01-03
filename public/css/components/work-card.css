@@ -1,5 +1,8 @@
-/* ===== WORK CARD STYLES - CLEAN COLLAPSIBLE DESIGN ===== */
+/* ===== WORK-RELATED SHARED STYLES ===== */
+/* WorkCard component styles are in WorkCard.module.css */
+/* TeethSelector component styles are in TeethSelector.module.css */
 
+/* Works Container */
 .works-card-container {
     display: flex;
     flex-direction: column;
@@ -7,340 +10,29 @@
     padding: 0.25rem 0;
 }
 
-.work-card {
-    position: relative;
-    background: white;
-    border-radius: var(--radius-lg);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    transition: all 0.2s ease;
-    border-left: 4px solid transparent;
-    overflow: visible;
-}
-
-.work-card.collapsed {
-    padding: var(--spacing-sm) var(--spacing-md);
-}
-
-.work-card.expanded {
-    padding: var(--spacing-lg);
-    box-shadow: var(--shadow-md);
-}
-
-.work-card:hover {
-    box-shadow: var(--shadow-lg);
-}
-
-.work-card-active {
-    border-left-color: var(--success-500);
-}
-
-.work-card-completed {
-    border-left-color: var(--gray-500);
-    opacity: 0.85;
-}
-
-.work-card-discontinued {
-    border-left-color: var(--warning-color);
-    opacity: 0.75;
-    background: linear-gradient(135deg, #fff 0%, #fffbeb 100%);
-}
-
-/* Collapsed Header - Always Visible */
-.work-card-collapsed-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    transition: all 0.2s;
-    cursor: pointer;
-}
-
-.work-card-collapsed-header:hover {
-    opacity: 0.8;
-}
-
-.chevron-icon {
-    font-size: var(--font-size-sm);
-    color: var(--gray-500);
-    margin-right: var(--spacing-sm);
-}
-
-.balance-indicator {
-    color: var(--error-500);
-    font-weight: 600;
-}
-
-.work-card-title-section {
-    flex: 1;
-}
-
-.work-card-title {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-xs);
-}
-
-.work-card-title i.fa-tooth {
-    color: var(--success-500);
-    font-size: var(--font-size-base);
-}
-
-.work-card-title h3 {
-    margin: 0;
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-semibold);
-    color: var(--gray-800);
-}
-
-.work-status-badge {
-    padding: 0.125rem var(--spacing-sm);
-    border-radius: var(--radius-full);
-    font-size: 0.7rem;
-    font-weight: var(--font-weight-semibold);
-    text-transform: uppercase;
-    letter-spacing: var(--letter-spacing-wide);
-}
-
-.work-status-badge.active {
-    background: var(--success-100);
-    color: var(--success-800);
-}
-
-.work-status-badge.completed {
-    background: var(--gray-200);
-    color: var(--gray-600);
-}
-
-.work-status-badge.discontinued {
-    background: var(--warning-100);
-    color: var(--warning-900);
-}
-
-.work-card-meta-minimal {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--spacing-md);
-    font-size: var(--font-size-sm);
-    color: var(--gray-500);
-    margin-left: 1.375rem;
-}
-
-.work-card-meta-minimal span {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
-
-.work-card-meta-minimal i {
-    font-size: 0.7rem;
-    color: var(--gray-400);
-}
-
-/* Full Content - Only When Expanded */
-.work-card-full-content {
-    position: relative;
-    margin-top: var(--spacing-md);
-    padding-top: var(--spacing-md);
-    border-top: var(--border-width-thin) solid var(--gray-200);
-    animation: slideDown 0.3s ease;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-0.625rem);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Actions Menu */
-.work-card-actions-menu {
-    position: absolute;
-    top: var(--spacing-md);
-    right: var(--spacing-md);
-    z-index: var(--z-index-dropdown);
-}
-
-/* .btn-icon moved to /css/components/buttons.css (global - used across multiple components) */
-
-.work-card-dropdown {
-    position: absolute;
-    right: 0;
-    top: 100%;
-    background: white;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-    min-width: 11.25rem;
-    z-index: var(--z-index-dropdown);
-    overflow: hidden;
-    margin-top: var(--spacing-xs);
-}
-
-.work-card-dropdown button {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    width: 100%;
-    padding: var(--spacing-sm) var(--spacing-md);
-    border: none;
-    background: white;
-    color: var(--gray-700);
-    cursor: pointer;
-    font-size: var(--font-size-sm);
-    text-align: left;
-    transition: background 0.2s;
-}
-
-.work-card-dropdown button:hover {
-    background: var(--gray-100);
-}
-
-.work-card-dropdown button i {
-    width: 16px;
-    color: var(--gray-500);
-}
-
-/* Delete button styling */
-.work-card-dropdown .dropdown-delete-btn {
-    color: var(--error-500);
-    border-top: 1px solid var(--gray-100);
-}
-
-.work-card-dropdown .dropdown-delete-btn:hover {
-    background: var(--error-50);
-    color: var(--error-600);
-}
-
-.work-card-dropdown .dropdown-delete-btn i {
-    color: var(--error-500);
-}
-
-.work-card-dropdown .dropdown-delete-btn:hover i {
-    color: var(--error-600);
-}
-
-/* Progress Section */
-.work-card-progress {
-    margin-bottom: 1rem;
-}
-
-.progress-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-}
-
-.progress-label {
-    font-size: 0.875rem;
-    color: var(--gray-500);
-    font-weight: 500;
-}
-
-.progress-percentage {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--success-500);
-}
-
-.progress-bar-container {
-    height: 8px;
-    background: var(--gray-200);
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.progress-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--success-500) 0%, var(--success-300) 100%);
-    border-radius: 4px;
-    transition: width 0.5s ease;
-}
-
-/* Financial Summary */
-.work-card-financial {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    background: var(--gray-50);
-    border-radius: var(--radius-lg);
-    margin-bottom: 1rem;
-}
-
-.financial-item {
+/* No Works Message */
+.no-works-message {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-}
-
-.financial-label {
-    font-size: 0.75rem;
-    color: var(--gray-500);
-    text-transform: uppercase;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-}
-
-.financial-value {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--gray-800);
-}
-
-.financial-value.paid {
-    color: var(--success-500);
-}
-
-.financial-value.remaining {
-    color: var(--error-500);
-}
-
-.financial-value.paid-full {
-    color: var(--success-500);
-}
-
-/* Additional Info Section */
-.work-card-additional-info {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    padding: 0.75rem;
-    background: var(--gray-50);
-    border-radius: var(--radius-lg);
-    margin-bottom: 1rem;
-    font-size: 0.875rem;
-}
-
-.work-card-additional-info .info-item {
-    display: flex;
     align-items: center;
-    gap: 0.5rem;
-    color: var(--gray-700);
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
 }
 
-.work-card-additional-info .info-item.full-width {
-    flex-basis: 100%;
+.no-works-icon {
+    font-size: 3rem;
+    color: var(--gray-300);
+    margin-bottom: 1rem;
 }
 
-.work-card-additional-info .info-item i {
+.no-works-text {
     color: var(--gray-500);
-    font-size: 0.75rem;
+    font-size: 1rem;
 }
 
-/* Primary Actions */
-.work-card-primary-actions {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-}
-
-/* Button styles inherited from /css/components/buttons.css */
+/* ===== BUTTON MODIFIERS FOR WORK ACTIONS ===== */
+/* Base .btn and .btn-card-action are in buttons.css */
 
 .btn-card-action i {
     font-size: 1rem;
@@ -366,14 +58,7 @@
     color: var(--blue-300);
 }
 
-/* Secondary Actions */
-.work-card-secondary-actions {
-    display: flex;
-    gap: 0.75rem;
-}
-
-/* Button base styles inherited from /css/components/buttons.css */
-
+/* Secondary Action Button Modifiers */
 .btn-card-secondary.btn-add-payment {
     background: var(--success-500);
 }
@@ -404,159 +89,8 @@
     background: var(--indigo-500);
 }
 
-/* No Works Message */
-.no-works-message {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 4rem 2rem;
-    text-align: center;
-}
+/* ===== PATIENT INFO CARD ===== */
 
-/* Responsive Design */
-@media (max-width: 768px) {
-    .work-card.expanded {
-        padding: var(--spacing-md);
-    }
-
-    .work-card-financial {
-        grid-template-columns: 1fr;
-        gap: var(--spacing-md);
-    }
-
-    .work-card-primary-actions {
-        grid-template-columns: repeat(2, 1fr);
-        gap: var(--spacing-sm);
-    }
-
-    .work-card-secondary-actions {
-        flex-direction: column;
-        gap: var(--spacing-sm);
-    }
-
-    .work-card-meta-minimal {
-        flex-direction: column;
-        gap: var(--spacing-xs);
-    }
-
-    .patient-info-card {
-        flex-direction: column;
-        text-align: center;
-        gap: var(--spacing-md);
-    }
-
-    .patient-photo-container {
-        width: 6rem;
-        height: 7.5rem;
-    }
-
-    .patient-info-row {
-        flex-direction: column;
-        gap: var(--spacing-md);
-        width: 100%;
-    }
-
-    .patient-info-header {
-        width: 100%;
-    }
-
-    .work-summary-inline {
-        width: 100%;
-        justify-content: space-around;
-    }
-
-    .summary-card-inline {
-        flex: 1;
-        min-width: 3.75rem;
-        padding: var(--spacing-xs) var(--spacing-sm);
-    }
-
-    .summary-value-inline {
-        font-size: var(--font-size-xl);
-    }
-
-    .patient-controls {
-        flex-direction: column;
-        width: 100%;
-        gap: var(--spacing-sm);
-    }
-
-    .search-input,
-    .filter-select,
-    .btn-checkin,
-    .btn-secondary,
-    .btn-primary {
-        width: 100%;
-    }
-
-    .patient-meta-info {
-        gap: var(--spacing-md);
-        justify-content: center;
-    }
-
-    .patient-alert-badge {
-        max-width: 100%;
-    }
-}
-
-@media (max-width: 480px) {
-    .work-card.collapsed {
-        padding: var(--spacing-sm) var(--spacing-md);
-    }
-
-    .work-card.expanded {
-        padding: var(--spacing-sm);
-    }
-
-    .work-card-title h3 {
-        font-size: var(--font-size-sm);
-    }
-
-    .btn-card-action span {
-        font-size: var(--font-size-xs);
-    }
-
-    .work-card-financial {
-        padding: var(--spacing-sm);
-        gap: var(--spacing-sm);
-    }
-
-    .financial-value {
-        font-size: var(--font-size-sm);
-    }
-
-    .patient-photo-container {
-        width: 5rem;
-        height: 6.25rem;
-    }
-
-    .patient-name {
-        font-size: var(--font-size-sm);
-    }
-
-    .patient-meta-info {
-        font-size: var(--font-size-xs);
-        flex-direction: column;
-        gap: var(--spacing-xs);
-        align-items: center;
-    }
-
-    .summary-value-inline {
-        font-size: var(--font-size-lg);
-    }
-
-    .summary-label-inline {
-        font-size: 0.625rem;
-    }
-
-    .work-card-primary-actions {
-        grid-template-columns: 1fr;
-        gap: var(--spacing-xs);
-    }
-}
-
-/* Patient Info Card */
 .patient-info-card {
     display: flex;
     align-items: center;
@@ -687,7 +221,8 @@
     color: var(--color-white);
 }
 
-/* Inline Work Summary */
+/* ===== INLINE WORK SUMMARY ===== */
+
 .work-summary-inline {
     display: flex;
     gap: var(--spacing-sm);
@@ -722,6 +257,8 @@
     letter-spacing: var(--letter-spacing-wide);
     margin-top: var(--spacing-xs);
 }
+
+/* ===== PATIENT CONTROLS ===== */
 
 .patient-controls {
     display: flex;
@@ -760,8 +297,6 @@
     box-shadow: var(--shadow-focus);
 }
 
-/* Button base styles inherited from /css/components/buttons.css */
-
 .patient-controls .btn-work-checkin.checked-in {
     background-color: var(--success-500);
     cursor: not-allowed;
@@ -773,11 +308,8 @@
     cursor: not-allowed;
 }
 
-/* Button base styles inherited from /css/components/buttons.css */
+/* ===== WORK ERROR/SUCCESS MESSAGES ===== */
 
-/* Button base styles inherited from /css/components/buttons.css */
-
-/* Work Error */
 .work-error {
     background-color: var(--error-50);
     color: var(--error-600);
@@ -804,7 +336,6 @@
     color: var(--error-700);
 }
 
-/* Work Success Message */
 .work-success {
     background-color: var(--success-300);
     color: white;
@@ -825,8 +356,6 @@
     display: flex;
     gap: 0.5rem;
 }
-
-/* Button base styles inherited from /css/components/buttons.css */
 
 .work-btn-success-action {
     background-color: white;
@@ -851,7 +380,8 @@
     opacity: 0.8;
 }
 
-/* Work Summary */
+/* ===== WORK SUMMARY CARDS ===== */
+
 .work-summary {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -884,7 +414,6 @@
     line-height: 1.2;
 }
 
-/* Work Loading */
 .work-loading {
     padding: 2rem;
     text-align: center;
@@ -892,9 +421,7 @@
     font-size: 1rem;
 }
 
-/* Payment History Modal Styles */
-/* NOTE: Global modal styles (.modal-overlay, .modal-header, .modal-close, .modal-content-scroll)
-   are now in /css/components/modal.css */
+/* ===== PAYMENT HISTORY MODAL ===== */
 
 .work-modal {
     background-color: white;
@@ -963,6 +490,8 @@
     color: var(--error-500);
 }
 
+/* ===== DETAILS TABLE ===== */
+
 .details-table-container {
     overflow-x: auto;
 }
@@ -998,15 +527,13 @@
 }
 
 /* Payment action buttons - Compact for table use */
-
 .work-btn-action-edit,
 .work-btn-action-delete {
-    /* Base button properties */
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.375rem 0.5rem; /* Smaller than global .btn for table use */
-    font-size: 0.875rem; /* Slightly smaller font */
+    padding: 0.375rem 0.5rem;
+    font-size: 0.875rem;
     border: 1px solid transparent;
     border-radius: var(--radius-sm);
     cursor: pointer;
@@ -1063,19 +590,8 @@
     font-weight: 600;
 }
 
-/* No Works Icon */
-.no-works-icon {
-    font-size: 3rem;
-    color: var(--gray-300);
-    margin-bottom: 1rem;
-}
+/* ===== WORK DETAILS MODAL CONTENT ===== */
 
-.no-works-text {
-    color: var(--gray-500);
-    font-size: 1rem;
-}
-
-/* Work Details Modal Content */
 .work-details-content {
     padding: 1.5rem;
 }
@@ -1246,133 +762,7 @@
     width: 95%;
 }
 
-/* ===== TEETH SELECTION STYLES ===== */
-
-.teeth-filter-toggle {
-    display: flex;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-sm);
-}
-
-.teeth-filter-toggle .checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-}
-
-.teeth-filter-toggle input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-}
-
-.teeth-selection-grid {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md);
-    background: var(--background-secondary);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-color);
-}
-
-.teeth-arch {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
-
-.arch-label {
-    font-size: var(--font-size-xs);
-    color: var(--text-secondary);
-    font-weight: 600;
-    text-transform: uppercase;
-}
-
-.teeth-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    flex-wrap: nowrap;
-}
-
-.teeth-row .midline {
-    color: var(--border-color);
-    font-weight: bold;
-    padding: 0 var(--spacing-xs);
-    font-size: var(--font-size-lg);
-}
-
-.tooth-btn {
-    min-width: 28px;
-    height: 28px;
-    padding: 2px 4px;
-    border: 1px solid var(--border-color);
-    background: var(--background-primary);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-xs);
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    color: var(--text-primary);
-}
-
-.tooth-btn:hover {
-    background: var(--primary-100);
-    border-color: var(--primary-color);
-}
-
-.tooth-btn.selected {
-    background: var(--primary-color);
-    border-color: var(--primary-color);
-    color: white;
-}
-
-.tooth-btn.deciduous {
-    background: var(--warning-50);
-    border-color: var(--warning-200);
-    font-style: italic;
-}
-
-.tooth-btn.deciduous.selected {
-    background: var(--warning-500);
-    border-color: var(--warning-500);
-    color: white;
-}
-
-.selected-teeth-display {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-sm);
-    padding: var(--spacing-sm);
-    background: var(--primary-50);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    color: var(--primary-700);
-}
-
-.btn-clear-teeth {
-    margin-left: auto;
-    padding: 2px 8px;
-    font-size: var(--font-size-xs);
-    background: transparent;
-    border: 1px solid var(--primary-300);
-    border-radius: var(--radius-sm);
-    color: var(--primary-600);
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.btn-clear-teeth:hover {
-    background: var(--primary-100);
-}
-
-/* Teeth badge in table */
+/* Teeth badge in table (still used by WorkComponent) */
 .teeth-badge {
     display: inline-block;
     padding: 2px 8px;
@@ -1383,15 +773,91 @@
     font-weight: 500;
 }
 
-/* Responsive adjustments for teeth selection */
-@media (max-width: 600px) {
-    .tooth-btn {
-        min-width: 24px;
-        height: 24px;
-        font-size: 10px;
+/* ===== RESPONSIVE DESIGN ===== */
+
+@media (max-width: 768px) {
+    .patient-info-card {
+        flex-direction: column;
+        text-align: center;
+        gap: var(--spacing-md);
     }
 
-    .teeth-row .midline {
-        padding: 0 2px;
+    .patient-photo-container {
+        width: 6rem;
+        height: 7.5rem;
+    }
+
+    .patient-info-row {
+        flex-direction: column;
+        gap: var(--spacing-md);
+        width: 100%;
+    }
+
+    .patient-info-header {
+        width: 100%;
+    }
+
+    .work-summary-inline {
+        width: 100%;
+        justify-content: space-around;
+    }
+
+    .summary-card-inline {
+        flex: 1;
+        min-width: 3.75rem;
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+
+    .summary-value-inline {
+        font-size: var(--font-size-xl);
+    }
+
+    .patient-controls {
+        flex-direction: column;
+        width: 100%;
+        gap: var(--spacing-sm);
+    }
+
+    .search-input,
+    .filter-select,
+    .btn-checkin,
+    .btn-secondary,
+    .btn-primary {
+        width: 100%;
+    }
+
+    .patient-meta-info {
+        gap: var(--spacing-md);
+        justify-content: center;
+    }
+
+    .patient-alert-badge {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .patient-photo-container {
+        width: 5rem;
+        height: 6.25rem;
+    }
+
+    .patient-name {
+        font-size: var(--font-size-sm);
+    }
+
+    .patient-meta-info {
+        font-size: var(--font-size-xs);
+        flex-direction: column;
+        gap: var(--spacing-xs);
+        align-items: center;
+    }
+
+    .summary-value-inline {
+        font-size: var(--font-size-lg);
+    }
+
+    .summary-label-inline {
+        font-size: 0.625rem;
     }
 }

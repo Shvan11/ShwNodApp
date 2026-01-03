@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, ChangeEvent, MouseEvent } from 'react';
+import cn from 'classnames';
+import styles from './SettingsSection.module.css';
 
 interface OptionsMap {
     [key: string]: string;
@@ -145,7 +147,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                     id={settingId}
                     value={currentValue}
                     onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange(key, e.target.value)}
-                    className={hasChanges ? 'pending-change' : ''}
+                    className={hasChanges ? styles.pendingChange : ''}
                 >
                     <option value="true">True</option>
                     <option value="false">False</option>
@@ -159,7 +161,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                     value={currentValue}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange(key, e.target.value)}
                     step="any"
-                    className={hasChanges ? 'pending-change' : ''}
+                    className={hasChanges ? styles.pendingChange : ''}
                 />
             );
         } else if (value.length > 100) {
@@ -169,7 +171,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                     value={currentValue}
                     onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleInputChange(key, e.target.value)}
                     rows={3}
-                    className={hasChanges ? 'pending-change' : ''}
+                    className={hasChanges ? styles.pendingChange : ''}
                 />
             );
         } else {
@@ -179,7 +181,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                     id={settingId}
                     value={currentValue}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange(key, e.target.value)}
-                    className={hasChanges ? 'pending-change' : ''}
+                    className={hasChanges ? styles.pendingChange : ''}
                 />
             );
         }
@@ -188,37 +190,37 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     const hasChanges = Object.keys(pendingChanges).length > 0;
 
     return (
-        <div className="general-settings">
-            <div className="settings-section">
+        <div>
+            <div className={styles.section}>
                 <h3>
                     <i className="fas fa-cog"></i>
                     System Options
                 </h3>
-                <p className="section-description">
+                <p className={styles.sectionDescription}>
                     Configure general system settings and preferences
                 </p>
 
-                <div className="settings-form">
+                <div className={styles.form}>
                     {isLoading ? (
-                        <div className="loading-spinner">
+                        <div className={styles.loading}>
                             <i className="fas fa-spinner fa-spin"></i>
                             <span>Loading settings...</span>
                         </div>
                     ) : (
-                        <div className="settings-form-fields">
+                        <div className={styles.formFields}>
                             {Object.keys(options).length === 0 ? (
-                                <p className="no-settings">No settings found. Please check your database configuration.</p>
+                                <p className={styles.noSettings}>No settings found. Please check your database configuration.</p>
                             ) : (
                                 Object.entries(options)
                                     // Filter out email settings - they belong in the Email Settings tab
                                     .filter(([key]) => !key.startsWith('EMAIL_'))
                                     .map(([key, value]) => (
-                                    <div key={key} className={`setting-group ${pendingChanges[key] !== undefined ? 'pending-change' : ''}`}>
+                                    <div key={key} className={cn(styles.settingGroup, pendingChanges[key] !== undefined && styles.pendingChange)}>
                                         <label htmlFor={`setting_${key.replace(/[^a-zA-Z0-9]/g, '_')}`}>
                                             {formatSettingName(key)}
                                         </label>
                                         {renderSettingInput(key, value)}
-                                        <div className="setting-description">Option: {key}</div>
+                                        <div className={styles.settingDescription}>Option: {key}</div>
                                     </div>
                                 ))
                             )}
@@ -227,7 +229,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                 </div>
             </div>
 
-            <div className="settings-actions">
+            <div className={styles.actions}>
                 <button
                     className="btn btn-primary"
                     onClick={saveAllChanges}

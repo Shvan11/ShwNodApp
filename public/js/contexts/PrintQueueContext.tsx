@@ -21,7 +21,7 @@ export interface PrintQueueBatch {
 
 export interface PrintQueuePatient {
     code?: number | string;
-    patientId?: string | number;
+    personId?: number;
     name?: string;
     patientName?: string;
 }
@@ -42,7 +42,7 @@ export interface PrintQueueItem {
     id: string;
     batchId: number | string;
     batchNumber: number | string;
-    patientId: string | number;
+    personId: number;
     patientName: string;
     doctorId?: number;
     doctorName: string;
@@ -67,7 +67,7 @@ export interface PrintQueueStats {
 }
 
 export interface PatientGroup {
-    patientId: string | number;
+    personId: number;
     patientName: string;
     batches: PrintQueueItem[];
 }
@@ -191,7 +191,7 @@ export function PrintQueueProvider({ children }: PrintQueueProviderProps) {
                 id: generateId(),
                 batchId: batch.batchId,
                 batchNumber: batch.batchNumber || batch.batchId,
-                patientId: patient.code || patient.patientId || '',
+                personId: Number(patient.code || patient.personId || 0),
                 patientName: patient.name || patient.patientName || '',
                 doctorId: doctor?.id || doctor?.doctorId,
                 doctorName: doctor?.name || doctor?.doctorName || '',
@@ -257,7 +257,7 @@ export function PrintQueueProvider({ children }: PrintQueueProviderProps) {
      */
     const getStats = useCallback((): PrintQueueStats => {
         const totalLabels = queue.reduce((sum, item) => sum + item.labels.length, 0);
-        const uniquePatients = new Set(queue.map(item => item.patientId)).size;
+        const uniquePatients = new Set(queue.map(item => item.personId)).size;
         const uniqueDoctors = new Set(queue.filter(item => item.doctorId).map(item => item.doctorId)).size;
 
         return {
@@ -272,16 +272,16 @@ export function PrintQueueProvider({ children }: PrintQueueProviderProps) {
      * Get queue grouped by patient
      */
     const getGroupedQueue = useCallback((): PatientGroup[] => {
-        const grouped: Record<string | number, PatientGroup> = {};
+        const grouped: Record<number, PatientGroup> = {};
         queue.forEach(item => {
-            if (!grouped[item.patientId]) {
-                grouped[item.patientId] = {
-                    patientId: item.patientId,
+            if (!grouped[item.personId]) {
+                grouped[item.personId] = {
+                    personId: item.personId,
                     patientName: item.patientName,
                     batches: []
                 };
             }
-            grouped[item.patientId].batches.push(item);
+            grouped[item.personId].batches.push(item);
         });
         return Object.values(grouped);
     }, [queue]);

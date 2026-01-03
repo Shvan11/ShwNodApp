@@ -1,0 +1,170 @@
+/* Settings Container - Main layout for settings page */
+
+.container {
+    margin: 0;
+    padding: 0;
+    padding-top: var(--header-height, 50px);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background: linear-gradient(
+        to bottom,
+        var(--color-white) 0,
+        var(--color-white) 200px,
+        var(--gray-50) 200px
+    );
+}
+
+/* Tab Content Area */
+.content {
+    flex: 1;
+    background: var(--gray-50);
+    padding: 2rem;
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+}
+
+/* Inner wrapper - ensures all tabs have same max-width */
+.content > :global(*) {
+    width: 100%;
+    max-width: 1400px;
+    background: white;
+    border-radius: var(--radius-xl);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    min-height: 500px;
+    padding: 2.5rem;
+    box-sizing: border-box;
+}
+
+/* Settings Placeholder for Coming Soon tabs */
+.placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 6rem 2rem;
+    text-align: center;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    border-radius: var(--radius-xl);
+}
+
+.placeholderIcon {
+    font-size: 5rem;
+    background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 1.5rem;
+}
+
+.placeholder h3 {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+    color: var(--color-dark-blue);
+    font-weight: 700;
+}
+
+.placeholder p {
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+    color: var(--gray-500);
+}
+
+.placeholderDescription {
+    font-size: 1rem;
+    color: var(--gray-400);
+    max-width: 500px;
+}
+
+/* Coming Soon Content */
+.comingSoonContent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.comingSoonIcon {
+    font-size: 4rem;
+    color: var(--gray-200);
+    margin-bottom: 1rem;
+}
+
+.comingSoonContent h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.comingSoonContent p {
+    margin-bottom: 2rem;
+    font-size: 1rem;
+}
+
+.comingSoonMessage {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--warning-100);
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    color: var(--warning-900);
+    font-weight: 500;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .content {
+        padding: 1.5rem;
+    }
+
+    .content > :global(*) {
+        padding: 2rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding-top: var(--header-height, 50px);
+        min-height: 100vh;
+    }
+
+    .content {
+        padding: 1rem;
+    }
+
+    .content > :global(*) {
+        padding: 1.5rem;
+    }
+
+    .placeholder {
+        padding: 4rem 1.5rem;
+    }
+
+    .placeholderIcon {
+        font-size: 4rem;
+    }
+
+    .placeholder h3 {
+        font-size: 1.5rem;
+    }
+
+    .comingSoonContent {
+        padding: 3rem 1.5rem;
+    }
+
+    .comingSoonIcon {
+        font-size: 3rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .content > :global(*) {
+        padding: 1.25rem;
+    }
+}

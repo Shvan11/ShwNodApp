@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLoaderData, useSearchParams } from 'react-router-dom';
 import AppointmentsHeader from './AppointmentsHeader';
 import StatsCards from './StatsCards';
@@ -6,6 +6,7 @@ import MobileViewToggle, { type ViewType } from './MobileViewToggle';
 import AppointmentsList from './AppointmentsList';
 import type { DailyAppointment } from './AppointmentCard';
 import type { ConnectionStatusType } from './ConnectionStatus';
+import styles from './DailyAppointments.module.css';
 
 import { useAppointments } from '../../../hooks/useAppointments';
 import { useWebSocketSync } from '../../../hooks/useWebSocketSync';
@@ -66,14 +67,23 @@ const DailyAppointments = () => {
         getStats
     } = useAppointments(loaderData as unknown as Parameters<typeof useAppointments>[0]);
 
-    // 6. WebSocket integration (UNCHANGED - preserves existing scroll behavior)
-    const { connectionStatus } = useWebSocketSync(selectedDate, () => {
+    // 6. Flash update indicator
+    const flashUpdateIndicator = useCallback((): void => {
+        setShowFlash(true);
+        setTimeout(() => setShowFlash(false), 1000);
+    }, []);
+
+    // 7. WebSocket update handler - stable reference to prevent re-subscription churn
+    const handleWebSocketUpdate = useCallback(() => {
         console.log('📡 [DailyAppointments] WebSocket update received - reloading appointments');
         loadAppointments(selectedDate);
         flashUpdateIndicator();
-    });
+    }, [selectedDate, loadAppointments, flashUpdateIndicator]);
 
-    // 7. Sync URL when date changes (component-driven updates)
+    // 8. WebSocket integration
+    const { connectionStatus } = useWebSocketSync(selectedDate, handleWebSocketUpdate);
+
+    // 9. Sync URL when date changes (component-driven updates)
     useEffect(() => {
         // Only update if date is different from URL
         const urlDate = searchParams.get('date');
@@ -87,7 +97,7 @@ const DailyAppointments = () => {
         }
     }, [selectedDate, searchParams, setSearchParams]);
 
-    // 8. Load appointments when date changes (for user-initiated date changes)
+    // 10. Load appointments when date changes (for user-initiated date changes)
     useEffect(() => {
         // Skip if this is loader data (already loaded)
         if (loaderData.loadedDate === selectedDate) {
@@ -99,7 +109,7 @@ const DailyAppointments = () => {
         loadAppointments(selectedDate);
     }, [selectedDate]); // Only depend on selectedDate
 
-    // 9. Handle WebSocket reconnection (UNCHANGED)
+    // 11. Handle WebSocket reconnection
     useEffect(() => {
         const handleReconnect = (): void => {
             console.log('[DailyAppointments] 🔄 Connection restored - refreshing appointments');
@@ -113,19 +123,13 @@ const DailyAppointments = () => {
         };
     }, [selectedDate, loadAppointments]);
 
-    // 10. Flash update indicator (UNCHANGED)
-    const flashUpdateIndicator = (): void => {
-        setShowFlash(true);
-        setTimeout(() => setShowFlash(false), 1000);
-    };
-
-    // 11. Handle date change (updates state + URL)
+    // 12. Handle date change (updates state + URL)
     const handleDateChange = (newDate: string): void => {
         setSelectedDate(newDate);
         // URL sync happens in useEffect above
     };
 
-    // 12. Handle refresh - reload today's appointments
+    // 13. Handle refresh - reload today's appointments
     const handleRefresh = (): void => {
         const today = getTodayDate();
         setSelectedDate(today);
@@ -188,8 +192,8 @@ const DailyAppointments = () => {
     // Error state
     if (error) {
         return (
-            <div className="daily-appointments-view">
-                <div className="error-message">
+            <div className={styles.view}>
+                <div className={styles.errorMessage}>
                     <i className="fas fa-exclamation-circle"></i>
                     Failed to load appointments: {error}
                 </div>
@@ -198,7 +202,7 @@ const DailyAppointments = () => {
     }
 
     return (
-        <div className="daily-appointments-view">
+        <div className={styles.view}>
             {/* Header with date picker, refresh button, and search */}
             <AppointmentsHeader
                 selectedDate={selectedDate}
@@ -226,7 +230,7 @@ const DailyAppointments = () => {
             />
 
             {/* Appointments lists */}
-            <div className="container full-width">
+            <div className={styles.container}>
                 <AppointmentsList
                     title="All Appointments"
                     appointments={filteredAllAppointments}
@@ -251,7 +255,7 @@ const DailyAppointments = () => {
             </div>
 
             {/* Footer */}
-            <footer>
+            <footer className={styles.footer}>
                 <p>&copy; 2025 Shwan Orthodontics. All rights reserved.</p>
             </footer>
 

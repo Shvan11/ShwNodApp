@@ -311,3 +311,9 @@
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
 }
+
+/* Icon-only variants - disable ::before since inline <i> elements are used */
+.btn-icon.btn-edit::before,
+.btn-icon.btn-delete::before {
+  content: none;
+}

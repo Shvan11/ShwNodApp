@@ -38,12 +38,11 @@ export interface AppRequest<
 }
 
 /**
- * Request with parsed patient ID
+ * Request with parsed person ID
  */
 export interface PatientRequest extends AppRequest {
   params: {
-    patientId: string;
-    personId?: string;
+    personId: string;
   };
 }
 
@@ -53,7 +52,7 @@ export interface PatientRequest extends AppRequest {
 export interface WorkRequest extends AppRequest {
   params: {
     workId: string;
-    patientId?: string;
+    personId?: string;
   };
 }
 

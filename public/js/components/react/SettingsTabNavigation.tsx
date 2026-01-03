@@ -1,4 +1,6 @@
 import React from 'react';
+import cn from 'classnames';
+import styles from './SettingsTabNavigation.module.css';
 
 interface TabConfig {
     id: string;
@@ -29,7 +31,7 @@ const SettingsTabNavigation: React.FC<SettingsTabNavigationProps> = ({ tabs, act
         const data = tabData[tabId];
         if (data && data.hasChanges) {
             return (
-                <span className="tab-badge">
+                <span className={styles.badge}>
                     <i className="fas fa-circle"></i>
                 </span>
             );
@@ -38,25 +40,29 @@ const SettingsTabNavigation: React.FC<SettingsTabNavigationProps> = ({ tabs, act
     };
 
     return (
-        <div className="settings-tab-navigation">
-            <div className="tab-header">
+        <div className={styles.navigation}>
+            <div className={styles.header}>
                 <h2>Settings</h2>
             </div>
 
-            <div className="tab-buttons">
+            <div className={styles.buttons}>
                 {tabs.map(tab => (
                     <button
                         key={tab.id}
-                        className={`tab-button ${activeTab === tab.id ? 'active' : ''} ${tab.disabled ? 'disabled' : ''}`}
+                        className={cn(
+                            styles.button,
+                            activeTab === tab.id && styles.active,
+                            tab.disabled && styles.disabled
+                        )}
                         onClick={() => !tab.disabled && onTabChange(tab.id)}
                         disabled={tab.disabled}
                         title={tab.description}
                     >
                         <i className={tab.icon}></i>
-                        <span className="tab-label">{tab.label}</span>
+                        <span className={styles.label}>{tab.label}</span>
                         {getTabBadge(tab.id)}
                         {tab.disabled && (
-                            <span className="coming-soon-badge">Soon</span>
+                            <span className={styles.comingSoonBadge}>Soon</span>
                         )}
                     </button>
                 ))}

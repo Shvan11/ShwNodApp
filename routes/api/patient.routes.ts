@@ -26,7 +26,8 @@ import {
 import {
   getAlertsByPersonId,
   createAlert,
-  setAlertStatus
+  setAlertStatus,
+  updateAlert
 } from '../../services/database/queries/alert-queries.js';
 import * as imaging from '../../services/imaging/index.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
@@ -59,7 +60,6 @@ export function setWebSocketEmitter(emitter: EventEmitter): void {
 
 interface PatientSearchResult {
   PersonID: number;
-  patientID: string;
   PatientName: string;
   FirstName: string | null;
   LastName: string | null;
@@ -134,6 +134,12 @@ interface CreateAlertBody {
 
 interface UpdateAlertStatusBody {
   isActive: boolean;
+}
+
+interface UpdateAlertBody {
+  alertTypeId: number;
+  alertSeverity: number;
+  alertDetails: string;
 }
 
 interface TagOption {
@@ -498,7 +504,7 @@ router.get(
       // General search (phone or ID)
       if (searchQuery.trim()) {
         whereConditions.push(
-          '(p.Phone LIKE @search OR p.Phone2 LIKE @search OR p.patientID LIKE @search)'
+          '(p.Phone LIKE @search OR p.Phone2 LIKE @search)'
         );
         parameters.push([
           'search',
@@ -575,7 +581,7 @@ router.get(
 
       const query = `
             SELECT DISTINCT TOP 100
-                    p.PersonID, p.patientID, p.PatientName, p.FirstName, p.LastName,
+                    p.PersonID, p.PatientName, p.FirstName, p.LastName,
                     p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
                     p.AddressID, p.ReferralSourceID, p.PatientTypeID, p.TagID,
                     p.Notes, p.Language, p.CountryCode,
@@ -607,31 +613,30 @@ router.get(
         parameters,
         (columns) => ({
           PersonID: columns[0].value as number,
-          patientID: columns[1].value as string,
-          PatientName: columns[2].value as string,
-          FirstName: columns[3].value as string | null,
-          LastName: columns[4].value as string | null,
-          Phone: columns[5].value as string | null,
-          Phone2: columns[6].value as string | null,
-          Email: columns[7].value as string | null,
-          DateofBirth: columns[8].value as Date | null,
-          Gender: columns[9].value as number | null,
-          AddressID: columns[10].value as number | null,
-          ReferralSourceID: columns[11].value as number | null,
-          PatientTypeID: columns[12].value as number | null,
-          TagID: columns[13].value as number | null,
-          Notes: columns[14].value as string | null,
-          Language: columns[15].value as string | null,
-          CountryCode: columns[16].value as string | null,
-          EstimatedCost: columns[17].value as number | null,
-          Currency: columns[18].value as string | null,
-          DateAdded: columns[19].value as Date | null,
-          GenderName: columns[20].value as string | null,
-          AddressName: columns[21].value as string | null,
-          ReferralSource: columns[22].value as string | null,
-          PatientTypeName: columns[23].value as string | null,
-          TagName: columns[24].value as string | null,
-          ActiveWorkTypes: columns[25].value as string | null
+          PatientName: columns[1].value as string,
+          FirstName: columns[2].value as string | null,
+          LastName: columns[3].value as string | null,
+          Phone: columns[4].value as string | null,
+          Phone2: columns[5].value as string | null,
+          Email: columns[6].value as string | null,
+          DateofBirth: columns[7].value as Date | null,
+          Gender: columns[8].value as number | null,
+          AddressID: columns[9].value as number | null,
+          ReferralSourceID: columns[10].value as number | null,
+          PatientTypeID: columns[11].value as number | null,
+          TagID: columns[12].value as number | null,
+          Notes: columns[13].value as string | null,
+          Language: columns[14].value as string | null,
+          CountryCode: columns[15].value as string | null,
+          EstimatedCost: columns[16].value as number | null,
+          Currency: columns[17].value as string | null,
+          DateAdded: columns[18].value as Date | null,
+          GenderName: columns[19].value as string | null,
+          AddressName: columns[20].value as string | null,
+          ReferralSource: columns[21].value as string | null,
+          PatientTypeName: columns[22].value as string | null,
+          TagName: columns[23].value as string | null,
+          ActiveWorkTypes: columns[24].value as string | null
         })
       );
 
@@ -668,7 +673,13 @@ router.get(
         return;
       }
 
-      const patient = await getPatientById(parseInt(personId));
+      const parsedId = parseInt(personId, 10);
+      if (isNaN(parsedId)) {
+        ErrorResponses.badRequest(res, 'Invalid personId: must be a number');
+        return;
+      }
+
+      const patient = await getPatientById(parsedId);
 
       if (!patient) {
         ErrorResponses.notFound(res, 'Patient');
@@ -1041,6 +1052,49 @@ router.put(
       ErrorResponses.internalError(
         res,
         'Failed to update alert status',
+        error as Error
+      );
+    }
+  }
+);
+
+/**
+ * Update an alert
+ * PUT /alerts/:alertId
+ */
+router.put(
+  '/alerts/:alertId',
+  authenticate,
+  authorize(['admin', 'secretary', 'doctor']),
+  async (
+    req: Request<{ alertId: string }, unknown, UpdateAlertBody>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const alertId = parseInt(req.params.alertId, 10);
+      const { alertTypeId, alertSeverity, alertDetails } = req.body;
+
+      if (isNaN(alertId)) {
+        ErrorResponses.badRequest(res, 'Invalid alert ID');
+        return;
+      }
+
+      if (!alertDetails) {
+        ErrorResponses.badRequest(res, 'Alert details are required');
+        return;
+      }
+
+      await updateAlert(alertId, alertTypeId, alertSeverity, alertDetails);
+
+      res.json({
+        success: true,
+        message: 'Alert updated successfully'
+      });
+    } catch (error) {
+      log.error('Error updating alert:', error);
+      ErrorResponses.internalError(
+        res,
+        'Failed to update alert',
         error as Error
       );
     }

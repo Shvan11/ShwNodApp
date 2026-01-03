@@ -4,6 +4,7 @@
  */
 
 import { AUTH_STATES, AuthState, SessionRestorationProgress } from '../../hooks/useWhatsAppAuth';
+import styles from '../../routes/WhatsAppAuth.module.css';
 
 interface StatusContent {
   icon: string;
@@ -72,24 +73,24 @@ export const StatusDisplay = ({ authState, sessionRestorationProgress }: StatusD
   if (!content) return null;
 
   return (
-    <div className="auth-status" role="status" aria-live="polite" aria-atomic="true">
-      <div className="status-icon-container">
-        <span className="status-icon" aria-hidden="true">
+    <div className={styles.authStatus} role="status" aria-live="polite" aria-atomic="true">
+      <div className={styles.statusIconContainer}>
+        <span className={styles.statusIcon} aria-hidden="true">
           {content.icon}
         </span>
       </div>
-      <div className="status-text">
+      <div className={styles.statusText}>
         <h2>{content.title}</h2>
         <p>{content.message}</p>
         {content.progress && content.elapsed !== undefined && content.maxWait !== undefined && (
-          <div className="session-restoration-progress">
-            <div className="progress-bar">
+          <div className={styles.sessionRestorationProgress}>
+            <div className={styles.progressBar}>
               <div
-                className="progress-bar-fill"
+                className={styles.progressBarFill}
                 style={{ width: `${(content.elapsed / content.maxWait) * 100}%` }}
               />
             </div>
-            <p className="progress-note">
+            <p className={styles.progressNote}>
               If session restoration fails, a QR code will be displayed for re-authentication.
             </p>
           </div>

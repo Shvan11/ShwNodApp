@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import styles from './AppointmentCard.module.css';
 
 // Daily appointment interface with all fields from stored procedure
 export interface DailyAppointment {
@@ -110,6 +111,14 @@ const AppointmentCard = ({
     const seatedTime = appointment.SeatedTime ? formatTime(appointment.SeatedTime) : null;
     const dismissedTime = appointment.DismissedTime ? formatTime(appointment.DismissedTime) : null;
 
+    // Helper to get button class based on state
+    const getButtonClass = (isActive: boolean, isClickable: boolean, isWaitingState: boolean = false): string => {
+        if (isWaitingState) return styles.statusWaiting;
+        if (isActive) return styles.statusActive;
+        if (isClickable) return styles.statusInactiveClickable;
+        return styles.statusInactive;
+    };
+
     // Render action buttons based on status
     const renderActions = (): React.ReactNode => {
         const appointmentId = appointment.appointmentID || appointment.AppointmentID;
@@ -122,7 +131,7 @@ const AppointmentCard = ({
             return (
                 <button
                     type="button"
-                    className={`status-icon-btn ${isCheckedIn ? 'status-icon-active' : 'status-icon-inactive-clickable'}`}
+                    className={isCheckedIn ? styles.statusActive : styles.statusInactiveClickable}
                     onClick={(e: React.MouseEvent) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -150,11 +159,11 @@ const AppointmentCard = ({
             const isWaitingForSeat = isPresent && !isSeated && !isDismissed;
 
             return (
-                <div className="status-workflow-icons">
+                <div className={styles.workflowIcons}>
                     {/* Check-in icon with time - Can undo only if not seated/dismissed */}
                     <button
                         type="button"
-                        className={`status-icon-btn status-icon-active ${isWaitingForSeat ? 'status-icon-waiting' : ''}`}
+                        className={getButtonClass(true, true, Boolean(isWaitingForSeat))}
                         onClick={(e: React.MouseEvent) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -166,13 +175,13 @@ const AppointmentCard = ({
                         disabled={!canUndoPresent}
                     >
                         <i className="fas fa-user-check"></i>
-                        {presentTime && <span className="status-icon-time">{presentTime}</span>}
+                        {presentTime && <span className={styles.statusTime}>{presentTime}</span>}
                     </button>
 
                     {/* Seated icon with time - Green when seated, gray when not seated yet */}
                     <button
                         type="button"
-                        className={`status-icon-btn status-icon-chair ${isSeated ? 'status-icon-active' : 'status-icon-inactive-clickable'}`}
+                        className={isSeated ? styles.statusActive : styles.statusInactiveClickable}
                         onClick={(e: React.MouseEvent) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -188,15 +197,15 @@ const AppointmentCard = ({
                         <img
                             src={isSeated ? "/images/dental_chair.svg" : "/images/dental_chair_grey.svg"}
                             alt="Seat"
-                            className="chair-icon"
+                            className={styles.chairIcon}
                         />
-                        {seatedTime && <span className="status-icon-time">{seatedTime}</span>}
+                        {seatedTime && <span className={styles.statusTime}>{seatedTime}</span>}
                     </button>
 
                     {/* Complete icon with time - Green when dismissed, gray/clickable when seated, gray/disabled when not seated */}
                     <button
                         type="button"
-                        className={`status-icon-btn ${isDismissed ? 'status-icon-active' : (isSeated ? 'status-icon-inactive-clickable' : 'status-icon-inactive')}`}
+                        className={getButtonClass(Boolean(isDismissed), Boolean(isSeated), false)}
                         onClick={(e: React.MouseEvent) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -210,57 +219,61 @@ const AppointmentCard = ({
                         disabled={!isSeated && !isDismissed}
                     >
                         <i className="fas fa-check-circle"></i>
-                        {dismissedTime && <span className="status-icon-time">{dismissedTime}</span>}
+                        {dismissedTime && <span className={styles.statusTime}>{dismissedTime}</span>}
                     </button>
                 </div>
             );
         }
     };
 
+    // Build card classes dynamically
+    const cardClass = isWaiting ? styles.waiting : styles.card;
+    const animationClass = !hasAnimated ? styles.fadeInUp : '';
+
     return (
         <div
-            className={`appointment-card ${!hasAnimated ? 'fade-in-up' : ''} ${statusClass}${isWaiting ? ' waiting-patient' : ''}`}
+            className={`${cardClass}${animationClass ? ' ' + animationClass : ''}`}
             data-appointment-id={appointment.appointmentID || appointment.AppointmentID}
             data-status={statusClass}
         >
-            <div className="appointment-time">
-                <i className="fas fa-clock appointment-time-icon"></i>
+            <div className={styles.time}>
+                <i className={`fas fa-clock ${styles.timeIcon}`}></i>
                 {appointment.apptime || 'N/A'}
             </div>
 
-            <div className="appointment-info">
-                <div className="appointment-info-line-1">
-                    <div className="patient-name text-md">
+            <div className={styles.info}>
+                <div className={styles.infoLine1}>
+                    <div className={styles.patientName}>
                         <a
                             href="javascript:void(0)"
-                            className="patient-link"
+                            className={styles.patientLink}
                             onClick={handlePatientClick}
                         >
-                            <i className="fas fa-user-circle patient-link-icon"></i>
+                            <i className={`fas fa-user-circle ${styles.patientLinkIcon}`}></i>
                             {appointment.PatientName || 'Unknown'}
                         </a>
                         {appointment.hasActiveAlert && (
-                            <i className="fas fa-bell patient-alert-icon" title="Patient has an active alert"></i>
+                            <i className={`fas fa-bell ${styles.alertIcon}`} title="Patient has an active alert"></i>
                         )}
                         {appointment.PatientType && (
-                            <span className="patient-type-badge-inline">
+                            <span className={styles.patientTypeBadge}>
                                 <i className="fas fa-tag"></i>
                                 {appointment.PatientType}
                             </span>
                         )}
                     </div>
                     {appointment.AppDetail && (
-                        <div className="appointment-type-inline">
-                            <i className="fas fa-stethoscope appointment-type-icon"></i>
+                        <div className={styles.appointmentType}>
+                            <i className={`fas fa-stethoscope ${styles.appointmentTypeIcon}`}></i>
                             {appointment.AppDetail}
                         </div>
                     )}
                 </div>
 
                 {showStatus && appointment.IsOrthoVisit && (
-                    <div className="appointment-info-line-2">
+                    <div className={styles.infoLine2}>
                         <span
-                            className={`visit-notes-icon ${appointment.HasVisit ? 'visit-notes-registered' : 'visit-notes-missing'}`}
+                            className={appointment.HasVisit ? styles.visitNotesRegistered : styles.visitNotesMissing}
                             title={appointment.HasVisit ? 'Visit notes registered ✓' : 'No visit notes yet'}
                         >
                             <i className={`fas fa-${appointment.HasVisit ? 'clipboard-check' : 'clipboard'}`}></i>
@@ -269,7 +282,7 @@ const AppointmentCard = ({
                 )}
             </div>
 
-            <div className="appointment-actions">
+            <div className={styles.actions}>
                 {renderActions()}
             </div>
         </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import type { ChangeEvent, FormEvent, FocusEvent } from 'react';
-import '../../../css/components/invoice-form.css';
+import styles from './PaymentModal.module.css';
 import { parseFormattedNumber } from '../../utils/formatters';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -837,40 +837,40 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
     return (
         <>
-            <div className="modal-overlay">
-                <div className="modal-content invoice-modal payment-modal-compact">
-                <button className="modal-close" onClick={paymentSuccess ? handleCloseAfterSuccess : onClose}>×</button>
+            <div className={styles.modalOverlay}>
+                <div className={`${styles.modalContent} ${styles.invoiceModal} ${styles.paymentModalCompact}`}>
+                <button className={styles.modalClose} onClick={paymentSuccess ? handleCloseAfterSuccess : onClose}>×</button>
 
                 {!paymentSuccess ? (
                     <>
                         {/* Compact Header with Balance Info */}
-                        <div className="payment-header-compact">
-                            <div className="payment-header-left">
-                                <h2 className="payment-title-compact">
+                        <div className={styles.paymentHeaderCompact}>
+                            <div className={styles.paymentHeaderLeft}>
+                                <h2 className={styles.paymentTitleCompact}>
                                     <i className="fas fa-credit-card"></i>
                                     Add Payment
                                 </h2>
-                                <span className="payment-work-type">{workData.TypeName || `Work #${workData.workid}`}</span>
+                                <span className={styles.paymentWorkType}>{workData.TypeName || `Work #${workData.workid}`}</span>
                             </div>
-                            <div className="payment-header-right">
-                                <div className="payment-balance-badge">
-                                    <span className="balance-label">Balance</span>
-                                    <span className="balance-amount">{formatCurrency(calculations.remainingBalance, calculations.accountCurrency)}</span>
+                            <div className={styles.paymentHeaderRight}>
+                                <div className={styles.paymentBalanceBadge}>
+                                    <span className={styles.balanceLabel}>Balance</span>
+                                    <span className={styles.balanceAmount}>{formatCurrency(calculations.remainingBalance, calculations.accountCurrency)}</span>
                                 </div>
                             </div>
                         </div>
 
                         {/* Exchange Rate - Compact Inline */}
                         {exchangeRateError && !exchangeRate ? (
-                            <div className="exchange-rate-error-compact">
+                            <div className={styles.exchangeRateErrorCompact}>
                                 <i className="fas fa-exclamation-triangle"></i>
                                 <span>No rate for {formData.paymentDate}</span>
                                 {!showRateInput ? (
-                                    <button type="button" onClick={() => setShowRateInput(true)} className="btn-link">
+                                    <button type="button" onClick={() => setShowRateInput(true)} className={styles.btnLink}>
                                         Set Rate
                                     </button>
                                 ) : (
-                                    <div className="rate-input-inline">
+                                    <div className={styles.rateInputInline}>
                                         <input
                                             type="text"
                                             value={displayValues.newRateValue}
@@ -879,35 +879,35 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                 setDisplayValues(prev => ({ ...prev, newRateValue: e.target.value }));
                                             }}
                                             placeholder="1,406"
-                                            className="rate-input-small"
+                                            className={styles.rateInputSmall}
                                         />
-                                        <button type="button" onClick={handleSetExchangeRate} disabled={loading} className="btn-sm btn-primary">
+                                        <button type="button" onClick={handleSetExchangeRate} disabled={loading} className={styles.btnSmPrimary}>
                                             {loading ? '...' : 'Save'}
                                         </button>
-                                        <button type="button" onClick={() => { setShowRateInput(false); setNewRateValue(''); }} className="btn-sm btn-ghost">
+                                        <button type="button" onClick={() => { setShowRateInput(false); setNewRateValue(''); }} className={styles.btnSmGhost}>
                                             ×
                                         </button>
                                     </div>
                                 )}
                             </div>
                         ) : exchangeRate ? (
-                            <div className="exchange-rate-compact">
+                            <div className={styles.exchangeRateCompact}>
                                 <i className="fas fa-exchange-alt"></i>
                                 <span>1 USD = {formatNumber(exchangeRate)} IQD</span>
-                                <span className="rate-date">({formData.paymentDate})</span>
+                                <span className={styles.rateDate}>({formData.paymentDate})</span>
                             </div>
                         ) : null}
 
-                        <form onSubmit={handleSubmit} className="invoice-form payment-form-compact">
+                        <form onSubmit={handleSubmit} className={`${styles.invoiceForm} ${styles.paymentFormCompact}`}>
                             {/* Row 1: Currency + Entry Mode + Date */}
-                            <div className="payment-row-compact">
-                                <div className="payment-field">
+                            <div className={styles.paymentRowCompact}>
+                                <div className={styles.paymentField}>
                                     <label>Payment Currency</label>
                                     <select
                                         name="paymentCurrency"
                                         value={formData.paymentCurrency}
                                         onChange={handleInputChange}
-                                        className="select-compact"
+                                        className={styles.selectCompact}
                                     >
                                         <option value="USD">USD Only</option>
                                         <option value="IQD">IQD Only</option>
@@ -915,42 +915,42 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                     </select>
                                 </div>
 
-                                <div className="payment-field entry-mode-field">
+                                <div className={`${styles.paymentField} ${styles.entryModeField}`}>
                                     <label>Entry Mode</label>
-                                    <div className="entry-mode-toggle">
-                                        <span className={`toggle-label ${entryMode === 'amount' ? 'active' : ''}`}>Amount</span>
-                                        <label className="entry-mode-switch">
+                                    <div className={styles.entryModeToggle}>
+                                        <span className={`${styles.toggleLabel} ${entryMode === 'amount' ? styles.toggleLabelActive : ''}`}>Amount</span>
+                                        <label className={styles.entryModeSwitch}>
                                             <input
                                                 type="checkbox"
                                                 checked={entryMode === 'cash'}
                                                 onChange={(e) => handleEntryModeChange(e.target.checked ? 'cash' : 'amount')}
                                             />
-                                            <span className="slider"></span>
+                                            <span className={styles.slider}></span>
                                         </label>
-                                        <span className={`toggle-label ${entryMode === 'cash' ? 'active' : ''}`}>Cash</span>
+                                        <span className={`${styles.toggleLabel} ${entryMode === 'cash' ? styles.toggleLabelActive : ''}`}>Cash</span>
                                     </div>
                                 </div>
 
-                                <div className="payment-field">
+                                <div className={styles.paymentField}>
                                     <label>Date</label>
                                     <input
                                         type="date"
                                         name="paymentDate"
                                         value={formData.paymentDate}
                                         onChange={handleInputChange}
-                                        className="input-compact"
+                                        className={styles.inputCompact}
                                     />
                                 </div>
                             </div>
 
                             {/* Row 2: Amount + Cash Received + Change */}
-                            <div className="payment-row-compact payment-main-row">
+                            <div className={`${styles.paymentRowCompact} ${styles.paymentMainRow}`}>
                                 {/* Amount to Register */}
-                                <div className="payment-field payment-field-lg">
+                                <div className={`${styles.paymentField} ${styles.paymentFieldLg}`}>
                                     <label>
                                         Amount to Register ({calculations.accountCurrency})
-                                        {entryMode === 'amount' && <span className="required">*</span>}
-                                        {entryMode === 'cash' && <span className="auto-badge">Auto</span>}
+                                        {entryMode === 'amount' && <span className={styles.required}>*</span>}
+                                        {entryMode === 'cash' && <span className={styles.autoBadge}>Auto</span>}
                                     </label>
                                     <input
                                         type="text"
@@ -960,18 +960,18 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                         onFocus={handleMoneyInputFocus}
                                         readOnly={entryMode === 'cash'}
                                         placeholder={entryMode === 'cash' ? 'Auto' : 'Enter amount'}
-                                        className={`input-lg ${entryMode === 'cash' ? 'input-readonly' : ''}`}
+                                        className={`${styles.inputLg} ${entryMode === 'cash' ? styles.inputReadonly : ''}`}
                                     />
                                 </div>
 
                                 {/* Cash Received - Dynamic based on currency */}
                                 {formData.paymentCurrency !== 'MIXED' ? (
-                                    <div className="payment-field payment-field-lg">
+                                    <div className={`${styles.paymentField} ${styles.paymentFieldLg}`}>
                                         <label>
                                             {formData.paymentCurrency} Received
-                                            {entryMode === 'cash' && <span className="required">*</span>}
-                                            {entryMode === 'amount' && !formData.cashOverrideEnabled && <span className="auto-badge">Auto</span>}
-                                            {entryMode === 'amount' && formData.cashOverrideEnabled && <span className="override-badge">Override</span>}
+                                            {entryMode === 'cash' && <span className={styles.required}>*</span>}
+                                            {entryMode === 'amount' && !formData.cashOverrideEnabled && <span className={styles.autoBadge}>Auto</span>}
+                                            {entryMode === 'amount' && formData.cashOverrideEnabled && <span className={styles.overrideBadge}>Override</span>}
                                         </label>
                                         {formData.paymentCurrency === 'USD' ? (
                                             /* USD field - check if cross-currency override is available */
@@ -982,7 +982,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                 const isOverriding = canOverride && formData.cashOverrideEnabled;
 
                                                 return (
-                                                    <div className="input-with-lock">
+                                                    <div className={styles.inputWithLock}>
                                                         <input
                                                             type="text"
                                                             value={displayValues.actualUSD}
@@ -993,12 +993,12 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                             onFocus={handleMoneyInputFocus}
                                                             readOnly={isLocked}
                                                             placeholder={entryMode === 'cash' ? 'Enter USD' : (isOverriding ? 'Enter bill amount' : 'Auto')}
-                                                            className={`input-lg ${isLocked ? 'input-readonly' : ''}`}
+                                                            className={`${styles.inputLg} ${isLocked ? styles.inputReadonly : ''}`}
                                                         />
                                                         {canOverride && (
                                                             <button
                                                                 type="button"
-                                                                className={`lock-toggle-btn ${isOverriding ? 'unlocked' : 'locked'}`}
+                                                                className={`${styles.lockToggleBtn} ${isOverriding ? styles.unlocked : styles.locked}`}
                                                                 onClick={handleCashOverrideToggle}
                                                                 title={isOverriding ? 'Lock (use auto-calculated)' : 'Unlock (enter actual bill amount)'}
                                                             >
@@ -1016,24 +1016,24 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                 onBlur={() => handleMoneyInputBlur('actualIQD')}
                                                 onFocus={handleMoneyInputFocus}
                                                 placeholder={entryMode === 'cash' ? 'Enter IQD' : 'Auto'}
-                                                className="input-lg"
+                                                className={styles.inputLg}
                                             />
                                         )}
                                         {/* Suggestion hint */}
                                         {entryMode === 'amount' && calculations.suggestedUSD > 0 && formData.paymentCurrency === 'USD' && !formData.cashOverrideEnabled && (
-                                            <small className="field-hint">Collect {formatNumber(calculations.suggestedUSD)}</small>
+                                            <small className={styles.fieldHint}>Collect {formatNumber(calculations.suggestedUSD)}</small>
                                         )}
                                         {entryMode === 'amount' && formData.paymentCurrency === 'USD' && formData.cashOverrideEnabled && (
-                                            <small className="field-hint override-hint">Enter $50, $100, etc.</small>
+                                            <small className={`${styles.fieldHint} ${styles.overrideHint}`}>Enter $50, $100, etc.</small>
                                         )}
                                         {entryMode === 'amount' && calculations.suggestedIQD > 0 && formData.paymentCurrency === 'IQD' && (
-                                            <small className="field-hint">Collect {formatNumber(calculations.suggestedIQD)}</small>
+                                            <small className={styles.fieldHint}>Collect {formatNumber(calculations.suggestedIQD)}</small>
                                         )}
                                     </div>
                                 ) : (
                                     /* Mixed Payment - Two smaller fields */
-                                    <div className="payment-field-group">
-                                        <div className="payment-field">
+                                    <div className={styles.paymentFieldGroup}>
+                                        <div className={styles.paymentField}>
                                             <label>USD Received</label>
                                             <input
                                                 type="text"
@@ -1042,10 +1042,10 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                 onBlur={() => handleMoneyInputBlur('actualUSD')}
                                                 onFocus={handleMoneyInputFocus}
                                                 placeholder="USD"
-                                                className="input-md"
+                                                className={styles.inputMd}
                                             />
                                         </div>
-                                        <div className="payment-field">
+                                        <div className={styles.paymentField}>
                                             <label>IQD Received</label>
                                             <input
                                                 type="text"
@@ -1054,24 +1054,24 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                 onBlur={() => handleMoneyInputBlur('actualIQD')}
                                                 onFocus={handleMoneyInputFocus}
                                                 placeholder="IQD"
-                                                className="input-md"
+                                                className={styles.inputMd}
                                             />
                                         </div>
                                     </div>
                                 )}
 
                                 {/* Change Field */}
-                                <div className="payment-field">
+                                <div className={styles.paymentField}>
                                     <label>
                                         Change (IQD)
-                                        {isSameCurrencyPayment && <span className="na-badge">N/A</span>}
+                                        {isSameCurrencyPayment && <span className={styles.naBadge}>N/A</span>}
                                     </label>
                                     {isSameCurrencyPayment ? (
                                         <input
                                             type="text"
                                             value="—"
                                             disabled
-                                            className="input-compact input-disabled"
+                                            className={`${styles.inputCompact} ${styles.inputDisabled}`}
                                         />
                                     ) : (
                                         <input
@@ -1081,38 +1081,38 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                             onBlur={() => handleMoneyInputBlur('change')}
                                             onFocus={handleMoneyInputFocus}
                                             placeholder="0"
-                                            className="input-compact"
+                                            className={styles.inputCompact}
                                         />
                                     )}
                                     {!isSameCurrencyPayment && calculations.calculatedChange > 0 && !formData.changeManualOverride && (
-                                        <small className="field-hint success">Auto-calculated</small>
+                                        <small className={`${styles.fieldHint} ${styles.fieldHintSuccess}`}>Auto-calculated</small>
                                     )}
                                 </div>
                             </div>
 
                             {/* Summary Strip - Only show when there's data */}
                             {(formData.actualUSD || formData.actualIQD) && (
-                                <div className={`payment-summary-strip ${calculations.isShort ? 'warning' : 'success'}`}>
-                                    <div className="summary-item">
-                                        <span className="summary-label">Cash IN:</span>
-                                        <span className="summary-value">
+                                <div className={`${styles.paymentSummaryStrip} ${calculations.isShort ? styles.summaryWarning : styles.summarySuccess}`}>
+                                    <div className={styles.summaryItem}>
+                                        <span className={styles.summaryLabel}>Cash IN:</span>
+                                        <span className={styles.summaryValue}>
                                             {formData.actualUSD ? `$${formatNumber(formData.actualUSD)}` : ''}
                                             {formData.actualUSD && formData.actualIQD ? ' + ' : ''}
                                             {formData.actualIQD ? `${formatNumber(formData.actualIQD)} IQD` : ''}
                                         </span>
                                     </div>
                                     {!isSameCurrencyPayment && formData.change > 0 && (
-                                        <div className="summary-item">
-                                            <span className="summary-label">Change OUT:</span>
-                                            <span className="summary-value">{formatNumber(formData.change)} IQD</span>
+                                        <div className={styles.summaryItem}>
+                                            <span className={styles.summaryLabel}>Change OUT:</span>
+                                            <span className={styles.summaryValue}>{formatNumber(formData.change)} IQD</span>
                                         </div>
                                     )}
-                                    <div className="summary-item summary-total">
-                                        <span className="summary-label">Register:</span>
-                                        <span className="summary-value">{formatCurrency(formData.amountToRegister || 0, calculations.accountCurrency)}</span>
+                                    <div className={`${styles.summaryItem} ${styles.summaryTotal}`}>
+                                        <span className={styles.summaryLabel}>Register:</span>
+                                        <span className={styles.summaryValue}>{formatCurrency(formData.amountToRegister || 0, calculations.accountCurrency)}</span>
                                     </div>
                                     {calculations.isShort && (
-                                        <div className="summary-warning">
+                                        <div className={styles.summaryWarningText}>
                                             <i className="fas fa-exclamation-triangle"></i>
                                             Short by {formatCurrency((parseFloat(String(formData.amountToRegister)) || 0) - calculations.totalReceived, calculations.accountCurrency)}
                                         </div>
@@ -1121,7 +1121,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                             )}
 
                             {/* Actions - Compact */}
-                            <div className="payment-actions-compact">
+                            <div className={styles.paymentActionsCompact}>
                                 <button type="button" className="btn btn-secondary" onClick={onClose}>
                                     Cancel
                                 </button>
@@ -1137,15 +1137,15 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                     </>
                 ) : (
                     /* Payment Success State - Compact */
-                    <div className="payment-success-compact">
-                        <div className="success-icon">
+                    <div className={styles.paymentSuccessCompact}>
+                        <div className={styles.successIcon}>
                             <i className="fas fa-check-circle"></i>
                         </div>
                         <h2>Payment Recorded!</h2>
-                        <p className="success-amount">
+                        <p className={styles.successAmount}>
                             {formatCurrency(receiptData?.amountPaidToday || 0, receiptData?.Currency || 'IQD')}
                         </p>
-                        <div className="success-actions">
+                        <div className={styles.successActions}>
                             <button onClick={handlePrint} className="btn btn-primary">
                                 <i className="fas fa-print"></i> Print Receipt
                             </button>

@@ -79,7 +79,7 @@ function Toast({ id, message, type = 'info', duration = 3000, onClose }: ToastPr
       <div className="toast-icon">{icons[type]}</div>
       <div className="toast-message">{message}</div>
       <button className="toast-close" onClick={handleClose} aria-label="Close">
-        \u00D7
+        {'\u00D7'}
       </button>
     </div>
   );

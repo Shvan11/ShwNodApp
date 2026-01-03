@@ -1,0 +1,119 @@
+/* AppointmentsList.module.css - Appointments section with grid */
+
+.section {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+}
+
+/* Refreshing state - dim list and prevent clicks during data reload */
+.refreshing {
+    composes: section;
+    opacity: 0.6;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.title {
+    margin: 0 0 var(--spacing-sm) 0;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--gray-800);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.title::before {
+    content: '';
+    width: 3px;
+    height: 16px;
+    background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+    border-radius: var(--radius-full);
+}
+
+.grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+/* Empty state */
+.empty {
+    text-align: center;
+    padding: var(--spacing-2xl);
+    color: var(--neutral-gray);
+    font-size: var(--font-size-lg);
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    border: 2px dashed var(--border-color);
+}
+
+.empty::before {
+    content: '\01F4C5';
+    display: block;
+    font-size: 3rem;
+    margin-bottom: var(--spacing-md);
+    opacity: 0.5;
+}
+
+/* Skeleton loaders */
+.skeleton {
+    background: linear-gradient(90deg, var(--gray-100) 25%, var(--gray-200) 50%, var(--gray-100) 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s ease-in-out infinite;
+    border-radius: var(--radius-md);
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+.skeletonCard {
+    height: 100px;
+    margin-bottom: var(--spacing-md);
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.skeletonLine {
+    composes: skeleton;
+    height: 20px;
+    margin-bottom: var(--spacing-sm);
+    border-radius: var(--radius-sm);
+}
+
+.skeletonLine:last-child {
+    width: 60%;
+}
+
+/* Active view state for mobile toggle */
+.activeView {
+    composes: section;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .section {
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Hide sections by default on mobile - show only active view */
+    .section {
+        display: none;
+    }
+
+    .activeView {
+        display: block;
+    }
+}

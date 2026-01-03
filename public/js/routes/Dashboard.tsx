@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import type { MouseEvent } from 'react';
 
-// Dashboard styles
-import '../../css/pages/dashboard.css';
+// Dashboard styles - CSS Module
+import styles from './Dashboard.module.css';
 
 interface DashboardCard {
   title: string;
@@ -10,8 +10,6 @@ interface DashboardCard {
   icon: string;
   link: string;
   linkText: string;
-  borderClass?: string;
-  gradientClass?: string;
 }
 
 export default function Dashboard() {
@@ -102,9 +100,7 @@ export default function Dashboard() {
       description: 'Manage receipts, invoices, and prescription templates',
       icon: 'fas fa-file-alt',
       link: '/templates',
-      linkText: 'Manage Templates',
-      borderClass: 'border-left-purple',
-      gradientClass: 'gradient-purple'
+      linkText: 'Manage Templates'
     },
     {
       title: 'Financial Statistics',
@@ -124,23 +120,23 @@ export default function Dashboard() {
 
   return (
     <div id="app">
-      <main className="main-content">
-        <div className="container">
-          <div className="dashboard-grid">
+      <main className={styles.mainContent}>
+        <div className={styles.container}>
+          <div className={styles.dashboardGrid}>
             {dashboardCards.map((card, index) => (
               <a
                 key={index}
                 href={card.link}
-                className="dashboard-card-link"
+                className={styles.cardLink}
                 onClick={(e) => handleCardClick(e, card.link)}
               >
-                <div className={`dashboard-card ${card.borderClass || ''}`}>
-                  <div className={`card-icon ${card.gradientClass || ''}`}>
+                <div className={styles.dashboardCard}>
+                  <div className={styles.cardIcon}>
                     <i className={card.icon}></i>
                   </div>
                   <h3>{card.title}</h3>
                   <p>{card.description}</p>
-                  <div className="card-link">
+                  <div className={styles.cardFooter}>
                     <span>{card.linkText}</span>
                     <i className="fas fa-arrow-right"></i>
                   </div>
@@ -151,8 +147,8 @@ export default function Dashboard() {
         </div>
       </main>
 
-      <footer className="footer">
-        <div className="container">
+      <footer className={styles.footer}>
+        <div className={styles.container}>
           <p>&copy; 2024 Shwan Orthodontics - All Rights Reserved</p>
         </div>
       </footer>

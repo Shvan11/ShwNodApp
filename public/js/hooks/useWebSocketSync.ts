@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import connectionManager from '../services/websocket-connection-manager';
 import { WebSocketEvents } from '../constants/websocket-events';
 
+// Configuration
+const PERIODIC_SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes - safety net for missed WebSocket messages
+
 /**
  * Connection status type
  */
@@ -101,24 +104,79 @@ export function useWebSocketSync(
     };
   }, []);
 
-  // Listen for appointment updates - SIMPLIFIED
+  // Listen for appointment updates
   useEffect(() => {
     const wsService = connectionManager.getService();
 
+    // Normalize date to YYYY-MM-DD format for comparison
+    const normalizeDate = (dateStr: string | undefined | null): string => {
+      if (!dateStr) return '';
+      // Handle ISO strings (2025-01-02T00:00:00) and plain dates (2025-01-02)
+      return dateStr.split('T')[0];
+    };
+
     const handleAppointmentsUpdated = (data: AppointmentsUpdatedData) => {
+      const receivedDate = normalizeDate(data?.date);
+      const expectedDate = normalizeDate(currentDate);
+
+      console.log('[useWebSocketSync] Received appointments_updated:', {
+        receivedDate,
+        expectedDate,
+        rawData: data?.date,
+        match: receivedDate === expectedDate
+      });
+
       // Only reload if the update is for the currently displayed date
-      if (data && data.date === currentDate) {
-        console.log('[useWebSocketSync] Appointments updated for date:', currentDate);
+      if (receivedDate && receivedDate === expectedDate) {
+        console.log('[useWebSocketSync] ✅ Date matches - triggering reload');
         onAppointmentsUpdated(data);
+      } else {
+        console.log('[useWebSocketSync] ⏭️ Date mismatch - ignoring update');
       }
     };
 
     wsService.on(WebSocketEvents.APPOINTMENTS_UPDATED, handleAppointmentsUpdated);
+    console.log('[useWebSocketSync] 📡 Subscribed to appointments_updated for date:', currentDate);
 
     return () => {
       wsService.off(WebSocketEvents.APPOINTMENTS_UPDATED, handleAppointmentsUpdated);
+      console.log('[useWebSocketSync] 🔌 Unsubscribed from appointments_updated');
     };
   }, [currentDate, onAppointmentsUpdated]);
+
+  // Periodic sync fallback - safety net for any missed WebSocket messages
+  // Only active when viewing today's date (when real-time updates matter most)
+  useEffect(() => {
+    const getTodayDate = (): string => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const today = getTodayDate();
+    const isViewingToday = currentDate === today;
+
+    // Only set up periodic sync when viewing today's appointments
+    if (!isViewingToday) {
+      return;
+    }
+
+    console.log('[useWebSocketSync] 🔄 Starting periodic sync for today');
+
+    const syncInterval = setInterval(() => {
+      if (connectionStatus === 'connected') {
+        console.log('[useWebSocketSync] 🔄 Periodic sync triggered');
+        onAppointmentsUpdated({ date: currentDate });
+      }
+    }, PERIODIC_SYNC_INTERVAL_MS);
+
+    return () => {
+      clearInterval(syncInterval);
+      console.log('[useWebSocketSync] 🔄 Periodic sync stopped');
+    };
+  }, [currentDate, connectionStatus, onAppointmentsUpdated]);
 
   return {
     connectionStatus,

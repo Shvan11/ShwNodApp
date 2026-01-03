@@ -5,6 +5,7 @@
 import React from 'react';
 import type { MouseEvent } from 'react';
 import type { Expense } from '../../hooks/useExpenses';
+import styles from '../../routes/Expenses.module.css';
 
 interface DeleteConfirmModalProps {
     isOpen: boolean;
@@ -37,20 +38,20 @@ export default function DeleteConfirmModal({ isOpen, expense, onConfirm, onCance
 
     return (
         <div className="modal-overlay" onClick={handleOverlayClick}>
-            <div className="modal-content modal-sm" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
+            <div className={`${styles.modalContent} ${styles.modalSm}`} onClick={(e) => e.stopPropagation()}>
+                <div className={styles.modalHeader}>
                     <h2>Delete Expense</h2>
-                    <button className="close" onClick={onCancel} aria-label="Close modal">
+                    <button className={styles.closeBtn} onClick={onCancel} aria-label="Close modal">
                         &times;
                     </button>
                 </div>
 
-                <div className="modal-body">
-                    <p className="warning-text">
+                <div className={styles.modalBody}>
+                    <p className={styles.warningText}>
                         Are you sure you want to delete this expense? This action cannot be undone.
                     </p>
 
-                    <div className="expense-details">
+                    <div className={styles.expenseDetails}>
                         <p><strong>Date:</strong> {date}</p>
                         <p><strong>Amount:</strong> {amount} {currency}</p>
                         <p><strong>Category:</strong> {expense.CategoryName || '-'}</p>
@@ -58,17 +59,17 @@ export default function DeleteConfirmModal({ isOpen, expense, onConfirm, onCance
                     </div>
                 </div>
 
-                <div className="modal-footer">
+                <div className={styles.modalFooter}>
                     <button
                         type="button"
-                        className="btn-action btn-secondary cancel-btn"
+                        className="btn btn-secondary"
                         onClick={onCancel}
                     >
                         Cancel
                     </button>
                     <button
                         type="button"
-                        className="btn-action btn-danger"
+                        className="btn btn-danger"
                         onClick={onConfirm}
                     >
                         Delete Expense

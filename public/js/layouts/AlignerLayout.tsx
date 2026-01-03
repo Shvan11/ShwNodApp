@@ -3,11 +3,13 @@
  */
 import { Outlet, useLocation } from 'react-router-dom';
 
-// Aligner section CSS (loaded when any aligner route is visited)
-import '../../css/pages/aligner.css';
+// Aligner section CSS - shared/common styles remain global
+import '../../css/components/aligner-common.css';
 import '../../css/components/aligner-set-card.css';
 import '../../css/components/aligner-drawer-form.css';
-import '../../css/components/label-preview-modal.css';
+
+// CSS Module for layout-specific styles
+import styles from './AlignerLayout.module.css';
 import AlignerModeToggle from '../components/react/AlignerModeToggle';
 
 type AlignerMode = 'doctors' | 'search' | 'all-sets';
@@ -31,8 +33,8 @@ function AlignerLayout() {
   };
 
   return (
-    <div className="aligner-container">
-      <AlignerModeToggle activeMode={getActiveMode()} />
+    <div className={styles.container}>
+      <AlignerModeToggle activeMode={getActiveMode()} styles={styles} />
       <Outlet />
     </div>
   );

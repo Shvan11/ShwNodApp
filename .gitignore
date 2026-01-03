@@ -50,6 +50,9 @@ web_modules/
 # TypeScript cache
 *.tsbuildinfo
 
+# Generated CSS Module type definitions (run npm run css:types to regenerate)
+*.module.css.d.ts
+
 # Optional npm cache directory
 .npm
 

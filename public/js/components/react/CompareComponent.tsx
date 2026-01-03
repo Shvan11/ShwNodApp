@@ -9,7 +9,7 @@ import React, { useState, useEffect, useRef, ChangeEvent, FormEvent } from 'reac
 import { useToast } from '../../contexts/ToastContext';
 
 interface Props {
-    patientId?: string;
+    personId?: number | null;
     phone?: string;
 }
 
@@ -96,7 +96,7 @@ interface ImageState {
     logo: string | null;
 }
 
-const CompareComponent = ({ patientId, phone }: Props) => {
+const CompareComponent = ({ personId, phone }: Props) => {
     const toast = useToast();
     const [timepoints, setTimepoints] = useState<Timepoint[]>([]);
     const [selectedTimepoints, setSelectedTimepoints] = useState<number[]>([]);
@@ -146,7 +146,7 @@ const CompareComponent = ({ patientId, phone }: Props) => {
 
     useEffect(() => {
         loadTimepoints();
-    }, [patientId]);
+    }, [personId]);
 
     useEffect(() => {
         if (canvasRef.current && !comparison) {
@@ -193,14 +193,14 @@ const CompareComponent = ({ patientId, phone }: Props) => {
     };
 
     const loadTimepoints = async () => {
-        if (!patientId || patientId === 'new') {
+        if (!personId) {
             setLoading(false);
             return;
         }
 
         try {
             setLoading(true);
-            const response = await fetch(`/api/patients/${patientId}/timepoints`);
+            const response = await fetch(`/api/patients/${personId}/timepoints`);
             if (!response.ok) throw new Error('Failed to load timepoints');
 
             const data: Timepoint[] = await response.json();
@@ -632,8 +632,8 @@ const CompareComponent = ({ patientId, phone }: Props) => {
             const categoryCode = getCategoryCode(selectedPhotoType);
 
             const urls = [
-                `/DolImgs/${patientId}0${sortedTimepoints[0]}${categoryCode}`,
-                `/DolImgs/${patientId}0${sortedTimepoints[1]}${categoryCode}`,
+                `/DolImgs/${personId}0${sortedTimepoints[0]}${categoryCode}`,
+                `/DolImgs/${personId}0${sortedTimepoints[1]}${categoryCode}`,
                 '/images/logo_white.png'
             ];
 
@@ -665,7 +665,7 @@ const CompareComponent = ({ patientId, phone }: Props) => {
             }
 
             try {
-                const response = await fetch(`/api/patients/${patientId}/timepoints/${tpCode}/images`);
+                const response = await fetch(`/api/patients/${personId}/timepoints/${tpCode}/images`);
                 let images: string[];
                 if (!response.ok) {
                     images = ['10', '12', '13', '20', '21', '22', '23', '24'];
@@ -1279,5 +1279,5 @@ const CompareComponent = ({ patientId, phone }: Props) => {
 };
 
 // Memoize to prevent unnecessary re-renders
-// Only re-renders when patientId or phone props change
+// Only re-renders when personId or phone props change
 export default React.memo(CompareComponent);

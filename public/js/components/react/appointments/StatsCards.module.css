@@ -1,0 +1,148 @@
+/* StatsCards.module.css - Statistics cards component */
+
+.container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: var(--spacing-xs);
+    padding: 0 var(--spacing-lg) var(--spacing-md) var(--spacing-lg);
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.card {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: 0.3rem 0.5rem;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all var(--transition-base);
+    border-left: 2px solid transparent;
+    height: 36px;
+    max-height: 36px;
+}
+
+.card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.cardTotal {
+    composes: card;
+    border-left-color: var(--primary-blue);
+}
+
+.cardPresent {
+    composes: card;
+    border-left-color: var(--success-green);
+}
+
+.cardAbsent {
+    composes: card;
+    border-left-color: var(--error-color);
+}
+
+.cardWaiting {
+    composes: card;
+    border-left-color: var(--warning-600);
+}
+
+.icon {
+    width: 22px;
+    height: 22px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-xs);
+    flex-shrink: 0;
+}
+
+.cardTotal .icon {
+    background-color: var(--blue-50);
+    color: var(--blue-500);
+}
+
+.cardPresent .icon {
+    background-color: var(--success-50);
+    color: var(--success-600);
+}
+
+.cardAbsent .icon {
+    background-color: var(--error-50);
+    color: var(--error-color);
+}
+
+.cardWaiting .icon {
+    background-color: var(--warning-50);
+    color: var(--warning-color);
+}
+
+.content {
+    flex: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.25rem;
+    flex-wrap: nowrap;
+}
+
+.label {
+    font-size: var(--font-size-base);
+    color: var(--neutral-gray);
+    font-weight: var(--font-weight-medium);
+    line-height: 1;
+    white-space: nowrap;
+    order: 2;
+}
+
+.value {
+    font-size: 0.95rem;
+    font-weight: var(--font-weight-bold);
+    color: var(--gray-800);
+    line-height: 1;
+    order: 1;
+}
+
+/* Responsive - Tablet */
+@media (max-width: 1024px) {
+    .container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Responsive - Mobile */
+@media (max-width: 768px) {
+    .container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.25rem;
+    }
+}
+
+/* Responsive - Small Mobile */
+@media (max-width: 480px) {
+    .card {
+        padding: 0.3rem 0.5rem;
+        height: 36px;
+        max-height: 36px;
+    }
+
+    .icon {
+        width: 22px;
+        height: 22px;
+        font-size: var(--font-size-xs);
+    }
+
+    .value {
+        font-size: 0.95rem;
+    }
+
+    .label {
+        font-size: var(--font-size-xs);
+    }
+
+    .container {
+        grid-template-columns: 1fr;
+    }
+}

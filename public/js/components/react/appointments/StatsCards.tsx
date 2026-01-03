@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import styles from './StatsCards.module.css';
 
 interface StatsCardsProps {
     total?: number;
@@ -82,44 +83,44 @@ const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0 }: Stats
     }, [total, checkedIn, absent, waiting]);
 
     return (
-        <div className="stats-container">
-            <div className="stat-card stat-total">
-                <div className="stat-icon">
+        <div className={styles.container}>
+            <div className={styles.cardTotal}>
+                <div className={styles.icon}>
                     <i className="fas fa-calendar-check"></i>
                 </div>
-                <div className="stat-content">
-                    <div className="stat-label">Total Appointments</div>
-                    <div className="stat-value">{isNaN(animatedTotal) ? 0 : animatedTotal}</div>
+                <div className={styles.content}>
+                    <div className={styles.label}>Total Appointments</div>
+                    <div className={styles.value}>{isNaN(animatedTotal) ? 0 : animatedTotal}</div>
                 </div>
             </div>
 
-            <div className="stat-card stat-present">
-                <div className="stat-icon">
+            <div className={styles.cardPresent}>
+                <div className={styles.icon}>
                     <i className="fas fa-user-check"></i>
                 </div>
-                <div className="stat-content">
-                    <div className="stat-label">Checked In</div>
-                    <div className="stat-value">{isNaN(animatedCheckedIn) ? 0 : animatedCheckedIn}</div>
+                <div className={styles.content}>
+                    <div className={styles.label}>Checked In</div>
+                    <div className={styles.value}>{isNaN(animatedCheckedIn) ? 0 : animatedCheckedIn}</div>
                 </div>
             </div>
 
-            <div className="stat-card stat-absent">
-                <div className="stat-icon">
+            <div className={styles.cardAbsent}>
+                <div className={styles.icon}>
                     <i className="fas fa-user-times"></i>
                 </div>
-                <div className="stat-content">
-                    <div className="stat-label">Absent</div>
-                    <div className="stat-value">{isNaN(animatedAbsent) ? 0 : animatedAbsent}</div>
+                <div className={styles.content}>
+                    <div className={styles.label}>Absent</div>
+                    <div className={styles.value}>{isNaN(animatedAbsent) ? 0 : animatedAbsent}</div>
                 </div>
             </div>
 
-            <div className="stat-card stat-waiting">
-                <div className="stat-icon">
+            <div className={styles.cardWaiting}>
+                <div className={styles.icon}>
                     <i className="fas fa-clock"></i>
                 </div>
-                <div className="stat-content">
-                    <div className="stat-label">Waiting</div>
-                    <div className="stat-value">{isNaN(animatedWaiting) ? 0 : animatedWaiting}</div>
+                <div className={styles.content}>
+                    <div className={styles.label}>Waiting</div>
+                    <div className={styles.value}>{isNaN(animatedWaiting) ? 0 : animatedWaiting}</div>
                 </div>
             </div>
         </div>

@@ -10,45 +10,50 @@ interface TemplateStatsData {
     usedToday: number;
 }
 
-interface TemplateStatsProps {
-    stats: TemplateStatsData;
+interface StatsStyles {
+    readonly [key: string]: string;
 }
 
-function TemplateStats({ stats }: TemplateStatsProps) {
+interface TemplateStatsProps {
+    stats: TemplateStatsData;
+    styles: StatsStyles;
+}
+
+function TemplateStats({ stats, styles }: TemplateStatsProps) {
     return (
-        <div className="stats-grid">
-            <div className="stat-card">
-                <div className="stat-icon">
+        <div className={styles.statsGrid}>
+            <div className={styles.statCard}>
+                <div className={styles.statIcon}>
                     <i className="fas fa-file-alt"></i>
                 </div>
-                <div className="stat-content">
+                <div className={styles.statContent}>
                     <h3>{stats.total}</h3>
                     <p>Total Templates</p>
                 </div>
             </div>
-            <div className="stat-card">
-                <div className="stat-icon active">
+            <div className={styles.statCard}>
+                <div className={`${styles.statIcon} ${styles.statIconActive}`}>
                     <i className="fas fa-check-circle"></i>
                 </div>
-                <div className="stat-content">
+                <div className={styles.statContent}>
                     <h3>{stats.active}</h3>
                     <p>Active Templates</p>
                 </div>
             </div>
-            <div className="stat-card">
-                <div className="stat-icon system">
+            <div className={styles.statCard}>
+                <div className={`${styles.statIcon} ${styles.statIconSystem}`}>
                     <i className="fas fa-shield-alt"></i>
                 </div>
-                <div className="stat-content">
+                <div className={styles.statContent}>
                     <h3>{stats.system}</h3>
                     <p>System Templates</p>
                 </div>
             </div>
-            <div className="stat-card">
-                <div className="stat-icon usage">
+            <div className={styles.statCard}>
+                <div className={`${styles.statIcon} ${styles.statIconUsage}`}>
                     <i className="fas fa-clock"></i>
                 </div>
-                <div className="stat-content">
+                <div className={styles.statContent}>
                     <h3>{stats.usedToday}</h3>
                     <p>Used Today</p>
                 </div>

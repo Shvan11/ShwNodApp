@@ -4,6 +4,7 @@
  */
 
 import { ChangeEvent, MouseEvent } from 'react';
+import styles from '../../routes/WhatsAppSend.module.css';
 
 export interface DateOption {
   value: string;
@@ -55,14 +56,14 @@ export default function DateSelector({
   };
 
   return (
-    <section className="controls-area">
-      <fieldset className="date-selection-panel">
-        <legend className="sr-only">Date and Message Controls</legend>
-        <div className="date-controls">
+    <section className={styles.controlsArea}>
+      <fieldset className={styles.dateSelectionPanel}>
+        <legend className={styles.srOnly}>Date and Message Controls</legend>
+        <div className={styles.dateControls}>
           <label htmlFor="dateSelector">Select Date:</label>
           <select
             id="dateSelector"
-            className="date-dropdown"
+            className={styles.dateDropdown}
             value={currentDate}
             onChange={handleDateSelect}
             aria-label="Select date for messaging"
@@ -81,7 +82,7 @@ export default function DateSelector({
             disabled={loading}
             aria-label="Refresh message count for selected date"
           >
-            <span className="btn-icon" aria-hidden="true">
+            <span className={styles.btnIcon} aria-hidden="true">
               🔄
             </span>
             <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
@@ -95,7 +96,7 @@ export default function DateSelector({
               resetConfirm ? 'Click again to confirm reset' : 'Reset all messages for selected date'
             }
           >
-            <span className="btn-icon" aria-hidden="true">
+            <span className={styles.btnIcon} aria-hidden="true">
               {resetConfirm ? '⚠️' : '🔄'}
             </span>
             <span>{resetConfirm ? 'Click to Confirm Reset' : 'Reset Messages'}</span>
@@ -109,7 +110,7 @@ export default function DateSelector({
               emailConfirm ? 'Click again to confirm sending email' : 'Email appointment list to staff'
             }
           >
-            <span className="btn-icon" aria-hidden="true">
+            <span className={styles.btnIcon} aria-hidden="true">
               {emailConfirm ? '⚠️' : '📧'}
             </span>
             <span>{emailConfirm ? 'Click to Confirm Email' : 'Email to Staff'}</span>
@@ -118,12 +119,12 @@ export default function DateSelector({
 
         <div
           id="messageCount"
-          className="message-count-info"
+          className={styles.messageCountInfo}
           role="status"
           aria-live="polite"
           aria-atomic="true"
         >
-          {loading && <span className="loading-spinner" aria-hidden="true"></span>}
+          {loading && <span className={styles.loadingSpinner} aria-hidden="true"></span>}
           <span>{displayMessage || 'Loading message count...'}</span>
         </div>
       </fieldset>

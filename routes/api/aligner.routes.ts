@@ -930,18 +930,28 @@ router.put(
 
 /**
  * Mark batch as manufactured
+ * @body targetDate - Optional ISO date string for backdating/correction
  */
 router.patch(
   '/aligner/batches/:batchId/manufacture',
-  async (req: Request<{ batchId: string }>, res: Response): Promise<void> => {
+  async (req: Request<{ batchId: string }, unknown, { targetDate?: string }>, res: Response): Promise<void> => {
     try {
       const { batchId } = req.params;
+      const { targetDate } = req.body || {};
 
-      await AlignerService.markBatchManufactured(batchId);
+      const result = await AlignerService.markBatchManufactured(
+        batchId,
+        targetDate ? new Date(targetDate) : null
+      );
 
       res.json({
         success: true,
-        message: 'Batch marked as manufactured'
+        message: result.message,
+        data: {
+          batchId: result.batchId,
+          batchSequence: result.batchSequence,
+          action: result.action,
+        }
       });
     } catch (error) {
       if (error instanceof AlignerValidationError) {
@@ -959,19 +969,34 @@ router.patch(
 );
 
 /**
- * Mark batch as delivered
+ * Mark batch as delivered with automatic activation for latest batch
+ * BatchExpiryDate is auto-computed from DeliveredToPatientDate + (Days * AlignerCount)
+ * @body targetDate - Optional ISO date string for backdating/correction
  */
 router.patch(
   '/aligner/batches/:batchId/deliver',
-  async (req: Request<{ batchId: string }>, res: Response): Promise<void> => {
+  async (req: Request<{ batchId: string }, unknown, { targetDate?: string }>, res: Response): Promise<void> => {
     try {
       const { batchId } = req.params;
+      const { targetDate } = req.body || {};
 
-      await AlignerService.markBatchDelivered(batchId);
+      const result = await AlignerService.markBatchDelivered(
+        batchId,
+        targetDate ? new Date(targetDate) : null
+      );
 
       res.json({
         success: true,
-        message: 'Batch marked as delivered'
+        message: result.message,
+        data: {
+          batchId: result.batchId,
+          batchSequence: result.batchSequence,
+          setId: result.setId,
+          wasActivated: result.wasActivated,
+          wasAlreadyActive: result.wasAlreadyActive,
+          wasAlreadyDelivered: result.wasAlreadyDelivered,
+          previouslyActiveBatchSequence: result.previouslyActiveBatchSequence,
+        }
       });
     } catch (error) {
       if (error instanceof AlignerValidationError) {
@@ -997,11 +1022,15 @@ router.patch(
     try {
       const { batchId } = req.params;
 
-      await AlignerService.undoManufactureBatch(batchId);
+      const result = await AlignerService.undoManufactureBatch(batchId);
 
       res.json({
         success: true,
-        message: 'Manufacture undone successfully'
+        message: result.message,
+        data: {
+          batchId: result.batchId,
+          batchSequence: result.batchSequence,
+        }
       });
     } catch (error) {
       if (error instanceof AlignerValidationError) {
@@ -1027,11 +1056,15 @@ router.patch(
     try {
       const { batchId } = req.params;
 
-      await AlignerService.undoDeliverBatch(batchId);
+      const result = await AlignerService.undoDeliverBatch(batchId);
 
       res.json({
         success: true,
-        message: 'Delivery undone successfully'
+        message: result.message,
+        data: {
+          batchId: result.batchId,
+          batchSequence: result.batchSequence,
+        }
       });
     } catch (error) {
       if (error instanceof AlignerValidationError) {

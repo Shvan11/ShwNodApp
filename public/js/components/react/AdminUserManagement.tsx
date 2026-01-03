@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import styles from './AdminUserManagement.module.css';
 
 type UserRole = 'secretary' | 'admin';
 
@@ -169,33 +170,33 @@ export default function AdminUserManagement() {
   };
 
   return (
-    <div className="admin-user-mgmt-container">
+    <div className={styles.container}>
 
-      <div className="header">
+      <div className={styles.header}>
         <h2>
           <i className="fas fa-users"></i> User Management
         </h2>
         <button
-          className="user-mgmt-btn primary"
+          className={`${styles.btn} ${styles.btnPrimary}`}
           onClick={() => setShowCreateForm(!showCreateForm)}
         >
-          <i className="fas fa-plus"></i>
+          <i className={`fas fa-${showCreateForm ? 'times' : 'plus'}`}></i>
           {showCreateForm ? 'Cancel' : 'Create User'}
         </button>
       </div>
 
       {message.text && (
-        <div className={`message ${message.type}`}>
+        <div className={`${styles.message} ${message.type === 'success' ? styles.success : styles.error}`}>
           {message.text}
         </div>
       )}
 
       {showCreateForm && (
-        <div className="create-form">
+        <div className={styles.createForm}>
           <h3>Create New User</h3>
           <form onSubmit={handleCreateUser}>
-            <div className="form-row">
-              <div className="form-group">
+            <div className={styles.formRow}>
+              <div className={styles.formGroup}>
                 <label>Username *</label>
                 <input
                   type="text"
@@ -204,7 +205,7 @@ export default function AdminUserManagement() {
                   required
                 />
               </div>
-              <div className="form-group">
+              <div className={styles.formGroup}>
                 <label>Full Name</label>
                 <input
                   type="text"
@@ -214,8 +215,8 @@ export default function AdminUserManagement() {
               </div>
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
+            <div className={styles.formRow}>
+              <div className={styles.formGroup}>
                 <label>Password * (min 6 characters)</label>
                 <input
                   type="password"
@@ -225,7 +226,7 @@ export default function AdminUserManagement() {
                   minLength={6}
                 />
               </div>
-              <div className="form-group">
+              <div className={styles.formGroup}>
                 <label>Role *</label>
                 <select
                   value={formData.role}
@@ -238,20 +239,20 @@ export default function AdminUserManagement() {
               </div>
             </div>
 
-            <button type="submit" className="user-mgmt-btn primary">
+            <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`}>
               <i className="fas fa-save"></i> Create User
             </button>
           </form>
         </div>
       )}
 
-      <div className="users-table">
+      <div className={styles.usersTable}>
         {loading ? (
-          <div className="empty-state-message">
+          <div className={styles.emptyState}>
             Loading users...
           </div>
         ) : users.length === 0 ? (
-          <div className="empty-state-message">
+          <div className={styles.emptyState}>
             No users found
           </div>
         ) : (
@@ -273,35 +274,35 @@ export default function AdminUserManagement() {
                   <td><strong>{user.username}</strong></td>
                   <td>{user.fullName || '-'}</td>
                   <td>
-                    <span className={`role-badge ${user.role}`}>
+                    <span className={`${styles.roleBadge} ${user.role === 'admin' ? styles.roleAdmin : styles.roleSecretary}`}>
                       {user.role}
                     </span>
                   </td>
                   <td>
-                    <span className={`status-badge ${user.isActive ? 'active' : 'inactive'}`}>
+                    <span className={`${styles.statusBadge} ${user.isActive ? styles.statusActive : styles.statusInactive}`}>
                       {user.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td>{user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}</td>
                   <td>{new Date(user.createdAt).toLocaleDateString()}</td>
                   <td>
-                    <div className="actions">
+                    <div className={styles.actions}>
                       <button
-                        className="user-mgmt-btn secondary small"
+                        className={`${styles.btn} ${styles.btnSecondary} ${styles.btnSmall}`}
                         onClick={() => handleResetPassword(user.userId, user.username)}
                         title="Reset Password"
                       >
                         <i className="fas fa-key"></i>
                       </button>
                       <button
-                        className="user-mgmt-btn secondary small"
+                        className={`${styles.btn} ${styles.btnSecondary} ${styles.btnSmall}`}
                         onClick={() => handleToggleActive(user.userId)}
                         title={user.isActive ? 'Deactivate' : 'Activate'}
                       >
                         <i className={`fas fa-${user.isActive ? 'ban' : 'check'}`}></i>
                       </button>
                       <button
-                        className="user-mgmt-btn danger small"
+                        className={`${styles.btn} ${styles.btnDanger} ${styles.btnSmall}`}
                         onClick={() => handleDeleteUser(user.userId, user.username)}
                         title="Delete User"
                       >

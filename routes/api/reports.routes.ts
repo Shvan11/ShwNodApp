@@ -140,8 +140,25 @@ router.get('/statistics', async (req: Request<object, object, object, Statistics
         columns.forEach(column => {
           const value = column.value;
           const name = column.metadata.colName as keyof DailyData;
-          if (typeof value === 'number' || typeof value === 'string' || value === undefined) {
+          if (value === null || value === undefined) {
+            // Skip null/undefined values
+            return;
+          } else if (typeof value === 'number' || typeof value === 'string') {
             (row as Record<string, unknown>)[name] = value;
+          } else if (value instanceof Date) {
+            // Format Date objects without timezone conversion
+            (row as Record<string, unknown>)[name] = `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+          } else if (typeof value === 'object' && value.constructor?.name === 'Date') {
+            // Handle Date-like objects from Tedious - format without timezone conversion
+            const d = value as Date;
+            (row as Record<string, unknown>)[name] = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          } else if (typeof (value as { getFullYear?: () => number })?.getFullYear === 'function') {
+            // Handle objects with Date methods - format without timezone conversion
+            const d = value as Date;
+            (row as Record<string, unknown>)[name] = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          } else {
+            // Fallback: convert to string
+            (row as Record<string, unknown>)[name] = String(value);
           }
         });
         return row;

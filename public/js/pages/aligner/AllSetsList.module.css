@@ -1,0 +1,693 @@
+/* AllSetsList.module.css - Table, badges, and filters styles */
+
+/* Filter Controls Container */
+.filterContainer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+    align-items: center;
+}
+
+.filterContainer .patientFilterBox {
+    flex: 1;
+    min-width: 300px;
+}
+
+/* Patient Filter Box */
+.patientFilterBox {
+    position: relative;
+}
+
+.patientFilterBox input {
+    width: 100%;
+    padding: 0.75rem 0.75rem 0.75rem 2.5rem;
+    font-size: 1rem;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    transition: all 0.3s ease;
+}
+
+.patientFilterBox input:focus {
+    outline: none;
+    border-color: var(--blue-300);
+    box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.1);
+}
+
+.filterIcon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-light);
+    font-size: 1rem;
+}
+
+.clearFilterBtn {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    padding: 0.5rem;
+    font-size: 1rem;
+    transition: color 0.2s;
+}
+
+.clearFilterBtn:hover {
+    color: var(--text-light);
+}
+
+/* Doctor Filter Dropdown */
+.doctorFilter {
+    min-width: 200px;
+}
+
+.doctorFilterSelect {
+    width: 100%;
+    padding: 0.75rem var(--spacing-md);
+    font-size: 1rem;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    background-color: var(--color-white);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.doctorFilterSelect:focus {
+    outline: none;
+    border-color: var(--blue-300);
+    box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.1);
+}
+
+.doctorFilterSelect:hover {
+    border-color: var(--gray-300);
+}
+
+/* Filter Toggles Container */
+.filterToggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    align-items: center;
+}
+
+/* Toggle Labels */
+.filterToggle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    background-color: var(--gray-100);
+    padding: 0.75rem var(--spacing-md);
+    border-radius: var(--radius-lg);
+    border: 2px solid transparent;
+    transition: var(--transition-base);
+    white-space: nowrap;
+}
+
+.filterToggle.active {
+    background-color: var(--warning-100);
+    border-color: var(--warning-300);
+}
+
+.filterToggle input[type="checkbox"] {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+}
+
+/* Status Legend Bar */
+.statusLegend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0.25rem var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+}
+
+.legendTitle {
+    font-weight: var(--font-weight-semibold);
+    color: var(--gray-700);
+    margin-right: var(--spacing-sm);
+}
+
+.legendItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--gray-600);
+}
+
+.legendDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.legendDot.gray {
+    background-color: #6c757d;
+}
+
+.legendDot.green {
+    background-color: #28a745;
+}
+
+.legendDot.amber {
+    background-color: #e65100;
+}
+
+.legendDot.red {
+    background-color: #dc3545;
+}
+
+.legendDot.purple {
+    background-color: #7c3aed;
+}
+
+.inactiveSetsToggle {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    cursor: pointer;
+}
+
+.inactiveSetsToggle input {
+    cursor: pointer;
+}
+
+.inactiveSetsToggle:hover {
+    color: var(--gray-800);
+}
+
+.info {
+    font-size: 0.8rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--gray-700);
+}
+
+.infoHidden {
+    color: var(--gray-500);
+    font-weight: normal;
+}
+
+/* Table Container */
+.tableContainer {
+    background-color: var(--color-white);
+    border-radius: var(--radius-lg);
+    overflow: auto;
+    max-height: calc(100vh - 160px);
+    box-shadow: var(--shadow-sm);
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+
+.table thead {
+    background-color: var(--gray-50);
+    border-bottom: 2px solid var(--gray-200);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.table th {
+    padding: 0.75rem var(--spacing-sm);
+    text-align: left;
+    font-weight: var(--font-weight-semibold);
+    color: var(--gray-700);
+    text-transform: uppercase;
+    font-size: var(--font-size-xs);
+    letter-spacing: var(--letter-spacing-wide);
+    background-color: var(--gray-50);
+}
+
+.sortableHeader {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s;
+}
+
+.sortableHeader:hover {
+    background-color: var(--gray-100);
+}
+
+.sortIcon {
+    margin-left: 0.25rem;
+    font-size: 0.7rem;
+    color: var(--gray-400);
+}
+
+.sortableHeader:hover .sortIcon {
+    color: var(--gray-600);
+}
+
+.table td {
+    padding: 0.75rem var(--spacing-sm);
+    color: var(--gray-800);
+}
+
+/* Table Row States */
+.table tbody tr {
+    cursor: pointer;
+    border-bottom: 1px solid var(--gray-200);
+    transition: background-color 0.15s;
+}
+
+.table tbody tr:nth-child(even) {
+    background-color: var(--gray-50);
+}
+
+.table tbody tr:nth-child(odd) {
+    background-color: var(--color-white);
+}
+
+/* No Batches Row */
+.noBatchesRow,
+.noBatchesRow:nth-child(even),
+.noBatchesRow:nth-child(odd) {
+    background-color: var(--gray-100);
+    display: table-row;
+    opacity: 0.85;
+}
+
+.noBatchesRow:hover {
+    background-color: var(--gray-200);
+    opacity: 0.95;
+}
+
+.noBatchesRow td {
+    display: table-cell;
+}
+
+/* Completed Work Row */
+.completedWorkRow,
+.completedWorkRow:nth-child(even),
+.completedWorkRow:nth-child(odd) {
+    background-color: #e8f5e9;
+    display: table-row;
+    opacity: 0.7;
+}
+
+.completedWorkRow:hover {
+    background-color: #c8e6c9;
+    opacity: 0.85;
+}
+
+.completedWorkRow td {
+    display: table-cell;
+}
+
+/* Normal row hover */
+.table tbody tr:not(.completedWorkRow):not(.noBatchesRow):hover {
+    background-color: var(--blue-50);
+}
+
+/* Patient Name Cell */
+.patientName {
+    font-weight: var(--font-weight-semibold);
+    color: var(--gray-800);
+}
+
+/* Badge Variants */
+.badge {
+    padding: 0.25rem var(--spacing-sm);
+    border-radius: var(--radius-md);
+    font-weight: var(--font-weight-semibold);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: var(--font-size-sm);
+}
+
+/* Set Badge */
+.badgeSet {
+    background-color: var(--indigo-100);
+    color: var(--indigo-700);
+}
+
+.badgeNoSet {
+    background-color: var(--gray-100);
+    color: var(--gray-500);
+    font-weight: var(--font-weight-medium);
+    font-style: italic;
+}
+
+/* Batch Badge */
+.badgeBatch {
+    background-color: #e8eaf6;
+    color: var(--indigo-700);
+}
+
+.badgeNoBatch {
+    background-color: var(--gray-100);
+    color: var(--gray-500);
+    font-weight: var(--font-weight-medium);
+    font-style: italic;
+}
+
+/* Status Badges */
+.badgeNa {
+    background-color: var(--gray-100);
+    color: var(--gray-600);
+    font-weight: var(--font-weight-medium);
+}
+
+.badgePendingMfg {
+    background-color: #fff3e0;
+    color: #e65100;
+}
+
+/* Next Batch Badges */
+.badgeNextReady {
+    background-color: var(--success-100);
+    color: var(--success-700);
+}
+
+.badgeNextWarning {
+    background-color: var(--error-100);
+    color: var(--error-700);
+}
+
+.badgeFinal {
+    background-color: #f3e8ff;
+    color: #7c3aed;
+}
+
+/* Notes Text */
+.notes {
+    color: var(--gray-500);
+    font-size: 0.8125rem;
+}
+
+.notesEmpty {
+    color: var(--gray-400);
+}
+
+/* Empty State */
+.emptyPatients {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--gray-400);
+}
+
+.emptyPatients i {
+    font-size: 4rem;
+    color: var(--gray-300);
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.emptyPatients h3 {
+    color: var(--text-light);
+    margin-bottom: 0.5rem;
+}
+
+.btnClearFilters {
+    margin-top: var(--spacing-md);
+    background: rgba(255, 255, 255, 0.2);
+    color: var(--text-light);
+    border: 1px solid var(--gray-300);
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 0.9rem;
+}
+
+.btnClearFilters:hover {
+    background: var(--gray-100);
+}
+
+/* Loading Container */
+.loadingContainer {
+    text-align: center;
+    padding: 3rem;
+}
+
+.spinner {
+    border: 4px solid var(--gray-100);
+    border-top: 4px solid var(--blue-300);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .filterContainer {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-sm);
+    }
+
+    .filterContainer .patientFilterBox {
+        min-width: 100%;
+    }
+
+    .doctorFilter {
+        min-width: 100%;
+    }
+
+    .doctorFilterSelect {
+        width: 100%;
+    }
+
+    .filterToggles {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--spacing-sm);
+        width: 100%;
+    }
+
+    .filterToggle {
+        width: 100%;
+        justify-content: center;
+        padding: 0.6rem var(--spacing-sm);
+        font-size: 0.85rem;
+    }
+
+    .filterToggle span {
+        font-size: 0.8rem;
+    }
+
+    .statusLegend {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding: var(--spacing-sm);
+        gap: var(--spacing-sm);
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+
+    .legendItem {
+        white-space: nowrap;
+        font-size: 0.75rem;
+    }
+
+    .legendTitle {
+        display: none;
+    }
+
+    /* Table to Cards conversion on mobile */
+    .tableContainer {
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .table {
+        display: block;
+    }
+
+    .table thead {
+        display: none;
+    }
+
+    .table tbody {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-md);
+    }
+
+    .table tbody tr {
+        display: flex;
+        flex-direction: column;
+        background: var(--color-white);
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-md);
+        box-shadow: var(--shadow-sm);
+        gap: var(--spacing-sm);
+    }
+
+    .table tbody tr:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+    }
+
+    .table tbody tr.noBatchesRow {
+        background-color: var(--gray-100);
+        opacity: 0.9;
+    }
+
+    .table tbody tr.completedWorkRow {
+        background-color: #e8f5e9;
+        opacity: 0.8;
+    }
+
+    .table tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.4rem 0;
+        border-bottom: 1px solid var(--gray-100);
+    }
+
+    .table tbody td:last-child {
+        border-bottom: none;
+    }
+
+    .table tbody td::before {
+        content: attr(data-label);
+        font-weight: var(--font-weight-semibold);
+        color: var(--gray-600);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        flex-shrink: 0;
+        margin-right: var(--spacing-sm);
+    }
+
+    .table tbody td:first-child {
+        border-bottom: 2px solid var(--gray-200);
+        padding-bottom: var(--spacing-sm);
+        margin-bottom: var(--spacing-xs);
+    }
+
+    .table tbody td:first-child::before {
+        display: none;
+    }
+
+    .patientName {
+        font-size: 1.1rem;
+        width: 100%;
+    }
+
+    .badge {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+    }
+
+    .notes {
+        font-size: 0.8rem;
+        text-align: right;
+        max-width: 60%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .emptyPatients {
+        padding: 2rem var(--spacing-md);
+    }
+
+    .emptyPatients i {
+        font-size: 3rem;
+    }
+
+    .emptyPatients h3 {
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .filterToggles {
+        grid-template-columns: 1fr;
+    }
+
+    .filterToggle {
+        padding: 0.75rem var(--spacing-md);
+    }
+
+    .table tbody tr {
+        padding: var(--spacing-sm);
+    }
+
+    .table tbody td {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+
+    .table tbody td::before {
+        margin-right: 0;
+        margin-bottom: 0.15rem;
+    }
+
+    .badge {
+        width: fit-content;
+    }
+
+    .notes {
+        max-width: 100%;
+        text-align: left;
+    }
+
+    .statusLegend {
+        display: none;
+    }
+
+    .patientName {
+        font-size: 1rem;
+    }
+}
+
+/* Touch device improvements */
+@media (hover: none) and (pointer: coarse) {
+    .filterToggle {
+        min-height: 48px;
+    }
+
+    .doctorFilterSelect {
+        min-height: 48px;
+    }
+
+    .patientFilterBox input {
+        min-height: 48px;
+    }
+
+    .table tbody tr {
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .table tbody tr:active {
+        transform: scale(0.98);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .table tbody tr:hover {
+        transform: none;
+    }
+}

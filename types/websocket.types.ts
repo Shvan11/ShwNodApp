@@ -125,7 +125,7 @@ export interface AppointmentUpdateData {
  * Patient loaded event data
  */
 export interface PatientLoadedData {
-  patientId: number;
+  personId: number;
   patientName: string;
   timestamp: number;
 }
@@ -134,7 +134,7 @@ export interface PatientLoadedData {
  * Patient unloaded event data
  */
 export interface PatientUnloadedData {
-  patientId: number;
+  personId: number;
   timestamp: number;
 }
 

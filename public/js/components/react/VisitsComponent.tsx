@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import styles from './VisitsComponent.module.css';
 
 interface Visit {
     ID: number;
@@ -32,10 +33,10 @@ interface Visit {
 
 interface VisitsComponentProps {
     workId: number | null;
-    patientId?: string | number | null;
+    personId?: number | null;
 }
 
-const VisitsComponent = ({ workId, patientId }: VisitsComponentProps) => {
+const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
     const navigate = useNavigate();
     const [visits, setVisits] = useState<Visit[]>([]);
     const [loading, setLoading] = useState(true);
@@ -64,11 +65,11 @@ const VisitsComponent = ({ workId, patientId }: VisitsComponentProps) => {
     };
 
     const handleAddVisit = () => {
-        navigate(`/patient/${patientId}/new-visit?workId=${workId}`);
+        navigate(`/patient/${personId}/new-visit?workId=${workId}`);
     };
 
     const handleEditVisit = (visitId: number) => {
-        navigate(`/patient/${patientId}/new-visit?workId=${workId}&visitId=${visitId}`);
+        navigate(`/patient/${personId}/new-visit?workId=${workId}&visitId=${visitId}`);
     };
 
     const handleDeleteVisit = async (visitId: number) => {
@@ -97,16 +98,16 @@ const VisitsComponent = ({ workId, patientId }: VisitsComponentProps) => {
         return new Date(dateString).toLocaleDateString();
     };
 
-    if (loading) return <div className="work-loading">Loading visits...</div>;
+    if (loading) return <div className={styles.loading}>Loading visits...</div>;
 
     return (
-        <div className="work-component">
-            <div className="work-header">
+        <div className={styles.container}>
+            <div className={styles.header}>
                 <h2>Visit History</h2>
-                <div className="work-controls">
-                    {patientId && (
+                <div className={styles.controls}>
+                    {personId && (
                         <button
-                            onClick={() => navigate(`/patient/${patientId}/works`)}
+                            onClick={() => navigate(`/patient/${personId}/works`)}
                             className="btn btn-secondary"
                         >
                             <i className="fas fa-arrow-left"></i> Back
@@ -119,50 +120,50 @@ const VisitsComponent = ({ workId, patientId }: VisitsComponentProps) => {
             </div>
 
             {error && (
-                <div className="work-error">
+                <div className={styles.error}>
                     {error}
-                    <button onClick={() => setError(null)} className="error-close">×</button>
+                    <button onClick={() => setError(null)} className={styles.errorClose}>×</button>
                 </div>
             )}
 
-            <div className="work-summary">
-                <div className="summary-card">
+            <div className={styles.summary}>
+                <div className={styles.summaryCard}>
                     <h3>Total Visits</h3>
-                    <span className="summary-value">{visits.length}</span>
+                    <span className={styles.summaryValue}>{visits.length}</span>
                 </div>
-                <div className="summary-card">
+                <div className={styles.summaryCard}>
                     <h3>OPG Taken</h3>
-                    <span className="summary-value">{visits.filter(v => v.OPG).length}</span>
+                    <span className={styles.summaryValue}>{visits.filter(v => v.OPG).length}</span>
                 </div>
-                <div className="summary-card">
+                <div className={styles.summaryCard}>
                     <h3>Photos Taken</h3>
-                    <span className="summary-value">{visits.filter(v => v.IPhoto || v.PPhoto || v.FPhoto).length}</span>
+                    <span className={styles.summaryValue}>{visits.filter(v => v.IPhoto || v.PPhoto || v.FPhoto).length}</span>
                 </div>
             </div>
 
             {/* Visit Cards View */}
-            <div className="visit-cards-container">
+            <div className={styles.cardsContainer}>
                 {visits.map((visit) => (
-                    <div key={visit.ID} className="visit-card">
+                    <div key={visit.ID} className={styles.card}>
                         {/* Header Row */}
-                        <div className="visit-card-header">
+                        <div className={styles.cardHeader}>
                             <div>
-                                <h3 className="visit-card-title">
+                                <h3 className={styles.cardTitle}>
                                     <i className="fas fa-calendar-check"></i> {formatDate(visit.VisitDate)}
                                 </h3>
-                                <div className="visit-card-meta">
+                                <div className={styles.cardMeta}>
                                     {visit.OperatorName && (
                                         <span><i className="fas fa-user-md"></i> {visit.OperatorName}</span>
                                     )}
                                     {visit.OPG && (
-                                        <span className="meta-success"><i className="fas fa-x-ray"></i> OPG</span>
+                                        <span className={styles.metaSuccess}><i className="fas fa-x-ray"></i> OPG</span>
                                     )}
                                     {visit.ApplianceRemoved && (
-                                        <span className="meta-danger"><i className="fas fa-times-circle"></i> Removed</span>
+                                        <span className={styles.metaDanger}><i className="fas fa-times-circle"></i> Removed</span>
                                     )}
                                 </div>
                             </div>
-                            <div className="action-buttons">
+                            <div className={styles.actionButtons}>
                                 <button
                                     onClick={() => handleEditVisit(visit.ID)}
                                     className="btn-edit"
@@ -182,17 +183,17 @@ const VisitsComponent = ({ workId, patientId }: VisitsComponentProps) => {
 
                         {/* Wire Info */}
                         {(visit.UpperWireName || visit.LowerWireName) && (
-                            <div className="wire-info">
+                            <div className={styles.wireInfo}>
                                 {visit.UpperWireName && (
-                                    <div className="wire-info-item">
-                                        <div className="wire-info-label">Upper Wire:</div>
-                                        <div className="wire-info-value">{visit.UpperWireName}</div>
+                                    <div className={styles.wireInfoItem}>
+                                        <div className={styles.wireInfoLabel}>Upper Wire:</div>
+                                        <div className={styles.wireInfoValue}>{visit.UpperWireName}</div>
                                     </div>
                                 )}
                                 {visit.LowerWireName && (
-                                    <div className="wire-info-item">
-                                        <div className="wire-info-label">Lower Wire:</div>
-                                        <div className="wire-info-value">{visit.LowerWireName}</div>
+                                    <div className={styles.wireInfoItem}>
+                                        <div className={styles.wireInfoLabel}>Lower Wire:</div>
+                                        <div className={styles.wireInfoValue}>{visit.LowerWireName}</div>
                                     </div>
                                 )}
                             </div>
@@ -200,23 +201,23 @@ const VisitsComponent = ({ workId, patientId }: VisitsComponentProps) => {
 
                         {/* Treatment Info */}
                         {(visit.BracketChange || visit.WireBending || visit.Elastics) && (
-                            <div className="treatment-info">
+                            <div className={styles.treatmentInfo}>
                                 {visit.BracketChange && (
-                                    <div className="treatment-info-item">
-                                        <span className="treatment-info-label">Bracket: </span>
-                                        <span className="treatment-info-value">{visit.BracketChange}</span>
+                                    <div className={styles.treatmentInfoItem}>
+                                        <span className={styles.treatmentInfoLabel}>Bracket: </span>
+                                        <span className={styles.treatmentInfoValue}>{visit.BracketChange}</span>
                                     </div>
                                 )}
                                 {visit.WireBending && (
-                                    <div className="treatment-info-item">
-                                        <span className="treatment-info-label">Bending: </span>
-                                        <span className="treatment-info-value">{visit.WireBending}</span>
+                                    <div className={styles.treatmentInfoItem}>
+                                        <span className={styles.treatmentInfoLabel}>Bending: </span>
+                                        <span className={styles.treatmentInfoValue}>{visit.WireBending}</span>
                                     </div>
                                 )}
                                 {visit.Elastics && (
-                                    <div className="treatment-info-item">
-                                        <span className="treatment-info-label">Elastics: </span>
-                                        <span className="treatment-info-value">{visit.Elastics}</span>
+                                    <div className={styles.treatmentInfoItem}>
+                                        <span className={styles.treatmentInfoLabel}>Elastics: </span>
+                                        <span className={styles.treatmentInfoValue}>{visit.Elastics}</span>
                                     </div>
                                 )}
                             </div>
@@ -224,16 +225,16 @@ const VisitsComponent = ({ workId, patientId }: VisitsComponentProps) => {
 
                         {/* Photos */}
                         {(visit.IPhoto || visit.PPhoto || visit.FPhoto) && (
-                            <div className="photo-badges">
-                                {visit.IPhoto && <span className="photo-badge"><i className="fas fa-camera"></i> Initial</span>}
-                                {visit.PPhoto && <span className="photo-badge"><i className="fas fa-camera"></i> Progress</span>}
-                                {visit.FPhoto && <span className="photo-badge"><i className="fas fa-camera"></i> Final</span>}
+                            <div className={styles.photoBadges}>
+                                {visit.IPhoto && <span className={styles.photoBadge}><i className="fas fa-camera"></i> Initial</span>}
+                                {visit.PPhoto && <span className={styles.photoBadge}><i className="fas fa-camera"></i> Progress</span>}
+                                {visit.FPhoto && <span className={styles.photoBadge}><i className="fas fa-camera"></i> Final</span>}
                             </div>
                         )}
 
                         {/* Notes Section */}
                         {visit.Others && (
-                            <div className="notes-section">
+                            <div className={styles.notesSection}>
                                 <strong><i className="fas fa-sticky-note"></i> Notes</strong>
                                 <p>{visit.Others}</p>
                             </div>
@@ -241,7 +242,7 @@ const VisitsComponent = ({ workId, patientId }: VisitsComponentProps) => {
 
                         {/* Next Visit Instructions */}
                         {visit.NextVisit && (
-                            <div className="next-visit-section">
+                            <div className={styles.nextVisitSection}>
                                 <strong><i className="fas fa-arrow-circle-right"></i> Next Visit</strong>
                                 <p>{visit.NextVisit}</p>
                             </div>
@@ -249,7 +250,7 @@ const VisitsComponent = ({ workId, patientId }: VisitsComponentProps) => {
                     </div>
                 ))}
                 {visits.length === 0 && (
-                    <div className="empty-state">
+                    <div className={styles.emptyState}>
                         <i className="fas fa-calendar-times"></i>
                         <p>No visits recorded yet.</p>
                     </div>

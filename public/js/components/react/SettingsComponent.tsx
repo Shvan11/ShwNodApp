@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback, ComponentType } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
-// Settings page CSS (loaded when settings route is visited)
-import '../../../css/pages/settings.css';
-import '../../../css/pages/cost-presets-settings.css';
-import '../../../css/pages/user-management.css';
+// CSS Modules
+import styles from './SettingsContainer.module.css';
+
 import SettingsTabNavigation from './SettingsTabNavigation';
 import GeneralSettings from './GeneralSettings';
 import DatabaseSettings from './DatabaseSettings';
@@ -15,6 +14,7 @@ import UserManagement from './UserManagement';
 import AdminUserManagement from './AdminUserManagement';
 import CostPresetsSettings from './CostPresetsSettings';
 import LookupsSettings from './LookupsSettings';
+import ProtocolHandlersSettings from './ProtocolHandlersSettings';
 
 // Types
 interface SettingsTabComponentProps {
@@ -52,6 +52,7 @@ const SettingsComponent: React.FC = () => {
     const [tabData, setTabData] = useState<TabDataState>({
         general: { hasChanges: false },
         database: { hasChanges: false },
+        protocolHandlers: { hasChanges: false },
         alignerDoctors: { hasChanges: false },
         email: { hasChanges: false },
         employees: { hasChanges: false },
@@ -94,6 +95,13 @@ const SettingsComponent: React.FC = () => {
             icon: 'fas fa-database',
             component: DatabaseSettings,
             description: 'Database connection and configuration'
+        },
+        {
+            id: 'protocolHandlers',
+            label: 'Protocol Handlers',
+            icon: 'fas fa-link',
+            component: ProtocolHandlersSettings,
+            description: 'Windows protocol handler configuration (Dolphin, CS Imaging)'
         },
         {
             id: 'alignerDoctors',
@@ -201,7 +209,7 @@ const SettingsComponent: React.FC = () => {
     const ActiveTabComponent = activeTabConfig?.component;
 
     return (
-        <div className="settings-container">
+        <div className={styles.container}>
             <SettingsTabNavigation
                 tabs={filteredTabs}
                 activeTab={activeTab}
@@ -209,19 +217,19 @@ const SettingsComponent: React.FC = () => {
                 tabData={tabData}
             />
 
-            <div className="settings-content">
+            <div className={styles.content}>
                 {ActiveTabComponent ? (
                     <ActiveTabComponent
                         onChangesUpdate={(hasChanges: boolean) => handleTabChangesUpdate(activeTab, hasChanges)}
                     />
                 ) : (
-                    <div className="settings-placeholder">
-                        <div className="placeholder-icon">
+                    <div className={styles.placeholder}>
+                        <div className={styles.placeholderIcon}>
                             <i className={activeTabConfig?.icon || 'fas fa-cog'}></i>
                         </div>
                         <h3>{activeTabConfig?.label || 'Settings'}</h3>
                         <p>This section is coming soon.</p>
-                        <p className="placeholder-description">
+                        <p className={styles.placeholderDescription}>
                             {activeTabConfig?.description || 'Configure your system settings'}
                         </p>
                     </div>

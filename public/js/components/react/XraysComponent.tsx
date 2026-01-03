@@ -1,7 +1,8 @@
 import React, { useState, useEffect, SyntheticEvent } from 'react';
+import styles from './XraysComponent.module.css';
 
 interface Props {
-    patientId?: string;
+    personId?: number | null;
 }
 
 interface Xray {
@@ -15,23 +16,23 @@ interface PatientInfo {
     xrays?: Xray[];
 }
 
-const XraysComponent = ({ patientId }: Props) => {
+const XraysComponent = ({ personId }: Props) => {
     const [patientInfo, setPatientInfo] = useState<PatientInfo | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (patientId && patientId !== 'new') {
+        if (personId) {
             loadXrays();
         }
-    }, [patientId]);
+    }, [personId]);
 
     const loadXrays = async () => {
         try {
             setLoading(true);
-            console.log('Loading X-rays for patient:', patientId);
+            console.log('Loading X-rays for patient:', personId);
 
-            const response = await fetch(`/api/patients/${patientId}/info`);
+            const response = await fetch(`/api/patients/${personId}/info`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -48,12 +49,12 @@ const XraysComponent = ({ patientId }: Props) => {
     };
 
     const handleXrayClick = (xray: Xray) => {
-        const xrayUrl = `/api/patients/${patientId}/xray?file=${xray.name}&detailsDir=${xray.detailsDirName}`;
+        const xrayUrl = `/api/patients/${personId}/xray?file=${xray.name}&detailsDir=${xray.detailsDirName}`;
         window.open(xrayUrl, '_blank');
     };
 
     const handleSendClick = (xray: Xray) => {
-        const xrayUrl = `/api/patients/${patientId}/xray?file=${xray.name}&detailsDir=${xray.detailsDirName}`;
+        const xrayUrl = `/api/patients/${personId}/xray?file=${xray.name}&detailsDir=${xray.detailsDirName}`;
         const sendMessageUrl = `/send-message?file=${encodeURIComponent(xrayUrl)}`;
         window.open(sendMessageUrl, '_blank');
     };
@@ -111,37 +112,37 @@ const XraysComponent = ({ patientId }: Props) => {
         );
     }
 
-    console.log('X-rays Component Rendering:', { patientId, xraysCount: xrays.length });
+    console.log('X-rays Component Rendering:', { personId, xraysCount: xrays.length });
 
     return (
-        <div className="xrays-component">
-            <div className="xrays-header">
+        <div className={styles.component}>
+            <div className={styles.header}>
                 <h2>
                     <i className="fas fa-x-ray"></i>
                     X-Ray Images ({xrays.length})
                 </h2>
             </div>
 
-            <div className="xrays-grid">
+            <div className={styles.grid}>
                 {xrays.map((xray, index) => (
-                    <div key={index} className="xray-card">
-                        <div className="xray-preview">
+                    <div key={index} className={styles.card}>
+                        <div className={styles.preview}>
                             <button
-                                className="xray-view-btn"
+                                className={styles.viewBtn}
                                 onClick={() => handleXrayClick(xray)}
                                 title="Click to view X-ray in full size"
                             >
                                 {xray.previewImagePartialPath ? (
                                     <img
-                                        src={`/clinic-assets/${patientId}${xray.previewImagePartialPath}`}
-                                        className="xray-thumbnail"
+                                        src={`/clinic-assets/${personId}${xray.previewImagePartialPath}`}
+                                        className={styles.thumbnail}
                                         alt={`X-ray ${xray.name}`}
                                         onError={handleImageError}
                                     />
                                 ) : null}
 
                                 <div
-                                    className={`xray-placeholder ${xray.previewImagePartialPath ? 'hidden' : ''}`}
+                                    className={`${styles.placeholder} ${xray.previewImagePartialPath ? 'hidden' : ''}`}
                                 >
                                     <i className="fas fa-x-ray"></i>
                                     <span>View X-ray</span>
@@ -149,13 +150,13 @@ const XraysComponent = ({ patientId }: Props) => {
                             </button>
                         </div>
 
-                        <div className="xray-info">
-                            <div className="xray-date">
+                        <div className={styles.info}>
+                            <div className={styles.date}>
                                 <i className="fas fa-calendar-alt"></i>
                                 <span>{formatXrayDate(xray.date || xray.name)}</span>
                             </div>
 
-                            <div className="xray-actions">
+                            <div className={styles.actions}>
                                 <button
                                     className="btn btn-primary btn-sm"
                                     onClick={() => handleXrayClick(xray)}
@@ -179,9 +180,9 @@ const XraysComponent = ({ patientId }: Props) => {
                 ))}
             </div>
 
-            <div className="xrays-footer">
-                <div className="xrays-summary">
-                    <span className="summary-text">
+            <div className={styles.footer}>
+                <div className={styles.summary}>
+                    <span className={styles.summaryText}>
                         Total X-rays: <strong>{xrays.length}</strong>
                     </span>
                 </div>

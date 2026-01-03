@@ -1,0 +1,157 @@
+/* SearchPatient.module.css - Search section styles */
+
+/* Search Section */
+.searchSection {
+    position: relative;
+    margin-bottom: 2rem;
+}
+
+/* Search Box */
+.searchBox {
+    position: relative;
+    flex: 1;
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.searchBox input {
+    width: 100%;
+    padding: 1rem 1rem 1rem 3rem;
+    font-size: 1rem;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.searchBox input:focus {
+    outline: none;
+    border-color: var(--blue-300);
+    box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.1);
+}
+
+.searchIcon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-light);
+    font-size: 1.1rem;
+}
+
+.searchInfo {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.85rem;
+    color: var(--gray-400);
+}
+
+/* Search Results Dropdown */
+.searchResults {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+.searchResultItem {
+    padding: 1rem;
+    border-bottom: 1px solid var(--gray-100);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.searchResultItem:last-child {
+    border-bottom: none;
+}
+
+.searchResultItem:hover {
+    background-color: var(--gray-50);
+}
+
+.resultName {
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 0.25rem;
+}
+
+.resultNameSecondary {
+    font-weight: 400;
+    color: var(--gray-500);
+    margin-left: 0.5rem;
+}
+
+.resultMeta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.9rem;
+    color: var(--text-light);
+}
+
+.resultMeta span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* No Results */
+.searchNoResults {
+    padding: 2rem;
+    text-align: center;
+    color: var(--gray-400);
+}
+
+.searchNoResults i {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.searchNoResults p {
+    margin: 0;
+}
+
+/* Empty State */
+.emptyState {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--gray-400);
+}
+
+.emptyState i {
+    font-size: 4rem;
+    color: var(--gray-300);
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.emptyState h3 {
+    color: var(--text-light);
+    margin-bottom: 0.5rem;
+}
+
+.emptyState p {
+    color: var(--gray-400);
+    margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .searchBox {
+        max-width: 100%;
+    }
+
+    .searchResults {
+        left: 0;
+        right: 0;
+        margin: 0;
+    }
+}

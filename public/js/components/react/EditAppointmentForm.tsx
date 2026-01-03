@@ -1,7 +1,8 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { useLocation } from 'react-router-dom';
+import cn from 'classnames';
 import SimplifiedCalendarPicker from './SimplifiedCalendarPicker';
-import '../../../css/components/simplified-calendar-picker.css';
+import styles from './AppointmentForm.module.css';
 
 interface AppointmentFormData {
     PersonID: number | string;
@@ -34,7 +35,7 @@ interface ExistingAppointment {
 }
 
 interface EditAppointmentFormProps {
-    patientId?: number | string;
+    personId?: number | null;
     appointmentId?: number | string;
     onClose?: () => void;
     onSuccess?: (result: unknown) => void;
@@ -47,12 +48,12 @@ interface EditAppointmentFormProps {
  * Uses the same layout as AppointmentForm
  */
 
-const EditAppointmentForm = ({ patientId, appointmentId, onClose, onSuccess }: EditAppointmentFormProps) => {
+const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: EditAppointmentFormProps) => {
     const location = useLocation();
     const existingAppointment = (location.state as { appointment?: ExistingAppointment } | null)?.appointment;
 
     const [formData, setFormData] = useState<AppointmentFormData>({
-        PersonID: patientId ?? '',
+        PersonID: personId ?? '',
         AppDate: '',
         AppTime: '',
         AppDetail: '',
@@ -231,8 +232,8 @@ const EditAppointmentForm = ({ patientId, appointmentId, onClose, onSuccess }: E
 
     if (loadingData) {
         return (
-            <div className="appointment-form-page">
-                <div className="loading-state">
+            <div className={styles.page}>
+                <div className={styles.loadingState}>
                     <i className="fas fa-spinner fa-spin"></i>
                     <p>Loading appointment data...</p>
                 </div>
@@ -241,20 +242,20 @@ const EditAppointmentForm = ({ patientId, appointmentId, onClose, onSuccess }: E
     }
 
     return (
-        <div className="appointment-form-page">
+        <div className={styles.page}>
             {/* Page Header */}
-            <header className="page-header">
+            <header className={styles.pageHeader}>
                 <div>
                     <h1><i className="fas fa-calendar-edit"></i> Edit Appointment</h1>
-                    <p>Patient #{patientId}</p>
+                    <p>Patient #{personId}</p>
                 </div>
-                <button className="close-button" onClick={onClose} title="Close">
+                <button className={styles.closeButton} onClick={onClose} title="Close">
                     <i className="fas fa-times"></i>
                 </button>
             </header>
 
             {/* Main Content: 3 Columns */}
-            <div className="page-content">
+            <div className={styles.pageContent}>
                 {/* Calendar Picker (LEFT + MIDDLE columns) */}
                 <SimplifiedCalendarPicker
                     onSelectDateTime={handleDateTimeSelection}
@@ -262,37 +263,37 @@ const EditAppointmentForm = ({ patientId, appointmentId, onClose, onSuccess }: E
                 />
 
                 {/* RIGHT COLUMN: Form */}
-                <div className="form-column">
-                    <div className="form-header">
+                <div className={styles.formColumn}>
+                    <div className={styles.formHeader}>
                         <h2><i className="fas fa-clipboard-list"></i> Appointment Details</h2>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="appointment-form">
+                    <form onSubmit={handleSubmit} className={styles.form}>
                         {error && (
-                            <div className="alert alert-error">
+                            <div className={cn(styles.alert, styles.alertError)}>
                                 <i className="fas fa-exclamation-circle"></i>
                                 <span>{error}</span>
                             </div>
                         )}
 
-                        <div className="form-field">
+                        <div className={styles.formField}>
                             <label><i className="fas fa-calendar-check"></i> Selected Time</label>
-                            <div className={`selected-time ${formData.AppDate && formData.AppTime ? 'has-value' : ''}`}>
+                            <div className={cn(styles.selectedTime, { [styles.hasValue]: formData.AppDate && formData.AppTime })}>
                                 {getDateTimeDisplay()}
                             </div>
                             {(validation.AppDate || validation.AppTime) && (
-                                <span className="field-error">{validation.AppDate || validation.AppTime}</span>
+                                <span className={styles.fieldError}>{validation.AppDate || validation.AppTime}</span>
                             )}
                         </div>
 
-                        <div className="form-field">
+                        <div className={styles.formField}>
                             <label htmlFor="doctor"><i className="fas fa-user-md"></i> Doctor</label>
                             <select
                                 id="doctor"
                                 name="DrID"
                                 value={formData.DrID}
                                 onChange={handleInputChange}
-                                className={validation.DrID ? 'error' : ''}
+                                className={validation.DrID ? styles.error : ''}
                             >
                                 <option value="">Select doctor...</option>
                                 {doctors.filter(d => d.ID).map((doctor) => (
@@ -301,17 +302,17 @@ const EditAppointmentForm = ({ patientId, appointmentId, onClose, onSuccess }: E
                                     </option>
                                 ))}
                             </select>
-                            {validation.DrID && <span className="field-error">{validation.DrID}</span>}
+                            {validation.DrID && <span className={styles.fieldError}>{validation.DrID}</span>}
                         </div>
 
-                        <div className="form-field">
+                        <div className={styles.formField}>
                             <label htmlFor="details"><i className="fas fa-notes-medical"></i> Appointment Type</label>
                             <select
                                 id="details"
                                 name="AppDetail"
                                 value={formData.AppDetail}
                                 onChange={handleInputChange}
-                                className={validation.AppDetail ? 'error' : ''}
+                                className={validation.AppDetail ? styles.error : ''}
                             >
                                 <option value="">Select type...</option>
                                 {details.filter(d => d.ID).map((detail) => (
@@ -320,10 +321,10 @@ const EditAppointmentForm = ({ patientId, appointmentId, onClose, onSuccess }: E
                                     </option>
                                 ))}
                             </select>
-                            {validation.AppDetail && <span className="field-error">{validation.AppDetail}</span>}
+                            {validation.AppDetail && <span className={styles.fieldError}>{validation.AppDetail}</span>}
                         </div>
 
-                        <div className="form-actions">
+                        <div className={styles.formActions}>
                             <button
                                 type="button"
                                 className="btn btn-cancel"

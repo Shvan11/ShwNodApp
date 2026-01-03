@@ -286,7 +286,7 @@ export const routesConfig: RouteObject[] = [
         children: [
           // Specific route for diagnosis with workId in path
           {
-            path: ':patientId/work/:workId/diagnosis',
+            path: ':personId/work/:workId/diagnosis',
             element: (
               <RouteErrorBoundary routeName="Patient Diagnosis">
                 <PatientShell />
@@ -300,7 +300,7 @@ export const routesConfig: RouteObject[] = [
           //        payments, new-appointment, edit-appointment/:id,
           //        patient-info, edit-patient
           {
-            path: ':patientId/:page/*',
+            path: ':personId/:page/*',
             element: (
               <RouteErrorBoundary routeName="Patient Portal">
                 <PatientShell />
@@ -311,7 +311,7 @@ export const routesConfig: RouteObject[] = [
 
           // Default patient route - redirect to works
           {
-            path: ':patientId',
+            path: ':personId',
             element: <Navigate to="works" replace />,
           },
 

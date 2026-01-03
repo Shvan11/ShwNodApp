@@ -1,0 +1,611 @@
+/**
+ * SimplifiedCalendarPicker - CSS Module
+ * Calendar column and schedule column styles
+ */
+
+/* ==================== CONTAINER ==================== */
+
+.container {
+    display: contents;
+}
+
+/* ==================== LEFT COLUMN: CALENDAR ==================== */
+
+.calendarColumn {
+    background: white;
+    border-right: 1px solid var(--gray-200);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+/* Jump to Days Ahead */
+.jumpToDays {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    align-items: center;
+}
+
+.daysAheadInput {
+    flex: 1;
+    padding: 8px 12px;
+    border: 2px solid var(--gray-200);
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.2s;
+}
+
+.daysAheadInput:focus {
+    outline: none;
+    border-color: var(--color-purple-light);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.daysAheadInput::placeholder {
+    color: var(--gray-400);
+}
+
+.jumpBtn {
+    background: var(--color-purple-light);
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.jumpBtn:hover {
+    background: var(--indigo-500);
+    transform: translateX(2px);
+}
+
+/* Full Calendar Link */
+.fullCalendarLink {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--gray-50);
+    border: 2px solid var(--gray-200);
+    border-radius: 6px;
+    color: var(--gray-600);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+    margin-bottom: 12px;
+}
+
+.fullCalendarLink:hover {
+    background: var(--color-purple-light);
+    color: white;
+    border-color: var(--color-purple-light);
+    transform: translateY(-1px);
+}
+
+.calendarHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.monthNavBtn {
+    background: var(--gray-50);
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--gray-600);
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.monthNavBtn:hover {
+    background: var(--color-purple-light);
+    color: white;
+}
+
+.monthDisplay {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.monthName {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.monthNameText {
+    font-size: 11px;
+    color: var(--gray-500);
+    font-weight: 500;
+}
+
+.calendarWeekdays {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.weekday {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gray-500);
+    padding: 4px 0;
+}
+
+.calendarDays {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    margin-bottom: 16px;
+}
+
+.calendarDay {
+    aspect-ratio: 1;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--gray-50);
+    color: var(--gray-600);
+    transition: all 0.2s;
+}
+
+.calendarDay.empty {
+    background: transparent;
+}
+
+.calendarDay.past {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.calendarDay.today {
+    background: var(--info-50);
+    color: var(--blue-700);
+    font-weight: 600;
+}
+
+.calendarDay.hasSlots {
+    background: var(--success-50);
+    color: var(--success-600);
+}
+
+.calendarDay.selected {
+    background: var(--color-purple-light);
+    color: white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+}
+
+.calendarDay.holiday {
+    background: var(--error-50);
+    color: var(--error-600);
+    border: 2px solid var(--error-300);
+    cursor: not-allowed;
+}
+
+.calendarDay.holiday:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.calendarDay.clickable {
+    cursor: pointer;
+}
+
+.calendarDay.clickable:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dayNum {
+    position: relative;
+    z-index: 1;
+}
+
+.slotCount {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: var(--blue-700);
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.holidayIndicator {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    color: var(--error-500);
+    font-size: 8px;
+}
+
+.holidayIndicator i {
+    filter: drop-shadow(0 0 1px rgba(0,0,0,0.3));
+}
+
+.todayBtn {
+    background: var(--gray-50);
+    border: none;
+    padding: 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--gray-600);
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.todayBtn:hover {
+    background: var(--color-purple-light);
+    color: white;
+}
+
+/* ==================== MIDDLE COLUMN: SCHEDULE ==================== */
+
+.scheduleColumn {
+    background: var(--gray-50);
+    padding: 20px;
+    overflow-y: auto;
+    border-right: 1px solid var(--gray-200);
+}
+
+.emptyState {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray-500);
+    text-align: center;
+    gap: 12px;
+}
+
+.emptyState i {
+    font-size: 48px;
+    opacity: 0.5;
+}
+
+.emptyState.error {
+    color: var(--error-color);
+}
+
+.scheduleHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.scheduleHeader h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.availableCount {
+    background: var(--color-purple-light);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Slots Grid: 2 columns */
+.slotsGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+/* Afternoon slots toggle */
+.afternoonToggle {
+    background: var(--gray-50);
+    border: 2px dashed var(--gray-300);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 12px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.2s;
+    grid-column: 1 / -1;
+}
+
+.afternoonToggle:hover {
+    background: var(--gray-100);
+    border-color: var(--gray-400);
+}
+
+.afternoonToggleText {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-600);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.afternoonToggleIcon {
+    color: var(--gray-500);
+    transition: transform 0.2s;
+}
+
+.afternoonToggleIcon.expanded {
+    transform: rotate(180deg);
+}
+
+.timeSlot {
+    background: white;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 12px;
+    transition: all 0.2s;
+}
+
+.timeSlot.clickable {
+    cursor: pointer;
+}
+
+.timeSlot.available {
+    border-color: var(--success-color);
+    background: var(--success-50);
+}
+
+.timeSlot.available:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(67, 160, 71, 0.2);
+}
+
+.timeSlot.booked {
+    border-color: var(--blue-700);
+    background: var(--info-50);
+}
+
+.timeSlot.booked:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.2);
+}
+
+.timeSlot.full {
+    border-color: var(--warning-orange);
+    background: var(--warning-50);
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.timeSlot.past {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.slotHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.slotTime {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--gray-700);
+}
+
+.addMore {
+    background: var(--success-color);
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.slotAppointments {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.aptItem {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 6px 8px;
+    border-radius: 4px;
+    border-left: 3px solid var(--blue-700);
+}
+
+.aptName {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 2px;
+}
+
+.aptType {
+    font-size: 12px;
+    color: var(--gray-500);
+}
+
+.slotEmpty {
+    color: var(--success-color);
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ==================== RESPONSIVE ==================== */
+
+@media (max-width: 1200px) {
+    .slotsGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 992px) {
+    .calendarColumn,
+    .scheduleColumn {
+        border-right: none;
+        border-bottom: 1px solid var(--gray-200);
+    }
+
+    .slotsGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .calendarColumn,
+    .scheduleColumn {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--gray-200);
+        padding: 16px;
+        max-height: none;
+        overflow-y: visible;
+    }
+
+    .calendarColumn {
+        padding: 12px;
+    }
+
+    .calendarHeader {
+        margin-bottom: 12px;
+    }
+
+    .monthName {
+        font-size: 14px;
+    }
+
+    .calendarDays {
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+
+    .calendarDay {
+        font-size: 12px;
+        min-height: 36px;
+    }
+
+    .jumpToDays {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .daysAheadInput,
+    .jumpBtn {
+        width: 100%;
+    }
+
+    .jumpBtn {
+        height: 44px;
+        font-size: 16px;
+    }
+
+    .fullCalendarLink {
+        padding: 12px;
+        font-size: 14px;
+    }
+
+    .scheduleColumn {
+        padding: 16px 12px;
+    }
+
+    .scheduleHeader h3 {
+        font-size: 16px;
+    }
+
+    .slotsGrid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .timeSlot {
+        padding: 14px;
+    }
+
+    .slotTime {
+        font-size: 18px;
+    }
+
+    .aptName {
+        font-size: 15px;
+    }
+
+    .aptType {
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 480px) {
+    .calendarColumn,
+    .scheduleColumn {
+        padding: 12px 8px;
+    }
+
+    .calendarDays {
+        gap: 4px;
+    }
+
+    .calendarDay {
+        font-size: 11px;
+        min-height: 32px;
+    }
+
+    .slotCount {
+        width: 14px;
+        height: 14px;
+        font-size: 8px;
+    }
+
+    .timeSlot {
+        padding: 12px;
+    }
+
+    .slotTime {
+        font-size: 16px;
+    }
+}

@@ -13,7 +13,7 @@ import ViewPatientInfo from './ViewPatientInfo';
 import PatientAppointments from './PatientAppointments';
 import AddPatientForm from './AddPatientForm';
 import Diagnosis from '../../pages/Diagnosis';
-import '../../../css/components/new-work-component.css';
+// new-work-component.css -> NewWorkComponent.module.css
 
 interface ContentRendererParams {
     tpCode?: string;
@@ -22,12 +22,13 @@ interface ContentRendererParams {
 }
 
 interface ContentRendererProps {
-    patientId?: string;
+    personId?: number | null;  // Validated PersonID from loader (null if invalid/new)
     page?: string;
     params?: ContentRendererParams;
+    isNewPatient?: boolean;
 }
 
-const ContentRenderer = ({ patientId, page = 'photos', params = {} }: ContentRendererProps) => {
+const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient = false }: ContentRendererProps) => {
     const navigate = useNavigate();
     const wildcardParams = useParams<{ '*': string }>();
     const [searchParams] = useSearchParams();
@@ -54,7 +55,7 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }: ContentRen
             case 'photos':
                 return (
                     <GridComponent
-                        patientId={patientId}
+                        personId={personId}
                         tpCode={tpCode ? tpCode.replace('tp', '') : '0'}
                     />
                 );
@@ -62,7 +63,7 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }: ContentRen
             case 'xrays':
                 return (
                     <XraysComponent
-                        patientId={patientId}
+                        personId={personId}
                     />
                 );
 
@@ -71,7 +72,7 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }: ContentRen
                 return (
                     <VisitsComponent
                         workId={workId ? parseInt(workId) : null}
-                        patientId={patientId ? parseInt(patientId) : null}
+                        personId={personId}
                     />
                 );
 
@@ -83,11 +84,11 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }: ContentRen
                         visitId={visitId ? parseInt(visitId) : null}
                         onSave={() => {
                             // Navigate back to works page after save
-                            navigate(`/patient/${patientId}/works`);
+                            if (personId) navigate(`/patient/${personId}/works`);
                         }}
                         onCancel={() => {
                             // Navigate back to works page on cancel
-                            navigate(`/patient/${patientId}/works`);
+                            if (personId) navigate(`/patient/${personId}/works`);
                         }}
                     />
                 );
@@ -99,7 +100,7 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }: ContentRen
                     return <Diagnosis />;
                 }
                 // If just /work, redirect to /works
-                navigate(`/patient/${patientId}/works`, { replace: true });
+                if (personId) navigate(`/patient/${personId}/works`, { replace: true });
                 return null;
 
             case 'diagnosis':
@@ -110,7 +111,7 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }: ContentRen
             case 'works':
                 return (
                     <WorkComponent
-                        patientId={patientId}
+                        personId={personId}
                     />
                 );
 
@@ -118,16 +119,16 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }: ContentRen
                 // New work form - uses NewWorkComponent
                 return (
                     <NewWorkComponent
-                        patientId={patientId}
+                        personId={personId}
                         workId={workId ? parseInt(workId) : null}
                         onSave={(result: unknown) => {
                             console.log('Work saved successfully:', result);
                             // Navigate back to works page
-                            navigate(`/patient/${patientId}/works`);
+                            if (personId) navigate(`/patient/${personId}/works`);
                         }}
                         onCancel={() => {
                             // Go back to works page
-                            navigate(`/patient/${patientId}/works`);
+                            if (personId) navigate(`/patient/${personId}/works`);
                         }}
                     />
                 );
@@ -135,7 +136,7 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }: ContentRen
             case 'compare':
                 return (
                     <CompareComponent
-                        patientId={patientId}
+                        personId={personId}
                         phone={params.phone}
                     />
                 );
@@ -176,14 +177,14 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }: ContentRen
             case 'appointments':
                 return (
                     <PatientAppointments
-                        patientId={patientId}
+                        personId={personId}
                     />
                 );
 
             case 'new-appointment':
                 return (
                     <AppointmentForm
-                        patientId={patientId}
+                        personId={personId}
                         onClose={() => {
                             // Go back to previous page
                             navigate(-1);
@@ -191,7 +192,7 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }: ContentRen
                         onSuccess={(result: unknown) => {
                             console.log('Appointment created successfully:', result);
                             // Navigate to works page after success
-                            navigate(`/patient/${patientId}/works`);
+                            if (personId) navigate(`/patient/${personId}/works`);
                         }}
                     />
                 );
@@ -200,7 +201,7 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }: ContentRen
                 // Handle edit-appointment/:appointmentId pattern
                 return (
                     <EditAppointmentForm
-                        patientId={patientId}
+                        personId={personId}
                         appointmentId={appointmentId}
                         onClose={() => {
                             // Go back to previous page
@@ -217,19 +218,19 @@ const ContentRenderer = ({ patientId, page = 'photos', params = {} }: ContentRen
             case 'patient-info':
                 return (
                     <ViewPatientInfo
-                        patientId={patientId}
+                        personId={personId}
                     />
                 );
 
             case 'edit-patient':
                 return (
                     <EditPatientComponent
-                        patientId={patientId}
+                        personId={personId}
                     />
                 );
 
             case 'add':
-                // Add new patient form (when patientId is "new")
+                // Add new patient form (when isNewPatient is true)
                 return (
                     <AddPatientForm
                         onSuccess={(newPatientId: string | number) => {

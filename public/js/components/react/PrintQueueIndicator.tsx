@@ -6,14 +6,15 @@
 
 import { useState } from 'react';
 import type { FocusEvent } from 'react';
+import cn from 'classnames';
 import {
     usePrintQueue,
     type PrintQueueItem,
     type PatientGroup
 } from '../../contexts/PrintQueueContext';
 
-// Import CSS
-import '../../../css/components/print-queue-indicator.css';
+// CSS Module import
+import styles from './PrintQueueIndicator.module.css';
 
 interface QueueItemProps {
     item: PrintQueueItem;
@@ -26,13 +27,13 @@ interface QueueItemProps {
  */
 function QueueItemComponent({ item, onRemove }: QueueItemProps) {
     return (
-        <div className="queue-item">
-            <div className="queue-item-info">
-                <span className="queue-item-batch">Batch #{item.batchNumber}</span>
-                <span className="queue-item-labels">{item.labels.length} labels</span>
+        <div className={styles.item}>
+            <div className={styles.itemInfo}>
+                <span className={styles.itemBatch}>Batch #{item.batchNumber}</span>
+                <span className={styles.itemLabels}>{item.labels.length} labels</span>
             </div>
             <button
-                className="queue-item-remove"
+                className={styles.itemRemove}
                 onClick={() => onRemove(item.id)}
                 title="Remove from queue"
                 aria-label="Remove batch from queue"
@@ -57,9 +58,9 @@ interface PatientGroupProps {
  */
 function PatientGroupComponent({ group, onRemove }: PatientGroupProps) {
     return (
-        <div className="queue-patient-group">
-            <div className="queue-patient-name">{group.patientName}</div>
-            <div className="queue-patient-batches">
+        <div className={styles.patientGroup}>
+            <div className={styles.patientName}>{group.patientName}</div>
+            <div className={styles.patientBatches}>
                 {group.batches.map(item => (
                     <QueueItemComponent key={item.id} item={item} onRemove={onRemove} />
                 ))}
@@ -121,26 +122,26 @@ export default function PrintQueueIndicator({ onPrintAll }: PrintQueueIndicatorP
     };
 
     return (
-        <div className={`print-queue-indicator ${isExpanded ? 'expanded' : ''}`}>
+        <div className={cn(styles.container, { [styles.expanded]: isExpanded })}>
             {/* Collapsed badge */}
             <button
-                className="queue-badge"
+                className={styles.badge}
                 onClick={handleToggleExpand}
                 aria-expanded={isExpanded}
                 aria-label={`Print queue: ${stats.batchCount} batches, ${stats.totalLabels} labels`}
             >
-                <svg className="queue-badge-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg className={styles.badgeIcon} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="6" y="2" width="12" height="6" rx="1" />
                     <rect x="4" y="8" width="16" height="12" rx="1" />
                     <line x1="9" y1="14" x2="15" y2="14" />
                     <line x1="9" y1="17" x2="12" y2="17" />
                 </svg>
-                <span className="queue-badge-text">
+                <span className={styles.badgeText}>
                     {stats.batchCount} {stats.batchCount === 1 ? 'batch' : 'batches'}
-                    <span className="queue-badge-labels">({stats.totalLabels} labels)</span>
+                    <span className={styles.badgeLabels}>({stats.totalLabels} labels)</span>
                 </span>
                 <svg
-                    className={`queue-badge-chevron ${isExpanded ? 'up' : 'down'}`}
+                    className={cn(styles.badgeChevron, { up: isExpanded })}
                     width="16"
                     height="16"
                     viewBox="0 0 24 24"
@@ -154,36 +155,36 @@ export default function PrintQueueIndicator({ onPrintAll }: PrintQueueIndicatorP
 
             {/* Expanded panel */}
             {isExpanded && (
-                <div className="queue-panel">
-                    <div className="queue-panel-header">
+                <div className={styles.panel}>
+                    <div className={styles.panelHeader}>
                         <h3>Print Queue</h3>
                         {stats.patientCount > 1 && (
-                            <span className="queue-panel-subtitle">
+                            <span className={styles.panelSubtitle}>
                                 {stats.patientCount} patients
                             </span>
                         )}
                     </div>
 
-                    <div className="queue-panel-content">
+                    <div className={styles.panelContent}>
                         {groupedQueue.map(group => (
                             <PatientGroupComponent
-                                key={group.patientId}
+                                key={group.personId}
                                 group={group}
                                 onRemove={removeFromQueue}
                             />
                         ))}
                     </div>
 
-                    <div className="queue-panel-actions">
+                    <div className={styles.panelActions}>
                         <button
-                            className={`queue-btn-clear ${showClearConfirm ? 'confirm' : ''}`}
+                            className={cn(styles.btnClear, { [styles.confirm]: showClearConfirm })}
                             onClick={handleClearClick}
                             onBlur={handleClearBlur}
                         >
                             {showClearConfirm ? 'Confirm Clear' : 'Clear All'}
                         </button>
                         <button
-                            className="queue-btn-print"
+                            className={styles.btnPrint}
                             onClick={handlePrintAll}
                         >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

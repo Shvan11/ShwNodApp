@@ -37,7 +37,6 @@ export interface ColumnValue {
  */
 export interface Patient {
   PersonID: number;
-  patientID?: string;
   PatientName: string;
   FirstName?: string | null;
   LastName?: string | null;

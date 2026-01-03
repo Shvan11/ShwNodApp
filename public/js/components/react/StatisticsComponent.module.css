@@ -1,0 +1,1488 @@
+/* Statistics Page Styles - CSS Module */
+
+.statisticsContainer {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Page Title */
+.pageTitle {
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--border-color, var(--gray-200));
+}
+
+.pageTitle h1 {
+    font-size: 2rem;
+    color: var(--primary-color, var(--color-dark-blue));
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 0;
+}
+
+.pageTitle h1 i {
+    color: var(--accent-color, var(--info-color));
+}
+
+/* Controls Section */
+.controlsSection {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dateSelector {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dateDisplay {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btnNav {
+    padding: 0.75rem 1rem;
+    background-color: var(--primary-color, var(--info-color));
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+}
+
+.btnNav:hover:not(:disabled) {
+    background-color: var(--primary-dark, var(--info-600));
+    transform: translateY(-2px);
+}
+
+.btnNav:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.formSelect,
+.formInput {
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-color, var(--gray-300));
+    border-radius: 8px;
+    font-size: 1rem;
+    min-width: 120px;
+}
+
+.formInput[type="number"] {
+    width: 100px;
+}
+
+.actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.btnAction {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background-color: var(--accent-color, var(--success-green));
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+}
+
+.btnAction:hover:not(:disabled) {
+    background-color: var(--accent-dark, var(--success-green));
+    transform: translateY(-2px);
+}
+
+.btnAction:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.faSpin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Loading and Error States */
+.loadingState,
+.errorState {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-top-color: var(--primary-color, var(--info-color));
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+.errorState i {
+    font-size: 3rem;
+    color: var(--danger-color, var(--error-color));
+    margin-bottom: 1rem;
+}
+
+.btnRetry {
+    margin-top: 1rem;
+    padding: 0.75rem 2rem;
+    background-color: var(--primary-color, var(--info-color));
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.btnRetry:hover {
+    background-color: var(--primary-dark, var(--info-600));
+}
+
+/* Summary Cards */
+.summaryCards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.summaryCard {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.summaryCard:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.cardHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.cardHeader i {
+    font-size: 1.5rem;
+}
+
+.cardHeader h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text-color, var(--color-dark-blue));
+}
+
+.summaryCard.revenue .cardHeader i {
+    color: var(--success-green);
+}
+
+.summaryCard.expenses .cardHeader i {
+    color: var(--error-color);
+}
+
+.summaryCard.profit .cardHeader i {
+    color: var(--info-color);
+}
+
+.summaryCard.cashbox .cardHeader i {
+    color: var(--warning-color);
+}
+
+.cardContent {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.amountRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background-color: rgba(0, 0, 0, 0.02);
+    border-radius: 6px;
+}
+
+.amountRow .currency {
+    font-weight: 600;
+    color: var(--text-secondary, var(--gray-500));
+    font-size: 0.9rem;
+}
+
+.amountRow .amount {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--text-color, var(--color-dark-blue));
+}
+
+/* View Mode Selector */
+.viewModeSelector {
+    display: flex;
+    gap: var(--spacing-sm, 0.5rem);
+    margin-bottom: var(--spacing-lg, 1.5rem);
+    padding: var(--spacing-sm, 0.5rem);
+    background-color: var(--background-secondary, #f8f9fa);
+    border-radius: var(--radius-lg, 0.5rem);
+    width: fit-content;
+}
+
+.viewModeBtn {
+    padding: var(--spacing-sm, 0.5rem) var(--spacing-lg, 1.5rem);
+    border: none;
+    background-color: transparent;
+    color: var(--text-secondary, #6c757d);
+    font-size: var(--font-size-sm, 0.875rem);
+    font-weight: 500;
+    border-radius: var(--radius-md, 0.25rem);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.viewModeBtn:hover {
+    background-color: var(--background-primary, #ffffff);
+    color: var(--text-primary, #212529);
+}
+
+.viewModeBtn.active {
+    background-color: var(--primary-color, #007bff);
+    color: white;
+    box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+/* Period Selector for Monthly View */
+.periodSelector {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg, 1.5rem);
+    padding: var(--spacing-md, 1rem) var(--spacing-lg, 1.5rem);
+    background: linear-gradient(135deg, var(--background-secondary, #f8f9fa) 0%, #e9ecef 100%);
+    border-radius: var(--radius-lg, 0.5rem);
+    margin-bottom: var(--spacing-lg, 1.5rem);
+    border: 1px solid var(--border-color, #dee2e6);
+    flex-wrap: wrap;
+}
+
+.periodSelectorLabel {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm, 0.5rem);
+    font-weight: 600;
+    color: var(--text-primary, #212529);
+    white-space: nowrap;
+}
+
+.periodSelectorLabel i {
+    color: var(--primary-color, #007bff);
+    font-size: 1.1rem;
+}
+
+.periodSelectorControls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md, 1rem);
+    flex-wrap: wrap;
+}
+
+.periodSelectorField {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm, 0.5rem);
+}
+
+.periodSelectorField label {
+    font-size: var(--font-size-sm, 0.875rem);
+    color: var(--text-secondary, #6c757d);
+    font-weight: 500;
+}
+
+.periodSelectorField .formSelect,
+.periodSelectorField .formInput {
+    padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
+    min-width: auto;
+}
+
+.periodSelectorField .formInput[type="number"] {
+    width: 100px;
+    min-width: 100px;
+    text-align: center;
+}
+
+.periodSelectorArrow {
+    color: var(--text-secondary, #6c757d);
+    padding: 0 var(--spacing-sm, 0.5rem);
+}
+
+.periodEndDisplay {
+    font-weight: 600;
+    color: var(--primary-color, #007bff);
+    background: var(--background-primary, #ffffff);
+    padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
+    border-radius: var(--radius-md, 0.25rem);
+    border: 1px solid var(--border-color, #dee2e6);
+}
+
+.periodSelectorLoading {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm, 0.5rem);
+    color: var(--text-secondary, #6c757d);
+    font-size: var(--font-size-sm, 0.875rem);
+}
+
+/* Charts Section */
+.chartsSection {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: var(--spacing-lg, 1.5rem);
+    margin-bottom: var(--spacing-lg, 2rem);
+}
+
+/* Single chart layout */
+.chartsSectionSingle {
+    grid-template-columns: 1fr;
+}
+
+.chartCard {
+    background: var(--background-primary, white);
+    border-radius: var(--radius-lg, 12px);
+    padding: var(--spacing-lg, 1.5rem);
+    box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.1));
+}
+
+/* Chart Controls - View mode selector inside chart card */
+.chartControls {
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--spacing-md, 1rem);
+}
+
+.chartControls .viewModeSelector {
+    margin-bottom: 0;
+}
+
+/* Period selector when inside chart card */
+.chartCard .periodSelector {
+    margin-bottom: var(--spacing-md, 1rem);
+}
+
+.chartCardFull {
+    max-width: 100%;
+}
+
+.chartCard h3 {
+    margin: 0 0 var(--spacing-md, 1rem) 0;
+    color: var(--text-primary, var(--color-dark-blue));
+    font-size: var(--font-size-lg, 1.2rem);
+}
+
+.chartContainer {
+    position: relative;
+    height: 300px;
+    padding: var(--spacing-sm, 0.5rem);
+}
+
+.chartContainerLarge {
+    height: 400px;
+    padding: var(--spacing-md, 1rem);
+}
+
+/* Table Section */
+.tableSection {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.tableSection h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-color, var(--color-dark-blue));
+    font-size: 1.2rem;
+}
+
+.tableWrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.dataTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    min-width: 900px;
+}
+
+.dataTable thead {
+    background-color: var(--primary-color, var(--info-color));
+    color: white;
+}
+
+.dataTable th,
+.dataTable td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color, var(--gray-200));
+    white-space: nowrap;
+}
+
+.dataTable th {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+}
+
+.dataTable tfoot {
+    background-color: rgba(52, 152, 219, 0.1);
+    font-weight: bold;
+}
+
+.dataTable tfoot td {
+    border-top: 2px solid var(--primary-color, var(--info-color));
+}
+
+.dataTable .amountCell {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+    font-weight: 500;
+    white-space: normal;
+    word-break: break-word;
+    vertical-align: middle;
+}
+
+.amountCell.negative {
+    color: var(--danger-color, var(--error-color));
+}
+
+.amountCell.grandTotal {
+    color: var(--primary-color, var(--info-color));
+    font-weight: bold;
+}
+
+/* Qasa (Cash Box) Columns - Highlighted for Daily Auditing */
+.qasaColumn {
+    background-color: rgba(243, 156, 18, 0.1);
+    font-weight: 600;
+}
+
+.qasaIqd {
+    color: var(--success-green);
+}
+
+.qasaUsd {
+    color: var(--warning-orange);
+}
+
+th.qasaColumn {
+    background-color: var(--warning-color);
+    color: white;
+}
+
+.totalRow {
+    font-size: 1rem;
+}
+
+/* Print Styles */
+@media print {
+    .controlsSection,
+    .pageTitle {
+        display: none !important;
+    }
+
+    .summaryCard,
+    .chartCard,
+    .tableSection {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid var(--gray-300);
+    }
+
+    .statisticsContainer {
+        padding: 1rem 0;
+        padding-top: 0;
+    }
+
+    body {
+        background: white;
+    }
+
+    /* Add title for print */
+    .statisticsContainer::before {
+        content: "Financial Statistics Report";
+        display: block;
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid var(--text-color);
+    }
+}
+
+/* Clickable Rows */
+.clickableRow {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.clickableRow:hover {
+    background-color: rgba(52, 152, 219, 0.1);
+}
+
+/* ===================================================================
+   STATISTICS DAILY INVOICES MODAL - Completely Isolated Styles
+   =================================================================== */
+
+/* Modal Overlay */
+.statisticsModalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+/* Modal Container */
+.statisticsModalContainer {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    width: 1200px;
+    max-width: 95vw;
+    height: 85vh;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Modal Header */
+.statisticsModalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
+    color: white;
+    flex-shrink: 0;
+}
+
+.statisticsModalHeader h2 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.5rem;
+}
+
+.statisticsModalClose {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.3s ease;
+}
+
+.statisticsModalClose:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+}
+
+/* Modal Body */
+.statisticsModalBody {
+    flex: 1;
+    padding: 2rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Invoice Summary */
+.statisticsInvoiceSummary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-300) 100%);
+    border-radius: 8px;
+}
+
+.statisticsInvoiceSummary .summaryItem {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.statisticsInvoiceSummary .summaryItem .label {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    font-weight: 500;
+}
+
+.statisticsInvoiceSummary .summaryItem .value {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--color-dark-blue);
+}
+
+.statisticsInvoiceSummary .summaryItem.highlight {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 1rem;
+    border-radius: 6px;
+}
+
+.statisticsInvoiceSummary .summaryItem .value.negative {
+    color: var(--error-color);
+}
+
+/* Table Wrapper */
+.statisticsTableWrapper {
+    margin-bottom: 1rem;
+}
+
+/* Invoices Table */
+.statisticsInvoicesTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.statisticsInvoicesTable thead {
+    background-color: var(--info-color);
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.statisticsInvoicesTable th {
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+}
+
+.statisticsInvoicesTable td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.statisticsInvoicesTable tbody tr:hover {
+    background-color: rgba(52, 152, 219, 0.05);
+}
+
+.statisticsInvoicesTable .invoiceId {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    color: var(--info-color);
+}
+
+.statisticsInvoicesTable .patientName {
+    font-weight: 500;
+}
+
+.statisticsInvoicesTable .currencyBadge .badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.statisticsInvoicesTable .currencyBadge .badge.IQD {
+    background: var(--success-green);
+    color: white;
+}
+
+.statisticsInvoicesTable .currencyBadge .badge.USD {
+    background: var(--info-color);
+    color: white;
+}
+
+/* Empty State */
+.emptyState {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+}
+
+.emptyState i {
+    font-size: 3rem;
+    color: var(--gray-400);
+    margin-bottom: 1rem;
+}
+
+.emptyState p {
+    color: var(--gray-500);
+    font-size: 1.1rem;
+}
+
+/* Modal Footer */
+.statisticsModalFooter {
+    padding: 1rem 2rem;
+    border-top: 1px solid var(--gray-200);
+    display: flex;
+    justify-content: flex-end;
+    flex-shrink: 0;
+}
+
+.statisticsBtnClose {
+    padding: 0.75rem 2rem;
+    background-color: var(--gray-400);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease;
+}
+
+.statisticsBtnClose:hover {
+    background-color: var(--gray-500);
+}
+
+/* ===== RESPONSIVE MOBILE DESIGN ===== */
+
+/* Tablets and medium screens */
+@media (max-width: 1024px) {
+    .statisticsContainer {
+        padding: 1.5rem;
+    }
+
+    .controlsSection {
+        padding: 1.25rem;
+    }
+
+    .summaryCards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .chartsSection {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Mobile devices */
+@media (max-width: 768px) {
+    .statisticsContainer {
+        padding: 1rem;
+    }
+
+    .pageTitle h1 {
+        font-size: 1.5rem;
+    }
+
+    .controlsSection {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+    }
+
+    .dateSelector {
+        flex-direction: column;
+        width: 100%;
+        align-items: stretch;
+    }
+
+    .dateDisplay {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .formSelect,
+    .formInput {
+        width: 100%;
+        padding: 12px;
+        font-size: 16px;
+        min-height: 44px;
+    }
+
+    .btnNav,
+    .btnAction {
+        width: 100%;
+        padding: 12px 16px;
+        font-size: 16px;
+        min-height: 48px;
+        justify-content: center;
+    }
+
+    .actions {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .summaryCards {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .summaryCard {
+        padding: 1.25rem;
+    }
+
+    .chartsSection {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+
+    .chartContainer {
+        height: 250px;
+    }
+
+    /* Period selector responsive */
+    .periodSelector {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-md, 1rem);
+        padding: var(--spacing-md, 1rem);
+    }
+
+    .periodSelectorLabel {
+        justify-content: center;
+    }
+
+    .periodSelectorControls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-sm, 0.5rem);
+    }
+
+    .periodSelectorField {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-xs, 0.25rem);
+    }
+
+    .periodSelectorField > div {
+        display: flex;
+        gap: var(--spacing-sm, 0.5rem);
+    }
+
+    .periodSelectorField .formSelect,
+    .periodSelectorField .formInput {
+        flex: 1;
+    }
+
+    .periodSelectorArrow {
+        text-align: center;
+        padding: var(--spacing-xs, 0.25rem) 0;
+    }
+
+    .periodEndDisplay {
+        text-align: center;
+    }
+
+    .periodSelectorLoading {
+        justify-content: center;
+    }
+
+    /* CARD-BASED TABLE LAYOUT FOR MOBILE */
+    .tableWrapper {
+        overflow: visible;
+        margin: 0;
+        padding: 0;
+    }
+
+    .dataTable {
+        display: block;
+        font-size: 0.875rem;
+        min-width: 0;
+    }
+
+    .dataTable thead {
+        display: none;
+    }
+
+    .dataTable tbody {
+        display: block;
+    }
+
+    .dataTable tbody tr {
+        display: block;
+        margin-bottom: 1rem;
+        background: white;
+        border: 1px solid var(--border-color, var(--gray-200));
+        border-radius: 8px;
+        padding: 1rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .dataTable tbody tr.clickableRow:active {
+        background-color: rgba(52, 152, 219, 0.05);
+    }
+
+    .dataTable tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.625rem 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        text-align: right;
+        min-width: 0;
+        white-space: normal;
+    }
+
+    .dataTable tbody td:last-child {
+        border-bottom: none;
+    }
+
+    .dataTable tbody td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        text-align: left;
+        flex-shrink: 0;
+        margin-right: 1rem;
+        color: var(--text-secondary, var(--gray-600));
+        font-size: 0.8125rem;
+    }
+
+    .dataTable tbody td:first-child {
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--primary-color, var(--info-color));
+        padding-bottom: 0.75rem;
+        margin-bottom: 0.5rem;
+        border-bottom: 2px solid var(--border-color, var(--gray-200));
+    }
+
+    .dataTable .amountCell {
+        font-family: 'Courier New', monospace;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        white-space: normal;
+        word-break: normal;
+    }
+
+    .dataTable .qasaColumn {
+        background-color: rgba(243, 156, 18, 0.08);
+        padding: 0.75rem;
+        margin: 0.25rem -1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        border-radius: 4px;
+    }
+
+    /* Footer - Keep as summary card */
+    .dataTable tfoot {
+        display: block;
+        background-color: rgba(52, 152, 219, 0.1);
+        border: 2px solid var(--primary-color, var(--info-color));
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+
+    .dataTable tfoot tr {
+        display: block;
+    }
+
+    .dataTable tfoot td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.625rem 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        text-align: right;
+    }
+
+    .dataTable tfoot td:last-child {
+        border-bottom: none;
+    }
+
+    .dataTable tfoot td::before {
+        content: attr(data-label);
+        font-weight: 700;
+        text-align: left;
+        margin-right: 1rem;
+        color: var(--primary-color, var(--info-color));
+        font-size: 0.8125rem;
+    }
+
+    .dataTable tfoot td:first-child {
+        font-size: 1.125rem;
+        color: var(--primary-color, var(--info-color));
+        padding-bottom: 0.75rem;
+        margin-bottom: 0.5rem;
+        border-bottom: 2px solid var(--primary-color, var(--info-color));
+    }
+
+    /* Modal adjustments */
+    .statisticsModalContainer {
+        width: 100%;
+        max-width: 100%;
+        height: 95vh;
+        border-radius: 0;
+    }
+
+    .statisticsModalHeader {
+        padding: 1rem;
+    }
+
+    .statisticsModalHeader h2 {
+        font-size: 1.25rem;
+    }
+
+    .statisticsModalBody {
+        padding: 1rem;
+    }
+
+    .statisticsInvoiceSummary {
+        grid-template-columns: 1fr;
+        padding: 1rem;
+    }
+
+    .statisticsInvoicesTable {
+        font-size: 0.8125rem;
+    }
+
+    .statisticsBtnClose {
+        width: 100%;
+    }
+
+    /* CARD-BASED LAYOUT FOR INVOICES MODAL TABLE */
+    .statisticsTableWrapper {
+        overflow: visible;
+        margin: 0;
+        padding: 0;
+    }
+
+    .statisticsInvoicesTable {
+        display: block;
+        font-size: 0.875rem;
+    }
+
+    .statisticsInvoicesTable thead {
+        display: none;
+    }
+
+    .statisticsInvoicesTable tbody {
+        display: block;
+    }
+
+    .statisticsInvoicesTable tbody tr {
+        display: block;
+        margin-bottom: 1rem;
+        background: white;
+        border: 1px solid var(--border-color, var(--gray-200));
+        border-radius: 8px;
+        padding: 1rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .statisticsInvoicesTable tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.625rem 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        text-align: right;
+    }
+
+    .statisticsInvoicesTable tbody td:last-child {
+        border-bottom: none;
+    }
+
+    .statisticsInvoicesTable tbody td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        text-align: left;
+        flex-shrink: 0;
+        margin-right: 1rem;
+        color: var(--text-secondary, var(--gray-600));
+        font-size: 0.8125rem;
+    }
+
+    /* Invoice ID - Header style */
+    .statisticsInvoicesTable tbody td.invoiceId {
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--info-color);
+        padding-bottom: 0.75rem;
+        margin-bottom: 0.5rem;
+        border-bottom: 2px solid var(--border-color, var(--gray-200));
+        font-family: 'Courier New', monospace;
+    }
+
+    /* Patient Name - Prominent display */
+    .statisticsInvoicesTable tbody td.patientName {
+        font-weight: 600;
+        font-size: 0.9375rem;
+        color: var(--text-primary, var(--color-dark-blue));
+    }
+
+    /* Currency Badge */
+    .statisticsInvoicesTable tbody td.currencyBadge {
+        align-items: center;
+    }
+
+    .statisticsInvoicesTable .badge {
+        padding: 0.375rem 0.875rem;
+        border-radius: 16px;
+        font-size: 0.8125rem;
+        font-weight: 700;
+    }
+
+    .statisticsInvoicesTable .badge.IQD {
+        background: var(--success-green);
+        color: white;
+    }
+
+    .statisticsInvoicesTable .badge.USD {
+        background: var(--info-color);
+        color: white;
+    }
+
+    /* Amount fields */
+    .statisticsInvoicesTable tbody td.amount {
+        font-family: 'Courier New', monospace;
+        font-size: 0.9375rem;
+        font-weight: 600;
+    }
+
+    /* IQD/USD highlight */
+    .statisticsInvoicesTable tbody td.iqd {
+        background-color: rgba(76, 175, 80, 0.05);
+        padding: 0.75rem;
+        margin: 0 -1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        border-radius: 4px;
+    }
+
+    .statisticsInvoicesTable tbody td.usd {
+        background-color: rgba(33, 150, 243, 0.05);
+        padding: 0.75rem;
+        margin: 0 -1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        border-radius: 4px;
+    }
+
+    .statisticsInvoicesTable tbody td.change {
+        color: var(--warning-color, var(--warning-orange));
+        font-weight: 700;
+    }
+}
+
+/* Small mobile devices */
+@media (max-width: 640px) {
+    .statisticsContainer {
+        padding: 0.75rem;
+    }
+
+    .pageTitle h1 {
+        font-size: 1.375rem;
+    }
+
+    .controlsSection {
+        padding: 0.875rem;
+    }
+
+    .summaryCard {
+        padding: 1rem;
+    }
+
+    .cardHeader h3 {
+        font-size: 1rem;
+    }
+
+    .amountRow .amount {
+        font-size: 1.125rem;
+    }
+
+    .chartContainer {
+        height: 220px;
+    }
+
+    /* Card layout adjustments for smaller screens */
+    .dataTable tbody tr {
+        padding: 0.875rem;
+    }
+
+    .dataTable tbody td {
+        padding: 0.5rem 0;
+        font-size: 0.8125rem;
+    }
+
+    .dataTable tbody td::before {
+        font-size: 0.75rem;
+    }
+
+    .dataTable .amountCell {
+        font-size: 0.875rem;
+    }
+
+    .dataTable tfoot {
+        padding: 0.875rem;
+    }
+
+    .dataTable tfoot td {
+        padding: 0.5rem 0;
+        font-size: 0.8125rem;
+    }
+
+    .statisticsModalHeader h2 {
+        font-size: 1.125rem;
+    }
+
+    .statisticsModalBody {
+        padding: 0.875rem;
+    }
+
+    .statisticsInvoiceSummary {
+        padding: 0.875rem;
+    }
+
+    .statisticsInvoicesTable {
+        font-size: 0.75rem;
+    }
+
+    .statisticsInvoicesTable th,
+    .statisticsInvoicesTable td {
+        padding: 8px 6px;
+    }
+
+    /* Refine invoice card layout for smaller screens */
+    .statisticsInvoicesTable tbody tr {
+        padding: 0.875rem;
+    }
+
+    .statisticsInvoicesTable tbody td {
+        padding: 0.5rem 0;
+        font-size: 0.8125rem;
+    }
+
+    .statisticsInvoicesTable tbody td::before {
+        font-size: 0.75rem;
+    }
+
+    .statisticsInvoicesTable tbody td.invoiceId {
+        font-size: 0.9375rem;
+    }
+
+    .statisticsInvoicesTable tbody td.patientName {
+        font-size: 0.875rem;
+    }
+
+    .statisticsInvoicesTable tbody td.amount {
+        font-size: 0.875rem;
+    }
+
+    .statisticsInvoicesTable .badge {
+        padding: 0.3125rem 0.75rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 480px) {
+    .statisticsContainer {
+        padding: 0.625rem;
+    }
+
+    .pageTitle h1 {
+        font-size: 1.25rem;
+    }
+
+    .controlsSection {
+        padding: 0.75rem;
+    }
+
+    .btnNav,
+    .btnAction {
+        padding: 14px;
+    }
+
+    .summaryCard {
+        padding: 0.875rem;
+    }
+
+    .chartContainer {
+        height: 200px;
+    }
+
+    /* Card layout adjustments for smallest screens */
+    .dataTable tbody tr {
+        padding: 0.75rem;
+        margin-bottom: 0.875rem;
+    }
+
+    .dataTable tbody td {
+        padding: 0.5rem 0;
+        font-size: 0.75rem;
+    }
+
+    .dataTable tbody td::before {
+        font-size: 0.6875rem;
+    }
+
+    .dataTable tbody td:first-child {
+        font-size: 0.9375rem;
+    }
+
+    .dataTable .amountCell {
+        font-size: 0.8125rem;
+    }
+
+    .dataTable .qasaColumn {
+        padding: 0.625rem;
+        margin: 0.25rem -0.75rem;
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+
+    .dataTable tfoot {
+        padding: 0.75rem;
+    }
+
+    .dataTable tfoot td {
+        padding: 0.5rem 0;
+        font-size: 0.75rem;
+    }
+
+    .dataTable tfoot td:first-child {
+        font-size: 1rem;
+    }
+
+    .statisticsModalHeader {
+        padding: 0.875rem;
+    }
+
+    .statisticsModalBody {
+        padding: 0.75rem;
+    }
+
+    .statisticsBtnClose {
+        padding: 14px 16px;
+    }
+
+    /* Refine invoice card layout for smallest screens */
+    .statisticsInvoicesTable tbody tr {
+        padding: 0.75rem;
+        margin-bottom: 0.875rem;
+    }
+
+    .statisticsInvoicesTable tbody td {
+        padding: 0.5rem 0;
+        font-size: 0.75rem;
+    }
+
+    .statisticsInvoicesTable tbody td::before {
+        font-size: 0.6875rem;
+    }
+
+    .statisticsInvoicesTable tbody td.invoiceId {
+        font-size: 0.875rem;
+    }
+
+    .statisticsInvoicesTable tbody td.patientName {
+        font-size: 0.8125rem;
+    }
+
+    .statisticsInvoicesTable tbody td.amount {
+        font-size: 0.8125rem;
+    }
+
+    .statisticsInvoicesTable .badge {
+        padding: 0.25rem 0.625rem;
+        font-size: 0.6875rem;
+    }
+
+    .statisticsInvoicesTable tbody td.iqd,
+    .statisticsInvoicesTable tbody td.usd {
+        padding: 0.625rem;
+        margin: 0.25rem -0.75rem;
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .btnNav,
+    .btnAction,
+    .formSelect,
+    .formInput {
+        min-height: 48px;
+    }
+
+    .btnNav:active:not(:disabled),
+    .btnAction:active:not(:disabled) {
+        transform: scale(0.98);
+        opacity: 0.9;
+    }
+
+    .clickableRow {
+        -webkit-tap-highlight-color: rgba(52, 152, 219, 0.1);
+    }
+
+    .clickableRow:active {
+        background-color: rgba(52, 152, 219, 0.15);
+    }
+
+    .statisticsBtnClose:active {
+        transform: scale(0.98);
+    }
+}
+
+/* Helper classes for card types */
+.revenue {}
+.expenses {}
+.profit {}
+.cashbox {}
+.currency {}
+.amount {}
+.negative {}
+.grandTotal {}
+.summaryItem {}
+.label {}
+.value {}
+.highlight {}
+.active {}
+.time {}
+.iqd {}
+.usd {}
+.change {}

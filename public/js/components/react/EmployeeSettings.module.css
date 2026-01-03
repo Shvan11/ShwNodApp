@@ -1,0 +1,686 @@
+/* Employee Settings - Styles for employee management and modal */
+
+/* Main container - reuses many styles from AlignerDoctorsSettings */
+.container {
+    background: white;
+    border-radius: var(--radius-xl);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--gray-200);
+    transition: all 0.3s ease;
+}
+
+.container:hover {
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+/* Section header */
+.sectionHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.headerContent h2 {
+    color: var(--primary-color);
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.sectionDescription {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+/* Add Employee Button */
+.btnAdd {
+    background: var(--primary-color);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.btnAdd:hover:not(:disabled) {
+    background: var(--blue-300);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+}
+
+.btnAdd:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Employee Modal - Overrides for global modal */
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal {
+    background: var(--surface);
+    margin: 0;
+    padding: 0;
+    border-radius: var(--radius-xl);
+    width: 90%;
+    max-width: 900px;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-light);
+    animation: modalSlideIn 0.3s var(--easing-ease-out);
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modalHeader {
+    position: relative;
+    top: auto;
+    z-index: 1;
+    background: var(--surface-elevated);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-bottom: 1px solid var(--border-light);
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modalHeader h3 {
+    margin: 0;
+    color: var(--primary-color);
+    font-size: var(--font-size-xl);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.modalClose {
+    background: none;
+    border: none;
+    font-size: var(--font-size-xl);
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: var(--spacing-xs);
+    border-radius: 50%;
+    transition: all var(--transition-fast);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modalClose:hover {
+    background: var(--gray-200);
+    color: var(--error-color);
+}
+
+.modalBody {
+    padding: var(--spacing-xl);
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modalFooter {
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-md);
+    background: var(--surface-elevated);
+    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+    flex-shrink: 0;
+}
+
+/* Employee Tabs inside modal */
+.tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-light);
+    margin-bottom: var(--spacing-lg);
+    gap: var(--spacing-md);
+}
+
+.tabBtn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-md);
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.tabBtn:hover {
+    color: var(--primary-color);
+}
+
+.tabBtn.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.tabContent {
+    min-height: 300px;
+}
+
+/* Form rows */
+.formRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-xs);
+}
+
+.formGroup {
+    margin-bottom: 0;
+}
+
+.formGroup label {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+    display: block;
+    font-size: 0.95rem;
+}
+
+.required {
+    color: var(--error-color);
+    margin-left: var(--spacing-xs);
+}
+
+.fieldHelp {
+    font-weight: 400;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-left: 0.25rem;
+}
+
+.formGroup input,
+.formGroup select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.75rem;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+}
+
+.formGroup input:focus,
+.formGroup select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+/* Checkbox group */
+.checkboxGroup {
+    background: var(--gray-50);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-light);
+    margin-top: var(--spacing-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.checkboxItem {
+    margin: 0;
+}
+
+.checkboxItem label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    cursor: pointer;
+    width: 100%;
+    padding: var(--spacing-xs) 0;
+}
+
+.checkboxGroup input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    accent-color: var(--primary-color);
+    cursor: pointer;
+    margin: 0;
+}
+
+.checkboxLabel {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-md);
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+/* Action buttons in modal footer */
+.btnCancel {
+    background: var(--gray-500);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.btnCancel:hover {
+    background: var(--gray-600);
+}
+
+.btnSave {
+    background: var(--success-300);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.btnSave:hover {
+    background: var(--success-500);
+}
+
+/* Employees List - reuses table styles from aligner doctors */
+.list {
+    margin-top: 2rem;
+}
+
+/* Empty state */
+.emptyState {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-secondary);
+}
+
+.emptyState i {
+    font-size: 4rem;
+    color: var(--gray-200);
+    margin-bottom: 1rem;
+}
+
+.emptyState p {
+    font-size: 1.1rem;
+    margin: 0.5rem 0;
+}
+
+.emptyStateHint {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* Table styles */
+.tableContainer {
+    overflow-x: auto;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table thead {
+    background: var(--gray-50);
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.table tbody tr {
+    border-bottom: 1px solid var(--gray-200);
+    transition: background-color 0.2s ease;
+}
+
+.table tbody tr:hover {
+    background: var(--gray-50);
+}
+
+.table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.table td {
+    padding: 1rem;
+    color: var(--text-primary);
+}
+
+.employeeName {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.employeeName i {
+    color: var(--primary-color);
+}
+
+.positionBadge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--info-100);
+    color: var(--info-700);
+}
+
+.sortOrderValue {
+    font-family: monospace;
+    color: var(--text-secondary);
+}
+
+.emailValue {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-primary);
+}
+
+.emailValue i {
+    color: var(--info-500);
+}
+
+.noEmail {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Badges */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badgeSuccess {
+    background: var(--success-100);
+    color: var(--success-800);
+}
+
+.badgeInfo {
+    background: var(--info-100);
+    color: var(--info-700);
+}
+
+.badgeMuted {
+    background: var(--gray-100);
+    color: var(--gray-500);
+}
+
+/* Actions column */
+.actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.btnIcon {
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btnEdit {
+    background: var(--info-100);
+    color: var(--info-700);
+}
+
+.btnEdit:hover {
+    background: var(--info-200);
+    transform: scale(1.1);
+}
+
+.btnDelete {
+    background: var(--error-50);
+    color: var(--error-600);
+}
+
+.btnDelete:hover {
+    background: var(--error-100);
+    transform: scale(1.1);
+}
+
+/* Loading and error states */
+.loadingContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+}
+
+.loadingContainer i {
+    font-size: 3rem;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.errorContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+}
+
+.errorContainer i {
+    font-size: 3rem;
+    color: var(--error-400);
+    margin-bottom: 1rem;
+}
+
+.errorContainer p {
+    color: var(--error-600);
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+}
+
+.btnRetry {
+    background: var(--primary-color);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.btnRetry:hover {
+    background: var(--blue-300);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .formRow {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+
+    .modal {
+        width: 95%;
+        margin: 0;
+    }
+
+    .modalHeader,
+    .modalBody,
+    .modalFooter {
+        padding: var(--spacing-md);
+    }
+
+    .sectionHeader {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+
+    .btnAdd {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .table th,
+    .table td {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .modalFooter {
+        flex-direction: column;
+    }
+
+    .btnCancel,
+    .btnSave {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Mobile card layout for table */
+@media (max-width: 480px) {
+    .table thead {
+        display: none;
+    }
+
+    .table,
+    .table tbody,
+    .table tr,
+    .table td {
+        display: block;
+        width: 100%;
+    }
+
+    .table tbody tr {
+        margin-bottom: var(--spacing-md);
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-md);
+        background: white;
+    }
+
+    .table tbody tr:hover {
+        background: var(--gray-50);
+        box-shadow: var(--shadow-md);
+    }
+
+    .table td {
+        padding: var(--spacing-xs) 0;
+        border: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .table td::before {
+        content: attr(data-label);
+        font-weight: var(--font-weight-semibold);
+        color: var(--text-secondary);
+        font-size: var(--font-size-sm);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        flex-shrink: 0;
+        margin-right: var(--spacing-md);
+    }
+
+    /* Hide ID column on mobile */
+    .table td:first-child {
+        display: none;
+    }
+
+    .employeeName {
+        font-size: var(--font-size-lg);
+        font-weight: var(--font-weight-bold);
+    }
+
+    .actions {
+        justify-content: flex-end;
+        gap: var(--spacing-sm);
+        margin-top: var(--spacing-sm);
+        padding-top: var(--spacing-sm);
+        border-top: 1px solid var(--gray-200);
+    }
+
+    .btnIcon {
+        padding: var(--spacing-md);
+        font-size: var(--font-size-lg);
+    }
+
+    .headerContent h2 {
+        font-size: var(--font-size-xl);
+    }
+
+    .btnAdd {
+        padding: var(--spacing-md) var(--spacing-lg);
+        font-size: var(--font-size-sm);
+    }
+}

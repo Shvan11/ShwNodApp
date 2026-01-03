@@ -1,0 +1,61 @@
+/* AlignerLayout.module.css - Container and mode toggle styles */
+
+/* Main container */
+.container {
+    padding: var(--spacing-md);
+}
+
+/* View Mode Toggle */
+.modeToggle {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    position: sticky;
+    top: 50px;
+    z-index: 100;
+    background-color: var(--gray-100);
+}
+
+.modeBtn {
+    background: white;
+    color: var(--text-light);
+    border: 2px solid var(--gray-200);
+    padding: 0.75rem 2rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.modeBtn:hover {
+    border-color: var(--blue-300);
+    color: var(--blue-300);
+}
+
+.modeBtn.active {
+    background: var(--blue-300);
+    color: white;
+    border-color: var(--blue-300);
+}
+
+.modeBtn i {
+    font-size: 1.1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .modeToggle {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .modeBtn {
+        width: 100%;
+    }
+}

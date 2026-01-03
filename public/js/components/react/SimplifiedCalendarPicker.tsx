@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, type ChangeEvent, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
+import cn from 'classnames';
+import styles from './SimplifiedCalendarPicker.module.css';
 
 interface Appointment {
     patientName: string;
@@ -249,36 +251,33 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
         const isPast = slot.slotStatus === 'past';
         const canBook = isAvailable || isBooked;
 
-        const slotClasses = [
-            'time-slot',
-            isAvailable && 'available',
-            isBooked && 'booked',
-            isFull && 'full',
-            isPast && 'past',
-            canBook && 'clickable'
-        ].filter(Boolean).join(' ');
-
         return (
             <div
                 key={slot.time}
-                className={slotClasses}
+                className={cn(styles.timeSlot, {
+                    [styles.available]: isAvailable,
+                    [styles.booked]: isBooked,
+                    [styles.full]: isFull,
+                    [styles.past]: isPast,
+                    [styles.clickable]: canBook
+                })}
                 onClick={() => canBook && handleSlotClick(slot)}
             >
-                <div className="slot-header">
-                    <span className="slot-time">{slot.time}</span>
+                <div className={styles.slotHeader}>
+                    <span className={styles.slotTime}>{slot.time}</span>
                 </div>
 
                 {slot.appointments && slot.appointments.length > 0 ? (
-                    <div className="slot-appointments">
+                    <div className={styles.slotAppointments}>
                         {slot.appointments.map((apt, idx) => (
-                            <div key={idx} className="apt-item">
-                                <div className="apt-name">{apt.patientName}</div>
-                                <div className="apt-type">{apt.appDetail}</div>
+                            <div key={idx} className={styles.aptItem}>
+                                <div className={styles.aptName}>{apt.patientName}</div>
+                                <div className={styles.aptType}>{apt.appDetail}</div>
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <div className="slot-empty">
+                    <div className={styles.slotEmpty}>
                         <i className="fas fa-check-circle"></i> Available
                     </div>
                 )}
@@ -287,11 +286,11 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
     };
 
     return (
-        <div className="calendar-picker-container">
+        <div className={styles.container}>
             {/* LEFT COLUMN: Monthly Calendar */}
-            <div className="calendar-column">
+            <div className={styles.calendarColumn}>
                 {/* Jump to Days Ahead */}
-                <div className="jump-to-days">
+                <div className={styles.jumpToDays}>
                     <input
                         type="number"
                         min="0"
@@ -299,55 +298,45 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                         value={daysAhead}
                         onChange={(e: ChangeEvent<HTMLInputElement>) => setDaysAhead(e.target.value)}
                         onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleJumpToDays()}
-                        className="days-ahead-input"
+                        className={styles.daysAheadInput}
                     />
-                    <button className="jump-btn" onClick={handleJumpToDays} title="Jump to date">
+                    <button className={styles.jumpBtn} onClick={handleJumpToDays} title="Jump to date">
                         <i className="fas fa-arrow-right"></i>
                     </button>
                 </div>
 
                 {/* View Full Calendar Button */}
-                <Link to="/calendar" className="full-calendar-link">
+                <Link to="/calendar" className={styles.fullCalendarLink}>
                     <i className="fas fa-calendar-alt"></i> Full Calendar
                 </Link>
 
-                <div className="calendar-header">
-                    <button className="month-nav-btn" onClick={goToPreviousMonth}>
+                <div className={styles.calendarHeader}>
+                    <button className={styles.monthNavBtn} onClick={goToPreviousMonth}>
                         <i className="fas fa-chevron-left"></i>
                     </button>
-                    <div className="month-display">
-                        <h3 className="month-name">{monthName}</h3>
-                        <div className="month-name-text">{monthNameOnly}</div>
+                    <div className={styles.monthDisplay}>
+                        <h3 className={styles.monthName}>{monthName}</h3>
+                        <div className={styles.monthNameText}>{monthNameOnly}</div>
                     </div>
-                    <button className="month-nav-btn" onClick={goToNextMonth}>
+                    <button className={styles.monthNavBtn} onClick={goToNextMonth}>
                         <i className="fas fa-chevron-right"></i>
                     </button>
                 </div>
 
-                <div className="calendar-weekdays">
+                <div className={styles.calendarWeekdays}>
                     {['S', 'S', 'M', 'T', 'W', 'T'].map((day, i) => (
-                        <div key={i} className="weekday">{day}</div>
+                        <div key={i} className={styles.weekday}>{day}</div>
                     ))}
                 </div>
 
-                <div className="calendar-days">
+                <div className={styles.calendarDays}>
                     {calendarDays.map((dayInfo, index) => {
                         if (!dayInfo) {
-                            return <div key={`empty-${index}`} className="calendar-day empty"></div>;
+                            return <div key={`empty-${index}`} className={cn(styles.calendarDay, styles.empty)}></div>;
                         }
 
                         // Holiday days are not clickable
                         const isClickable = !dayInfo.isPast && dayInfo.hasAvailability && !dayInfo.isHoliday;
-
-                        const classes = [
-                            'calendar-day',
-                            dayInfo.isPast && 'past',
-                            dayInfo.isToday && 'today',
-                            dayInfo.isSelected && 'selected',
-                            dayInfo.isHoliday && 'holiday',
-                            dayInfo.hasAvailability && !dayInfo.isHoliday && 'has-slots',
-                            isClickable && 'clickable'
-                        ].filter(Boolean).join(' ');
 
                         // Build tooltip
                         let tooltip = '';
@@ -362,52 +351,59 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                         return (
                             <div
                                 key={dayInfo.dateStr}
-                                className={classes}
+                                className={cn(styles.calendarDay, {
+                                    [styles.past]: dayInfo.isPast,
+                                    [styles.today]: dayInfo.isToday,
+                                    [styles.selected]: dayInfo.isSelected,
+                                    [styles.holiday]: dayInfo.isHoliday,
+                                    [styles.hasSlots]: dayInfo.hasAvailability && !dayInfo.isHoliday,
+                                    [styles.clickable]: isClickable
+                                })}
                                 onClick={() => isClickable && handleDateClick(dayInfo.date)}
                                 title={tooltip}
                             >
-                                <span className="day-num">{dayInfo.day}</span>
+                                <span className={styles.dayNum}>{dayInfo.day}</span>
                                 {dayInfo.isHoliday && (
-                                    <span className="holiday-indicator"><i className="fas fa-star"></i></span>
+                                    <span className={styles.holidayIndicator}><i className="fas fa-star"></i></span>
                                 )}
                                 {dayInfo.appointmentCount > 0 && !dayInfo.isPast && !dayInfo.isHoliday && (
-                                    <span className="slot-count">{dayInfo.appointmentCount}</span>
+                                    <span className={styles.slotCount}>{dayInfo.appointmentCount}</span>
                                 )}
                             </div>
                         );
                     })}
                 </div>
 
-                <button className="today-btn" onClick={goToToday}>
+                <button className={styles.todayBtn} onClick={goToToday}>
                     <i className="fas fa-calendar-day"></i> Today
                 </button>
             </div>
 
             {/* MIDDLE COLUMN: Day Schedule */}
-            <div className="schedule-column">
+            <div className={styles.scheduleColumn}>
                 {!selectedDate ? (
-                    <div className="empty-state">
+                    <div className={styles.emptyState}>
                         <i className="fas fa-hand-pointer"></i>
                         <p>Select a date to view available time slots</p>
                     </div>
                 ) : loading ? (
-                    <div className="empty-state">
+                    <div className={styles.emptyState}>
                         <i className="fas fa-spinner fa-spin"></i>
                         <p>Loading...</p>
                     </div>
                 ) : error ? (
-                    <div className="empty-state error">
+                    <div className={cn(styles.emptyState, styles.error)}>
                         <i className="fas fa-exclamation-triangle"></i>
                         <p>{error}</p>
                     </div>
                 ) : availableSlots.length === 0 ? (
-                    <div className="empty-state">
+                    <div className={styles.emptyState}>
                         <i className="fas fa-calendar-times"></i>
                         <p>No slots for this date</p>
                     </div>
                 ) : (
                     <>
-                        <div className="schedule-header">
+                        <div className={styles.scheduleHeader}>
                             <h3>
                                 {selectedDate.toLocaleDateString('en-US', {
                                     weekday: 'long',
@@ -415,12 +411,12 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                                     day: 'numeric'
                                 })}
                             </h3>
-                            <span className="available-count">
+                            <span className={styles.availableCount}>
                                 {availableSlots.filter(s => s.slotStatus === 'available' || s.slotStatus === 'booked').length} available
                             </span>
                         </div>
 
-                        <div className="slots-grid">
+                        <div className={styles.slotsGrid}>
                             {(() => {
                                 // Separate slots into regular and afternoon slots
                                 const regularSlots: TimeSlot[] = [];
@@ -445,14 +441,14 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                                     <>
                                         {hasEmptyAfternoonSlots && (
                                             <div
-                                                className="afternoon-toggle"
+                                                className={styles.afternoonToggle}
                                                 onClick={() => setShowAfternoonSlots(!showAfternoonSlots)}
                                             >
-                                                <div className="afternoon-toggle-text">
+                                                <div className={styles.afternoonToggleText}>
                                                     <i className="fas fa-clock"></i>
                                                     {showAfternoonSlots ? 'Hide' : 'Show'} afternoon slots (12:00 - 2:30 PM)
                                                 </div>
-                                                <i className={`fas fa-chevron-down afternoon-toggle-icon ${showAfternoonSlots ? 'expanded' : ''}`}></i>
+                                                <i className={cn('fas fa-chevron-down', styles.afternoonToggleIcon, { [styles.expanded]: showAfternoonSlots })}></i>
                                             </div>
                                         )}
 

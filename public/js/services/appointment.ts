@@ -114,19 +114,19 @@ export class AppointmentService {
 
   /**
    * Get patient images for a specific timepoint
-   * @param patientId - Patient ID
+   * @param personId - Person ID
    * @param timepoint - Timepoint code
    * @returns Patient images
    */
-  async getPatientImages(patientId: string, timepoint = '0'): Promise<PatientImage[]> {
+  async getPatientImages(personId: number, timepoint = '0'): Promise<PatientImage[]> {
     try {
       const images = await fetchJSON<number[]>(
-        `${this.options.apiBase}/getTimePointImgs?code=${patientId}&tp=${timepoint}`
+        `${this.options.apiBase}/getTimePointImgs?code=${personId}&tp=${timepoint}`
       );
 
       // Transform image names to proper format
       return images.map((code) => {
-        const name = `${patientId}0${timepoint}.i${code}`;
+        const name = `${personId}0${timepoint}.i${code}`;
         return { name };
       });
     } catch (error) {
@@ -137,13 +137,13 @@ export class AppointmentService {
 
   /**
    * Get latest visit summary for a patient
-   * @param patientId - Patient ID
+   * @param personId - Person ID
    * @returns Latest visit summary
    */
-  async getLatestVisitSummary(patientId: string): Promise<VisitSummary> {
+  async getLatestVisitSummary(personId: number): Promise<VisitSummary> {
     try {
       return await fetchJSON<VisitSummary>(
-        `${this.options.apiBase}/getLatestVisitsSum?PID=${patientId}`
+        `${this.options.apiBase}/getLatestVisitsSum?PID=${personId}`
       );
     } catch (error) {
       console.error('Error getting latest visit summary:', error);

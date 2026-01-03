@@ -31,8 +31,10 @@ interface ApiLoaderOptions {
  * Patient data structure
  */
 export interface PatientData {
+  PersonID?: number;
   code?: number;
   id?: number;
+  name?: string;
   PatientName?: string;
   FirstName?: string;
   LastName?: string;
@@ -47,6 +49,7 @@ export interface WorkData {
   WorkID?: number;
   PersonID?: number;
   WorkType?: string;
+  TypeName?: string;
   [key: string]: unknown;
 }
 
@@ -208,18 +211,18 @@ export async function patientInfoLoader({
   params,
   request,
 }: LoaderFunctionArgs): Promise<PatientInfoLoaderResult> {
-  const { patientId } = params;
+  const { personId } = params;
   const { signal } = request;
 
   // Skip loading for "new" patient (add patient form)
-  if (patientId === 'new' || isNaN(parseInt(patientId || ''))) {
+  if (personId === 'new' || isNaN(parseInt(personId || ''))) {
     return { patient: null, isNew: true };
   }
 
-  const data = await apiLoader<PatientData>(`/api/patients/${patientId}/info`, {
+  const data = await apiLoader<PatientData>(`/api/patients/${personId}/info`, {
     signal,
     cache: true,
-    cacheKey: `patient_${patientId}`,
+    cacheKey: `patient_${personId}`,
   });
 
   return { patient: data, isNew: false };
@@ -289,14 +292,14 @@ export async function patientShellLoader({
   params,
   request,
 }: LoaderFunctionArgs): Promise<PatientShellLoaderResult> {
-  const { patientId, page, workId } = params;
+  const { personId, page, workId } = params;
   const { signal } = request;
   const url = new URL(request.url);
   const workIdFromQuery = url.searchParams.get('workId');
   const effectiveWorkId = workId || workIdFromQuery;
 
   // Skip loading for "new" patient (add patient form)
-  if (patientId === 'new' || isNaN(parseInt(patientId || ''))) {
+  if (personId === 'new' || isNaN(parseInt(personId || ''))) {
     return {
       patient: null,
       work: null,
@@ -308,10 +311,10 @@ export async function patientShellLoader({
   }
 
   // Load patient demographics
-  const patientPromise = apiLoader<PatientData>(`/api/patients/${patientId}/info`, {
+  const patientPromise = apiLoader<PatientData>(`/api/patients/${personId}/info`, {
     signal,
     cache: true,
-    cacheKey: `patient_${patientId}`,
+    cacheKey: `patient_${personId}`,
   });
 
   // Load work details if workId is present
@@ -327,10 +330,10 @@ export async function patientShellLoader({
   // Load time points for photos/comparison pages
   let timepointsPromise: Promise<TimepointData[] | null> | null = null;
   if (page && (page.startsWith('photos') || page === 'compare' || page === 'xrays')) {
-    timepointsPromise = apiLoader<TimepointData[]>(`/api/patients/${patientId}/timepoints`, {
+    timepointsPromise = apiLoader<TimepointData[]>(`/api/patients/${personId}/timepoints`, {
       signal,
       cache: true,
-      cacheKey: `timepoints_${patientId}`,
+      cacheKey: `timepoints_${personId}`,
     });
   }
 
@@ -408,11 +411,21 @@ export async function alignerPatientWorkLoader({
   const { workId } = params;
   const { signal } = request;
 
+  // Validate workId before making API calls
+  if (!workId || isNaN(parseInt(workId))) {
+    throw new Response('Invalid work ID', { status: 400 });
+  }
+
   const data = await apiLoader<WorkData>(`/api/getworkdetails?workId=${workId}`, {
     signal,
     cache: true,
     cacheKey: `work_${workId}`,
   });
+
+  // Validate PersonID before fetching patient data
+  if (!data?.PersonID) {
+    throw new Response('Work record has no associated patient', { status: 404 });
+  }
 
   // Also load patient info (Note: getWorkDetails returns PersonID, not PatientID)
   const patientData = await apiLoader<PatientData>(`/api/patients/${data.PersonID}/info`, {

@@ -4,6 +4,7 @@
  */
 
 import { MessageStatusValue } from '../../utils/whatsapp-send-constants';
+import styles from '../../routes/WhatsAppSend.module.css';
 
 export interface MessageItem {
   status: MessageStatusValue;
@@ -54,9 +55,9 @@ export default function MessageStatusTable({
 }: MessageStatusTableProps) {
   if (loading) {
     return (
-      <div className="results-placeholder">
-        <p className="placeholder-text">
-          <span className="status-icon" aria-hidden="true">
+      <div className={styles.resultsPlaceholder}>
+        <p className={styles.placeholderText}>
+          <span className={styles.statusIcon} aria-hidden="true">
             ⏳
           </span>
           Loading message status...
@@ -81,9 +82,9 @@ export default function MessageStatusTable({
     }
 
     return (
-      <div className="results-placeholder">
-        <p className="placeholder-text">
-          <span className="status-icon" aria-hidden="true">
+      <div className={styles.resultsPlaceholder}>
+        <p className={styles.placeholderText}>
+          <span className={styles.statusIcon} aria-hidden="true">
             📊
           </span>
           {message}
@@ -112,10 +113,10 @@ export default function MessageStatusTable({
   };
 
   return (
-    <div className="message-status-table">
+    <div className={styles.messageStatusTable}>
       <h3>Message Status for {formatDisplayDate(currentDate)}</h3>
-      <div className="table-responsive">
-        <table className="status-table">
+      <div className={styles.tableResponsive}>
+        <table className={styles.statusTable}>
           <thead>
             <tr>
               <th>Patient</th>
@@ -140,18 +141,18 @@ export default function MessageStatusTable({
 
               return (
                 <tr key={index} className={`status-row ${statusClass}`}>
-                  <td className="patient-name">
+                  <td className={styles.patientName}>
                     <div dangerouslySetInnerHTML={{ __html: escapeHtml(patientName) }} />
                   </td>
-                  <td className="phone-number">
+                  <td className={styles.phoneNumber}>
                     <div dangerouslySetInnerHTML={{ __html: escapeHtml(phoneNumber) }} />
                   </td>
-                  <td className="status-cell">
-                    <span className={`status-indicator ${statusClass}`}></span>
+                  <td className={styles.statusCell}>
+                    <span className={`${styles.statusIndicator} ${statusClass}`}></span>
                     {statusText}
                   </td>
-                  <td className="time-sent">{timeSent}</td>
-                  <td className="message-preview" title={messageText}>
+                  <td className={styles.timeSent}>{timeSent}</td>
+                  <td className={styles.messagePreview} title={messageText}>
                     <div dangerouslySetInnerHTML={{ __html: escapeHtml(messagePreview) }} />
                   </td>
                 </tr>
@@ -160,14 +161,14 @@ export default function MessageStatusTable({
           </tbody>
         </table>
       </div>
-      <div className="table-summary">
-        <span className="summary-item">Total: {summary.total}</span>
-        <span className="summary-item">Pending: {summary.pending}</span>
-        <span className="summary-item">Server: {summary.server}</span>
-        <span className="summary-item">Device: {summary.device}</span>
-        <span className="summary-item">Read: {summary.read}</span>
-        <span className="summary-item">Played: {summary.played}</span>
-        <span className="summary-item">Failed: {summary.failed}</span>
+      <div className={styles.tableSummary}>
+        <span className={styles.summaryItem}>Total: {summary.total}</span>
+        <span className={styles.summaryItem}>Pending: {summary.pending}</span>
+        <span className={styles.summaryItem}>Server: {summary.server}</span>
+        <span className={styles.summaryItem}>Device: {summary.device}</span>
+        <span className={styles.summaryItem}>Read: {summary.read}</span>
+        <span className={styles.summaryItem}>Played: {summary.played}</span>
+        <span className={styles.summaryItem}>Failed: {summary.failed}</span>
       </div>
     </div>
   );
