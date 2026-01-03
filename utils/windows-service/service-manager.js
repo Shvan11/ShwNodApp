@@ -8,8 +8,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Path to your main application file
-const appPath = path.resolve(__dirname, '../../index.js');
+// Path to compiled application (run `npm run build:server` before installing service)
+const appPath = path.resolve(__dirname, '../../dist-server/index.js');
 
 // Common service configuration
 const serviceConfig = {

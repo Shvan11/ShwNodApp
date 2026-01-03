@@ -3,9 +3,8 @@
  * Uses database configuration from tbloptions table
  */
 
-import nodemailer, { Transporter } from 'nodemailer';
+import nodemailer, { Transporter, SentMessageInfo } from 'nodemailer';
 import type { SendMailOptions } from 'nodemailer';
-import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { executeQuery, TYPES } from '../database/index.js';
 import { log } from '../../utils/logger.js';
 
@@ -89,7 +88,7 @@ export interface ConfigUpdateResult {
 // ===========================================
 
 class EmailService {
-  private transporter: Transporter<SMTPTransport.SentMessageInfo> | null;
+  private transporter: Transporter<SentMessageInfo> | null;
   private config: EmailConfig | null;
 
   constructor() {
@@ -142,7 +141,7 @@ class EmailService {
   /**
    * Initialize nodemailer transporter
    */
-  async initialize(): Promise<Transporter<SMTPTransport.SentMessageInfo>> {
+  async initialize(): Promise<Transporter<SentMessageInfo>> {
     if (!this.config) {
       await this.loadConfig();
     }
