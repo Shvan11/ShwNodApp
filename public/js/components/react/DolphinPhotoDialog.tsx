@@ -32,6 +32,14 @@ const TIMEPOINT_TYPES: TimepointType[] = [
     { value: 'Retention', label: 'Retention' }
 ];
 
+interface ConflictInfo {
+    conflictType: string;
+    conflictSource: 'dolphin' | 'shwan';
+    existingDate: string;
+    requestedDate: string;
+    message: string;
+}
+
 const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
     const toast = useToast();
     const [loading, setLoading] = useState(true);
@@ -41,6 +49,7 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
     const [timepointType, setTimepointType] = useState('Initial');
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
     const [skipDolphin, setSkipDolphin] = useState(false);
+    const [conflictInfo, setConflictInfo] = useState<ConflictInfo | null>(null);
 
     useEffect(() => {
         loadPhotoDates();
@@ -64,18 +73,21 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
     };
 
     const handleDateSelect = (date: Date | string) => {
-        if (date instanceof Date) {
-            setSelectedDate(date.toISOString().slice(0, 10));
-        } else if (typeof date === 'string') {
-            // Parse date string if needed
-            const parsed = new Date(date);
-            if (!isNaN(parsed.getTime())) {
-                setSelectedDate(parsed.toISOString().slice(0, 10));
-            }
+        // Always parse and use local date components to match the display format
+        const dateObj = date instanceof Date ? date : new Date(date);
+
+        if (isNaN(dateObj.getTime())) {
+            return; // Invalid date
         }
+
+        // Use local date components - this matches formatDate() which uses toLocaleDateString
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        setSelectedDate(`${year}-${month}-${day}`);
     };
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (overrideDate = false) => {
         // Validate patient has required fields
         if (!patientInfo?.FirstName && !patientInfo?.PatientName) {
             toast.error('Patient name is required for Dolphin integration');
@@ -84,6 +96,7 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
 
         try {
             setSubmitting(true);
+            setConflictInfo(null);
 
             const response = await fetch('/api/dolphin/prepare-photo-import', {
                 method: 'POST',
@@ -92,7 +105,8 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
                     personId,
                     tpDescription: timepointType,
                     tpDate: selectedDate,
-                    skipDolphin
+                    skipDolphin,
+                    overrideDate
                 })
             });
 
@@ -102,6 +116,19 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
             }
 
             const data = await response.json();
+
+            // Check for date conflict
+            if (data.conflict) {
+                setConflictInfo({
+                    conflictType: data.conflictType,
+                    conflictSource: data.conflictSource || 'shwan',
+                    existingDate: data.existingDate,
+                    requestedDate: data.requestedDate,
+                    message: data.message
+                });
+                setSubmitting(false);
+                return;
+            }
 
             // Launch the protocol handler
             window.location.href = data.protocolUrl;
@@ -113,6 +140,14 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
         } finally {
             setSubmitting(false);
         }
+    };
+
+    const handleOverrideConfirm = () => {
+        handleSubmit(true);
+    };
+
+    const handleOverrideCancel = () => {
+        setConflictInfo(null);
     };
 
     const formatDate = (dateStr: string): string => {
@@ -136,6 +171,55 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
                 </div>
 
                 <div className={styles.body}>
+                    {/* Conflict Warning */}
+                    {conflictInfo && (
+                        <div className={`${styles.conflictWarning} ${conflictInfo.conflictSource === 'dolphin' ? styles.conflictError : ''}`}>
+                            <div className={styles.conflictIcon}>
+                                <i className={`fas ${conflictInfo.conflictSource === 'dolphin' ? 'fa-times-circle' : 'fa-exclamation-triangle'}`} />
+                            </div>
+                            <div className={styles.conflictContent}>
+                                <strong>{conflictInfo.conflictSource === 'dolphin' ? 'Duplicate Timepoint' : 'Date Conflict Detected'}</strong>
+                                <p>{conflictInfo.message}</p>
+                                {conflictInfo.conflictSource === 'dolphin' ? (
+                                    <>
+                                        <p>Please choose a different date or timepoint type.</p>
+                                        <div className={styles.conflictActions}>
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary"
+                                                onClick={handleOverrideCancel}
+                                            >
+                                                OK
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p>Do you want to override the existing date?</p>
+                                        <div className={styles.conflictActions}>
+                                            <button
+                                                type="button"
+                                                className="btn btn-warning"
+                                                onClick={handleOverrideConfirm}
+                                                disabled={submitting}
+                                            >
+                                                {submitting ? 'Updating...' : 'Yes, Override'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary"
+                                                onClick={handleOverrideCancel}
+                                                disabled={submitting}
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Timepoint Type */}
                     <div className={styles.formGroup}>
                         <label>Timepoint Type</label>
@@ -143,6 +227,7 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
                             value={timepointType}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setTimepointType(e.target.value)}
                             className={styles.formSelect}
+                            disabled={!!conflictInfo}
                         >
                             {TIMEPOINT_TYPES.map(tp => (
                                 <option key={tp.value} value={tp.value}>{tp.label}</option>
@@ -158,6 +243,7 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
                             value={selectedDate}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setSelectedDate(e.target.value)}
                             className={styles.formInput}
+                            disabled={!!conflictInfo}
                         />
                     </div>
 
@@ -221,22 +307,26 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
                 </div>
 
                 <div className={styles.footer}>
-                    <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={onClose}
-                        disabled={submitting}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={handleSubmit}
-                        disabled={submitting || loading}
-                    >
-                        {submitting ? 'Preparing...' : 'Select Photos'}
-                    </button>
+                    {!conflictInfo && (
+                        <>
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={onClose}
+                                disabled={submitting}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => handleSubmit(false)}
+                                disabled={submitting || loading}
+                            >
+                                {submitting ? 'Preparing...' : 'Select Photos'}
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
         </div>

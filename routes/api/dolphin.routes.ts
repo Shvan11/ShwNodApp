@@ -15,7 +15,9 @@ import {
   createTimePoint,
   getPatientForDolphin,
   getAppointmentsForDolphin,
-  getVisitsForDolphin
+  getVisitsForDolphin,
+  getExistingPhotoDate,
+  updatePhotoDate
 } from '../../services/database/queries/dolphin-queries.js';
 import { ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
@@ -30,6 +32,7 @@ interface PreparePhotoImportBody {
   tpDescription: string;
   tpDate: string;
   skipDolphin?: boolean;
+  overrideDate?: boolean;
 }
 
 /**
@@ -57,7 +60,7 @@ interface SqlError extends Error {
  */
 router.post('/prepare-photo-import', async (req: Request<object, object, PreparePhotoImportBody>, res: Response): Promise<void> => {
   try {
-    const { personId, tpDescription, tpDate, skipDolphin } = req.body;
+    const { personId, tpDescription, tpDate, skipDolphin, overrideDate } = req.body;
 
     if (!personId || !tpDescription || !tpDate) {
       ErrorResponses.badRequest(res, 'Missing required fields: personId, tpDescription, tpDate');
@@ -80,6 +83,69 @@ router.post('/prepare-photo-import', async (req: Request<object, object, Prepare
       return;
     }
 
+    // Parse the date as LOCAL midnight (not UTC)
+    // tpDate is "YYYY-MM-DD" string, we need local midnight for SQL Server
+    const [year, month, day] = tpDate.split('-').map(Number);
+    const parsedDate = new Date(year, month - 1, day); // Local midnight
+    const parsedDateOnly = tpDate; // Already in YYYY-MM-DD format
+
+    // Check if exact timepoint (same name + same date) already exists in Dolphin
+    const existingTpCode = await checkTimePoint(personIdStr, tpDescription, parsedDate);
+    if (existingTpCode !== -1) {
+      // Duplicate exists - warn and prevent
+      res.json({
+        success: false,
+        conflict: true,
+        conflictType: tpDescription,
+        conflictSource: 'dolphin',
+        existingDate: parsedDateOnly,
+        requestedDate: parsedDateOnly,
+        message: `A "${tpDescription}" timepoint with date ${parsedDateOnly} already exists in Dolphin Imaging. Cannot create duplicate.`
+      });
+      return;
+    }
+
+    // Check for date conflicts in tblwork for Initial/Final timepoints
+    if (tpDescription === 'Initial' || tpDescription === 'Final') {
+      const existingDates = await getExistingPhotoDate(personIdStr);
+
+      if (existingDates) {
+        const existingDate = tpDescription === 'Initial'
+          ? existingDates.iPhotoDate
+          : existingDates.fPhotoDate;
+
+        if (existingDate) {
+          // Use LOCAL date components, not UTC (toISOString gives UTC)
+          const y = existingDate.getFullYear();
+          const m = String(existingDate.getMonth() + 1).padStart(2, '0');
+          const d = String(existingDate.getDate()).padStart(2, '0');
+          const existingDateOnly = `${y}-${m}-${d}`;
+
+          // Check if dates differ
+          if (existingDateOnly !== parsedDateOnly) {
+            // If override not requested, return conflict info
+            if (!overrideDate) {
+              res.json({
+                success: false,
+                conflict: true,
+                conflictType: tpDescription,
+                conflictSource: 'shwan',
+                existingDate: existingDateOnly,
+                requestedDate: parsedDateOnly,
+                message: `There is already an ${tpDescription} photo date (${existingDateOnly}) stored in Shwan database that differs from the selected date (${parsedDateOnly}).`
+              });
+              return;
+            }
+
+            // Override requested - update the existing date
+            const field = tpDescription === 'Initial' ? 'IPhotoDate' : 'FPhotoDate';
+            await updatePhotoDate(personIdStr, field, parsedDate);
+            log.info(`Updated ${field} for patient ${personId} from ${existingDateOnly} to ${parsedDateOnly}`);
+          }
+        }
+      }
+    }
+
     // Check if patient exists in DolphinPlatform
     const existsInDolphin = await checkDolphinPatient(personIdStr);
 
@@ -97,17 +163,9 @@ router.post('/prepare-photo-import', async (req: Request<object, object, Prepare
       log.info(`Created patient ${personId} in DolphinPlatform`);
     }
 
-    // Parse the date
-    const parsedDate = new Date(tpDate);
-
-    // Check if timepoint exists
-    let tpCode = await checkTimePoint(personIdStr, tpDescription, parsedDate);
-
-    // Create timepoint if not exists
-    if (tpCode === -1) {
-      tpCode = await createTimePoint(personIdStr, tpDescription, parsedDate);
-      log.info(`Created timepoint ${tpCode} for patient ${personId}`);
-    }
+    // Create timepoint (we already verified it doesn't exist at the top)
+    const tpCode = await createTimePoint(personIdStr, tpDescription, parsedDate);
+    log.info(`Created timepoint ${tpCode} for patient ${personId}`);
 
     // Format date as YYYYMMDD for protocol URL
     const dateStr = parsedDate.toISOString().slice(0, 10).replace(/-/g, '');

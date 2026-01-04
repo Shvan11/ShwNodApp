@@ -217,3 +217,63 @@
         transform: translateY(0);
     }
 }
+
+/* Conflict Warning */
+.conflictWarning {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    margin-bottom: 1.25rem;
+}
+
+.conflictIcon {
+    flex-shrink: 0;
+    font-size: 1.5rem;
+    color: #856404;
+}
+
+.conflictContent {
+    flex: 1;
+}
+
+.conflictContent strong {
+    display: block;
+    color: #856404;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.conflictContent p {
+    margin: 0 0 0.5rem 0;
+    color: #856404;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.conflictContent p:last-of-type {
+    margin-bottom: 1rem;
+    font-weight: 500;
+}
+
+.conflictActions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* Error variant for Dolphin duplicate conflicts */
+.conflictError {
+    background: #f8d7da;
+    border-color: #dc3545;
+}
+
+.conflictError .conflictIcon {
+    color: #721c24;
+}
+
+.conflictError .conflictContent strong,
+.conflictError .conflictContent p {
+    color: #721c24;
+}

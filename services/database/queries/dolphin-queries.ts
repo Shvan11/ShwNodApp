@@ -25,6 +25,11 @@ interface VisitForDolphin {
   hasProgressPhoto: boolean | null;
 }
 
+interface ExistingPhotoDate {
+  iPhotoDate: Date | null;
+  fPhotoDate: Date | null;
+}
+
 /**
  * Check if patient exists in DolphinPlatform database
  */
@@ -158,3 +163,40 @@ export async function getVisitsForDolphin(personId: string): Promise<VisitForDol
     })
   );
 }
+
+/**
+ * Get existing IPhotoDate/FPhotoDate from tblwork for conflict detection
+ */
+export async function getExistingPhotoDate(personId: string): Promise<ExistingPhotoDate | null> {
+  const result = await executeQuery<ExistingPhotoDate>(
+    `SELECT IPhotoDate, FPhotoDate
+     FROM dbo.tblwork
+     WHERE PersonID = @PID AND Status = 1`,
+    [['PID', TYPES.Int, parseInt(personId, 10)]],
+    (columns: ColumnValue[]) => ({
+      iPhotoDate: columns[0].value as Date | null,
+      fPhotoDate: columns[1].value as Date | null,
+    })
+  );
+  return result[0] || null;
+}
+
+/**
+ * Update IPhotoDate or FPhotoDate in tblwork (override existing date)
+ */
+export async function updatePhotoDate(
+  personId: string,
+  field: 'IPhotoDate' | 'FPhotoDate',
+  newDate: Date
+): Promise<void> {
+  await executeQuery(
+    `UPDATE dbo.tblwork
+     SET ${field} = @NewDate
+     WHERE PersonID = @PID AND Status = 1`,
+    [
+      ['PID', TYPES.Int, parseInt(personId, 10)],
+      ['NewDate', TYPES.DateTime, newDate],
+    ]
+  );
+}
+
