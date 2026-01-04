@@ -11,7 +11,6 @@ Custom Windows protocol handlers for Shwan Orthodontics Management System.
 | `explorer:` | Open/create folders | `explorer:\\\\Server\\Path` |
 | `csimaging:` | Launch CS Imaging with patient | `csimaging:12345?name=John_Doe` |
 | `dolphin:` | Launch Dolphin Imaging with patient | `dolphin:12345?name=John_Doe` |
-| `launch:` | Universal app launcher | `launch://msaccess?args={AccessDatabase}\|/cmd\|Form` |
 
 ---
 
@@ -37,11 +36,7 @@ Right-click UNINSTALL.bat → Run as Administrator
 ```ini
 [Paths]
 PatientsFolder=\\Clinic\clinic1
-AccessDatabase=C:\S_O\labels.accdb
 DolphinPath=C:\Dolphin\
-
-[Applications]
-msaccess=C:\Program Files\Microsoft Office\root\Office16\MSACCESS.EXE
 ```
 
 **Edit:** `notepad C:\ShwanOrtho\ProtocolHandlers.ini` (as Admin). Changes apply immediately.
@@ -64,7 +59,7 @@ msaccess=C:\Program Files\Microsoft Office\root\Office16\MSACCESS.EXE
 
 **Registry:** `HKLM\SOFTWARE\Policies\{Chrome,Edge}\AutoLaunchProtocolsFromOrigins`
 
-**Add origin:** Edit `registry/register-protocols.reg`, add to all 4 protocol arrays, merge, restart browser.
+**Add origin:** Edit `registry/register-protocols.reg`, add to all 3 protocol arrays, merge, restart browser.
 
 ---
 
@@ -77,7 +72,6 @@ msaccess=C:\Program Files\Microsoft Office\root\Office16\MSACCESS.EXE
 | Dolphin not found | Edit config: `DolphinPath=C:\Correct\Path\`. Verify `DolCtrl.exe` exists |
 | Network share error | Test: `explorer \\Clinic\clinic1`. Update `PatientsFolder` in config |
 | Handler not found | Re-run `INSTALL.bat`. Check antivirus. Verify: `dir C:\ShwanOrtho\*ProtocolHandler.exe` |
-| App not found (launch) | Add alias to `[Applications]` section in config (whitelist-only mode, secure) |
 | Policy not in browser | Verify registry, re-run `INSTALL.bat`, `gpupdate /force`, restart browser |
 
 **Verify policies:** `chrome://policy` or `edge://policy` → Search `AutoLaunchProtocolsFromOrigins`
@@ -86,9 +80,9 @@ msaccess=C:\Program Files\Microsoft Office\root\Office16\MSACCESS.EXE
 
 ## Technical
 
-**Files:** `C:\ShwanOrtho\{Explorer,CSImaging,Dolphin,Universal}ProtocolHandler.exe` + `ProtocolHandlers.ini`
+**Files:** `C:\ShwanOrtho\{Explorer,CSImaging,Dolphin}ProtocolHandler.exe` + `ProtocolHandlers.ini`
 
-**Registry:** `HKCR\{explorer,csimaging,dolphin,launch}` → handlers
+**Registry:** `HKCR\{explorer,csimaging,dolphin}` → handlers
 
 **Requirements:** Windows 10/11, .NET 4.0+, Chrome/Edge
 
@@ -108,18 +102,6 @@ reg query "HKLM\SOFTWARE\Policies\Google\Chrome" /v AutoLaunchProtocolsFromOrigi
 ---
 
 ## Protocol Details
-
-### Universal Launcher (`launch:`)
-
-**Features:** Application aliases only (whitelist-only, secure), variable substitution (`{AccessDatabase}`, `{PatientsFolder}`), multiple args via `|`, `/cmd` switch handling.
-
-**Example:**
-```javascript
-// Alias with variables
-launch://msaccess?args={AccessDatabase}|/cmd|frmLabels|ID=123
-```
-
-**Security:** Only applications defined in `[Applications]` section can be launched. Full paths are not supported (hardened security).
 
 ### Dolphin Imaging (`dolphin:`)
 

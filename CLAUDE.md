@@ -15,7 +15,7 @@
 
 ### Tech Stack
 - **Backend**: Node.js, Express 5, **TypeScript**, SQL Server (Tedious), WebSocket
-- **Frontend**: React 19, **TypeScript**, React Router v7 (Data Router), Vite
+- **Frontend**: React 19, **TypeScript**, React Router v7 (Data Router), Vite, CSS Modules
 - **External**: WhatsApp Web.js, Twilio, Telegram Bot API, Google Drive, WebCeph
 
 ### Application Scale
@@ -23,7 +23,7 @@
 |--------|-------|
 | API Endpoints | ~202 |
 | React Components | 97 |
-| CSS Files | 60 (~36,900 lines) |
+| CSS Module Files | ~70+ (component-scoped) |
 | Frontend Routes | 31 |
 | Route Loaders | 7 |
 | Backend Service Categories | 16 |
@@ -101,16 +101,30 @@ index.ts                 # Entry point, server setup, graceful shutdown
   express-session.d.ts   # Express session augmentation
 ```
 
-### CSS Structure
+### CSS Structure (CSS Modules)
+
+**Component styles use CSS Modules** (`.module.css`) for scoped styling:
 ```
+/public/js/components/react/
+  ComponentName.tsx
+  ComponentName.module.css    # Scoped styles for component
+
 /public/css/
-  /base/       # 5 files: variables, reset, typography, rtl-support, utilities
-  /layout/     # 2 files: universal-header, sidebar-navigation
-  /components/ # 29 files
-  /pages/      # 24 files
+  /base/       # Global: variables, reset, typography, rtl-support, utilities
+  /layout/     # Global: universal-header, sidebar-navigation
+  /pages/      # Page-specific global styles (legacy)
 ```
 
-**CSS Guidelines**: See `css-styling-guidelines.skill.md` for comprehensive documentation.
+**CSS Module Usage:**
+```typescript
+import styles from './ComponentName.module.css';
+
+const Component = () => (
+  <div className={styles.container}>
+    <button className={styles.primaryButton}>Click</button>
+  </div>
+);
+```
 
 ---
 
@@ -375,11 +389,12 @@ Use variables from `/public/css/base/variables.css`:
 --breakpoint-lg: 1024px
 ```
 
-**CSS Rules:**
+**CSS Modules Rules:**
+- Use CSS Modules (`.module.css`) for component styles
+- Import as `import styles from './Component.module.css'`
+- Use `className={styles.className}` syntax
+- Use `clsx` or template literals for conditional classes
+- Global variables from `variables.css` work in modules
 - NO inline styles (except dynamic values)
 - NO `!important` (except print/accessibility)
-- Use CSS variables from variables.css
-- Mobile-first responsive design
-- BEM-like naming
-
-Full guidelines: `css-styling-guidelines.skill.md`
+- camelCase class names recommended (e.g., `.primaryButton`)

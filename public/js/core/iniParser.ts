@@ -176,8 +176,7 @@ export function getProtocolHandlerFormatOptions(): FormatOptions {
       'Location: C:\\ShwanOrtho\\ProtocolHandlers.ini'
     ],
     sectionComments: {
-      Paths: 'Path configuration for protocol handlers',
-      Applications: 'Application aliases for Universal Protocol (launch://)'
+      Paths: 'Path configuration for protocol handlers'
     },
     keyComments: {
       UseRunAsDate: 'Set to true on PCs requiring RunAsDate workaround for Dolphin',
