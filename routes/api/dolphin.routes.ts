@@ -167,11 +167,11 @@ router.post('/prepare-photo-import', async (req: Request<object, object, Prepare
     const tpCode = await createTimePoint(personIdStr, tpDescription, parsedDate);
     log.info(`Created timepoint ${tpCode} for patient ${personId}`);
 
-    // Format date as YYYYMMDD for protocol URL
-    const dateStr = parsedDate.toISOString().slice(0, 10).replace(/-/g, '');
+    // Format date as DD-MM-YYYY for folder naming (e.g., "11-12-2025")
+    const dateStr = `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${year}`;
 
-    // Build protocol URL
-    const protocolUrl = `dolphin:${personId}?action=photos&tp=${tpCode}&date=${dateStr}&skip=${skipDolphin ? 1 : 0}`;
+    // Build protocol URL with tpName for folder naming
+    const protocolUrl = `dolphin:${personId}?action=photos&tp=${tpCode}&tpName=${encodeURIComponent(tpDescription)}&date=${dateStr}&skip=${skipDolphin ? 1 : 0}`;
 
     res.json({
       success: true,

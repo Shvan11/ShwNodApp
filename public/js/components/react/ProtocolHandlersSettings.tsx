@@ -445,14 +445,16 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
     };
 
     const handleInputChange = (section: string, key: string, value: string) => {
+        // Strip surrounding quotes (from Windows "Copy as path")
+        const cleanedValue = value.replace(/^["']|["']$/g, '');
         const originalValue = config[section]?.[key] || '';
 
-        if (value !== originalValue) {
+        if (cleanedValue !== originalValue) {
             setPendingChanges(prev => ({
                 ...prev,
                 [section]: {
                     ...(prev[section] || {}),
-                    [key]: value
+                    [key]: cleanedValue
                 }
             }));
         } else {
@@ -672,10 +674,15 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
 
                 <div className={styles.restartWarning} style={{ marginBottom: 'var(--spacing-lg)', background: 'var(--info-50, #eff6ff)', borderColor: 'var(--info-200, #bfdbfe)', color: 'var(--info-800, #1e40af)' }}>
                     <i className="fas fa-info-circle" style={{ color: 'var(--info-color)' }}></i>
-                    <span>
-                        <strong>Note:</strong> This page edits the INI file on <strong>this computer</strong>.
-                        Each PC has its own configuration file at C:\ShwanOrtho\ProtocolHandlers.ini.
-                    </span>
+                    <div>
+                        <div>
+                            <strong>Note:</strong> This page edits the INI file on <strong>this computer</strong>.
+                            Each PC has its own configuration file at C:\ShwanOrtho\ProtocolHandlers.ini.
+                        </div>
+                        <div style={{ marginTop: 'var(--spacing-sm)', fontSize: '0.9em' }}>
+                            <strong>Tip:</strong> To copy a folder path, find it in Windows Explorer, hold <kbd style={{ background: '#e5e7eb', padding: '2px 6px', borderRadius: '3px', fontFamily: 'monospace' }}>Shift</kbd> + Right-Click → <em>"Copy as path"</em>, then paste here.
+                        </div>
+                    </div>
                 </div>
 
                 {/* Browser not supported */}

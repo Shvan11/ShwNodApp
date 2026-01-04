@@ -130,6 +130,11 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
                 return;
             }
 
+            // Notify user if patient was created in Dolphin
+            if (data.patientCreated) {
+                toast.success('Patient created in Dolphin Imaging');
+            }
+
             // Launch the protocol handler
             window.location.href = data.protocolUrl;
 

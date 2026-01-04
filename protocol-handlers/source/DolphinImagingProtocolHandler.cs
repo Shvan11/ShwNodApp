@@ -114,7 +114,11 @@ namespace DolphinImagingProtocolHandler
         /// Open patient in Dolphin Imaging
         /// Uses RunAsDate if configured, otherwise DolCtrl.exe
         /// </summary>
-        static void OpenDolphin(string patientId, Config config, int? tpCode = null)
+        /// <param name="patientId">Patient ID</param>
+        /// <param name="config">Configuration</param>
+        /// <param name="tpCode">Optional timepoint code for /tp argument</param>
+        /// <param name="timepointFolder">Optional specific timepoint folder path for CaptureFromFilePath</param>
+        static void OpenDolphin(string patientId, Config config, int? tpCode = null, string timepointFolder = null)
         {
             if (string.IsNullOrEmpty(config.DolphinPath))
             {
@@ -123,10 +127,13 @@ namespace DolphinImagingProtocolHandler
             }
 
             // Set CaptureFromFilePath in Dolphin.ini
-            string patientFolder = Path.Combine(config.PatientsFolder, patientId) + "\\";
+            // Use specific timepoint folder if provided, otherwise use patient folder
+            string captureFolder = !string.IsNullOrEmpty(timepointFolder)
+                ? timepointFolder + "\\"
+                : Path.Combine(config.PatientsFolder, patientId) + "\\";
             string dolphinIni = Path.Combine(config.DolphinPath, "Dolphin.ini");
 
-            if (WritePrivateProfileString("Defaults", "CaptureFromFilePath", patientFolder, dolphinIni) == 0)
+            if (WritePrivateProfileString("Defaults", "CaptureFromFilePath", captureFolder, dolphinIni) == 0)
             {
                 ShowError("Failed to write to Dolphin.ini: " + dolphinIni);
                 return;
@@ -199,11 +206,13 @@ namespace DolphinImagingProtocolHandler
             // Parse parameters
             string tpStr = parameters["tp"];
             int tpCode = !string.IsNullOrEmpty(tpStr) ? int.Parse(tpStr) : 0;
-            string date = parameters["date"] ?? DateTime.Now.ToString("yyyyMMdd");
+            string tpName = parameters["tpName"] ?? "Photos"; // Use tpName for folder naming (e.g., "Initial", "Final", "Progress")
+            string date = parameters["date"] ?? DateTime.Now.ToString("dd-MM-yyyy");
             bool skipDolphin = parameters["skip"] == "1";
 
-            // Create destination folder
-            string destFolder = Path.Combine(config.PatientsFolder, patientId, tpCode + "_" + date);
+            // Create destination folder using tpName_date format (e.g., "Initial_11-12-2025")
+            string folderName = tpName + "_" + date;
+            string destFolder = Path.Combine(config.PatientsFolder, patientId, folderName);
             Directory.CreateDirectory(destFolder);
 
             // Show file picker
@@ -256,7 +265,8 @@ namespace DolphinImagingProtocolHandler
                 }
                 else
                 {
-                    OpenDolphin(patientId, config, tpCode);
+                    // Pass the destination folder so Dolphin.ini points to the correct timepoint folder
+                    OpenDolphin(patientId, config, tpCode, destFolder);
                 }
             }
         }
