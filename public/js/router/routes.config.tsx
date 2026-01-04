@@ -38,6 +38,7 @@ import {
 const Dashboard = React.lazy(() => import('../routes/Dashboard'));
 const Statistics = React.lazy(() => import('../routes/Statistics'));
 const Expenses = React.lazy(() => import('../routes/Expenses'));
+const Videos = React.lazy(() => import('../routes/Videos'));
 const PatientManagement = React.lazy(() => import('../routes/PatientManagement'));
 const CompilerTest = React.lazy(() => import('../test-compiler'));
 
@@ -125,6 +126,16 @@ export const routesConfig: RouteObject[] = [
         element: (
           <RouteErrorBoundary routeName="Expenses">
             <Expenses />
+          </RouteErrorBoundary>
+        ),
+      },
+
+      // Videos (educational content)
+      {
+        path: '/videos',
+        element: (
+          <RouteErrorBoundary routeName="Videos">
+            <Videos />
           </RouteErrorBoundary>
         ),
       },

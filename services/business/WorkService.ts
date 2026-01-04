@@ -16,10 +16,16 @@ import { log } from '../../utils/logger.js';
 import {
   addWork,
   getActiveWork,
+  getWorkById,
   addWorkWithInvoice as dbAddWorkWithInvoice,
   deleteWork as dbDeleteWork,
+  transferWork as dbTransferWork,
+  getWorkRelatedCounts,
   WORK_STATUS,
+  type WorkRelatedCounts,
+  type TransferWorkResult,
 } from '../database/queries/work-queries.js';
+import { getPatientById } from '../database/queries/patient-queries.js';
 import type { Work, WorkWithDetails } from '../../types/database.types.js';
 
 // Re-export WORK_STATUS for convenience
@@ -37,7 +43,11 @@ export type WorkErrorCode =
   | 'INVALID_TOTAL_REQUIRED'
   | 'MISSING_CURRENCY'
   | 'DUPLICATE_ACTIVE_WORK'
-  | 'WORK_HAS_DEPENDENCIES';
+  | 'WORK_HAS_DEPENDENCIES'
+  | 'WORK_NOT_FOUND'
+  | 'TARGET_PATIENT_NOT_FOUND'
+  | 'SAME_PATIENT'
+  | 'ACTIVE_WORK_CONFLICT';
 
 /**
  * Work error details
@@ -479,10 +489,117 @@ export async function validateAndDeleteWork(
   return result;
 }
 
+// ===== WORK TRANSFER =====
+
+/**
+ * Re-export transfer-related types
+ */
+export type { WorkRelatedCounts, TransferWorkResult };
+
+/**
+ * Validate and transfer a work to a new patient
+ *
+ * Validation:
+ * - Work must exist
+ * - Target patient must exist
+ * - Cannot transfer to same patient
+ * - If work is ACTIVE, target patient cannot have an active work
+ *
+ * @param workId - Work ID to transfer
+ * @param targetPatientId - Target patient ID
+ * @returns Transfer result with source/target info and related counts
+ * @throws WorkValidationError If validation fails
+ */
+export async function validateAndTransferWork(
+  workId: number,
+  targetPatientId: number
+): Promise<TransferWorkResult> {
+  log.info(`Validating work transfer: Work ${workId} -> Patient ${targetPatientId}`);
+
+  // 1. Get the work to transfer
+  const work = await getWorkById(workId);
+  if (!work) {
+    throw new WorkValidationError(
+      'Work not found',
+      'WORK_NOT_FOUND',
+      { workId }
+    );
+  }
+
+  // 2. Check not transferring to same patient
+  if (work.PersonID === targetPatientId) {
+    throw new WorkValidationError(
+      'Cannot transfer work to the same patient',
+      'SAME_PATIENT',
+      { workId, sourcePatientId: work.PersonID, targetPatientId }
+    );
+  }
+
+  // 3. Validate target patient exists
+  const targetPatient = await getPatientById(targetPatientId);
+  if (!targetPatient) {
+    throw new WorkValidationError(
+      'Target patient not found',
+      'TARGET_PATIENT_NOT_FOUND',
+      { targetPatientId }
+    );
+  }
+
+  // 4. If work is ACTIVE, check for active work conflict
+  if (work.Status === WORK_STATUS.ACTIVE) {
+    const targetActiveWork = await getActiveWork(targetPatientId);
+    if (targetActiveWork) {
+      throw new WorkValidationError(
+        'Target patient already has an active work',
+        'ACTIVE_WORK_CONFLICT',
+        {
+          targetPatientId,
+          existingWork: {
+            workId: targetActiveWork.workid,
+            typeOfWork: targetActiveWork.Typeofwork ?? null,
+            typeName: targetActiveWork.TypeName ?? null,
+            doctor: targetActiveWork.DoctorName ?? null,
+            additionDate: targetActiveWork.AdditionDate ?? null,
+            totalRequired: targetActiveWork.TotalRequired ?? null,
+            currency: targetActiveWork.Currency ?? null,
+          },
+        }
+      );
+    }
+  }
+
+  // 5. Execute the transfer
+  log.info(`Executing work transfer: Work ${workId} from Patient ${work.PersonID} to Patient ${targetPatientId}`);
+  const result = await dbTransferWork(workId, targetPatientId);
+  log.info(`Work transfer complete:`, result);
+
+  return result;
+}
+
+/**
+ * Get transfer preview (related record counts)
+ * @param workId - Work ID
+ * @returns Related record counts
+ */
+export async function getTransferPreview(workId: number): Promise<WorkRelatedCounts> {
+  const work = await getWorkById(workId);
+  if (!work) {
+    throw new WorkValidationError(
+      'Work not found',
+      'WORK_NOT_FOUND',
+      { workId }
+    );
+  }
+
+  return getWorkRelatedCounts(workId);
+}
+
 export default {
   validateAndCreateWork,
   validateAndCreateWorkWithInvoice,
   checkWorkDependencies,
   validateAndDeleteWork,
+  validateAndTransferWork,
+  getTransferPreview,
   WorkValidationError,
 };

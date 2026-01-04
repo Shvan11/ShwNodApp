@@ -50,6 +50,7 @@ import utilityRoutes from './utility.routes.js';
 import dolphinRoutes from './dolphin.routes.js';
 import costPresetRoutes from './cost-preset.routes.js';
 import holidayRoutes from './holiday.routes.js';
+import videoRoutes from './video.routes.js';
 
 // Import template routes (already modular)
 import templateRouter from '../template-api.js';
@@ -118,5 +119,8 @@ router.use('/holidays', holidayRoutes); // Holiday management
 
 // External integrations
 router.use('/dolphin', dolphinRoutes); // Dolphin Imaging integration
+
+// Video management
+router.use('/videos', videoRoutes); // Educational videos
 
 export default router;

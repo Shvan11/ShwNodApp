@@ -89,6 +89,13 @@ export default function Dashboard() {
       linkText: 'Open Settings'
     },
     {
+      title: 'Videos',
+      description: 'Educational videos for patients',
+      icon: 'fas fa-video',
+      link: '/videos',
+      linkText: 'Watch Videos'
+    },
+    {
       title: 'Expense Management',
       description: 'Track and manage clinic expenses',
       icon: 'fas fa-money-bill-wave',

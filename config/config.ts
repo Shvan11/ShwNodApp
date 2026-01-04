@@ -81,7 +81,8 @@ const config: AppConfig = {
     port: process.env.PORT || getDefaultPort()
   },
   urls: {
-    qrHost: process.env.QR_HOST_URL
+    qrHost: process.env.QR_HOST_URL,
+    publicUrl: process.env.PUBLIC_URL || 'https://remote.shwan-orthodontics.com'
   },
   webceph: {
     partnerApiKey: process.env.WEBCEPH_PARTNER_API_KEY,

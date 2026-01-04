@@ -890,3 +890,103 @@ export async function getImplantManufacturers(): Promise<ImplantManufacturer[]> 
     })
   );
 }
+
+// ===== WORK TRANSFER FUNCTIONS =====
+
+/**
+ * Related record counts for work transfer preview
+ */
+export interface WorkRelatedCounts {
+  visits: number;
+  invoices: number;
+  diagnoses: number;
+  workItems: number;
+  alignerSets: number;
+  alignerBatches: number;
+  wires: number;
+  implants: number;
+  screws: number;
+}
+
+/**
+ * Work transfer result
+ */
+export interface TransferWorkResult {
+  success: boolean;
+  workId: number;
+  sourcePatientId: number;
+  targetPatientId: number;
+  relatedCounts: WorkRelatedCounts;
+}
+
+/**
+ * Get counts of all related records for a work
+ * Used to show what will be transferred in the preview
+ */
+export async function getWorkRelatedCounts(workId: number): Promise<WorkRelatedCounts> {
+  return executeQuery<WorkRelatedCounts, WorkRelatedCounts>(
+    `SELECT
+      (SELECT COUNT(*) FROM tblvisits WHERE WorkID = @WorkID) AS visits,
+      (SELECT COUNT(*) FROM tblInvoice WHERE workid = @WorkID) AS invoices,
+      (SELECT COUNT(*) FROM tblDiagnosis WHERE WorkID = @WorkID) AS diagnoses,
+      (SELECT COUNT(*) FROM tblWorkItems WHERE WorkID = @WorkID) AS workItems,
+      (SELECT COUNT(*) FROM tblAlignerSets WHERE WorkID = @WorkID) AS alignerSets,
+      (SELECT COUNT(*) FROM tblAlignerBatches ab
+       INNER JOIN tblAlignerSets s ON ab.AlignerSetID = s.AlignerSetID
+       WHERE s.WorkID = @WorkID) AS alignerBatches,
+      (SELECT COUNT(*) FROM tblWires WHERE WorkID = @WorkID) AS wires,
+      (SELECT COUNT(*) FROM tblImplant WHERE WorkID = @WorkID) AS implants,
+      (SELECT COUNT(*) FROM tblscrews WHERE WorkID = @WorkID) AS screws`,
+    [['WorkID', TYPES.Int, workId]],
+    (columns: ColumnValue[]) => ({
+      visits: columns[0].value as number,
+      invoices: columns[1].value as number,
+      diagnoses: columns[2].value as number,
+      workItems: columns[3].value as number,
+      alignerSets: columns[4].value as number,
+      alignerBatches: columns[5].value as number,
+      wires: columns[6].value as number,
+      implants: columns[7].value as number,
+      screws: columns[8].value as number,
+    }),
+    (results) => results[0]
+  );
+}
+
+/**
+ * Transfer a work to a new patient
+ * All related records (visits, invoices, wires, etc.) automatically follow
+ * because they link via WorkID, not PersonID
+ */
+export async function transferWork(
+  workId: number,
+  targetPatientId: number
+): Promise<TransferWorkResult> {
+  // Get source patient ID and related counts before transfer
+  const work = await getWorkById(workId);
+  if (!work) {
+    throw new Error(`Work ${workId} not found`);
+  }
+
+  const relatedCounts = await getWorkRelatedCounts(workId);
+  const sourcePatientId = work.PersonID;
+
+  // Execute the transfer - simple UPDATE since all related tables link via WorkID
+  await executeQuery(
+    `UPDATE tblwork SET PersonID = @TargetPersonID WHERE workid = @WorkID`,
+    [
+      ['WorkID', TYPES.Int, workId],
+      ['TargetPersonID', TYPES.Int, targetPatientId],
+    ],
+    () => ({}),
+    () => ({ success: true })
+  );
+
+  return {
+    success: true,
+    workId,
+    sourcePatientId,
+    targetPatientId,
+    relatedCounts,
+  };
+}

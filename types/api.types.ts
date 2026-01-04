@@ -265,3 +265,61 @@ export interface FileUploadRequest
   file?: UploadedFile;
   files?: UploadedFile[] | Record<string, UploadedFile[]>;
 }
+
+// ===========================================
+// WORK TRANSFER TYPES
+// ===========================================
+
+/**
+ * Transfer work request body
+ */
+export interface TransferWorkRequest {
+  targetPatientId: number;
+}
+
+/**
+ * Related record counts for transfer preview
+ */
+export interface WorkRelatedCounts {
+  visits: number;
+  invoices: number;
+  diagnoses: number;
+  workItems: number;
+  alignerSets: number;
+  alignerBatches: number;
+  wires: number;
+  implants: number;
+  screws: number;
+}
+
+/**
+ * Transfer work response
+ */
+export interface TransferWorkResponse {
+  success: boolean;
+  message: string;
+  workId: number;
+  sourcePatientId: number;
+  targetPatientId: number;
+  relatedCounts: WorkRelatedCounts;
+}
+
+/**
+ * Transfer preview response
+ */
+export interface TransferPreviewResponse {
+  success: boolean;
+  work: {
+    workId: number;
+    type: string | null;
+    status: string | null;
+    doctor: string | null;
+    totalRequired: number | null;
+    currency: string | null;
+    currentPatient: {
+      personId: number;
+      name: string | null;
+    };
+  };
+  relatedRecords: WorkRelatedCounts;
+}

@@ -116,6 +116,7 @@ export interface ServerConfig {
  */
 export interface UrlConfig {
   qrHost?: string;
+  publicUrl?: string;
 }
 
 // ===========================================
@@ -179,6 +180,7 @@ export interface OptionalEnvVars {
   GOOGLE_DRIVE_REFRESH_TOKEN?: string;
   GOOGLE_DRIVE_FOLDER_ID?: string;
   QR_HOST_URL?: string;
+  PUBLIC_URL?: string;
   WEBCEPH_PARTNER_API_KEY?: string;
   WEBCEPH_USER_EMAIL?: string;
   WEBCEPH_USER_API_PASSWORD?: string;

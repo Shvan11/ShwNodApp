@@ -2,9 +2,11 @@ import React, { useState, useEffect, type FormEvent, type ChangeEvent, type Synt
 import { useNavigate } from 'react-router-dom';
 import WorkCard, { type Work, type WorkStatus } from './WorkCard';
 import PaymentModal from './PaymentModal';
+import TransferWorkModal from './TransferWorkModal';
 import TeethSelector from './TeethSelector';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters';
 import { useToast } from '../../contexts/ToastContext';
+import { useGlobalState } from '../../contexts/GlobalStateContext';
 import {
     getWorkTypeConfig,
     MATERIAL_OPTIONS,
@@ -102,6 +104,8 @@ interface WorkComponentProps {
 const WorkComponent = ({ personId }: WorkComponentProps) => {
     const navigate = useNavigate();
     const toast = useToast();
+    const { user } = useGlobalState();
+    const isAdmin = user?.role === 'admin';
     const [works, setWorks] = useState<Work[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -139,6 +143,10 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     // Delete confirmation modal state
     const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
     const [workToDelete, setWorkToDelete] = useState<Work | null>(null);
+
+    // Transfer work modal state (admin only)
+    const [showTransferModal, setShowTransferModal] = useState(false);
+    const [workToTransfer, setWorkToTransfer] = useState<Work | null>(null);
 
     // Work detail form state - includes all possible fields for all work types
     const [detailFormData, setDetailFormData] = useState<DetailFormData>({
@@ -408,6 +416,20 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const cancelDeleteWork = () => {
         setShowDeleteConfirmation(false);
         setWorkToDelete(null);
+    };
+
+    // Transfer work handlers (admin only)
+    const handleTransferWork = (work: Work) => {
+        setWorkToTransfer(work);
+        setShowTransferModal(true);
+    };
+
+    const handleTransferSuccess = (result: { sourcePatientId: number; targetPatientId: number }) => {
+        setShowTransferModal(false);
+        setWorkToTransfer(null);
+        // Refresh works since the work was transferred away
+        loadWorks();
+        toast.success('Work transferred successfully to another patient');
     };
 
     const handleViewDetails = async (work: Work) => {
@@ -835,10 +857,12 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         personId={personId}
                         isAlignerWork={isAlignerWork}
                         isExpanded={expandedWorks.has(work.workid)}
+                        isAdmin={isAdmin}
                         onToggleExpanded={() => toggleWorkExpanded(work.workid)}
                         onViewDetails={handleViewDetails}
                         onEdit={handleEditWork}
                         onDelete={handleDeleteWork}
+                        onTransfer={handleTransferWork}
                         onAddPayment={handleAddPayment}
                         onViewPaymentHistory={handleViewPaymentHistory}
                         onAddAlignerSet={handleAddAlignerSet}
@@ -1411,6 +1435,18 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Transfer Work Modal (Admin Only) */}
+            {showTransferModal && workToTransfer && (
+                <TransferWorkModal
+                    work={workToTransfer}
+                    onClose={() => {
+                        setShowTransferModal(false);
+                        setWorkToTransfer(null);
+                    }}
+                    onSuccess={handleTransferSuccess}
+                />
             )}
         </div>
     );

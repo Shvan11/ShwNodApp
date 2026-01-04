@@ -19,6 +19,7 @@ import costPresetRoutes from './routes/api/cost-preset.routes.js';
 import lookupRoutes from './routes/api/lookup.routes.js';
 import lookupAdminRoutes from './routes/api/lookup-admin.routes.js';
 import holidayRoutes from './routes/api/holiday.routes.js';
+import publicVideoRoutes from './routes/public/video.routes.js';
 import whatsappService from './services/messaging/whatsapp.js';
 import session from 'express-session';
 import SQLiteStore from 'connect-sqlite3';
@@ -195,6 +196,7 @@ async function initializeApplication(): Promise<AppInitResult> {
     app.use('/api/auth', authRoutes);
     app.use('/api', costPresetRoutes); // Cost preset routes (public - no auth needed)
     app.use('/api', lookupRoutes); // Lookup routes (public - no auth needed)
+    app.use('/v', publicVideoRoutes); // Public video sharing (no auth - educational content)
 
     // Serve login page BEFORE auth check (public access)
     app.get('/login.html', (_req: Request, res: Response) => {

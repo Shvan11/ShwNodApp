@@ -55,11 +55,14 @@ import {
   validateAndCreateWork,
   validateAndCreateWorkWithInvoice,
   validateAndDeleteWork,
+  validateAndTransferWork,
+  getTransferPreview,
   WorkValidationError,
   type WorkStatusType,
   type WorkErrorDetails,
   type DeleteResult
 } from '../../services/business/WorkService.js';
+import { getWorkDetails as getWorkDetailsFromQueries } from '../../services/database/queries/work-queries.js';
 
 const router = Router();
 
@@ -1672,6 +1675,153 @@ router.delete(
     } catch (error) {
       log.error('Error deleting diagnosis:', error);
       sendError(res, 500, 'Failed to delete diagnosis', error as Error);
+    }
+  }
+);
+
+// ============================================================================
+// WORK TRANSFER API ENDPOINTS (Admin Only)
+// ============================================================================
+
+/**
+ * Transfer work request body
+ */
+interface TransferWorkBody {
+  targetPatientId: number;
+}
+
+/**
+ * GET /api/work/:workId/transfer-preview
+ * Get preview of what will be transferred (related record counts)
+ * Admin only
+ */
+router.get(
+  '/work/:workId/transfer-preview',
+  authenticate,
+  authorize(['admin']),
+  async (req: Request<{ workId: string }>, res: Response): Promise<void> => {
+    try {
+      const { workId } = req.params;
+
+      if (!workId || isNaN(parseInt(workId))) {
+        log.warn('Transfer preview invalid workId', { workId });
+        ErrorResponses.badRequest(res, 'workId must be a valid number');
+        return;
+      }
+
+      // Get work details
+      const work = await getWorkDetailsFromQueries(parseInt(workId));
+      if (!work) {
+        log.warn('Work not found for transfer preview', { workId });
+        ErrorResponses.notFound(res, 'Work');
+        return;
+      }
+
+      // Get related record counts
+      const relatedCounts = await getTransferPreview(parseInt(workId));
+
+      res.json({
+        success: true,
+        work: {
+          workId: work.workid,
+          type: work.TypeName,
+          status: work.StatusName,
+          doctor: work.DoctorName,
+          totalRequired: work.TotalRequired,
+          currency: work.Currency,
+          currentPatient: {
+            personId: work.PersonID,
+            name: work.PatientName
+          }
+        },
+        relatedRecords: relatedCounts
+      });
+    } catch (error) {
+      log.error('Error getting transfer preview:', error);
+
+      if (error instanceof WorkValidationError) {
+        if (error.code === 'WORK_NOT_FOUND') {
+          ErrorResponses.notFound(res, 'Work');
+          return;
+        }
+        ErrorResponses.badRequest(res, error.message, error.details);
+        return;
+      }
+
+      sendError(res, 500, 'Failed to get transfer preview', error as Error);
+    }
+  }
+);
+
+/**
+ * POST /api/work/:workId/transfer
+ * Transfer a work to a different patient
+ * Admin only
+ */
+router.post(
+  '/work/:workId/transfer',
+  authenticate,
+  authorize(['admin']),
+  async (
+    req: Request<{ workId: string }, unknown, TransferWorkBody>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { workId } = req.params;
+      const { targetPatientId } = req.body;
+
+      // Validate workId
+      if (!workId || isNaN(parseInt(workId))) {
+        log.warn('Transfer work invalid workId', { workId });
+        ErrorResponses.badRequest(res, 'workId must be a valid number');
+        return;
+      }
+
+      // Validate targetPatientId
+      if (!targetPatientId || isNaN(parseInt(String(targetPatientId)))) {
+        log.warn('Transfer work missing targetPatientId', { workId });
+        ErrorResponses.missingParameter(res, 'targetPatientId');
+        return;
+      }
+
+      // Execute transfer with validation
+      const result = await validateAndTransferWork(
+        parseInt(workId),
+        parseInt(String(targetPatientId))
+      );
+
+      log.info('Work transferred successfully', {
+        workId: result.workId,
+        sourcePatientId: result.sourcePatientId,
+        targetPatientId: result.targetPatientId
+      });
+
+      res.json({
+        ...result,
+        message: 'Work transferred successfully'
+      });
+    } catch (error) {
+      log.error('Error transferring work:', error);
+
+      if (error instanceof WorkValidationError) {
+        switch (error.code) {
+          case 'WORK_NOT_FOUND':
+          case 'TARGET_PATIENT_NOT_FOUND':
+            ErrorResponses.notFound(res, error.message);
+            return;
+          case 'ACTIVE_WORK_CONFLICT':
+            ErrorResponses.conflict(res, error.message, error.details);
+            return;
+          case 'SAME_PATIENT':
+            ErrorResponses.badRequest(res, error.message, error.details);
+            return;
+          default:
+            ErrorResponses.badRequest(res, error.message, error.details);
+            return;
+        }
+      }
+
+      sendError(res, 500, 'Failed to transfer work', error as Error);
     }
   }
 );

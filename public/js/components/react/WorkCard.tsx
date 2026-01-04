@@ -38,10 +38,12 @@ interface WorkCardProps {
     personId?: number | null;
     isAlignerWork: (work: Work) => boolean;
     isExpanded: boolean;
+    isAdmin?: boolean;
     onToggleExpanded: () => void;
     onViewDetails: (work: Work) => void;
     onEdit: (work: Work) => void;
     onDelete: (work: Work) => void;
+    onTransfer?: (work: Work) => void;
     onAddPayment: (work: Work) => void;
     onViewPaymentHistory: (work: Work) => void;
     onAddAlignerSet: (work: Work) => void;
@@ -62,10 +64,12 @@ const WorkCard = ({
     personId,
     isAlignerWork,
     isExpanded,
+    isAdmin = false,
     onToggleExpanded,
     onViewDetails,
     onEdit,
     onDelete,
+    onTransfer,
     onAddPayment,
     onViewPaymentHistory,
     onAddAlignerSet,
@@ -153,6 +157,11 @@ const WorkCard = ({
                             <button type="button" onClick={() => { onEdit(work); setShowActions(false); }}>
                                 <i className="fas fa-edit"></i> Edit Work
                             </button>
+                            {isAdmin && onTransfer && (
+                                <button type="button" onClick={() => { onTransfer(work); setShowActions(false); }}>
+                                    <i className="fas fa-exchange-alt"></i> Transfer Work
+                                </button>
+                            )}
                             {isActive && (
                                 <>
                                     <button type="button" onClick={() => { onComplete(work.workid); setShowActions(false); }}>
