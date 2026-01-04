@@ -12,14 +12,14 @@ Windows Registry Editor Version 5.00
 "URL Protocol"=""
 
 [HKEY_CLASSES_ROOT\explorer\DefaultIcon]
-@="C:\\Windows\\ExplorerProtocolHandler.exe,1"
+@="C:\\ShwanOrtho\\ExplorerProtocolHandler.exe,1"
 
 [HKEY_CLASSES_ROOT\explorer\shell]
 
 [HKEY_CLASSES_ROOT\explorer\shell\open]
 
 [HKEY_CLASSES_ROOT\explorer\shell\open\command]
-@="\"C:\\Windows\\ExplorerProtocolHandler.exe\" \"%1\""
+@="\"C:\\ShwanOrtho\\ExplorerProtocolHandler.exe\" \"%1\""
 
 
 ; --- CS IMAGING PROTOCOL ---
@@ -29,14 +29,14 @@ Windows Registry Editor Version 5.00
 "URL Protocol"=""
 
 [HKEY_CLASSES_ROOT\csimaging\DefaultIcon]
-@="C:\\Windows\\CSImagingProtocolHandler.exe,1"
+@="C:\\ShwanOrtho\\CSImagingProtocolHandler.exe,1"
 
 [HKEY_CLASSES_ROOT\csimaging\shell]
 
 [HKEY_CLASSES_ROOT\csimaging\shell\open]
 
 [HKEY_CLASSES_ROOT\csimaging\shell\open\command]
-@="\"C:\\Windows\\CSImagingProtocolHandler.exe\" \"%1\""
+@="\"C:\\ShwanOrtho\\CSImagingProtocolHandler.exe\" \"%1\""
 
 
 ; --- DOLPHIN IMAGING PROTOCOL ---
@@ -46,14 +46,14 @@ Windows Registry Editor Version 5.00
 "URL Protocol"=""
 
 [HKEY_CLASSES_ROOT\dolphin\DefaultIcon]
-@="C:\\Windows\\DolphinImagingProtocolHandler.exe,1"
+@="C:\\ShwanOrtho\\DolphinImagingProtocolHandler.exe,1"
 
 [HKEY_CLASSES_ROOT\dolphin\shell]
 
 [HKEY_CLASSES_ROOT\dolphin\shell\open]
 
 [HKEY_CLASSES_ROOT\dolphin\shell\open\command]
-@="\"C:\\Windows\\DolphinImagingProtocolHandler.exe\" \"%1\""
+@="\"C:\\ShwanOrtho\\DolphinImagingProtocolHandler.exe\" \"%1\""
 
 
 ; --- 3SHAPE UNITE PROTOCOL ---
@@ -63,14 +63,14 @@ Windows Registry Editor Version 5.00
 "URL Protocol"=""
 
 [HKEY_CLASSES_ROOT\3shape\DefaultIcon]
-@="C:\\Windows\\3ShapeProtocolHandler.exe,1"
+@="C:\\ShwanOrtho\\3ShapeProtocolHandler.exe,1"
 
 [HKEY_CLASSES_ROOT\3shape\shell]
 
 [HKEY_CLASSES_ROOT\3shape\shell\open]
 
 [HKEY_CLASSES_ROOT\3shape\shell\open\command]
-@="\"C:\\Windows\\3ShapeProtocolHandler.exe\" \"%1\""
+@="\"C:\\ShwanOrtho\\3ShapeProtocolHandler.exe\" \"%1\""
 
 
 ; --- BROWSER AUTO-LAUNCH CONFIGURATION ---

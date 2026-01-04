@@ -14,7 +14,10 @@ namespace UniversalProtocolHandler
         [DllImport("kernel32", CharSet = CharSet.Unicode)]
         static extern int GetPrivateProfileString(string section, string key, string defaultValue, StringBuilder result, int size, string filePath);
 
-        private const string CONFIG_FILE = @"C:\Windows\ProtocolHandlers.ini";
+        private static readonly string CONFIG_FILE = Path.Combine(
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location),
+            "ProtocolHandlers.ini"
+        );
 
         [STAThread]
         static void Main(string[] args)
@@ -42,7 +45,7 @@ namespace UniversalProtocolHandler
                 if (string.IsNullOrEmpty(executablePath))
                 {
                     ShowError("Application alias not found: " + appIdentifier + "\n\n" +
-                            "Please add it to C:\\Windows\\ProtocolHandlers.ini in the [Applications] section.\n\n" +
+                            "Please add it to C:\\ShwanOrtho\\ProtocolHandlers.ini in the [Applications] section.\n\n" +
                             "Example:\n" +
                             appIdentifier + "=C:\\Path\\To\\Application.exe");
                     return;

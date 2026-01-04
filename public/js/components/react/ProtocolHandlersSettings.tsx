@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, ChangeEvent, MouseEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, ChangeEvent, MouseEvent } from 'react';
 import styles from './DatabaseSettings.module.css';
 import {
     isFileSystemAccessSupported,
@@ -77,6 +77,7 @@ const KEY_DESCRIPTIONS: Record<string, string> = {
 
 const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsProps) => {
     const toast = useToast();
+    const lastReportedChanges = useRef<boolean | null>(null);
 
     // Configuration state
     const [config, setConfig] = useState<IniConfig>({});
@@ -115,7 +116,11 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
             const hasChanges = Object.keys(pendingChanges).some(
                 section => Object.keys(pendingChanges[section]).length > 0
             );
-            onChangesUpdate(hasChanges);
+            // Only call if value actually changed to prevent infinite loops
+            if (lastReportedChanges.current !== hasChanges) {
+                lastReportedChanges.current = hasChanges;
+                onChangesUpdate(hasChanges);
+            }
         }
     }, [pendingChanges, onChangesUpdate]);
 
@@ -554,7 +559,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 </ul>
                 <p style={{ marginTop: 'var(--spacing-md)', color: 'var(--text-secondary)' }}>
                     Alternatively, you can manually edit the file at:<br />
-                    <code>C:\Windows\ProtocolHandlers.ini</code>
+                    <code>C:\ShwanOrtho\ProtocolHandlers.ini</code>
                 </p>
             </div>
         </div>
@@ -567,7 +572,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 To edit the protocol handler configuration, you need to select the INI file on your local computer.
             </p>
             <p style={{ marginBottom: 'var(--spacing-lg)', color: 'var(--text-secondary)' }}>
-                Default location: <code>C:\Windows\ProtocolHandlers.ini</code>
+                Default location: <code>C:\ShwanOrtho\ProtocolHandlers.ini</code>
             </p>
             <button
                 className={`${styles.btn} ${styles.btnPrimary}`}
@@ -662,14 +667,14 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 </h3>
                 <p className={styles.sectionDescription}>
                     Configure Windows protocol handlers for Dolphin, CS Imaging, and other integrations.
-                    File location: C:\Windows\ProtocolHandlers.ini
+                    File location: C:\ShwanOrtho\ProtocolHandlers.ini
                 </p>
 
                 <div className={styles.restartWarning} style={{ marginBottom: 'var(--spacing-lg)', background: 'var(--info-50, #eff6ff)', borderColor: 'var(--info-200, #bfdbfe)', color: 'var(--info-800, #1e40af)' }}>
                     <i className="fas fa-info-circle" style={{ color: 'var(--info-color)' }}></i>
                     <span>
                         <strong>Note:</strong> This page edits the INI file on <strong>this computer</strong>.
-                        Each PC has its own configuration file at C:\Windows\ProtocolHandlers.ini.
+                        Each PC has its own configuration file at C:\ShwanOrtho\ProtocolHandlers.ini.
                     </span>
                 </div>
 

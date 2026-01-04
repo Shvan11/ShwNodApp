@@ -25,6 +25,7 @@ The `tblwork` table has been migrated from using a `Finished` bit column (0/1) t
 | Procedure Name | Status |
 |---------------|--------|
 | `AddTimePoint` | ✅ Fixed |
+| `VisitsPhotoforOne` | ✅ Fixed |
 
 ### Views (Used by Application)
 | View Name | Status |
@@ -38,7 +39,7 @@ The `tblwork` table has been migrated from using a `Finished` bit column (0/1) t
 
 These database objects still reference the old `Finished` column but are **NOT actively used** by the application code.
 
-### Stored Procedures (5 Unused)
+### Stored Procedures (4 Unused)
 
 #### 1. `CheckDate`
 - **Usage**: Checks if a work has a specific date field set
@@ -58,13 +59,7 @@ These database objects still reference the old `Finished` column but are **NOT a
 - **Impact**: Low - Not called by application
 - **Fix Required**: Change parameter to `@Status tinyint` and update INSERT
 
-#### 4. `VisitsPhotoforOne`
-- **Usage**: Lists photo visits for a patient
-- **Reference**: `WHERE ... AND Finished = 0`
-- **Impact**: Low - Not called by application
-- **Fix Required**: Replace `Finished = 0` with `Status = 1`
-
-#### 5. `WorkPhotoDates`
+#### 4. `WorkPhotoDates`
 - **Usage**: Gets photo dates for a work
 - **Reference**: `WHERE PersonID = @ID AND Finished = 0`
 - **Impact**: Low - Not called by application
@@ -118,7 +113,7 @@ These database objects still reference the old `Finished` column but are **NOT a
 All high-priority objects have been successfully migrated. ✅
 
 ### Low Priority (Unused Legacy Objects)
-The remaining 11 objects are **not actively used** by the application. They can be:
+The remaining 10 objects are **not actively used** by the application. They can be:
 
 1. **Left as-is** - No immediate impact on application functionality
 2. **Fixed when needed** - If these procedures/views are needed in the future
@@ -176,11 +171,12 @@ ORDER BY o.type_desc, o.name
 | 2025-12-02 | Fixed stored procedures | AddTimePoint |
 | 2025-12-02 | Fixed views | V_ActiveWork, V_Spatient |
 | 2025-12-02 | Documented remaining legacy objects | 11 unused objects |
+| 2026-01-04 | Fixed stored procedure (now in use) | VisitsPhotoforOne |
 
 ---
 
 ## Status Summary
 
 - ✅ **Critical Objects**: All fixed (triggers, used procedures, used views)
-- ⚠️ **Legacy Objects**: 11 remain with `Finished` references (unused by application)
+- ⚠️ **Legacy Objects**: 10 remain with `Finished` references (unused by application)
 - 🎯 **Application Impact**: Zero - All actively used objects migrated successfully

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, ComponentType } from 'react';
+import React, { useState, useEffect, useCallback, useRef, ComponentType } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
 // CSS Modules
@@ -49,6 +49,10 @@ const SettingsComponent: React.FC = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<string>(tab || 'general');
     const [userRole, setUserRole] = useState<string | null>(null);
+
+    // Ref to hold current activeTab - allows stable callback that reads current value
+    const activeTabRef = useRef(activeTab);
+    activeTabRef.current = activeTab;
     const [tabData, setTabData] = useState<TabDataState>({
         general: { hasChanges: false },
         database: { hasChanges: false },
@@ -185,15 +189,23 @@ const SettingsComponent: React.FC = () => {
         }
     };
 
-    const handleTabChangesUpdate = useCallback((tabId: string, hasChanges: boolean): void => {
-        setTabData(prev => ({
-            ...prev,
-            [tabId]: {
-                ...prev[tabId],
-                hasChanges
+    // Stable callback - reads activeTab from ref, so it never changes reference
+    const handleTabChangesUpdate = useCallback((hasChanges: boolean): void => {
+        const tabId = activeTabRef.current;
+        setTabData(prev => {
+            // Only update if the value actually changed to avoid unnecessary re-renders
+            if (prev[tabId]?.hasChanges === hasChanges) {
+                return prev;
             }
-        }));
-    }, []);
+            return {
+                ...prev,
+                [tabId]: {
+                    ...prev[tabId],
+                    hasChanges
+                }
+            };
+        });
+    }, []); // Empty deps = stable reference forever
 
     // Filter tabs based on user role
     const filteredTabs = tabs.filter(tabItem => {
@@ -220,7 +232,7 @@ const SettingsComponent: React.FC = () => {
             <div className={styles.content}>
                 {ActiveTabComponent ? (
                     <ActiveTabComponent
-                        onChangesUpdate={(hasChanges: boolean) => handleTabChangesUpdate(activeTab, hasChanges)}
+                        onChangesUpdate={handleTabChangesUpdate}
                     />
                 ) : (
                     <div className={styles.placeholder}>

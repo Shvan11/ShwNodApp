@@ -97,8 +97,8 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
             });
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.message || 'Failed to prepare photo import');
+                const errorData = await response.json();
+                throw new Error(errorData.error || errorData.message || 'Failed to prepare photo import');
             }
 
             const data = await response.json();

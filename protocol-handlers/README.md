@@ -21,7 +21,7 @@ Custom Windows protocol handlers for Shwan Orthodontics Management System.
 Right-click INSTALL.bat → Run as Administrator
 ```
 
-**Installs:** Handlers to `C:\Windows\`, registry entries, browser policies. **Time:** ~30s. **Restart:** Browser only.
+**Installs:** Handlers to `C:\ShwanOrtho\`, registry entries, browser policies. **Time:** ~30s. **Restart:** Browser only.
 
 **Uninstall:**
 ```cmd
@@ -32,7 +32,7 @@ Right-click UNINSTALL.bat → Run as Administrator
 
 ## Configuration
 
-**File:** `C:\Windows\ProtocolHandlers.ini`
+**File:** `C:\ShwanOrtho\ProtocolHandlers.ini`
 
 ```ini
 [Paths]
@@ -44,7 +44,7 @@ DolphinPath=C:\Dolphin\
 msaccess=C:\Program Files\Microsoft Office\root\Office16\MSACCESS.EXE
 ```
 
-**Edit:** `notepad C:\Windows\ProtocolHandlers.ini` (as Admin). Changes apply immediately.
+**Edit:** `notepad C:\ShwanOrtho\ProtocolHandlers.ini` (as Admin). Changes apply immediately.
 
 ---
 
@@ -76,7 +76,7 @@ msaccess=C:\Program Files\Microsoft Office\root\Office16\MSACCESS.EXE
 | CS Imaging not found | Install CS Imaging. Verify: `reg query "HKLM\Software\Classes\Trophy" /v InstallDir` |
 | Dolphin not found | Edit config: `DolphinPath=C:\Correct\Path\`. Verify `DolCtrl.exe` exists |
 | Network share error | Test: `explorer \\Clinic\clinic1`. Update `PatientsFolder` in config |
-| Handler not found | Re-run `INSTALL.bat`. Check antivirus. Verify: `dir C:\Windows\*ProtocolHandler.exe` |
+| Handler not found | Re-run `INSTALL.bat`. Check antivirus. Verify: `dir C:\ShwanOrtho\*ProtocolHandler.exe` |
 | App not found (launch) | Add alias to `[Applications]` section in config (whitelist-only mode, secure) |
 | Policy not in browser | Verify registry, re-run `INSTALL.bat`, `gpupdate /force`, restart browser |
 
@@ -86,7 +86,7 @@ msaccess=C:\Program Files\Microsoft Office\root\Office16\MSACCESS.EXE
 
 ## Technical
 
-**Files:** `C:\Windows\{Explorer,CSImaging,Dolphin,Universal}ProtocolHandler.exe` + `ProtocolHandlers.ini`
+**Files:** `C:\ShwanOrtho\{Explorer,CSImaging,Dolphin,Universal}ProtocolHandler.exe` + `ProtocolHandlers.ini`
 
 **Registry:** `HKCR\{explorer,csimaging,dolphin,launch}` → handlers
 
@@ -98,7 +98,7 @@ msaccess=C:\Program Files\Microsoft Office\root\Office16\MSACCESS.EXE
 
 **Verification:**
 ```cmd
-dir C:\Windows\*ProtocolHandler.exe
+dir C:\ShwanOrtho\*ProtocolHandler.exe
 reg query HKCR\explorer
 reg query "HKLM\SOFTWARE\Policies\Google\Chrome" /v AutoLaunchProtocolsFromOrigins
 ```

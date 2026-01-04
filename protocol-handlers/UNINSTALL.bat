@@ -5,9 +5,13 @@ REM Removes both Explorer and CS Imaging protocols
 REM Run as Administrator
 REM ============================================
 
+REM Installation directory
+set INSTALL_DIR=C:\ShwanOrtho
+
 echo ============================================
 echo   Protocol Handlers Uninstaller
 echo ============================================
+echo   Uninstalling from: %INSTALL_DIR%
 echo   This will remove:
 echo   - Explorer Protocol (folder opening)
 echo   - CS Imaging Protocol (Trophy integration)
@@ -98,8 +102,8 @@ echo.
 echo [Step 2/4] Deleting handler executables...
 echo.
 
-if exist "C:\Windows\ExplorerProtocolHandler.exe" (
-    del /f "C:\Windows\ExplorerProtocolHandler.exe" >nul 2>&1
+if exist "%INSTALL_DIR%\ExplorerProtocolHandler.exe" (
+    del /f "%INSTALL_DIR%\ExplorerProtocolHandler.exe" >nul 2>&1
     if %errorLevel% equ 0 (
         echo   - ExplorerProtocolHandler.exe deleted
     ) else (
@@ -109,8 +113,8 @@ if exist "C:\Windows\ExplorerProtocolHandler.exe" (
     echo   - ExplorerProtocolHandler.exe not found (already removed)
 )
 
-if exist "C:\Windows\CSImagingProtocolHandler.exe" (
-    del /f "C:\Windows\CSImagingProtocolHandler.exe" >nul 2>&1
+if exist "%INSTALL_DIR%\CSImagingProtocolHandler.exe" (
+    del /f "%INSTALL_DIR%\CSImagingProtocolHandler.exe" >nul 2>&1
     if %errorLevel% equ 0 (
         echo   - CSImagingProtocolHandler.exe deleted
     ) else (
@@ -120,8 +124,8 @@ if exist "C:\Windows\CSImagingProtocolHandler.exe" (
     echo   - CSImagingProtocolHandler.exe not found (already removed)
 )
 
-if exist "C:\Windows\UniversalProtocolHandler.exe" (
-    del /f "C:\Windows\UniversalProtocolHandler.exe" >nul 2>&1
+if exist "%INSTALL_DIR%\UniversalProtocolHandler.exe" (
+    del /f "%INSTALL_DIR%\UniversalProtocolHandler.exe" >nul 2>&1
     if %errorLevel% equ 0 (
         echo   - UniversalProtocolHandler.exe deleted
     ) else (
@@ -131,8 +135,8 @@ if exist "C:\Windows\UniversalProtocolHandler.exe" (
     echo   - UniversalProtocolHandler.exe not found (already removed)
 )
 
-if exist "C:\Windows\DolphinImagingProtocolHandler.exe" (
-    del /f "C:\Windows\DolphinImagingProtocolHandler.exe" >nul 2>&1
+if exist "%INSTALL_DIR%\DolphinImagingProtocolHandler.exe" (
+    del /f "%INSTALL_DIR%\DolphinImagingProtocolHandler.exe" >nul 2>&1
     if %errorLevel% equ 0 (
         echo   - DolphinImagingProtocolHandler.exe deleted
     ) else (
@@ -152,8 +156,8 @@ echo.
 echo [Step 3/4] Deleting configuration file...
 echo.
 
-if exist "C:\Windows\ProtocolHandlers.ini" (
-    del /f "C:\Windows\ProtocolHandlers.ini" >nul 2>&1
+if exist "%INSTALL_DIR%\ProtocolHandlers.ini" (
+    del /f "%INSTALL_DIR%\ProtocolHandlers.ini" >nul 2>&1
     if %errorLevel% equ 0 (
         echo   - ProtocolHandlers.ini deleted
     ) else (
@@ -163,8 +167,8 @@ if exist "C:\Windows\ProtocolHandlers.ini" (
     echo   - ProtocolHandlers.ini not found (already removed)
 )
 
-if exist "C:\Windows\ProtocolHandlers.ini.backup" (
-    del /f "C:\Windows\ProtocolHandlers.ini.backup" >nul 2>&1
+if exist "%INSTALL_DIR%\ProtocolHandlers.ini.backup" (
+    del /f "%INSTALL_DIR%\ProtocolHandlers.ini.backup" >nul 2>&1
     if %errorLevel% equ 0 (
         echo   - ProtocolHandlers.ini.backup deleted
     ) else (
@@ -174,6 +178,15 @@ if exist "C:\Windows\ProtocolHandlers.ini.backup" (
     echo   - ProtocolHandlers.ini.backup not found (already removed)
 )
 
+REM Remove installation directory if empty
+dir /b "%INSTALL_DIR%" 2>nul | findstr . >nul 2>&1
+if %errorLevel% neq 0 (
+    rmdir "%INSTALL_DIR%" >nul 2>&1
+    if %errorLevel% equ 0 (
+        echo   - Removed empty installation directory
+    )
+)
+
 echo.
 echo [Step 4/4] Verifying removal...
 echo.
@@ -181,35 +194,35 @@ echo.
 set ALL_REMOVED=1
 
 REM Check if files still exist
-if exist "C:\Windows\ProtocolHandlers.ini" (
+if exist "%INSTALL_DIR%\ProtocolHandlers.ini" (
     echo   X ProtocolHandlers.ini still exists
     set ALL_REMOVED=0
 ) else (
     echo   + ProtocolHandlers.ini removed
 )
 
-if exist "C:\Windows\ExplorerProtocolHandler.exe" (
+if exist "%INSTALL_DIR%\ExplorerProtocolHandler.exe" (
     echo   X ExplorerProtocolHandler.exe still exists
     set ALL_REMOVED=0
 ) else (
     echo   + ExplorerProtocolHandler.exe removed
 )
 
-if exist "C:\Windows\CSImagingProtocolHandler.exe" (
+if exist "%INSTALL_DIR%\CSImagingProtocolHandler.exe" (
     echo   X CSImagingProtocolHandler.exe still exists
     set ALL_REMOVED=0
 ) else (
     echo   + CSImagingProtocolHandler.exe removed
 )
 
-if exist "C:\Windows\UniversalProtocolHandler.exe" (
+if exist "%INSTALL_DIR%\UniversalProtocolHandler.exe" (
     echo   X UniversalProtocolHandler.exe still exists
     set ALL_REMOVED=0
 ) else (
     echo   + UniversalProtocolHandler.exe removed
 )
 
-if exist "C:\Windows\DolphinImagingProtocolHandler.exe" (
+if exist "%INSTALL_DIR%\DolphinImagingProtocolHandler.exe" (
     echo   X DolphinImagingProtocolHandler.exe still exists
     set ALL_REMOVED=0
 ) else (

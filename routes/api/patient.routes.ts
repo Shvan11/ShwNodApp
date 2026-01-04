@@ -654,6 +654,39 @@ router.get(
 );
 
 // ============================================================================
+// TAG OPTIONS
+// ============================================================================
+
+/**
+ * Get all tag options
+ * GET /patients/tag-options
+ * NOTE: Must be defined BEFORE /patients/:personId to avoid route conflicts
+ */
+router.get(
+  '/patients/tag-options',
+  async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const tags = await database.executeQuery<TagOption>(
+        'SELECT ID, Tag FROM dbo.tblTagOptions ORDER BY Tag',
+        [],
+        (columns) => ({
+          id: columns[0].value as number,
+          tag: columns[1].value as string
+        })
+      );
+      res.json(tags);
+    } catch (error) {
+      log.error('Error fetching tag options:', error);
+      ErrorResponses.internalError(
+        res,
+        'Failed to fetch tag options',
+        error as Error
+      );
+    }
+  }
+);
+
+// ============================================================================
 // PATIENT CRUD OPERATIONS
 // ============================================================================
 
@@ -1150,38 +1183,6 @@ router.get(
       ErrorResponses.internalError(
         res,
         'Failed to check appointment status',
-        error as Error
-      );
-    }
-  }
-);
-
-// ============================================================================
-// TAG OPTIONS
-// ============================================================================
-
-/**
- * Get all tag options
- * GET /patients/tag-options
- */
-router.get(
-  '/patients/tag-options',
-  async (_req: Request, res: Response): Promise<void> => {
-    try {
-      const tags = await database.executeQuery<TagOption>(
-        'SELECT ID, Tag FROM dbo.tblTagOptions ORDER BY Tag',
-        [],
-        (columns) => ({
-          id: columns[0].value as number,
-          tag: columns[1].value as string
-        })
-      );
-      res.json(tags);
-    } catch (error) {
-      log.error('Error fetching tag options:', error);
-      ErrorResponses.internalError(
-        res,
-        'Failed to fetch tag options',
         error as Error
       );
     }

@@ -128,7 +128,7 @@ export function formatIniContent(
       lines.push(...options.headerLines.map(line => `# ${line}`));
     } else {
       lines.push('# Protocol Handlers Configuration');
-      lines.push('# Location: C:\\Windows\\ProtocolHandlers.ini');
+      lines.push('# Location: C:\\ShwanOrtho\\ProtocolHandlers.ini');
     }
 
     if (options?.includeTimestamp !== false) {
@@ -173,7 +173,7 @@ export function getProtocolHandlerFormatOptions(): FormatOptions {
     includeTimestamp: true,
     headerLines: [
       'Protocol Handlers Configuration',
-      'Location: C:\\Windows\\ProtocolHandlers.ini'
+      'Location: C:\\ShwanOrtho\\ProtocolHandlers.ini'
     ],
     sectionComments: {
       Paths: 'Path configuration for protocol handlers',

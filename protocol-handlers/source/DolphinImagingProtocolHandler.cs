@@ -22,7 +22,10 @@ namespace DolphinImagingProtocolHandler
 
     class Program
     {
-        private const string ConfigPath = @"C:\Windows\ProtocolHandlers.ini";
+        private static readonly string ConfigPath = Path.Combine(
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location),
+            "ProtocolHandlers.ini"
+        );
 
         [DllImport("kernel32", CharSet = CharSet.Unicode)]
         static extern long WritePrivateProfileString(string Section, string Key, string Value, string FilePath);

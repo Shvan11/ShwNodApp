@@ -65,7 +65,7 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
                     </tr>
                 </thead>
                 <tbody>
-                    {expenses.map(expense => {
+                    {expenses.map((expense, index) => {
                         const date = formatDate(expense.ExpenseDate);
                         const amount = formatNumber(expense.Amount);
                         const currency = (expense.Currency || '').trim();
@@ -75,7 +75,7 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
                         const note = expense.Description || '-';
 
                         return (
-                            <tr key={expense.ExpenseID} data-expense-id={expense.ExpenseID}>
+                            <tr key={expense.ExpenseID ?? `expense-${index}`} data-expense-id={expense.ExpenseID}>
                                 <td>{date}</td>
                                 <td className={`${styles.amountCell} ${getCurrencyClass(currencyLower)}`}>
                                     {amount}

@@ -133,7 +133,7 @@ export async function getAppointmentsForDolphin(
 ): Promise<AppointmentForDolphin[]> {
   return executeStoredProcedure<AppointmentForDolphin>(
     'ApposforOne',
-    [['PID', TYPES.Int, parseInt(personId, 10)]],
+    [['ID', TYPES.Int, parseInt(personId, 10)]],
     undefined,
     (columns: ColumnValue[]) => ({
       date: columns[0].value as Date,
@@ -148,7 +148,7 @@ export async function getAppointmentsForDolphin(
 export async function getVisitsForDolphin(personId: string): Promise<VisitForDolphin[]> {
   return executeStoredProcedure<VisitForDolphin>(
     'VisitsPhotoforOne',
-    [['PID', TYPES.Int, parseInt(personId, 10)]],
+    [['ID', TYPES.Int, parseInt(personId, 10)]],
     undefined,
     (columns: ColumnValue[]) => ({
       visitDate: columns[0].value as Date,
