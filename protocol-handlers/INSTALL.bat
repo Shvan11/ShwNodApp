@@ -13,6 +13,7 @@ REM Component selection flags (default: all selected)
 set INSTALL_EXPLORER=1
 set INSTALL_CSIMAGING=1
 set INSTALL_DOLPHIN=1
+set INSTALL_3SHAPE=1
 
 REM Check for admin rights first
 net session >nul 2>&1
@@ -45,49 +46,63 @@ echo.
 if !INSTALL_EXPLORER! equ 1 (echo   [X] 1. Explorer Protocol      - Open patient folders) else (echo   [ ] 1. Explorer Protocol      - Open patient folders)
 if !INSTALL_CSIMAGING! equ 1 (echo   [X] 2. CS Imaging Protocol    - Trophy/Carestream integration) else (echo   [ ] 2. CS Imaging Protocol    - Trophy/Carestream integration)
 if !INSTALL_DOLPHIN! equ 1 (echo   [X] 3. Dolphin Protocol       - Dolphin Imaging integration) else (echo   [ ] 3. Dolphin Protocol       - Dolphin Imaging integration)
+if !INSTALL_3SHAPE! equ 1 (echo   [X] 4. 3Shape Protocol        - 3Shape scanner integration) else (echo   [ ] 4. 3Shape Protocol        - 3Shape scanner integration)
 echo.
 echo   ----------------------------------------
 echo   A. Select All          N. Select None
 echo   I. Install Selected    Q. Quit
 echo   ----------------------------------------
 echo.
-set /p "CHOICE=Enter choice (1-3, A, N, I, Q): "
+set /p "CHOICE=Enter choice (1-4, A, N, I, Q): "
 
-if /i "!CHOICE!"=="1" (
-    if !INSTALL_EXPLORER! equ 1 (set INSTALL_EXPLORER=0) else (set INSTALL_EXPLORER=1)
-    goto :menu
-)
-if /i "!CHOICE!"=="2" (
-    if !INSTALL_CSIMAGING! equ 1 (set INSTALL_CSIMAGING=0) else (set INSTALL_CSIMAGING=1)
-    goto :menu
-)
-if /i "!CHOICE!"=="3" (
-    if !INSTALL_DOLPHIN! equ 1 (set INSTALL_DOLPHIN=0) else (set INSTALL_DOLPHIN=1)
-    goto :menu
-)
-if /i "!CHOICE!"=="A" (
-    set INSTALL_EXPLORER=1
-    set INSTALL_CSIMAGING=1
-    set INSTALL_DOLPHIN=1
-    goto :menu
-)
-if /i "!CHOICE!"=="N" (
-    set INSTALL_EXPLORER=0
-    set INSTALL_CSIMAGING=0
-    set INSTALL_DOLPHIN=0
-    goto :menu
-)
-if /i "!CHOICE!"=="I" goto :validate_selection
-if /i "!CHOICE!"=="Q" (
-    echo.
-    echo Installation cancelled.
-    pause
-    exit /b 0
-)
+if /i "%CHOICE%"=="1" goto :toggle1
+if /i "%CHOICE%"=="2" goto :toggle2
+if /i "%CHOICE%"=="3" goto :toggle3
+if /i "%CHOICE%"=="4" goto :toggle4
+if /i "%CHOICE%"=="A" goto :selectall
+if /i "%CHOICE%"=="N" goto :selectnone
+if /i "%CHOICE%"=="I" goto :validate_selection
+if /i "%CHOICE%"=="Q" goto :quit
 
 echo Invalid choice. Press any key to try again...
 pause >nul
 goto :menu
+
+:toggle1
+set /a INSTALL_EXPLORER=1-INSTALL_EXPLORER
+goto :menu
+
+:toggle2
+set /a INSTALL_CSIMAGING=1-INSTALL_CSIMAGING
+goto :menu
+
+:toggle3
+set /a INSTALL_DOLPHIN=1-INSTALL_DOLPHIN
+goto :menu
+
+:toggle4
+set /a INSTALL_3SHAPE=1-INSTALL_3SHAPE
+goto :menu
+
+:selectall
+set INSTALL_EXPLORER=1
+set INSTALL_CSIMAGING=1
+set INSTALL_DOLPHIN=1
+set INSTALL_3SHAPE=1
+goto :menu
+
+:selectnone
+set INSTALL_EXPLORER=0
+set INSTALL_CSIMAGING=0
+set INSTALL_DOLPHIN=0
+set INSTALL_3SHAPE=0
+goto :menu
+
+:quit
+echo.
+echo Installation cancelled.
+pause
+exit /b 0
 
 :validate_selection
 REM Check that at least one component is selected
@@ -95,6 +110,7 @@ set TOTAL_SELECTED=0
 if !INSTALL_EXPLORER! equ 1 set /a TOTAL_SELECTED+=1
 if !INSTALL_CSIMAGING! equ 1 set /a TOTAL_SELECTED+=1
 if !INSTALL_DOLPHIN! equ 1 set /a TOTAL_SELECTED+=1
+if !INSTALL_3SHAPE! equ 1 set /a TOTAL_SELECTED+=1
 
 if !TOTAL_SELECTED! equ 0 (
     echo.
@@ -114,6 +130,7 @@ echo   Selected components:
 if !INSTALL_EXPLORER! equ 1 echo   - Explorer Protocol ^(folder opening^)
 if !INSTALL_CSIMAGING! equ 1 echo   - CS Imaging Protocol ^(Trophy integration^)
 if !INSTALL_DOLPHIN! equ 1 echo   - Dolphin Imaging Protocol ^(Dolphin integration^)
+if !INSTALL_3SHAPE! equ 1 echo   - 3Shape Protocol ^(3Shape scanner integration^)
 echo ============================================
 echo.
 
@@ -204,6 +221,15 @@ if !INSTALL_DOLPHIN! equ 1 (
     )
 )
 
+if !INSTALL_3SHAPE! equ 1 (
+    if not exist "%~dp03ShapeProtocolHandler.exe" (
+        echo.
+        echo ERROR: 3ShapeProtocolHandler.exe not found after compilation!
+        pause
+        exit /b 1
+    )
+)
+
 echo.
 echo [Step 2/4] Creating installation directory and configuration file...
 echo.
@@ -244,12 +270,14 @@ REM Kill running protocol handler processes for selected components
 if !INSTALL_EXPLORER! equ 1 taskkill /F /IM ExplorerProtocolHandler.exe >nul 2>&1
 if !INSTALL_CSIMAGING! equ 1 taskkill /F /IM CSImagingProtocolHandler.exe >nul 2>&1
 if !INSTALL_DOLPHIN! equ 1 taskkill /F /IM DolphinImagingProtocolHandler.exe >nul 2>&1
+if !INSTALL_3SHAPE! equ 1 taskkill /F /IM 3ShapeProtocolHandler.exe >nul 2>&1
 echo   - Stopped any running protocol handlers
 
 REM Check if files already exist and compare
 set NEEDS_COPY_EXPLORER=1
 set NEEDS_COPY_CSIMAGING=1
 set NEEDS_COPY_DOLPHIN=1
+set NEEDS_COPY_3SHAPE=1
 
 REM Explorer Protocol Handler
 if !INSTALL_EXPLORER! equ 1 (
@@ -326,6 +354,31 @@ if !INSTALL_DOLPHIN! equ 1 (
     echo   - Dolphin Protocol: skipped ^(not selected^)
 )
 
+REM 3Shape Protocol Handler
+if !INSTALL_3SHAPE! equ 1 (
+    if exist "%INSTALL_DIR%\3ShapeProtocolHandler.exe" (
+        fc /b "%~dp03ShapeProtocolHandler.exe" "%INSTALL_DIR%\3ShapeProtocolHandler.exe" >nul 2>&1
+        if !errorLevel! equ 0 (
+            echo   - 3ShapeProtocolHandler.exe is up to date
+            set NEEDS_COPY_3SHAPE=0
+        ) else (
+            echo   - Updating 3ShapeProtocolHandler.exe
+        )
+    ) else (
+        echo   - Installing 3ShapeProtocolHandler.exe
+    )
+
+    if !NEEDS_COPY_3SHAPE! equ 1 (
+        call :copy_with_retry 3ShapeProtocolHandler.exe
+        if !errorLevel! neq 0 (
+            pause
+            exit /b 1
+        )
+    )
+) else (
+    echo   - 3Shape Protocol: skipped ^(not selected^)
+)
+
 echo.
 echo [Step 4/4] Registering selected protocols in Windows registry...
 echo.
@@ -358,6 +411,15 @@ if !INSTALL_DOLPHIN! equ 1 (
     echo   - dolphin: skipped ^(not selected^)
 )
 
+if !INSTALL_3SHAPE! equ 1 (
+    reg add "HKCR\3shape" /ve /t REG_SZ /d "URL:3Shape Protocol" /f >nul 2>&1
+    reg add "HKCR\3shape" /v "URL Protocol" /t REG_SZ /d "" /f >nul 2>&1
+    reg add "HKCR\3shape\shell\open\command" /ve /t REG_SZ /d "\"C:\\ShwanOrtho\\3ShapeProtocolHandler.exe\" \"%%1\"" /f >nul 2>&1
+    echo   - 3shape: protocol registered
+) else (
+    echo   - 3shape: skipped ^(not selected^)
+)
+
 REM Smart browser policy handling
 echo   - Configuring browser auto-launch policies ^(all protocols^)...
 
@@ -369,7 +431,7 @@ if %errorLevel% equ 0 (
 ) else (
     echo   - Chrome policy not found, creating...
 )
-reg add %CHROME_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
+reg add %CHROME_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"3shape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
 
 REM For Edge
 set EDGE_POLICY="HKLM\SOFTWARE\Policies\Microsoft\Edge"
@@ -379,7 +441,7 @@ if %errorLevel% equ 0 (
 ) else (
     echo   - Edge policy not found, creating...
 )
-reg add %EDGE_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
+reg add %EDGE_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"3shape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
 
 echo   - Protocols registered successfully
 
@@ -448,6 +510,23 @@ if !INSTALL_DOLPHIN! equ 1 (
     )
 )
 
+REM Verify 3Shape Protocol
+if !INSTALL_3SHAPE! equ 1 (
+    if not exist "%INSTALL_DIR%\3ShapeProtocolHandler.exe" (
+        echo   X 3ShapeProtocolHandler.exe NOT FOUND
+        set ALL_OK=0
+    ) else (
+        echo   + 3ShapeProtocolHandler.exe OK
+    )
+    reg query "HKCR\3shape\shell\open\command" >nul 2>&1
+    if !errorLevel! equ 0 (
+        echo   + 3shape: protocol registered
+    ) else (
+        echo   X 3shape: protocol NOT registered
+        set ALL_OK=0
+    )
+)
+
 echo.
 echo ============================================
 
@@ -459,6 +538,7 @@ if !ALL_OK! equ 1 (
     if !INSTALL_EXPLORER! equ 1 echo   - Explorer Protocol ^(explorer://^)
     if !INSTALL_CSIMAGING! equ 1 echo   - CS Imaging Protocol ^(csimaging://^)
     if !INSTALL_DOLPHIN! equ 1 echo   - Dolphin Protocol ^(dolphin://^)
+    if !INSTALL_3SHAPE! equ 1 echo   - 3Shape Protocol ^(3shape://^)
     echo.
     echo Next steps:
     echo 1. Edit configuration if needed:
