@@ -412,12 +412,12 @@ if !INSTALL_DOLPHIN! equ 1 (
 )
 
 if !INSTALL_3SHAPE! equ 1 (
-    reg add "HKCR\3shape" /ve /t REG_SZ /d "URL:3Shape Protocol" /f >nul 2>&1
-    reg add "HKCR\3shape" /v "URL Protocol" /t REG_SZ /d "" /f >nul 2>&1
-    reg add "HKCR\3shape\shell\open\command" /ve /t REG_SZ /d "\"C:\\ShwanOrtho\\3ShapeProtocolHandler.exe\" \"%%1\"" /f >nul 2>&1
-    echo   - 3shape: protocol registered
+    reg add "HKCR\tshape" /ve /t REG_SZ /d "URL:3Shape Protocol" /f >nul 2>&1
+    reg add "HKCR\tshape" /v "URL Protocol" /t REG_SZ /d "" /f >nul 2>&1
+    reg add "HKCR\tshape\shell\open\command" /ve /t REG_SZ /d "\"C:\\ShwanOrtho\\3ShapeProtocolHandler.exe\" \"%%1\"" /f >nul 2>&1
+    echo   - tshape: protocol registered
 ) else (
-    echo   - 3shape: skipped ^(not selected^)
+    echo   - tshape: skipped ^(not selected^)
 )
 
 REM Smart browser policy handling
@@ -431,7 +431,7 @@ if %errorLevel% equ 0 (
 ) else (
     echo   - Chrome policy not found, creating...
 )
-reg add %CHROME_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"3shape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
+reg add %CHROME_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"tshape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
 
 REM For Edge
 set EDGE_POLICY="HKLM\SOFTWARE\Policies\Microsoft\Edge"
@@ -441,7 +441,7 @@ if %errorLevel% equ 0 (
 ) else (
     echo   - Edge policy not found, creating...
 )
-reg add %EDGE_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"3shape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
+reg add %EDGE_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"tshape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
 
 echo   - Protocols registered successfully
 
@@ -518,11 +518,11 @@ if !INSTALL_3SHAPE! equ 1 (
     ) else (
         echo   + 3ShapeProtocolHandler.exe OK
     )
-    reg query "HKCR\3shape\shell\open\command" >nul 2>&1
+    reg query "HKCR\tshape\shell\open\command" >nul 2>&1
     if !errorLevel! equ 0 (
-        echo   + 3shape: protocol registered
+        echo   + tshape: protocol registered
     ) else (
-        echo   X 3shape: protocol NOT registered
+        echo   X tshape: protocol NOT registered
         set ALL_OK=0
     )
 )
@@ -538,7 +538,7 @@ if !ALL_OK! equ 1 (
     if !INSTALL_EXPLORER! equ 1 echo   - Explorer Protocol ^(explorer://^)
     if !INSTALL_CSIMAGING! equ 1 echo   - CS Imaging Protocol ^(csimaging://^)
     if !INSTALL_DOLPHIN! equ 1 echo   - Dolphin Protocol ^(dolphin://^)
-    if !INSTALL_3SHAPE! equ 1 echo   - 3Shape Protocol ^(3shape://^)
+    if !INSTALL_3SHAPE! equ 1 echo   - 3Shape Protocol ^(tshape://^)
     echo.
     echo Next steps:
     echo 1. Edit configuration if needed:

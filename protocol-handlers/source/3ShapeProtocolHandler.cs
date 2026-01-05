@@ -22,14 +22,14 @@ namespace ThreeShapeProtocolHandler
 
                 string url = args[0];
 
-                // Parse the 3shape: URL
-                // Format: 3shape:PatientID?firstname=FirstName&lastname=LastName
+                // Parse the tshape: URL (named "tshape" because URI schemes must start with a letter)
+                // Format: tshape:PatientID?firstname=FirstName&lastname=LastName
                 var parsedUrl = Parse3ShapeUrl(url);
 
                 if (parsedUrl == null)
                 {
                     MessageBox.Show(
-                        "Invalid 3Shape URL format.\n\nExpected: 3shape:PatientID?firstname=FirstName&lastname=LastName",
+                        "Invalid 3Shape URL format.\n\nExpected: tshape:PatientID?firstname=FirstName&lastname=LastName",
                         "Invalid URL",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Error
@@ -127,16 +127,16 @@ namespace ThreeShapeProtocolHandler
         }
 
         /// <summary>
-        /// Parse 3shape: URL
-        /// Format: 3shape:PatientID?firstname=FirstName&lastname=LastName
+        /// Parse tshape: URL (named "tshape" because URI schemes must start with a letter)
+        /// Format: tshape:PatientID?firstname=FirstName&lastname=LastName
         /// Returns Tuple of (PatientID, FirstName, LastName)
         /// </summary>
         private static Tuple<string, string, string> Parse3ShapeUrl(string url)
         {
             try
             {
-                // Strip protocol: 3shape:PatientID?firstname=...&lastname=...
-                string withoutProtocol = Regex.Replace(url, "^3shape:", "", RegexOptions.IgnoreCase);
+                // Strip protocol: tshape:PatientID?firstname=...&lastname=...
+                string withoutProtocol = Regex.Replace(url, "^tshape:", "", RegexOptions.IgnoreCase);
 
                 // URL decode
                 withoutProtocol = HttpUtility.UrlDecode(withoutProtocol);

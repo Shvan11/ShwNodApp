@@ -203,8 +203,8 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
             const firstName = names[0] || '';
             const lastName = names.slice(1).join(' ') || '';
 
-            // Use dedicated 3shape: protocol handler
-            const url = `3shape:${personId}?firstname=${encodeURIComponent(firstName)}&lastname=${encodeURIComponent(lastName)}`;
+            // Use dedicated tshape: protocol handler (named "tshape" because URI schemes must start with a letter)
+            const url = `tshape:${personId}?firstname=${encodeURIComponent(firstName)}&lastname=${encodeURIComponent(lastName)}`;
             window.location.href = url;
 
             console.log('Opening 3Shape Unite for patient:', personId, firstName, lastName);

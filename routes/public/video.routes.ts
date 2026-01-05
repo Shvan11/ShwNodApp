@@ -283,11 +283,49 @@ router.get('/:id', async (req: Request<VideoIdParams>, res: Response): Promise<v
     .download-btn:hover {
       background: #5a6fd6;
     }
+    .share-btn {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background: #667eea;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: none;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .share-btn:hover {
+      background: #5a6fd6;
+    }
+    .buttons {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
     .footer {
       margin-top: 20px;
       color: rgba(255,255,255,0.8);
       font-size: 14px;
     }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      border-radius: 8px;
+      color: white;
+      font-weight: 500;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 1000;
+    }
+    .toast.show { opacity: 1; }
+    .toast.warning { background: #f59e0b; }
+    .toast.error { background: #dc3545; }
   </style>
 </head>
 <body>
@@ -304,17 +342,104 @@ router.get('/:id', async (req: Request<VideoIdParams>, res: Response): Promise<v
     <div class="content">
       <h2 class="title">${escapeHtml(video.Description)}</h2>
       ${video.Details ? `<p class="details">${escapeHtml(video.Details)}</p>` : ''}
-      <a href="/v/${id}/download" class="download-btn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-        Download Video
-      </a>
+      <div class="buttons">
+        <a href="/v/${id}/download" class="download-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Download Video
+        </a>
+        <button id="shareBtn" class="share-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/>
+          </svg>
+          Share Video
+        </button>
+      </div>
     </div>
   </div>
   <p class="footer">Educational content from Shwan Orthodontics</p>
+  <div id="toast" class="toast"></div>
+  <script>
+    (function() {
+      // Blob caching pattern (duplicated from GridComponent.tsx)
+      var cachedBlob = { url: null, blob: null, fetchId: 0 };
+      var isSharing = false;
+      var videoUrl = '/v/${id}/stream';
+      var videoTitle = '${escapeHtml(video.Description).replace(/'/g, "\\'")}';
+
+      // Toast notification
+      function showToast(message, type) {
+        var toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = 'toast ' + type + ' show';
+        setTimeout(function() {
+          toast.classList.remove('show');
+        }, 3000);
+      }
+
+      // Pre-fetch blob for sharing (duplicated from GridComponent.tsx)
+      function prefetchBlobForShare() {
+        if (!navigator.share || !navigator.canShare) return;
+
+        var currentFetchId = ++cachedBlob.fetchId;
+        cachedBlob.url = null;
+        cachedBlob.blob = null;
+
+        fetch(videoUrl)
+          .then(function(response) {
+            if (!response.ok) return;
+            return response.blob();
+          })
+          .then(function(blob) {
+            if (blob && currentFetchId === cachedBlob.fetchId) {
+              cachedBlob.url = videoUrl;
+              cachedBlob.blob = blob;
+            }
+          })
+          .catch(function() {
+            // Silent fail - user will see "please wait" message if they try to share
+          });
+      }
+
+      // Native share handler (duplicated from GridComponent.tsx)
+      function handleShare() {
+        if (isSharing) return;
+        isSharing = true;
+
+        if (cachedBlob.url !== videoUrl || !cachedBlob.blob) {
+          showToast('Please wait a moment and try again', 'warning');
+          isSharing = false;
+          return;
+        }
+
+        var fileName = videoTitle.replace(/[^a-zA-Z0-9\\s-]/g, '').trim() + '.mp4';
+        var file = new File([cachedBlob.blob], fileName, { type: 'video/mp4' });
+
+        navigator.share({ files: [file] })
+          .catch(function(err) {
+            if (err.name !== 'AbortError') {
+              showToast('Failed to share video', 'error');
+            }
+          })
+          .finally(function() {
+            isSharing = false;
+          });
+      }
+
+      // Initialize on page load
+      if ('share' in navigator && 'canShare' in navigator) {
+        var shareBtn = document.getElementById('shareBtn');
+        shareBtn.style.display = 'inline-flex';
+        shareBtn.addEventListener('click', handleShare);
+
+        // Pre-fetch blob on page load
+        prefetchBlobForShare();
+      }
+    })();
+  </script>
 </body>
 </html>`;
 
