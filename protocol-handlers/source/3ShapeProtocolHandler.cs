@@ -74,7 +74,7 @@ namespace ThreeShapeProtocolHandler
                         "Please add TShapePath to " + configPath + "\n\n" +
                         "Example:\n" +
                         "[Paths]\n" +
-                        "TShapePath=C:\\Program Files\\3Shape\\Unite\\3ShapeUnite.exe",
+                        "TShapePath=C:\\Program Files\\3Shape\\Dental Desktop\\Plugins\\ThreeShape.PracticeManagementIntegration\\DentalDesktopCmd.exe",
                         "Configuration Error",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Error

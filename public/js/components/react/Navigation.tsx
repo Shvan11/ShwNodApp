@@ -512,8 +512,8 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             }}
                             title={isNewPatient ? "Save patient first to access Dolphin Imaging" : "Launch Dolphin Imaging with patient data"}
                         >
-                            <div className="action-item-icon dolphin-icon">
-                                🐬
+                            <div className="action-item-icon">
+                                <img src="/images/dolphin-logo@2x.png" alt="Dolphin" style={{ width: '20px', height: '20px' }} />
                             </div>
                             <span className="action-item-label">Dolphin Imaging</span>
                         </Link>
@@ -530,9 +530,9 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             title={isNewPatient ? "Save patient first" : "Launch 3Shape Unite with patient data"}
                         >
                             <div className="action-item-icon">
-                                <i className="fas fa-cube" />
+                                <img src="/images/3Shape_transparent_256x256.png" alt="3Shape" style={{ width: '20px', height: '20px' }} />
                             </div>
-                            <span className="action-item-label">3Shape Unite</span>
+                            <span className="action-item-label">3Shape</span>
                         </Link>
 
                         <Link
@@ -547,7 +547,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             title={isNewPatient ? "Save patient first" : "Add photos from memory card to Dolphin Imaging"}
                         >
                             <div className="action-item-icon">
-                                <i className="fas fa-camera" />
+                                <img src="/images/dolphin-logo@2x.png" alt="Dolphin" style={{ width: '20px', height: '20px' }} />
                             </div>
                             <span className="action-item-label">Add Photos to Dolphin</span>
                         </Link>
