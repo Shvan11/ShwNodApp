@@ -27,6 +27,10 @@ interface AlignerDoctor {
 
 interface AlignerDoctorWithUnread extends AlignerDoctor {
   UnreadDoctorNotes: number;
+  // Aliased properties for frontend compatibility
+  id: number;
+  name: string;
+  logoPath: string | null;
 }
 
 interface DoctorData {
@@ -303,6 +307,7 @@ export async function getDoctorsWithUnreadCounts(): Promise<AlignerDoctorWithUnr
     SELECT DISTINCT
       ad.DrID,
       ad.DoctorName,
+      ad.LogoPath,
       (SELECT COUNT(*)
        FROM tblAlignerNotes n
        INNER JOIN tblAlignerSets s ON n.AlignerSetID = s.AlignerSetID
@@ -318,8 +323,12 @@ export async function getDoctorsWithUnreadCounts(): Promise<AlignerDoctorWithUnr
     DrID: columns[0].value as number,
     DoctorName: columns[1].value as string,
     DoctorEmail: null,
-    LogoPath: null,
-    UnreadDoctorNotes: (columns[2].value as number) || 0,
+    LogoPath: columns[2].value as string | null,
+    UnreadDoctorNotes: (columns[3].value as number) || 0,
+    // Aliased properties for frontend compatibility (PrintQueueContext expects these)
+    id: columns[0].value as number,
+    name: columns[1].value as string,
+    logoPath: columns[2].value as string | null,
   }));
 }
 
