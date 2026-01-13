@@ -34,9 +34,28 @@
   overflow-x: hidden;
 }
 
-/* Padding-only class for pswp-gallery (works with dynamic inline grid styles) */
+/* Photo gallery grid */
 .galleryPadded {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: 44fr 30fr 26fr;
+  gap: 10px;
   padding: 0 var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  height: calc(100vh - 120px);
+  overflow: hidden;
+}
+
+.galleryPadded a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Gallery Image Styling */
@@ -77,65 +96,50 @@
   margin: var(--spacing-md);
 }
 
-/* ===== MOBILE RESPONSIVE DESIGN ===== */
+/* ===== RESPONSIVE DESIGN ===== */
 
-/* Tablets and medium screens */
+/* Tablets */
 @media (max-width: 1024px) {
-  .dolphGallery {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-    padding: 0 16px 16px 16px;
-  }
-
+  .dolphGallery,
   .galleryPadded {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(5, 1fr);
+    max-width: 600px;
+    gap: 12px;
     padding: 0 var(--spacing-md) var(--spacing-md) var(--spacing-md);
   }
 }
 
 /* Mobile devices */
 @media (max-width: 768px) {
-  .dolphGallery {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    padding: 0 12px 12px 12px;
-  }
-
-  .dolphGallery a {
-    border-radius: 8px;
-    min-height: 150px;
-  }
-
+  .dolphGallery,
   .galleryPadded {
-    padding: 0 var(--spacing-sm) var(--spacing-sm) var(--spacing-sm);
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(9, auto);
+    height: auto;
+    max-width: 100%;
+    overflow-y: auto;
+    gap: 12px;
+    padding: 0 var(--spacing-md) var(--spacing-md) var(--spacing-md);
+  }
+
+  .dolphGallery a,
+  .galleryPadded a {
+    min-height: 250px;
+    border-radius: 8px;
   }
 }
 
 /* Small mobile devices */
-@media (max-width: 640px) {
-  .dolphGallery {
-    grid-template-columns: 1fr;
-    gap: 12px;
-    padding: 0 16px 16px 16px;
-  }
-
-  .dolphGallery a {
-    min-height: 200px;
-    border-radius: 8px;
-  }
-
-  .dolphGallery img {
-    object-fit: contain;
-  }
-}
-
-/* Extra small devices */
 @media (max-width: 480px) {
-  .dolphGallery {
-    padding: 0 12px 12px 12px;
+  .dolphGallery,
+  .galleryPadded {
     gap: 10px;
+    padding: 0 var(--spacing-sm) var(--spacing-sm) var(--spacing-sm);
   }
 
-  .dolphGallery a {
-    min-height: 180px;
+  .dolphGallery a,
+  .galleryPadded a {
+    min-height: 200px;
   }
 }

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import styles from './TransferWorkModal.module.css';
 import { useToast } from '../../contexts/ToastContext';
+import PatientQuickSearch, { type SelectedPatient } from './PatientQuickSearch';
 
 /**
  * Work data for transfer
@@ -14,15 +15,6 @@ interface Work {
   TotalRequired?: number;
   Currency?: string;
   PatientName?: string;
-}
-
-/**
- * Patient search result
- */
-interface PatientSearchResult {
-  PersonID: number;
-  PatientName: string;
-  Phone?: string;
 }
 
 /**
@@ -75,42 +67,10 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
 }) => {
   const toast = useToast();
   const [step, setStep] = useState<'search' | 'confirm'>('search');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<PatientSearchResult[]>([]);
-  const [selectedPatient, setSelectedPatient] = useState<PatientSearchResult | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<SelectedPatient | null>(null);
   const [preview, setPreview] = useState<TransferPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [transferring, setTransferring] = useState(false);
-
-  // Search patients with debounce
-  useEffect(() => {
-    if (searchTerm.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
-    const searchPatients = async (): Promise<void> => {
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/patients/search?q=${encodeURIComponent(searchTerm)}`);
-        if (!response.ok) {
-          throw new Error('Search failed');
-        }
-        const data = await response.json() as PatientSearchResult[];
-        // Exclude current patient from results
-        const filtered = data.filter((p) => p.PersonID !== work.PersonID);
-        setSearchResults(filtered);
-      } catch (error) {
-        console.error('Search failed:', error);
-        toast.error('Failed to search patients');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const debounce = setTimeout(searchPatients, 300);
-    return () => clearTimeout(debounce);
-  }, [searchTerm, work.PersonID, toast]);
 
   // Load preview when patient selected
   const loadPreview = useCallback(async (): Promise<void> => {
@@ -131,11 +91,11 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
     }
   }, [work.workid, toast]);
 
-  // Handle patient selection
-  const handleSelectPatient = (patient: PatientSearchResult): void => {
+  // Handle patient selection from QuickSearch
+  const handleSelectPatient = useCallback((patient: SelectedPatient): void => {
     setSelectedPatient(patient);
     loadPreview();
-  };
+  }, [loadPreview]);
 
   // Execute transfer
   const handleTransfer = async (): Promise<void> => {
@@ -230,45 +190,24 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
                 )}
               </div>
 
-              {/* Search section */}
+              {/* Search section using reusable PatientQuickSearch */}
               <div className={styles.searchSection}>
-                <label htmlFor="patient-search" className={styles.searchLabel}>
+                <label className={styles.searchLabel}>
                   Search for target patient:
                 </label>
-                <div className={styles.searchInputWrapper}>
-                  <i className="fas fa-search"></i>
-                  <input
-                    id="patient-search"
-                    type="text"
-                    placeholder="Enter patient name or phone..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className={styles.searchInput}
-                    autoFocus
-                  />
-                  {loading && <i className="fas fa-spinner fa-spin"></i>}
-                </div>
-
-                {/* Search results */}
-                <div className={styles.searchResults}>
-                  {searchResults.length === 0 && searchTerm.length >= 2 && !loading && (
-                    <div className={styles.noResults}>No patients found</div>
-                  )}
-                  {searchResults.map((patient) => (
-                    <button
-                      key={patient.PersonID}
-                      type="button"
-                      className={styles.patientRow}
-                      onClick={() => handleSelectPatient(patient)}
-                    >
-                      <span className={styles.patientName}>{patient.PatientName}</span>
-                      {patient.Phone && (
-                        <span className={styles.patientPhone}>{patient.Phone}</span>
-                      )}
-                      <span className={styles.patientId}>#{patient.PersonID}</span>
-                    </button>
-                  ))}
-                </div>
+                <PatientQuickSearch
+                    onSelect={handleSelectPatient}
+                    excludePatientIds={[work.PersonID]}
+                    layout="vertical"
+                    showHeader={false}
+                    autoFocus={true}
+                />
+                {loading && (
+                  <div className={styles.loadingIndicator}>
+                    <i className="fas fa-spinner fa-spin"></i>
+                    <span>Loading preview...</span>
+                  </div>
+                )}
               </div>
             </>
           )}

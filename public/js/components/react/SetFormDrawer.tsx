@@ -1,30 +1,7 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent, MouseEvent } from 'react';
 import { copyToClipboard } from '../../core/utils';
 import { useToast } from '../../contexts/ToastContext';
-
-interface AlignerDoctor {
-    DrID: number;
-    DoctorName?: string;
-}
-
-interface AlignerSet {
-    AlignerSetID: number;
-    SetSequence: number;
-    Type?: string;
-    UpperAlignersCount?: number;
-    LowerAlignersCount?: number;
-    Days?: number;
-    AlignerDrID?: number;
-    SetUrl?: string;
-    SetPdfUrl?: string;
-    SetVideo?: string;
-    SetCost?: number;
-    Currency?: string;
-    Notes?: string;
-    IsActive?: boolean;
-    CreationDate?: string;
-    TotalBatches?: number;
-}
+import type { AlignerDoctorMinimal, AlignerSet } from '../../pages/aligner/aligner.types';
 
 interface SetFormData {
     SetSequence: number | string;
@@ -54,7 +31,7 @@ interface SetFormDrawerProps {
     onSave: () => void;
     set?: AlignerSet | null;
     workId: number;
-    doctors?: AlignerDoctor[];
+    doctors?: AlignerDoctorMinimal[];
     allSets?: AlignerSet[];
     defaultDoctorId?: string | number;
     folderPath?: string | null;

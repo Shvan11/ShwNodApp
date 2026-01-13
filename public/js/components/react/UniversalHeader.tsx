@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useGlobalState } from '../../contexts/GlobalStateContext';
 
 interface Patient {
     code: string | number;
@@ -34,6 +35,7 @@ interface NavigationItem {
 const UniversalHeader = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { setUser } = useGlobalState();
 
     const [currentPatient, setCurrentPatient] = useState<Patient | null>(null);
     const [navigationContext, setNavigationContext] = useState<NavigationContext | null>(null);
@@ -78,6 +80,8 @@ const UniversalHeader = () => {
             .then(data => {
                 if (data && data.success && data.user) {
                     setCurrentUser(data.user);
+                    // Also set global user state for other components (e.g., WorkComponent admin checks)
+                    setUser(data.user);
                 }
             })
             .catch(error => console.error('Error loading user info:', error));

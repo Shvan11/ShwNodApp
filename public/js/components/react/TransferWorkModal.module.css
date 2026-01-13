@@ -409,6 +409,21 @@
   cursor: not-allowed;
 }
 
+/* Loading indicator */
+.loadingIndicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm, 8px);
+  padding: var(--spacing-md, 16px);
+  color: var(--primary-color, #007bff);
+  font-size: var(--font-size-sm, 14px);
+}
+
+.loadingIndicator i {
+  font-size: 16px;
+}
+
 /* Responsive */
 @media (max-width: 480px) {
   .modalContent {

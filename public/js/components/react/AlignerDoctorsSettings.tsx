@@ -1,13 +1,7 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import styles from './AlignerDoctorsSettings.module.css';
-
-interface AlignerDoctor {
-    DrID: number;
-    DoctorName: string;
-    DoctorEmail: string | null;
-    LogoPath: string | null;
-}
+import type { AlignerDoctor } from '../../pages/aligner/aligner.types';
 
 interface FormData {
     DoctorName: string;

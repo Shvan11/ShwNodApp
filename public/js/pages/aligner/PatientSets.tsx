@@ -23,16 +23,18 @@ import {
 } from '../../core/fileSystemAccess';
 import { useToast } from '../../contexts/ToastContext';
 import { usePrintQueue } from '../../contexts/PrintQueueContext';
+import { useSetDrawer } from '../../hooks/useSetDrawer';
+import { useBatchDrawer } from '../../hooks/useBatchDrawer';
+import { useLabelModal } from '../../hooks/useLabelModal';
+import type {
+    AlignerDoctorWithAliases,
+    AlignerSet,
+    AlignerBatch,
+    AlignerNote,
+} from './aligner.types';
+import styles from './PatientSets.module.css';
 
-// Types
-interface AlignerDoctor {
-    id: number;
-    DrID: number;
-    name: string;
-    DoctorName?: string;
-    logoPath?: string | null;
-}
-
+// Page-specific types
 interface Patient {
     PersonID: number;
     PatientName?: string;
@@ -41,63 +43,6 @@ interface Patient {
     Phone?: string;
     WorkType?: string;
     workid: number;
-}
-
-interface AlignerSet {
-    AlignerSetID: number;
-    SetSequence: number;
-    Type?: string;
-    UpperAlignersCount: number;
-    LowerAlignersCount: number;
-    RemainingUpperAligners: number;
-    RemainingLowerAligners: number;
-    Days?: number;
-    AlignerDrID?: number;
-    AlignerDoctorName?: string;
-    SetUrl?: string;
-    SetPdfUrl?: string;
-    SetVideo?: string;
-    SetCost?: number;
-    Currency?: string;
-    Notes?: string;
-    IsActive: boolean;
-    CreationDate?: string;
-    TotalBatches?: number;
-    DeliveredBatches?: number;
-    TotalPaid?: number;
-    Balance?: number;
-    PaymentStatus?: string;
-    UnreadActivityCount?: number;
-}
-
-interface AlignerBatch {
-    AlignerBatchID: number;
-    AlignerSetID: number;
-    BatchSequence: number;
-    UpperAlignerCount?: number;
-    LowerAlignerCount?: number;
-    UpperAlignerStartSequence?: number;
-    UpperAlignerEndSequence?: number;
-    LowerAlignerStartSequence?: number;
-    LowerAlignerEndSequence?: number;
-    Days?: number;
-    ValidityPeriod?: number;
-    ManufactureDate?: string | null;
-    DeliveredToPatientDate?: string | null;
-    BatchExpiryDate?: string | null;
-    Notes?: string;
-    CreationDate?: string;
-}
-
-interface AlignerNote {
-    NoteID: number;
-    AlignerSetID: number;
-    NoteType: 'Lab' | 'Doctor';
-    NoteText: string;
-    DoctorName?: string;
-    CreatedAt: string;
-    IsRead: boolean;
-    IsEdited?: boolean;
 }
 
 interface ConfirmDialogState {
@@ -133,11 +78,6 @@ interface BatchStatusResponse {
     error?: string;
 }
 
-interface LabelModalData {
-    batch: AlignerBatch | null;
-    set: AlignerSet | null;
-}
-
 // PaymentSaveData matches what PaymentFormDrawer sends
 interface PaymentSaveData {
     Amountpaid: number;
@@ -145,19 +85,6 @@ interface PaymentSaveData {
     ActualAmount: null;
     ActualCur: string;
     Change: null;
-}
-
-interface LabelGenerationData {
-    startingPosition: number;
-    patientName: string;
-    doctorName: string;
-    includeLogo: boolean;
-    arabicFont: string;
-    customLabels: Array<{
-        text: string;
-        isUpper: boolean;
-        sequence: number;
-    }>;
 }
 
 const PatientSets: React.FC = () => {
@@ -183,27 +110,54 @@ const PatientSets: React.FC = () => {
 
     const [patient, setPatient] = useState<Patient | null>(initialPatient);
     const [alignerSets, setAlignerSets] = useState<AlignerSet[]>([]);
-    const [doctors, setDoctors] = useState<AlignerDoctor[]>([]);
+    const [doctors, setDoctors] = useState<AlignerDoctorWithAliases[]>([]);
     const [expandedSets, setExpandedSets] = useState<Record<number, boolean>>({});
     const [batchesData, setBatchesData] = useState<Record<number, AlignerBatch[]>>({});
     const [notesData, setNotesData] = useState<Record<number, AlignerNote[]>>({});
     const [expandedCommunication, setExpandedCommunication] = useState<Record<number, boolean>>({});
     const [loading, setLoading] = useState<boolean>(false);
 
-    // CRUD states
-    const [showSetDrawer, setShowSetDrawer] = useState<boolean>(false);
-    const [editingSet, setEditingSet] = useState<AlignerSet | null>(null);
-    const [showBatchDrawer, setShowBatchDrawer] = useState<boolean>(false);
-    const [editingBatch, setEditingBatch] = useState<AlignerBatch | null>(null);
-    const [currentSetForBatch, setCurrentSetForBatch] = useState<AlignerSet | null>(null);
+    // Set drawer hook - handles add/edit set form state
+    const {
+        showSetDrawer,
+        editingSet,
+        openAddSetDrawer,
+        openEditSetDrawer,
+        closeSetDrawer,
+        handleSetSaved,
+    } = useSetDrawer({
+        onRefresh: () => {
+            if (patient) loadAlignerSets(patient.workid);
+        },
+    });
+
+    // Batch drawer hook - handles add/edit batch form state
+    const {
+        showBatchDrawer,
+        editingBatch,
+        currentSetForBatch,
+        openAddBatchDrawer,
+        openEditBatchDrawer,
+        closeBatchDrawer,
+        handleBatchSaved,
+    } = useBatchDrawer({
+        onRefresh: (setId) => loadBatches(setId),
+    });
+
+    const {
+        showLabelModal,
+        labelModalData,
+        openLabelModal,
+        closeLabelModal,
+    } = useLabelModal();
+
     const [showPaymentDrawer, setShowPaymentDrawer] = useState<boolean>(false);
     const [currentSetForPayment, setCurrentSetForPayment] = useState<AlignerSet | null>(null);
     const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({ isOpen: false, title: '', message: '', onConfirm: null });
 
-    // Label preview modal state
-    const [showLabelModal, setShowLabelModal] = useState<boolean>(false);
-    const [labelModalData, setLabelModalData] = useState<LabelModalData>({ batch: null, set: null });
-    const [isGeneratingLabels, setIsGeneratingLabels] = useState<boolean>(false);
+    // Folder confirmation dialog (async pattern)
+    const [folderConfirmDialog, setFolderConfirmDialog] = useState<{ isOpen: boolean; folderName: string }>({ isOpen: false, folderName: '' });
+    const folderConfirmResolveRef = useRef<((value: boolean) => void) | null>(null);
 
     // Note states for lab communication
     const [showAddLabNote, setShowAddLabNote] = useState<Record<number, boolean>>({});
@@ -498,46 +452,6 @@ const PatientSets: React.FC = () => {
         }
     };
 
-    // CRUD Operations
-    const openAddSetDrawer = (): void => {
-        setEditingSet(null);
-        setShowSetDrawer(true);
-    };
-
-    const openEditSetDrawer = (set: AlignerSet): void => {
-        setEditingSet(set);
-        setShowSetDrawer(true);
-    };
-
-    const handleSetSaved = (): void => {
-        setShowSetDrawer(false);
-        setEditingSet(null);
-        if (patient) {
-            loadAlignerSets(patient.workid);
-        }
-    };
-
-    const openAddBatchDrawer = (set: AlignerSet): void => {
-        setCurrentSetForBatch(set);
-        setEditingBatch(null);
-        setShowBatchDrawer(true);
-    };
-
-    const openEditBatchDrawer = (batch: AlignerBatch, set: AlignerSet): void => {
-        setCurrentSetForBatch(set);
-        setEditingBatch(batch);
-        setShowBatchDrawer(true);
-    };
-
-    const handleBatchSaved = (): void => {
-        setShowBatchDrawer(false);
-        setEditingBatch(null);
-        setCurrentSetForBatch(null);
-        if (currentSetForBatch) {
-            loadBatches(currentSetForBatch.AlignerSetID);
-        }
-    };
-
     const openPaymentDrawer = (set: AlignerSet): void => {
         setCurrentSetForPayment(set);
         setShowPaymentDrawer(true);
@@ -788,7 +702,7 @@ const PatientSets: React.FC = () => {
         });
     };
 
-    // Open label preview modal
+    // Open label preview modal - validation wrapper for hook's openLabelModal
     const handlePrintLabels = (batch: AlignerBatch, set: AlignerSet, e: MouseEvent<HTMLButtonElement>): void => {
         e.stopPropagation();
 
@@ -797,74 +711,7 @@ const PatientSets: React.FC = () => {
             return;
         }
 
-        // Open the modal with batch and set data
-        setLabelModalData({ batch, set });
-        setShowLabelModal(true);
-    };
-
-    // Generate labels from modal data
-    const handleGenerateLabels = async (labelData: LabelGenerationData): Promise<void> => {
-        const { batch, set } = labelModalData;
-
-        if (!batch || !set) {
-            toast.error('Missing batch or set information');
-            return;
-        }
-
-        // Get the doctor ID from the set's AlignerDrID field
-        const doctorIdForLabels = set.AlignerDrID || 1;
-
-        setIsGeneratingLabels(true);
-
-        try {
-            toast.info('Generating labels...');
-
-            const response = await fetch('/api/aligner/labels/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    batchId: batch.AlignerBatchID,
-                    startingPosition: labelData.startingPosition,
-                    patientName: labelData.patientName,
-                    doctorName: labelData.doctorName,
-                    doctorId: doctorIdForLabels,
-                    includeLogo: labelData.includeLogo,
-                    arabicFont: labelData.arabicFont,
-                    // Pass the custom labels array (fully editable)
-                    customLabels: labelData.customLabels
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || 'Failed to generate labels');
-            }
-
-            // Get metadata from headers
-            const totalLabels = response.headers.get('X-Total-Labels');
-            const nextPosition = response.headers.get('X-Next-Position');
-
-            // Convert response to blob and open in new tab
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            window.open(url, '_blank');
-
-            // Close modal and show success message
-            setShowLabelModal(false);
-            setLabelModalData({ batch: null, set: null });
-            toast.success(`Labels generated! ${totalLabels} labels created. Next position: ${nextPosition}`);
-        } catch (error) {
-            console.error('Error generating labels:', error);
-            toast.error('Failed to generate labels: ' + (error as Error).message);
-        } finally {
-            setIsGeneratingLabels(false);
-        }
-    };
-
-    // Close label modal
-    const handleCloseLabelModal = (): void => {
-        setShowLabelModal(false);
-        setLabelModalData({ batch: null, set: null });
+        openLabelModal(batch, set);
     };
 
     // Handle adding batch to print queue
@@ -983,6 +830,20 @@ const PatientSets: React.FC = () => {
         }
     };
 
+    // Helper for async folder confirmation
+    const confirmFolderSelection = (folderName: string): Promise<boolean> => {
+        return new Promise((resolve) => {
+            folderConfirmResolveRef.current = resolve;
+            setFolderConfirmDialog({ isOpen: true, folderName });
+        });
+    };
+
+    const handleFolderConfirmResponse = (confirmed: boolean): void => {
+        setFolderConfirmDialog({ isOpen: false, folderName: '' });
+        folderConfirmResolveRef.current?.(confirmed);
+        folderConfirmResolveRef.current = null;
+    };
+
     const requestBaseDirectoryAccess = async (): Promise<boolean> => {
         if (!isFileSystemAccessSupported()) {
             toast.warning('Your browser does not support the File System Access API. Please use Chrome or Edge.');
@@ -1003,9 +864,7 @@ const PatientSets: React.FC = () => {
 
             // Verify the folder name is correct
             if (dirHandle.name !== 'Aligner_Sets') {
-                const confirmed = window.confirm(
-                    `You selected folder "${dirHandle.name}". Are you sure this is your Aligner_Sets folder?`
-                );
+                const confirmed = await confirmFolderSelection(dirHandle.name);
                 if (!confirmed) {
                     return false;
                 }
@@ -1440,8 +1299,8 @@ const PatientSets: React.FC = () => {
     if (loading) {
         return (
             <div className="aligner-container">
-                <div className="loading-container">
-                    <div className="spinner"></div>
+                <div className={styles.loadingContainer}>
+                    <div className={styles.spinner}></div>
                     <p>Loading patient sets...</p>
                 </div>
             </div>
@@ -1451,10 +1310,10 @@ const PatientSets: React.FC = () => {
     if (!patient) {
         return (
             <div className="aligner-container">
-                <div className="error-container">
+                <div className={styles.errorContainer}>
                     <i className="fas fa-exclamation-triangle"></i>
                     <h2>Patient Not Found</h2>
-                    <button onClick={backToList} className="btn-primary">
+                    <button onClick={backToList} className="btn btn-primary">
                         Back to List
                     </button>
                 </div>
@@ -1470,96 +1329,50 @@ const PatientSets: React.FC = () => {
                 type="file"
                 accept=".pdf,application/pdf"
                 onChange={handlePdfFileChange}
-                className="hidden-file-input"
+                className={styles.hiddenFileInput}
             />
 
             {/* Upload Progress Overlay */}
             {uploadingPdf && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 9999
-                }}>
-                    <div style={{
-                        background: 'white',
-                        padding: '2rem 3rem',
-                        borderRadius: '12px',
-                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '1.5rem'
-                    }}>
-                        <div style={{
-                            width: '60px',
-                            height: '60px',
-                            border: '4px solid #e5e7eb',
-                            borderTop: '4px solid #2563eb',
-                            borderRadius: '50%',
-                            animation: 'spin 1s linear infinite'
-                        }}></div>
-                        <div style={{
-                            fontSize: '1.25rem',
-                            fontWeight: '600',
-                            color: '#1f2937'
-                        }}>
-                            Uploading PDF...
-                        </div>
-                        <div style={{
-                            fontSize: '0.875rem',
-                            color: '#6b7280'
-                        }}>
-                            Please wait while your file is being uploaded
-                        </div>
+                <div className={styles.uploadOverlay}>
+                    <div className={styles.uploadDialog}>
+                        <div className={styles.uploadSpinner}></div>
+                        <div className={styles.uploadTitle}>Uploading PDF...</div>
+                        <div className={styles.uploadHint}>Please wait while your file is being uploaded</div>
                     </div>
                 </div>
             )}
 
             {/* Breadcrumb */}
-            <div className="breadcrumb">
-                <button onClick={backToList} className="breadcrumb-link">
+            <div className={styles.breadcrumb}>
+                <button onClick={backToList} className={styles.breadcrumbLink}>
                     <i className="fas fa-arrow-left"></i>
                     Back to {isFromDoctorBrowse ? 'Patients' : 'Search'}
                 </button>
             </div>
 
             {/* Patient Info Header */}
-            <div className="patient-info">
-                <div className="patient-header">
-                    <div className="patient-details">
+            <div className={styles.patientInfo}>
+                <div className={styles.patientHeader}>
+                    <div className={styles.patientDetails}>
                         <h2>
                             {formatPatientName(patient)}
                             {patient.PatientName && patient.FirstName && (
-                                <span className="patient-subtitle">
+                                <span className={styles.patientSubtitle}>
                                     ({patient.FirstName} {patient.LastName})
                                 </span>
                             )}
                         </h2>
-                        <div className="patient-meta">
+                        <div className={styles.patientMeta}>
                             <span><i className="fas fa-id-card"></i> {patient.PersonID}</span>
                             <span><i className="fas fa-phone"></i> {patient.Phone || 'N/A'}</span>
                             <span><i className="fas fa-tooth"></i> {patient.WorkType}</span>
                         </div>
                     </div>
-                    <div className="fs-access-container">
+                    <div className={styles.fsAccessContainer}>
                         {/* File System Access Status */}
                         {isFileSystemAccessSupported() && (
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                padding: '0.5rem 1rem',
-                                background: hasBaseDirectoryAccess ? '#d1fae5' : '#fee2e2',
-                                borderRadius: '6px',
-                                fontSize: '0.875rem'
-                            }}>
+                            <div className={`${styles.fsAccessStatus} ${hasBaseDirectoryAccess ? styles.fsAccessActive : styles.fsAccessInactive}`}>
                                 <i className={`fas ${hasBaseDirectoryAccess ? 'fa-check-circle status-success' : 'fa-exclamation-circle status-error'}`}></i>
                                 <span className={hasBaseDirectoryAccess ? 'text-success' : 'text-error'}>
                                     {hasBaseDirectoryAccess ? 'Folder Access: Active' : 'Folder Access: Not Set'}
@@ -1598,21 +1411,21 @@ const PatientSets: React.FC = () => {
             </div>
 
             {/* Aligner Sets - Complete rendering */}
-            <div className="aligner-sets-container">
-                <div className="section-header">
+            <div className={styles.setsContainer}>
+                <div className={styles.sectionHeader}>
                     <h3>Aligner Sets</h3>
-                    <div className="section-info">
+                    <div className={styles.sectionInfo}>
                         <span>{alignerSets.length} set{alignerSets.length !== 1 ? 's' : ''}</span>
                     </div>
                 </div>
 
                 {loading ? (
-                    <div className="loading">
-                        <div className="spinner"></div>
+                    <div className={styles.loadingContainer}>
+                        <div className={styles.spinner}></div>
                         <p>Loading aligner sets...</p>
                     </div>
                 ) : alignerSets.length === 0 ? (
-                    <div className="empty-state">
+                    <div className={styles.emptyState}>
                         <i className="fas fa-inbox"></i>
                         <p>No aligner sets found for this patient</p>
                     </div>
@@ -2154,7 +1967,7 @@ const PatientSets: React.FC = () => {
                                                                         value={labNoteText}
                                                                         onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setLabNoteText(e.target.value)}
                                                                     />
-                                                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                                                    <div className={styles.noteFormActions}>
                                                                         <button
                                                                             className="btn btn-secondary btn-sm"
                                                                             onClick={() => {
@@ -2278,7 +2091,7 @@ const PatientSets: React.FC = () => {
             {showSetDrawer && (
                 <SetFormDrawer
                     isOpen={showSetDrawer}
-                    onClose={() => setShowSetDrawer(false)}
+                    onClose={closeSetDrawer}
                     onSave={handleSetSaved}
                     set={editingSet}
                     workId={patient.workid}
@@ -2292,7 +2105,7 @@ const PatientSets: React.FC = () => {
             {showBatchDrawer && (
                 <BatchFormDrawer
                     isOpen={showBatchDrawer}
-                    onClose={() => setShowBatchDrawer(false)}
+                    onClose={closeBatchDrawer}
                     onSave={handleBatchSaved}
                     batch={editingBatch}
                     set={currentSetForBatch}
@@ -2319,15 +2132,24 @@ const PatientSets: React.FC = () => {
                 onCancel={() => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null })}
             />
 
-            {/* Label Preview Modal - handles generation internally */}
+            {/* Folder Selection Confirmation Dialog */}
+            <ConfirmDialog
+                isOpen={folderConfirmDialog.isOpen}
+                title="Verify Folder Selection"
+                message={`You selected folder "${folderConfirmDialog.folderName}". Are you sure this is your Aligner_Sets folder?`}
+                onConfirm={() => handleFolderConfirmResponse(true)}
+                onCancel={() => handleFolderConfirmResponse(false)}
+                confirmText="Yes, Continue"
+                cancelText="Cancel"
+            />
+
             <LabelPreviewModal
                 isOpen={showLabelModal}
-                onClose={handleCloseLabelModal}
+                onClose={closeLabelModal}
                 batch={labelModalData.batch}
                 set={labelModalData.set}
                 patient={patient}
                 doctorName={labelModalData.set?.AlignerDoctorName}
-                isGenerating={isGeneratingLabels}
             />
         </div>
     );

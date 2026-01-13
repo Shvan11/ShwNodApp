@@ -934,7 +934,9 @@ export async function getWorkRelatedCounts(workId: number): Promise<WorkRelatedC
       (SELECT COUNT(*) FROM tblAlignerBatches ab
        INNER JOIN tblAlignerSets s ON ab.AlignerSetID = s.AlignerSetID
        WHERE s.WorkID = @WorkID) AS alignerBatches,
-      (SELECT COUNT(*) FROM tblWires WHERE WorkID = @WorkID) AS wires,
+      (SELECT COUNT(DISTINCT UpperWireID) + COUNT(DISTINCT LowerWireID)
+       FROM tblvisits WHERE WorkID = @WorkID
+       AND (UpperWireID IS NOT NULL OR LowerWireID IS NOT NULL)) AS wires,
       (SELECT COUNT(*) FROM tblImplant WHERE WorkID = @WorkID) AS implants,
       (SELECT COUNT(*) FROM tblscrews WHERE WorkID = @WorkID) AS screws`,
     [['WorkID', TYPES.Int, workId]],

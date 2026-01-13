@@ -1,31 +1,6 @@
 import React, { useState, useEffect, useRef, ChangeEvent, FormEvent, MouseEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
-
-interface AlignerSet {
-    AlignerSetID: number;
-    Days?: number;
-    RemainingUpperAligners?: number;
-    RemainingLowerAligners?: number;
-}
-
-interface AlignerBatch {
-    AlignerBatchID: number;
-    AlignerSetID: number;
-    BatchSequence: number;
-    UpperAlignerCount?: number;
-    LowerAlignerCount?: number;
-    UpperAlignerStartSequence?: number;
-    LowerAlignerStartSequence?: number;
-    UpperAlignerEndSequence?: number;
-    LowerAlignerEndSequence?: number;
-    Days?: number;
-    ManufactureDate?: string | null;
-    DeliveredToPatientDate?: string | null;
-    Notes?: string;
-    IsActive?: boolean;
-    IsLast?: boolean;
-    CreationDate?: string;
-}
+import type { AlignerBatch, AlignerSetForBatch } from '../../pages/aligner/aligner.types';
 
 interface BatchFormData {
     BatchSequence: number | string;
@@ -58,7 +33,7 @@ interface BatchFormDrawerProps {
     onClose: () => void;
     onSave: () => void;
     batch?: AlignerBatch | null;
-    set?: AlignerSet | null;
+    set?: AlignerSetForBatch | null;
     existingBatches?: AlignerBatch[];
     onUndoManufacture?: (batch: AlignerBatch, e: MouseEvent<HTMLButtonElement>) => void;
     onUndoDelivery?: (batch: AlignerBatch, e: MouseEvent<HTMLButtonElement>) => void;

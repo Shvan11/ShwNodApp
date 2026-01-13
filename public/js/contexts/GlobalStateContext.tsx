@@ -122,8 +122,28 @@ interface WhatsAppInitialStateData {
  * - Appointments cache
  */
 export function GlobalStateProvider({ children }: GlobalStateProviderProps): React.ReactElement {
-  // User state
-  const [user, setUser] = useState<UserData | null>(null);
+  // User state - initialize from sessionStorage if available
+  const [user, setUser] = useState<UserData | null>(() => {
+    try {
+      const cached = sessionStorage.getItem('currentUser');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Fetch user on mount and cache it
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.success && data?.user) {
+          setUser(data.user);
+          sessionStorage.setItem('currentUser', JSON.stringify(data.user));
+        }
+      })
+      .catch(() => {/* ignore */});
+  }, []);
 
   // Current patient state (shared across patient-related apps)
   const [currentPatient, setCurrentPatient] = useState<PatientData | null>(null);

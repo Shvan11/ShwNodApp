@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
+import React, { useState, useEffect, useRef, MouseEvent as ReactMouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import tpStyles from './TimePointsSelector.module.css';
@@ -84,7 +84,6 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [lightbox, setLightbox] = useState<PhotoSwipeLightbox | null>(null);
-    const [screenSize, setScreenSize] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
     const componentRef = useRef<HTMLDivElement>(null);
     const isSharingRef = useRef(false);
 
@@ -482,24 +481,6 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         }
     }, [loading, images]);
 
-    // Screen size detection
-    useEffect(() => {
-        const checkScreenSize = () => {
-            const width = window.innerWidth;
-            if (width < 576) {
-                setScreenSize('mobile');
-            } else if (width < 992) {
-                setScreenSize('tablet');
-            } else {
-                setScreenSize('desktop');
-            }
-        };
-
-        checkScreenSize();
-        window.addEventListener('resize', checkScreenSize);
-        return () => window.removeEventListener('resize', checkScreenSize);
-    }, []);
-
     // Load timepoints when component mounts
     useEffect(() => {
         if (personId) {
@@ -524,84 +505,6 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             clearCachedBlob();
         };
     }, [lightbox]);
-
-    const calculateGridStyle = (): CSSProperties => {
-        // Get responsive grid configuration
-        const getGridConfig = () => {
-            switch (screenSize) {
-                case 'mobile':
-                    return { columns: 1, maxWidth: '100%' };
-                case 'tablet':
-                    return { columns: 2, maxWidth: '600px' };
-                case 'desktop':
-                default:
-                    return { columns: 3, maxWidth: '900px' };
-            }
-        };
-
-        const { columns, maxWidth } = getGridConfig();
-
-        // For single column (mobile), just use auto heights
-        if (columns === 1) {
-            return {
-                display: 'grid',
-                gridTemplateColumns: '1fr',
-                gridTemplateRows: 'repeat(9, auto)',
-                width: '100%',
-                maxWidth: maxWidth,
-                margin: '0 auto',
-                gap: '15px',
-                justifyContent: 'center',
-                alignItems: 'center',
-                height: 'auto',
-                overflow: 'visible'
-            };
-        }
-
-        // For desktop: Calculate available height with proper ratios
-        if (screenSize === 'desktop') {
-            const availableHeight = window.innerHeight - 120; // Reduce padding for less waste
-            const gap = 10;
-
-            // Define row ratios: first row 44%, others 28% each
-            const rowRatios = [0.44, 0.30, 0.26]; // 3 rows total
-            const totalGapHeight = (rowRatios.length - 1) * gap;
-            const usableHeight = availableHeight - totalGapHeight;
-
-            // Calculate row heights based on ratios
-            const rowHeights = rowRatios.map(ratio => `${usableHeight * ratio}px`);
-
-            return {
-                display: 'grid',
-                gridTemplateColumns: `repeat(${columns}, 1fr)`,
-                gridTemplateRows: rowHeights.join(' '),
-                width: '100%',
-                maxWidth: maxWidth,
-                margin: '0 auto',
-                gap: `${gap}px`,
-                justifyContent: 'center',
-                alignItems: 'center',
-                height: `${availableHeight}px`,
-                overflow: 'visible' // Keep visible as safety net
-            };
-        }
-
-        // For tablet: use auto heights
-        return {
-            display: 'grid',
-            gridTemplateColumns: `repeat(${columns}, 1fr)`,
-            gridTemplateRows: 'repeat(3, auto)',
-            width: '100%',
-            maxWidth: maxWidth,
-            margin: '0 auto',
-            gap: '10px',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: 'auto',
-            overflow: 'visible'
-        };
-    };
-
 
     if (loading) {
         return (
@@ -665,7 +568,6 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             <div
                 id="dolph_gallery"
                 className={`pswp-gallery ${styles.galleryPadded}`}
-                style={calculateGridStyle()}
             >
                 {imageElements.map(element => {
                     const imageSrc = getImageSrc(element);

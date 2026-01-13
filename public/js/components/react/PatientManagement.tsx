@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, ChangeEvent } from 'react';
 import { useNavigate, useLoaderData } from 'react-router-dom';
-import AsyncSelect from 'react-select/async';
-import Select, { MultiValue, StylesConfig } from 'react-select';
+import Select, { MultiValue } from 'react-select';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
+import PatientQuickSearch, { type SelectedPatient, type PatientOption } from './PatientQuickSearch';
 import styles from './PatientManagement.module.css';
 
 interface Patient {
@@ -14,12 +14,6 @@ interface Patient {
     Phone?: string;
     DateAdded?: string;
     TagName?: string;
-}
-
-interface PatientOption {
-    id: number;
-    name?: string;
-    phone?: string;
 }
 
 interface SelectOption {
@@ -292,23 +286,7 @@ const PatientManagement = () => {
         }
     };
 
-    const handleQuickSearchSelect = (opt: SelectOption | null) => opt?.value && navigate(`/patient/${opt.value}/works`);
-
-    // Select Loaders
-    const loadNameOptions = (input: string, cb: (options: SelectOption[]) => void) =>
-        cb(input.length < 2 ? [] : allPatients.filter(p => p.name?.startsWith(input)).slice(0, 50).map(p => ({value: p.id, label: p.name || ''})));
-
-    const loadPhoneOptions = (input: string, cb: (options: SelectOption[]) => void) =>
-        cb(input.length < 2 ? [] : allPatients.filter(p => p.phone?.includes(input)).slice(0, 50).map(p => ({value: p.id, label: p.phone || ''})));
-
-    const loadIdOptions = (input: string, cb: (options: SelectOption[]) => void) =>
-        cb(input.length < 1 ? [] : allPatients.filter(p => p.id?.toString().includes(input)).slice(0, 50).map(p => ({value: p.id, label: p.id.toString()})));
-
-    const selectStylesRTL: StylesConfig<SelectOption, false> = {
-        input: (provided) => ({ ...provided, direction: 'rtl' as const, textAlign: 'right' as const }),
-        singleValue: (provided) => ({ ...provided, direction: 'rtl' as const, textAlign: 'right' as const }),
-        placeholder: (provided) => ({ ...provided, direction: 'rtl' as const, textAlign: 'right' as const })
-    };
+    const handleQuickSearchSelect = (patient: SelectedPatient) => navigate(`/patient/${patient.PersonID}/works`);
 
     return (
         <div className={styles.page}>
@@ -326,23 +304,12 @@ const PatientManagement = () => {
             </div>
 
             {showQuickSearch && (
-                <div className={styles.quickSearchContainer}>
-                    <div className={styles.quickSearchHeader}><i className="fas fa-bolt"></i><h3>Quick Search - Select & Go</h3></div>
-                    <div className={styles.quickSearchGrid}>
-                        <div className={styles.quickSearchField}>
-                            <label><i className={cn('fas fa-user', styles.iconGap)}></i>Search by Name (Arabic)</label>
-                            <AsyncSelect cacheOptions defaultOptions={false} loadOptions={loadNameOptions} onChange={handleQuickSearchSelect} placeholder="اكتب للبحث..." isClearable classNamePrefix="pm-select" styles={selectStylesRTL} />
-                        </div>
-                        <div className={styles.quickSearchField}>
-                            <label><i className={cn('fas fa-phone', styles.iconGap)}></i>Search by Phone</label>
-                            <AsyncSelect cacheOptions defaultOptions={false} loadOptions={loadPhoneOptions} onChange={handleQuickSearchSelect} placeholder="Search phone..." isClearable classNamePrefix="pm-select" />
-                        </div>
-                        <div className={styles.quickSearchField}>
-                            <label><i className={cn('fas fa-id-card', styles.iconGap)}></i>Search by ID</label>
-                            <AsyncSelect cacheOptions defaultOptions={false} loadOptions={loadIdOptions} onChange={handleQuickSearchSelect} placeholder="Search ID..." isClearable classNamePrefix="pm-select" />
-                        </div>
-                    </div>
-                </div>
+                <PatientQuickSearch
+                    onSelect={handleQuickSearchSelect}
+                    allPatients={allPatients}
+                    showHeader={true}
+                    layout="horizontal"
+                />
             )}
 
             <hr className={styles.sectionDivider} />

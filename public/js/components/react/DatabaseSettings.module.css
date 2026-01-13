@@ -286,6 +286,24 @@
     box-shadow: var(--shadow-md);
 }
 
+.btnLink {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    transition: color var(--transition-base);
+}
+
+.btnLink:hover {
+    color: var(--primary-700);
+    text-decoration: underline;
+}
+
 /* ===================================
    RESTART WARNING
    =================================== */
