@@ -141,7 +141,13 @@ const PatientSets: React.FC = () => {
         closeBatchDrawer,
         handleBatchSaved,
     } = useBatchDrawer({
-        onRefresh: (setId) => loadBatches(setId),
+        onRefresh: async (setId) => {
+            await loadBatches(setId);
+            // Also refresh sets to update RemainingUpperAligners/RemainingLowerAligners
+            if (patient) {
+                await loadAlignerSets(patient.workid);
+            }
+        },
     });
 
     const {

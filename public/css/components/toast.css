@@ -9,7 +9,7 @@
   top: calc(var(--header-height) + var(--spacing-lg));
   /* Below header with spacing */
   right: var(--spacing-lg);
-  z-index: var(--z-index-tooltip);
+  z-index: 2100; /* Must be above drawer-container (2000) to show over modals */
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
