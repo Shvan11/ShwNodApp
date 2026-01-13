@@ -13,7 +13,6 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { log } from '../../utils/logger.js';
 
 // =============================================================================
@@ -78,16 +77,16 @@ interface LabelConfig {
 // CONSTANTS
 // =============================================================================
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Project root - use process.cwd() for consistent path resolution in dev and production
+const PROJECT_ROOT = process.cwd();
 
 // Default logo path
-const DEFAULT_LOGO_PATH = path.resolve(__dirname, '../../public/shawan logon.png');
+const DEFAULT_LOGO_PATH = path.resolve(PROJECT_ROOT, 'public/shawan logon.png');
 
 // Arabic font paths
 const ARABIC_FONTS: Record<string, string> = {
-  cairo: path.resolve(__dirname, '../../fonts/Cairo/static/Cairo-Regular.ttf'),
-  noto: path.resolve(__dirname, '../../fonts/NotoSansArabic.ttf'),
+  cairo: path.resolve(PROJECT_ROOT, 'fonts/Cairo/static/Cairo-Regular.ttf'),
+  noto: path.resolve(PROJECT_ROOT, 'fonts/NotoSansArabic.ttf'),
 };
 
 // =============================================================================
