@@ -117,20 +117,22 @@ function validateCurrencyAmounts(usd: number, iqd: number): void {
 
 /**
  * Determine if payment is same-currency (no change tracking needed)
+ *
+ * Only IQD account + IQD payment = same-currency (no change tracking)
+ * USD account + USD payment DOES track change (converted to IQD)
+ * because clinic uses $50/$100 bills and gives change in IQD
+ *
  * @param accountCurrency - Work account currency (USD or IQD)
  * @param usd - USD amount received
  * @param iqd - IQD amount received
- * @returns True if same-currency payment
+ * @returns True if same-currency payment (only IQD-to-IQD)
  */
 function isSameCurrencyPayment(
   accountCurrency: CurrencyType | string,
   usd: number,
   iqd: number
 ): boolean {
-  return (
-    (accountCurrency === 'USD' && usd > 0 && iqd === 0) ||
-    (accountCurrency === 'IQD' && iqd > 0 && usd === 0)
-  );
+  return accountCurrency === 'IQD' && iqd > 0 && usd === 0;
 }
 
 /**

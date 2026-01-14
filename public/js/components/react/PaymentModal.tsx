@@ -490,19 +490,29 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
         // When changing payment currency, clear the irrelevant cash field and reset override
         if (name === 'paymentCurrency') {
+            // Check if switching to same-currency (need to force amount mode)
+            const willBeSameCurrency =
+                (calculations.accountCurrency === 'USD' && value === 'USD') ||
+                (calculations.accountCurrency === 'IQD' && value === 'IQD');
+
             if (value === 'USD') {
                 // Switching to USD only - clear IQD, reset override
                 setFormData(prev => ({ ...prev, paymentCurrency: value as 'USD', actualIQD: '', cashOverrideEnabled: false }));
                 setDisplayValues(prev => ({ ...prev, actualIQD: '' }));
-                return;
             } else if (value === 'IQD') {
                 // Switching to IQD only - clear USD, reset override
                 setFormData(prev => ({ ...prev, paymentCurrency: value as 'IQD', actualUSD: '', cashOverrideEnabled: false }));
                 setDisplayValues(prev => ({ ...prev, actualUSD: '' }));
-                return;
+            } else {
+                // For MIXED, keep both values but reset override
+                setFormData(prev => ({ ...prev, paymentCurrency: value as 'MIXED', cashOverrideEnabled: false }));
             }
-            // For MIXED, keep both values but reset override
-            setFormData(prev => ({ ...prev, paymentCurrency: value as 'MIXED', cashOverrideEnabled: false }));
+
+            // Force amount mode for same-currency payments (cash mode doesn't make sense)
+            if (willBeSameCurrency && entryMode === 'cash') {
+                setEntryMode('amount');
+                setModeLocked(false); // Allow re-detection on next input
+            }
             return;
         }
 
@@ -678,13 +688,13 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             if (!confirm) return;
         }
 
-        // Determine if same-currency payment
+        // Only IQD-to-IQD = same-currency (no change tracking)
+        // USD-to-USD DOES track change (converted to IQD) because clinic uses $50/$100 bills
         const isSameCurrencyPayment =
-            (calculations.accountCurrency === 'USD' && actualUSD > 0 && actualIQD === 0) ||
-            (calculations.accountCurrency === 'IQD' && actualIQD > 0 && actualUSD === 0);
+            calculations.accountCurrency === 'IQD' && actualIQD > 0 && actualUSD === 0;
 
-        // For same-currency: Force change to NULL (not tracked)
-        // For cross-currency: Use the change value (can be 0 or positive)
+        // For IQD-to-IQD: Force change to NULL (not tracked, exact payments expected)
+        // For all other scenarios: Use the change value (can be 0 or positive)
         const changeToSubmit = isSameCurrencyPayment ? null : (parseInt(String(formData.change)) || 0);
 
         // Validate cross-currency change doesn't exceed received amounts
@@ -829,11 +839,16 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
     if (!workData) return null;
 
-    // Detect same-currency payment for UI display (based on selected payment currency)
-    // Note: In handleSubmit, we recalculate based on actual values entered for validation
-    const isSameCurrencyPayment =
+    // Detect same-currency selection (for entry mode locking)
+    // Cash mode doesn't make sense for same-currency - can't derive "amount owed" from "cash received"
+    const isSameCurrencySelection =
         (calculations.accountCurrency === 'USD' && formData.paymentCurrency === 'USD') ||
         (calculations.accountCurrency === 'IQD' && formData.paymentCurrency === 'IQD');
+
+    // Detect same-currency payment for change tracking (only IQD-to-IQD)
+    // USD-to-USD tracks change as IQD because clinic uses $50/$100 bills
+    const isSameCurrencyPayment =
+        calculations.accountCurrency === 'IQD' && formData.paymentCurrency === 'IQD';
 
     return (
         <>
@@ -916,14 +931,15 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                 </div>
 
                                 <div className={`${styles.paymentField} ${styles.entryModeField}`}>
-                                    <label>Entry Mode</label>
-                                    <div className={styles.entryModeToggle}>
+                                    <label>Entry Mode {isSameCurrencySelection && <span className={styles.lockedBadge}>Locked</span>}</label>
+                                    <div className={`${styles.entryModeToggle} ${isSameCurrencySelection ? styles.entryModeDisabled : ''}`}>
                                         <span className={`${styles.toggleLabel} ${entryMode === 'amount' ? styles.toggleLabelActive : ''}`}>Amount</span>
                                         <label className={styles.entryModeSwitch}>
                                             <input
                                                 type="checkbox"
                                                 checked={entryMode === 'cash'}
                                                 onChange={(e) => handleEntryModeChange(e.target.checked ? 'cash' : 'amount')}
+                                                disabled={isSameCurrencySelection}
                                             />
                                             <span className={styles.slider}></span>
                                         </label>
