@@ -1,4 +1,8 @@
 // index.ts - Enhanced with resource management, health checks, and graceful shutdown
+
+// Default to production for safety (before any other code runs)
+process.env.NODE_ENV ??= 'production';
+
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { createServer, Server as HTTPServer } from 'http';
