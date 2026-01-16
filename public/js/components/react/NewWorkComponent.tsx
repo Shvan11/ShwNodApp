@@ -599,7 +599,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 value={displayValues.TotalRequired}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                     const numericValue = parseFormattedNumber(e.target.value) || 0;
-                                    setFormData({...formData, TotalRequired: numericValue});
+                                    // Auto-switch to IQD if amount > 10,000 (USD amounts are typically < 10,000)
+                                    const newCurrency = numericValue > 10000 ? 'IQD' : formData.Currency;
+                                    setFormData({...formData, TotalRequired: numericValue, Currency: newCurrency});
                                     setDisplayValues({TotalRequired: e.target.value});
                                 }}
                                 onBlur={() => {
