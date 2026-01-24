@@ -61,6 +61,9 @@ export interface BaseInvoice {
   Dateofpayment?: Date | string;
   PatientName?: string;
   Phone?: string;
+  SysStartTime?: Date | string;
+  currency?: string;
+  Change?: number;
 }
 
 /**

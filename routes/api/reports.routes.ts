@@ -422,13 +422,35 @@ router.get('/daily-invoices', async (req: Request<object, object, object, DailyI
         if (invoiceID === undefined || invoiceID === null) {
           throw new Error('invoiceID is required in ProDailyInvoices result');
         }
+        // Handle SysStartTime - stored as UTC (sysutcdatetime), send as ISO UTC string
+        // Frontend will convert to local time automatically
+        const sysStartTimeValue = columns.find(c => c.metadata.colName === 'SysStartTime')?.value;
+        let SysStartTime: string | undefined;
+        if (sysStartTimeValue instanceof Date) {
+          // Tedious interprets SQL datetime as local, but it's actually UTC
+          // Get the "local" components which are really UTC values
+          const d = sysStartTimeValue;
+          const y = d.getFullYear();
+          const mo = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          const h = String(d.getHours()).padStart(2, '0');
+          const mi = String(d.getMinutes()).padStart(2, '0');
+          const s = String(d.getSeconds()).padStart(2, '0');
+          // Send as UTC ISO string so frontend converts to local time
+          SysStartTime = `${y}-${mo}-${day}T${h}:${mi}:${s}Z`;
+        } else {
+          SysStartTime = sysStartTimeValue as string | undefined;
+        }
         return {
           invoiceID,
           workid: columns.find(c => c.metadata.colName === 'workid')?.value as number | undefined,
           Amountpaid: columns.find(c => c.metadata.colName === 'Amountpaid')?.value as number | undefined,
           Dateofpayment: columns.find(c => c.metadata.colName === 'Dateofpayment')?.value as Date | string | undefined,
           PatientName: columns.find(c => c.metadata.colName === 'PatientName')?.value as string | undefined,
-          Phone: columns.find(c => c.metadata.colName === 'Phone')?.value as string | undefined
+          Phone: columns.find(c => c.metadata.colName === 'Phone')?.value as string | undefined,
+          SysStartTime,
+          currency: columns.find(c => c.metadata.colName === 'currency')?.value as string | undefined,
+          Change: columns.find(c => c.metadata.colName === 'Change')?.value as number | undefined
         };
       }
     );
