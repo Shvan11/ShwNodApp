@@ -59,10 +59,51 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showAfternoonSlots, setShowAfternoonSlots] = useState(false);
+    const [showExtendedSlotsDefault, setShowExtendedSlotsDefault] = useState(false);
     const [daysAhead, setDaysAhead] = useState('');
 
-    // Rarely-used afternoon times
-    const rareAfternoonTimes = ['12:00', '12:30', '13:00', '13:30', '14:00', '14:30'];
+    // Early and late slot times (loaded from settings)
+    const [earlySlotTimes, setEarlySlotTimes] = useState<string[]>(['12:00', '12:30', '13:00', '13:30']);
+    const [lateSlotTimes, setLateSlotTimes] = useState<string[]>(['21:00', '21:30', '22:00', '22:30']);
+
+    // Combined extended times for filtering (includes 14:00 and 14:30 which are also rarely used)
+    const rareAfternoonTimes = [...earlySlotTimes, '14:00', '14:30', ...lateSlotTimes];
+
+    // Fetch extended slot settings on mount
+    useEffect(() => {
+        const fetchExtendedSlotsSettings = async () => {
+            try {
+                const [earlyResponse, lateResponse, defaultResponse] = await Promise.all([
+                    fetch('/api/options/CALENDAR_EARLY_SLOTS'),
+                    fetch('/api/options/CALENDAR_LATE_SLOTS'),
+                    fetch('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT')
+                ]);
+
+                const [earlyData, lateData, defaultData] = await Promise.all([
+                    earlyResponse.json(),
+                    lateResponse.json(),
+                    defaultResponse.json()
+                ]);
+
+                if (earlyData.status === 'success' && earlyData.value) {
+                    setEarlySlotTimes(earlyData.value.split(',').filter(Boolean));
+                }
+
+                if (lateData.status === 'success' && lateData.value) {
+                    setLateSlotTimes(lateData.value.split(',').filter(Boolean));
+                }
+
+                if (defaultData.status === 'success' && defaultData.value !== null) {
+                    setShowExtendedSlotsDefault(defaultData.value === 'true');
+                }
+            } catch (err) {
+                // Silently fail - keep defaults
+                console.error('Failed to fetch extended slots settings:', err);
+            }
+        };
+
+        fetchExtendedSlotsSettings();
+    }, []);
 
     // Fetch month availability
     const fetchMonthAvailability = useCallback(async (monthDate: Date) => {
@@ -119,13 +160,15 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                 const slots: TimeSlot[] = data.slots || [];
                 setAvailableSlots(slots);
 
-                // Auto-expand afternoon slots if any have appointments
-                const afternoonWithAppointments = slots.some(slot =>
+                // Show extended slots if:
+                // 1. The default setting is true, OR
+                // 2. Any extended slot has appointments (auto-expand)
+                const hasAppointmentsInExtendedSlots = slots.some(slot =>
                     rareAfternoonTimes.includes(slot.time) &&
                     slot.appointments &&
                     slot.appointments.length > 0
                 );
-                setShowAfternoonSlots(afternoonWithAppointments);
+                setShowAfternoonSlots(showExtendedSlotsDefault || hasAppointmentsInExtendedSlots);
             }
         } catch (err) {
             console.error('Error fetching slots:', err);
@@ -134,7 +177,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
         } finally {
             setLoading(false);
         }
-    }, [rareAfternoonTimes]);
+    }, [rareAfternoonTimes, showExtendedSlotsDefault]);
 
     useEffect(() => {
         fetchMonthAvailability(currentMonth);
@@ -446,7 +489,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                                             >
                                                 <div className={styles.afternoonToggleText}>
                                                     <i className="fas fa-clock"></i>
-                                                    {showAfternoonSlots ? 'Hide' : 'Show'} afternoon slots (12:00 - 2:30 PM)
+                                                    {showAfternoonSlots ? 'Hide' : 'Show'} early & late slots
                                                 </div>
                                                 <i className={cn('fas fa-chevron-down', styles.afternoonToggleIcon, { [styles.expanded]: showAfternoonSlots })}></i>
                                             </div>

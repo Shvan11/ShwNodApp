@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import AsyncSelect from 'react-select/async';
 import type { StylesConfig } from 'react-select';
 import cn from 'classnames';
+import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import styles from './PatientQuickSearch.module.css';
 
 /**
@@ -143,7 +144,7 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
         const results = filteredPatients
             .filter(p => p.phone?.includes(input))
             .slice(0, 50)
-            .map(p => ({ value: p.id, label: p.phone || '' }));
+            .map(p => ({ value: p.id, label: formatPhoneForDisplay(p.phone) }));
         callback(results);
     }, [filteredPatients]);
 

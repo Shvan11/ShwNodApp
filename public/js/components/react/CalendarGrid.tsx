@@ -26,6 +26,8 @@ interface CalendarGridProps {
     viewMode?: ViewMode;
     showOnlyAvailable?: boolean;
     showEarlySlots?: boolean;
+    earlySlotTimes?: string[];
+    lateSlotTimes?: string[];
 }
 
 const CalendarGrid = ({
@@ -36,7 +38,9 @@ const CalendarGrid = ({
     mode = 'view',
     viewMode = 'week',
     showOnlyAvailable = false,
-    showEarlySlots = false
+    showEarlySlots = false,
+    earlySlotTimes = ['12:00', '12:30', '13:00', '13:30'],
+    lateSlotTimes = ['21:00', '21:30', '22:00', '22:30']
 }: CalendarGridProps) => {
     const { days = [], timeSlots = [] } = calendarData || {};
 
@@ -51,11 +55,11 @@ const CalendarGrid = ({
     // Filter days for day view - show only the first day (or current day)
     const filteredDays = viewMode === 'day' ? [days[0]] : days;
 
-    // Filter out early time slots if showEarlySlots is false
-    const earlySlotTimes = ['12:00', '12:30', '13:00', '13:30'];
+    // Filter out early and late time slots if showEarlySlots is false
+    const extendedSlotTimes = [...earlySlotTimes, ...lateSlotTimes];
     const filteredTimeSlots = showEarlySlots
         ? timeSlots
-        : timeSlots.filter(slot => !earlySlotTimes.includes(slot));
+        : timeSlots.filter(slot => !extendedSlotTimes.includes(slot));
 
     // Helper function to extract appointments from slot data
     const extractAppointments = (slotData: CalendarSlotInfo | CalendarAppointment[] | undefined): CalendarAppointment[] => {

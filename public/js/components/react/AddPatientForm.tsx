@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import PhoneInput from './PhoneInput';
 import styles from './AddPatientForm.module.css';
 
 interface Props {
@@ -141,31 +142,17 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         }
     }, [formData.firstName, formData.lastName]);
 
-    const formatPhoneNumber = (value: string): string => {
-        if (!value) return value;
-        const phoneNumber = value.replace(/[^\d]/g, '');
-        const phoneNumberLength = phoneNumber.length;
-        if (phoneNumberLength < 4) return phoneNumber;
-        if (phoneNumberLength < 7) {
-            return `${phoneNumber.slice(0, 3)} ${phoneNumber.slice(3)}`;
-        }
-        return `${phoneNumber.slice(0, 3)} ${phoneNumber.slice(3, 6)} ${phoneNumber.slice(6, 10)}`;
-    };
-
     const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-        if (name === 'phone') {
-            const formattedPhoneNumber = formatPhoneNumber(value);
-            setFormData(prev => ({
-                ...prev,
-                [name]: formattedPhoneNumber
-            }));
-        } else {
-            setFormData(prev => ({
-                ...prev,
-                [name]: value
-            }));
-        }
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    // IMaskInput handler - receives unmasked (digits only) value
+    const handlePhoneChange = (value: string) => {
+        setFormData(prev => ({ ...prev, phone: value }));
     };
 
     const showAlert = (message: string, type: 'danger' | 'success' = 'danger', personId: number | null = null) => {
@@ -318,14 +305,9 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         <i className="fas fa-phone"></i>
                         Primary Phone
                     </label>
-                    <input
-                        type="tel"
-                        name="phone"
+                    <PhoneInput
                         value={formData.phone}
-                        onChange={handleInputChange}
-                        className="form-control"
-                        placeholder="### ### ####"
-                        maxLength={12}
+                        onChange={handlePhoneChange}
                     />
                 </div>
             </div>

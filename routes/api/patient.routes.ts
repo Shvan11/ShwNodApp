@@ -147,6 +147,11 @@ interface TagOption {
   tag: string;
 }
 
+interface PatientTypeOption {
+  id: number;
+  type: string;
+}
+
 // ============================================================================
 // PATIENT INFORMATION ROUTES
 // ============================================================================
@@ -446,6 +451,10 @@ router.get(
       const workTypesParam = req.query.workTypes || '';
       const keywordsParam = req.query.keywords || '';
       const tagsParam = req.query.tags || '';
+      const patientTypesParam = req.query.patientTypes || '';
+      const lastAppointmentParam = req.query.lastAppointment || '';
+      const hasFinalPhotos = req.query.hasFinalPhotos === 'true';
+      const nameStartsWith = req.query.nameStartsWith === 'true';
 
       const sortBy = req.query.sortBy || 'name';
       const order = req.query.order || 'asc';
@@ -469,18 +478,27 @@ router.get(
             .map((id) => parseInt(id.trim()))
             .filter((id) => !isNaN(id))
         : [];
+      const patientTypeIds = patientTypesParam
+        ? patientTypesParam
+            .split(',')
+            .map((id) => parseInt(id.trim()))
+            .filter((id) => !isNaN(id))
+        : [];
 
       // Build WHERE clause for search
       const whereConditions: string[] = [];
       const parameters: database.SqlParam[] = [];
 
       // Search by individual name fields
+      // Use 'starts with' pattern if nameStartsWith is true, otherwise 'contains'
+      const namePrefix = nameStartsWith ? '' : '%';
+
       if (patientName.trim()) {
         whereConditions.push('p.PatientName LIKE @patientName');
         parameters.push([
           'patientName',
           database.TYPES.NVarChar,
-          `%${patientName.trim()}%`
+          `${namePrefix}${patientName.trim()}%`
         ]);
       }
 
@@ -489,7 +507,7 @@ router.get(
         parameters.push([
           'firstName',
           database.TYPES.NVarChar,
-          `%${firstName.trim()}%`
+          `${namePrefix}${firstName.trim()}%`
         ]);
       }
 
@@ -498,7 +516,7 @@ router.get(
         parameters.push([
           'lastName',
           database.TYPES.NVarChar,
-          `%${lastName.trim()}%`
+          `${namePrefix}${lastName.trim()}%`
         ]);
       }
 
@@ -559,6 +577,64 @@ router.get(
         tagIds.forEach((id, idx) => {
           parameters.push([`tag${idx}`, database.TYPES.Int, id]);
         });
+      }
+
+      // Filter by patient types
+      if (patientTypeIds.length > 0) {
+        const typePlaceholders = patientTypeIds
+          .map((_, idx) => `@patientType${idx}`)
+          .join(',');
+        whereConditions.push(`p.PatientTypeID IN (${typePlaceholders})`);
+        patientTypeIds.forEach((id, idx) => {
+          parameters.push([`patientType${idx}`, database.TYPES.Int, id]);
+        });
+      }
+
+      // Filter by last appointment date
+      if (lastAppointmentParam) {
+        let dateCondition = '';
+        switch (lastAppointmentParam) {
+          case '1month':
+            dateCondition = 'DATEADD(MONTH, -1, GETDATE())';
+            break;
+          case '3months':
+            dateCondition = 'DATEADD(MONTH, -3, GETDATE())';
+            break;
+          case '6months':
+            dateCondition = 'DATEADD(MONTH, -6, GETDATE())';
+            break;
+          case '1year':
+            dateCondition = 'DATEADD(YEAR, -1, GETDATE())';
+            break;
+          default:
+            // Custom date (ISO format)
+            dateCondition = '@lastAppDate';
+            parameters.push([
+              'lastAppDate',
+              database.TYPES.Date,
+              new Date(lastAppointmentParam)
+            ]);
+        }
+
+        whereConditions.push(`EXISTS (
+          SELECT 1 FROM (
+            SELECT PersonID, MAX(AppDate) AS LatestApp
+            FROM dbo.tblappointments
+            GROUP BY PersonID
+          ) la
+          WHERE la.PersonID = p.PersonID
+          AND la.LatestApp < ${dateCondition}
+        )`);
+      }
+
+      // Filter by has final photos (timepoint with 'Final' in description)
+      if (hasFinalPhotos) {
+        whereConditions.push(`EXISTS (
+                SELECT 1 FROM DolphinPlatform.dbo.Patients dp
+                INNER JOIN DolphinPlatform.dbo.TimePoints tp ON dp.PatID = tp.PatID
+                WHERE dp.patOtherID = CAST(p.PersonID AS VARCHAR(50))
+                AND tp.tpDescription LIKE '%Final%'
+            )`);
       }
 
       const whereClause =
@@ -680,6 +756,35 @@ router.get(
       ErrorResponses.internalError(
         res,
         'Failed to fetch tag options',
+        error as Error
+      );
+    }
+  }
+);
+
+/**
+ * Get all patient type options
+ * GET /patients/type-options
+ * NOTE: Must be defined BEFORE /patients/:personId to avoid route conflicts
+ */
+router.get(
+  '/patients/type-options',
+  async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const types = await database.executeQuery<PatientTypeOption>(
+        'SELECT ID, PatientType FROM dbo.tblPatientType ORDER BY PatientType',
+        [],
+        (columns) => ({
+          id: columns[0].value as number,
+          type: columns[1].value as string
+        })
+      );
+      res.json(types);
+    } catch (error) {
+      log.error('Error fetching patient type options:', error);
+      ErrorResponses.internalError(
+        res,
+        'Failed to fetch patient type options',
         error as Error
       );
     }

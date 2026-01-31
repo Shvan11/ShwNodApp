@@ -27,7 +27,7 @@
 }
 
 .form-control::placeholder {
-    color: var(--gray-500);
+    color: var(--gray-400);
     opacity: 1;
 }
 
@@ -184,7 +184,7 @@ textarea.form-control {
 }
 
 .pm-select__placeholder {
-    color: var(--gray-500);
+    color: var(--gray-400);
     font-size: var(--font-size-base);
 }
 

@@ -4,6 +4,7 @@
  */
 
 import { MessageStatusValue } from '../../utils/whatsapp-send-constants';
+import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import styles from '../../routes/WhatsAppSend.module.css';
 
 export interface MessageItem {
@@ -133,7 +134,8 @@ export default function MessageStatusTable({
               const timeSent = getTimeSent(msg);
 
               const patientName = msg.patientName || msg.name || msg.patient || 'N/A';
-              const phoneNumber = msg.phone || msg.phoneNumber || msg.mobile || 'N/A';
+              const rawPhone = msg.phone || msg.phoneNumber || msg.mobile || '';
+              const phoneNumber = rawPhone ? formatPhoneForDisplay(rawPhone) : 'N/A';
               const messageText = msg.message || msg.messageText || msg.content || '';
 
               const messagePreview =

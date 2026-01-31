@@ -195,6 +195,10 @@ export interface PatientSearchQuery extends PaginationQuery {
   workTypes?: string;
   keywords?: string;
   tags?: string;
+  hasFinalPhotos?: string;
+  patientTypes?: string;          // comma-separated patient type IDs
+  lastAppointment?: string;       // '1month', '3months', '6months', '1year', or ISO date
+  nameStartsWith?: string;        // 'true' to match from beginning of names only
 }
 
 /**

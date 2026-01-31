@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import DolphinPhotoDialog from './DolphinPhotoDialog';
 import AlertModal from './AlertModal';
 import { useToast } from '../../contexts/ToastContext';
+import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import styles from './ViewPatientInfo.module.css';
 
 interface Props {
@@ -86,8 +87,9 @@ const ViewPatientInfo = ({ personId }: Props) => {
 
     const formatPhoneDisplay = (countryCode: string | undefined, phone: string | undefined): string => {
         if (!phone) return '-';
-        if (!countryCode) return phone;
-        return `+${countryCode.replace('+', '')} ${phone}`;
+        const formatted = formatPhoneForDisplay(phone);
+        if (!countryCode) return formatted;
+        return `+${countryCode.replace('+', '')} ${formatted}`;
     };
 
     const formatDateDisplay = (dateStr: string | undefined): string => {
@@ -475,7 +477,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         {patientInfo.Phone2 && (
                             <div className={styles.patientInfoRow}>
                                 <span className={styles.patientInfoLabel}>Phone 2:</span>
-                                <span className={styles.patientInfoValue}>{patientInfo.Phone2}</span>
+                                <span className={styles.patientInfoValue}>{formatPhoneForDisplay(patientInfo.Phone2)}</span>
                             </div>
                         )}
                         <div className={styles.patientInfoRow}>

@@ -6,6 +6,7 @@ import React, { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
 import { useCategories, useSubcategories } from '../../hooks/useExpenses';
 import type { Expense, ExpenseData } from '../../hooks/useExpenses';
+import { formatNumber } from '../../utils/formatters';
 import styles from '../../routes/Expenses.module.css';
 
 // Types
@@ -56,6 +57,7 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
+    const [displayAmount, setDisplayAmount] = useState('');
 
     // Initialize form when modal opens or expense changes
     useEffect(() => {
@@ -64,24 +66,26 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                 // Edit mode - populate with expense data
                 setFormData({
                     expenseDate: expense.ExpenseDate?.split('T')[0] || '',
-                    amount: expense.Amount || '',
+                    amount: expense.Amount || 0,
                     currency: (expense.Currency || '').trim() || 'IQD',
                     categoryId: expense.CategoryID || '',
                     subcategoryId: expense.SubcategoryID || '',
                     note: expense.Description || ''
                 });
+                setDisplayAmount(expense.Amount ? formatNumber(expense.Amount) : '');
                 setCategoryId(expense.CategoryID || '');
             } else {
                 // Add mode - set default date to today
                 const today = new Date().toISOString().split('T')[0];
                 setFormData({
                     expenseDate: today,
-                    amount: '',
+                    amount: 0,
                     currency: 'IQD',
                     categoryId: '',
                     subcategoryId: '',
                     note: ''
                 });
+                setDisplayAmount('');
                 setCategoryId('');
             }
             setErrors({});
@@ -103,6 +107,17 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
             categoryId: value,
             subcategoryId: '' // Reset subcategory when category changes
         }));
+    };
+
+    // Handle amount input with formatting as you type
+    const handleAmountChange = (value: string) => {
+        const digits = value.replace(/[^\d]/g, '');
+        const num = parseInt(digits, 10) || 0;
+        setDisplayAmount(num ? num.toLocaleString('en-US') : '');
+        setFormData(prev => ({ ...prev, amount: num }));
+        if (errors.amount) {
+            setErrors(prev => ({ ...prev, amount: null }));
+        }
     };
 
     const validateForm = (): boolean => {
@@ -146,12 +161,13 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
     const handleClose = () => {
         setFormData({
             expenseDate: '',
-            amount: '',
+            amount: 0,
             currency: 'IQD',
             categoryId: '',
             subcategoryId: '',
             note: ''
         });
+        setDisplayAmount('');
         setCategoryId('');
         setErrors({});
         onClose();
@@ -202,12 +218,12 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                                     Amount <span className={styles.required}>*</span>
                                 </label>
                                 <input
-                                    type="number"
+                                    type="text"
                                     id="expense-amount"
-                                    min="0"
-                                    step="1"
-                                    value={formData.amount}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('amount', e.target.value)}
+                                    value={displayAmount}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleAmountChange(e.target.value)}
+                                    onBlur={() => setDisplayAmount(formData.amount ? formatNumber(formData.amount) : '')}
+                                    placeholder="Enter amount"
                                     className={`${styles.formInput} ${errors.amount ? styles.inputError : ''}`}
                                 />
                                 {errors.amount && (

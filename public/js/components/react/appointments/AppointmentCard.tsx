@@ -178,10 +178,10 @@ const AppointmentCard = ({
                         {presentTime && <span className={styles.statusTime}>{presentTime}</span>}
                     </button>
 
-                    {/* Seated icon with time - Green when seated, gray when not seated yet */}
+                    {/* Seated icon with time - Orange when seated (not dismissed), Green when dismissed, gray when not seated yet */}
                     <button
                         type="button"
-                        className={isSeated ? styles.statusActive : styles.statusInactiveClickable}
+                        className={isSeated ? (isDismissed ? styles.statusActive : styles.statusSeated) : styles.statusInactiveClickable}
                         onClick={(e: React.MouseEvent) => {
                             e.preventDefault();
                             e.stopPropagation();

@@ -9,6 +9,7 @@ import { createWebSocketMessage, MessageSchemas } from './schemas.js';
 import { messageSessionManager, type MessageLookupResult } from './MessageSessionManager.js';
 import { type MessageSession } from './MessageSession.js';
 import { logger } from '../core/Logger.js';
+import { PhoneFormatter } from '../../utils/phoneFormatter.js';
 import qrcode from 'qrcode';
 import pkg from 'whatsapp-web.js';
 
@@ -1382,13 +1383,14 @@ class WhatsAppService extends EventEmitter {
     appointmentDate: string,
     session: MessageSession
   ): Promise<SendResult> {
-    const cleanNumber = number.startsWith('+') ? number.substring(1) : number;
+    // Normalize phone number - removes spaces, handles country code formats
+    const cleanNumber = PhoneFormatter.normalize(number, '964');
     const chatId = `${cleanNumber}@c.us`;
 
     try {
       const sentMessage = await this.clientState.client!.sendMessage(chatId, message);
 
-      logger.whatsapp.debug(`Message sent to ${number}`);
+      logger.whatsapp.debug(`Message sent to ${number} (normalized: ${cleanNumber})`);
 
       if (session) {
         const registered = session.registerMessage(
@@ -1466,13 +1468,14 @@ class WhatsAppService extends EventEmitter {
       return { success: false, error: 'WhatsApp client not ready' };
     }
 
-    const cleanNumber = number.startsWith('+') ? number.substring(1) : number;
+    // Normalize phone number - removes spaces, handles country code formats
+    const cleanNumber = PhoneFormatter.normalize(number, '964');
     const chatId = `${cleanNumber}@c.us`;
 
     try {
       const sentMessage = await this.clientState.client!.sendMessage(chatId, message);
 
-      logger.whatsapp.debug(`Message sent to ${number}`);
+      logger.whatsapp.debug(`Message sent to ${number} (normalized: ${cleanNumber})`);
 
       // Update database if appointmentId provided
       if (appointmentId) {

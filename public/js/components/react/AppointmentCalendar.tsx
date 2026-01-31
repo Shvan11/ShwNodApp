@@ -73,6 +73,9 @@ const AppointmentCalendar = ({
     const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
     const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(null);
     const [showEarlySlots, setShowEarlySlots] = useState(false);
+    const [extendedSlotsDefaultLoaded, setExtendedSlotsDefaultLoaded] = useState(false);
+    const [earlySlotTimes, setEarlySlotTimes] = useState<string[]>(['12:00', '12:30', '13:00', '13:30']);
+    const [lateSlotTimes, setLateSlotTimes] = useState<string[]>(['21:00', '21:30', '22:00', '22:30']);
     const [isMobile, setIsMobile] = useState(false);
 
     // Context menu and delete confirmation state
@@ -107,6 +110,50 @@ const AppointmentCalendar = ({
 
         return () => window.removeEventListener('resize', checkMobile);
     }, [viewMode]);
+
+    // Fetch extended slots settings on mount (default toggle + slot categories)
+    useEffect(() => {
+        if (extendedSlotsDefaultLoaded) return;
+
+        const fetchExtendedSlotsSettings = async () => {
+            try {
+                // Fetch all settings in parallel
+                const [defaultResponse, earlyResponse, lateResponse] = await Promise.all([
+                    fetch('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT'),
+                    fetch('/api/options/CALENDAR_EARLY_SLOTS'),
+                    fetch('/api/options/CALENDAR_LATE_SLOTS')
+                ]);
+
+                const [defaultData, earlyData, lateData] = await Promise.all([
+                    defaultResponse.json(),
+                    earlyResponse.json(),
+                    lateResponse.json()
+                ]);
+
+                // Set toggle default
+                if (defaultData.status === 'success' && defaultData.value !== null) {
+                    setShowEarlySlots(defaultData.value === 'true');
+                }
+
+                // Set early slots
+                if (earlyData.status === 'success' && earlyData.value) {
+                    setEarlySlotTimes(earlyData.value.split(',').filter(Boolean));
+                }
+
+                // Set late slots
+                if (lateData.status === 'success' && lateData.value) {
+                    setLateSlotTimes(lateData.value.split(',').filter(Boolean));
+                }
+            } catch (err) {
+                // Silently fail - keep defaults
+                console.error('Failed to fetch extended slots settings:', err);
+            } finally {
+                setExtendedSlotsDefaultLoaded(true);
+            }
+        };
+
+        fetchExtendedSlotsSettings();
+    }, [extendedSlotsDefaultLoaded]);
 
     // Utility functions
     // Week starts on Saturday (day 6)
@@ -574,6 +621,8 @@ const AppointmentCalendar = ({
                     viewMode={viewMode}
                     showOnlyAvailable={showOnlyAvailable}
                     showEarlySlots={showEarlySlots}
+                    earlySlotTimes={earlySlotTimes}
+                    lateSlotTimes={lateSlotTimes}
                 />
             )}
 

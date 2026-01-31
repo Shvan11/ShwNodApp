@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
+import PhoneInput from './PhoneInput';
 import styles from './EditPatientComponent.module.css';
 
 interface Props {
@@ -467,7 +468,35 @@ const EditPatientComponent = ({ personId }: Props) => {
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className={styles.editPatientForm}>
+            {/* Top action buttons */}
+            <div className={styles.topActions}>
+                <button
+                    type="button"
+                    onClick={handleCancel}
+                    className="btn btn-secondary"
+                    disabled={saving}
+                >
+                    <i className="fas fa-times"></i> Cancel
+                </button>
+                <button
+                    type="submit"
+                    form="edit-patient-form"
+                    className="btn bg-success"
+                    disabled={saving}
+                >
+                    {saving ? (
+                        <>
+                            <i className="fas fa-spinner fa-spin"></i> Saving...
+                        </>
+                    ) : (
+                        <>
+                            <i className="fas fa-save"></i> Save Changes
+                        </>
+                    )}
+                </button>
+            </div>
+
+            <form id="edit-patient-form" onSubmit={handleSubmit} className={styles.editPatientForm}>
                 <div className={styles.formRow}>
                     <div className={styles.formGroup}>
                         <label>Patient Name (Arabic) <span className={styles.requiredAsterisk}>*</span></label>
@@ -512,18 +541,16 @@ const EditPatientComponent = ({ personId }: Props) => {
                     </div>
                     <div className={styles.formGroup}>
                         <label>Phone</label>
-                        <input
-                            type="tel"
+                        <PhoneInput
                             value={formData.Phone}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, Phone: e.target.value})}
+                            onChange={(value) => setFormData({...formData, Phone: value})}
                         />
                     </div>
                     <div className={styles.formGroup}>
                         <label>Phone 2</label>
-                        <input
-                            type="tel"
+                        <PhoneInput
                             value={formData.Phone2}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, Phone2: e.target.value})}
+                            onChange={(value) => setFormData({...formData, Phone2: value})}
                         />
                     </div>
                 </div>

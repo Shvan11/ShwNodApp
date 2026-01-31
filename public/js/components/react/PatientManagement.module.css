@@ -142,6 +142,15 @@
     color: var(--gray-700);
 }
 
+/* Name search options (toggle for starts with) */
+.nameSearchOptions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    padding: 0 var(--spacing-lg);
+}
+
 .searchForm {
     display: flex;
     gap: var(--spacing-sm);
@@ -339,6 +348,17 @@
     font-size: var(--font-size-base);
 }
 
+.patientNameLink {
+    cursor: pointer;
+    color: var(--primary-color);
+    transition: color var(--transition-base);
+}
+
+.patientNameLink:hover {
+    color: var(--primary-700);
+    text-decoration: underline;
+}
+
 .patientNameSecondary {
     font-size: var(--font-size-sm);
     color: var(--gray-500);
@@ -504,7 +524,32 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(var(--grid-min-column-width-md), 1fr));
     gap: var(--spacing-lg);
-    margin-bottom: var(--spacing-lg);
+}
+
+.checkboxFilters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-lg);
+    padding-top: var(--spacing-md);
+    border-top: var(--border-width-thin) solid var(--border-color);
+    margin-top: var(--spacing-md);
+}
+
+.checkboxLabel {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    font-weight: var(--font-weight-medium);
+    color: var(--text-primary);
+    font-size: var(--font-size-base);
+}
+
+.checkboxLabel input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary-color);
+    cursor: pointer;
 }
 
 .filterGroup label {

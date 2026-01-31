@@ -1,6 +1,7 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent, MouseEvent } from 'react';
 import { copyToClipboard } from '../../core/utils';
 import { useToast } from '../../contexts/ToastContext';
+import { formatNumber } from '../../utils/formatters';
 import type { AlignerDoctorMinimal, AlignerSet } from '../../pages/aligner/aligner.types';
 
 interface SetFormData {
@@ -71,6 +72,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
     const [pdfFile, setPdfFile] = useState<File | null>(null);
     const [uploadingPdf, setUploadingPdf] = useState<boolean>(false);
     const [deletingPdf, setDeletingPdf] = useState<boolean>(false);
+    const [displaySetCost, setDisplaySetCost] = useState('');
 
     // Check if an inactive set can be reactivated
     const cannotReactivate = (): boolean => {
@@ -115,6 +117,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                 Notes: set.Notes || '',
                 IsActive: set.IsActive !== undefined ? set.IsActive : true
             });
+            setDisplaySetCost(set.SetCost ? formatNumber(set.SetCost) : '');
         } else if (isOpen) {
             // Add mode - reset form with auto-populated values
 
@@ -154,6 +157,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                 Notes: '',
                 IsActive: true
             });
+            setDisplaySetCost('');
         }
         setErrors({});
         setPdfFile(null); // Reset PDF file selection
@@ -659,14 +663,18 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                         <div className="form-field">
                                             <label htmlFor="SetCost">Set Cost</label>
                                             <input
-                                                type="number"
+                                                type="text"
                                                 id="SetCost"
                                                 name="SetCost"
-                                                value={formData.SetCost}
-                                                onChange={handleChange}
-                                                step="0.01"
-                                                min="0"
-                                                placeholder="0.00"
+                                                value={displaySetCost}
+                                                onChange={(e) => {
+                                                    const digits = e.target.value.replace(/[^\d]/g, '');
+                                                    const num = parseInt(digits, 10) || 0;
+                                                    setDisplaySetCost(num ? num.toLocaleString('en-US') : '');
+                                                    setFormData(prev => ({ ...prev, SetCost: num }));
+                                                }}
+                                                onBlur={() => setDisplaySetCost(formData.SetCost ? formatNumber(formData.SetCost) : '')}
+                                                placeholder="Enter cost"
                                             />
                                         </div>
 

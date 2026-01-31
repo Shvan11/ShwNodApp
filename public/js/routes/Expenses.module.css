@@ -379,12 +379,16 @@
   margin-bottom: var(--spacing-lg);
 }
 
-/* Mobile: reduce padding */
+/* Mobile: reduce padding and enable full-width scroll */
 @media (max-width: 768px) {
   .tableContainer {
     padding: var(--spacing-md);
     margin-bottom: var(--spacing-md);
     border-radius: var(--radius-sm);
+    /* Allow scrolling from edge to edge */
+    margin-left: calc(-1 * var(--spacing-md));
+    margin-right: calc(-1 * var(--spacing-md));
+    width: calc(100% + 2 * var(--spacing-md));
   }
 }
 
@@ -392,6 +396,34 @@
   .tableContainer {
     padding: var(--spacing-sm);
     border-radius: 0;
+    margin-left: calc(-1 * var(--spacing-sm));
+    margin-right: calc(-1 * var(--spacing-sm));
+    width: calc(100% + 2 * var(--spacing-sm));
+  }
+}
+
+/* Scroll hint wrapper for mobile */
+.tableScrollWrapper {
+  position: relative;
+}
+
+.tableScrollWrapper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 30px;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.9));
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.3s;
+}
+
+/* Hide scroll hint on larger screens */
+@media (min-width: 900px) {
+  .tableScrollWrapper::after {
+    display: none;
   }
 }
 
@@ -702,17 +734,9 @@
     grid-template-columns: 1fr;
   }
 
-  .tableContainer {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    margin-left: -20px;
-    margin-right: -20px;
-    padding-left: 20px;
-    padding-right: 20px;
-  }
-
   .expensesTable {
     font-size: 12px;
+    min-width: 700px;
   }
 
   .expensesTable th,
@@ -728,6 +752,7 @@
     left: 0;
     background-color: white;
     z-index: 2;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
   }
 
   .expensesTable thead th:first-child {
@@ -770,34 +795,26 @@
     font-size: 13px;
   }
 
-  .tableContainer {
-    margin-left: -10px;
-    margin-right: -10px;
-    padding-left: 10px;
-    padding-right: 10px;
-    padding-top: 15px;
-    padding-bottom: 15px;
-  }
-
   .expensesTable {
     font-size: 11px;
+    min-width: 600px;
   }
 
   .expensesTable th,
   .expensesTable td {
     padding: 6px;
     font-size: 11px;
-    min-width: 60px;
+    min-width: 55px;
   }
 
   .expensesTable th:first-child,
   .expensesTable td:first-child {
-    min-width: 75px;
+    min-width: 70px;
   }
 
   .noteCell {
-    max-width: 120px;
-    min-width: 80px;
+    max-width: 100px;
+    min-width: 70px;
   }
 }
 

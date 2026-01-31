@@ -539,6 +539,7 @@ export interface PatientManagementLoaderResult {
   workTypes: SelectOption[];
   keywords: SelectOption[];
   tags: SelectOption[];
+  patientTypes: SelectOption[];
   searchResults: PatientData[] | null;
   error?: string;
   _loaderTimestamp: number;
@@ -559,11 +560,12 @@ export async function patientManagementLoader({
 
   try {
     // Fetch all filter data in parallel
-    const [allPatientsRes, workTypesRes, keywordsRes, tagsRes] = await Promise.all([
+    const [allPatientsRes, workTypesRes, keywordsRes, tagsRes, patientTypesRes] = await Promise.all([
       fetch('/api/patients/phones', { signal }),
       fetch('/api/getworktypes', { signal }),
       fetch('/api/getworkkeywords', { signal }),
       fetch('/api/patients/tag-options', { signal }),
+      fetch('/api/patients/type-options', { signal }),
     ]);
 
     // Parse responses
@@ -575,6 +577,9 @@ export async function patientManagementLoader({
       ? await keywordsRes.json()
       : [];
     const tagsData: Array<{ id: number; tag: string }> = tagsRes.ok ? await tagsRes.json() : [];
+    const patientTypesData: Array<{ id: number; type: string }> = patientTypesRes.ok
+      ? await patientTypesRes.json()
+      : [];
 
     // Transform to react-select format
     const workTypes: SelectOption[] = workTypesData.map((wt) => ({
@@ -590,6 +595,11 @@ export async function patientManagementLoader({
     const tags: SelectOption[] = tagsData.map((tag) => ({
       value: tag.id,
       label: tag.tag,
+    }));
+
+    const patientTypes: SelectOption[] = patientTypesData.map((pt) => ({
+      value: pt.id,
+      label: pt.type,
     }));
 
     // Check if we have search params and need to execute search
@@ -634,6 +644,7 @@ export async function patientManagementLoader({
       workTypes,
       keywords,
       tags,
+      patientTypes,
       searchResults, // Will be null if no search params, or array if search executed
       _loaderTimestamp: Date.now(),
     };
@@ -645,6 +656,7 @@ export async function patientManagementLoader({
       workTypes: [],
       keywords: [],
       tags: [],
+      patientTypes: [],
       searchResults: null,
       error: error instanceof Error ? error.message : 'Unknown error',
       _loaderTimestamp: Date.now(),

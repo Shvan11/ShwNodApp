@@ -4,6 +4,7 @@ import Select, { MultiValue } from 'react-select';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
 import PatientQuickSearch, { type SelectedPatient, type PatientOption } from './PatientQuickSearch';
+import PhoneDisplay from './PhoneDisplay';
 import styles from './PatientManagement.module.css';
 
 interface Patient {
@@ -26,6 +27,20 @@ interface SortConfig {
     direction: 'asc' | 'desc';
 }
 
+interface LastAppointmentOption {
+    value: string;
+    label: string;
+}
+
+const LAST_APPOINTMENT_OPTIONS: LastAppointmentOption[] = [
+    { value: '', label: 'Any time' },
+    { value: '1month', label: 'More than 1 month ago' },
+    { value: '3months', label: 'More than 3 months ago' },
+    { value: '6months', label: 'More than 6 months ago' },
+    { value: '1year', label: 'More than 1 year ago' },
+    { value: 'custom', label: 'Before specific date...' },
+];
+
 interface SavedState {
     patients: Patient[];
     hasSearched: boolean;
@@ -33,9 +48,14 @@ interface SavedState {
     searchFirstName: string;
     searchLastName: string;
     searchTerm: string;
+    nameStartsWith: boolean;
     selectedWorkTypes: SelectOption[];
     selectedKeywords: SelectOption[];
     selectedTags: SelectOption[];
+    selectedPatientTypes: SelectOption[];
+    lastAppointmentFilter: string;
+    lastAppointmentCustomDate: string;
+    hasFinalPhotos: boolean;
     showFilters: boolean;
     sortConfig: SortConfig;
 }
@@ -45,6 +65,7 @@ interface LoaderData {
     workTypes?: SelectOption[];
     keywords?: SelectOption[];
     tags?: SelectOption[];
+    patientTypes?: SelectOption[];
 }
 
 /**
@@ -83,11 +104,16 @@ const PatientManagement = () => {
     const [searchFirstName, setSearchFirstName] = useState(savedState?.searchFirstName || '');
     const [searchLastName, setSearchLastName] = useState(savedState?.searchLastName || '');
     const [searchTerm, setSearchTerm] = useState(savedState?.searchTerm || '');
+    const [nameStartsWith, setNameStartsWith] = useState(savedState?.nameStartsWith || false);
 
     // -- Filters & Sorting --
     const [selectedWorkTypes, setSelectedWorkTypes] = useState<SelectOption[]>(savedState?.selectedWorkTypes || []);
     const [selectedKeywords, setSelectedKeywords] = useState<SelectOption[]>(savedState?.selectedKeywords || []);
     const [selectedTags, setSelectedTags] = useState<SelectOption[]>(savedState?.selectedTags || []);
+    const [selectedPatientTypes, setSelectedPatientTypes] = useState<SelectOption[]>(savedState?.selectedPatientTypes || []);
+    const [lastAppointmentFilter, setLastAppointmentFilter] = useState(savedState?.lastAppointmentFilter || '');
+    const [lastAppointmentCustomDate, setLastAppointmentCustomDate] = useState(savedState?.lastAppointmentCustomDate || '');
+    const [hasFinalPhotos, setHasFinalPhotos] = useState(savedState?.hasFinalPhotos || false);
     const [showFilters, setShowFilters] = useState(savedState?.showFilters || false);
     const [sortConfig, setSortConfig] = useState<SortConfig>(savedState?.sortConfig || { key: 'name', direction: 'asc' });
 
@@ -101,6 +127,7 @@ const PatientManagement = () => {
     const workTypes = loaderData?.workTypes || [];
     const keywords = loaderData?.keywords || [];
     const tags = loaderData?.tags || [];
+    const patientTypes = loaderData?.patientTypes || [];
 
     // -- Refs --
     const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -130,9 +157,14 @@ const PatientManagement = () => {
                 searchFirstName,
                 searchLastName,
                 searchTerm,
+                nameStartsWith,
                 selectedWorkTypes,
                 selectedKeywords,
                 selectedTags,
+                selectedPatientTypes,
+                lastAppointmentFilter,
+                lastAppointmentCustomDate,
+                hasFinalPhotos,
                 showFilters,
                 sortConfig
             };
@@ -143,7 +175,8 @@ const PatientManagement = () => {
         return () => handleSaveState();
     }, [
         patients, hasSearched, searchPatientName, searchFirstName, searchLastName, searchTerm,
-        selectedWorkTypes, selectedKeywords, selectedTags, showFilters, sortConfig
+        nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes,
+        lastAppointmentFilter, lastAppointmentCustomDate, hasFinalPhotos, showFilters, sortConfig
     ]);
 
     // --- Search Logic ---
@@ -162,10 +195,20 @@ const PatientManagement = () => {
             if (searchFirstName.trim()) params.append('firstName', searchFirstName.trim());
             if (searchLastName.trim()) params.append('lastName', searchLastName.trim());
             if (searchTerm.trim()) params.append('q', searchTerm.trim());
+            if (nameStartsWith) params.append('nameStartsWith', 'true');
 
             if (selectedWorkTypes.length > 0) params.append('workTypes', selectedWorkTypes.map(wt => wt.value).join(','));
             if (selectedKeywords.length > 0) params.append('keywords', selectedKeywords.map(kw => kw.value).join(','));
             if (selectedTags.length > 0) params.append('tags', selectedTags.map(tag => tag.value).join(','));
+            if (selectedPatientTypes.length > 0) params.append('patientTypes', selectedPatientTypes.map(pt => pt.value).join(','));
+            if (lastAppointmentFilter) {
+                if (lastAppointmentFilter === 'custom' && lastAppointmentCustomDate) {
+                    params.append('lastAppointment', lastAppointmentCustomDate);
+                } else if (lastAppointmentFilter !== 'custom') {
+                    params.append('lastAppointment', lastAppointmentFilter);
+                }
+            }
+            if (hasFinalPhotos) params.append('hasFinalPhotos', 'true');
 
             params.append('sortBy', currentSort.key);
             params.append('order', currentSort.direction);
@@ -188,12 +231,13 @@ const PatientManagement = () => {
                 setLoading(false);
             }
         }
-    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, selectedWorkTypes, selectedKeywords, selectedTags, sortConfig, toast]);
+    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes, lastAppointmentFilter, lastAppointmentCustomDate, hasFinalPhotos, sortConfig, toast]);
 
     // --- Auto-Search Effect ---
     useEffect(() => {
         const hasInputs = searchPatientName || searchFirstName || searchLastName || searchTerm ||
-                          selectedWorkTypes.length > 0 || selectedKeywords.length > 0 || selectedTags.length > 0;
+                          selectedWorkTypes.length > 0 || selectedKeywords.length > 0 || selectedTags.length > 0 ||
+                          selectedPatientTypes.length > 0 || lastAppointmentFilter || hasFinalPhotos;
 
         // SKIP search if we just restored data from storage
         // This ensures the "cached view" remains stable and we don't flash a loading spinner unnecessarily
@@ -212,7 +256,7 @@ const PatientManagement = () => {
         return () => {
             if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
         };
-    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, selectedWorkTypes, selectedKeywords, selectedTags, executeSearch]);
+    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes, lastAppointmentFilter, lastAppointmentCustomDate, hasFinalPhotos, executeSearch]);
 
     // --- Handlers ---
 
@@ -221,7 +265,10 @@ const PatientManagement = () => {
     const handleReset = () => {
         sessionStorage.removeItem('pm_search_state');
         setSearchPatientName(''); setSearchFirstName(''); setSearchLastName(''); setSearchTerm('');
+        setNameStartsWith(false);
         setSelectedWorkTypes([]); setSelectedKeywords([]); setSelectedTags([]);
+        setSelectedPatientTypes([]); setLastAppointmentFilter(''); setLastAppointmentCustomDate('');
+        setHasFinalPhotos(false);
         setPatients([]); setHasSearched(false); setShowFilters(false);
         setSortConfig({ key: 'name', direction: 'asc' });
     };
@@ -322,6 +369,17 @@ const PatientManagement = () => {
                 <div><label>Phone/ID</label><input type="text" value={searchTerm} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && executeSearch()} className="form-control"/></div>
             </div>
 
+            <div className={styles.nameSearchOptions}>
+                <label className={styles.checkboxLabel}>
+                    <input
+                        type="checkbox"
+                        checked={nameStartsWith}
+                        onChange={(e) => setNameStartsWith(e.target.checked)}
+                    />
+                    <span>Match from beginning of name only</span>
+                </label>
+            </div>
+
             <div className={styles.searchForm}>
                 <button type="button" onClick={handleSearchBtnClick} className="btn btn-primary" disabled={loading}><i className={cn('fas fa-search', styles.iconGap)}></i>Search</button>
                 <button type="button" onClick={handleShowAll} className="btn btn-secondary" disabled={loading}><i className={cn('fas fa-list', styles.iconGap)}></i>Show All</button>
@@ -330,7 +388,7 @@ const PatientManagement = () => {
 
             <div className={styles.advancedFilters}>
                 <div className={styles.advancedFiltersHeader} onClick={() => setShowFilters(!showFilters)}>
-                    <h4><i className={cn('fas fa-filter', styles.iconGap)}></i>Filters {(selectedWorkTypes.length + selectedKeywords.length + selectedTags.length > 0) && <span className={styles.filterBadge}>{selectedWorkTypes.length + selectedKeywords.length + selectedTags.length}</span>}</h4>
+                    <h4><i className={cn('fas fa-filter', styles.iconGap)}></i>Filters {(selectedWorkTypes.length + selectedKeywords.length + selectedTags.length + selectedPatientTypes.length + (lastAppointmentFilter ? 1 : 0) + (hasFinalPhotos ? 1 : 0) > 0) && <span className={styles.filterBadge}>{selectedWorkTypes.length + selectedKeywords.length + selectedTags.length + selectedPatientTypes.length + (lastAppointmentFilter ? 1 : 0) + (hasFinalPhotos ? 1 : 0)}</span>}</h4>
                     <i className={`fas fa-chevron-${showFilters ? 'up' : 'down'}`}></i>
                 </div>
                 {showFilters && (
@@ -366,6 +424,45 @@ const PatientManagement = () => {
                                     classNamePrefix="pm-select"
                                 />
                             </div>
+                            <div className={styles.filterGroup}>
+                                <label>Patient Type</label>
+                                <Select
+                                    isMulti
+                                    options={patientTypes}
+                                    value={selectedPatientTypes}
+                                    onChange={(newValue: MultiValue<SelectOption>) => setSelectedPatientTypes([...newValue])}
+                                    classNamePrefix="pm-select"
+                                />
+                            </div>
+                            <div className={styles.filterGroup}>
+                                <label>Last Appointment</label>
+                                <Select
+                                    options={LAST_APPOINTMENT_OPTIONS}
+                                    value={LAST_APPOINTMENT_OPTIONS.find(o => o.value === lastAppointmentFilter) || LAST_APPOINTMENT_OPTIONS[0]}
+                                    onChange={(option) => setLastAppointmentFilter(option?.value || '')}
+                                    classNamePrefix="pm-select"
+                                    isClearable
+                                />
+                                {lastAppointmentFilter === 'custom' && (
+                                    <input
+                                        type="date"
+                                        value={lastAppointmentCustomDate}
+                                        onChange={(e) => setLastAppointmentCustomDate(e.target.value)}
+                                        className="form-control"
+                                        style={{ marginTop: 'var(--spacing-sm)' }}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                        <div className={styles.checkboxFilters}>
+                            <label className={styles.checkboxLabel}>
+                                <input
+                                    type="checkbox"
+                                    checked={hasFinalPhotos}
+                                    onChange={(e) => setHasFinalPhotos(e.target.checked)}
+                                />
+                                <span>Has Final Photos</span>
+                            </label>
                         </div>
                     </div>
                 )}
@@ -395,16 +492,25 @@ const PatientManagement = () => {
                             {patients.map(p => (
                                 <tr key={p.PersonID}>
                                     <td data-label="ID">{p.PersonID}</td>
-                                    <td data-label="Name"><strong>{p.PatientName}</strong>{p.FirstName && <div>{p.FirstName} {p.LastName}</div>}</td>
-                                    <td data-label="Phone">{p.Phone || '-'}</td>
+                                    <td data-label="Name">
+                                        <strong
+                                            className={styles.patientNameLink}
+                                            onClick={() => navigate(`/patient/${p.PersonID}/works`)}
+                                            title="View Patient"
+                                        >
+                                            {p.PatientName}
+                                        </strong>
+                                        {p.FirstName && <div>{p.FirstName} {p.LastName}</div>}
+                                    </td>
+                                    <td data-label="Phone"><PhoneDisplay phone={p.Phone} /> {!p.Phone && '-'}</td>
                                     <td data-label="Date">{p.DateAdded ? new Date(p.DateAdded).toLocaleDateString() : '-'}</td>
                                     <td data-label="Tag">{p.TagName ? <span className={styles.tagBadge}>{p.TagName}</span> : '-'}</td>
                                     <td data-label="Actions">
                                         <div className={styles.actionButtons}>
-                                            <button onClick={(e) => handleQuickCheckin(e, p)} className="btn btn-icon btn-outline-success"><i className="fas fa-user-check"></i></button>
-                                            <button onClick={() => navigate(`/patient/${p.PersonID}/works`)} className="btn btn-icon btn-outline-primary"><i className="fas fa-eye"></i></button>
-                                            <button onClick={() => navigate(`/patient/${p.PersonID}/edit-patient`)} className="btn btn-icon btn-outline-warning"><i className="fas fa-edit"></i></button>
-                                            <button onClick={() => handleDeleteClick(p)} className="btn btn-icon btn-outline-danger"><i className="fas fa-trash"></i></button>
+                                            <button onClick={(e) => handleQuickCheckin(e, p)} className="btn btn-icon btn-outline-success" title="Quick Check-in"><i className="fas fa-user-check"></i></button>
+                                            <button onClick={() => navigate(`/patient/${p.PersonID}/works`)} className="btn btn-icon btn-outline-primary" title="View Patient"><i className="fas fa-eye"></i></button>
+                                            <button onClick={() => navigate(`/patient/${p.PersonID}/edit-patient`)} className="btn btn-icon btn-outline-warning" title="Edit Patient"><i className="fas fa-edit"></i></button>
+                                            <button onClick={() => handleDeleteClick(p)} className="btn btn-icon btn-outline-danger" title="Delete Patient"><i className="fas fa-trash"></i></button>
                                         </div>
                                     </td>
                                 </tr>

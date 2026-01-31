@@ -1,6 +1,7 @@
 // SearchPatient.tsx - Quick search for patients by name/ID/phone
 import React, { useState, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import PhoneDisplay from '../../components/react/PhoneDisplay';
 import styles from './SearchPatient.module.css';
 
 interface AlignerPatient {
@@ -112,7 +113,7 @@ const SearchPatient: React.FC = () => {
                                     </div>
                                     <div className={styles.resultMeta}>
                                         <span><i className="fas fa-id-card"></i> {patient.PersonID}</span>
-                                        <span><i className="fas fa-phone"></i> {patient.Phone || 'N/A'}</span>
+                                        <span><i className="fas fa-phone"></i> <PhoneDisplay phone={patient.Phone} />{!patient.Phone && 'N/A'}</span>
                                         <span><i className="fas fa-tooth"></i> {patient.WorkType}</span>
                                     </div>
                                 </div>

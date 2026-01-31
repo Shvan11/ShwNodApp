@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
+import { formatNumber } from '../../utils/formatters';
 
 // Types
 interface SetInfo {
@@ -43,20 +44,23 @@ interface PaymentFormDrawerProps {
 
 const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }: PaymentFormDrawerProps) => {
     const [formData, setFormData] = useState<PaymentFormData>({
-        Amountpaid: '',
+        Amountpaid: 0,
         Dateofpayment: new Date().toISOString().split('T')[0]
     });
 
+    const [displayAmount, setDisplayAmount] = useState('');
     const [errors, setErrors] = useState<FormErrors>({});
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         if (isOpen && set) {
             // Reset form when drawer opens
+            const initialAmount = set.Balance || set.SetCost || 0;
             setFormData({
-                Amountpaid: set.Balance || set.SetCost || '',
+                Amountpaid: initialAmount,
                 Dateofpayment: new Date().toISOString().split('T')[0]
             });
+            setDisplayAmount(initialAmount ? formatNumber(initialAmount) : '');
             setErrors({});
         }
     }, [isOpen, set]);
@@ -74,10 +78,22 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }: PaymentFo
         }
     };
 
+    // Handle amount input with formatting as you type
+    const handleAmountChange = (value: string) => {
+        const digits = value.replace(/[^\d]/g, '');
+        const num = parseInt(digits, 10) || 0;
+        setDisplayAmount(num ? num.toLocaleString('en-US') : '');
+        setFormData(prev => ({ ...prev, Amountpaid: num }));
+        if (errors.Amountpaid) {
+            setErrors(prev => ({ ...prev, Amountpaid: null }));
+        }
+    };
+
     const validate = (): boolean => {
         const newErrors: FormErrors = {};
+        const amount = Number(formData.Amountpaid) || 0;
 
-        if (!formData.Amountpaid || parseFloat(String(formData.Amountpaid)) <= 0) {
+        if (amount <= 0) {
             newErrors.Amountpaid = 'Amount paid is required and must be greater than 0';
         }
 
@@ -85,8 +101,8 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }: PaymentFo
             newErrors.Dateofpayment = 'Payment date is required';
         }
 
-        if (set && set.Balance && parseFloat(String(formData.Amountpaid)) > set.Balance) {
-            newErrors.Amountpaid = `Amount cannot exceed balance of ${set.Balance}`;
+        if (set && set.Balance && amount > set.Balance) {
+            newErrors.Amountpaid = `Amount cannot exceed balance of ${formatNumber(set.Balance)}`;
         }
 
         setErrors(newErrors);
@@ -105,7 +121,7 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }: PaymentFo
         try {
             await onSave({
                 ...formData,
-                Amountpaid: parseFloat(String(formData.Amountpaid)),
+                Amountpaid: Number(formData.Amountpaid),
                 ActualAmount: null,
                 ActualCur: set?.Currency || 'USD',
                 Change: null
@@ -123,7 +139,7 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }: PaymentFo
 
     const remainingBalance = set?.Balance || set?.SetCost || 0;
     const totalPaid = set?.TotalPaid || 0;
-    const newBalance = remainingBalance - (parseFloat(String(formData.Amountpaid)) || 0);
+    const newBalance = remainingBalance - (Number(formData.Amountpaid) || 0);
     const currency = set?.Currency || 'USD';
 
     return (
@@ -146,15 +162,15 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }: PaymentFo
                         <div className="summary-grid">
                             <div className="summary-item">
                                 <span className="label">Set Cost</span>
-                                <span className="value">{set?.SetCost || 0}</span>
+                                <span className="value">{formatNumber(set?.SetCost || 0)}</span>
                             </div>
                             <div className="summary-item">
                                 <span className="label">Total Paid</span>
-                                <span className="value">{totalPaid}</span>
+                                <span className="value">{formatNumber(totalPaid)}</span>
                             </div>
                             <div className="summary-item highlight">
                                 <span className="label">Balance Due</span>
-                                <span className="value">{remainingBalance}</span>
+                                <span className="value">{formatNumber(remainingBalance)}</span>
                             </div>
                         </div>
                     </div>
@@ -167,13 +183,12 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }: PaymentFo
                             </label>
                             <div className="input-group">
                                 <input
-                                    type="number"
+                                    type="text"
                                     id="Amountpaid"
                                     name="Amountpaid"
-                                    value={formData.Amountpaid}
-                                    onChange={handleChange}
-                                    step="0.01"
-                                    min="0.01"
+                                    value={displayAmount}
+                                    onChange={(e) => handleAmountChange(e.target.value)}
+                                    onBlur={() => setDisplayAmount(formData.Amountpaid ? formatNumber(formData.Amountpaid) : '')}
                                     className={errors.Amountpaid ? 'error' : ''}
                                     autoFocus
                                     placeholder="Enter amount"
@@ -200,11 +215,11 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }: PaymentFo
                         </div>
 
                         {/* New Balance Preview */}
-                        {formData.Amountpaid && (
+                        {Number(formData.Amountpaid) > 0 && (
                             <div className="balance-preview">
                                 <span className="preview-label">New Balance:</span>
                                 <span className={`preview-value ${newBalance <= 0 ? 'paid-full' : ''}`}>
-                                    {newBalance.toFixed(2)} {currency}
+                                    {formatNumber(newBalance)} {currency}
                                 </span>
                                 {newBalance <= 0 && <span className="badge-success">Fully Paid</span>}
                             </div>

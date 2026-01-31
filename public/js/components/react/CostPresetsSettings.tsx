@@ -1,5 +1,6 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import { formatNumber } from '../../utils/formatters';
 import styles from './CostPresetsSettings.module.css';
 
 type Currency = 'IQD' | 'USD' | 'EUR';
@@ -28,6 +29,7 @@ const CostPresetsSettings = () => {
         currency: 'IQD',
         displayOrder: 0
     });
+    const [displayAmount, setDisplayAmount] = useState('');
 
     // Load presets
     const loadPresets = async () => {
@@ -84,6 +86,7 @@ const CostPresetsSettings = () => {
             if (response.ok) {
                 toast.success('Preset created successfully');
                 setFormData({ amount: '', currency: activeCurrency, displayOrder: 0 });
+                setDisplayAmount('');
                 loadPresets();
             } else {
                 const error = await response.json();
@@ -103,6 +106,7 @@ const CostPresetsSettings = () => {
             currency: preset.Currency,
             displayOrder: preset.DisplayOrder
         });
+        setDisplayAmount(preset.Amount ? formatNumber(preset.Amount) : '');
     };
 
     // Update preset
@@ -131,6 +135,7 @@ const CostPresetsSettings = () => {
                 toast.success('Preset updated successfully');
                 setEditingPreset(null);
                 setFormData({ amount: '', currency: activeCurrency, displayOrder: 0 });
+                setDisplayAmount('');
                 loadPresets();
             } else {
                 const error = await response.json();
@@ -170,6 +175,7 @@ const CostPresetsSettings = () => {
     const handleCancelEdit = () => {
         setEditingPreset(null);
         setFormData({ amount: '', currency: activeCurrency, displayOrder: 0 });
+        setDisplayAmount('');
     };
 
     // Format number with commas
@@ -225,11 +231,17 @@ const CostPresetsSettings = () => {
                         <div className={styles.formGroup}>
                             <label htmlFor="amount">Amount</label>
                             <input
-                                type="number"
+                                type="text"
                                 id="amount"
                                 name="amount"
-                                value={formData.amount}
-                                onChange={handleInputChange}
+                                value={displayAmount}
+                                onChange={(e) => {
+                                    const digits = e.target.value.replace(/[^\d]/g, '');
+                                    const num = parseInt(digits, 10) || 0;
+                                    setDisplayAmount(num ? num.toLocaleString('en-US') : '');
+                                    setFormData(prev => ({ ...prev, amount: String(num) }));
+                                }}
+                                onBlur={() => setDisplayAmount(formData.amount ? formatNumber(parseInt(formData.amount, 10)) : '')}
                                 placeholder="Enter amount"
                                 required
                             />

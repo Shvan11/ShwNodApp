@@ -188,6 +188,17 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
       { name: 'Description', label: 'Description', type: 'nvarchar', maxLength: 255, required: false },
     ],
   },
+  tbltimes: {
+    tableName: 'tbltimes',
+    idColumn: 'TimeID',
+    displayColumn: 'MyTime',
+    displayName: 'Time Slots',
+    icon: 'fas fa-clock',
+    idType: 'int',
+    columns: [
+      { name: 'MyTime', label: 'Time', type: 'varchar', maxLength: 30, required: true },
+    ],
+  },
 };
 
 /**

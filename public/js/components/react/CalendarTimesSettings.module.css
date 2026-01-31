@@ -1,0 +1,395 @@
+/* CalendarTimesSettings Component Styles */
+
+.settingsContent {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+/* Toggle Section */
+.toggleSection {
+    background: var(--gray-50);
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid var(--gray-200);
+}
+
+.toggleRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+}
+
+.toggleInfo {
+    flex: 1;
+}
+
+.toggleLabel {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.toggleDescription {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Toggle Switch */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 56px;
+    height: 30px;
+    flex-shrink: 0;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--gray-300);
+    transition: 0.3s;
+    border-radius: 30px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 22px;
+    width: 22px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.switch input:checked + .slider {
+    background-color: var(--primary-color);
+}
+
+.switch input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+.switch input:focus + .slider {
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+}
+
+/* Add Slot Section */
+.addSlotSection {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid var(--gray-200);
+}
+
+.addSlotSection h4 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-primary);
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.addSlotSection h4 i {
+    color: var(--success-500);
+}
+
+.addSlotForm {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.timeInputGroup {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.timeInput {
+    width: 60px;
+    padding: 0.5rem;
+    border: 2px solid var(--gray-300);
+    border-radius: 6px;
+    font-size: 1rem;
+    text-align: center;
+    font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.timeInput:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.timeSeparator {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: var(--text-secondary);
+}
+
+.minuteSelect {
+    width: 70px;
+    padding: 0.5rem;
+    border: 2px solid var(--gray-300);
+    border-radius: 6px;
+    font-size: 1rem;
+    font-family: 'Consolas', 'Monaco', monospace;
+    cursor: pointer;
+}
+
+.minuteSelect:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.categorySelect {
+    padding: 0.5rem 1rem;
+    border: 2px solid var(--gray-300);
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    min-width: 100px;
+}
+
+.categorySelect:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+/* Categories Section */
+.categoriesSection {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.slotCategory {
+    background: white;
+    border-radius: 12px;
+    padding: 1.25rem;
+    border: 2px solid var(--gray-200);
+}
+
+.earlyCategory {
+    border-left: 4px solid var(--warning-400);
+}
+
+.mainCategory {
+    border-left: 4px solid var(--primary-color);
+}
+
+.lateCategory {
+    border-left: 4px solid var(--purple-500, #8b5cf6);
+}
+
+.categoryHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.categoryHeader i {
+    font-size: 1rem;
+}
+
+.earlyCategory .categoryHeader i {
+    color: var(--warning-500);
+}
+
+.mainCategory .categoryHeader i {
+    color: var(--primary-color);
+}
+
+.lateCategory .categoryHeader i {
+    color: var(--purple-500, #8b5cf6);
+}
+
+.categoryCount {
+    background: var(--gray-100);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 10px;
+    margin-left: auto;
+}
+
+.categoryNote {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0 0 1rem 0;
+    line-height: 1.4;
+}
+
+.slotTimes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.emptyCategory {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 0.5rem 0;
+}
+
+/* Time Chip with Actions */
+.timeChipWrapper {
+    display: inline-flex;
+    align-items: center;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-300);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.timeChip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-family: 'Consolas', 'Monaco', monospace;
+    background: white;
+}
+
+.chipActions {
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--gray-300);
+    background: var(--gray-50);
+}
+
+.moveBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.moveBtn:hover:not(:disabled) {
+    background: var(--gray-200);
+    color: var(--primary-color);
+}
+
+.moveBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.moveBtn i {
+    font-size: 0.8rem;
+}
+
+.moveBtn.deleteBtn:hover:not(:disabled) {
+    background: var(--error-100);
+    color: var(--error-500);
+}
+
+.moveBtn.confirmDelete {
+    background: var(--error-100);
+    color: var(--error-500);
+}
+
+.moveBtn.confirmDelete:hover:not(:disabled) {
+    background: var(--error-200);
+}
+
+/* Messages */
+.errorMessage {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: var(--error-50);
+    border: 1px solid var(--error-200);
+    border-left: 4px solid var(--error-400);
+    border-radius: 8px;
+    color: var(--error-600);
+    margin-bottom: 1.5rem;
+}
+
+.errorMessage i {
+    font-size: 1.1rem;
+}
+
+.successMessage {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: var(--success-50);
+    border: 1px solid var(--success-200);
+    border-left: 4px solid var(--success-300);
+    border-radius: 8px;
+    color: var(--success-800);
+    margin-bottom: 1.5rem;
+}
+
+.successMessage i {
+    font-size: 1.1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .toggleRow {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .addSlotForm {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .timeInputGroup {
+        justify-content: center;
+    }
+
+    .categorySelect {
+        width: 100%;
+    }
+
+    .slotTimes {
+        gap: 0.5rem;
+    }
+
+    .timeChipWrapper {
+        flex-grow: 1;
+        justify-content: space-between;
+    }
+}

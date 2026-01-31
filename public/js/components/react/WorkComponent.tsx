@@ -144,6 +144,13 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
     const [workToDelete, setWorkToDelete] = useState<Work | null>(null);
 
+    // Generic confirmation modal state
+    const [confirmationModal, setConfirmationModal] = useState<{
+        show: boolean;
+        type: 'complete' | 'discontinue' | 'reactivate' | null;
+        work: Work | null;
+    }>({ show: false, type: null, work: null });
+
     // Transfer work modal state (admin only)
     const [showTransferModal, setShowTransferModal] = useState(false);
     const [workToTransfer, setWorkToTransfer] = useState<Work | null>(null);
@@ -166,6 +173,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         CompletedDate: '',
         Note: ''
     });
+    const [displayItemCost, setDisplayItemCost] = useState('');
 
     // Teeth options for multi-select
     const [teethOptions, setTeethOptions] = useState<ToothOption[]>([]);
@@ -294,70 +302,106 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         navigate(`/patient/${personId}/new-work?workId=${work.workid}`);
     };
 
-    const handleCompleteWork = async (workId: number) => {
-        if (!confirm('Are you sure you want to mark this work as completed?')) return;
+    // Show confirmation modal for work status changes
+    const handleCompleteWork = (work: Work) => {
+        setConfirmationModal({ show: true, type: 'complete', work });
+    };
+
+    const handleDiscontinueWork = (work: Work) => {
+        setConfirmationModal({ show: true, type: 'discontinue', work });
+    };
+
+    const handleReactivateWork = (work: Work) => {
+        setConfirmationModal({ show: true, type: 'reactivate', work });
+    };
+
+    const closeConfirmationModal = () => {
+        setConfirmationModal({ show: false, type: null, work: null });
+    };
+
+    const executeConfirmedAction = async () => {
+        const { type, work } = confirmationModal;
+        if (!type || !work) return;
+
+        closeConfirmationModal();
 
         try {
-            const response = await fetch('/api/finishwork', {
+            let endpoint = '';
+            let body: Record<string, unknown> = {};
+            let successMessage = '';
+
+            switch (type) {
+                case 'complete':
+                    endpoint = '/api/finishwork';
+                    body = { workId: work.workid };
+                    successMessage = 'Work marked as completed';
+                    break;
+                case 'discontinue':
+                    endpoint = '/api/discontinuework';
+                    body = { workId: work.workid };
+                    successMessage = 'Work marked as discontinued';
+                    break;
+                case 'reactivate':
+                    endpoint = '/api/reactivatework';
+                    body = { workId: work.workid, personId: work.PersonID };
+                    successMessage = 'Work reactivated successfully';
+                    break;
+            }
+
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ workId })
+                body: JSON.stringify(body)
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to complete work');
+                throw new Error(errorData.message || errorData.error || `Failed to ${type} work`);
             }
 
-            toast.success('Work marked as completed');
+            toast.success(successMessage);
             await loadWorks();
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
+            toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
         }
     };
 
-    const handleDiscontinueWork = async (workId: number) => {
-        if (!confirm('Are you sure you want to mark this work as discontinued?\n\nThis indicates the patient has abandoned treatment.')) return;
+    // Get confirmation modal content based on type
+    const getConfirmationModalContent = () => {
+        const { type, work } = confirmationModal;
+        if (!type || !work) return null;
 
-        try {
-            const response = await fetch('/api/discontinuework', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ workId })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to discontinue work');
+        const configs = {
+            complete: {
+                title: 'Complete Work',
+                icon: 'fa-check-circle',
+                color: 'var(--success-color)',
+                message: 'Are you sure you want to mark this work as completed?',
+                warning: 'This will change the work status to Finished.',
+                buttonText: 'Complete Work',
+                buttonIcon: 'fa-check'
+            },
+            discontinue: {
+                title: 'Discontinue Work',
+                icon: 'fa-times-circle',
+                color: 'var(--warning-color)',
+                message: 'Are you sure you want to discontinue this work?',
+                warning: 'This indicates the patient has abandoned treatment.',
+                buttonText: 'Discontinue',
+                buttonIcon: 'fa-times'
+            },
+            reactivate: {
+                title: 'Reactivate Work',
+                icon: 'fa-redo',
+                color: 'var(--primary-color)',
+                message: 'Are you sure you want to reactivate this work?',
+                warning: 'This will make it the active work for this patient.',
+                buttonText: 'Reactivate',
+                buttonIcon: 'fa-redo'
             }
+        };
 
-            toast.success('Work marked as discontinued');
-            await loadWorks();
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
-        }
-    };
-
-    const handleReactivateWork = async (work: Work) => {
-        if (!confirm('Are you sure you want to reactivate this work?\n\nThis will make it the active work for this patient.')) return;
-
-        try {
-            const response = await fetch('/api/reactivatework', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ workId: work.workid, personId: work.PersonID })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || errorData.error || 'Failed to reactivate work');
-            }
-
-            toast.success('Work reactivated successfully');
-            await loadWorks();
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
-        }
+        return { ...configs[type], work };
     };
 
     const handleDeleteWork = (work: Work) => {
@@ -469,6 +513,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             CompletedDate: '',
             Note: ''
         });
+        setDisplayItemCost('');
         setShowDetailForm(true);
     };
 
@@ -491,6 +536,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             CompletedDate: detail.CompletedDate ? detail.CompletedDate.split('T')[0] : '',
             Note: detail.Note || ''
         });
+        setDisplayItemCost(detail.ItemCost ? formatNumber(detail.ItemCost) : '');
         setShowDetailForm(true);
     };
 
@@ -1186,11 +1232,16 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                 <div className={styles.formGroup}>
                                     <label>Item Cost</label>
                                     <input
-                                        type="number"
-                                        value={detailFormData.ItemCost}
-                                        onChange={(e) => setDetailFormData({ ...detailFormData, ItemCost: e.target.value })}
+                                        type="text"
+                                        value={displayItemCost}
+                                        onChange={(e) => {
+                                            const digits = e.target.value.replace(/[^\d]/g, '');
+                                            const num = parseInt(digits, 10) || 0;
+                                            setDisplayItemCost(num ? num.toLocaleString('en-US') : '');
+                                            setDetailFormData({ ...detailFormData, ItemCost: String(num) });
+                                        }}
+                                        onBlur={() => setDisplayItemCost(detailFormData.ItemCost ? formatNumber(detailFormData.ItemCost) : '')}
                                         placeholder="Optional"
-                                        min="0"
                                     />
                                 </div>
                             </div>
@@ -1436,6 +1487,67 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     </div>
                 </div>
             )}
+
+            {/* Work Status Confirmation Modal */}
+            {confirmationModal.show && confirmationModal.work && (() => {
+                const config = getConfirmationModalContent();
+                if (!config) return null;
+                return (
+                    <div className={styles.modalOverlay} onClick={closeConfirmationModal}>
+                        <div className="whatsapp-modal" onClick={(e: React.MouseEvent) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                            <div className="whatsapp-modal-header">
+                                <h3 className="whatsapp-modal-title" style={{ color: config.color }}>
+                                    <i className={`fas ${config.icon}`}></i> {config.title}
+                                </h3>
+                                <button onClick={closeConfirmationModal} className="whatsapp-modal-close">
+                                    ×
+                                </button>
+                            </div>
+                            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+                                <p style={{ marginBottom: 'var(--spacing-md)', fontSize: 'var(--font-size-base)', color: 'var(--text-primary)' }}>
+                                    {config.message}
+                                </p>
+                                <div style={{
+                                    background: 'var(--background-secondary)',
+                                    padding: 'var(--spacing-md)',
+                                    borderRadius: 'var(--radius-md)',
+                                    borderLeft: `4px solid ${config.color}`
+                                }}>
+                                    <p style={{ margin: '0 0 var(--spacing-sm) 0' }}>
+                                        <strong>Work Type:</strong> {config.work.TypeName || 'N/A'}
+                                    </p>
+                                    <p style={{ margin: '0 0 var(--spacing-sm) 0' }}>
+                                        <strong>Doctor:</strong> {config.work.DoctorName || 'N/A'}
+                                    </p>
+                                    <p style={{ margin: '0' }}>
+                                        <strong>Total Required:</strong> {formatCurrency(config.work.TotalRequired, config.work.Currency)}
+                                    </p>
+                                </div>
+                                <p style={{
+                                    marginTop: 'var(--spacing-md)',
+                                    color: config.color,
+                                    fontWeight: '500',
+                                    fontSize: 'var(--font-size-sm)'
+                                }}>
+                                    {config.warning}
+                                </p>
+                            </div>
+                            <div className="whatsapp-actions">
+                                <button onClick={closeConfirmationModal} className="whatsapp-btn-cancel">
+                                    <i className="fas fa-times"></i> Cancel
+                                </button>
+                                <button
+                                    onClick={executeConfirmedAction}
+                                    className="whatsapp-btn-send"
+                                    style={{ backgroundColor: config.color }}
+                                >
+                                    <i className={`fas ${config.buttonIcon}`}></i> {config.buttonText}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Transfer Work Modal (Admin Only) */}
             {showTransferModal && workToTransfer && (

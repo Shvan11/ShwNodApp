@@ -47,8 +47,8 @@ interface WorkCardProps {
     onAddPayment: (work: Work) => void;
     onViewPaymentHistory: (work: Work) => void;
     onAddAlignerSet: (work: Work) => void;
-    onComplete: (workId: number) => void;
-    onDiscontinue: (workId: number) => void;
+    onComplete: (work: Work) => void;
+    onDiscontinue: (work: Work) => void;
     onReactivate: (work: Work) => void;
     onViewVisits: (work: Work) => void;
     onNewVisit: (work: Work) => void;
@@ -164,10 +164,10 @@ const WorkCard = ({
                             )}
                             {isActive && (
                                 <>
-                                    <button type="button" onClick={() => { onComplete(work.workid); setShowActions(false); }}>
+                                    <button type="button" onClick={() => { onComplete(work); setShowActions(false); }}>
                                         <i className="fas fa-check-circle"></i> Mark Complete
                                     </button>
-                                    <button type="button" onClick={() => { onDiscontinue(work.workid); setShowActions(false); }}>
+                                    <button type="button" onClick={() => { onDiscontinue(work); setShowActions(false); }}>
                                         <i className="fas fa-ban"></i> Mark Discontinued
                                     </button>
                                 </>

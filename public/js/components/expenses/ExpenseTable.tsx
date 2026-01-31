@@ -2,7 +2,6 @@
  * ExpenseTable Component
  * Displays expenses in a table with edit and delete actions
  */
-import React from 'react';
 import type { Expense } from '../../hooks/useExpenses';
 import styles from '../../routes/Expenses.module.css';
 
@@ -51,8 +50,9 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
     };
 
     return (
-        <div className={styles.tableContainer}>
-            <table className={styles.expensesTable}>
+        <div className={styles.tableScrollWrapper}>
+            <div className={styles.tableContainer}>
+                <table className={styles.expensesTable}>
                 <thead>
                     <tr>
                         <th>Date</th>
@@ -112,7 +112,8 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
                         );
                     })}
                 </tbody>
-            </table>
+                </table>
+            </div>
         </div>
     );
 }

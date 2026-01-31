@@ -15,6 +15,7 @@ import AdminUserManagement from './AdminUserManagement';
 import CostPresetsSettings from './CostPresetsSettings';
 import LookupsSettings from './LookupsSettings';
 import ProtocolHandlersSettings from './ProtocolHandlersSettings';
+import CalendarTimesSettings from './CalendarTimesSettings';
 
 // Types
 interface SettingsTabComponentProps {
@@ -62,6 +63,7 @@ const SettingsComponent: React.FC = () => {
         employees: { hasChanges: false },
         costPresets: { hasChanges: false },
         lookups: { hasChanges: false },
+        calendarTimes: { hasChanges: false },
         messaging: { hasChanges: false },
         system: { hasChanges: false },
         security: { hasChanges: false },
@@ -141,6 +143,13 @@ const SettingsComponent: React.FC = () => {
             icon: 'fas fa-list',
             component: LookupsSettings,
             description: 'Manage dropdown and reference data'
+        },
+        {
+            id: 'calendarTimes',
+            label: 'Calendar Times',
+            icon: 'fas fa-clock',
+            component: CalendarTimesSettings,
+            description: 'Configure calendar time slot visibility'
         },
         {
             id: 'messaging',

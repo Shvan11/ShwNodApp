@@ -370,6 +370,35 @@
     box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.4), 0 4px 6px -2px rgba(239, 68, 68, 0.3);
 }
 
+/* Seated state - Dark yellow (seated but not dismissed yet) */
+.statusSeated {
+    composes: statusButton;
+    background: linear-gradient(135deg, var(--warning-dark) 0%, var(--warning-700) 100%);
+    border-color: var(--warning-700);
+    cursor: pointer;
+    box-shadow: var(--shadow-warning-sm);
+    opacity: 1;
+}
+
+.statusSeated i {
+    color: var(--color-white);
+}
+
+.statusSeated .chairIcon {
+    opacity: 1;
+    filter: brightness(0) invert(1);
+}
+
+.statusSeated .statusTime {
+    color: var(--color-white);
+}
+
+.statusSeated:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: var(--shadow-warning-lg);
+    background: linear-gradient(135deg, var(--warning-dark) 0%, var(--warning-600) 100%);
+}
+
 /* Chair icon special active state */
 .statusChairActive {
     composes: statusActive;
@@ -415,7 +444,8 @@
     .statusActive,
     .statusInactive,
     .statusInactiveClickable,
-    .statusWaiting {
+    .statusWaiting,
+    .statusSeated {
         width: 42px;
         height: 42px;
     }
@@ -448,7 +478,8 @@
     .statusActive,
     .statusInactive,
     .statusInactiveClickable,
-    .statusWaiting {
+    .statusWaiting,
+    .statusSeated {
         width: 38px;
         height: 38px;
     }

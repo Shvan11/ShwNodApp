@@ -138,17 +138,17 @@ const CalendarHeader = ({
                     className="header-doctor-filter"
                 />
 
-                {/* Early slots toggle - only show in week/day view */}
+                {/* Early & Late slots toggle - only show in week/day view */}
                 {(viewMode === 'week' || viewMode === 'day') && (
                     <button
                         className={`early-slots-toggle ${showEarlySlots ? 'active' : ''}`}
                         onClick={onToggleEarlySlots}
                         disabled={loading}
-                        title={showEarlySlots ? 'Hide early time slots (12:00-13:30)' : 'Show early time slots (12:00-13:30)'}
-                        aria-label={showEarlySlots ? 'Hide early time slots' : 'Show early time slots'}
+                        title={showEarlySlots ? 'Hide early & late time slots (12:00-13:30, 21:00-22:30)' : 'Show early & late time slots (12:00-13:30, 21:00-22:30)'}
+                        aria-label={showEarlySlots ? 'Hide early & late time slots' : 'Show early & late time slots'}
                     >
                         <i className={`fas fa-clock ${showEarlySlots ? '' : 'fa-slash'}`} />
-                        <span>{showEarlySlots ? 'Hide' : 'Show'} Early Slots</span>
+                        <span>{showEarlySlots ? 'Hide' : 'Show'} Early & Late Slots</span>
                     </button>
                 )}
             </div>
