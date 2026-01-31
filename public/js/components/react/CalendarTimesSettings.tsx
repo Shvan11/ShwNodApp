@@ -58,6 +58,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
     // UI state
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [isRegenerating, setIsRegenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -321,6 +322,34 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
         setShowExtendedSlotsDefault(originalShowExtendedDefault);
         setSuccessMessage(null);
         setError(null);
+    };
+
+    // Regenerate calendar entries
+    const handleRegenerateCalendar = async () => {
+        setIsRegenerating(true);
+        setError(null);
+        setSuccessMessage(null);
+
+        try {
+            const response = await fetch('/api/calendar/regenerate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to regenerate calendar');
+            }
+
+            setSuccessMessage(data.message || `Added ${data.entriesAdded} calendar entries`);
+            setTimeout(() => setSuccessMessage(null), 5000);
+        } catch (err) {
+            console.error('Error regenerating calendar:', err);
+            setError(err instanceof Error ? err.message : 'Failed to regenerate calendar');
+        } finally {
+            setIsRegenerating(false);
+        }
     };
 
     // Render a time slot chip with move buttons
@@ -598,6 +627,35 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                 >
                     <i className="fas fa-undo"></i>
                     Reset
+                </button>
+            </div>
+
+            {/* Regenerate Calendar Section */}
+            <div className={sectionStyles.section} style={{ marginTop: '1.5rem' }}>
+                <h3>
+                    <i className="fas fa-sync-alt"></i>
+                    Regenerate Calendar
+                </h3>
+                <p className={sectionStyles.sectionDescription}>
+                    If you've added new time slots, click this button to populate them into the calendar for all future dates.
+                </p>
+                <button
+                    className="btn btn-secondary"
+                    onClick={handleRegenerateCalendar}
+                    disabled={isRegenerating || isSaving}
+                    style={{ marginTop: '0.5rem' }}
+                >
+                    {isRegenerating ? (
+                        <>
+                            <i className="fas fa-spinner fa-spin"></i>
+                            Regenerating...
+                        </>
+                    ) : (
+                        <>
+                            <i className="fas fa-sync-alt"></i>
+                            Regenerate Calendar Entries
+                        </>
+                    )}
                 </button>
             </div>
         </div>

@@ -1,6 +1,23 @@
 /* Settings Section - Shared styles for all settings tabs */
 
-/* Main section container */
+/* Page title - used when container already provides box styling */
+.pageTitle {
+    color: var(--color-purple-light);
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 700;
+    padding-bottom: 1rem;
+    border-bottom: 3px solid var(--gray-200);
+}
+
+.pageTitle i {
+    font-size: 1.5rem;
+}
+
+/* Main section container - use when you need a nested box */
 .section {
     background: white;
     border-radius: var(--radius-xl);

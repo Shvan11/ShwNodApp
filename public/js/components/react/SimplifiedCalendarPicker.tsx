@@ -461,28 +461,36 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
 
                         <div className={styles.slotsGrid}>
                             {(() => {
-                                // Separate slots into regular and afternoon slots
+                                // Separate slots into early, regular, and late
+                                const earlySlots: TimeSlot[] = [];
                                 const regularSlots: TimeSlot[] = [];
-                                const afternoonSlots: TimeSlot[] = [];
-                                const emptyAfternoonSlots: TimeSlot[] = [];
+                                const lateSlots: TimeSlot[] = [];
+                                const emptyExtendedSlots: TimeSlot[] = [];
+
+                                // Extended times include 14:00 and 14:30 as early
+                                const extendedEarlyTimes = [...earlySlotTimes, '14:00', '14:30'];
 
                                 availableSlots.forEach(slot => {
-                                    if (rareAfternoonTimes.includes(slot.time)) {
-                                        afternoonSlots.push(slot);
-                                        // Check if slot is empty (no appointments)
+                                    if (extendedEarlyTimes.includes(slot.time)) {
+                                        earlySlots.push(slot);
                                         if (!slot.appointments || slot.appointments.length === 0) {
-                                            emptyAfternoonSlots.push(slot);
+                                            emptyExtendedSlots.push(slot);
+                                        }
+                                    } else if (lateSlotTimes.includes(slot.time)) {
+                                        lateSlots.push(slot);
+                                        if (!slot.appointments || slot.appointments.length === 0) {
+                                            emptyExtendedSlots.push(slot);
                                         }
                                     } else {
                                         regularSlots.push(slot);
                                     }
                                 });
 
-                                const hasEmptyAfternoonSlots = emptyAfternoonSlots.length > 0;
+                                const hasEmptyExtendedSlots = emptyExtendedSlots.length > 0;
 
                                 return (
                                     <>
-                                        {hasEmptyAfternoonSlots && (
+                                        {hasEmptyExtendedSlots && (
                                             <div
                                                 className={styles.afternoonToggle}
                                                 onClick={() => setShowAfternoonSlots(!showAfternoonSlots)}
@@ -495,11 +503,18 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                                             </div>
                                         )}
 
-                                        {showAfternoonSlots && afternoonSlots.map(renderSlot)}
+                                        {/* Early slots (12:00-14:30) */}
+                                        {showAfternoonSlots && earlySlots.map(renderSlot)}
 
+                                        {/* Regular slots (15:00-20:30) - always shown */}
                                         {regularSlots.map(renderSlot)}
 
-                                        {!hasEmptyAfternoonSlots && afternoonSlots.map(renderSlot)}
+                                        {/* Late slots (21:00-22:30) */}
+                                        {showAfternoonSlots && lateSlots.map(renderSlot)}
+
+                                        {/* Fallback: show extended slots if all have appointments */}
+                                        {!hasEmptyExtendedSlots && earlySlots.map(renderSlot)}
+                                        {!hasEmptyExtendedSlots && lateSlots.map(renderSlot)}
                                     </>
                                 );
                             })()}

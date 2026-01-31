@@ -41,9 +41,18 @@ const LAST_APPOINTMENT_OPTIONS: LastAppointmentOption[] = [
     { value: 'custom', label: 'Before specific date...' },
 ];
 
+interface SearchResponse {
+    patients: Patient[];
+    totalCount: number;
+    hasMore: boolean;
+}
+
 interface SavedState {
     patients: Patient[];
     hasSearched: boolean;
+    totalCount: number;
+    hasMore: boolean;
+    currentOffset: number;
     searchPatientName: string;
     searchFirstName: string;
     searchLastName: string;
@@ -87,17 +96,32 @@ const PatientManagement = () => {
     const savedState = useRef(() => {
         try {
             const saved = sessionStorage.getItem('pm_search_state');
-            return saved ? JSON.parse(saved) as SavedState : null;
+            if (!saved) return null;
+            const parsed = JSON.parse(saved) as SavedState;
+            // Validate that patients is an array (handle old/corrupted state)
+            if (parsed.patients && !Array.isArray(parsed.patients)) {
+                console.warn('Invalid patients data in sessionStorage, clearing...');
+                sessionStorage.removeItem('pm_search_state');
+                return null;
+            }
+            return parsed;
         } catch (e) {
             console.error('Failed to load saved state', e);
+            sessionStorage.removeItem('pm_search_state');
             return null;
         }
     }).current();
 
     // -- Data State --
-    const [patients, setPatients] = useState<Patient[]>(savedState?.patients || []);
+    const [patients, setPatients] = useState<Patient[]>(
+        Array.isArray(savedState?.patients) ? savedState.patients : []
+    );
     const [hasSearched, setHasSearched] = useState(savedState?.hasSearched || false);
+    const [totalCount, setTotalCount] = useState(savedState?.totalCount || 0);
+    const [hasMore, setHasMore] = useState(savedState?.hasMore || false);
+    const [currentOffset, setCurrentOffset] = useState(savedState?.currentOffset || 0);
     const [loading, setLoading] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
 
     // -- Search Inputs --
     const [searchPatientName, setSearchPatientName] = useState(savedState?.searchPatientName || '');
@@ -153,6 +177,9 @@ const PatientManagement = () => {
             const stateToSave: SavedState = {
                 patients,
                 hasSearched,
+                totalCount,
+                hasMore,
+                currentOffset,
                 searchPatientName,
                 searchFirstName,
                 searchLastName,
@@ -174,21 +201,26 @@ const PatientManagement = () => {
         // Save on unmount (navigation)
         return () => handleSaveState();
     }, [
-        patients, hasSearched, searchPatientName, searchFirstName, searchLastName, searchTerm,
+        patients, hasSearched, totalCount, hasMore, currentOffset, searchPatientName, searchFirstName, searchLastName, searchTerm,
         nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes,
         lastAppointmentFilter, lastAppointmentCustomDate, hasFinalPhotos, showFilters, sortConfig
     ]);
 
     // --- Search Logic ---
-    const executeSearch = useCallback(async (overrideSort: SortConfig | null = null) => {
+    const executeSearch = useCallback(async (overrideSort: SortConfig | null = null, loadMore = false) => {
         if (abortControllerRef.current) abortControllerRef.current.abort();
         const abortController = new AbortController();
         abortControllerRef.current = abortController;
 
         const currentSort = overrideSort || sortConfig;
+        const offset = loadMore ? currentOffset : 0;
 
         try {
-            setLoading(true);
+            if (loadMore) {
+                setLoadingMore(true);
+            } else {
+                setLoading(true);
+            }
 
             const params = new URLSearchParams();
             if (searchPatientName.trim()) params.append('patientName', searchPatientName.trim());
@@ -212,6 +244,8 @@ const PatientManagement = () => {
 
             params.append('sortBy', currentSort.key);
             params.append('order', currentSort.direction);
+            params.append('offset', offset.toString());
+            params.append('limit', '100');
 
             const response = await fetch(`/api/patients/search?${params.toString()}`, {
                 signal: abortController.signal
@@ -220,7 +254,23 @@ const PatientManagement = () => {
             if (!response.ok) throw new Error('Failed to search patients');
 
             const data = await response.json();
-            setPatients(data);
+
+            // Handle both new format {patients, totalCount, hasMore} and legacy array format
+            const patientsArray: Patient[] = Array.isArray(data) ? data : (data.patients || []);
+            const total = Array.isArray(data) ? patientsArray.length : (data.totalCount || patientsArray.length);
+            const more = Array.isArray(data) ? false : (data.hasMore || false);
+
+            if (loadMore) {
+                // Append to existing results
+                setPatients(prev => [...prev, ...patientsArray]);
+            } else {
+                // Replace results
+                setPatients(patientsArray);
+            }
+
+            setTotalCount(total);
+            setHasMore(more);
+            setCurrentOffset(offset + patientsArray.length);
             setHasSearched(true);
         } catch (err) {
             if (err instanceof Error && err.name !== 'AbortError') {
@@ -229,9 +279,15 @@ const PatientManagement = () => {
         } finally {
             if (!abortController.signal.aborted) {
                 setLoading(false);
+                setLoadingMore(false);
             }
         }
-    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes, lastAppointmentFilter, lastAppointmentCustomDate, hasFinalPhotos, sortConfig, toast]);
+    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes, lastAppointmentFilter, lastAppointmentCustomDate, hasFinalPhotos, sortConfig, currentOffset, toast]);
+
+    // --- Load More Handler ---
+    const handleLoadMore = useCallback(() => {
+        executeSearch(null, true);
+    }, [executeSearch]);
 
     // --- Auto-Search Effect ---
     useEffect(() => {
@@ -284,13 +340,25 @@ const PatientManagement = () => {
     };
 
     const handleShowAll = () => {
-        // Clear inputs and force search
+        // Clear inputs and filters, reset pagination
         setSearchPatientName(''); setSearchFirstName(''); setSearchLastName(''); setSearchTerm('');
+        setNameStartsWith(false);
+        setSelectedWorkTypes([]); setSelectedKeywords([]); setSelectedTags([]); setSelectedPatientTypes([]);
+        setLastAppointmentFilter(''); setLastAppointmentCustomDate(''); setHasFinalPhotos(false);
+        setCurrentOffset(0);
         setLoading(true);
-        fetch(`/api/patients/search?q=&sortBy=name&order=asc`)
+        fetch(`/api/patients/search?q=&sortBy=name&order=asc&limit=100&offset=0`)
             .then(res => res.json())
             .then(data => {
-                setPatients(data);
+                // Handle both new format {patients, totalCount, hasMore} and legacy array format
+                const patientsArray: Patient[] = Array.isArray(data) ? data : (data.patients || []);
+                const total = Array.isArray(data) ? patientsArray.length : (data.totalCount || patientsArray.length);
+                const more = Array.isArray(data) ? false : (data.hasMore || false);
+
+                setPatients(patientsArray);
+                setTotalCount(total);
+                setHasMore(more);
+                setCurrentOffset(patientsArray.length);
                 setHasSearched(true);
                 setLoading(false);
             })
@@ -470,12 +538,29 @@ const PatientManagement = () => {
 
             {hasSearched && (
                 <div className={styles.resultsSummary}>
-                    <div className="summary-card"><h3>Results</h3><span className="summary-value">{patients.length}</span>{loading && <span className={styles.refreshingBadge}><i className="fas fa-spinner fa-spin"></i></span>}</div>
+                    <div className="summary-card">
+                        <h3>Results</h3>
+                        <span className="summary-value">
+                            {patients.length}
+                            {totalCount > patients.length && <span className={styles.totalCountLabel}> of {totalCount}</span>}
+                        </span>
+                        {loading && <span className={styles.refreshingBadge}><i className="fas fa-spinner fa-spin"></i></span>}
+                    </div>
                     <div className={styles.sortControls}>
                         <span className={styles.sortLabel}>Sort:</span>
                         <div className={styles.sortToggle}>
-                            <button className={cn(styles.sortBtn, sortConfig.key === 'name' && styles.sortBtnActive)} onClick={() => handleSortToggle('name')}>Name</button>
-                            <button className={cn(styles.sortBtn, sortConfig.key === 'date' && styles.sortBtnActive)} onClick={() => handleSortToggle('date')}>Date</button>
+                            <button className={cn(styles.sortBtn, sortConfig.key === 'name' && styles.sortBtnActive)} onClick={() => handleSortToggle('name')}>
+                                Name
+                                {sortConfig.key === 'name' && (
+                                    <i className={cn('fas', sortConfig.direction === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down', styles.sortIcon)}></i>
+                                )}
+                            </button>
+                            <button className={cn(styles.sortBtn, sortConfig.key === 'date' && styles.sortBtnActive)} onClick={() => handleSortToggle('date')}>
+                                Date
+                                {sortConfig.key === 'date' && (
+                                    <i className={cn('fas', sortConfig.direction === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down', styles.sortIcon)}></i>
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -518,16 +603,41 @@ const PatientManagement = () => {
                             {patients.length === 0 && <tr><td colSpan={6} className={styles.noData}>No results</td></tr>}
                         </tbody>
                     </table>
+
+                    {hasMore && (
+                        <div className={styles.loadMoreContainer}>
+                            <button
+                                onClick={handleLoadMore}
+                                className={cn('btn btn-secondary', styles.loadMoreBtn)}
+                                disabled={loadingMore}
+                            >
+                                {loadingMore ? (
+                                    <>
+                                        <i className="fas fa-spinner fa-spin"></i>
+                                        Loading...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-plus"></i>
+                                        Load More ({totalCount - patients.length} remaining)
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 
             {showDeleteConfirm && selectedPatient && (
                 <div className="modal-overlay">
-                    <div className={cn('work-modal', styles.modalNarrow)}>
-                        <div className="modal-header"><h3>Confirm Delete</h3><button onClick={() => setShowDeleteConfirm(false)} className="modal-close">×</button></div>
+                    <div className={styles.deleteModal}>
+                        <div className={styles.deleteModalHeader}>
+                            <h3>Confirm Delete</h3>
+                            <button onClick={() => setShowDeleteConfirm(false)} className={styles.deleteModalClose}>×</button>
+                        </div>
                         <div className={styles.deleteModalContent}>
                             <p>Are you sure you want to delete <strong>{selectedPatient.PatientName}</strong>?</p>
-                            <div className="form-actions">
+                            <div className={styles.deleteModalActions}>
                                 <button onClick={() => setShowDeleteConfirm(false)} className="btn btn-secondary">Cancel</button>
                                 <button onClick={handleDeleteConfirm} className="btn btn-danger">Delete</button>
                             </div>

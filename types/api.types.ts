@@ -162,6 +162,7 @@ export type ErrorMiddleware = (
 export interface PaginationQuery {
   page?: string;
   limit?: string;
+  offset?: string;
   sortBy?: string;
   order?: 'asc' | 'desc';
 }

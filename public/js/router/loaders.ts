@@ -636,7 +636,13 @@ export async function patientManagementLoader({
       });
 
       const searchRes = await fetch(`/api/patients/search?${searchParams.toString()}`, { signal });
-      searchResults = searchRes.ok ? await searchRes.json() : [];
+      if (searchRes.ok) {
+        const data = await searchRes.json();
+        // Handle new paginated response format
+        searchResults = data.patients || data;
+      } else {
+        searchResults = [];
+      }
     }
 
     return {

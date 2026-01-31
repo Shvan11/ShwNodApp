@@ -129,9 +129,22 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     };
 
     const formatSettingName = (key: string): string => {
-        return key.replace(/([A-Z])/g, ' $1')
-                  .replace(/^./, str => str.toUpperCase())
-                  .replace(/_/g, ' ');
+        // Check if the key is ALL_UPPERCASE_WITH_UNDERSCORES (database option format)
+        if (key === key.toUpperCase() && key.includes('_')) {
+            // Convert CALENDAR_EARLY_SLOTS to "Calendar Early Slots"
+            return key
+                .split('_')
+                .map(word => word.charAt(0) + word.slice(1).toLowerCase())
+                .join(' ');
+        }
+        // Handle camelCase or PascalCase with proper acronym handling
+        // "OldOPG" → "Old OPG", "myAPIKey" → "My API Key"
+        return key
+            .replace(/([a-z])([A-Z])/g, '$1 $2')           // lowercase to uppercase: "oldOPG" → "old OPG"
+            .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')     // acronym to word: "OPGNew" → "OPG New"
+            .replace(/^./, str => str.toUpperCase())       // capitalize first letter
+            .replace(/_/g, ' ')                            // replace underscores
+            .trim();
     };
 
     const renderSettingInput = (key: string, value: string) => {
@@ -191,42 +204,40 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
 
     return (
         <div>
-            <div className={styles.section}>
-                <h3>
-                    <i className="fas fa-cog"></i>
-                    System Options
-                </h3>
-                <p className={styles.sectionDescription}>
-                    Configure general system settings and preferences
-                </p>
+            <h3 className={styles.pageTitle}>
+                <i className="fas fa-cog"></i>
+                System Options
+            </h3>
+            <p className={styles.sectionDescription}>
+                Configure general system settings and preferences
+            </p>
 
-                <div className={styles.form}>
-                    {isLoading ? (
-                        <div className={styles.loading}>
-                            <i className="fas fa-spinner fa-spin"></i>
-                            <span>Loading settings...</span>
-                        </div>
-                    ) : (
-                        <div className={styles.formFields}>
-                            {Object.keys(options).length === 0 ? (
-                                <p className={styles.noSettings}>No settings found. Please check your database configuration.</p>
-                            ) : (
-                                Object.entries(options)
-                                    // Filter out email settings - they belong in the Email Settings tab
-                                    .filter(([key]) => !key.startsWith('EMAIL_'))
-                                    .map(([key, value]) => (
-                                    <div key={key} className={cn(styles.settingGroup, pendingChanges[key] !== undefined && styles.pendingChange)}>
-                                        <label htmlFor={`setting_${key.replace(/[^a-zA-Z0-9]/g, '_')}`}>
-                                            {formatSettingName(key)}
-                                        </label>
-                                        {renderSettingInput(key, value)}
-                                        <div className={styles.settingDescription}>Option: {key}</div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    )}
-                </div>
+            <div className={styles.form}>
+                {isLoading ? (
+                    <div className={styles.loading}>
+                        <i className="fas fa-spinner fa-spin"></i>
+                        <span>Loading settings...</span>
+                    </div>
+                ) : (
+                    <div className={styles.formFields}>
+                        {Object.keys(options).length === 0 ? (
+                            <p className={styles.noSettings}>No settings found. Please check your database configuration.</p>
+                        ) : (
+                            Object.entries(options)
+                                // Filter out settings that have their own dedicated tabs
+                                .filter(([key]) => !key.startsWith('EMAIL_') && !key.startsWith('CALENDAR_'))
+                                .map(([key, value]) => (
+                                <div key={key} className={cn(styles.settingGroup, pendingChanges[key] !== undefined && styles.pendingChange)}>
+                                    <label htmlFor={`setting_${key.replace(/[^a-zA-Z0-9]/g, '_')}`}>
+                                        {formatSettingName(key)}
+                                    </label>
+                                    {renderSettingInput(key, value)}
+                                    <div className={styles.settingDescription}>Option: {key}</div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
             </div>
 
             <div className={styles.actions}>

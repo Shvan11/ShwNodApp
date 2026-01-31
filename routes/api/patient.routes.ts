@@ -459,6 +459,13 @@ router.get(
       const sortBy = req.query.sortBy || 'name';
       const order = req.query.order || 'asc';
 
+      // Pagination parameters
+      const limit = Math.min(
+        parseInt(req.query.limit as string) || 100,
+        500
+      ); // Max 500
+      const offset = parseInt(req.query.offset as string) || 0;
+
       // Parse comma-separated IDs into arrays
       const workTypeIds = workTypesParam
         ? workTypesParam
@@ -656,8 +663,31 @@ router.get(
             : 'ORDER BY p.PatientName ASC';
       }
 
+      // First, get the total count of matching patients
+      const countQuery = `
+            SELECT COUNT(DISTINCT p.PersonID) as totalCount
+            FROM dbo.tblpatients p
+            LEFT JOIN dbo.tblGender g ON p.Gender = g.Gender_ID
+            LEFT JOIN dbo.tblAddress a ON p.AddressID = a.ID
+            LEFT JOIN dbo.tblReferrals r ON p.ReferralSourceID = r.ID
+            LEFT JOIN dbo.tblPatientType pt ON p.PatientTypeID = pt.ID
+            LEFT JOIN dbo.tblTagOptions tag ON p.TagID = tag.ID
+            ${whereClause}
+        `;
+
+      const countResult = await database.executeQuery<{ totalCount: number }>(
+        countQuery,
+        parameters,
+        (columns) => ({
+          totalCount: columns[0].value as number
+        })
+      );
+
+      const totalCount = countResult[0]?.totalCount || 0;
+
+      // Now get the paginated results
       const query = `
-            SELECT DISTINCT TOP 100
+            SELECT DISTINCT
                     p.PersonID, p.PatientName, p.FirstName, p.LastName,
                     p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
                     p.AddressID, p.ReferralSourceID, p.PatientTypeID, p.TagID,
@@ -683,6 +713,7 @@ router.get(
             LEFT JOIN dbo.tblTagOptions tag ON p.TagID = tag.ID
             ${whereClause}
             ${orderByClause}
+            OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
         `;
 
       const patients = await database.executeQuery<PatientSearchResult>(
@@ -717,7 +748,13 @@ router.get(
         })
       );
 
-      res.json(patients);
+      const hasMore = offset + patients.length < totalCount;
+
+      res.json({
+        patients,
+        totalCount,
+        hasMore
+      });
     } catch (error) {
       log.error('Error searching patients:', error);
       ErrorResponses.internalError(

@@ -555,6 +555,47 @@ router.get(
 );
 
 /**
+ * POST /api/calendar/regenerate
+ * Regenerates calendar entries by running FillCalender stored procedure
+ * This adds any missing time slot combinations to tblcalender
+ */
+router.post(
+  '/regenerate',
+  async (_req: Request, res: Response): Promise<void> => {
+    try {
+      logger.system.info('🔄 Regenerating calendar entries...');
+
+      const result = await executeStoredProcedure<{ DaysAdded: number }>(
+        'FillCalender',
+        [],
+        undefined,
+        (columns) => ({
+          DaysAdded: columns[0].value as number
+        })
+      );
+
+      const daysAdded = result[0]?.DaysAdded || 0;
+      logger.system.info(`✅ Calendar regeneration complete: ${daysAdded} entries added`);
+
+      res.json({
+        success: true,
+        entriesAdded: daysAdded,
+        message: daysAdded > 0
+          ? `Added ${daysAdded} missing calendar entries`
+          : 'Calendar is already up to date'
+      });
+    } catch (error) {
+      logger.system.error('❌ Calendar regeneration error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to regenerate calendar',
+        details: (error as Error).message
+      });
+    }
+  }
+);
+
+/**
  * POST /api/calendar/ensure-range
  * Ensures calendar has enough future dates for the web interface
  */

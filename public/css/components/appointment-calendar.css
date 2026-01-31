@@ -69,7 +69,6 @@ body:has(.appointment-calendar) {
     background: var(--calendar-background);
     overflow: hidden;
     font-family: var(--font-primary);
-    margin-top: -10px;
 }
 
 /* Calendar Header - Sticky within calendar container */
