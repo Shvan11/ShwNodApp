@@ -31,7 +31,7 @@ interface FormErrors {
 interface BatchFormDrawerProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: () => void;
+    onSave: () => Promise<void>;
     batch?: AlignerBatch | null;
     set?: AlignerSetForBatch | null;
     existingBatches?: AlignerBatch[];
@@ -95,10 +95,10 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             if (batch) {
                 // Edit mode - populate form (dates are handled separately via status endpoints)
                 setFormData({
-                    BatchSequence: batch.BatchSequence || '',
-                    UpperAlignerCount: batch.UpperAlignerCount || '',
-                    LowerAlignerCount: batch.LowerAlignerCount || '',
-                    Days: batch.Days || '',
+                    BatchSequence: batch.BatchSequence ?? '',
+                    UpperAlignerCount: batch.UpperAlignerCount ?? '',
+                    LowerAlignerCount: batch.LowerAlignerCount ?? '',
+                    Days: batch.Days ?? '',
                     Notes: batch.Notes || '',
                     IsActive: batch.IsActive !== undefined ? batch.IsActive : false,
                     IsLast: batch.IsLast !== undefined ? batch.IsLast : false
@@ -316,7 +316,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                     toast.info(`Batch #${result.deactivatedBatch.batchSequence} was automatically deactivated (only one batch can be active at a time)`);
                 }
 
-                onSave();
+                await onSave();
                 onClose();
             } else {
                 toast.error('Error: ' + (result.error || 'Failed to save batch'));
@@ -358,7 +358,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             toast.success(result.message || 'Manufacture date updated');
             setEditingManufactureDate(false);
             setTempManufactureDate('');
-            onSave(); // Refresh data
+            await onSave(); // Refresh data
         } catch (error) {
             toast.error('Error updating manufacture date: ' + (error as Error).message);
         } finally {
@@ -383,7 +383,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             toast.success(result.message || 'Delivery date updated');
             setEditingDeliveryDate(false);
             setTempDeliveryDate('');
-            onSave(); // Refresh data
+            await onSave(); // Refresh data
         } catch (error) {
             toast.error('Error updating delivery date: ' + (error as Error).message);
         } finally {

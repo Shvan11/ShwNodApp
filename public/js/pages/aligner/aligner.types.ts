@@ -223,7 +223,7 @@ export interface UseSetDrawerReturn {
  * Props for useBatchDrawer hook
  */
 export interface UseBatchDrawerProps {
-    onRefresh: (setId: number) => void;
+    onRefresh: (setId: number) => Promise<void>;
 }
 
 /**
@@ -236,5 +236,5 @@ export interface UseBatchDrawerReturn {
     openAddBatchDrawer: (set: AlignerSetForBatch) => void;
     openEditBatchDrawer: (batch: AlignerBatch, set: AlignerSetForBatch) => void;
     closeBatchDrawer: () => void;
-    handleBatchSaved: () => void;
+    handleBatchSaved: () => Promise<void>;
 }

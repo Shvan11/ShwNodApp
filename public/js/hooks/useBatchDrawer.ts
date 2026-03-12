@@ -32,12 +32,12 @@ export function useBatchDrawer({ onRefresh }: UseBatchDrawerProps): UseBatchDraw
         setCurrentSetForBatch(null);
     }, []);
 
-    const handleBatchSaved = useCallback((): void => {
+    const handleBatchSaved = useCallback(async (): Promise<void> => {
         const setId = currentSetForBatch?.AlignerSetID;
         setShowBatchDrawer(false);
         setEditingBatch(null);
         setCurrentSetForBatch(null);
-        if (setId) onRefresh(setId);
+        if (setId) await onRefresh(setId);
     }, [currentSetForBatch, onRefresh]);
 
     return {

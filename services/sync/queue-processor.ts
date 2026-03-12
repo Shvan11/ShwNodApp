@@ -553,11 +553,11 @@ class QueueProcessor {
 
         if (!data) {
           // Record no longer exists (was deleted before sync)
-          log.info(`  ⚠️  Record not found in SQL Server - marking as skipped`);
+          log.info(`  ⚠️  Record not found in SQL Server - marking as synced (nothing to sync)`);
           await this.executeUpdate(
             `
                         UPDATE SyncQueue
-                        SET Status = 'Skipped',
+                        SET Status = 'Synced',
                             LastAttempt = GETDATE(),
                             LastError = 'Record not found in source table'
                         WHERE QueueID = @id
