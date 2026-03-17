@@ -57,6 +57,7 @@ export interface AlignerSet {
     SetCost?: number;
     Currency?: string;
     Notes?: string;
+    ArchformID?: number | null;
     IsActive: boolean;
     CreationDate?: string;
     TotalBatches?: number;
@@ -218,6 +219,39 @@ export interface UseSetDrawerReturn {
     closeSetDrawer: () => void;
     handleSetSaved: () => void;
 }
+
+// =============================================================================
+// ARCHFORM MATCHING TYPES
+// =============================================================================
+
+/**
+ * Patient record from Archform SQLite database
+ */
+export interface ArchformPatient {
+    Id: number;
+    Name: string;
+    LastName: string;
+    CreatedDate: string;
+    LastModifiedDate: string | null;
+}
+
+/**
+ * Aligner set with patient context for Archform matching
+ */
+export interface AlignerSetForMatch {
+    AlignerSetID: number;
+    WorkID: number;
+    ArchformID: number | null;
+    PatientName: string;
+    FirstName: string | null;
+    LastName: string | null;
+    SetSequence: number | null;
+    DoctorName: string;
+}
+
+// =============================================================================
+// HOOK RETURN TYPES (continued)
+// =============================================================================
 
 /**
  * Props for useBatchDrawer hook

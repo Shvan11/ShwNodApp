@@ -59,6 +59,7 @@ interface AlignerSet {
   SetVideo: string | null;
   SetCost: number | null;
   Currency: string | null;
+  ArchformID: number | null;
 }
 
 interface AlignerSetWithDetails extends AlignerSet {
@@ -539,6 +540,7 @@ export async function getAlignerSetsByWorkId(workId: number): Promise<AlignerSet
       s.SetVideo,
       s.SetCost,
       s.Currency,
+      s.ArchformID,
       ad.DoctorName as AlignerDoctorName,
       COUNT(b.AlignerBatchID) as TotalBatches,
       SUM(CASE WHEN b.DeliveredToPatientDate IS NOT NULL THEN 1 ELSE 0 END) as DeliveredBatches,
@@ -562,7 +564,7 @@ export async function getAlignerSetsByWorkId(workId: number): Promise<AlignerSet
       s.RemainingUpperAligners, s.RemainingLowerAligners,
       s.CreationDate, s.Days, s.IsActive, s.Notes,
       s.FolderPath, s.AlignerDrID, s.SetUrl, s.SetPdfUrl,
-      s.SetVideo, s.SetCost, s.Currency, ad.DoctorName,
+      s.SetVideo, s.SetCost, s.Currency, s.ArchformID, ad.DoctorName,
       vp.TotalPaid, vp.Balance, vp.PaymentStatus
     ORDER BY s.SetSequence
   `;
@@ -590,13 +592,14 @@ export async function getAlignerSetsByWorkId(workId: number): Promise<AlignerSet
       SetVideo: columns[16].value as string | null,
       SetCost: columns[17].value as number | null,
       Currency: columns[18].value as string | null,
-      AlignerDoctorName: columns[19].value as string | null,
-      TotalBatches: columns[20].value as number,
-      DeliveredBatches: columns[21].value as number,
-      TotalPaid: columns[22].value as number | null,
-      Balance: columns[23].value as number | null,
-      PaymentStatus: columns[24].value as string | null,
-      UnreadActivityCount: (columns[25].value as number) || 0,
+      ArchformID: columns[19].value as number | null,
+      AlignerDoctorName: columns[20].value as string | null,
+      TotalBatches: columns[21].value as number,
+      DeliveredBatches: columns[22].value as number,
+      TotalPaid: columns[23].value as number | null,
+      Balance: columns[24].value as number | null,
+      PaymentStatus: columns[25].value as string | null,
+      UnreadActivityCount: (columns[26].value as number) || 0,
     })
   );
 }
@@ -612,7 +615,7 @@ export async function getAlignerSetById(setId: number): Promise<AlignerSet | nul
       RemainingUpperAligners, RemainingLowerAligners,
       CreationDate, Days, IsActive, Notes,
       FolderPath, AlignerDrID, SetUrl, SetPdfUrl,
-      SetVideo, SetCost, Currency
+      SetVideo, SetCost, Currency, ArchformID
     FROM tblAlignerSets
     WHERE AlignerSetID = @setId
   `;
@@ -640,6 +643,7 @@ export async function getAlignerSetById(setId: number): Promise<AlignerSet | nul
       SetVideo: columns[16].value as string | null,
       SetCost: columns[17].value as number | null,
       Currency: columns[18].value as string | null,
+      ArchformID: columns[19].value as number | null,
     })
   );
 
@@ -1626,6 +1630,77 @@ export async function getBatchById(batchId: number): Promise<AlignerBatch[]> {
       IsActive: columns[14].value as boolean,
       IsLast: columns[15].value as boolean,
     })
+  );
+}
+
+// ==============================
+// ARCHFORM MATCHING QUERIES
+// ==============================
+
+export interface AlignerSetForMatch {
+  AlignerSetID: number;
+  WorkID: number;
+  ArchformID: number | null;
+  PatientName: string;
+  SetSequence: number | null;
+  DoctorName: string;
+}
+
+/**
+ * Get all aligner sets with patient context for Archform matching
+ */
+export async function getSetsWithArchformIds(): Promise<AlignerSetForMatch[]> {
+  const query = `
+    SELECT s.AlignerSetID, s.WorkID, s.ArchformID,
+      p.PatientName, p.FirstName, p.LastName,
+      s.SetSequence, ISNULL(ad.DoctorName, '') AS DoctorName
+    FROM tblAlignerSets s
+    INNER JOIN tblwork w ON s.WorkID = w.workid
+    INNER JOIN tblpatients p ON w.PersonID = p.PersonID
+    LEFT JOIN AlignerDoctors ad ON s.AlignerDrID = ad.DrID
+    ORDER BY p.PatientName
+  `;
+
+  return executeQuery<AlignerSetForMatch>(
+    query,
+    [],
+    (columns: ColumnValue[]) => ({
+      AlignerSetID: columns[0].value as number,
+      WorkID: columns[1].value as number,
+      ArchformID: columns[2].value as number | null,
+      PatientName: columns[3].value as string,
+      FirstName: columns[4].value as string | null,
+      LastName: columns[5].value as string | null,
+      SetSequence: columns[6].value as number | null,
+      DoctorName: columns[7].value as string,
+    })
+  );
+}
+
+/**
+ * Update the ArchformID on an aligner set (set or clear)
+ */
+export async function updateArchformId(
+  setId: number,
+  archformId: number | null
+): Promise<void> {
+  await executeQuery(
+    'UPDATE tblAlignerSets SET ArchformID = @archformId WHERE AlignerSetID = @setId',
+    [
+      ['setId', TYPES.Int, setId],
+      ['archformId', TYPES.Int, archformId],
+    ]
+  );
+}
+
+/**
+ * Clear ArchformID from all aligner sets that reference a given Archform patient.
+ * Used before deleting an Archform patient to prevent orphaned references.
+ */
+export async function clearArchformIdByPatientId(archformPatientId: number): Promise<void> {
+  await executeQuery(
+    'UPDATE tblAlignerSets SET ArchformID = NULL WHERE ArchformID = @archformId',
+    [['archformId', TYPES.Int, archformPatientId]]
   );
 }
 

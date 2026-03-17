@@ -14,6 +14,7 @@ set INSTALL_EXPLORER=1
 set INSTALL_CSIMAGING=1
 set INSTALL_DOLPHIN=1
 set INSTALL_3SHAPE=1
+set INSTALL_ARCHFORM=1
 
 REM Check for admin rights first
 net session >nul 2>&1
@@ -47,18 +48,20 @@ if !INSTALL_EXPLORER! equ 1 (echo   [X] 1. Explorer Protocol      - Open patient
 if !INSTALL_CSIMAGING! equ 1 (echo   [X] 2. CS Imaging Protocol    - Trophy/Carestream integration) else (echo   [ ] 2. CS Imaging Protocol    - Trophy/Carestream integration)
 if !INSTALL_DOLPHIN! equ 1 (echo   [X] 3. Dolphin Protocol       - Dolphin Imaging integration) else (echo   [ ] 3. Dolphin Protocol       - Dolphin Imaging integration)
 if !INSTALL_3SHAPE! equ 1 (echo   [X] 4. 3Shape Protocol        - 3Shape scanner integration) else (echo   [ ] 4. 3Shape Protocol        - 3Shape scanner integration)
+if !INSTALL_ARCHFORM! equ 1 (echo   [X] 5. Archform Protocol      - Open Archform with patient) else (echo   [ ] 5. Archform Protocol      - Open Archform with patient)
 echo.
 echo   ----------------------------------------
 echo   A. Select All          N. Select None
 echo   I. Install Selected    Q. Quit
 echo   ----------------------------------------
 echo.
-set /p "CHOICE=Enter choice (1-4, A, N, I, Q): "
+set /p "CHOICE=Enter choice (1-5, A, N, I, Q): "
 
 if /i "%CHOICE%"=="1" goto :toggle1
 if /i "%CHOICE%"=="2" goto :toggle2
 if /i "%CHOICE%"=="3" goto :toggle3
 if /i "%CHOICE%"=="4" goto :toggle4
+if /i "%CHOICE%"=="5" goto :toggle5
 if /i "%CHOICE%"=="A" goto :selectall
 if /i "%CHOICE%"=="N" goto :selectnone
 if /i "%CHOICE%"=="I" goto :validate_selection
@@ -84,11 +87,16 @@ goto :menu
 set /a INSTALL_3SHAPE=1-INSTALL_3SHAPE
 goto :menu
 
+:toggle5
+set /a INSTALL_ARCHFORM=1-INSTALL_ARCHFORM
+goto :menu
+
 :selectall
 set INSTALL_EXPLORER=1
 set INSTALL_CSIMAGING=1
 set INSTALL_DOLPHIN=1
 set INSTALL_3SHAPE=1
+set INSTALL_ARCHFORM=1
 goto :menu
 
 :selectnone
@@ -96,6 +104,7 @@ set INSTALL_EXPLORER=0
 set INSTALL_CSIMAGING=0
 set INSTALL_DOLPHIN=0
 set INSTALL_3SHAPE=0
+set INSTALL_ARCHFORM=0
 goto :menu
 
 :quit
@@ -111,6 +120,7 @@ if !INSTALL_EXPLORER! equ 1 set /a TOTAL_SELECTED+=1
 if !INSTALL_CSIMAGING! equ 1 set /a TOTAL_SELECTED+=1
 if !INSTALL_DOLPHIN! equ 1 set /a TOTAL_SELECTED+=1
 if !INSTALL_3SHAPE! equ 1 set /a TOTAL_SELECTED+=1
+if !INSTALL_ARCHFORM! equ 1 set /a TOTAL_SELECTED+=1
 
 if !TOTAL_SELECTED! equ 0 (
     echo.
@@ -131,6 +141,7 @@ if !INSTALL_EXPLORER! equ 1 echo   - Explorer Protocol ^(folder opening^)
 if !INSTALL_CSIMAGING! equ 1 echo   - CS Imaging Protocol ^(Trophy integration^)
 if !INSTALL_DOLPHIN! equ 1 echo   - Dolphin Imaging Protocol ^(Dolphin integration^)
 if !INSTALL_3SHAPE! equ 1 echo   - 3Shape Protocol ^(3Shape scanner integration^)
+if !INSTALL_ARCHFORM! equ 1 echo   - Archform Protocol ^(Archform patient launch^)
 echo ============================================
 echo.
 
@@ -183,6 +194,7 @@ if exist "C:\Windows\ProtocolHandlers.ini" (
     del /f "C:\Windows\DolphinImagingProtocolHandler.exe" >nul 2>&1
     del /f "C:\Windows\UniversalProtocolHandler.exe" >nul 2>&1
     del /f "C:\Windows\3ShapeProtocolHandler.exe" >nul 2>&1
+    del /f "C:\Windows\ArchformProtocolHandler.exe" >nul 2>&1
     del /f "C:\Windows\ProtocolHandlers.ini" >nul 2>&1
     del /f "C:\Windows\ProtocolHandlers.ini.backup" >nul 2>&1
     echo   - Legacy files removed
@@ -230,6 +242,15 @@ if !INSTALL_3SHAPE! equ 1 (
     )
 )
 
+if !INSTALL_ARCHFORM! equ 1 (
+    if not exist "%~dp0ArchformProtocolHandler.exe" (
+        echo.
+        echo ERROR: ArchformProtocolHandler.exe not found after compilation!
+        pause
+        exit /b 1
+    )
+)
+
 echo.
 echo [Step 2/4] Creating installation directory and configuration file...
 echo.
@@ -271,6 +292,7 @@ if !INSTALL_EXPLORER! equ 1 taskkill /F /IM ExplorerProtocolHandler.exe >nul 2>&
 if !INSTALL_CSIMAGING! equ 1 taskkill /F /IM CSImagingProtocolHandler.exe >nul 2>&1
 if !INSTALL_DOLPHIN! equ 1 taskkill /F /IM DolphinImagingProtocolHandler.exe >nul 2>&1
 if !INSTALL_3SHAPE! equ 1 taskkill /F /IM 3ShapeProtocolHandler.exe >nul 2>&1
+if !INSTALL_ARCHFORM! equ 1 taskkill /F /IM ArchformProtocolHandler.exe >nul 2>&1
 echo   - Stopped any running protocol handlers
 
 REM Check if files already exist and compare
@@ -278,6 +300,7 @@ set NEEDS_COPY_EXPLORER=1
 set NEEDS_COPY_CSIMAGING=1
 set NEEDS_COPY_DOLPHIN=1
 set NEEDS_COPY_3SHAPE=1
+set NEEDS_COPY_ARCHFORM=1
 
 REM Explorer Protocol Handler
 if !INSTALL_EXPLORER! equ 1 (
@@ -379,6 +402,31 @@ if !INSTALL_3SHAPE! equ 1 (
     echo   - 3Shape Protocol: skipped ^(not selected^)
 )
 
+REM Archform Protocol Handler
+if !INSTALL_ARCHFORM! equ 1 (
+    if exist "%INSTALL_DIR%\ArchformProtocolHandler.exe" (
+        fc /b "%~dp0ArchformProtocolHandler.exe" "%INSTALL_DIR%\ArchformProtocolHandler.exe" >nul 2>&1
+        if !errorLevel! equ 0 (
+            echo   - ArchformProtocolHandler.exe is up to date
+            set NEEDS_COPY_ARCHFORM=0
+        ) else (
+            echo   - Updating ArchformProtocolHandler.exe
+        )
+    ) else (
+        echo   - Installing ArchformProtocolHandler.exe
+    )
+
+    if !NEEDS_COPY_ARCHFORM! equ 1 (
+        call :copy_with_retry ArchformProtocolHandler.exe
+        if !errorLevel! neq 0 (
+            pause
+            exit /b 1
+        )
+    )
+) else (
+    echo   - Archform Protocol: skipped ^(not selected^)
+)
+
 echo.
 echo [Step 4/4] Registering selected protocols in Windows registry...
 echo.
@@ -420,6 +468,15 @@ if !INSTALL_3SHAPE! equ 1 (
     echo   - tshape: skipped ^(not selected^)
 )
 
+if !INSTALL_ARCHFORM! equ 1 (
+    reg add "HKCR\archform" /ve /t REG_SZ /d "URL:Archform Protocol" /f >nul 2>&1
+    reg add "HKCR\archform" /v "URL Protocol" /t REG_SZ /d "" /f >nul 2>&1
+    reg add "HKCR\archform\shell\open\command" /ve /t REG_SZ /d "\"C:\\ShwanOrtho\\ArchformProtocolHandler.exe\" \"%%1\"" /f >nul 2>&1
+    echo   - archform: protocol registered
+) else (
+    echo   - archform: skipped ^(not selected^)
+)
+
 REM Smart browser policy handling
 echo   - Configuring browser auto-launch policies ^(all protocols^)...
 
@@ -431,7 +488,7 @@ if %errorLevel% equ 0 (
 ) else (
     echo   - Chrome policy not found, creating...
 )
-reg add %CHROME_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"tshape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
+reg add %CHROME_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"tshape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"archform\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
 
 REM For Edge
 set EDGE_POLICY="HKLM\SOFTWARE\Policies\Microsoft\Edge"
@@ -441,7 +498,7 @@ if %errorLevel% equ 0 (
 ) else (
     echo   - Edge policy not found, creating...
 )
-reg add %EDGE_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"tshape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
+reg add %EDGE_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"tshape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"archform\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
 
 echo   - Protocols registered successfully
 
@@ -527,6 +584,23 @@ if !INSTALL_3SHAPE! equ 1 (
     )
 )
 
+REM Verify Archform Protocol
+if !INSTALL_ARCHFORM! equ 1 (
+    if not exist "%INSTALL_DIR%\ArchformProtocolHandler.exe" (
+        echo   X ArchformProtocolHandler.exe NOT FOUND
+        set ALL_OK=0
+    ) else (
+        echo   + ArchformProtocolHandler.exe OK
+    )
+    reg query "HKCR\archform\shell\open\command" >nul 2>&1
+    if !errorLevel! equ 0 (
+        echo   + archform: protocol registered
+    ) else (
+        echo   X archform: protocol NOT registered
+        set ALL_OK=0
+    )
+)
+
 echo.
 echo ============================================
 
@@ -539,6 +613,7 @@ if !ALL_OK! equ 1 (
     if !INSTALL_CSIMAGING! equ 1 echo   - CS Imaging Protocol ^(csimaging://^)
     if !INSTALL_DOLPHIN! equ 1 echo   - Dolphin Protocol ^(dolphin://^)
     if !INSTALL_3SHAPE! equ 1 echo   - 3Shape Protocol ^(tshape://^)
+    if !INSTALL_ARCHFORM! equ 1 echo   - Archform Protocol ^(archform://^)
     echo.
     echo Next steps:
     echo 1. Edit configuration if needed:

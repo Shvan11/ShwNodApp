@@ -810,3 +810,28 @@
 .video-btn i {
     font-size: 0.95rem;
 }
+
+.archform-btn {
+    background: #00897b;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.archform-btn:hover {
+    background: #00695c;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0, 137, 123, 0.3);
+}
+
+.archform-btn i {
+    font-size: 0.95rem;
+}

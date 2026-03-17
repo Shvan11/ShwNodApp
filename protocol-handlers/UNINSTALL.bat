@@ -16,6 +16,8 @@ echo   This will remove:
 echo   - Explorer Protocol (folder opening)
 echo   - CS Imaging Protocol (Trophy integration)
 echo   - Dolphin Imaging Protocol (Dolphin integration)
+echo   - 3Shape Protocol (3Shape scanner integration)
+echo   - Archform Protocol (Archform patient launch)
 echo   - All registry entries
 echo   - Handler executables
 echo ============================================
@@ -68,6 +70,22 @@ if %errorLevel% equ 0 (
     echo   - dolphin: protocol removed
 ) else (
     echo   - dolphin: protocol not found (already removed)
+)
+
+reg query "HKCR\tshape" >nul 2>&1
+if %errorLevel% equ 0 (
+    reg delete "HKCR\tshape" /f >nul 2>&1
+    echo   - tshape: protocol removed
+) else (
+    echo   - tshape: protocol not found (already removed)
+)
+
+reg query "HKCR\archform" >nul 2>&1
+if %errorLevel% equ 0 (
+    reg delete "HKCR\archform" /f >nul 2>&1
+    echo   - archform: protocol removed
+) else (
+    echo   - archform: protocol not found (already removed)
 )
 
 REM Remove browser policies
@@ -124,6 +142,28 @@ if exist "%INSTALL_DIR%\DolphinImagingProtocolHandler.exe" (
     )
 ) else (
     echo   - DolphinImagingProtocolHandler.exe not found (already removed)
+)
+
+if exist "%INSTALL_DIR%\3ShapeProtocolHandler.exe" (
+    del /f "%INSTALL_DIR%\3ShapeProtocolHandler.exe" >nul 2>&1
+    if %errorLevel% equ 0 (
+        echo   - 3ShapeProtocolHandler.exe deleted
+    ) else (
+        echo   - Warning: Could not delete 3ShapeProtocolHandler.exe
+    )
+) else (
+    echo   - 3ShapeProtocolHandler.exe not found (already removed)
+)
+
+if exist "%INSTALL_DIR%\ArchformProtocolHandler.exe" (
+    del /f "%INSTALL_DIR%\ArchformProtocolHandler.exe" >nul 2>&1
+    if %errorLevel% equ 0 (
+        echo   - ArchformProtocolHandler.exe deleted
+    ) else (
+        echo   - Warning: Could not delete ArchformProtocolHandler.exe
+    )
+) else (
+    echo   - ArchformProtocolHandler.exe not found (already removed)
 )
 
 REM Also clean up CS Imaging cache if it exists
@@ -202,6 +242,20 @@ if exist "%INSTALL_DIR%\DolphinImagingProtocolHandler.exe" (
     echo   + DolphinImagingProtocolHandler.exe removed
 )
 
+if exist "%INSTALL_DIR%\3ShapeProtocolHandler.exe" (
+    echo   X 3ShapeProtocolHandler.exe still exists
+    set ALL_REMOVED=0
+) else (
+    echo   + 3ShapeProtocolHandler.exe removed
+)
+
+if exist "%INSTALL_DIR%\ArchformProtocolHandler.exe" (
+    echo   X ArchformProtocolHandler.exe still exists
+    set ALL_REMOVED=0
+) else (
+    echo   + ArchformProtocolHandler.exe removed
+)
+
 REM Check if registry keys still exist
 reg query "HKCR\explorer" >nul 2>&1
 if %errorLevel% equ 0 (
@@ -225,6 +279,22 @@ if %errorLevel% equ 0 (
     set ALL_REMOVED=0
 ) else (
     echo   + dolphin: protocol removed
+)
+
+reg query "HKCR\tshape" >nul 2>&1
+if %errorLevel% equ 0 (
+    echo   X tshape: protocol still registered
+    set ALL_REMOVED=0
+) else (
+    echo   + tshape: protocol removed
+)
+
+reg query "HKCR\archform" >nul 2>&1
+if %errorLevel% equ 0 (
+    echo   X archform: protocol still registered
+    set ALL_REMOVED=0
+) else (
+    echo   + archform: protocol removed
 )
 
 echo.

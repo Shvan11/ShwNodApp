@@ -12,7 +12,7 @@ import '../../css/components/aligner-drawer-form.css';
 import styles from './AlignerLayout.module.css';
 import AlignerModeToggle from '../components/react/AlignerModeToggle';
 
-type AlignerMode = 'doctors' | 'search' | 'all-sets';
+type AlignerMode = 'doctors' | 'search' | 'all-sets' | 'archform-match';
 
 /**
  * Layout component for aligner section
@@ -23,7 +23,9 @@ function AlignerLayout() {
 
   // Determine active mode based on current route
   const getActiveMode = (): AlignerMode => {
-    if (location.pathname.includes('/search')) {
+    if (location.pathname.includes('/archform-match')) {
+      return 'archform-match';
+    } else if (location.pathname.includes('/search')) {
       return 'search';
     } else if (location.pathname.includes('/all-sets')) {
       return 'all-sets';

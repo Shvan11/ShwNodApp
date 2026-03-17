@@ -1511,6 +1511,19 @@ const PatientSets: React.FC = () => {
                                                     <span>Case Video</span>
                                                 </button>
                                             )}
+                                            {set.ArchformID && (
+                                                <button
+                                                    className="archform-btn"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        window.location.href = `archform:${set.ArchformID}`;
+                                                    }}
+                                                    title="Open in Archform"
+                                                >
+                                                    <i className="fas fa-cube"></i>
+                                                    <span>Archform</span>
+                                                </button>
+                                            )}
                                             {set.SetCost && (set.Balance || 0) > 0 && (
                                                 <button
                                                     className="btn btn-primary btn-sm"

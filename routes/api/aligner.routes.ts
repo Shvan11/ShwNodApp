@@ -31,6 +31,17 @@ import { timeouts } from '../../middleware/timeout.js';
 // Query layer imports
 import * as alignerQueries from '../../services/database/queries/aligner-queries.js';
 
+// Archform SQLite service
+import {
+  getArchformPatients,
+  getArchformPatientById,
+  updateArchformPatient,
+  deleteArchformPatient,
+  closeArchformDb,
+  isArchformAvailable,
+  ArchformDbUnavailableError,
+} from '../../services/archform/archform-db.js';
+
 // Service layer imports
 import * as AlignerService from '../../services/business/AlignerService.js';
 import { AlignerValidationError } from '../../services/business/AlignerService.js';
@@ -1195,6 +1206,240 @@ router.delete(
       }
       log.error('Error deleting PDF:', error);
       ErrorResponses.internalError(res, 'Failed to delete PDF', error as Error);
+    }
+  }
+);
+
+// ============================================================================
+// ARCHFORM PATIENT MATCHING
+// ============================================================================
+
+/**
+ * Get all patients from Archform SQLite database
+ */
+router.get(
+  '/aligner/archform/patients',
+  async (_req: Request, res: Response): Promise<void> => {
+    try {
+      log.info('Fetching Archform patients');
+      const patients = await getArchformPatients();
+
+      res.json({
+        success: true,
+        patients,
+        count: patients.length
+      });
+    } catch (error) {
+      if (error instanceof ArchformDbUnavailableError) {
+        log.warn('Archform database unavailable', { path: error.dbPath });
+        res.status(503).json({
+          success: false,
+          unavailable: true,
+          message: 'Archform database is not accessible',
+          path: error.dbPath,
+        });
+        return;
+      }
+      log.error('Error fetching Archform patients:', error);
+      ErrorResponses.internalError(
+        res,
+        'Failed to fetch Archform patients',
+        error as Error
+      );
+    }
+  }
+);
+
+/**
+ * Check Archform database availability
+ */
+router.get(
+  '/aligner/archform/status',
+  async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const status = await isArchformAvailable();
+      res.json({ success: true, ...status });
+    } catch (error) {
+      log.error('Error checking Archform status:', error);
+      ErrorResponses.internalError(
+        res,
+        'Failed to check Archform status',
+        error as Error
+      );
+    }
+  }
+);
+
+/**
+ * Get all aligner sets with ArchformID data for matching UI
+ */
+router.get(
+  '/aligner/archform/matches',
+  async (_req: Request, res: Response): Promise<void> => {
+    try {
+      log.info('Fetching aligner sets with Archform IDs');
+      const sets = await alignerQueries.getSetsWithArchformIds();
+
+      res.json({
+        success: true,
+        sets: sets || [],
+        count: sets ? sets.length : 0
+      });
+    } catch (error) {
+      log.error('Error fetching Archform matches:', error);
+      ErrorResponses.internalError(
+        res,
+        'Failed to fetch Archform matches',
+        error as Error
+      );
+    }
+  }
+);
+
+/**
+ * Save or clear ArchformID on an aligner set
+ */
+router.patch(
+  '/aligner/sets/:setId/archform',
+  async (
+    req: Request<{ setId: string }, unknown, { archformId: number | null }>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { setId } = req.params;
+      const { archformId } = req.body;
+
+      if (!setId || isNaN(parseInt(setId))) {
+        ErrorResponses.badRequest(res, 'Valid setId is required');
+        return;
+      }
+
+      await alignerQueries.updateArchformId(
+        parseInt(setId, 10),
+        archformId ?? null
+      );
+
+      log.info('Updated ArchformID', { setId, archformId });
+
+      res.json({
+        success: true,
+        message: archformId
+          ? 'Archform patient matched successfully'
+          : 'Archform match removed successfully'
+      });
+    } catch (error) {
+      log.error('Error updating ArchformID:', error);
+      ErrorResponses.internalError(
+        res,
+        'Failed to update Archform match',
+        error as Error
+      );
+    }
+  }
+);
+
+/**
+ * Update an Archform patient's name
+ */
+router.put(
+  '/aligner/archform/patients/:id',
+  async (
+    req: Request<{ id: string }, unknown, { name: string; lastName: string }>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        ErrorResponses.badRequest(res, 'Valid patient ID is required');
+        return;
+      }
+
+      const { name, lastName } = req.body;
+      if (!name || !name.trim() || !lastName || !lastName.trim()) {
+        ErrorResponses.badRequest(res, 'Name and last name are required');
+        return;
+      }
+
+      await updateArchformPatient(id, name.trim(), lastName.trim());
+      log.info('Updated Archform patient', { id, name: name.trim(), lastName: lastName.trim() });
+
+      res.json({
+        success: true,
+        message: 'Archform patient updated successfully'
+      });
+    } catch (error) {
+      if (error instanceof ArchformDbUnavailableError) {
+        res.status(503).json({
+          success: false,
+          unavailable: true,
+          message: 'Archform database is not accessible',
+          path: error.dbPath,
+        });
+        return;
+      }
+      log.error('Error updating Archform patient:', error);
+      ErrorResponses.internalError(
+        res,
+        'Failed to update Archform patient',
+        error as Error
+      );
+    }
+  }
+);
+
+/**
+ * Delete an Archform patient (SQLite + clear SQL Server references)
+ */
+router.delete(
+  '/aligner/archform/patients/:id',
+  async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        ErrorResponses.badRequest(res, 'Valid patient ID is required');
+        return;
+      }
+
+      // Verify patient exists
+      const patient = await getArchformPatientById(id);
+      if (!patient) {
+        ErrorResponses.notFound(res, 'Archform patient');
+        return;
+      }
+
+      // Clear SQL Server references first (safer partial failure mode)
+      await alignerQueries.clearArchformIdByPatientId(id);
+
+      // Delete from Archform SQLite
+      const result = await deleteArchformPatient(id);
+
+      log.info('Deleted Archform patient', {
+        id,
+        name: `${patient.Name} ${patient.LastName}`,
+        deletedFromTables: result.deletedFromTables
+      });
+
+      res.json({
+        success: true,
+        message: 'Archform patient deleted successfully',
+        deletedFromTables: result.deletedFromTables
+      });
+    } catch (error) {
+      if (error instanceof ArchformDbUnavailableError) {
+        res.status(503).json({
+          success: false,
+          unavailable: true,
+          message: 'Archform database is not accessible',
+          path: error.dbPath,
+        });
+        return;
+      }
+      log.error('Error deleting Archform patient:', error);
+      ErrorResponses.internalError(
+        res,
+        'Failed to delete Archform patient',
+        error as Error
+      );
     }
   }
 );

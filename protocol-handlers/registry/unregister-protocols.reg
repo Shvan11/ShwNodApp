@@ -2,7 +2,7 @@ Windows Registry Editor Version 5.00
 
 ; ============================================
 ; Unified Protocol Handler Uninstallation
-; Removes both explorer: and csimaging: protocols
+; Removes explorer:, csimaging:, dolphin:, tshape:, and archform: protocols
 ; ============================================
 
 ; Remove explorer: protocol
@@ -13,6 +13,12 @@ Windows Registry Editor Version 5.00
 
 ; Remove dolphin: protocol
 [-HKEY_CLASSES_ROOT\dolphin]
+
+; Remove tshape: protocol
+[-HKEY_CLASSES_ROOT\tshape]
+
+; Remove archform: protocol
+[-HKEY_CLASSES_ROOT\archform]
 
 ; Remove Chrome auto-launch policy
 [-HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome]

@@ -55,6 +55,7 @@ const PatientsList = React.lazy(() => import('../pages/aligner/PatientsList'));
 const PatientSets = React.lazy(() => import('../pages/aligner/PatientSets'));
 const SearchPatient = React.lazy(() => import('../pages/aligner/SearchPatient'));
 const AllSetsList = React.lazy(() => import('../pages/aligner/AllSetsList'));
+const ArchformMatcher = React.lazy(() => import('../pages/aligner/ArchformMatcher'));
 
 // Lazy-loaded route components - Patient
 const PatientShell = React.lazy(() => import('../components/react/PatientShell'));
@@ -279,6 +280,15 @@ export const routesConfig: RouteObject[] = [
               </RouteErrorBoundary>
             ),
             loader: alignerPatientWorkLoader, // Same loader as browse path
+          },
+          {
+            path: 'archform-match',
+            element: (
+              <RouteErrorBoundary routeName="Archform Matcher">
+                <ArchformMatcher />
+              </RouteErrorBoundary>
+            ),
+            // No loader - loads data in component
           },
           {
             path: '*',

@@ -3,7 +3,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
 interface AlignerModeToggleProps {
-    activeMode: 'doctors' | 'all-sets' | 'search';
+    activeMode: 'doctors' | 'all-sets' | 'search' | 'archform-match';
     styles: Record<string, string>;
 }
 
@@ -32,6 +32,13 @@ const AlignerModeToggle: React.FC<AlignerModeToggleProps> = ({ activeMode, style
             >
                 <i className="fas fa-search"></i>
                 Quick Search
+            </button>
+            <button
+                className={`${styles.modeBtn} ${activeMode === 'archform-match' ? styles.active || 'active' : ''}`}
+                onClick={() => navigate('/aligner/archform-match')}
+            >
+                <i className="fas fa-link"></i>
+                Archform Match
             </button>
         </div>
     );
