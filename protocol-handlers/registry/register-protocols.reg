@@ -2,7 +2,7 @@ Windows Registry Editor Version 5.00
 
 ; ============================================
 ; Unified Protocol Handler Registration
-; Registers explorer:, csimaging:, dolphin:, tshape:, archform:, and launch: protocols
+; Registers explorer:, csimaging:, dolphin:, tshape:, archformlocal:, and launch: protocols
 ; ============================================
 
 ; --- EXPLORER PROTOCOL ---
@@ -74,20 +74,22 @@ Windows Registry Editor Version 5.00
 @="\"C:\\ShwanOrtho\\3ShapeProtocolHandler.exe\" \"%1\""
 
 
-; --- ARCHFORM PROTOCOL ---
+; --- ARCHFORM LOCAL PROTOCOL ---
+; Uses "archformlocal:" to avoid conflicting with Archform's native "archform:" protocol
+; (which handles cloud-synced patients). Our handler opens local patients via registry + exe launch.
 
-[HKEY_CLASSES_ROOT\archform]
-@="URL:Archform Protocol"
+[HKEY_CLASSES_ROOT\archformlocal]
+@="URL:Archform Local Protocol"
 "URL Protocol"=""
 
-[HKEY_CLASSES_ROOT\archform\DefaultIcon]
+[HKEY_CLASSES_ROOT\archformlocal\DefaultIcon]
 @="C:\\ShwanOrtho\\ArchformProtocolHandler.exe,1"
 
-[HKEY_CLASSES_ROOT\archform\shell]
+[HKEY_CLASSES_ROOT\archformlocal\shell]
 
-[HKEY_CLASSES_ROOT\archform\shell\open]
+[HKEY_CLASSES_ROOT\archformlocal\shell\open]
 
-[HKEY_CLASSES_ROOT\archform\shell\open\command]
+[HKEY_CLASSES_ROOT\archformlocal\shell\open\command]
 @="\"C:\\ShwanOrtho\\ArchformProtocolHandler.exe\" \"%1\""
 
 
@@ -96,8 +98,8 @@ Windows Registry Editor Version 5.00
 
 ; --- For Google Chrome ---
 [HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome]
-"AutoLaunchProtocolsFromOrigins"="[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"tshape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"archform\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"launch\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]"
+"AutoLaunchProtocolsFromOrigins"="[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"tshape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"archformlocal\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"launch\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]"
 
 ; --- For Microsoft Edge ---
 [HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge]
-"AutoLaunchProtocolsFromOrigins"="[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"tshape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"archform\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"launch\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]"
+"AutoLaunchProtocolsFromOrigins"="[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"tshape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"archformlocal\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"launch\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]"

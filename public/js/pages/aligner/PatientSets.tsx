@@ -1516,7 +1516,7 @@ const PatientSets: React.FC = () => {
                                                     className="archform-btn"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        window.location.href = `archform:${set.ArchformID}`;
+                                                        window.location.href = `archformlocal:${set.ArchformID}`;
                                                     }}
                                                     title="Open in Archform"
                                                 >

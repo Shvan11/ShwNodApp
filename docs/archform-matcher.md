@@ -78,11 +78,13 @@ Patient
 
 ## Protocol Handler (Open in Archform)
 
-A teal "Archform" button appears on set cards when `ArchformID` is matched. Clicking it triggers `archform:{id}` which:
+A teal "Archform" button appears on set cards when `ArchformID` is matched. Clicking it triggers `archformlocal:{id}` which:
 
-1. **C# handler** (`protocol-handlers/source/ArchformProtocolHandler.cs`) writes the ID to registry `HKCU\Software\ArchForm\ArchForm\LastPatient_h2457475196`
+1. **C# handler** (`protocol-handlers/source/ArchformProtocolHandler.cs`) parses the ID, writes it as REG_DWORD to `HKCU\Software\ArchForm\ArchForm\LastPatient_h2457475196`
 2. Launches `archform.exe` (path from `ProtocolHandlers.ini` → `ArchformPath`)
 3. Archform reads the registry value on startup and opens that patient
+
+**Why `archformlocal:` instead of `archform:`?** Archform registers its own `archform:` protocol for cloud-synced patients (downloads from AWS). Overwriting it breaks Archform's cloud features. Our handler only opens local patients (via registry key + direct exe launch), so it uses a separate `archformlocal:` protocol to avoid conflicts.
 
 Install via `INSTALL.bat` (option 5). Optional `ArchformAllowedComputer` restricts to a single machine.
 

@@ -48,7 +48,7 @@ if !INSTALL_EXPLORER! equ 1 (echo   [X] 1. Explorer Protocol      - Open patient
 if !INSTALL_CSIMAGING! equ 1 (echo   [X] 2. CS Imaging Protocol    - Trophy/Carestream integration) else (echo   [ ] 2. CS Imaging Protocol    - Trophy/Carestream integration)
 if !INSTALL_DOLPHIN! equ 1 (echo   [X] 3. Dolphin Protocol       - Dolphin Imaging integration) else (echo   [ ] 3. Dolphin Protocol       - Dolphin Imaging integration)
 if !INSTALL_3SHAPE! equ 1 (echo   [X] 4. 3Shape Protocol        - 3Shape scanner integration) else (echo   [ ] 4. 3Shape Protocol        - 3Shape scanner integration)
-if !INSTALL_ARCHFORM! equ 1 (echo   [X] 5. Archform Protocol      - Open Archform with patient) else (echo   [ ] 5. Archform Protocol      - Open Archform with patient)
+if !INSTALL_ARCHFORM! equ 1 (echo   [X] 5. Archform Local Protocol - Open Archform with patient) else (echo   [ ] 5. Archform Local Protocol - Open Archform with patient)
 echo.
 echo   ----------------------------------------
 echo   A. Select All          N. Select None
@@ -141,7 +141,7 @@ if !INSTALL_EXPLORER! equ 1 echo   - Explorer Protocol ^(folder opening^)
 if !INSTALL_CSIMAGING! equ 1 echo   - CS Imaging Protocol ^(Trophy integration^)
 if !INSTALL_DOLPHIN! equ 1 echo   - Dolphin Imaging Protocol ^(Dolphin integration^)
 if !INSTALL_3SHAPE! equ 1 echo   - 3Shape Protocol ^(3Shape scanner integration^)
-if !INSTALL_ARCHFORM! equ 1 echo   - Archform Protocol ^(Archform patient launch^)
+if !INSTALL_ARCHFORM! equ 1 echo   - Archform Local Protocol ^(Archform patient launch^)
 echo ============================================
 echo.
 
@@ -469,12 +469,20 @@ if !INSTALL_3SHAPE! equ 1 (
 )
 
 if !INSTALL_ARCHFORM! equ 1 (
-    reg add "HKCR\archform" /ve /t REG_SZ /d "URL:Archform Protocol" /f >nul 2>&1
-    reg add "HKCR\archform" /v "URL Protocol" /t REG_SZ /d "" /f >nul 2>&1
-    reg add "HKCR\archform\shell\open\command" /ve /t REG_SZ /d "\"C:\\ShwanOrtho\\ArchformProtocolHandler.exe\" \"%%1\"" /f >nul 2>&1
-    echo   - archform: protocol registered
+    REM Clean up old archform: registration if it points to our handler
+    reg query "HKCR\archform\shell\open\command" >nul 2>&1
+    if !errorLevel! equ 0 (
+        for /f "tokens=2*" %%a in ('reg query "HKCR\archform\shell\open\command" /ve 2^>nul ^| findstr ShwanOrtho') do (
+            echo   - Removing old HKCR\archform registration ^(restoring Archform native protocol^)
+            reg delete "HKCR\archform" /f >nul 2>&1
+        )
+    )
+    reg add "HKCR\archformlocal" /ve /t REG_SZ /d "URL:Archform Local Protocol" /f >nul 2>&1
+    reg add "HKCR\archformlocal" /v "URL Protocol" /t REG_SZ /d "" /f >nul 2>&1
+    reg add "HKCR\archformlocal\shell\open\command" /ve /t REG_SZ /d "\"C:\\ShwanOrtho\\ArchformProtocolHandler.exe\" \"%%1\"" /f >nul 2>&1
+    echo   - archformlocal: protocol registered
 ) else (
-    echo   - archform: skipped ^(not selected^)
+    echo   - archformlocal: skipped ^(not selected^)
 )
 
 REM Smart browser policy handling
@@ -488,7 +496,7 @@ if %errorLevel% equ 0 (
 ) else (
     echo   - Chrome policy not found, creating...
 )
-reg add %CHROME_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"tshape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"archform\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
+reg add %CHROME_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"tshape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"archformlocal\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
 
 REM For Edge
 set EDGE_POLICY="HKLM\SOFTWARE\Policies\Microsoft\Edge"
@@ -498,7 +506,7 @@ if %errorLevel% equ 0 (
 ) else (
     echo   - Edge policy not found, creating...
 )
-reg add %EDGE_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"tshape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"archform\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
+reg add %EDGE_POLICY% /v AutoLaunchProtocolsFromOrigins /t REG_SZ /d "[{\"protocol\": \"explorer\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"csimaging\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"dolphin\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"tshape\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}, {\"protocol\": \"archformlocal\", \"allowed_origins\": [\"http://clinic:3000\", \"http://192.168.100.2:3000\", \"https://local.shwan-orthodontics.com\", \"https://remote.shwan-orthodontics.com\", \"http://localhost:3000\", \"http://192.168.100.2:5173\", \"http://localhost:5173\"]}]" /f >nul 2>&1
 
 echo   - Protocols registered successfully
 
@@ -592,11 +600,11 @@ if !INSTALL_ARCHFORM! equ 1 (
     ) else (
         echo   + ArchformProtocolHandler.exe OK
     )
-    reg query "HKCR\archform\shell\open\command" >nul 2>&1
+    reg query "HKCR\archformlocal\shell\open\command" >nul 2>&1
     if !errorLevel! equ 0 (
-        echo   + archform: protocol registered
+        echo   + archformlocal: protocol registered
     ) else (
-        echo   X archform: protocol NOT registered
+        echo   X archformlocal: protocol NOT registered
         set ALL_OK=0
     )
 )
@@ -613,7 +621,7 @@ if !ALL_OK! equ 1 (
     if !INSTALL_CSIMAGING! equ 1 echo   - CS Imaging Protocol ^(csimaging://^)
     if !INSTALL_DOLPHIN! equ 1 echo   - Dolphin Protocol ^(dolphin://^)
     if !INSTALL_3SHAPE! equ 1 echo   - 3Shape Protocol ^(tshape://^)
-    if !INSTALL_ARCHFORM! equ 1 echo   - Archform Protocol ^(archform://^)
+    if !INSTALL_ARCHFORM! equ 1 echo   - Archform Local Protocol ^(archformlocal://^)
     echo.
     echo Next steps:
     echo 1. Edit configuration if needed:

@@ -22,14 +22,14 @@ namespace ArchformProtocolHandler
 
                 string url = args[0];
 
-                // Parse the archform: URL
-                // Format: archform:ArchformID
+                // Parse the archformlocal: URL
+                // Format: archformlocal:ArchformID
                 string archformId = ParseArchformUrl(url);
 
                 if (string.IsNullOrEmpty(archformId))
                 {
                     MessageBox.Show(
-                        "Invalid Archform URL format.\n\nExpected: archform:ArchformID",
+                        "Invalid Archform URL format.\n\nExpected: archformlocal:ArchformID",
                         "Invalid URL",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Error
@@ -78,7 +78,18 @@ namespace ArchformProtocolHandler
                             );
                             return;
                         }
-                        key.SetValue("LastPatient_h2457475196", archformId, RegistryValueKind.String);
+                        int archformIdInt;
+                        if (!int.TryParse(archformId, out archformIdInt))
+                        {
+                            MessageBox.Show(
+                                "Invalid ArchformID: '" + archformId + "'\n\nExpected a numeric ID.",
+                                "Invalid ID",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error
+                            );
+                            return;
+                        }
+                        key.SetValue("LastPatient_h2457475196", archformIdInt, RegistryValueKind.DWord);
                     }
                 }
                 catch (Exception regEx)
@@ -146,8 +157,8 @@ namespace ArchformProtocolHandler
         }
 
         /// <summary>
-        /// Parse archform: URL
-        /// Format: archform:ArchformID
+        /// Parse archformlocal: URL
+        /// Format: archformlocal:ArchformID
         /// Returns the ArchformID string
         /// </summary>
         private static string ParseArchformUrl(string url)
@@ -156,9 +167,9 @@ namespace ArchformProtocolHandler
             {
                 // Strip protocol prefix
                 string withoutProtocol = url;
-                if (url.StartsWith("archform:", StringComparison.OrdinalIgnoreCase))
+                if (url.StartsWith("archformlocal:", StringComparison.OrdinalIgnoreCase))
                 {
-                    withoutProtocol = url.Substring("archform:".Length);
+                    withoutProtocol = url.Substring("archformlocal:".Length);
                 }
 
                 // URL decode and trim

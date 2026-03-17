@@ -80,12 +80,12 @@ if %errorLevel% equ 0 (
     echo   - tshape: protocol not found (already removed)
 )
 
-reg query "HKCR\archform" >nul 2>&1
+reg query "HKCR\archformlocal" >nul 2>&1
 if %errorLevel% equ 0 (
-    reg delete "HKCR\archform" /f >nul 2>&1
-    echo   - archform: protocol removed
+    reg delete "HKCR\archformlocal" /f >nul 2>&1
+    echo   - archformlocal: protocol removed
 ) else (
-    echo   - archform: protocol not found (already removed)
+    echo   - archformlocal: protocol not found (already removed)
 )
 
 REM Remove browser policies
@@ -289,12 +289,12 @@ if %errorLevel% equ 0 (
     echo   + tshape: protocol removed
 )
 
-reg query "HKCR\archform" >nul 2>&1
+reg query "HKCR\archformlocal" >nul 2>&1
 if %errorLevel% equ 0 (
-    echo   X archform: protocol still registered
+    echo   X archformlocal: protocol still registered
     set ALL_REMOVED=0
 ) else (
-    echo   + archform: protocol removed
+    echo   + archformlocal: protocol removed
 )
 
 echo.
