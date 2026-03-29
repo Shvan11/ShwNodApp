@@ -205,7 +205,7 @@ const AlignerDoctorsSettings = ({ onChangesUpdate }: AlignerDoctorsSettingsProps
                                 value={formData.DoctorName}
                                 onChange={handleInputChange}
                                 required
-                                placeholder="e.g., Dr. John Smith"
+                                placeholder="e.g., Ahmad (without Dr. prefix)"
                             />
                         </div>
 

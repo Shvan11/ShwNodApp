@@ -1640,6 +1640,7 @@ export async function getBatchById(batchId: number): Promise<AlignerBatch[]> {
 export interface AlignerSetForMatch {
   AlignerSetID: number;
   WorkID: number;
+  PersonID: number;
   ArchformID: number | null;
   PatientName: string;
   SetSequence: number | null;
@@ -1651,7 +1652,7 @@ export interface AlignerSetForMatch {
  */
 export async function getSetsWithArchformIds(): Promise<AlignerSetForMatch[]> {
   const query = `
-    SELECT s.AlignerSetID, s.WorkID, s.ArchformID,
+    SELECT s.AlignerSetID, s.WorkID, p.PersonID, s.ArchformID,
       p.PatientName, p.FirstName, p.LastName,
       s.SetSequence, ISNULL(ad.DoctorName, '') AS DoctorName
     FROM tblAlignerSets s
@@ -1667,12 +1668,13 @@ export async function getSetsWithArchformIds(): Promise<AlignerSetForMatch[]> {
     (columns: ColumnValue[]) => ({
       AlignerSetID: columns[0].value as number,
       WorkID: columns[1].value as number,
-      ArchformID: columns[2].value as number | null,
-      PatientName: columns[3].value as string,
-      FirstName: columns[4].value as string | null,
-      LastName: columns[5].value as string | null,
-      SetSequence: columns[6].value as number | null,
-      DoctorName: columns[7].value as string,
+      PersonID: columns[2].value as number,
+      ArchformID: columns[3].value as number | null,
+      PatientName: columns[4].value as string,
+      FirstName: columns[5].value as string | null,
+      LastName: columns[6].value as string | null,
+      SetSequence: columns[7].value as number | null,
+      DoctorName: columns[8].value as string,
     })
   );
 }

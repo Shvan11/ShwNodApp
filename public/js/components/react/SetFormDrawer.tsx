@@ -128,18 +128,19 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
             const nextSequence = maxSequence + 1;
 
             // Determine default doctor ID
+            // Only auto-populate if patient has existing sets (inherit from Set 1)
+            // If no previous sets, leave empty — user must select manually
             let defaultDoctor: number | string = '';
-            if (defaultDoctorId) {
-                // If doctorId is provided from URL, use it
-                const doctorExists = doctors && doctors.find(d => d.DrID === parseInt(String(defaultDoctorId)));
-                if (doctorExists) {
-                    defaultDoctor = parseInt(String(defaultDoctorId));
-                } else if (doctors && doctors.length > 0) {
-                    defaultDoctor = doctors[0].DrID;
+            if (allSets.length > 0) {
+                const firstSet = allSets.reduce((min, s) =>
+                    (s.SetSequence || Infinity) < (min.SetSequence || Infinity) ? s : min
+                , allSets[0]);
+                if (firstSet.AlignerDrID) {
+                    const doctorExists = doctors?.find(d => d.DrID === firstSet.AlignerDrID);
+                    if (doctorExists) {
+                        defaultDoctor = firstSet.AlignerDrID;
+                    }
                 }
-            } else if (doctors && doctors.length > 0) {
-                // Otherwise use the first doctor
-                defaultDoctor = doctors[0].DrID;
             }
 
             setFormData({

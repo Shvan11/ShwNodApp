@@ -241,6 +241,7 @@ export interface ArchformPatient {
 export interface AlignerSetForMatch {
     AlignerSetID: number;
     WorkID: number;
+    PersonID: number;
     ArchformID: number | null;
     PatientName: string;
     FirstName: string | null;

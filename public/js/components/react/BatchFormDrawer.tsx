@@ -273,11 +273,31 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             return;
         }
 
+        // Check if remaining aligners would hit 0 after this save
+        const upperCount = parseInt(String(formData.UpperAlignerCount)) || 0;
+        const lowerCount = parseInt(String(formData.LowerAlignerCount)) || 0;
+        const currentUpperCount = batch ? (parseInt(String(batch.UpperAlignerCount)) || 0) : 0;
+        const currentLowerCount = batch ? (parseInt(String(batch.LowerAlignerCount)) || 0) : 0;
+
+        const newRemainingUpper = (set?.RemainingUpperAligners ?? 0) + currentUpperCount - upperCount;
+        const newRemainingLower = (set?.RemainingLowerAligners ?? 0) + currentLowerCount - lowerCount;
+
+        let markAsLast = false;
+        if (newRemainingUpper === 0 && newRemainingLower === 0 && !formData.IsLast) {
+            const confirmed = window.confirm(
+                'Both remaining upper and lower aligners will be 0. Do you want to mark this as the last batch?'
+            );
+            if (confirmed) {
+                markAsLast = true;
+            }
+        }
+
         setSaving(true);
 
         try {
             const dataToSend = {
                 ...formData,
+                ...(markAsLast && { IsLast: true }),
                 AlignerSetID: set?.AlignerSetID,
                 UpperAlignerStartSequence: computedFields.UpperAlignerStartSequence,
                 LowerAlignerStartSequence: computedFields.LowerAlignerStartSequence,

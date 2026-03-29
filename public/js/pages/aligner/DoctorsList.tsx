@@ -57,7 +57,7 @@ const DoctorsList: React.FC = () => {
                 <div className={styles.sectionInfo}>
                     <span>{doctors.length} doctor{doctors.length !== 1 ? 's' : ''}</span>
                     <Link
-                        to="/settings?tab=alignerDoctors"
+                        to="/settings/alignerDoctors"
                         className={styles.btnManageDoctors}
                         title="Manage aligner doctors and portal access"
                     >

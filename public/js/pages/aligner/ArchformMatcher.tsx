@@ -1,9 +1,47 @@
 // ArchformMatcher.tsx - Match Archform patients to aligner sets
-import { useState, useEffect, useCallback, type ChangeEvent, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useMemo, type ChangeEvent, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Select, { type SingleValue, type StylesConfig } from 'react-select';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmDialog from '../../components/react/ConfirmDialog';
 import type { ArchformPatient, AlignerSetForMatch } from './aligner.types';
 import styles from './ArchformMatcher.module.css';
+
+interface SetOption {
+    value: number;
+    label: string;
+    isDisabled: boolean;
+}
+
+const setSelectStyles: StylesConfig<SetOption, false> = {
+    control: (provided) => ({
+        ...provided,
+        minHeight: '34px',
+        fontSize: '0.85rem',
+        minWidth: '220px',
+    }),
+    menu: (provided) => ({
+        ...provided,
+        zIndex: 9999,
+        fontSize: '0.85rem',
+    }),
+    option: (provided, state) => ({
+        ...provided,
+        backgroundColor: state.isDisabled
+            ? '#f5f5f5'
+            : state.isSelected
+              ? 'var(--primary-color)'
+              : state.isFocused
+                ? 'var(--primary-100)'
+                : 'white',
+        color: state.isDisabled ? '#aaa' : state.isSelected ? 'white' : '#333',
+        padding: '6px 10px',
+    }),
+    placeholder: (provided) => ({
+        ...provided,
+        color: '#999',
+    }),
+};
 
 type FilterMode = 'all' | 'unmatched' | 'matched';
 type SortColumn = 'Name' | 'CreatedDate' | 'LastModifiedDate';
@@ -11,6 +49,7 @@ type SortDirection = 'asc' | 'desc';
 
 const ArchformMatcher: React.FC = () => {
     const toast = useToast();
+    const navigate = useNavigate();
     const [archformPatients, setArchformPatients] = useState<ArchformPatient[]>([]);
     const [alignerSets, setAlignerSets] = useState<AlignerSetForMatch[]>([]);
     const [loading, setLoading] = useState(true);
@@ -109,6 +148,15 @@ const ArchformMatcher: React.FC = () => {
         return parts.join(' - ');
     };
 
+    const setOptions = useMemo((): SetOption[] => {
+        const matched = getMatchedSetIds();
+        return alignerSets.map((set) => ({
+            value: set.AlignerSetID,
+            label: formatSetLabel(set),
+            isDisabled: matched.has(set.AlignerSetID),
+        }));
+    }, [alignerSets]);
+
     const formatDate = (dateString: string | null): string => {
         if (!dateString) return '';
         const date = new Date(dateString);
@@ -118,11 +166,10 @@ const ArchformMatcher: React.FC = () => {
         return `${day}-${month}-${year}`;
     };
 
-    const handleSelectionChange = (archformId: number, value: string): void => {
-        const numVal = value === '' ? 0 : parseInt(value, 10);
+    const handleSelectionChange = (archformId: number, option: SingleValue<SetOption>): void => {
         setSelections((prev) => ({
             ...prev,
-            [archformId]: numVal,
+            [archformId]: option ? option.value : 0,
         }));
     };
 
@@ -479,7 +526,6 @@ const ArchformMatcher: React.FC = () => {
     }
 
     const archformToSet = getArchformToSetMap();
-    const matchedSetIds = getMatchedSetIds();
     const filteredPatients = sortPatients(getFilteredPatients());
     const matchedCount = archformPatients.filter((p) =>
         archformToSet.has(p.Id)
@@ -696,53 +742,19 @@ const ArchformMatcher: React.FC = () => {
                                                     )}
                                                 </span>
                                             ) : (
-                                                <select
-                                                    className={
-                                                        styles.matchSelect
-                                                    }
-                                                    value={
-                                                        currentSelection || ''
-                                                    }
-                                                    onChange={(e) =>
-                                                        handleSelectionChange(
-                                                            patient.Id,
-                                                            e.target.value
-                                                        )
-                                                    }
-                                                    disabled={isSaving}
-                                                >
-                                                    <option value="">
-                                                        -- Select set --
-                                                    </option>
-                                                    {alignerSets.map(
-                                                        (set) => {
-                                                            const isUsed =
-                                                                matchedSetIds.has(
-                                                                    set.AlignerSetID
-                                                                );
-                                                            return (
-                                                                <option
-                                                                    key={
-                                                                        set.AlignerSetID
-                                                                    }
-                                                                    value={
-                                                                        set.AlignerSetID
-                                                                    }
-                                                                    disabled={
-                                                                        isUsed
-                                                                    }
-                                                                >
-                                                                    {formatSetLabel(
-                                                                        set
-                                                                    )}
-                                                                    {isUsed
-                                                                        ? ' (matched)'
-                                                                        : ''}
-                                                                </option>
-                                                            );
-                                                        }
-                                                    )}
-                                                </select>
+                                                <Select<SetOption, false>
+                                                    value={setOptions.find((o) => o.value === currentSelection) || null}
+                                                    onChange={(option) => handleSelectionChange(patient.Id, option)}
+                                                    options={setOptions}
+                                                    isSearchable={true}
+                                                    isClearable={true}
+                                                    isDisabled={isSaving}
+                                                    placeholder="Search set..."
+                                                    noOptionsMessage={() => 'No sets found'}
+                                                    styles={setSelectStyles}
+                                                    menuPortalTarget={document.body}
+                                                    menuPlacement="auto"
+                                                />
                                             )}
                                         </td>
                                         <td data-label="Action">
@@ -792,6 +804,15 @@ const ArchformMatcher: React.FC = () => {
                                                                 Match
                                                             </>
                                                         )}
+                                                    </button>
+                                                )}
+                                                {matchedSet && (
+                                                    <button
+                                                        className={styles.btnEditPatient}
+                                                        onClick={() => navigate(`/patient/${matchedSet.PersonID}/edit-patient`)}
+                                                        title="Edit patient info"
+                                                    >
+                                                        <i className="fas fa-user-edit"></i>
                                                     </button>
                                                 )}
                                                 <button
