@@ -1,0 +1,155 @@
+/* StandKPICards - KPI tile grid for Stand dashboard */
+
+.container {
+  margin-bottom: var(--spacing-lg);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.card {
+  position: relative;
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg);
+  color: var(--color-white);
+  box-shadow: var(--shadow-md);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  overflow: hidden;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.cardIcon {
+  font-size: var(--font-size-2xl);
+  margin-bottom: var(--spacing-sm);
+  opacity: 0.9;
+}
+
+.cardLabel {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  opacity: 0.9;
+  margin-bottom: var(--spacing-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.cardValue {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+}
+
+.cardCurrency {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  opacity: 0.8;
+  margin-left: var(--spacing-xs);
+}
+
+/* Gradient variants */
+.purple {
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+}
+
+.blue {
+  background: linear-gradient(135deg, #2563eb, #60a5fa);
+}
+
+.green {
+  background: linear-gradient(135deg, #059669, #34d399);
+}
+
+.orange {
+  background: linear-gradient(135deg, #ea580c, #fb923c);
+}
+
+.teal {
+  background: linear-gradient(135deg, #0d9488, #5eead4);
+}
+
+/* Expiring soon badge */
+.expiringBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: var(--error-50);
+  color: var(--error-700);
+  border: 1px solid var(--error-200);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.expiringBadge i {
+  font-size: var(--font-size-sm);
+}
+
+/* Loading state */
+.loadingGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.skeletonCard {
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg);
+  background: var(--gray-100);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonIcon {
+  width: 32px;
+  height: 32px;
+  background: var(--gray-200);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-sm);
+}
+
+.skeletonLabel {
+  width: 80px;
+  height: 14px;
+  background: var(--gray-200);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.skeletonValue {
+  width: 120px;
+  height: 28px;
+  background: var(--gray-200);
+  border-radius: var(--radius-sm);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--spacing-sm);
+  }
+
+  .card {
+    padding: var(--spacing-md);
+  }
+
+  .cardValue {
+    font-size: var(--font-size-xl);
+  }
+}

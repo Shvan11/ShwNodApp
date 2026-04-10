@@ -51,6 +51,7 @@ import dolphinRoutes from './dolphin.routes.js';
 import costPresetRoutes from './cost-preset.routes.js';
 import holidayRoutes from './holiday.routes.js';
 import videoRoutes from './video.routes.js';
+import standRoutes from './stand.routes.js';
 
 // Import template routes (already modular)
 import templateRouter from '../template-api.js';
@@ -122,5 +123,8 @@ router.use('/dolphin', dolphinRoutes); // Dolphin Imaging integration
 
 // Video management
 router.use('/videos', videoRoutes); // Educational videos
+
+// Stand / Mini-Pharmacy
+router.use('/', standRoutes); // Stand inventory, POS, reports (routes define /stand/* prefix)
 
 export default router;

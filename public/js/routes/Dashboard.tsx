@@ -110,6 +110,13 @@ export default function Dashboard() {
       linkText: 'Manage Templates'
     },
     {
+      title: 'Stand / Mini Pharmacy',
+      description: 'Inventory, POS sales, and reports for the retail stand',
+      icon: 'fas fa-store',
+      link: '/stand',
+      linkText: 'Open Stand'
+    },
+    {
       title: 'Financial Statistics',
       description: 'View clinic reports and financial analytics',
       icon: 'fas fa-chart-bar',

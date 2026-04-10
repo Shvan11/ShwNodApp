@@ -1,0 +1,351 @@
+/* ==============================
+   STAND ITEM TABLE STYLES
+   ============================== */
+
+/* Table Container */
+.tableContainer {
+  background: var(--background-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-lg);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: var(--spacing-lg);
+}
+
+@media (max-width: 768px) {
+  .tableContainer {
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    border-radius: var(--radius-sm);
+    margin-left: calc(-1 * var(--spacing-md));
+    margin-right: calc(-1 * var(--spacing-md));
+    width: calc(100% + 2 * var(--spacing-md));
+  }
+}
+
+@media (max-width: 480px) {
+  .tableContainer {
+    padding: var(--spacing-sm);
+    border-radius: 0;
+    margin-left: calc(-1 * var(--spacing-sm));
+    margin-right: calc(-1 * var(--spacing-sm));
+    width: calc(100% + 2 * var(--spacing-sm));
+  }
+}
+
+/* Scroll hint wrapper */
+.tableScrollWrapper {
+  position: relative;
+}
+
+.tableScrollWrapper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 30px;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.9));
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity var(--transition-base);
+}
+
+@media (min-width: 1200px) {
+  .tableScrollWrapper::after {
+    display: none;
+  }
+}
+
+/* Table */
+.itemsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+  min-width: 1000px;
+}
+
+.itemsTable thead {
+  background-color: var(--gray-100);
+  border-bottom: 2px solid var(--gray-200);
+}
+
+.itemsTable th {
+  padding: 12px;
+  text-align: left;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  text-transform: uppercase;
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-wide);
+  white-space: nowrap;
+}
+
+.itemsTable tbody tr {
+  border-bottom: 1px solid var(--gray-200);
+  transition: background-color var(--transition-fast);
+}
+
+.itemsTable tbody tr:hover {
+  background-color: var(--hover-bg);
+}
+
+.itemsTable td {
+  padding: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Amount cells */
+.amountCell {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.profitCell {
+  font-weight: var(--font-weight-semibold);
+  color: var(--success-color);
+}
+
+.profitNegative {
+  color: var(--error-color);
+}
+
+/* Stock badge */
+.stockBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.stockInStock {
+  background-color: var(--success-100);
+  color: var(--success-700);
+}
+
+.stockLow {
+  background-color: var(--warning-100);
+  color: var(--warning-700);
+}
+
+.stockOut {
+  background-color: var(--error-100);
+  color: var(--error-700);
+}
+
+/* Expiry badge */
+.expiryBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.expiryWarning {
+  background-color: var(--error-100);
+  color: var(--error-700);
+}
+
+.expiryExpired {
+  background-color: var(--error-200);
+  color: var(--error-700);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Inactive row */
+.inactiveRow {
+  opacity: 0.55;
+}
+
+/* Action Buttons */
+.actionButtons {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.actionBtn {
+  padding: 4px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: var(--background-light);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.actionBtn:hover {
+  background-color: var(--gray-100);
+  border-color: var(--gray-400);
+}
+
+.btnEdit {
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.btnEdit:hover {
+  background-color: var(--blue-50);
+}
+
+.btnRestock {
+  color: var(--success-color);
+  border-color: var(--success-color);
+}
+
+.btnRestock:hover {
+  background-color: var(--success-50);
+}
+
+.btnAdjust {
+  color: var(--warning-500);
+  border-color: var(--warning-500);
+}
+
+.btnAdjust:hover {
+  background-color: var(--warning-50);
+}
+
+.btnMovements {
+  color: var(--info-color);
+  border-color: var(--info-color);
+}
+
+.btnMovements:hover {
+  background-color: var(--info-50);
+}
+
+.btnDelete {
+  color: var(--error-color);
+  border-color: var(--error-color);
+}
+
+.btnDelete:hover {
+  background-color: var(--error-50);
+}
+
+/* Loading State */
+.loadingState {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--gray-400);
+}
+
+.loadingSpinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Empty State */
+.emptyState {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--gray-400);
+  font-size: var(--font-size-base);
+}
+
+/* Note cell */
+.noteCell {
+  max-width: 150px;
+  min-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .itemsTable {
+    font-size: var(--font-size-xs);
+    min-width: 900px;
+  }
+
+  .itemsTable th,
+  .itemsTable td {
+    padding: 8px;
+    min-width: 60px;
+  }
+
+  .itemsTable th:first-child,
+  .itemsTable td:first-child {
+    min-width: 100px;
+    position: sticky;
+    left: 0;
+    background-color: white;
+    z-index: 2;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .itemsTable thead th:first-child {
+    background-color: var(--gray-100);
+  }
+
+  .itemsTable tbody tr:hover td:first-child {
+    background-color: var(--hover-bg);
+  }
+
+  .actionButtons {
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+}
+
+@media (max-width: 480px) {
+  .itemsTable {
+    font-size: 11px;
+    min-width: 800px;
+  }
+
+  .itemsTable th,
+  .itemsTable td {
+    padding: 6px;
+    font-size: 11px;
+    min-width: 50px;
+  }
+
+  .itemsTable th:first-child,
+  .itemsTable td:first-child {
+    min-width: 80px;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .itemsTable th,
+  .itemsTable td {
+    min-height: 44px;
+  }
+
+  .itemsTable tbody tr {
+    -webkit-tap-highlight-color: rgba(0, 123, 255, 0.1);
+  }
+
+  .itemsTable tbody tr:active {
+    background-color: rgba(0, 123, 255, 0.05);
+  }
+
+  .actionBtn {
+    min-height: 32px;
+    min-width: 44px;
+  }
+}

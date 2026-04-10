@@ -1,0 +1,130 @@
+/* Stand Landing Page Styles */
+
+.standContainer {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--spacing-lg);
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-xl);
+}
+
+.pageHeader h1 {
+  margin: 0;
+  font-size: var(--font-size-3xl);
+  color: var(--text-primary, var(--text-color));
+}
+
+.quickActions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.kpiSection {
+  margin-bottom: var(--spacing-xl);
+}
+
+.panelsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+}
+
+.panel {
+  background: var(--background-primary, white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-lg);
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.panelHeader h2 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--text-primary, var(--text-color));
+}
+
+.navCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.navCard {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  background: var(--background-primary, white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: var(--text-primary, var(--text-color));
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.navCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.navCardIcon {
+  font-size: 24px;
+  color: var(--primary-color);
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 123, 255, 0.1);
+  border-radius: var(--radius-md);
+}
+
+.navCardText h3 {
+  margin: 0 0 4px;
+  font-size: var(--font-size-md);
+}
+
+.navCardText p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary, var(--text-light));
+}
+
+@media (max-width: 768px) {
+  .standContainer {
+    padding: var(--spacing-md);
+  }
+
+  .pageHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+  }
+
+  .panelsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .navCards {
+    grid-template-columns: 1fr;
+  }
+}

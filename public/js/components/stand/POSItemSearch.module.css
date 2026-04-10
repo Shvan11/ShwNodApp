@@ -1,0 +1,147 @@
+/* POSItemSearch.module.css */
+
+.container {
+  position: relative;
+}
+
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: var(--spacing-md);
+  color: var(--gray-400);
+  font-size: var(--font-size-sm);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  height: var(--input-height);
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-sm) var(--spacing-xl);
+  font-size: var(--font-size-base);
+  font-family: var(--font-primary);
+  color: var(--text-color);
+  background-color: var(--color-white);
+  border: var(--border-width-thin) solid var(--gray-300);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.searchInput:focus {
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-focus);
+}
+
+.searchInput::placeholder {
+  color: var(--gray-400);
+}
+
+.spinner {
+  position: absolute;
+  right: var(--spacing-md);
+  color: var(--primary-color);
+  font-size: var(--font-size-sm);
+}
+
+/* Dropdown */
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: var(--spacing-xs) 0 0;
+  padding: 0;
+  list-style: none;
+  background-color: var(--color-white);
+  border: var(--border-width-thin) solid var(--gray-200);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-index-dropdown);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.dropdownItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+  border-bottom: var(--border-width-thin) solid var(--gray-100);
+}
+
+.dropdownItem:last-child {
+  border-bottom: none;
+}
+
+.dropdownItem:hover {
+  background-color: var(--blue-50);
+}
+
+.itemInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+  flex: 1;
+}
+
+.itemName {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itemCategory {
+  font-size: var(--font-size-xs);
+  color: var(--gray-500);
+}
+
+.itemMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--spacing-xs);
+  margin-left: var(--spacing-md);
+  flex-shrink: 0;
+}
+
+.itemPrice {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-color);
+}
+
+.itemStockAvailable {
+  font-size: var(--font-size-xs);
+  color: var(--success-color);
+}
+
+.itemStockOut {
+  font-size: var(--font-size-xs);
+  color: var(--error-color);
+}
+
+@media (max-width: 480px) {
+  .dropdownItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
+  }
+
+  .itemMeta {
+    flex-direction: row;
+    align-items: center;
+    margin-left: 0;
+    gap: var(--spacing-sm);
+  }
+}

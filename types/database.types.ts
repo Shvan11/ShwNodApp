@@ -512,6 +512,198 @@ export interface MessageRecord {
 export type MessageStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
 
 // ===========================================
+// STAND / MINI-PHARMACY TYPES
+// ===========================================
+
+/**
+ * Stock movement type constants
+ */
+export const STAND_MOVEMENT_TYPE = {
+  INITIAL: 'initial',
+  RESTOCK: 'restock',
+  SALE: 'sale',
+  ADJUSTMENT: 'adjustment',
+  WASTE: 'waste',
+  RETURN: 'return',
+  VOID: 'void',
+} as const;
+
+export type StandMovementType = typeof STAND_MOVEMENT_TYPE[keyof typeof STAND_MOVEMENT_TYPE];
+
+/**
+ * Stand category from tblStandCategories
+ */
+export interface StandCategory {
+  CategoryID: number;
+  CategoryName: string;
+  IsActive: boolean;
+}
+
+/**
+ * Stand item from tblStandItems
+ */
+export interface StandItem {
+  ItemID: number;
+  ItemName: string;
+  SKU: string | null;
+  Barcode: string | null;
+  CategoryID: number | null;
+  CostPrice: number;
+  SellPrice: number;
+  CurrentStock: number;
+  ReorderLevel: number;
+  ExpiryDate: Date | null;
+  Unit: string | null;
+  Notes: string | null;
+  IsActive: boolean;
+  DateAdded: Date;
+  ModifiedDate: Date | null;
+  CreatedBy: number | null;
+}
+
+/**
+ * Stand item with joined category name
+ */
+export interface StandItemWithCategory extends StandItem {
+  CategoryName: string | null;
+}
+
+/**
+ * Stand sale from tblStandSales
+ */
+export interface StandSale {
+  SaleID: number;
+  SaleDate: Date;
+  TotalAmount: number;
+  TotalCost: number;
+  TotalProfit: number;
+  AmountPaid: number;
+  Change: number;
+  PaymentMethod: string;
+  CustomerNote: string | null;
+  PersonID: number | null;
+  CashierID: number | null;
+  VoidedDate: Date | null;
+  VoidedBy: number | null;
+  VoidReason: string | null;
+}
+
+/**
+ * Stand sale line item from tblStandSaleItems
+ */
+export interface StandSaleItem {
+  SaleItemID: number;
+  SaleID: number;
+  ItemID: number;
+  Quantity: number;
+  UnitPrice: number;
+  UnitCost: number;
+  LineTotal: number;
+}
+
+/**
+ * Stand sale line item with item name (joined)
+ */
+export interface StandSaleItemWithName extends StandSaleItem {
+  ItemName: string;
+}
+
+/**
+ * Stand sale with its line items (joined)
+ */
+export interface StandSaleWithItems extends StandSale {
+  Items: StandSaleItemWithName[];
+  PatientName: string | null;
+  CashierName: string | null;
+}
+
+/**
+ * Stand stock movement from tblStandStockMovements
+ */
+export interface StandStockMovement {
+  MovementID: number;
+  ItemID: number;
+  MovementType: StandMovementType;
+  Quantity: number;
+  UnitCost: number | null;
+  TotalCost: number | null;
+  RelatedSaleID: number | null;
+  Reason: string | null;
+  MovementDate: Date;
+  PerformedBy: number | null;
+}
+
+/**
+ * Stock movement with performer name (joined)
+ */
+export interface StandStockMovementWithUser extends StandStockMovement {
+  PerformedByName: string | null;
+}
+
+/**
+ * Data for creating a new stand item
+ */
+export interface StandItemCreateData {
+  itemName: string;
+  sku?: string | null;
+  barcode?: string | null;
+  categoryId?: number | null;
+  costPrice: number;
+  sellPrice: number;
+  currentStock?: number;
+  reorderLevel?: number;
+  expiryDate?: string | null;
+  unit?: string | null;
+  notes?: string | null;
+  createdBy?: number | null;
+}
+
+/**
+ * Data for creating a sale (from POS)
+ */
+export interface StandSaleCreateData {
+  items: Array<{
+    itemId: number;
+    quantity: number;
+  }>;
+  amountPaid: number;
+  paymentMethod?: string;
+  customerNote?: string | null;
+  personId?: number | null;
+  cashierId?: number | null;
+}
+
+/**
+ * Data for restocking an item
+ */
+export interface StandRestockData {
+  quantity: number;
+  unitCost: number;
+  userId?: number | null;
+}
+
+/**
+ * Data for adjusting stock
+ */
+export interface StandAdjustData {
+  delta: number;
+  reason: string;
+  userId?: number | null;
+}
+
+/**
+ * Stand dashboard KPI data
+ */
+export interface StandDashboardKPIs {
+  todaySalesCount: number;
+  todayRevenue: number;
+  todayProfit: number;
+  lowStockCount: number;
+  expiringSoonCount: number;
+  totalInventoryValue: number;
+}
+
+// ===========================================
 // HOLIDAY TYPES
 // ===========================================
 

@@ -45,6 +45,24 @@ interface Window {
     showSaveFilePicker(options?: { excludeAcceptAllOption?: boolean; suggestedName?: string; types?: { description?: string; accept: Record<string, string[]> }[] }): Promise<FileSystemFileHandle>;
 }
 
+// BarcodeDetector API (Chrome/Edge, not yet in lib.dom.d.ts)
+interface BarcodeDetectorOptions {
+  formats?: string[];
+}
+
+interface DetectedBarcode {
+  boundingBox: DOMRectReadOnly;
+  cornerPoints: { x: number; y: number }[];
+  format: string;
+  rawValue: string;
+}
+
+declare class BarcodeDetector {
+  constructor(options?: BarcodeDetectorOptions);
+  static getSupportedFormats(): Promise<string[]>;
+  detect(image: ImageBitmapSource): Promise<DetectedBarcode[]>;
+}
+
 // JSX modules - temporary until migration is complete
 declare module '*.jsx' {
   import type { ComponentType, ReactNode } from 'react';

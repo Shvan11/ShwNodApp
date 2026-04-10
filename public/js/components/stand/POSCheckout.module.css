@@ -1,0 +1,369 @@
+/* POSCheckout.module.css */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  background-color: var(--color-white);
+  border: var(--border-width-thin) solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+}
+
+.header {
+  margin-bottom: var(--spacing-xs);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-color);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.title i {
+  color: var(--primary-color);
+}
+
+/* Total section */
+.totalSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background-color: var(--gray-50);
+  border-radius: var(--radius-md);
+  border: var(--border-width-thin) solid var(--gray-200);
+}
+
+.totalLabel {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--gray-600);
+}
+
+.totalAmount {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-color);
+}
+
+/* Form fields */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  position: relative;
+}
+
+.label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--gray-700);
+}
+
+/* Amount paid input */
+.amountInputWrapper {
+  display: flex;
+  align-items: center;
+  border: var(--border-width-thin) solid var(--gray-300);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.amountInputWrapper:focus-within {
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-focus);
+}
+
+.amountInput {
+  flex: 1;
+  height: var(--input-height);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: none;
+  outline: none;
+  font-size: var(--font-size-lg);
+  font-family: var(--font-primary);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-color);
+  background: transparent;
+}
+
+.amountInput::placeholder {
+  color: var(--gray-400);
+  font-weight: var(--font-weight-normal);
+}
+
+.amountInput:disabled {
+  background-color: var(--gray-100);
+  cursor: not-allowed;
+}
+
+.currencyTag {
+  padding: 0 var(--spacing-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--gray-500);
+  background-color: var(--gray-100);
+  height: var(--input-height);
+  display: flex;
+  align-items: center;
+  border-left: var(--border-width-thin) solid var(--gray-300);
+}
+
+/* Change display */
+.changeSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+}
+
+.changePositive {
+  background-color: var(--success-50);
+  border: var(--border-width-thin) solid var(--success-200);
+}
+
+.changeNegative {
+  background-color: var(--error-50);
+  border: var(--border-width-thin) solid var(--error-200);
+}
+
+.changeLabel {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.changePositive .changeLabel {
+  color: var(--success-700);
+}
+
+.changeNegative .changeLabel {
+  color: var(--error-700);
+}
+
+.changeAmount {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+}
+
+.changePositive .changeAmount {
+  color: var(--success-color);
+}
+
+.changeNegative .changeAmount {
+  color: var(--error-color);
+}
+
+/* Select input */
+.select {
+  height: var(--input-height);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-base);
+  font-family: var(--font-primary);
+  color: var(--text-color);
+  background-color: var(--color-white);
+  border: var(--border-width-thin) solid var(--gray-300);
+  border-radius: var(--radius-md);
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.select:focus {
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-focus);
+}
+
+.select:disabled {
+  background-color: var(--gray-100);
+  cursor: not-allowed;
+}
+
+/* Patient search */
+.patientInputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.patientInput {
+  width: 100%;
+  height: var(--input-height-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-primary);
+  color: var(--text-color);
+  background-color: var(--color-white);
+  border: var(--border-width-thin) solid var(--gray-300);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.patientInput:focus {
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-focus);
+}
+
+.patientInput:disabled {
+  background-color: var(--gray-100);
+  cursor: not-allowed;
+}
+
+.patientSpinner {
+  position: absolute;
+  right: var(--spacing-md);
+  color: var(--primary-color);
+  font-size: var(--font-size-sm);
+}
+
+.clearPatientButton {
+  position: absolute;
+  right: var(--spacing-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  background: none;
+  color: var(--gray-400);
+  cursor: pointer;
+  border-radius: var(--radius-full);
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.clearPatientButton:hover {
+  color: var(--error-color);
+  background-color: var(--error-50);
+}
+
+.patientLinked {
+  font-size: var(--font-size-xs);
+  color: var(--success-color);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.patientLinked i {
+  font-size: var(--font-size-xs);
+}
+
+.patientDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: var(--spacing-xs) 0 0;
+  padding: 0;
+  list-style: none;
+  background-color: var(--color-white);
+  border: var(--border-width-thin) solid var(--gray-200);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-index-dropdown);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.patientDropdownItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  transition: background-color var(--transition-fast);
+  border-bottom: var(--border-width-thin) solid var(--gray-100);
+}
+
+.patientDropdownItem:last-child {
+  border-bottom: none;
+}
+
+.patientDropdownItem:hover {
+  background-color: var(--blue-50);
+}
+
+.patientId {
+  font-size: var(--font-size-xs);
+  color: var(--gray-400);
+}
+
+/* Note input */
+.noteInput {
+  width: 100%;
+  height: var(--input-height-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-primary);
+  color: var(--text-color);
+  background-color: var(--color-white);
+  border: var(--border-width-thin) solid var(--gray-300);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.noteInput:focus {
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-focus);
+}
+
+.noteInput:disabled {
+  background-color: var(--gray-100);
+  cursor: not-allowed;
+}
+
+/* Confirm button */
+.confirmButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  height: var(--input-height-lg);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  font-family: var(--font-primary);
+  color: var(--color-white);
+  background-color: var(--success-color);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--transition-base), box-shadow var(--transition-base);
+  margin-top: var(--spacing-sm);
+}
+
+.confirmButton:hover:not(:disabled) {
+  background-color: var(--success-darker);
+  box-shadow: var(--shadow-md);
+}
+
+.confirmButton:disabled {
+  background-color: var(--gray-300);
+  color: var(--gray-500);
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: var(--spacing-md);
+  }
+
+  .totalAmount {
+    font-size: var(--font-size-xl);
+  }
+
+  .totalSection {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+}

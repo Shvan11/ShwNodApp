@@ -1,0 +1,122 @@
+/* Stand POS Page Styles */
+
+.posContainer {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--spacing-lg);
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-lg);
+  background-color: var(--background-primary, white);
+  border-bottom: 2px solid var(--border-color, var(--gray-200));
+  margin-bottom: var(--spacing-lg);
+}
+
+.pageHeader h1 {
+  margin: 0;
+  font-size: var(--font-size-3xl);
+  color: var(--text-primary, var(--text-color));
+}
+
+.posLayout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: var(--spacing-lg);
+  align-items: start;
+}
+
+.posLeft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.scanSection {
+  background: var(--background-primary, white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-lg);
+}
+
+.scanSection h2 {
+  margin: 0 0 var(--spacing-md);
+  font-size: var(--font-size-lg);
+}
+
+.scanInputs {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+}
+
+.posRight {
+  position: sticky;
+  top: var(--spacing-lg);
+}
+
+.successOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-index-modal, 1040);
+}
+
+.successCard {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  text-align: center;
+  max-width: 400px;
+  box-shadow: var(--shadow-lg);
+}
+
+.successIcon {
+  font-size: 48px;
+  color: var(--success-color);
+  margin-bottom: var(--spacing-md);
+}
+
+.successCard h2 {
+  margin: 0 0 var(--spacing-sm);
+  color: var(--success-color);
+}
+
+.successCard p {
+  color: var(--text-secondary);
+  margin: 0 0 var(--spacing-md);
+}
+
+.changeAmount {
+  font-size: var(--font-size-2xl);
+  font-weight: bold;
+  color: var(--text-primary);
+  margin: var(--spacing-md) 0;
+}
+
+@media (max-width: 768px) {
+  .posContainer {
+    padding: var(--spacing-md);
+  }
+
+  .posLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .posRight {
+    position: static;
+  }
+
+  .scanInputs {
+    flex-direction: column;
+  }
+}

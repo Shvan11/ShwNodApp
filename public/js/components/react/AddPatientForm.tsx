@@ -6,7 +6,7 @@
  * - Mobile: Accordion/stacked layout for easy mobile access
  */
 
-import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import PhoneInput from './PhoneInput';
 import styles from './AddPatientForm.module.css';
 
@@ -131,17 +131,6 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         loadDropdownData();
     }, []);
 
-    // Auto-fill patient name from first and last name
-    useEffect(() => {
-        const { firstName, lastName } = formData;
-        if (firstName.trim() || lastName.trim()) {
-            setFormData(prev => ({
-                ...prev,
-                patientName: `${firstName} ${lastName}`.trim()
-            }));
-        }
-    }, [formData.firstName, formData.lastName]);
-
     const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({
@@ -239,7 +228,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
                     <label className={styles.formLabel}>
                         <i className="fas fa-signature"></i>
-                        Patient Name <span className={styles.required}>*</span>
+                        Patient Name (Arabic) <span className={styles.required}>*</span>
                     </label>
                     <input
                         type="text"
@@ -247,7 +236,9 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         value={formData.patientName}
                         onChange={handleInputChange}
                         className="form-control"
-                        placeholder="Enter full patient name"
+                        placeholder="الاسم الكامل"
+                        dir="rtl"
+                        lang="ar"
                         required
                     />
                 </div>
@@ -257,7 +248,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel}>
                         <i className="fas fa-user"></i>
-                        First Name
+                        First Name (English)
                     </label>
                     <input
                         type="text"
@@ -266,12 +257,14 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         onChange={handleInputChange}
                         className="form-control"
                         placeholder="First name"
+                        dir="ltr"
+                        lang="en"
                     />
                 </div>
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel}>
                         <i className="fas fa-user"></i>
-                        Last Name
+                        Last Name (English)
                     </label>
                     <input
                         type="text"
@@ -280,6 +273,8 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         onChange={handleInputChange}
                         className="form-control"
                         placeholder="Last name"
+                        dir="ltr"
+                        lang="en"
                     />
                 </div>
             </div>

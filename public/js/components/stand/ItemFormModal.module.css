@@ -1,0 +1,336 @@
+/* ==============================
+   ITEM FORM MODAL STYLES
+   ============================== */
+
+.modalContent {
+  background-color: var(--background-light);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideDown var(--transition-base);
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.modalHeader h2 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  color: var(--text-primary);
+}
+
+.closeBtn {
+  color: var(--gray-400);
+  font-size: 28px;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+  background: none;
+  border: none;
+}
+
+.closeBtn:hover,
+.closeBtn:focus {
+  color: var(--black);
+}
+
+.modalBody {
+  padding: 20px;
+}
+
+.modalFooter {
+  padding: 20px;
+  border-top: 1px solid var(--gray-200);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Form layout */
+.formGroup {
+  margin-bottom: 20px;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.required {
+  color: var(--error-color);
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.formRowThree {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 15px;
+}
+
+.formInput {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  transition: border-color var(--transition-fast);
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.formInput:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+.formInput:disabled {
+  background-color: var(--gray-100);
+  cursor: not-allowed;
+}
+
+.inputError {
+  border-color: var(--error-color);
+  background-color: var(--error-50);
+}
+
+.errorMessage {
+  display: block;
+  color: var(--error-color);
+  font-size: var(--font-size-xs);
+  margin-top: 4px;
+  font-weight: var(--font-weight-medium);
+}
+
+/* Profit display */
+.profitDisplay {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 12px 16px;
+  background-color: var(--gray-50);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--gray-200);
+}
+
+.profitLabel {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.profitValue {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--success-color);
+}
+
+.profitNegative {
+  color: var(--error-color);
+}
+
+/* ==============================
+   VISION SCANNER SECTION
+   ============================== */
+
+.visionScanner {
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 2px dashed var(--gray-300);
+  border-radius: var(--radius-md);
+  background-color: var(--gray-50);
+}
+
+.visionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.visionIcon {
+  font-size: 20px;
+}
+
+.visionHint {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin: 0 0 12px 0;
+}
+
+.visionControls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.visionFileLabel {
+  display: inline-block;
+  padding: 8px 16px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  background-color: var(--background-light);
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.visionFileLabel:hover {
+  background-color: var(--gray-100);
+  border-color: var(--gray-400);
+}
+
+.visionFileInput {
+  display: none;
+}
+
+.visionScanBtn {
+  padding: 8px 20px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--white);
+  background-color: var(--primary-color);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.visionScanBtn:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+}
+
+.visionScanBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.visionPreviews {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.visionThumb {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--gray-300);
+}
+
+.visionThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.visionThumbRemove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: var(--white);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background-color var(--transition-fast);
+}
+
+.visionThumbRemove:hover {
+  background-color: var(--error-color);
+}
+
+.visionThumbRemove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: var(--white);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .formRow,
+  .formRowThree {
+    grid-template-columns: 1fr;
+  }
+
+  .modalContent {
+    width: 95%;
+    margin: 10px;
+  }
+
+  .visionControls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .visionFileLabel,
+  .visionScanBtn {
+    text-align: center;
+  }
+
+  .visionThumb {
+    width: 60px;
+    height: 60px;
+  }
+}

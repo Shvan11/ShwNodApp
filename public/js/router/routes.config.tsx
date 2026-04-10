@@ -60,6 +60,13 @@ const ArchformMatcher = React.lazy(() => import('../pages/aligner/ArchformMatche
 // Lazy-loaded route components - Patient
 const PatientShell = React.lazy(() => import('../components/react/PatientShell'));
 
+// Lazy-loaded route components - Stand / Mini Pharmacy
+const Stand = React.lazy(() => import('../routes/Stand'));
+const StandInventory = React.lazy(() => import('../routes/StandInventory'));
+const StandPOS = React.lazy(() => import('../routes/StandPOS'));
+const StandSalesHistory = React.lazy(() => import('../routes/StandSalesHistory'));
+const StandReports = React.lazy(() => import('../routes/StandReports'));
+
 // Lazy-loaded route components - Appointments & WhatsApp
 const DailyAppointments = React.lazy(() => import('../routes/DailyAppointments'));
 const Calendar = React.lazy(() => import('../routes/Calendar'));
@@ -342,6 +349,51 @@ export const routesConfig: RouteObject[] = [
             element: <Navigate to="/patient-management" replace />,
           },
         ],
+      },
+
+      // ============================================================
+      // STAND / MINI PHARMACY
+      // ============================================================
+
+      {
+        path: '/stand',
+        element: (
+          <RouteErrorBoundary routeName="Stand">
+            <Stand />
+          </RouteErrorBoundary>
+        ),
+      },
+      {
+        path: '/stand/inventory',
+        element: (
+          <RouteErrorBoundary routeName="Stand Inventory">
+            <StandInventory />
+          </RouteErrorBoundary>
+        ),
+      },
+      {
+        path: '/stand/pos',
+        element: (
+          <RouteErrorBoundary routeName="Stand POS">
+            <StandPOS />
+          </RouteErrorBoundary>
+        ),
+      },
+      {
+        path: '/stand/sales',
+        element: (
+          <RouteErrorBoundary routeName="Stand Sales History">
+            <StandSalesHistory />
+          </RouteErrorBoundary>
+        ),
+      },
+      {
+        path: '/stand/reports',
+        element: (
+          <RouteErrorBoundary routeName="Stand Reports">
+            <StandReports />
+          </RouteErrorBoundary>
+        ),
       },
 
       // ============================================================

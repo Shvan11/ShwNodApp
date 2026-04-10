@@ -1,0 +1,58 @@
+/* Stand Inventory Page Styles */
+
+.inventoryContainer {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--spacing-lg);
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-lg);
+  background-color: var(--background-primary, white);
+  border-bottom: 2px solid var(--border-color, var(--gray-200));
+  margin-bottom: var(--spacing-lg);
+}
+
+.pageHeader h1 {
+  margin: 0;
+  font-size: var(--font-size-3xl);
+  color: var(--text-primary, var(--text-color));
+}
+
+.headerActions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.errorBanner {
+  background-color: var(--error-50);
+  border: 1px solid var(--error-color);
+  border-radius: 4px;
+  padding: 15px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.errorBanner p {
+  margin: 0;
+  color: var(--error-600);
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .inventoryContainer {
+    padding: var(--spacing-md);
+  }
+
+  .pageHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+  }
+}

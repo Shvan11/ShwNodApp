@@ -1,0 +1,254 @@
+/* ==============================
+   STOCK MOVEMENTS MODAL STYLES
+   ============================== */
+
+.modalContent {
+  background-color: var(--background-light);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideDown var(--transition-base);
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.modalHeader h2 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  color: var(--text-primary);
+}
+
+.closeBtn {
+  color: var(--gray-400);
+  font-size: 28px;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+  background: none;
+  border: none;
+}
+
+.closeBtn:hover,
+.closeBtn:focus {
+  color: var(--black);
+}
+
+.modalBody {
+  padding: 20px;
+}
+
+.modalFooter {
+  padding: 20px;
+  border-top: 1px solid var(--gray-200);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Item info */
+.itemInfo {
+  background-color: var(--blue-50);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+  border-left: 4px solid var(--primary-color);
+}
+
+.itemInfo p {
+  margin: 4px 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.itemInfo strong {
+  color: var(--text-primary);
+}
+
+/* Table wrapper */
+.tableWrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Table */
+.movementsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+  min-width: 650px;
+}
+
+.movementsTable thead {
+  background-color: var(--gray-100);
+  border-bottom: 2px solid var(--gray-200);
+}
+
+.movementsTable th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  text-transform: uppercase;
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-wide);
+  white-space: nowrap;
+}
+
+.movementsTable tbody tr {
+  border-bottom: 1px solid var(--gray-200);
+  transition: background-color var(--transition-fast);
+}
+
+.movementsTable tbody tr:hover {
+  background-color: var(--hover-bg);
+}
+
+.movementsTable td {
+  padding: 10px 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Movement type badges */
+.typeBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.typePurchase {
+  background-color: var(--success-100);
+  color: var(--success-700);
+}
+
+.typeSale {
+  background-color: var(--blue-50);
+  color: var(--blue-700);
+}
+
+.typeAdjustment {
+  background-color: var(--warning-100);
+  color: var(--warning-700);
+}
+
+.typeReturn {
+  background-color: var(--info-100);
+  color: var(--info-700);
+}
+
+.typeRestock {
+  background-color: var(--indigo-100);
+  color: var(--indigo-700);
+}
+
+.typeDefault {
+  background-color: var(--gray-100);
+  color: var(--gray-600);
+}
+
+/* Quantity */
+.quantityPositive {
+  color: var(--success-color);
+  font-weight: var(--font-weight-semibold);
+}
+
+.quantityNegative {
+  color: var(--error-color);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Reason cell */
+.reasonCell {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Loading & empty */
+.loadingState {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--gray-400);
+}
+
+.loadingSpinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.emptyState {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--gray-400);
+  font-size: var(--font-size-sm);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modalContent {
+    width: 95%;
+    margin: 10px;
+    max-width: none;
+  }
+
+  .movementsTable {
+    font-size: var(--font-size-xs);
+    min-width: 550px;
+  }
+
+  .movementsTable th,
+  .movementsTable td {
+    padding: 8px;
+  }
+
+  .reasonCell {
+    max-width: 120px;
+  }
+}
+
+@media (max-width: 480px) {
+  .movementsTable {
+    font-size: 11px;
+    min-width: 500px;
+  }
+
+  .movementsTable th,
+  .movementsTable td {
+    padding: 6px;
+  }
+}

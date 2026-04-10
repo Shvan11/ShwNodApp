@@ -1,0 +1,173 @@
+/* ==============================
+   RESTOCK MODAL STYLES
+   ============================== */
+
+.modalContent {
+  background-color: var(--background-light);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  width: 90%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideDown var(--transition-base);
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.modalHeader h2 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  color: var(--text-primary);
+}
+
+.closeBtn {
+  color: var(--gray-400);
+  font-size: 28px;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+  background: none;
+  border: none;
+}
+
+.closeBtn:hover,
+.closeBtn:focus {
+  color: var(--black);
+}
+
+.modalBody {
+  padding: 20px;
+}
+
+.modalFooter {
+  padding: 20px;
+  border-top: 1px solid var(--gray-200);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Item info banner */
+.itemInfo {
+  background-color: var(--blue-50);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+  border-left: 4px solid var(--primary-color);
+}
+
+.itemInfo p {
+  margin: 4px 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.itemInfo strong {
+  color: var(--text-primary);
+}
+
+/* Form */
+.formGroup {
+  margin-bottom: 20px;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.required {
+  color: var(--error-color);
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.formInput {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  transition: border-color var(--transition-fast);
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.formInput:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+.inputError {
+  border-color: var(--error-color);
+  background-color: var(--error-50);
+}
+
+.errorMessage {
+  display: block;
+  color: var(--error-color);
+  font-size: var(--font-size-xs);
+  margin-top: 4px;
+  font-weight: var(--font-weight-medium);
+}
+
+/* Total cost display */
+.totalCostDisplay {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background-color: var(--success-50);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--success-200);
+}
+
+.totalCostLabel {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.totalCostValue {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--success-700);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+
+  .modalContent {
+    width: 95%;
+    margin: 10px;
+  }
+}

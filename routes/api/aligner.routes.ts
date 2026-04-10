@@ -481,6 +481,17 @@ router.post(
         });
         return;
       }
+
+      // Check constraint violation: total paid exceeds new TotalRequired
+      const sqlError = error as { number?: number; message?: string };
+      if (sqlError.number === 547 && sqlError.message?.includes('CK_MoreThanTotalW')) {
+        ErrorResponses.badRequest(
+          res,
+          'Cannot create set: the set cost is too low. Total payments already exceed the calculated total cost. Increase the set cost or adjust payments first.'
+        );
+        return;
+      }
+
       log.error('Error creating aligner set:', error);
       ErrorResponses.internalError(
         res,
