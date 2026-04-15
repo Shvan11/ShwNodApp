@@ -145,6 +145,8 @@ export interface AlignerBatch {
     // Form-specific fields (used in BatchFormDrawer)
     IsActive?: boolean;
     IsLast?: boolean;
+    HasUpperTemplate?: boolean;
+    HasLowerTemplate?: boolean;
 }
 
 /**

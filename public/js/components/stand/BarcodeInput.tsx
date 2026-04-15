@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import styles from './BarcodeInput.module.css';
 
 interface BarcodeInputProps {
   onScan: (barcode: string) => void;
@@ -59,6 +60,7 @@ const BarcodeInput: React.FC<BarcodeInputProps> = ({
       disabled={disabled}
       autoComplete="off"
       aria-label="Barcode scanner input"
+      className={styles.input}
     />
   );
 };

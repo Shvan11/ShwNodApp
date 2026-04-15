@@ -126,6 +126,8 @@ export interface BatchCreateData {
   LowerAlignerEndSequence?: number;
   Days?: number;
   ValidityPeriod?: number;
+  HasUpperTemplate?: boolean;
+  HasLowerTemplate?: boolean;
 }
 
 /**
@@ -147,6 +149,8 @@ export interface BatchUpdateData {
   LowerAlignerEndSequence?: number;
   Days?: number;
   IsLast?: boolean;
+  HasUpperTemplate?: boolean;
+  HasLowerTemplate?: boolean;
   // Note: BatchExpiryDate and ValidityPeriod are computed columns - cannot be set directly
 }
 

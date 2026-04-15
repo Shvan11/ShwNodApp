@@ -27,7 +27,9 @@ interface ReceiptRow {
   workid: number;
   TotalRequired: number;
   Currency: string;
-  [key: string]: string | number | Date;
+  Discount: number | null;
+  DiscountDate: Date | null;
+  [key: string]: string | number | Date | null;
 }
 
 /**
@@ -47,6 +49,10 @@ export interface ReceiptWorkData {
   WorkID: number;
   TotalRequired: number;
   Currency: string;
+  Discount: number;
+  DiscountDate: Date | null;
+  HasDiscount: boolean;
+  NetRequired: number;
 }
 
 /**
@@ -111,18 +117,21 @@ interface TemplateData {
 export async function getReceiptData(workId: number): Promise<ReceiptData> {
   const query = `
         SELECT
-            PersonID,
-            PatientName,
-            Phone,
-            TotalPaid,
-            AppDate,
-            Dateofpayment,
-            Amountpaid,
-            workid,
-            TotalRequired,
-            Currency
-        FROM dbo.V_Report WITH (NOLOCK)
-        WHERE workid = @workId
+            v.PersonID,
+            v.PatientName,
+            v.Phone,
+            v.TotalPaid,
+            v.AppDate,
+            v.Dateofpayment,
+            v.Amountpaid,
+            v.workid,
+            v.TotalRequired,
+            v.Currency,
+            w.Discount,
+            w.DiscountDate
+        FROM dbo.V_Report v WITH (NOLOCK)
+        LEFT JOIN dbo.tblwork w WITH (NOLOCK) ON v.workid = w.workid
+        WHERE v.workid = @workId
     `;
 
   const results = await executeQuery<ReceiptRow>(
@@ -143,11 +152,13 @@ export async function getReceiptData(workId: number): Promise<ReceiptData> {
 
   const data = results[0];
 
-  // Calculate balances
+  // Calculate balances (discount reduces the net amount owed)
   const totalPaid = data.TotalPaid || 0;
   const amountPaidToday = data.Amountpaid || 0;
   const previouslyPaid = totalPaid - amountPaidToday;
-  const remainingBalance = data.TotalRequired - totalPaid;
+  const discount = data.Discount || 0;
+  const netRequired = (data.TotalRequired || 0) - discount;
+  const remainingBalance = netRequired - totalPaid;
 
   // Structure data for template
   return {
@@ -161,6 +172,10 @@ export async function getReceiptData(workId: number): Promise<ReceiptData> {
       WorkID: data.workid,
       TotalRequired: data.TotalRequired,
       Currency: data.Currency,
+      Discount: discount,
+      DiscountDate: data.DiscountDate,
+      HasDiscount: discount > 0,
+      NetRequired: netRequired,
     },
     payment: {
       PaymentDateTime: data.Dateofpayment || new Date(),
@@ -205,6 +220,18 @@ async function getDefaultTemplatePath(): Promise<string> {
  */
 function renderTemplate(templateHTML: string, data: TemplateData): string {
   let rendered = templateHTML;
+
+  // Handle {{#if path}}...{{/if}} blocks before placeholder substitution.
+  // The block renders only when resolveDataPath(path, data) is truthy (non-zero, non-empty).
+  rendered = rendered.replace(
+    /\{\{#if\s+([^}]+)\}\}([\s\S]*?)\{\{\/if\}\}/g,
+    (_, rawPath: string, body: string) => {
+      const value = resolveDataPath(rawPath.trim(), data);
+      const truthy = value !== null && value !== undefined && value !== false &&
+        value !== 0 && value !== '';
+      return truthy ? body : '';
+    }
+  );
 
   // Replace all {{placeholder}} occurrences
   rendered = rendered.replace(/\{\{([^}]+)\}\}/g, (_, placeholder: string) => {

@@ -213,6 +213,9 @@ export interface Work {
   KeywordID3?: number | null;
   KeywordID4?: number | null;
   KeywordID5?: number | null;
+  Discount?: number | null;
+  DiscountDate?: Date | null;
+  DiscountReason?: string | null;
 }
 
 /**
@@ -282,6 +285,9 @@ export interface WorkForInvoice {
   PatientName: string;
   Phone: string | null;
   TotalPaid: number;
+  Discount?: number | null;
+  DiscountDate?: Date | null;
+  DiscountReason?: string | null;
 }
 
 // ===========================================

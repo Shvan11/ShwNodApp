@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS aligner_batches (
     next_batch_ready_date DATE,
     notes VARCHAR(255),
     is_active BOOLEAN DEFAULT true,
+    has_upper_template BOOLEAN NOT NULL DEFAULT false,
+    has_lower_template BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

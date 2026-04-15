@@ -29,7 +29,8 @@ export type PaymentErrorCode =
   | 'NEGATIVE_CHANGE'
   | 'CHANGE_EXCEEDS_IQD_RECEIVED'
   | 'CHANGE_EXCEEDS_TOTAL_VALUE'
-  | 'WORK_NOT_FOUND';
+  | 'WORK_NOT_FOUND'
+  | 'PAYMENT_EXCEEDS_REMAINING';
 
 /**
  * Currency type
@@ -47,6 +48,10 @@ export interface PaymentErrorDetails {
   changeRequested?: number;
   workId?: number;
   amountPaid?: number;
+  totalRequired?: number;
+  discount?: number;
+  totalPaid?: number;
+  remaining?: number;
 }
 
 /**
@@ -250,6 +255,22 @@ export async function validateAndCreateInvoice(
   }
 
   const accountCurrency = workDetails.Currency || 'USD';
+
+  // Block overpayment: amountPaid must not exceed remaining balance
+  // Remaining = TotalRequired - Discount - TotalPaid
+  const totalRequired = Number(workDetails.TotalRequired ?? 0);
+  const discount = Number(workDetails.Discount ?? 0);
+  const totalPaid = Number(workDetails.TotalPaid ?? 0);
+  const remaining = totalRequired - discount - totalPaid;
+  const requestedAmount = Number(amountPaid) || 0;
+
+  if (requestedAmount > remaining) {
+    throw new PaymentValidationError(
+      `Payment (${requestedAmount}) exceeds remaining balance (${remaining}). Total ${totalRequired}, discount ${discount}, already paid ${totalPaid}.`,
+      'PAYMENT_EXCEEDS_REMAINING',
+      { workId: workid, amountPaid: requestedAmount, totalRequired, discount, totalPaid, remaining }
+    );
+  }
 
   // Calculate and validate change
   const changeToSave = await calculateValidatedChange({

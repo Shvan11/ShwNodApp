@@ -6,6 +6,7 @@
 
 import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
+import { useGlobalState } from '../../contexts/GlobalStateContext';
 import styles from './NewWorkComponent.module.css';
 
 interface WorkType {
@@ -52,6 +53,9 @@ interface WorkFormData {
     KeywordID3: string;
     KeywordID4: string;
     KeywordID5: string;
+    Discount: number;
+    DiscountDate: string;
+    DiscountReason: string;
     createAsFinished: boolean;
 }
 
@@ -75,6 +79,10 @@ interface WorkResponse {
     KeywordID3?: number;
     KeywordID4?: number;
     KeywordID5?: number;
+    Discount?: number | null;
+    DiscountDate?: string | null;
+    DiscountReason?: string | null;
+    TotalPaid?: number;
 }
 
 interface NewWorkComponentProps {
@@ -118,13 +126,23 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
         KeywordID3: '',
         KeywordID4: '',
         KeywordID5: '',
+        Discount: 0,
+        DiscountDate: '',
+        DiscountReason: '',
         createAsFinished: false
     });
 
     // Display state for formatted values
     const [displayValues, setDisplayValues] = useState({
-        TotalRequired: ''
+        TotalRequired: '',
+        Discount: ''
     });
+
+    // Existing work financial snapshot (for discount validation)
+    const [existingTotalPaid, setExistingTotalPaid] = useState<number>(0);
+
+    const { user } = useGlobalState();
+    const isAdmin = user?.role === 'admin';
 
     useEffect(() => {
         loadDropdownData();
@@ -135,10 +153,18 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
 
     // Auto-format display value when formData changes
     useEffect(() => {
-        setDisplayValues({
+        setDisplayValues(prev => ({
+            ...prev,
             TotalRequired: formatNumber(formData.TotalRequired)
-        });
+        }));
     }, [formData.TotalRequired]);
+
+    useEffect(() => {
+        setDisplayValues(prev => ({
+            ...prev,
+            Discount: formData.Discount ? formatNumber(formData.Discount) : ''
+        }));
+    }, [formData.Discount]);
 
     const loadDropdownData = async () => {
         try {
@@ -179,6 +205,8 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
             const work = works.find(w => w.workid === workId);
 
             if (work) {
+                const discountDateISO = work.DiscountDate ? new Date(work.DiscountDate).toISOString().split('T')[0] : '';
+                const discountValue = Number(work.Discount ?? 0);
                 setFormData({
                     PersonID: String(work.PersonID),
                     TotalRequired: work.TotalRequired ?? 0, // Use nullish coalescing to preserve 0
@@ -198,8 +226,12 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     KeywordID3: String(work.KeywordID3 || ''),
                     KeywordID4: String(work.KeywordID4 || ''),
                     KeywordID5: String(work.KeywordID5 || ''),
+                    Discount: discountValue,
+                    DiscountDate: discountDateISO,
+                    DiscountReason: work.DiscountReason || '',
                     createAsFinished: false
                 });
+                setExistingTotalPaid(Number(work.TotalPaid ?? 0));
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An error occurred');
@@ -240,21 +272,36 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 // Update existing work
                 // Send all fields - backend middleware handles authorization
                 // Backend will reject money field updates for old works if user is secretary
+                const discountNum = Number(formData.Discount) || 0;
+                const updatePayload: Record<string, unknown> = {
+                    workId,
+                    ...formData,
+                    Discount: discountNum > 0 ? discountNum : null,
+                    DiscountDate: discountNum > 0
+                        ? (formData.DiscountDate || new Date().toISOString().split('T')[0])
+                        : null,
+                    DiscountReason: discountNum > 0 ? (formData.DiscountReason || null) : null
+                };
+                // Non-admin: don't send Discount/DiscountDate so backend doesn't 403
+                if (!isAdmin) {
+                    delete updatePayload.Discount;
+                    delete updatePayload.DiscountDate;
+                }
                 response = await fetch('/api/updatework', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        workId,
-                        ...formData
-                    })
+                    body: JSON.stringify(updatePayload)
                 });
             } else {
                 // Add new work - use special endpoint if createAsFinished is true
+                // Strip discount fields from creation payload (not supported at creation)
+                const { Discount: _d, DiscountDate: _dd, DiscountReason: _dr, ...creationData } = formData;
+                void _d; void _dd; void _dr;
                 const endpoint = formData.createAsFinished ? '/api/addWorkWithInvoice' : '/api/addwork';
                 response = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData)
+                    body: JSON.stringify(creationData)
                 });
             }
 
@@ -316,10 +363,17 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
             }
 
             // Now add the new work
+            const pendingCreation = pendingFormData
+                ? (() => {
+                      const { Discount: _d, DiscountDate: _dd, DiscountReason: _dr, ...rest } = pendingFormData;
+                      void _d; void _dd; void _dr;
+                      return rest;
+                  })()
+                : pendingFormData;
             const addResponse = await fetch('/api/addwork', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(pendingFormData)
+                body: JSON.stringify(pendingCreation)
             });
 
             if (!addResponse.ok) {
@@ -602,10 +656,10 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                     // Auto-switch to IQD if amount > 10,000 (USD amounts are typically < 10,000)
                                     const newCurrency = numericValue > 10000 ? 'IQD' : formData.Currency;
                                     setFormData({...formData, TotalRequired: numericValue, Currency: newCurrency});
-                                    setDisplayValues({TotalRequired: e.target.value});
+                                    setDisplayValues(prev => ({...prev, TotalRequired: e.target.value}));
                                 }}
                                 onBlur={() => {
-                                    setDisplayValues({TotalRequired: formatNumber(formData.TotalRequired)});
+                                    setDisplayValues(prev => ({...prev, TotalRequired: formatNumber(formData.TotalRequired)}));
                                 }}
                                 placeholder="Enter amount (defaults to 0)"
                             />
@@ -643,6 +697,71 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 </small>
                             </div>
                         </div>
+                    )}
+
+                    {workId && (
+                        <>
+                            <div className={styles.formRow}>
+                                <div className={styles.formGroup}>
+                                    <label>
+                                        Discount
+                                        {!isAdmin && (
+                                            <small className={styles.formHint} style={{ marginLeft: 8 }}>
+                                                <i className="fas fa-lock"></i> Admin only
+                                            </small>
+                                        )}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={displayValues.Discount}
+                                        disabled={!isAdmin}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                                            const numericValue = parseFormattedNumber(e.target.value) || 0;
+                                            setFormData({ ...formData, Discount: numericValue });
+                                            setDisplayValues(prev => ({ ...prev, Discount: e.target.value }));
+                                        }}
+                                        onBlur={() => {
+                                            setDisplayValues(prev => ({
+                                                ...prev,
+                                                Discount: formData.Discount ? formatNumber(formData.Discount) : ''
+                                            }));
+                                        }}
+                                        placeholder="0"
+                                    />
+                                    {formData.Discount > 0 && formData.Discount > (formData.TotalRequired - existingTotalPaid) && (
+                                        <small className={`${styles.formHint} ${styles.textWarning}`}>
+                                            <i className="fas fa-exclamation-triangle"></i> Discount cannot exceed Total Required minus Total Paid ({formatNumber(formData.TotalRequired - existingTotalPaid)} {formData.Currency})
+                                        </small>
+                                    )}
+                                </div>
+
+                                <div className={styles.formGroup}>
+                                    <label>Discount Date</label>
+                                    <input
+                                        type="date"
+                                        value={formData.DiscountDate}
+                                        disabled={!isAdmin || formData.Discount <= 0}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, DiscountDate: e.target.value })}
+                                    />
+                                    {isAdmin && formData.Discount > 0 && !formData.DiscountDate && (
+                                        <small className={styles.formHint}>
+                                            Will default to today if left blank
+                                        </small>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className={`${styles.formGroup} ${styles.fullWidth}`}>
+                                <label>Discount Reason <small style={{ fontWeight: 'normal', opacity: 0.7 }}>(optional)</small></label>
+                                <textarea
+                                    value={formData.DiscountReason}
+                                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, DiscountReason: e.target.value })}
+                                    rows={2}
+                                    maxLength={500}
+                                    placeholder="Why was the discount granted? (visible on work card, not on receipt)"
+                                />
+                            </div>
+                        </>
                     )}
 
                     <div className={styles.formRow}>

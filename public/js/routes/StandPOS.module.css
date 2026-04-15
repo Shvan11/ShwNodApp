@@ -53,6 +53,11 @@
   align-items: flex-start;
 }
 
+.scanInputs > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .posRight {
   position: sticky;
   top: var(--spacing-lg);

@@ -57,6 +57,7 @@ import {
   validateAndDeleteWork,
   validateAndTransferWork,
   getTransferPreview,
+  validateDiscount,
   WorkValidationError,
   type WorkStatusType,
   type WorkErrorDetails,
@@ -152,6 +153,9 @@ interface UpdateWorkBody {
   KeywordID3?: number;
   KeywordID4?: number;
   KeywordID5?: number;
+  Discount?: number | null;
+  DiscountDate?: string | null;
+  DiscountReason?: string | null;
 }
 
 interface WorkStatusBody {
@@ -482,7 +486,8 @@ router.put(
         'DebondDate',
         'FPhotoDate',
         'IPhotoDate',
-        'NotesDate'
+        'NotesDate',
+        'DiscountDate'
       ];
       for (const field of dateFields) {
         const value = (workData as Record<string, unknown>)[field];
@@ -572,6 +577,59 @@ router.put(
         }
       }
       // ===== END FINANCIAL FIELDS PERMISSION CHECK =====
+
+      // ===== DISCOUNT FIELDS PERMISSION + VALIDATION =====
+      // Discount and DiscountDate are admin-only (financial concession).
+      // DiscountReason is editable by any authenticated user.
+      const discountAdminFields = ['Discount', 'DiscountDate'] as const;
+      const hasDiscountFieldInPayload = discountAdminFields.some((field) =>
+        Object.prototype.hasOwnProperty.call(workData, field)
+      );
+
+      if (hasDiscountFieldInPayload) {
+        // Fetch work with TotalPaid (needed for DISCOUNT_EXCEEDS_REMAINING check)
+        const workWithPaid = await getWorkDetailsFromQueries(parseInt(String(workId)));
+        if (!workWithPaid) {
+          ErrorResponses.notFound(res, 'Work not found');
+          return;
+        }
+
+        const discountChanged = workData.Discount !== undefined &&
+          Number(workData.Discount ?? 0) !== Number(workWithPaid.Discount ?? 0);
+        const discountDateChanged = workData.DiscountDate !== undefined &&
+          String(workData.DiscountDate ?? '') !== String(workWithPaid.DiscountDate ?? '');
+
+        if ((discountChanged || discountDateChanged) && req.session?.userRole !== 'admin') {
+          res.status(403).json({
+            error: 'Forbidden',
+            message: 'Only admin can add or edit discount.',
+            restrictedFields: [...discountAdminFields]
+          });
+          return;
+        }
+
+        if (discountChanged) {
+          try {
+            validateDiscount(
+              workData.Discount ?? null,
+              workWithPaid.TotalRequired,
+              (workWithPaid as { TotalPaid?: number }).TotalPaid ?? 0
+            );
+          } catch (err) {
+            if (err instanceof WorkValidationError) {
+              res.status(400).json({
+                error: 'Invalid discount',
+                code: err.code,
+                message: err.message,
+                details: err.details
+              });
+              return;
+            }
+            throw err;
+          }
+        }
+      }
+      // ===== END DISCOUNT FIELDS =====
 
       const { updateWork } = await import(
         '../../services/database/queries/work-queries.js'

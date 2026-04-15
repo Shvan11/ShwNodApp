@@ -80,8 +80,8 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
 
     // Template option - only for first batch (when no existing batches OR editing the first batch)
     // Separate controls for upper and lower
-    const [includeUpperTemplate, setIncludeUpperTemplate] = useState<boolean>(true);
-    const [includeLowerTemplate, setIncludeLowerTemplate] = useState<boolean>(true);
+    const [hasUpperTemplate, setHasUpperTemplate] = useState<boolean>(true);
+    const [hasLowerTemplate, setHasLowerTemplate] = useState<boolean>(true);
     const isFirstBatch = existingBatches.length === 0;
     // When editing, check if this batch is the first one (no other batch has a lower sequence)
     const isEditingFirstBatch = batch && !existingBatches.some(b =>
@@ -114,14 +114,13 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                     UpperAlignerEndSequence: batch.UpperAlignerEndSequence ?? null,
                     LowerAlignerEndSequence: batch.LowerAlignerEndSequence ?? null
                 });
-                // When editing first batch, determine includeTemplate from current start sequence
-                // Start sequence of 0 means template was included
+                // When editing first batch, read template flags directly from the batch
                 const isFirstBatchEdit = !existingBatches.some(b =>
                     b.AlignerBatchID !== batch.AlignerBatchID && b.BatchSequence < batch.BatchSequence
                 );
                 if (isFirstBatchEdit) {
-                    setIncludeUpperTemplate(batch.UpperAlignerStartSequence === 0);
-                    setIncludeLowerTemplate(batch.LowerAlignerStartSequence === 0);
+                    setHasUpperTemplate(batch.HasUpperTemplate ?? false);
+                    setHasLowerTemplate(batch.HasLowerTemplate ?? false);
                 }
             } else {
                 // Add mode - calculate next batch sequence and start sequences
@@ -140,11 +139,9 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
 
                     upperStart = (lastBatch.UpperAlignerEndSequence || 0) + 1;
                     lowerStart = (lastBatch.LowerAlignerEndSequence || 0) + 1;
-                } else {
-                    // First batch - start from 0 if includeTemplate is true (default)
-                    upperStart = 0;
-                    lowerStart = 0;
                 }
+                // First batch defaults to start=1 (no template); the template effect below
+                // shifts it to 0 if the user enables HasUpperTemplate/HasLowerTemplate.
 
                 setFormData({
                     BatchSequence: nextBatchSequence,
@@ -168,9 +165,9 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                     LowerAlignerEndSequence: null
                 });
 
-                // Reset includeTemplate to true for first batch
-                setIncludeUpperTemplate(true);
-                setIncludeLowerTemplate(true);
+                // Default template flags to false for new batches (user can opt in on first batch)
+                setHasUpperTemplate(false);
+                setHasLowerTemplate(false);
             }
             setErrors({});
         }
@@ -178,16 +175,16 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         previousIsOpenRef.current = isOpen;
     }, [isOpen, batch, existingBatches, set?.Days]);
 
-    // Update start sequences when includeTemplate checkboxes change (for first batch - add or edit)
+    // Update start sequences when template flag checkboxes change (for first batch - add or edit)
     useEffect(() => {
         if (canChangeTemplateOption) {
             setComputedFields(prev => ({
                 ...prev,
-                UpperAlignerStartSequence: includeUpperTemplate ? 0 : 1,
-                LowerAlignerStartSequence: includeLowerTemplate ? 0 : 1
+                UpperAlignerStartSequence: hasUpperTemplate ? 0 : 1,
+                LowerAlignerStartSequence: hasLowerTemplate ? 0 : 1
             }));
         }
-    }, [includeUpperTemplate, includeLowerTemplate, canChangeTemplateOption]);
+    }, [hasUpperTemplate, hasLowerTemplate, canChangeTemplateOption]);
 
     // Auto-calculate end sequences when counts change
     useEffect(() => {
@@ -230,27 +227,35 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             newErrors.IsActive = 'Cannot mark as active: batch must be delivered first';
         }
 
-        // Validate upper aligner count doesn't exceed remaining
+        // Real aligners consumed = total slots in batch minus the template slot (if any).
+        // Only the first batch can carry a template; non-first batches ignore the flag.
+        const newHasUpperTpl = canChangeTemplateOption && hasUpperTemplate;
+        const newHasLowerTpl = canChangeTemplateOption && hasLowerTemplate;
+
+        // Validate upper aligner consumption doesn't exceed remaining
         if (set && formData.UpperAlignerCount) {
             const upperCount = parseInt(String(formData.UpperAlignerCount));
-            // When editing, add back the current batch's count to get available total
-            const currentUpperCount = batch ? (parseInt(String(batch.UpperAlignerCount)) || 0) : 0;
-            const availableUpper = (set.RemainingUpperAligners || 0) + currentUpperCount;
+            const upperConsumed = upperCount - (newHasUpperTpl ? 1 : 0);
+            // When editing, add back this batch's prior real consumption to get available total
+            const oldUpperCount = batch ? (parseInt(String(batch.UpperAlignerCount)) || 0) : 0;
+            const oldUpperConsumed = batch ? oldUpperCount - (batch.HasUpperTemplate ? 1 : 0) : 0;
+            const availableUpper = (set.RemainingUpperAligners || 0) + oldUpperConsumed;
 
-            if (!isNaN(upperCount) && upperCount > availableUpper) {
-                newErrors.UpperAlignerCount = `Cannot exceed ${availableUpper} available upper aligners (${set.RemainingUpperAligners} remaining + ${currentUpperCount} from this batch)`;
+            if (!isNaN(upperCount) && upperConsumed > availableUpper) {
+                newErrors.UpperAlignerCount = `Cannot exceed ${availableUpper} available upper aligners (${set.RemainingUpperAligners} remaining + ${oldUpperConsumed} from this batch)`;
             }
         }
 
-        // Validate lower aligner count doesn't exceed remaining
+        // Validate lower aligner consumption doesn't exceed remaining
         if (set && formData.LowerAlignerCount) {
             const lowerCount = parseInt(String(formData.LowerAlignerCount));
-            // When editing, add back the current batch's count to get available total
-            const currentLowerCount = batch ? (parseInt(String(batch.LowerAlignerCount)) || 0) : 0;
-            const availableLower = (set.RemainingLowerAligners || 0) + currentLowerCount;
+            const lowerConsumed = lowerCount - (newHasLowerTpl ? 1 : 0);
+            const oldLowerCount = batch ? (parseInt(String(batch.LowerAlignerCount)) || 0) : 0;
+            const oldLowerConsumed = batch ? oldLowerCount - (batch.HasLowerTemplate ? 1 : 0) : 0;
+            const availableLower = (set.RemainingLowerAligners || 0) + oldLowerConsumed;
 
-            if (!isNaN(lowerCount) && lowerCount > availableLower) {
-                newErrors.LowerAlignerCount = `Cannot exceed ${availableLower} available lower aligners (${set.RemainingLowerAligners} remaining + ${currentLowerCount} from this batch)`;
+            if (!isNaN(lowerCount) && lowerConsumed > availableLower) {
+                newErrors.LowerAlignerCount = `Cannot exceed ${availableLower} available lower aligners (${set.RemainingLowerAligners} remaining + ${oldLowerConsumed} from this batch)`;
             }
         }
 
@@ -273,14 +278,23 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             return;
         }
 
-        // Check if remaining aligners would hit 0 after this save
+        // Check if remaining aligners would hit 0 after this save.
+        // Use real aligner consumption (total slots minus template slot), not raw counts.
+        const newHasUpperTpl = canChangeTemplateOption && hasUpperTemplate;
+        const newHasLowerTpl = canChangeTemplateOption && hasLowerTemplate;
+
         const upperCount = parseInt(String(formData.UpperAlignerCount)) || 0;
         const lowerCount = parseInt(String(formData.LowerAlignerCount)) || 0;
-        const currentUpperCount = batch ? (parseInt(String(batch.UpperAlignerCount)) || 0) : 0;
-        const currentLowerCount = batch ? (parseInt(String(batch.LowerAlignerCount)) || 0) : 0;
+        const newUpperConsumed = upperCount - (newHasUpperTpl ? 1 : 0);
+        const newLowerConsumed = lowerCount - (newHasLowerTpl ? 1 : 0);
 
-        const newRemainingUpper = (set?.RemainingUpperAligners ?? 0) + currentUpperCount - upperCount;
-        const newRemainingLower = (set?.RemainingLowerAligners ?? 0) + currentLowerCount - lowerCount;
+        const oldUpperCount = batch ? (parseInt(String(batch.UpperAlignerCount)) || 0) : 0;
+        const oldLowerCount = batch ? (parseInt(String(batch.LowerAlignerCount)) || 0) : 0;
+        const oldUpperConsumed = batch ? oldUpperCount - (batch.HasUpperTemplate ? 1 : 0) : 0;
+        const oldLowerConsumed = batch ? oldLowerCount - (batch.HasLowerTemplate ? 1 : 0) : 0;
+
+        const newRemainingUpper = (set?.RemainingUpperAligners ?? 0) + oldUpperConsumed - newUpperConsumed;
+        const newRemainingLower = (set?.RemainingLowerAligners ?? 0) + oldLowerConsumed - newLowerConsumed;
 
         let markAsLast = false;
         if (newRemainingUpper === 0 && newRemainingLower === 0 && !formData.IsLast) {
@@ -301,8 +315,8 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                 AlignerSetID: set?.AlignerSetID,
                 UpperAlignerStartSequence: computedFields.UpperAlignerStartSequence,
                 LowerAlignerStartSequence: computedFields.LowerAlignerStartSequence,
-                IncludeUpperTemplate: canChangeTemplateOption ? includeUpperTemplate : undefined,
-                IncludeLowerTemplate: canChangeTemplateOption ? includeLowerTemplate : undefined
+                HasUpperTemplate: canChangeTemplateOption ? hasUpperTemplate : undefined,
+                HasLowerTemplate: canChangeTemplateOption ? hasLowerTemplate : undefined
             };
 
             const url = batch
@@ -483,11 +497,11 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                         <div className="form-field-checkbox form-field-checkbox-compact">
                                             <input
                                                 type="checkbox"
-                                                id="IncludeUpperTemplate"
-                                                checked={includeUpperTemplate}
-                                                onChange={(e: ChangeEvent<HTMLInputElement>) => setIncludeUpperTemplate(e.target.checked)}
+                                                id="HasUpperTemplate"
+                                                checked={hasUpperTemplate}
+                                                onChange={(e: ChangeEvent<HTMLInputElement>) => setHasUpperTemplate(e.target.checked)}
                                             />
-                                            <label htmlFor="IncludeUpperTemplate">
+                                            <label htmlFor="HasUpperTemplate">
                                                 Include Template (Start from 0)
                                             </label>
                                         </div>
@@ -550,11 +564,11 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                         <div className="form-field-checkbox form-field-checkbox-compact">
                                             <input
                                                 type="checkbox"
-                                                id="IncludeLowerTemplate"
-                                                checked={includeLowerTemplate}
-                                                onChange={(e: ChangeEvent<HTMLInputElement>) => setIncludeLowerTemplate(e.target.checked)}
+                                                id="HasLowerTemplate"
+                                                checked={hasLowerTemplate}
+                                                onChange={(e: ChangeEvent<HTMLInputElement>) => setHasLowerTemplate(e.target.checked)}
                                             />
-                                            <label htmlFor="IncludeLowerTemplate">
+                                            <label htmlFor="HasLowerTemplate">
                                                 Include Template (Start from 0)
                                             </label>
                                         </div>

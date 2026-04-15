@@ -1,6 +1,11 @@
 -- Migration: Rename NextBatchReadyDate to BatchExpiryDate
 -- Purpose: Clarify that this column represents when THIS batch expires, not when next is ready
 -- Also updates v_allsets to calculate NextDueDate from latest DELIVERED batch
+--
+-- ⚠️ The column rename (Step 1) and v_allsets rewrite (Step 2) are still the
+--   authoritative history for those objects. The trg_sync_tblAlignerBatches
+--   body in Step 3 is STALE — superseded by
+--   update_batch_sync_trigger_template_flag.sql. Do not copy from Step 3.
 
 SET QUOTED_IDENTIFIER ON;
 GO

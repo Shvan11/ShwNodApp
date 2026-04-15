@@ -206,14 +206,21 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
   };
 
   const handleImageSelect = (e: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length > 3) {
+    const newFiles = Array.from(e.target.files || []);
+    if (newFiles.length === 0) return;
+    const combined = [...scanImages, ...newFiles];
+    if (combined.length > 3) {
       toast.warning('Maximum 3 images allowed');
-      return;
+      const allowed = newFiles.slice(0, 3 - scanImages.length);
+      if (allowed.length === 0) return;
+      setScanImages((prev) => [...prev, ...allowed]);
+      setScanPreviews((prev) => [...prev, ...allowed.map((f) => URL.createObjectURL(f))]);
+    } else {
+      setScanImages(combined);
+      setScanPreviews((prev) => [...prev, ...newFiles.map((f) => URL.createObjectURL(f))]);
     }
-    scanPreviews.forEach((url) => URL.revokeObjectURL(url));
-    setScanImages(files);
-    setScanPreviews(files.map((f) => URL.createObjectURL(f)));
+    // Reset input so the same file can be re-selected
+    e.target.value = '';
   };
 
   const handleRemoveImage = (index: number) => {
@@ -370,7 +377,6 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
                     <input
                       type="file"
                       accept="image/*"
-                      capture="environment"
                       multiple
                       onChange={handleImageSelect}
                       className={styles.visionFileInput}

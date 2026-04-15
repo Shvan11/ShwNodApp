@@ -162,6 +162,8 @@ interface AlignerBatch {
   Notes: string | null;
   IsActive: boolean;
   IsLast: boolean;
+  HasUpperTemplate: boolean;
+  HasLowerTemplate: boolean;
 }
 
 interface BatchData {
@@ -172,8 +174,8 @@ interface BatchData {
   Days?: number | null;
   Notes?: string | null;
   IsActive?: boolean;
-  IncludeUpperTemplate?: boolean;
-  IncludeLowerTemplate?: boolean;
+  HasUpperTemplate?: boolean;
+  HasLowerTemplate?: boolean;
   IsLast?: boolean;
   BatchSequence?: number;
   AlignersInBatch?: number;
@@ -1015,7 +1017,9 @@ export async function getBatchesBySetId(setId: number): Promise<AlignerBatch[]> 
       BatchExpiryDate,
       Notes,
       IsActive,
-      IsLast
+      IsLast,
+      HasUpperTemplate,
+      HasLowerTemplate
     FROM tblAlignerBatches
     WHERE AlignerSetID = @setId
     ORDER BY BatchSequence
@@ -1043,6 +1047,8 @@ export async function getBatchesBySetId(setId: number): Promise<AlignerBatch[]> 
       Notes: columns[15].value as string | null,
       IsActive: columns[16].value as boolean,
       IsLast: columns[17].value as boolean,
+      HasUpperTemplate: columns[18].value as boolean,
+      HasLowerTemplate: columns[19].value as boolean,
     })
   );
 }
@@ -1060,8 +1066,8 @@ export async function createBatch(batchData: BatchData): Promise<number | null> 
     Days,
     Notes,
     IsActive,
-    IncludeUpperTemplate,
-    IncludeLowerTemplate,
+    HasUpperTemplate,
+    HasLowerTemplate,
     IsLast,
   } = batchData;
 
@@ -1075,8 +1081,8 @@ export async function createBatch(batchData: BatchData): Promise<number | null> 
     ['Notes', TYPES.NVarChar, Notes || null],
     ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : false],  // Default false, set when delivered
     ['IsLast', TYPES.Bit, IsLast !== undefined ? IsLast : false],
-    ['IncludeUpperTemplate', TYPES.Bit, IncludeUpperTemplate !== undefined ? IncludeUpperTemplate : true],
-    ['IncludeLowerTemplate', TYPES.Bit, IncludeLowerTemplate !== undefined ? IncludeLowerTemplate : true],
+    ['HasUpperTemplate', TYPES.Bit, HasUpperTemplate ?? false],
+    ['HasLowerTemplate', TYPES.Bit, HasLowerTemplate ?? false],
   ];
 
   // Add output parameter for NewBatchID
@@ -1123,6 +1129,8 @@ export async function updateBatch(
     IsActive,
     Days,
     IsLast,
+    HasUpperTemplate,
+    HasLowerTemplate,
   } = batchData;
 
   const params: SqlParam[] = [
@@ -1134,6 +1142,8 @@ export async function updateBatch(
     ['Notes', TYPES.NVarChar, Notes || null],
     ['IsActive', TYPES.Bit, IsActive !== undefined ? IsActive : null],
     ['IsLast', TYPES.Bit, IsLast !== undefined ? IsLast : null],
+    ['HasUpperTemplate', TYPES.Bit, HasUpperTemplate !== undefined ? HasUpperTemplate : null],
+    ['HasLowerTemplate', TYPES.Bit, HasLowerTemplate !== undefined ? HasLowerTemplate : null],
   ];
 
   // Row mapper for deactivated batch info (if SP returns a result set)
@@ -1602,7 +1612,9 @@ export async function getBatchById(batchId: number): Promise<AlignerBatch[]> {
       Days,
       Notes,
       IsActive,
-      IsLast
+      IsLast,
+      HasUpperTemplate,
+      HasLowerTemplate
     FROM tblAlignerBatches
     WHERE AlignerBatchID = @batchId
   `;
@@ -1629,6 +1641,8 @@ export async function getBatchById(batchId: number): Promise<AlignerBatch[]> {
       Notes: columns[13].value as string | null,
       IsActive: columns[14].value as boolean,
       IsLast: columns[15].value as boolean,
+      HasUpperTemplate: columns[16].value as boolean,
+      HasLowerTemplate: columns[17].value as boolean,
     })
   );
 }

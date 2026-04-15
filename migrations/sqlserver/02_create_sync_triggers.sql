@@ -1,6 +1,16 @@
 -- =============================================
 -- SQL Server Triggers for Automatic Sync
 -- =============================================
+-- ⚠️ PARTIAL HISTORY — verify live bodies before copying from this file.
+--   Current state of the triggers defined here (verified via sys.sql_modules):
+--     • trg_sync_AlignerDoctors    — live body still matches this file;
+--         also re-installed identically by 08_install_aligner_doctors_trigger.sql.
+--     • trg_sync_tblAlignerSets    — SUPERSEDED by optimize_aligner_sets_sync_trigger.sql.
+--     • trg_sync_tblAlignerBatches — SUPERSEDED by update_batch_sync_trigger_template_flag.sql.
+--     • trg_sync_tblAlignerNotes   — live body still matches this file (INSERT/UPDATE).
+--         07_add_aligner_notes_delete_trigger.sql adds a *separate* DELETE trigger.
+--   Always read sys.sql_modules for the authoritative current body.
+--
 -- These triggers capture changes and add them to SyncQueue
 
 -- ============================================

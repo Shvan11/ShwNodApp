@@ -41,6 +41,16 @@ import { log } from '../../utils/logger.js';
 
 const router = Router();
 
+// Singleton Gemini client — created once, reused across requests
+let geminiClient: InstanceType<typeof GoogleGenAI> | null = null;
+function getGeminiClient(): GoogleGenAI | null {
+  if (geminiClient) return geminiClient;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  geminiClient = new GoogleGenAI({ apiKey });
+  return geminiClient;
+}
+
 // ============================================================================
 // HELPER: Catch StandValidationError and convert to 400
 // ============================================================================
@@ -187,14 +197,12 @@ router.post(
         }
       }
 
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
+      const ai = getGeminiClient();
+      if (!ai) {
         log.error('GEMINI_API_KEY is not configured');
         ErrorResponses.internalError(res, 'Vision scanning is not configured');
         return;
       }
-
-      const ai = new GoogleGenAI({ apiKey });
 
       const imageParts = images.map((base64Str) => {
         const match = base64Str.match(/^data:(image\/\w+);base64,(.+)$/);

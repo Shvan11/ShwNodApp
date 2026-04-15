@@ -25,6 +25,9 @@ export interface Work {
     KeywordID3?: number;
     KeywordID4?: number;
     KeywordID5?: number;
+    Discount?: number | null;
+    DiscountDate?: string | null;
+    DiscountReason?: string | null;
 }
 
 export interface WorkStatus {
@@ -101,8 +104,10 @@ const WorkCard = ({
     const isFinished = work.Status === WORK_STATUS.FINISHED;
     const isDiscontinued = work.Status === WORK_STATUS.DISCONTINUED;
 
+    const getDiscount = (): number => Number(work.Discount ?? 0);
+
     const getRemainingBalance = (): number => {
-        return (work.TotalRequired || 0) - (work.TotalPaid || 0);
+        return (work.TotalRequired || 0) - getDiscount() - (work.TotalPaid || 0);
     };
 
     const isFullyPaid = (): boolean => {
@@ -212,6 +217,22 @@ const WorkCard = ({
                             <span className={styles.financialLabel}>Total Cost</span>
                             <span className={styles.financialValue}>{formatCurrency(work.TotalRequired, work.Currency)}</span>
                         </div>
+                        {getDiscount() > 0 && (
+                            <>
+                                <div className={styles.financialItem}>
+                                    <span className={styles.financialLabel}>Discount</span>
+                                    <span className={styles.financialValue} style={{ color: 'var(--warning-color, #c77700)' }}>
+                                        -{formatCurrency(getDiscount(), work.Currency)}
+                                    </span>
+                                </div>
+                                <div className={styles.financialItem}>
+                                    <span className={styles.financialLabel}>Net</span>
+                                    <span className={styles.financialValue} style={{ fontWeight: 'bold' }}>
+                                        {formatCurrency((work.TotalRequired || 0) - getDiscount(), work.Currency)}
+                                    </span>
+                                </div>
+                            </>
+                        )}
                         <div className={styles.financialItem}>
                             <span className={styles.financialLabel}>Paid</span>
                             <span className={cn(styles.financialValue, styles.financialValuePaid)}>{formatCurrency(work.TotalPaid, work.Currency)}</span>
@@ -223,6 +244,17 @@ const WorkCard = ({
                             </span>
                         </div>
                     </div>
+
+                    {/* Discount badge with date and optional reason */}
+                    {getDiscount() > 0 && (
+                        <div className={styles.infoItem} style={{ marginTop: 'var(--spacing-sm, 8px)' }}>
+                            <i className="fas fa-tag" style={{ color: 'var(--warning-color, #c77700)' }}></i>
+                            <span>
+                                Discount applied{work.DiscountDate ? ` on ${formatDate(work.DiscountDate)}` : ''}
+                                {work.DiscountReason ? ` — ${work.DiscountReason}` : ''}
+                            </span>
+                        </div>
+                    )}
 
                     {/* Additional Details */}
                     {(work.Notes || work.EstimatedDuration || work.DebondDate || work.StartDate) && (

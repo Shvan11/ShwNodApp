@@ -101,17 +101,26 @@ interface UpdateSetBody {
 
 interface CreateBatchBody {
   AlignerSetID: number;
-  UpperCount?: number;
-  LowerCount?: number;
+  UpperAlignerCount?: number;
+  LowerAlignerCount?: number;
   IsActive?: boolean;
+  IsLast?: boolean;
   Notes?: string;
+  Days?: number;
+  HasUpperTemplate?: boolean;
+  HasLowerTemplate?: boolean;
 }
 
 interface UpdateBatchBody {
-  UpperCount?: number;
-  LowerCount?: number;
+  AlignerSetID?: number;
+  UpperAlignerCount?: number;
+  LowerAlignerCount?: number;
   IsActive?: boolean;
+  IsLast?: boolean;
   Notes?: string;
+  Days?: number;
+  HasUpperTemplate?: boolean;
+  HasLowerTemplate?: boolean;
 }
 
 interface CreateNoteBody {

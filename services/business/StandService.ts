@@ -142,19 +142,34 @@ export async function validateAndCreateSale(saleData: SaleInput) {
 
   const change = amountPaid - totalAmount;
 
-  // Create the sale transaction
-  const result = await createStandSaleTransaction({
-    items: resolvedItems,
-    totalAmount,
-    totalCost,
-    totalProfit,
-    amountPaid,
-    change,
-    paymentMethod,
-    customerNote,
-    personId,
-    cashierId,
-  });
+  let result;
+  try {
+    result = await createStandSaleTransaction({
+      items: resolvedItems,
+      totalAmount,
+      totalCost,
+      totalProfit,
+      amountPaid,
+      change,
+      paymentMethod,
+      customerNote,
+      personId,
+      cashierId,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const m = msg.match(/^INSUFFICIENT_STOCK:(\d+)$/);
+    if (m) {
+      const racedId = parseInt(m[1], 10);
+      const raced = resolvedItems.find((i) => i.itemId === racedId);
+      throw new StandValidationError(
+        `Insufficient stock for "${raced?.itemName ?? `item ${racedId}`}" — another sale drained inventory. Please reload and try again.`,
+        'INSUFFICIENT_STOCK',
+        { itemId: racedId, itemName: raced?.itemName, requested: raced?.quantity }
+      );
+    }
+    throw err;
+  }
 
   log.info(`Stand sale created: SaleID=${result.SaleID}, Total=${totalAmount}, Profit=${totalProfit}`);
 
@@ -228,7 +243,19 @@ export async function validateAndAdjustStock(
     );
   }
 
-  await adjustStock(itemId, delta, reason, userId);
+  try {
+    await adjustStock(itemId, delta, reason, userId);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'INSUFFICIENT_STOCK_FOR_ADJUSTMENT') {
+      throw new StandValidationError(
+        `Adjustment would result in negative stock for "${item.ItemName}" — stock changed concurrently.`,
+        'INSUFFICIENT_STOCK',
+        { itemId, currentStock: item.CurrentStock, delta }
+      );
+    }
+    throw err;
+  }
 
   log.info(`Stand stock adjusted: ItemID=${itemId}, Delta=${delta}, Reason="${reason}"`);
 }

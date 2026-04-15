@@ -47,7 +47,9 @@ export type WorkErrorCode =
   | 'WORK_NOT_FOUND'
   | 'TARGET_PATIENT_NOT_FOUND'
   | 'SAME_PATIENT'
-  | 'ACTIVE_WORK_CONFLICT';
+  | 'ACTIVE_WORK_CONFLICT'
+  | 'INVALID_DISCOUNT'
+  | 'DISCOUNT_EXCEEDS_REMAINING';
 
 /**
  * Work error details
@@ -429,6 +431,46 @@ export async function validateAndCreateWorkWithInvoice(
       );
     }
     throw error;
+  }
+}
+
+/**
+ * Validate a proposed discount amount against a work's TotalRequired and TotalPaid.
+ *
+ * Rules:
+ * - Discount must be a non-negative finite number
+ * - Discount + TotalPaid must not exceed TotalRequired (cannot create a refund situation)
+ *
+ * @param discount - Proposed discount amount (0 or null means no discount)
+ * @param totalRequired - Work's TotalRequired
+ * @param totalPaid - Current sum of invoices paid for this work
+ * @throws WorkValidationError when rules are violated
+ */
+export function validateDiscount(
+  discount: number | null | undefined,
+  totalRequired: number | null | undefined,
+  totalPaid: number
+): void {
+  if (discount == null || discount === 0) return;
+
+  if (!Number.isFinite(discount) || discount < 0) {
+    throw new WorkValidationError(
+      'Discount must be a non-negative number',
+      'INVALID_DISCOUNT',
+      { field: 'Discount', value: discount }
+    );
+  }
+
+  const total = Number(totalRequired ?? 0);
+  const paid = Number(totalPaid ?? 0);
+  const remaining = total - paid;
+
+  if (discount > remaining) {
+    throw new WorkValidationError(
+      `Discount (${discount}) cannot exceed remaining balance (${remaining}). Refund the difference first or lower the discount.`,
+      'DISCOUNT_EXCEEDS_REMAINING',
+      { field: 'Discount', value: discount, totalRequired: total, totalPaid: paid }
+    );
   }
 }
 

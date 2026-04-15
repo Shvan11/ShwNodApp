@@ -127,6 +127,8 @@ interface AlignerBatchRecord {
   is_active: boolean;
   creation_date?: Date;
   is_last?: boolean;
+  has_upper_template?: boolean;
+  has_lower_template?: boolean;
 }
 
 /**
@@ -377,7 +379,9 @@ class QueueProcessor {
                 ValidityPeriod as validity_period,
                 BatchExpiryDate as batch_expiry_date,
                 Notes as notes,
-                IsActive as is_active
+                IsActive as is_active,
+                HasUpperTemplate as has_upper_template,
+                HasLowerTemplate as has_lower_template
             FROM tblAlignerBatches
             WHERE AlignerBatchID = @batchId
         `;
@@ -402,6 +406,8 @@ class QueueProcessor {
         batch_expiry_date: columns[13].value as Date | null,
         notes: columns[14].value as string,
         is_active: columns[15].value as boolean,
+        has_upper_template: columns[16].value as boolean,
+        has_lower_template: columns[17].value as boolean,
       })
     );
 

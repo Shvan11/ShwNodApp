@@ -59,6 +59,8 @@ interface WorkForReceiptResult {
   workid: number;
   TotalRequired: number;
   Currency: string;
+  Discount: number | null;
+  DiscountDate: Date | null;
 }
 
 interface ExchangeRateBody {
@@ -146,7 +148,11 @@ router.get(
       }
 
       const result = await database.executeQuery<WorkForReceiptResult>(
-        'SELECT PersonID, PatientName, Phone, TotalPaid, AppDate, workid, TotalRequired, Currency FROM dbo.V_Report WHERE workid = @WorkID',
+        `SELECT v.PersonID, v.PatientName, v.Phone, v.TotalPaid, v.AppDate, v.workid, v.TotalRequired, v.Currency,
+                w.Discount, w.DiscountDate
+         FROM dbo.V_Report v
+         LEFT JOIN dbo.tblwork w ON v.workid = w.workid
+         WHERE v.workid = @WorkID`,
         [['WorkID', database.TYPES.Int, parseInt(workId)]],
         (columns) => ({
           PersonID: columns[0].value as number,
@@ -156,7 +162,9 @@ router.get(
           AppDate: columns[4].value as Date,
           workid: columns[5].value as number,
           TotalRequired: columns[6].value as number,
-          Currency: columns[7].value as string
+          Currency: columns[7].value as string,
+          Discount: columns[8].value as number | null,
+          DiscountDate: columns[9].value as Date | null
         })
       );
 

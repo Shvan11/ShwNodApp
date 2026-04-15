@@ -11,6 +11,9 @@ interface WorkData {
     TotalRequired?: number;
     TotalPaid?: number;
     Currency?: 'USD' | 'IQD';
+    Discount?: number | null;
+    DiscountDate?: string | null;
+    DiscountReason?: string | null;
 }
 
 interface ReceiptData extends WorkData {
@@ -251,7 +254,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
     const initializeFormData = () => {
         if (!workData) return;
-        const remainingBalance = (workData.TotalRequired || 0) - (workData.TotalPaid || 0);
+        const remainingBalance = (workData.TotalRequired || 0) - Number(workData.Discount ?? 0) - (workData.TotalPaid || 0);
         const accountCurrency = workData.Currency || 'IQD';
 
         setCalculations(prev => ({
@@ -683,6 +686,11 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             return;
         }
 
+        if (calculations.remainingBalance > 0 && amountPaid > calculations.remainingBalance) {
+            toast.error(`Amount exceeds remaining balance (${formatCurrency(calculations.remainingBalance, calculations.accountCurrency)})`);
+            return;
+        }
+
         if (calculations.isShort) {
             const confirm = window.confirm('Patient has not paid enough. Amount received is less than amount to register. Continue anyway?');
             if (!confirm) return;
@@ -746,7 +754,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                     usdReceived: actualUSD,
                     iqdReceived: actualIQD,
                     change: parseInt(String(formData.change)) || 0,
-                    newBalance: ((workData!.TotalRequired || 0) - (workData!.TotalPaid || 0) - amountPaid)
+                    newBalance: ((workData!.TotalRequired || 0) - Number(workData!.Discount ?? 0) - (workData!.TotalPaid || 0) - amountPaid)
                 });
 
                 if (onSuccess) {
@@ -885,6 +893,11 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                 <div className={styles.paymentBalanceBadge}>
                                     <span className={styles.balanceLabel}>Balance</span>
                                     <span className={styles.balanceAmount}>{formatCurrency(calculations.remainingBalance, calculations.accountCurrency)}</span>
+                                    {Number(workData.Discount ?? 0) > 0 && (
+                                        <span className={styles.balanceLabel} style={{ marginTop: 4 }}>
+                                            <i className="fas fa-tag"></i> {formatCurrency(Number(workData.Discount), calculations.accountCurrency)} discount applied
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>

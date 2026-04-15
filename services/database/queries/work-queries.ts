@@ -42,6 +42,9 @@ interface Work {
   KeywordID3: number | null;
   KeywordID4: number | null;
   KeywordID5: number | null;
+  Discount: number | null;
+  DiscountDate: Date | null;
+  DiscountReason: string | null;
   DoctorName: string | null;
   TypeName: string | null;
   StatusName: string | null;
@@ -98,6 +101,9 @@ interface WorkData {
   KeywordID3?: number | null;
   KeywordID4?: number | null;
   KeywordID5?: number | null;
+  Discount?: number | null;
+  DiscountDate?: Date | string | null;
+  DiscountReason?: string | null;
 }
 
 interface WorkItemData {
@@ -196,6 +202,9 @@ export async function getWorksByPatient(personId: number): Promise<Work[]> {
       w.KeywordID3,
       w.KeywordID4,
       w.KeywordID5,
+      w.Discount,
+      w.DiscountDate,
+      w.DiscountReason,
       e.employeeName as DoctorName,
       wt.WorkType as TypeName,
       ws.StatusName,
@@ -226,6 +235,7 @@ export async function getWorksByPatient(personId: number): Promise<Work[]> {
              w.Status, w.AdditionDate, w.StartDate, w.DebondDate, w.FPhotoDate,
              w.IPhotoDate, w.EstimatedDuration, w.DrID, w.NotesDate, w.KeyWordID1,
              w.KeyWordID2, w.KeywordID3, w.KeywordID4, w.KeywordID5,
+             w.Discount, w.DiscountDate, w.DiscountReason,
              e.employeeName, wt.WorkType, ws.StatusName, k1.KeyWord, k2.KeyWord, k3.KeyWord, k4.KeyWord, k5.KeyWord
     ORDER BY w.AdditionDate DESC`,
     [['PersonID', TYPES.Int, personId]],
@@ -263,6 +273,7 @@ export async function getWorkDetails(workId: number): Promise<WorkDetails | null
              w.Status, w.AdditionDate, w.StartDate, w.DebondDate, w.FPhotoDate,
              w.IPhotoDate, w.EstimatedDuration, w.DrID, w.NotesDate, w.KeyWordID1,
              w.KeyWordID2, w.KeywordID3, w.KeywordID4, w.KeywordID5,
+             w.Discount, w.DiscountDate, w.DiscountReason,
              e.employeeName, wt.WorkType, ws.StatusName, k1.KeyWord, k2.KeyWord, k3.KeyWord, k4.KeyWord, k5.KeyWord,
              p.PatientName`,
     [['WorkID', TYPES.Int, workId]],
@@ -518,6 +529,9 @@ export async function updateWork(
     KeywordID3: { param: 'KeywordID3', type: TYPES.Int, value: workData.KeywordID3 || null },
     KeywordID4: { param: 'KeywordID4', type: TYPES.Int, value: workData.KeywordID4 || null },
     KeywordID5: { param: 'KeywordID5', type: TYPES.Int, value: workData.KeywordID5 || null },
+    Discount: { param: 'Discount', type: TYPES.Int, value: workData.Discount ?? null },
+    DiscountDate: { param: 'DiscountDate', type: TYPES.Date, value: workData.DiscountDate || null },
+    DiscountReason: { param: 'DiscountReason', type: TYPES.NVarChar, value: workData.DiscountReason ?? null },
   };
 
   // Only include fields that are present in workData
