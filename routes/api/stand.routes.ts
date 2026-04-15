@@ -217,7 +217,7 @@ Look across all images to find missing data like expiry dates or barcodes.
 For the barcode, read the numbers printed under any barcode or near a QR code.
 For ItemName, combine the brand name and product name as shown on packaging.`;
 
-      const result = await ai.models.generateContent({
+      const generateRequest = {
         model: 'gemini-2.5-flash',
         contents: [
           {
@@ -240,7 +240,27 @@ For ItemName, combine the brand name and product name as shown on packaging.`;
             required: ['ItemName', 'CategorySuggestion', 'Unit', 'Notes'],
           },
         },
-      });
+      };
+
+      // Retry on transient overload errors (503 UNAVAILABLE) with exponential backoff
+      const MAX_ATTEMPTS = 3;
+      let result: Awaited<ReturnType<typeof ai.models.generateContent>> | null = null;
+      let lastError: unknown = null;
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          result = await ai.models.generateContent(generateRequest);
+          break;
+        } catch (err) {
+          lastError = err;
+          const msg = err instanceof Error ? err.message : String(err);
+          const isTransient = msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('overloaded');
+          if (!isTransient || attempt === MAX_ATTEMPTS) throw err;
+          const delayMs = 500 * 2 ** (attempt - 1) + Math.floor(Math.random() * 250);
+          log.warn('Gemini overloaded, retrying', { attempt, delayMs });
+          await new Promise((r) => setTimeout(r, delayMs));
+        }
+      }
+      if (!result) throw lastError ?? new Error('Vision scan failed');
 
       const parsed = JSON.parse(result.text ?? '{}');
 
@@ -253,6 +273,14 @@ For ItemName, combine the brand name and product name as shown on packaging.`;
         res.status(429).json({
           success: false,
           error: 'AI service is temporarily busy. Please try again in a moment.',
+        });
+        return;
+      }
+      if (errMsg.includes('503') || errMsg.includes('UNAVAILABLE') || errMsg.includes('overloaded')) {
+        log.warn('Gemini API overloaded after retries', { error: errMsg });
+        res.status(503).json({
+          success: false,
+          error: 'AI service is experiencing high demand. Please try again in a minute.',
         });
         return;
       }

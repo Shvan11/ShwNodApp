@@ -2,7 +2,7 @@
  * ItemFormModal Component
  * Modal for adding or editing a stand inventory item
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
 import type { StandItem } from '../../hooks/useStand';
 import { useStandCategories } from '../../hooks/useStand';
@@ -89,6 +89,20 @@ async function detectBarcode(files: File[]): Promise<string | null> {
   return null;
 }
 
+async function dataUrlToFile(dataUrl: string, name: string): Promise<File> {
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  return new File([blob], name, { type: blob.type || 'image/jpeg' });
+}
+
+const FORM_STORAGE_KEY = 'standInventory.itemForm';
+
+interface PersistedFormState {
+  itemId: number | null;
+  formData: FormData;
+  imageDataUrls: string[];
+}
+
 const UNIT_OPTIONS = ['piece', 'box', 'tube', 'bottle', 'pack'];
 
 const DEFAULT_FORM: FormData = {
@@ -115,6 +129,7 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
   const [scanImages, setScanImages] = useState<File[]>([]);
   const [scanPreviews, setScanPreviews] = useState<string[]>([]);
   const [scanning, setScanning] = useState(false);
+  const overlayMouseDownRef = useRef(false);
 
   const isEditMode = !!item;
 
@@ -124,10 +139,40 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
       setScanImages([]);
       setScanPreviews([]);
       setScanning(false);
+      sessionStorage.removeItem(FORM_STORAGE_KEY);
       return;
     }
 
-    if (item) {
+    let restored: PersistedFormState | null = null;
+    try {
+      const saved = sessionStorage.getItem(FORM_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as PersistedFormState;
+        const currentId = item?.ItemID ?? null;
+        if (parsed.itemId === currentId) restored = parsed;
+      }
+    } catch {
+      // ignore malformed storage
+    }
+
+    if (restored) {
+      setFormData(restored.formData);
+      setDisplayCost(restored.formData.costPrice ? formatNumber(restored.formData.costPrice) : '');
+      setDisplaySell(restored.formData.sellPrice ? formatNumber(restored.formData.sellPrice) : '');
+      if (restored.imageDataUrls.length > 0) {
+        (async () => {
+          try {
+            const files = await Promise.all(
+              restored!.imageDataUrls.map((url, i) => dataUrlToFile(url, `restored-${i}.jpg`))
+            );
+            setScanImages(files);
+            setScanPreviews(files.map((f) => URL.createObjectURL(f)));
+          } catch {
+            // ignore — user can re-shoot
+          }
+        })();
+      }
+    } else if (item) {
       setFormData({
         itemName: item.ItemName,
         sku: item.SKU || '',
@@ -150,6 +195,28 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
     }
     setErrors({});
   }, [isOpen, item]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const imageDataUrls = await Promise.all(
+          scanImages.map((file) => compressImage(file, 1024))
+        );
+        if (cancelled) return;
+        const payload: PersistedFormState = {
+          itemId: item?.ItemID ?? null,
+          formData,
+          imageDataUrls,
+        };
+        sessionStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(payload));
+      } catch {
+        // quota exceeded or compression failed — tolerate
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen, item, formData, scanImages]);
 
   const handleChange = (
     field: keyof FormData,
@@ -337,11 +404,18 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
     setScanImages([]);
     setScanPreviews([]);
     setScanning(false);
+    sessionStorage.removeItem(FORM_STORAGE_KEY);
     onClose();
   };
 
+  const handleOverlayMouseDown = (e: MouseEvent<HTMLDivElement>) => {
+    overlayMouseDownRef.current = e.target === e.currentTarget;
+  };
+
   const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
+    const startedOnOverlay = overlayMouseDownRef.current;
+    overlayMouseDownRef.current = false;
+    if (e.target === e.currentTarget && startedOnOverlay) {
       handleClose();
     }
   };
@@ -351,7 +425,7 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
   const profit = formData.sellPrice - formData.costPrice;
 
   return (
-    <div className="modal-overlay" onClick={handleOverlayClick}>
+    <div className="modal-overlay" onMouseDown={handleOverlayMouseDown} onClick={handleOverlayClick}>
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <h2>{isEditMode ? 'Edit Item' : 'Add New Item'}</h2>
@@ -370,9 +444,20 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
                   <span>Auto-Fill with AI</span>
                 </div>
                 <p className={styles.visionHint}>
-                  Take 1–3 photos of the product to auto-fill the form
+                  Shoot or pick 1–3 photos of the product to auto-fill the form
                 </p>
                 <div className={styles.visionControls}>
+                  <label className={styles.visionFileLabel}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleImageSelect}
+                      className={styles.visionFileInput}
+                      disabled={scanning}
+                    />
+                    Take Photo
+                  </label>
                   <label className={styles.visionFileLabel}>
                     <input
                       type="file"
@@ -382,7 +467,7 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
                       className={styles.visionFileInput}
                       disabled={scanning}
                     />
-                    Choose Photos
+                    Choose from Gallery
                   </label>
                   <button
                     type="button"

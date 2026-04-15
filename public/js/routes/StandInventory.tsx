@@ -1,12 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   useStandItems,
   useStandItemMutations,
 } from '../hooks/useStand';
 import type { StandItem, StandItemFilters } from '../hooks/useStand';
+
+const MODAL_STATE_KEY = 'standInventory.modalState';
+
+interface PersistedModalState {
+  isOpen: boolean;
+  item: StandItem | null;
+}
+
+function loadModalState(): PersistedModalState {
+  try {
+    const saved = sessionStorage.getItem(MODAL_STATE_KEY);
+    if (saved) return JSON.parse(saved) as PersistedModalState;
+  } catch {
+    // ignore malformed storage
+  }
+  return { isOpen: false, item: null };
+}
 import ItemTable from '../components/stand/ItemTable';
 import ItemFilters from '../components/stand/ItemFilters';
 import ItemFormModal from '../components/stand/ItemFormModal';
+import CategoryManagerModal from '../components/stand/CategoryManagerModal';
 import DeleteItemModal from '../components/stand/DeleteItemModal';
 import RestockModal from '../components/stand/RestockModal';
 import StockAdjustModal from '../components/stand/StockAdjustModal';
@@ -34,13 +52,27 @@ export default function StandInventory() {
     loading: mutationLoading,
   } = useStandItemMutations(refetch);
 
-  // Modal state
-  const [formItem, setFormItem] = useState<StandItem | null>(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  // Modal state (restored from sessionStorage so camera/refresh doesn't lose work)
+  const initialModalState = loadModalState();
+  const [formItem, setFormItem] = useState<StandItem | null>(initialModalState.item);
+  const [isFormOpen, setIsFormOpen] = useState(initialModalState.isOpen);
+
+  useEffect(() => {
+    if (isFormOpen) {
+      sessionStorage.setItem(
+        MODAL_STATE_KEY,
+        JSON.stringify({ isOpen: true, item: formItem } satisfies PersistedModalState)
+      );
+    } else {
+      sessionStorage.removeItem(MODAL_STATE_KEY);
+    }
+  }, [isFormOpen, formItem]);
+
   const [deleteTarget, setDeleteTarget] = useState<StandItem | null>(null);
   const [restockTarget, setRestockTarget] = useState<StandItem | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<StandItem | null>(null);
   const [movementsTarget, setMovementsTarget] = useState<StandItem | null>(null);
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
 
   // Filter handlers
   const handleFilterChange = (updates: Partial<StandItemFilters>) => {
@@ -120,6 +152,12 @@ export default function StandInventory() {
         <h1>Stand Inventory</h1>
         <div className={styles.headerActions}>
           <button
+            className="btn btn-secondary"
+            onClick={() => setIsCategoryManagerOpen(true)}
+          >
+            Manage Categories
+          </button>
+          <button
             className="btn btn-primary"
             onClick={handleAddItem}
             disabled={mutationLoading}
@@ -185,6 +223,11 @@ export default function StandInventory() {
         isOpen={!!movementsTarget}
         item={movementsTarget}
         onClose={() => setMovementsTarget(null)}
+      />
+
+      <CategoryManagerModal
+        isOpen={isCategoryManagerOpen}
+        onClose={() => setIsCategoryManagerOpen(false)}
       />
     </div>
   );
