@@ -238,6 +238,36 @@
   color: var(--warning-800);
 }
 
+/* Date Warning Banner */
+.dateWarningBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: var(--warning-100, #fff3cd);
+  border: 1px solid var(--warning-color, #ffc107);
+  border-left: 4px solid var(--warning-color, #ffc107);
+  border-radius: 6px;
+  color: var(--warning-800, #664d03);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.dateWarningIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--warning-color, #ffc107);
+  color: var(--warning-800, #664d03);
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
 /* Loading Spinner */
 .loadingSpinner {
   display: inline-block;

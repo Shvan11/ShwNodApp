@@ -4,6 +4,7 @@
  */
 
 import { ChangeEvent, MouseEvent } from 'react';
+import type { DateSendability } from '../../hooks/useDateManager';
 import styles from '../../routes/WhatsAppSend.module.css';
 
 export interface DateOption {
@@ -22,6 +23,17 @@ interface DateSelectorProps {
   loading: boolean;
   resetConfirm: boolean;
   emailConfirm: boolean;
+  sendability: DateSendability;
+}
+
+function getSendabilityWarning(sendability: DateSendability): string | null {
+  if (sendability.isSendable) return null;
+
+  const { daysFromToday } = sendability;
+  if (daysFromToday <= 0) {
+    return 'Messages can only be sent for tomorrow or the day after tomorrow. This date is in the past or today.';
+  }
+  return `Messages can only be sent 1-2 days ahead. This date is ${daysFromToday} days from today. Select a closer date or wait until it is 1-2 days away.`;
 }
 
 export default function DateSelector({
@@ -35,6 +47,7 @@ export default function DateSelector({
   loading,
   resetConfirm,
   emailConfirm,
+  sendability,
 }: DateSelectorProps) {
   const handleRefreshClick = async (e: MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -127,6 +140,13 @@ export default function DateSelector({
           {loading && <span className={styles.loadingSpinner} aria-hidden="true"></span>}
           <span>{displayMessage || 'Loading message count...'}</span>
         </div>
+
+        {!sendability.isSendable && (
+          <div className={styles.dateWarningBanner} role="alert">
+            <span className={styles.dateWarningIcon} aria-hidden="true">!</span>
+            <span>{getSendabilityWarning(sendability)}</span>
+          </div>
+        )}
       </fieldset>
     </section>
   );

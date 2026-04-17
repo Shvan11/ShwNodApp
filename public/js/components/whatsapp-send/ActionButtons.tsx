@@ -4,6 +4,7 @@
  */
 
 import { useNavigate, useLocation } from 'react-router-dom';
+import type { DateSendability } from '../../hooks/useDateManager';
 import type { SendingProgress } from './ProgressBar';
 import styles from '../../routes/WhatsAppSend.module.css';
 
@@ -12,6 +13,7 @@ interface ActionButtonsProps {
   onStartSending: () => void;
   sendingInProgress: boolean;
   sendingProgress: SendingProgress;
+  sendability: DateSendability;
 }
 
 export default function ActionButtons({
@@ -19,6 +21,7 @@ export default function ActionButtons({
   onStartSending,
   sendingInProgress,
   sendingProgress,
+  sendability,
 }: ActionButtonsProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -36,8 +39,13 @@ export default function ActionButtons({
     if (sendingInProgress) {
       return `Sending ${sendingProgress.sent}/${sendingProgress.total}`;
     }
+    if (!sendability.isSendable) {
+      return 'Cannot Send - Date Out of Range';
+    }
     return 'Start Sending Messages';
   };
+
+  const isSendDisabled = sendingInProgress || !sendability.isSendable;
 
   return (
     <div className={styles.actionSection}>
@@ -46,7 +54,7 @@ export default function ActionButtons({
           id="startButton"
           className={`btn btn-primary ${styles.primaryAction}`}
           onClick={onStartSending}
-          disabled={sendingInProgress}
+          disabled={isSendDisabled}
           aria-describedby="send-instructions"
         >
           <span className={styles.btnIcon} aria-hidden="true">

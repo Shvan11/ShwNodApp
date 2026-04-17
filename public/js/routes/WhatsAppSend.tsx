@@ -42,7 +42,7 @@ export default function WhatsAppSend() {
   const toast = useToast();
 
   // Date management
-  const { currentDate, dateOptions, setCurrentDate } = useDateManager();
+  const { currentDate, dateOptions, setCurrentDate, sendability } = useDateManager();
 
   // WebSocket connection and state
   const {
@@ -102,6 +102,7 @@ export default function WhatsAppSend() {
           `Reset completed: ${result.data?.appointmentsReset || 0} appointments reset`
         );
         await refreshMessageCount();
+        await refreshMessageStatus();
       } else {
         throw new Error(result.error || 'Reset failed');
       }
@@ -110,7 +111,7 @@ export default function WhatsAppSend() {
     } finally {
       setResetConfirm(false);
     }
-  }, [resetConfirm, currentDate, toast, refreshMessageCount]);
+  }, [resetConfirm, currentDate, toast, refreshMessageCount, refreshMessageStatus]);
 
   // Handle send email
   const handleSendEmail = useCallback(async () => {
@@ -201,6 +202,7 @@ export default function WhatsAppSend() {
           loading={countLoading}
           resetConfirm={resetConfirm}
           emailConfirm={emailConfirm}
+          sendability={sendability}
         />
 
         {/* Status and Action Area */}
@@ -220,6 +222,7 @@ export default function WhatsAppSend() {
             onStartSending={handleStartSending}
             sendingInProgress={sendingInProgress}
             sendingProgress={sendingProgress}
+            sendability={sendability}
           />
         </section>
 

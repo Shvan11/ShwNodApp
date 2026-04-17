@@ -16,6 +16,14 @@ export interface DateOption {
 }
 
 /**
+ * Sendability info for the selected date
+ */
+export interface DateSendability {
+  isSendable: boolean;
+  daysFromToday: number;
+}
+
+/**
  * Return type for useDateManager hook
  */
 export interface UseDateManagerReturn {
@@ -23,6 +31,7 @@ export interface UseDateManagerReturn {
   dateOptions: DateOption[];
   setCurrentDate: (newDate: string) => void;
   getLocalDateString: (date: Date) => string;
+  sendability: DateSendability;
 }
 
 /**
@@ -166,6 +175,26 @@ function generateDateOptions(currentDate: string): DateOption[] {
 }
 
 /**
+ * Check if a date is within the sendable range (1-2 days from today).
+ * The database stored procedure only returns messages for tomorrow or day after tomorrow.
+ */
+function getDateSendability(dateStr: string): DateSendability {
+  const today = new Date();
+  const selected = new Date(dateStr + 'T00:00:00');
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const selectedMidnight = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate());
+
+  const daysFromToday = Math.round(
+    (selectedMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  return {
+    isSendable: daysFromToday === 1 || daysFromToday === 2,
+    daysFromToday,
+  };
+}
+
+/**
  * Custom hook for date management
  */
 export function useDateManager(): UseDateManagerReturn {
@@ -174,6 +203,11 @@ export function useDateManager(): UseDateManagerReturn {
   // Generate date options whenever current date changes
   const dateOptions = useMemo(() => {
     return generateDateOptions(currentDate);
+  }, [currentDate]);
+
+  // Check if selected date is in the sendable range
+  const sendability = useMemo(() => {
+    return getDateSendability(currentDate);
   }, [currentDate]);
 
   // Handle date change
@@ -193,5 +227,6 @@ export function useDateManager(): UseDateManagerReturn {
     dateOptions,
     setCurrentDate: handleDateChange,
     getLocalDateString,
+    sendability,
   };
 }
