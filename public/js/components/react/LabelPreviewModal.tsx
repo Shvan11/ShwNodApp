@@ -10,8 +10,9 @@
  * @module LabelPreviewModal
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react';
+import type { ChangeEvent, KeyboardEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import Modal from './Modal';
 import styles from './LabelPreviewModal.module.css';
 
 const LABELS_PER_SHEET = 12;
@@ -553,15 +554,11 @@ const LabelPreviewModal = ({
         return styles.labelItemCustom;
     };
 
-    if (!isModalOpen) return null;
-
     const currentIsGenerating = isSubmitting || isGenerating;
 
-    const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
-        if (e.target === e.currentTarget && onClose) {
-            onClose();
-        }
-    };
+    const handleClose = useCallback(() => {
+        if (onClose) onClose();
+    }, [onClose]);
 
     // Shared: Position selector and stats
     const renderPositionAndStats = () => (
@@ -639,8 +636,7 @@ const LabelPreviewModal = ({
     // Queue mode render
     if (queueMode) {
         return (
-            <div className={styles.overlay} onClick={handleOverlayClick}>
-                <div className={`${styles.modal} ${styles.modalWide}`} onClick={e => e.stopPropagation()}>
+            <Modal isOpen={isModalOpen} onClose={handleClose} contentClassName={`${styles.modal} ${styles.modalWide}`}>
                     {/* Header */}
                     <div className={`${styles.header} ${styles.queueModeHeader}`}>
                         <h2>
@@ -848,15 +844,13 @@ const LabelPreviewModal = ({
                             )}
                         </button>
                     </div>
-                </div>
-            </div>
+            </Modal>
         );
     }
 
     // Single batch mode render
     return (
-        <div className={styles.overlay} onClick={handleOverlayClick}>
-            <div className={`${styles.modal} ${styles.modalWide}`} onClick={e => e.stopPropagation()}>
+        <Modal isOpen={isModalOpen} onClose={handleClose} contentClassName={`${styles.modal} ${styles.modalWide}`}>
                 {/* Header */}
                 <div className={styles.header}>
                     <h2>
@@ -1024,8 +1018,7 @@ const LabelPreviewModal = ({
                         )}
                     </button>
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 };
 

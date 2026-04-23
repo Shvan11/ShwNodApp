@@ -74,12 +74,15 @@ export const BUTTON_STATES = {
 export type ButtonState = (typeof BUTTON_STATES)[keyof typeof BUTTON_STATES];
 
 // Message Status Constants
+// PENDING = never attempted (SentWa IS NULL)
+// READY   = explicitly reset, awaiting resend (SentWa = 0)
 export const MESSAGE_STATUS = {
   PENDING: 0,
   SERVER: 1,
   DEVICE: 2,
   READ: 3,
   PLAYED: 4,
+  READY: 5,
   FAILED: -1,
   INVALID_PHONE: -2,
 } as const;
@@ -87,11 +90,12 @@ export const MESSAGE_STATUS = {
 export type MessageStatusValue = (typeof MESSAGE_STATUS)[keyof typeof MESSAGE_STATUS];
 
 export const MESSAGE_STATUS_TEXT: Record<MessageStatusValue, string> = {
-  [MESSAGE_STATUS.PENDING]: 'Pending',
+  [MESSAGE_STATUS.PENDING]: 'Not Sent Yet',
   [MESSAGE_STATUS.SERVER]: 'Server',
   [MESSAGE_STATUS.DEVICE]: 'Device',
   [MESSAGE_STATUS.READ]: 'Read',
   [MESSAGE_STATUS.PLAYED]: 'Played',
+  [MESSAGE_STATUS.READY]: 'Ready to Resend',
   [MESSAGE_STATUS.FAILED]: 'Failed',
   [MESSAGE_STATUS.INVALID_PHONE]: 'Invalid Phone',
 };
@@ -102,6 +106,7 @@ export const MESSAGE_STATUS_CLASS: Record<MessageStatusValue, string> = {
   [MESSAGE_STATUS.DEVICE]: 'status-device',
   [MESSAGE_STATUS.READ]: 'status-read',
   [MESSAGE_STATUS.PLAYED]: 'status-played',
+  [MESSAGE_STATUS.READY]: 'status-ready',
   [MESSAGE_STATUS.FAILED]: 'status-failed',
   [MESSAGE_STATUS.INVALID_PHONE]: 'status-invalid',
 };

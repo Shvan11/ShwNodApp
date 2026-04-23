@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, ChangeEvent, MouseEvent } from 'react';
+import { useState, useEffect, useCallback, ChangeEvent } from 'react';
+import Modal from './Modal';
 
 interface EmailConfig {
   smtp_host?: string;
@@ -381,28 +382,29 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
             </div>
 
             {/* Modal */}
-            {modal.show && (
-                <div className="modal-overlay" onClick={hideModal}>
-                    <div className="modal-content" onClick={(e: MouseEvent) => e.stopPropagation()}>
-                        <div className={`modal-header modal-${modal.type}`}>
-                            <h4>
-                                {modal.type === 'success' && <i className="fas fa-check-circle"></i>}
-                                {modal.type === 'error' && <i className="fas fa-exclamation-circle"></i>}
-                                {modal.type === 'info' && <i className="fas fa-info-circle"></i>}
-                                {' '}{modal.title}
-                            </h4>
-                        </div>
-                        <div className="modal-body">
-                            <p>{modal.message}</p>
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-primary" onClick={hideModal}>
-                                OK
-                            </button>
-                        </div>
-                    </div>
+            <Modal
+                isOpen={modal.show}
+                onClose={hideModal}
+                contentClassName="modal-content"
+                ariaLabelledBy="email-settings-modal-title"
+            >
+                <div className={`modal-header modal-${modal.type}`}>
+                    <h4 id="email-settings-modal-title">
+                        {modal.type === 'success' && <i className="fas fa-check-circle"></i>}
+                        {modal.type === 'error' && <i className="fas fa-exclamation-circle"></i>}
+                        {modal.type === 'info' && <i className="fas fa-info-circle"></i>}
+                        {' '}{modal.title}
+                    </h4>
                 </div>
-            )}
+                <div className="modal-body">
+                    <p>{modal.message}</p>
+                </div>
+                <div className="modal-footer">
+                    <button className="btn btn-primary" onClick={hideModal}>
+                        OK
+                    </button>
+                </div>
+            </Modal>
         </div>
     );
 };

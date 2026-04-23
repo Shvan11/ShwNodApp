@@ -12,5 +12,8 @@ declare module 'express-session' {
     username?: string;
     userRole?: UserRole;
     fullName?: string;
+    // Patient portal session fields (separate cookie `shwan.portal`)
+    patientId?: number;
+    patientName?: string;
   }
 }

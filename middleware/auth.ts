@@ -31,7 +31,11 @@ export function authenticate(
   next: NextFunction
 ): void | Response<ApiErrorResponse> {
   // Skip authentication for public routes
-  if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/settings/cost-presets')) {
+  if (
+    req.path.startsWith('/api/auth') ||
+    req.path.startsWith('/api/settings/cost-presets') ||
+    req.path.startsWith('/api/portal')
+  ) {
     return next();
   }
 
@@ -191,6 +195,11 @@ export function authenticateWeb(
 ): void {
   // Skip for API routes - they have their own auth middleware
   if (req.path.startsWith('/api')) {
+    return next();
+  }
+
+  // Skip for patient portal (has its own session and login UI)
+  if (req.path === '/portal' || req.path.startsWith('/portal/')) {
     return next();
   }
 

@@ -3,9 +3,10 @@
  * Full-detail modal for a single sale, including line items table,
  * financial totals, patient/cashier info, and a void action.
  */
-import React, { useCallback, useEffect } from 'react';
+import React from 'react';
 import type { StandSaleWithItems } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
+import Modal from '../react/Modal';
 import styles from './SaleDetailModal.module.css';
 
 interface SaleDetailModalProps {
@@ -38,50 +39,17 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
 }) => {
   const isVoided = sale?.VoidedDate != null;
 
-  // Close on Escape key
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    },
-    [onClose],
-  );
-
-  useEffect(() => {
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [isOpen, handleKeyDown]);
-
-  // Close when clicking the overlay background
-  const handleOverlayClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (e.target === e.currentTarget) {
-        onClose();
-      }
-    },
-    [onClose],
-  );
-
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div
-      className={styles.modalOverlay}
-      onClick={handleOverlayClick}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Sale details"
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      contentClassName={styles.modal}
+      ariaLabelledBy="sale-detail-modal-title"
     >
-      <div className={styles.modal}>
         {/* Header */}
         <div className={styles.modalHeader}>
           <div className={styles.headerInfo}>
-            <h2 className={styles.headerTitle}>
+            <h2 id="sale-detail-modal-title" className={styles.headerTitle}>
               <i className="fas fa-receipt" />
               Sale #{sale?.SaleID ?? '...'}
             </h2>
@@ -245,8 +213,7 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
             </div>
           </>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 };
 

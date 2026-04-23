@@ -2,10 +2,10 @@
  * StockMovementsModal Component
  * Displays a timeline/table of stock movements for a specific inventory item
  */
-import type { MouseEvent } from 'react';
 import type { StandItem, StandStockMovement } from '../../hooks/useStand';
 import { useStockMovements } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
+import Modal from '../react/Modal';
 import styles from './StockMovementsModal.module.css';
 
 interface StockMovementsModalProps {
@@ -84,19 +84,17 @@ function MovementsTable({ movements }: { movements: StandStockMovement[] }) {
 export default function StockMovementsModal({ isOpen, item, onClose }: StockMovementsModalProps) {
   const { movements, loading } = useStockMovements(isOpen && item ? item.ItemID : null);
 
-  const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
-  if (!isOpen || !item) return null;
+  if (!item) return null;
 
   return (
-    <div className="modal-overlay" onClick={handleOverlayClick}>
-      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      contentClassName={styles.modalContent}
+      ariaLabelledBy="stock-movements-modal-title"
+    >
         <div className={styles.modalHeader}>
-          <h2>Stock Movements</h2>
+          <h2 id="stock-movements-modal-title">Stock Movements</h2>
           <button className={styles.closeBtn} onClick={onClose} aria-label="Close modal">
             &times;
           </button>
@@ -129,7 +127,6 @@ export default function StockMovementsModal({ isOpen, item, onClose }: StockMove
             Close
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

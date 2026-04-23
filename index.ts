@@ -24,6 +24,7 @@ import lookupRoutes from './routes/api/lookup.routes.js';
 import lookupAdminRoutes from './routes/api/lookup-admin.routes.js';
 import holidayRoutes from './routes/api/holiday.routes.js';
 import publicVideoRoutes from './routes/public/video.routes.js';
+import portalRoutes from './routes/portal.js';
 import whatsappService from './services/messaging/whatsapp.js';
 import session from 'express-session';
 import SQLiteStore from 'connect-sqlite3';
@@ -155,6 +156,30 @@ async function initializeApplication(): Promise<AppInitResult> {
       name: 'shwan.sid' // Custom cookie name
     }));
 
+    // Patient portal session - separate cookie and store; scoped to portal paths
+    const portalSession = session({
+      store: new SQLiteStoreSession({
+        db: 'portal-sessions.db',
+        dir: './data'
+      }),
+      secret: process.env.PORTAL_SESSION_SECRET
+        || process.env.SESSION_SECRET
+        || 'shwan-portal-secret-change-in-production',
+      resave: false,
+      saveUninitialized: false,
+      rolling: true,
+      cookie: {
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        path: '/'
+      },
+      name: 'shwan.portal'
+    });
+    app.use('/api/portal', portalSession);
+    app.use('/portal', portalSession);
+
     log.info('✅ Session management configured');
 
     // ===== ADDED: Request timeout configuration =====
@@ -201,10 +226,22 @@ async function initializeApplication(): Promise<AppInitResult> {
     app.use('/api', costPresetRoutes); // Cost preset routes (public - no auth needed)
     app.use('/api', lookupRoutes); // Lookup routes (public - no auth needed)
     app.use('/v', publicVideoRoutes); // Public video sharing (no auth - educational content)
+    app.use('/api/portal', portalRoutes); // Patient portal (own session, own auth)
 
     // Serve login page BEFORE auth check (public access)
     app.get('/login.html', (_req: Request, res: Response) => {
       res.sendFile(path.join(process.cwd(), './public/login.html'));
+    });
+
+    // Patient portal SPA shell (public; portal handles its own auth)
+    app.get(['/portal', '/portal/*'], (_req: Request, res: Response) => {
+      // In production the built bundle is at dist/portal.html; in dev Vite
+      // serves it directly and this route isn't hit (vite proxy handles /api).
+      const builtPath = path.join(process.cwd(), './dist/portal.html');
+      const srcPath = path.join(process.cwd(), './public/portal.html');
+      res.sendFile(builtPath, (err) => {
+        if (err) res.sendFile(srcPath);
+      });
     });
 
     if (process.env.AUTHENTICATION_ENABLED === 'true') {

@@ -173,6 +173,10 @@
         </div>
     </div>
 
+    <!-- Portal target for <Modal> overlays. Rendered outside the React mount container -->
+    <!-- so modals escape any ancestor stacking/clipping context. See Modal.tsx. -->
+    <div id="modal-root"></div>
+
     <!-- Global Fetch Interceptor for Authentication -->
     <script>
         // Intercept all fetch requests to handle 401 authentication errors globally

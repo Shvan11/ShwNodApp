@@ -3,7 +3,8 @@
  * Modal for creating new templates
  */
 
-import { useState, type ChangeEvent, type FormEvent, type MouseEvent } from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
+import Modal from '../react/Modal';
 
 interface DocumentType {
     type_id: number;
@@ -83,17 +84,15 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
         onCreate(submissionData);
     };
 
-    const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
-        if ((e.target as HTMLElement).classList.contains('modal-overlay')) {
-            onClose();
-        }
-    };
-
     return (
-        <div className={styles.modalOverlay} onClick={handleOverlayClick}>
-            <div className={styles.modalDialog}>
+        <Modal
+            isOpen={true}
+            onClose={onClose}
+            contentClassName={styles.modalDialog}
+            ariaLabelledBy="create-template-modal-title"
+        >
                 <div className={styles.modalHeader}>
-                    <h3>
+                    <h3 id="create-template-modal-title">
                         <i className="fas fa-plus"></i> Create New Template
                     </h3>
                     <button className={styles.modalClose} onClick={onClose}>×</button>
@@ -217,8 +216,7 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+        </Modal>
     );
 }
 

@@ -490,6 +490,26 @@ Universal naming convention:
 
 Constants in `services/messaging/websocket-events.ts`.
 
+### Modals - Shared `<Modal>` ONLY
+
+All overlay modals render via `public/js/components/react/Modal.tsx` (portal into `#modal-root`). Provides focus trap/restore, scroll lock, Escape + mousedown+click backdrop dismiss, and `aria-modal`.
+
+```tsx
+import Modal from './Modal';
+
+<Modal
+  isOpen={open}
+  onClose={handleClose}
+  contentClassName={styles.modal}  // per-modal content styles
+  ariaLabelledBy="my-modal-title"
+>
+  <div className={styles.modalHeader}>…</div>
+  <div className={styles.modalBody}>…</div>
+</Modal>
+```
+
+**Never write a raw `.modal-overlay` / `styles.modalOverlay` wrapper** — it won't escape stacking/clipping ancestors.
+
 ### React Component Typing
 
 ```typescript

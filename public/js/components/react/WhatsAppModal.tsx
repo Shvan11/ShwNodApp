@@ -5,8 +5,9 @@
  */
 
 import { useState } from 'react';
-import type { MouseEvent, ChangeEvent } from 'react';
+import type { ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import Modal from './Modal';
 
 interface WhatsAppModalProps {
     show: boolean;
@@ -52,25 +53,20 @@ const WhatsAppModal = ({ show, onClose, patientCode, patientName }: WhatsAppModa
         }
     };
 
-    if (!show) return null;
-
-    const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
-        if (e.target === e.currentTarget) onClose();
-    };
-
     const handleMessageChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
         setMessage(e.target.value);
     };
 
     return (
-        <div
-            className="whatsapp-modal-overlay"
-            onClick={handleOverlayClick}
+        <Modal
+            isOpen={show}
+            onClose={onClose}
+            contentClassName="whatsapp-modal"
+            ariaLabelledBy="whatsapp-modal-title"
         >
-            <div className="whatsapp-modal">
                 {/* Header */}
                 <div className="whatsapp-modal-header">
-                    <h3 className="whatsapp-modal-title">
+                    <h3 id="whatsapp-modal-title" className="whatsapp-modal-title">
                         Send to {patientName || patientCode}
                     </h3>
 
@@ -114,8 +110,7 @@ const WhatsAppModal = ({ show, onClose, patientCode, patientName }: WhatsAppModa
                         {isSending ? 'Sending...' : 'Send'}
                     </button>
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 };
 

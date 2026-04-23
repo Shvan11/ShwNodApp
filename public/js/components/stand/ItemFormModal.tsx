@@ -2,12 +2,13 @@
  * ItemFormModal Component
  * Modal for adding or editing a stand inventory item
  */
-import { useState, useEffect, useRef } from 'react';
-import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
+import { useState, useEffect } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import type { StandItem } from '../../hooks/useStand';
 import { useStandCategories } from '../../hooks/useStand';
 import { useToast } from '../../contexts/ToastContext';
 import { formatNumber } from '../../utils/formatters';
+import Modal from '../react/Modal';
 import styles from './ItemFormModal.module.css';
 
 interface ItemFormModalProps {
@@ -129,7 +130,6 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
   const [scanImages, setScanImages] = useState<File[]>([]);
   const [scanPreviews, setScanPreviews] = useState<string[]>([]);
   const [scanning, setScanning] = useState(false);
-  const overlayMouseDownRef = useRef(false);
 
   const isEditMode = !!item;
 
@@ -408,27 +408,17 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
     onClose();
   };
 
-  const handleOverlayMouseDown = (e: MouseEvent<HTMLDivElement>) => {
-    overlayMouseDownRef.current = e.target === e.currentTarget;
-  };
-
-  const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
-    const startedOnOverlay = overlayMouseDownRef.current;
-    overlayMouseDownRef.current = false;
-    if (e.target === e.currentTarget && startedOnOverlay) {
-      handleClose();
-    }
-  };
-
-  if (!isOpen) return null;
-
   const profit = formData.sellPrice - formData.costPrice;
 
   return (
-    <div className="modal-overlay" onMouseDown={handleOverlayMouseDown} onClick={handleOverlayClick}>
-      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      contentClassName={styles.modalContent}
+      ariaLabelledBy="item-form-modal-title"
+    >
         <div className={styles.modalHeader}>
-          <h2>{isEditMode ? 'Edit Item' : 'Add New Item'}</h2>
+          <h2 id="item-form-modal-title">{isEditMode ? 'Edit Item' : 'Add New Item'}</h2>
           <button className={styles.closeBtn} onClick={handleClose} aria-label="Close modal">
             &times;
           </button>
@@ -701,7 +691,6 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

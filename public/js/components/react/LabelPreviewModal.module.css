@@ -8,10 +8,11 @@
  */
 
 /* ===========================================
-   CSS CUSTOM PROPERTIES
+   MODAL CONTAINER
+   Custom properties scoped to .modal cascade to all descendants.
    =========================================== */
 
-.overlay {
+.modal {
     /* Theme Colors */
     --lpm-primary: #6366f1;
     --lpm-primary-hover: #4f46e5;
@@ -75,30 +76,7 @@
     --lpm-transition-fast: 0.15s ease;
     --lpm-transition-normal: 0.2s ease;
     --lpm-transition-slow: 0.3s ease-out;
-}
 
-/* ===========================================
-   MODAL OVERLAY & CONTAINER
-   =========================================== */
-
-.overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--z-index-modal, 1040);
-    padding: var(--spacing-md, 1rem);
-    animation: lpmFadeIn var(--lpm-transition-normal);
-}
-
-@keyframes lpmFadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.modal {
     background: var(--bg-color, #ffffff);
     border-radius: var(--lpm-radius-2xl);
     box-shadow: var(--lpm-shadow-lg);

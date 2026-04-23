@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import type { ChangeEvent, MouseEvent } from 'react';
+import type { ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import Modal from './Modal';
 
 interface AlertType {
     AlertTypeID: number;
@@ -172,20 +173,15 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
     };
 
     // Handle overlay click
-    const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
-        if (e.target === e.currentTarget) {
-            handleCancel();
-        }
-    };
-
-    // Don't render if not open
-    if (!isOpen) return null;
-
     return (
-        <div className="modal-overlay" onClick={handleOverlayClick}>
-            <div className="modal-content alert-modal" onClick={(e) => e.stopPropagation()}>
+        <Modal
+            isOpen={isOpen}
+            onClose={handleCancel}
+            contentClassName="modal-content alert-modal"
+            ariaLabelledBy="alert-modal-title"
+        >
                 <div className="modal-header">
-                    <h3>
+                    <h3 id="alert-modal-title">
                         <i className="fas fa-exclamation-triangle"></i>
                         {isEditMode ? 'Edit Alert' : 'Add New Alert'}
                     </h3>
@@ -321,8 +317,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                         )}
                     </button>
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 };
 

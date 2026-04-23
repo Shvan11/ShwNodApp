@@ -1,0 +1,141 @@
+.loadingRow,
+.errorRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) 0;
+  color: var(--text-secondary, #6c757d);
+  font-size: 0.9rem;
+}
+
+.errorRow {
+  color: var(--error-color);
+  flex-wrap: wrap;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.enableRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.enableRow input[type='checkbox'] {
+  width: 1.1rem;
+  height: 1.1rem;
+  cursor: pointer;
+}
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md) var(--spacing-lg);
+}
+
+.statusGrid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary, #6c757d);
+}
+
+.value {
+  font-size: 0.9rem;
+  color: var(--text-primary, #1b2430);
+  word-break: break-word;
+}
+
+.valueWarning {
+  color: var(--warning-color, #d97706);
+  font-weight: 500;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.qrBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--border-color, #e3e7ef);
+}
+
+.qrImage {
+  width: 180px;
+  height: 180px;
+  max-width: 100%;
+  display: block;
+}
+
+.portalUrl {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6c757d);
+  word-break: break-all;
+  text-align: center;
+  background: var(--bg-muted, #f5f7fb);
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* ---------- Reset PIN modal ---------- */
+.pinModal {
+  max-width: 360px;
+  width: 100%;
+}
+
+.pinModalBody {
+  padding: var(--spacing-lg);
+  text-align: center;
+}
+
+.pinModalTitle {
+  margin: 0 0 var(--spacing-sm);
+  font-size: 1.1rem;
+  color: var(--text-primary, #1b2430);
+}
+
+.pinModalHint {
+  margin: 0 0 var(--spacing-md);
+  font-size: 0.85rem;
+  color: var(--text-secondary, #6c757d);
+}
+
+.pinDisplay {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 2.4rem;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  padding: 0.75rem 1rem;
+  background: var(--bg-muted, #f5f7fb);
+  border-radius: 8px;
+  color: var(--primary-color, #007bff);
+  margin-bottom: var(--spacing-md);
+  user-select: all;
+}
+
+.pinModalActions {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-sm);
+}

@@ -228,7 +228,7 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
                     />
                 );
 
-            case 'date':
+            case 'date': {
                 // Format date value for input (YYYY-MM-DD)
                 const dateValue = value ? (
                     value instanceof Date
@@ -245,6 +245,7 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
                         className={errors[column.name] ? 'input-error' : ''}
                     />
                 );
+            }
 
             case 'varchar':
             case 'nvarchar':

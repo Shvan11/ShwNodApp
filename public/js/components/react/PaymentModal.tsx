@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import type { ChangeEvent, FormEvent, FocusEvent } from 'react';
 import styles from './PaymentModal.module.css';
+import Modal from './Modal';
 import { parseFormattedNumber } from '../../utils/formatters';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -873,9 +874,11 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         (calculations.accountCurrency === 'USD' && formData.paymentCurrency === 'IQD');
 
     return (
-        <>
-            <div className={styles.modalOverlay}>
-                <div className={`${styles.modalContent} ${styles.invoiceModal} ${styles.paymentModalCompact}`}>
+        <Modal
+            isOpen={true}
+            onClose={paymentSuccess ? handleCloseAfterSuccess : onClose}
+            contentClassName={`${styles.modalContent} ${styles.invoiceModal} ${styles.paymentModalCompact}`}
+        >
                 <button className={styles.modalClose} onClick={paymentSuccess ? handleCloseAfterSuccess : onClose}>×</button>
 
                 {!paymentSuccess ? (
@@ -1220,9 +1223,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                         </div>
                     </div>
                 )}
-            </div>
-        </div>
-        </>
+        </Modal>
     );
 };
 

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#007bff">
+    <title>Patient Portal — Shwan Orthodontics</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+      html, body { margin: 0; padding: 0; height: 100%; background: #f5f7fb; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+      #portal-root { min-height: 100%; }
+      .portal-boot { display: flex; align-items: center; justify-content: center; height: 100vh; color: #6c757d; font-size: 0.95rem; }
+      .portal-boot-spinner { width: 28px; height: 28px; border: 3px solid #e3e7ef; border-top-color: #007bff; border-radius: 50%; animation: spin 0.9s linear infinite; margin-right: 0.75rem; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="portal-root">
+      <div class="portal-boot">
+        <div class="portal-boot-spinner"></div>
+        Loading portal…
+      </div>
+    </div>
+    <script type="module" src="/js/portal/main.tsx"></script>
+</body>
+</html>

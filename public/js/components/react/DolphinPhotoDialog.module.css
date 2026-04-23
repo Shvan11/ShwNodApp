@@ -3,22 +3,6 @@
  * Dialog for selecting timepoint and date when importing photos to Dolphin Imaging
  */
 
-.overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--z-index-modal, 1040);
-    animation: fadeIn 0.2s ease;
-}
-
 .dialog {
     background: var(--background-color, white);
     border-radius: 12px;

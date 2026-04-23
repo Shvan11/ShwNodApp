@@ -5,6 +5,7 @@ import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
 import PatientQuickSearch, { type SelectedPatient, type PatientOption } from './PatientQuickSearch';
 import PhoneDisplay from './PhoneDisplay';
+import Modal from './Modal';
 import styles from './PatientManagement.module.css';
 
 interface Patient {
@@ -628,11 +629,16 @@ const PatientManagement = () => {
                 </div>
             )}
 
-            {showDeleteConfirm && selectedPatient && (
-                <div className="modal-overlay">
-                    <div className={styles.deleteModal}>
+            <Modal
+                isOpen={showDeleteConfirm && !!selectedPatient}
+                onClose={() => setShowDeleteConfirm(false)}
+                contentClassName={styles.deleteModal}
+                ariaLabelledBy="patient-delete-modal-title"
+            >
+                {selectedPatient && (
+                    <>
                         <div className={styles.deleteModalHeader}>
-                            <h3>Confirm Delete</h3>
+                            <h3 id="patient-delete-modal-title">Confirm Delete</h3>
                             <button onClick={() => setShowDeleteConfirm(false)} className={styles.deleteModalClose}>×</button>
                         </div>
                         <div className={styles.deleteModalContent}>
@@ -642,9 +648,9 @@ const PatientManagement = () => {
                                 <button onClick={handleDeleteConfirm} className="btn btn-danger">Delete</button>
                             </div>
                         </div>
-                    </div>
-                </div>
-            )}
+                    </>
+                )}
+            </Modal>
         </div>
     );
 };

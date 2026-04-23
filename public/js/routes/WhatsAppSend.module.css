@@ -502,6 +502,38 @@
   border-radius: 50%;
   margin-right: 8px;
   vertical-align: middle;
+  background-color: var(--gray-400);
+}
+
+.statusIndicator:global(.status-pending) {
+  background-color: var(--gray-400);
+}
+.statusIndicator:global(.status-ready) {
+  background-color: #f59e0b;
+}
+.statusIndicator:global(.status-server) {
+  background-color: #60a5fa;
+}
+.statusIndicator:global(.status-device) {
+  background-color: #3b82f6;
+}
+.statusIndicator:global(.status-read) {
+  background-color: #22c55e;
+}
+.statusIndicator:global(.status-played) {
+  background-color: #16a34a;
+}
+.statusIndicator:global(.status-failed),
+.statusIndicator:global(.status-invalid) {
+  background-color: var(--error-color, #dc3545);
+}
+
+.statusTable tbody tr:global(.status-ready) {
+  background-color: rgba(245, 158, 11, 0.08);
+}
+.statusTable tbody tr:global(.status-failed),
+.statusTable tbody tr:global(.status-invalid) {
+  background-color: rgba(220, 53, 69, 0.06);
 }
 
 /* Status cell styling */

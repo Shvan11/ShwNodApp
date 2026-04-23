@@ -6,6 +6,7 @@
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { Request, TYPES } from 'tedious';
 import { withConnection, executeRawQuery } from '../services/database/index.js';
 import { getAllTodayApps, getPresentTodayApps } from '../services/database/queries/appointment-queries.js';
 
@@ -68,7 +69,6 @@ async function deploy() {
 
             // Test new procedure using raw query (simplified)
             const newResult = await new Promise((resolve, reject) => {
-                const { Request } = await import('tedious');
                 const request = new Request(
                     'EXEC GetDailyAppointmentsOptimized @AppsDate',
                     (err) => {
@@ -76,7 +76,7 @@ async function deploy() {
                     }
                 );
 
-                request.addParameter('AppsDate', require('tedious').TYPES.Date, testDate);
+                request.addParameter('AppsDate', TYPES.Date, testDate);
 
                 const resultSets = [];
                 let currentSet = [];

@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, type MouseEvent } fr
 import { createPortal } from 'react-dom';
 import { useToast } from '../../contexts/ToastContext';
 import LookupEditorModal from './LookupEditorModal';
+import Modal from './Modal';
 
 interface Column {
     name: string;
@@ -483,11 +484,17 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
             />
 
             {/* Appointment Warning Modal */}
-            {appointmentWarning && (
-                <div className="modal-overlay appointment-warning-modal" onClick={handleCancelWarning}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <Modal
+                isOpen={appointmentWarning !== null}
+                onClose={handleCancelWarning}
+                contentClassName="modal-content"
+                overlayClassName="appointment-warning-modal"
+                ariaLabelledBy="appt-warning-modal-title"
+            >
+                {appointmentWarning && (
+                    <>
                         <div className="modal-header warning-header">
-                            <h3>
+                            <h3 id="appt-warning-modal-title">
                                 <i className="fas fa-exclamation-triangle"></i>
                                 Existing Appointments Found
                             </h3>
@@ -545,9 +552,9 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
                                 Add Holiday Anyway
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
+                    </>
+                )}
+            </Modal>
 
             {/* Delete Confirmation Popover */}
             {deleteConfirm && deleteAnchorEl && (

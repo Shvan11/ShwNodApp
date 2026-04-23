@@ -40,6 +40,7 @@ import { getOption } from '../../services/database/queries/options-queries.js';
 import { ErrorResponses } from '../../utils/error-response.js';
 import * as PatientService from '../../services/business/PatientService.js';
 import { PatientValidationError } from '../../services/business/PatientService.js';
+import * as PatientPortalService from '../../services/business/PatientPortalService.js';
 import type { PatientSearchQuery } from '../../types/api.types.js';
 
 const router = Router();
@@ -1327,6 +1328,216 @@ router.get(
         'Failed to check appointment status',
         error as Error
       );
+    }
+  }
+);
+
+// ============================================================================
+// PATIENT PORTAL ADMIN ROUTES (staff-facing)
+// ============================================================================
+
+/**
+ * GET /api/patients/:personId/portal
+ * Fetch portal status + QR code for staff UI.
+ */
+router.get(
+  '/patients/:personId/portal',
+  authorize(['admin', 'secretary']),
+  async (req: Request<{ personId: string }>, res: Response): Promise<void> => {
+    try {
+      const personId = parseInt(req.params.personId, 10);
+      if (isNaN(personId)) {
+        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        return;
+      }
+      const [status, qr] = await Promise.all([
+        PatientPortalService.getStatus(personId),
+        PatientPortalService.getQrDataUrl(personId),
+      ]);
+      res.json({
+        success: true,
+        enabled: status.enabled,
+        hasPin: status.hasPin,
+        lockedUntil: status.lockedUntil,
+        lastLoginAt: status.lastLoginAt,
+        failedAttempts: status.failedAttempts,
+        qrDataUrl: qr.qr,
+        portalUrl: qr.url,
+      });
+    } catch (error) {
+      log.error('Portal status fetch error', { error: (error as Error).message });
+      ErrorResponses.internalError(res, 'Failed to load portal status', error as Error);
+    }
+  }
+);
+
+/**
+ * POST /api/patients/:personId/portal/reset-pin
+ * Regenerate default PIN (last-4-phone → DDMM-DOB fallback). Returns plaintext ONCE.
+ */
+router.post(
+  '/patients/:personId/portal/reset-pin',
+  authorize(['admin', 'secretary']),
+  async (req: Request<{ personId: string }>, res: Response): Promise<void> => {
+    try {
+      const personId = parseInt(req.params.personId, 10);
+      if (isNaN(personId)) {
+        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        return;
+      }
+      const pin = await PatientPortalService.resetToDefaultPin(personId);
+      res.json({ success: true, pin });
+    } catch (error) {
+      const msg = (error as Error).message;
+      log.warn('Portal reset-pin failed', { error: msg });
+      ErrorResponses.badRequest(res, msg);
+    }
+  }
+);
+
+/**
+ * POST /api/patients/:personId/portal/set-pin
+ * Manually set a PIN (4-6 digits).
+ */
+router.post(
+  '/patients/:personId/portal/set-pin',
+  authorize(['admin', 'secretary']),
+  async (
+    req: Request<{ personId: string }, unknown, { pin: string }>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const personId = parseInt(req.params.personId, 10);
+      const { pin } = req.body;
+      if (isNaN(personId)) {
+        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        return;
+      }
+      if (!pin || typeof pin !== 'string') {
+        ErrorResponses.badRequest(res, 'PIN is required');
+        return;
+      }
+      await PatientPortalService.setPin(personId, pin);
+      res.json({ success: true });
+    } catch (error) {
+      ErrorResponses.badRequest(res, (error as Error).message);
+    }
+  }
+);
+
+/**
+ * POST /api/patients/:personId/portal/enable
+ * Enable/disable portal access for the patient.
+ */
+router.post(
+  '/patients/:personId/portal/enable',
+  authorize(['admin', 'secretary']),
+  async (
+    req: Request<{ personId: string }, unknown, { enabled: boolean }>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const personId = parseInt(req.params.personId, 10);
+      const { enabled } = req.body;
+      if (isNaN(personId)) {
+        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        return;
+      }
+      if (typeof enabled !== 'boolean') {
+        ErrorResponses.badRequest(res, '`enabled` must be a boolean');
+        return;
+      }
+      await PatientPortalService.setEnabled(personId, enabled);
+      res.json({ success: true });
+    } catch (error) {
+      ErrorResponses.internalError(res, 'Failed to update portal access', error as Error);
+    }
+  }
+);
+
+/**
+ * POST /api/patients/:personId/portal/unlock
+ * Clear lockout counter.
+ */
+router.post(
+  '/patients/:personId/portal/unlock',
+  authorize(['admin', 'secretary']),
+  async (req: Request<{ personId: string }>, res: Response): Promise<void> => {
+    try {
+      const personId = parseInt(req.params.personId, 10);
+      if (isNaN(personId)) {
+        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        return;
+      }
+      await PatientPortalService.unlock(personId);
+      res.json({ success: true });
+    } catch (error) {
+      ErrorResponses.internalError(res, 'Failed to unlock portal', error as Error);
+    }
+  }
+);
+
+// ============================================================================
+// PHOTO VISIBILITY ROUTES (staff-facing)
+// ============================================================================
+
+/**
+ * GET /api/patients/:personId/photos/visibility
+ * List photos currently marked private for this patient.
+ */
+router.get(
+  '/patients/:personId/photos/visibility',
+  authorize(['admin', 'secretary']),
+  async (req: Request<{ personId: string }>, res: Response): Promise<void> => {
+    try {
+      const personId = parseInt(req.params.personId, 10);
+      if (isNaN(personId)) {
+        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        return;
+      }
+      const rows = await PatientPortalService.getPrivateList(personId);
+      res.json({
+        success: true,
+        privateImages: rows.map((r) => ({ tp: r.TimepointCode, name: r.ImageName })),
+      });
+    } catch (error) {
+      ErrorResponses.internalError(res, 'Failed to load photo visibility', error as Error);
+    }
+  }
+);
+
+/**
+ * POST /api/patients/:personId/photos/visibility
+ * Toggle private/public for a specific photo.
+ * Body: { tp: string, name: string, isPrivate: boolean }
+ */
+router.post(
+  '/patients/:personId/photos/visibility',
+  authorize(['admin', 'secretary']),
+  async (
+    req: Request<
+      { personId: string },
+      unknown,
+      { tp: string; name: string; isPrivate: boolean }
+    >,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const personId = parseInt(req.params.personId, 10);
+      const { tp, name, isPrivate } = req.body;
+      if (isNaN(personId)) {
+        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        return;
+      }
+      if (!tp || !name || typeof isPrivate !== 'boolean') {
+        ErrorResponses.badRequest(res, '`tp`, `name`, and `isPrivate` are required');
+        return;
+      }
+      const byUserId = req.session.userId ?? null;
+      await PatientPortalService.togglePhotoPrivacy(personId, tp, name, isPrivate, byUserId);
+      res.json({ success: true });
+    } catch (error) {
+      ErrorResponses.internalError(res, 'Failed to update photo visibility', error as Error);
     }
   }
 );

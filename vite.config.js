@@ -34,8 +34,10 @@ export default defineConfig(({ mode }) => {
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        // Single entry point for the entire SPA
+        // Main staff-facing SPA
         main: resolve(__dirname, 'public/index.html'),
+        // Patient portal SPA (separate bundle, own auth, mobile-first)
+        portal: resolve(__dirname, 'public/portal.html'),
       },
       output: {
         // Optimal code splitting strategy for production
@@ -107,6 +109,7 @@ export default defineConfig(({ mode }) => {
     // SPA history fallback - serve index.html for all routes
     historyApiFallback: {
       rewrites: [
+        { from: /^\/portal/, to: '/portal.html' },
         { from: /^\/dashboard/, to: '/index.html' },
         { from: /^\/patient/, to: '/index.html' },
         { from: /^\/expenses/, to: '/index.html' },

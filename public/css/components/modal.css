@@ -1,22 +1,6 @@
 /* modal.css - General Modal Component Styles */
 
 /* ===================================
-   MODAL OVERLAY
-   =================================== */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--z-index-modal);
-}
-
-/* ===================================
    GLOBAL MODAL COMPONENTS
    Moved from work-card.css - used across multiple components
    =================================== */
@@ -70,19 +54,6 @@
 /* ===================================
    WHATSAPP MODAL
    =================================== */
-.whatsapp-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--z-index-modal);
-}
-
 .whatsapp-modal {
     background-color: white;
     border-radius: var(--radius-lg);

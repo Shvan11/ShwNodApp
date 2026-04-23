@@ -4,6 +4,7 @@ import tsparser from '@typescript-eslint/parser';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import prettier from 'eslint-config-prettier';
+import globals from 'globals';
 
 export default [
   js.configs.recommended,
@@ -12,6 +13,7 @@ export default [
       'node_modules/**',
       'dist/**',
       'dist-ts/**',
+      'dist-server/**',
       '*.min.js',
       'public/libs/**',
       'public/photoswipe/**',
@@ -31,18 +33,8 @@ export default [
         sourceType: 'module'
       },
       globals: {
-        console: 'readonly',
-        process: 'readonly',
-        Buffer: 'readonly',
-        __dirname: 'readonly',
-        __filename: 'readonly',
-        setTimeout: 'readonly',
-        clearTimeout: 'readonly',
-        setInterval: 'readonly',
-        clearInterval: 'readonly',
-        setImmediate: 'readonly',
-        URL: 'readonly',
-        URLSearchParams: 'readonly'
+        ...globals.node,
+        ...globals.es2022
       }
     },
     plugins: {
@@ -51,8 +43,19 @@ export default [
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      'no-unused-vars': 'off'
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_'
+        }
+      ],
+      'no-unused-vars': 'off',
+      // TypeScript handles identifier resolution (including type-only references
+      // like NodeJS, Express, PDFKit namespaces) better than ESLint's no-undef.
+      // See: https://typescript-eslint.io/troubleshooting/faqs/general/#i-get-errors-from-the-no-undef-rule-about-global-variables-not-being-defined
+      'no-undef': 'off'
     }
   },
   // Frontend TypeScript/TSX files
@@ -68,55 +71,8 @@ export default [
         }
       },
       globals: {
-        window: 'readonly',
-        document: 'readonly',
-        console: 'readonly',
-        fetch: 'readonly',
-        localStorage: 'readonly',
-        sessionStorage: 'readonly',
-        WebSocket: 'readonly',
-        setTimeout: 'readonly',
-        clearTimeout: 'readonly',
-        setInterval: 'readonly',
-        clearInterval: 'readonly',
-        URL: 'readonly',
-        URLSearchParams: 'readonly',
-        FormData: 'readonly',
-        Blob: 'readonly',
-        File: 'readonly',
-        FileReader: 'readonly',
-        Image: 'readonly',
-        Event: 'readonly',
-        CustomEvent: 'readonly',
-        MouseEvent: 'readonly',
-        KeyboardEvent: 'readonly',
-        HTMLElement: 'readonly',
-        HTMLInputElement: 'readonly',
-        HTMLSelectElement: 'readonly',
-        HTMLTextAreaElement: 'readonly',
-        HTMLButtonElement: 'readonly',
-        HTMLFormElement: 'readonly',
-        HTMLImageElement: 'readonly',
-        Element: 'readonly',
-        Node: 'readonly',
-        NodeList: 'readonly',
-        MutationObserver: 'readonly',
-        ResizeObserver: 'readonly',
-        IntersectionObserver: 'readonly',
-        requestAnimationFrame: 'readonly',
-        cancelAnimationFrame: 'readonly',
-        AbortController: 'readonly',
-        Headers: 'readonly',
-        Request: 'readonly',
-        Response: 'readonly',
-        navigator: 'readonly',
-        location: 'readonly',
-        history: 'readonly',
-        alert: 'readonly',
-        confirm: 'readonly',
-        prompt: 'readonly',
-        atob: 'readonly',
-        btoa: 'readonly'
+        ...globals.browser,
+        ...globals.es2022
       }
     },
     plugins: {
@@ -132,8 +88,16 @@ export default [
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_'
+        }
+      ],
       'no-unused-vars': 'off',
+      'no-undef': 'off',
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
       'react-hooks/rules-of-hooks': 'error',

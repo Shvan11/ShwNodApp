@@ -3,9 +3,10 @@
  * Modal for adjusting stock with a delta value and required reason
  */
 import { useState, useEffect } from 'react';
-import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import type { StandItem } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
+import Modal from '../react/Modal';
 import styles from './StockAdjustModal.module.css';
 
 interface StockAdjustModalProps {
@@ -61,13 +62,7 @@ export default function StockAdjustModal({ isOpen, item, onClose, onSave }: Stoc
     onClose();
   };
 
-  const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      handleClose();
-    }
-  };
-
-  if (!isOpen || !item) return null;
+  if (!item) return null;
 
   const resultingStock = item.CurrentStock + delta;
   const previewClass =
@@ -78,10 +73,14 @@ export default function StockAdjustModal({ isOpen, item, onClose, onSave }: Stoc
         : styles.stockPreviewNegative;
 
   return (
-    <div className="modal-overlay" onClick={handleOverlayClick}>
-      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      contentClassName={styles.modalContent}
+      ariaLabelledBy="stock-adjust-modal-title"
+    >
         <div className={styles.modalHeader}>
-          <h2>Adjust Stock</h2>
+          <h2 id="stock-adjust-modal-title">Adjust Stock</h2>
           <button className={styles.closeBtn} onClick={handleClose} aria-label="Close modal">
             &times;
           </button>
@@ -153,7 +152,6 @@ export default function StockAdjustModal({ isOpen, item, onClose, onSave }: Stoc
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

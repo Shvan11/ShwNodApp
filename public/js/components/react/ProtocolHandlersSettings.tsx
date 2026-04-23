@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef, ChangeEvent, MouseEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, ChangeEvent } from 'react';
+import Modal from './Modal';
 import styles from './DatabaseSettings.module.css';
 import {
     isFileSystemAccessSupported,
@@ -811,24 +812,25 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
             )}
 
             {/* Modal */}
-            {modal.show && (
-                <div className={styles.modalOverlay} onClick={hideModal}>
-                    <div className={styles.modalContent} onClick={(e: MouseEvent) => e.stopPropagation()}>
-                        <div className={styles.modalHeader}>
-                            <h3>{modal.title}</h3>
-                            <button className={styles.modalClose} onClick={hideModal}>
-                                <i className="fas fa-times"></i>
-                            </button>
-                        </div>
-                        <div className={styles.modalBody}>
-                            <pre>{modal.message}</pre>
-                        </div>
-                        <div className={styles.modalFooter}>
-                            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={hideModal}>OK</button>
-                        </div>
-                    </div>
+            <Modal
+                isOpen={modal.show}
+                onClose={hideModal}
+                contentClassName={styles.modalContent}
+                ariaLabelledBy="protocol-handlers-modal-title"
+            >
+                <div className={styles.modalHeader}>
+                    <h3 id="protocol-handlers-modal-title">{modal.title}</h3>
+                    <button className={styles.modalClose} onClick={hideModal}>
+                        <i className="fas fa-times"></i>
+                    </button>
                 </div>
-            )}
+                <div className={styles.modalBody}>
+                    <pre>{modal.message}</pre>
+                </div>
+                <div className={styles.modalFooter}>
+                    <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={hideModal}>OK</button>
+                </div>
+            </Modal>
         </div>
     );
 };

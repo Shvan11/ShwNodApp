@@ -2,11 +2,12 @@
  * ExpenseModal Component
  * Modal for adding and editing expenses
  */
-import React, { useState, useEffect } from 'react';
-import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
+import { useState, useEffect } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import { useCategories, useSubcategories } from '../../hooks/useExpenses';
 import type { Expense, ExpenseData } from '../../hooks/useExpenses';
 import { formatNumber } from '../../utils/formatters';
+import Modal from '../react/Modal';
 import styles from '../../routes/Expenses.module.css';
 
 // Types
@@ -173,22 +174,18 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
         onClose();
     };
 
-    const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
-        if (e.target === e.currentTarget) {
-            handleClose();
-        }
-    };
-
-    if (!isOpen) return null;
-
     const isEditMode = !!expense;
     const modalTitle = isEditMode ? 'Edit Expense' : 'Add New Expense';
 
     return (
-        <div className="modal-overlay" onClick={handleOverlayClick}>
-            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <Modal
+            isOpen={isOpen}
+            onClose={handleClose}
+            contentClassName={styles.modalContent}
+            ariaLabelledBy="expense-modal-title"
+        >
                 <div className={styles.modalHeader}>
-                    <h2>{modalTitle}</h2>
+                    <h2 id="expense-modal-title">{modalTitle}</h2>
                     <button className={styles.closeBtn} onClick={handleClose} aria-label="Close modal">
                         &times;
                     </button>
@@ -314,7 +311,6 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+        </Modal>
     );
 }

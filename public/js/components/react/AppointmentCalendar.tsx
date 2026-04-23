@@ -5,6 +5,7 @@ import MonthlyCalendarGrid from './MonthlyCalendarGrid';
 import CalendarContextMenu from './CalendarContextMenu';
 import CalendarDayContextMenu from './CalendarDayContextMenu';
 import HolidayQuickModal from './HolidayQuickModal';
+import Modal from './Modal';
 import { useToast } from '../../contexts/ToastContext';
 import type {
     ViewMode,
@@ -637,10 +638,15 @@ const AppointmentCalendar = ({
             )}
 
             {/* Delete Confirmation Modal */}
-            {deleteConfirmation && (
-                <div className="modal-overlay" onClick={() => setDeleteConfirmation(null)}>
-                    <div className="modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
-                        <h3>
+            <Modal
+                isOpen={deleteConfirmation !== null}
+                onClose={() => setDeleteConfirmation(null)}
+                contentClassName="modal-content delete-modal"
+                ariaLabelledBy="appt-delete-modal-title"
+            >
+                {deleteConfirmation && (
+                    <>
+                        <h3 id="appt-delete-modal-title">
                             <i className="fas fa-exclamation-triangle"></i> Confirm Delete
                         </h3>
                         <p>
@@ -662,9 +668,9 @@ const AppointmentCalendar = ({
                                 <i className="fas fa-trash"></i> Delete
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
+                    </>
+                )}
+            </Modal>
 
             {/* Day Context Menu (for holiday management) */}
             {dayContextMenu && (
@@ -689,10 +695,15 @@ const AppointmentCalendar = ({
             />
 
             {/* Delete Holiday Confirmation Modal */}
-            {deleteHolidayConfirm && (
-                <div className="modal-overlay" onClick={() => setDeleteHolidayConfirm(null)}>
-                    <div className="modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
-                        <h3>
+            <Modal
+                isOpen={deleteHolidayConfirm !== null}
+                onClose={() => setDeleteHolidayConfirm(null)}
+                contentClassName="modal-content delete-modal"
+                ariaLabelledBy="holiday-delete-modal-title"
+            >
+                {deleteHolidayConfirm && (
+                    <>
+                        <h3 id="holiday-delete-modal-title">
                             <i className="fas fa-exclamation-triangle"></i> Remove Holiday
                         </h3>
                         <p>
@@ -716,9 +727,9 @@ const AppointmentCalendar = ({
                                 <i className="fas fa-trash"></i> Remove Holiday
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
+                    </>
+                )}
+            </Modal>
         </div>
     );
 };

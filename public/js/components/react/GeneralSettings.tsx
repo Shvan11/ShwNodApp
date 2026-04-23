@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, ChangeEvent, MouseEvent } from 'react';
+import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import cn from 'classnames';
+import Modal from './Modal';
 import styles from './SettingsSection.module.css';
 
 interface OptionsMap {
@@ -262,24 +263,25 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
             </div>
 
             {/* Modal */}
-            {modal.show && (
-                <div className="modal-overlay" onClick={hideModal}>
-                    <div className="modal-content" onClick={(e: MouseEvent) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3>{modal.title}</h3>
-                            <button className="modal-close" onClick={hideModal}>
-                                <i className="fas fa-times"></i>
-                            </button>
-                        </div>
-                        <div className="modal-body">
-                            <p>{modal.message}</p>
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-primary" onClick={hideModal}>OK</button>
-                        </div>
-                    </div>
+            <Modal
+                isOpen={modal.show}
+                onClose={hideModal}
+                contentClassName="modal-content"
+                ariaLabelledBy="general-settings-modal-title"
+            >
+                <div className="modal-header">
+                    <h3 id="general-settings-modal-title">{modal.title}</h3>
+                    <button className="modal-close" onClick={hideModal}>
+                        <i className="fas fa-times"></i>
+                    </button>
                 </div>
-            )}
+                <div className="modal-body">
+                    <p>{modal.message}</p>
+                </div>
+                <div className="modal-footer">
+                    <button className="btn btn-primary" onClick={hideModal}>OK</button>
+                </div>
+            </Modal>
         </div>
     );
 };

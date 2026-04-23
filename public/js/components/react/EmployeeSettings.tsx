@@ -1,6 +1,7 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
+import Modal from './Modal';
 import styles from './EmployeeSettings.module.css';
 
 interface Position {
@@ -252,19 +253,22 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
                 </button>
             </div>
 
-            {showAddForm && (
-                <div className={styles.modalOverlay}>
-                    <div className={styles.modal}>
-                        <div className={styles.modalHeader}>
-                            <h3>
-                                <i className={editingId ? 'fas fa-edit' : 'fas fa-plus'}></i>
-                                {editingId ? 'Edit Employee' : 'Add New Employee'}
-                            </h3>
-                            <button className={styles.modalClose} onClick={handleCancel} aria-label="Close">
-                                <i className="fas fa-times"></i>
-                            </button>
-                        </div>
-                        <form onSubmit={handleSubmit}>
+            <Modal
+                isOpen={showAddForm}
+                onClose={handleCancel}
+                contentClassName={styles.modal}
+                ariaLabelledBy="employee-modal-title"
+            >
+                <div className={styles.modalHeader}>
+                    <h3 id="employee-modal-title">
+                        <i className={editingId ? 'fas fa-edit' : 'fas fa-plus'}></i>
+                        {editingId ? 'Edit Employee' : 'Add New Employee'}
+                    </h3>
+                    <button className={styles.modalClose} onClick={handleCancel} aria-label="Close">
+                        <i className="fas fa-times"></i>
+                    </button>
+                </div>
+                <form onSubmit={handleSubmit}>
                             <div className={styles.modalBody}>
                                 <div className={styles.tabs}>
                                     <button
@@ -423,19 +427,17 @@ const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
                                     )}
                                 </div>
                             </div>
-                            <div className={styles.modalFooter}>
-                                <button type="button" onClick={handleCancel} className={styles.btnCancel}>
-                                    Cancel
-                                </button>
-                                <button type="submit" className={styles.btnSave}>
-                                    <i className="fas fa-save"></i>
-                                    {editingId ? 'Update Employee' : 'Add Employee'}
-                                </button>
-                            </div>
-                        </form>
+                    <div className={styles.modalFooter}>
+                        <button type="button" onClick={handleCancel} className={styles.btnCancel}>
+                            Cancel
+                        </button>
+                        <button type="submit" className={styles.btnSave}>
+                            <i className="fas fa-save"></i>
+                            {editingId ? 'Update Employee' : 'Add Employee'}
+                        </button>
                     </div>
-                </div>
-            )}
+                </form>
+            </Modal>
 
             <div className={styles.list}>
                 {employees.length === 0 ? (

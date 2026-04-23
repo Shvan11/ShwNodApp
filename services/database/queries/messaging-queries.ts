@@ -77,7 +77,7 @@ interface MessageStatusResult {
     appointmentId: number;
     patientName: string;
     phone: string;
-    sentStatus: boolean;
+    sentStatus: boolean | null;
     deliveryStatus: string | null;
     messageId: string | null;
     sentTimestamp: Date | null;
@@ -981,7 +981,7 @@ export async function getMessageStatusByDate(date: Date | string): Promise<Messa
         appointmentId: number;
         patientName: string;
         phone: string;
-        sentStatus: boolean;
+        sentStatus: boolean | null;
         deliveryStatus: string | null;
         messageId: string | null;
         sentTimestamp: Date | null;
@@ -998,7 +998,10 @@ export async function getMessageStatusByDate(date: Date | string): Promise<Messa
               appointmentId: columns[0].value as number,
               patientName: columns[1].value as string,
               phone: columns[2].value as string,
-              sentStatus: columns[3].value ? true : false,
+              sentStatus:
+                columns[3].value === null || columns[3].value === undefined
+                  ? null
+                  : Boolean(columns[3].value),
               deliveryStatus: columns[4].value as string | null,
               messageId: columns[5].value as string | null,
               sentTimestamp: columns[6].value as Date | null,
@@ -1009,7 +1012,7 @@ export async function getMessageStatusByDate(date: Date | string): Promise<Messa
             appointmentId: 0,
             patientName: '',
             phone: '',
-            sentStatus: false,
+            sentStatus: null,
             deliveryStatus: null,
             messageId: null,
             sentTimestamp: null,

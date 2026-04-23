@@ -3,9 +3,10 @@
  * Modal for restocking a stand inventory item with quantity and unit cost
  */
 import { useState, useEffect } from 'react';
-import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import type { StandItem } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
+import Modal from '../react/Modal';
 import styles from './RestockModal.module.css';
 
 interface RestockModalProps {
@@ -79,21 +80,19 @@ export default function RestockModal({ isOpen, item, onClose, onSave }: RestockM
     onClose();
   };
 
-  const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      handleClose();
-    }
-  };
-
-  if (!isOpen || !item) return null;
+  if (!item) return null;
 
   const totalCost = quantity * unitCost;
 
   return (
-    <div className="modal-overlay" onClick={handleOverlayClick}>
-      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      contentClassName={styles.modalContent}
+      ariaLabelledBy="restock-modal-title"
+    >
         <div className={styles.modalHeader}>
-          <h2>Restock Item</h2>
+          <h2 id="restock-modal-title">Restock Item</h2>
           <button className={styles.closeBtn} onClick={handleClose} aria-label="Close modal">
             &times;
           </button>
@@ -159,7 +158,6 @@ export default function RestockModal({ isOpen, item, onClose, onSave }: RestockM
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

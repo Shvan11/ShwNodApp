@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type FormEvent, type ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import Modal from './Modal';
 import type { ExistingHoliday, AppointmentWarning, SaveHolidayData } from './calendar.types';
 
 interface HolidayQuickModalProps {
@@ -48,7 +49,7 @@ const HolidayQuickModal = ({
         }
     }, [appointmentWarning]);
 
-    if (!isOpen || !date) return null;
+    if (!date) return null;
 
     const formatDate = (dateStr: string): string => {
         const d = new Date(dateStr);
@@ -81,17 +82,16 @@ const HolidayQuickModal = ({
         }
     };
 
-    const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (e.target === e.currentTarget) {
-            onClose();
-        }
-    };
-
     return (
-        <div className="modal-overlay holiday-quick-modal" onClick={handleOverlayClick}>
-            <div className="modal-content modal-sm" onClick={(e) => e.stopPropagation()}>
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            contentClassName="modal-content modal-sm"
+            overlayClassName="holiday-quick-modal"
+            ariaLabelledBy="holiday-quick-modal-title"
+        >
                 <div className="modal-header">
-                    <h3>
+                    <h3 id="holiday-quick-modal-title">
                         <i className="fas fa-calendar-times"></i>
                         {existingHoliday ? 'Edit Holiday' : 'Add Holiday'}
                     </h3>
@@ -191,8 +191,7 @@ const HolidayQuickModal = ({
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+        </Modal>
     );
 };
 

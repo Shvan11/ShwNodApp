@@ -26,6 +26,7 @@ export interface MessageItem {
 export interface MessageSummary {
   total: number;
   pending: number;
+  ready: number;
   server: number;
   device: number;
   read: number;
@@ -165,7 +166,8 @@ export default function MessageStatusTable({
       </div>
       <div className={styles.tableSummary}>
         <span className={styles.summaryItem}>Total: {summary.total}</span>
-        <span className={styles.summaryItem}>Pending: {summary.pending}</span>
+        <span className={styles.summaryItem}>Not Sent: {summary.pending}</span>
+        <span className={styles.summaryItem}>Ready: {summary.ready}</span>
         <span className={styles.summaryItem}>Server: {summary.server}</span>
         <span className={styles.summaryItem}>Device: {summary.device}</span>
         <span className={styles.summaryItem}>Read: {summary.read}</span>

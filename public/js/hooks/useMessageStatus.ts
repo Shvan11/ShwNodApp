@@ -42,6 +42,7 @@ interface MessageStatusApiResponse {
 export interface MessageSummary {
   total: number;
   pending: number;
+  ready: number;
   server: number;
   device: number;
   read: number;
@@ -188,6 +189,7 @@ export function useMessageStatus(
   const summary: MessageSummary = {
     total: messages.length,
     pending: messages.filter((m) => m.status === 0).length,
+    ready: messages.filter((m) => m.status === 5).length,
     server: messages.filter((m) => m.status === 1).length,
     device: messages.filter((m) => m.status === 2).length,
     read: messages.filter((m) => m.status === 3).length,

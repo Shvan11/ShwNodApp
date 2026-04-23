@@ -2,14 +2,15 @@
  * CategoryManagerModal Component
  * Modal to list, add, rename, and deactivate stand inventory categories
  */
-import { useState, useRef } from 'react';
-import type { FormEvent, MouseEvent } from 'react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
 import {
   useStandCategories,
   useStandCategoryMutations,
   type StandCategory,
 } from '../../hooks/useStand';
 import { useToast } from '../../contexts/ToastContext';
+import Modal from '../react/Modal';
 import styles from './CategoryManagerModal.module.css';
 
 interface CategoryManagerModalProps {
@@ -26,21 +27,6 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
-  const overlayMouseDownRef = useRef(false);
-
-  if (!isOpen) return null;
-
-  const handleOverlayMouseDown = (e: MouseEvent<HTMLDivElement>) => {
-    overlayMouseDownRef.current = e.target === e.currentTarget;
-  };
-
-  const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
-    const startedOnOverlay = overlayMouseDownRef.current;
-    overlayMouseDownRef.current = false;
-    if (e.target === e.currentTarget && startedOnOverlay) {
-      onClose();
-    }
-  };
 
   const handleAdd = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -90,14 +76,14 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
   };
 
   return (
-    <div
-      className="modal-overlay"
-      onMouseDown={handleOverlayMouseDown}
-      onClick={handleOverlayClick}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      contentClassName={styles.modalContent}
+      ariaLabelledBy="category-manager-modal-title"
     >
-      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
-          <h2>Manage Categories</h2>
+          <h2 id="category-manager-modal-title">Manage Categories</h2>
           <button className={styles.closeBtn} onClick={onClose} aria-label="Close modal">
             &times;
           </button>
@@ -196,7 +182,6 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
             Close
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

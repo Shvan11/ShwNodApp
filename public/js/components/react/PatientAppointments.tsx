@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
+import Modal from './Modal';
 import styles from './PatientAppointments.module.css';
 
 interface PatientAppointment {
@@ -207,30 +208,31 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
             )}
 
             {/* Delete Confirmation Modal */}
-            {deleteConfirm && (
-                <div className={styles.modalOverlay} onClick={() => setDeleteConfirm(null)}>
-                    <div className={styles.modalContent} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                        <h3>
-                            <i className="fas fa-exclamation-triangle"></i> Confirm Delete
-                        </h3>
-                        <p>Are you sure you want to delete this appointment?</p>
-                        <div className={styles.modalActions}>
-                            <button
-                                className={cn('btn', styles.btnCancel)}
-                                onClick={() => setDeleteConfirm(null)}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                className="btn-delete"
-                                onClick={() => handleDelete(deleteConfirm)}
-                            >
-                                Delete
-                            </button>
-                        </div>
-                    </div>
+            <Modal
+                isOpen={deleteConfirm !== null}
+                onClose={() => setDeleteConfirm(null)}
+                contentClassName={styles.modalContent}
+                ariaLabelledBy="patient-appointments-delete-title"
+            >
+                <h3 id="patient-appointments-delete-title">
+                    <i className="fas fa-exclamation-triangle"></i> Confirm Delete
+                </h3>
+                <p>Are you sure you want to delete this appointment?</p>
+                <div className={styles.modalActions}>
+                    <button
+                        className={cn('btn', styles.btnCancel)}
+                        onClick={() => setDeleteConfirm(null)}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        className="btn-delete"
+                        onClick={() => deleteConfirm !== null && handleDelete(deleteConfirm)}
+                    >
+                        Delete
+                    </button>
                 </div>
-            )}
+            </Modal>
         </div>
     );
 };

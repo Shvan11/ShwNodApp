@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import WorkCard, { type Work, type WorkStatus } from './WorkCard';
 import PaymentModal from './PaymentModal';
 import TransferWorkModal from './TransferWorkModal';
+import Modal from './Modal';
 import TeethSelector from './TeethSelector';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters';
 import { useToast } from '../../contexts/ToastContext';
@@ -938,10 +939,14 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
             {/* Work Details Modal */}
             {showDetailsModal && selectedWork && (
-                <div className={styles.modalOverlay}>
-                    <div className={`${styles.modal} ${styles.detailsModal}`}>
+                <Modal
+                    isOpen={true}
+                    onClose={() => setShowDetailsModal(false)}
+                    contentClassName={`${styles.modal} ${styles.detailsModal}`}
+                    ariaLabelledBy="work-details-modal-title"
+                >
                         <div className={styles.modalHeader}>
-                            <h3>Work Details - {selectedWork.TypeName || 'Work #' + selectedWork.workid}</h3>
+                            <h3 id="work-details-modal-title">Work Details - {selectedWork.TypeName || 'Work #' + selectedWork.workid}</h3>
                             <button
                                 onClick={() => setShowDetailsModal(false)}
                                 className={styles.modalClose}
@@ -1045,16 +1050,19 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             )}
 
             {/* Work Detail Form Modal */}
             {showDetailForm && selectedWork && (
-                <div className={styles.modalOverlay}>
-                    <div className={`${styles.modal} ${styles.detailFormModal}`}>
+                <Modal
+                    isOpen={true}
+                    onClose={() => setShowDetailForm(false)}
+                    contentClassName={`${styles.modal} ${styles.detailFormModal}`}
+                    ariaLabelledBy="work-detail-form-title"
+                >
                         <div className={styles.modalHeader}>
-                            <h3>
+                            <h3 id="work-detail-form-title">
                                 <i className={getWorkTypeConfig(selectedWork.Typeofwork).icon}></i>
                                 {' '}{editingDetail ? 'Edit' : 'Add'} {getWorkTypeConfig(selectedWork.Typeofwork).name} Item
                             </h3>
@@ -1269,8 +1277,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                 </button>
                             </div>
                         </form>
-                    </div>
-                </div>
+                </Modal>
             )}
 
             {/* Payment Modal */}
@@ -1290,15 +1297,16 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
             {/* Payment History Modal */}
             {showPaymentHistoryModal && selectedWorkForPayment && (
-                <div className={styles.modalOverlay}>
-                    <div className={`${styles.modal} ${styles.detailsModal}`}>
+                <Modal
+                    isOpen={true}
+                    onClose={() => setShowPaymentHistoryModal(false)}
+                    contentClassName={`${styles.modal} ${styles.detailsModal}`}
+                    ariaLabelledBy="payment-history-title"
+                >
                         <div className={styles.modalHeader}>
-                            <h3>Payment History - {selectedWorkForPayment.TypeName || 'Work #' + selectedWorkForPayment.workid}</h3>
+                            <h3 id="payment-history-title">Payment History - {selectedWorkForPayment.TypeName || 'Work #' + selectedWorkForPayment.workid}</h3>
                             <button
-                                onClick={() => {
-                                    console.log('CLOSE BUTTON CLICKED!');
-                                    setShowPaymentHistoryModal(false);
-                                }}
+                                onClick={() => setShowPaymentHistoryModal(false)}
                                 className={styles.modalClose}
                             >
                                 ×
@@ -1427,16 +1435,19 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                 )}
                             </div>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             )}
 
             {/* Delete Confirmation Modal */}
             {showDeleteConfirmation && workToDelete && (
-                <div className={styles.modalOverlay} onClick={cancelDeleteWork}>
-                    <div className="whatsapp-modal" onClick={(e: MouseEvent) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                <Modal
+                    isOpen={true}
+                    onClose={cancelDeleteWork}
+                    contentClassName="whatsapp-modal"
+                    ariaLabelledBy="delete-work-title"
+                >
                         <div className="whatsapp-modal-header">
-                            <h3 className="whatsapp-modal-title" style={{ color: 'var(--error-color)' }}>
+                            <h3 id="delete-work-title" className="whatsapp-modal-title" style={{ color: 'var(--error-color)' }}>
                                 <i className="fas fa-exclamation-triangle"></i> Confirm Delete Work
                             </h3>
                             <button onClick={cancelDeleteWork} className="whatsapp-modal-close">
@@ -1484,8 +1495,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                 <i className="fas fa-trash"></i> Delete Work
                             </button>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             )}
 
             {/* Work Status Confirmation Modal */}
@@ -1493,10 +1503,14 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                 const config = getConfirmationModalContent();
                 if (!config) return null;
                 return (
-                    <div className={styles.modalOverlay} onClick={closeConfirmationModal}>
-                        <div className="whatsapp-modal" onClick={(e: React.MouseEvent) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                    <Modal
+                        isOpen={true}
+                        onClose={closeConfirmationModal}
+                        contentClassName="whatsapp-modal"
+                        ariaLabelledBy="confirm-action-title"
+                    >
                             <div className="whatsapp-modal-header">
-                                <h3 className="whatsapp-modal-title" style={{ color: config.color }}>
+                                <h3 id="confirm-action-title" className="whatsapp-modal-title" style={{ color: config.color }}>
                                     <i className={`fas ${config.icon}`}></i> {config.title}
                                 </h3>
                                 <button onClick={closeConfirmationModal} className="whatsapp-modal-close">
@@ -1544,8 +1558,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     <i className={`fas ${config.buttonIcon}`}></i> {config.buttonText}
                                 </button>
                             </div>
-                        </div>
-                    </div>
+                    </Modal>
                 );
             })()}
 

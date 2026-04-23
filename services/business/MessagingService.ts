@@ -15,14 +15,15 @@ import { log } from '../../utils/logger.js';
 
 /**
  * Message status codes
- * - 0: Pending (not sent yet)
+ * - 0: Not Sent Yet (SentWa IS NULL — never attempted)
+ * - 5: Ready to Resend (SentWa = 0 — explicitly reset)
  * - -1: Error/Failed
  * - 1: Server (received by WhatsApp server)
  * - 2: Device (delivered to user's device)
  * - 3: Read (read by user)
  * - 4: Played (voice message played)
  */
-export type MessageStatusCode = -1 | 0 | 1 | 2 | 3 | 4;
+export type MessageStatusCode = -1 | 0 | 1 | 2 | 3 | 4 | 5;
 
 /**
  * Delivery status from database
@@ -40,7 +41,7 @@ export type DeliveryStatus =
  * Database message format
  */
 export interface DatabaseMessage {
-  sentStatus: boolean;
+  sentStatus: boolean | null;
   deliveryStatus: DeliveryStatus;
   patientName: string;
   phone: string;
@@ -59,7 +60,7 @@ export interface TransformedMessage extends DatabaseMessage {
   name: string;
   timeSent: string;
   message: string;
-  originalSentStatus: boolean;
+  originalSentStatus: boolean | null;
   originalDeliveryStatus: DeliveryStatus;
 }
 
@@ -119,11 +120,12 @@ export interface MessageDetails {
 /**
  * Transform message status from database format to frontend format
  *
- * Database format: sentStatus (boolean) + deliveryStatus (string)
+ * Database format: sentStatus (boolean | null) + deliveryStatus (string)
  * Frontend format: numeric status code
  *
  * Status mapping:
- * - 0: Pending (not sent yet)
+ * - 0: Not Sent Yet (SentWa IS NULL — fresh appointment)
+ * - 5: Ready to Resend (SentWa = 0 — explicitly reset)
  * - -1: Error/Failed
  * - 1: Server (received by WhatsApp server)
  * - 2: Device (delivered to user's device)
@@ -136,12 +138,14 @@ export interface MessageDetails {
 export function transformMessageStatus(
   msg: DatabaseMessage
 ): TransformedMessage {
-  // Convert sentStatus (boolean) + deliveryStatus (string) to numeric status
-  let status: MessageStatusCode = 0; // Default to pending
+  let status: MessageStatusCode = 0;
 
-  if (!msg.sentStatus) {
-    // Not sent yet
+  if (msg.sentStatus === null || msg.sentStatus === undefined) {
+    // Never attempted to send
     status = 0;
+  } else if (msg.sentStatus === false) {
+    // Explicitly reset — ready to resend
+    status = 5;
   } else if (msg.deliveryStatus === 'ERROR') {
     // Failed
     status = -1;
@@ -217,13 +221,14 @@ export function calculateMessageCount(
     pending: 0,
   };
 
-  // Count existing message statuses
+  // Count existing message statuses. Status 5 (reset/ready) is treated as pending,
+  // not as sent — it needs to be re-sent.
   if (Array.isArray(existingMessages) && existingMessages.length > 0) {
     messageCount.alreadySent = existingMessages.filter(
-      (m) => m.status >= 1
+      (m) => m.status >= 1 && m.status !== 5
     ).length;
     messageCount.pending = existingMessages.filter(
-      (m) => m.status === 0
+      (m) => m.status === 0 || m.status === 5
     ).length;
   }
 
@@ -253,11 +258,11 @@ export function calculateMessageSummary(
   }
 
   messages.forEach((msg) => {
-    if (msg.status === 0) {
+    if (msg.status === 0 || msg.status === 5) {
       summary.messagesPending++;
     } else if (msg.status === 1) {
       summary.messagesSent++;
-    } else if (msg.status >= 2) {
+    } else if (msg.status === 2 || msg.status === 3 || msg.status === 4) {
       summary.messagesDelivered++;
     } else if (msg.status === -1) {
       summary.messagesFailed++;

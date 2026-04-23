@@ -1,4 +1,5 @@
 import { useState, useEffect, ChangeEvent, MouseEvent } from 'react';
+import Modal from './Modal';
 import styles from './DatabaseSettings.module.css';
 
 interface DatabaseConfig {
@@ -474,24 +475,25 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
             )}
 
             {/* Modal */}
-            {modal.show && (
-                <div className={styles.modalOverlay} onClick={hideModal}>
-                    <div className={styles.modalContent} onClick={(e: MouseEvent) => e.stopPropagation()}>
-                        <div className={styles.modalHeader}>
-                            <h3>{modal.title}</h3>
-                            <button className={styles.modalClose} onClick={hideModal}>
-                                <i className="fas fa-times"></i>
-                            </button>
-                        </div>
-                        <div className={styles.modalBody}>
-                            <pre>{modal.message}</pre>
-                        </div>
-                        <div className={styles.modalFooter}>
-                            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={hideModal}>OK</button>
-                        </div>
-                    </div>
+            <Modal
+                isOpen={modal.show}
+                onClose={hideModal}
+                contentClassName={styles.modalContent}
+                ariaLabelledBy="database-settings-modal-title"
+            >
+                <div className={styles.modalHeader}>
+                    <h3 id="database-settings-modal-title">{modal.title}</h3>
+                    <button className={styles.modalClose} onClick={hideModal}>
+                        <i className="fas fa-times"></i>
+                    </button>
                 </div>
-            )}
+                <div className={styles.modalBody}>
+                    <pre>{modal.message}</pre>
+                </div>
+                <div className={styles.modalFooter}>
+                    <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={hideModal}>OK</button>
+                </div>
+            </Modal>
         </div>
     );
 };

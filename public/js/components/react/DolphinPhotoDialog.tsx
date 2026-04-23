@@ -1,5 +1,6 @@
 import { useState, useEffect, ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import Modal from './Modal';
 import styles from './DolphinPhotoDialog.module.css';
 
 interface Props {
@@ -166,8 +167,7 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
     };
 
     return (
-        <div className={styles.overlay} onClick={onClose}>
-            <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
+        <Modal isOpen={true} onClose={onClose} contentClassName={styles.dialog}>
                 <div className={styles.header}>
                     <h3>Add Photos to Dolphin</h3>
                     <button className={styles.closeBtn} onClick={onClose}>
@@ -333,8 +333,7 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
                         </>
                     )}
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 };
 

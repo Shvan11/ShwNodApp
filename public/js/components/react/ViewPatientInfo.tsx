@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DolphinPhotoDialog from './DolphinPhotoDialog';
 import AlertModal from './AlertModal';
+import PortalAccessCard from './PortalAccessCard';
 import { useToast } from '../../contexts/ToastContext';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import styles from './ViewPatientInfo.module.css';
@@ -662,6 +663,9 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         {patientInfo.Notes || <span className={styles.patientNotesEmpty}>No notes for this patient</span>}
                     </div>
                 </div>
+
+                {/* Portal Access */}
+                {validPersonId && <PortalAccessCard personId={validPersonId} />}
             </div>
 
             {/* Dolphin Photo Dialog */}

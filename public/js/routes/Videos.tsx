@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '../contexts/ToastContext';
+import Modal from '../components/react/Modal';
 import styles from './Videos.module.css';
 
 /**
@@ -512,34 +513,41 @@ export default function Videos() {
 
       {/* Video Player Modal */}
       {isPlayerOpen && currentVideo && (
-        <div className={styles.modalOverlay} onClick={handleClosePlayer}>
-          <div className={styles.playerModal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.playerHeader}>
-              <h2>{currentVideo.Description}</h2>
-              <button className={styles.closeBtn} onClick={handleClosePlayer}>
-                <i className="fas fa-times"></i>
-              </button>
-            </div>
-            <div className={styles.playerBody}>
-              <video
-                controls
-                autoPlay
-                className={styles.videoPlayer}
-                src={`/api/videos/${currentVideo.ID}/stream`}
-              >
-                Your browser does not support the video tag.
-              </video>
-            </div>
+        <Modal
+          isOpen={true}
+          onClose={handleClosePlayer}
+          contentClassName={styles.playerModal}
+          ariaLabelledBy="video-player-title"
+        >
+          <div className={styles.playerHeader}>
+            <h2 id="video-player-title">{currentVideo.Description}</h2>
+            <button className={styles.closeBtn} onClick={handleClosePlayer}>
+              <i className="fas fa-times"></i>
+            </button>
           </div>
-        </div>
+          <div className={styles.playerBody}>
+            <video
+              controls
+              autoPlay
+              className={styles.videoPlayer}
+              src={`/api/videos/${currentVideo.ID}/stream`}
+            >
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        </Modal>
       )}
 
       {/* Add/Edit Form Modal */}
       {isFormModalOpen && (
-        <div className={styles.modalOverlay} onClick={() => setIsFormModalOpen(false)}>
-          <div className={styles.formModal} onClick={(e) => e.stopPropagation()}>
+        <Modal
+          isOpen={true}
+          onClose={() => setIsFormModalOpen(false)}
+          contentClassName={styles.formModal}
+          ariaLabelledBy="video-form-title"
+        >
             <div className={styles.modalHeader}>
-              <h2>{editingVideo ? 'Edit Video' : 'Add New Video'}</h2>
+              <h2 id="video-form-title">{editingVideo ? 'Edit Video' : 'Add New Video'}</h2>
               <button className={styles.closeBtn} onClick={() => setIsFormModalOpen(false)}>
                 <i className="fas fa-times"></i>
               </button>
@@ -644,19 +652,19 @@ export default function Videos() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && videoToDelete && (
-        <div className={styles.modalOverlay} onClick={() => setIsDeleteModalOpen(false)}>
-          <div
-            className={`${styles.formModal} ${styles.deleteModal}`}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <Modal
+          isOpen={true}
+          onClose={() => setIsDeleteModalOpen(false)}
+          contentClassName={`${styles.formModal} ${styles.deleteModal}`}
+          ariaLabelledBy="video-delete-title"
+        >
             <div className={styles.modalHeader}>
-              <h2>Delete Video</h2>
+              <h2 id="video-delete-title">Delete Video</h2>
               <button className={styles.closeBtn} onClick={() => setIsDeleteModalOpen(false)}>
                 <i className="fas fa-times"></i>
               </button>
@@ -685,16 +693,19 @@ export default function Videos() {
                 Delete
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* QR Code Share Modal */}
       {isQRModalOpen && (
-        <div className={styles.modalOverlay} onClick={handleCloseQR}>
-          <div className={styles.qrModal} onClick={(e) => e.stopPropagation()}>
+        <Modal
+          isOpen={true}
+          onClose={handleCloseQR}
+          contentClassName={styles.qrModal}
+          ariaLabelledBy="video-qr-title"
+        >
             <div className={styles.modalHeader}>
-              <h2>Share Video</h2>
+              <h2 id="video-qr-title">Share Video</h2>
               <button className={styles.closeBtn} onClick={handleCloseQR}>
                 <i className="fas fa-times"></i>
               </button>
@@ -735,8 +746,7 @@ export default function Videos() {
                 Close
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

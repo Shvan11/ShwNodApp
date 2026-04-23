@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import styles from './TransferWorkModal.module.css';
+import Modal from './Modal';
 import { useToast } from '../../contexts/ToastContext';
 import PatientQuickSearch, { type SelectedPatient } from './PatientQuickSearch';
 
@@ -142,16 +143,8 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
            r.alignerSets + r.alignerBatches + r.wires + r.implants + r.screws;
   };
 
-  // Handle overlay click (close modal)
-  const handleOverlayClick = (e: React.MouseEvent): void => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   return (
-    <div className={styles.modalOverlay} onClick={handleOverlayClick}>
-      <div className={styles.modalContent}>
+    <Modal isOpen={true} onClose={onClose} contentClassName={styles.modalContent}>
         {/* Header */}
         <div className={styles.modalHeader}>
           <div className={styles.headerLeft}>
@@ -326,8 +319,7 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
             </>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

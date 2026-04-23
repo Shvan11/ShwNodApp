@@ -84,6 +84,12 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [lightbox, setLightbox] = useState<PhotoSwipeLightbox | null>(null);
+    // Set of private photo filenames (lowercase) for the CURRENT tpCode.
+    // Used both for grid badges and for the PhotoSwipe eye-toggle button.
+    const [privateNames, setPrivateNames] = useState<Set<string>>(() => new Set());
+    // Ref mirrors privateNames so PhotoSwipe callbacks (outside React) read fresh state.
+    const privateNamesRef = useRef<Set<string>>(privateNames);
+    privateNamesRef.current = privateNames;
     const componentRef = useRef<HTMLDivElement>(null);
     const isSharingRef = useRef(false);
 
@@ -224,19 +230,72 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         try {
             setLoading(true);
 
-            const response = await fetch(`/api/patients/${personId}/gallery/${tpCode}`);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            const [galleryRes, visibilityRes] = await Promise.all([
+                fetch(`/api/patients/${personId}/gallery/${tpCode}`),
+                fetch(`/api/patients/${personId}/photos/visibility`),
+            ]);
+
+            if (!galleryRes.ok) {
+                throw new Error(`HTTP ${galleryRes.status}: ${galleryRes.statusText}`);
             }
 
-            const galleryImages: GalleryImage[] = await response.json();
+            const galleryImages: GalleryImage[] = await galleryRes.json();
             setImages(galleryImages);
+
+            if (visibilityRes.ok) {
+                const visData = (await visibilityRes.json()) as {
+                    success: boolean;
+                    privateImages?: Array<{ tp: string; name: string }>;
+                };
+                const names = new Set<string>(
+                    (visData.privateImages ?? [])
+                        .filter((r) => r.tp === tpCode)
+                        .map((r) => r.name.toLowerCase())
+                );
+                setPrivateNames(names);
+            } else {
+                setPrivateNames(new Set());
+            }
         } catch (err) {
             console.error('Error loading grid:', err);
             setError(err instanceof Error ? err.message : 'Unknown error');
         } finally {
             setLoading(false);
         }
+    };
+
+    // Toggle a photo's private flag. Called from the PhotoSwipe eye button (outside
+    // React's tree), so it reads state from the ref and writes to setPrivateNames.
+    const togglePhotoPrivacy = async (fileName: string): Promise<void> => {
+        if (!personId) return;
+        const lower = fileName.toLowerCase();
+        const wasPrivate = privateNamesRef.current.has(lower);
+        const nextPrivate = !wasPrivate;
+        try {
+            const res = await fetch(`/api/patients/${personId}/photos/visibility`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tp: tpCode, name: fileName, isPrivate: nextPrivate }),
+            });
+            const data = (await res.json()) as { success: boolean; error?: string };
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || 'Failed to update');
+            }
+            setPrivateNames((prev) => {
+                const next = new Set(prev);
+                if (nextPrivate) next.add(lower);
+                else next.delete(lower);
+                return next;
+            });
+            toast.success(nextPrivate ? 'Photo hidden from patient' : 'Photo visible to patient');
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to update visibility');
+        }
+    };
+
+    // Extract the dolphin filename from a URL served via /DolImgs/{name}.
+    const getFileNameFromUrl = (imageUrl: string): string => {
+        return imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
     };
 
     const getImageSrc = (element: ImageElement): string => {
@@ -363,6 +422,61 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                                     el.setAttribute('download', getShareFileName(imageUrl));
                                     (el as HTMLAnchorElement).href = imageUrl;
                                 });
+                            }
+                        });
+
+                        // Add eye-toggle button: staff can mark individual photos as
+                        // private (hidden from the patient portal). Reads current
+                        // state from privateNamesRef; updates on slide change.
+                        lightboxInstance.pswp!.ui.registerElement({
+                            name: 'visibility-toggle-button',
+                            order: 7.5,
+                            isButton: true,
+                            tagName: 'button',
+
+                            html: {
+                                isCustomSVG: true,
+                                inner: '<path d="M16 8.5c3.13 0 5.94 1.76 7.31 4.5-1.37 2.74-4.18 4.5-7.31 4.5S10.06 15.74 8.69 13c1.37-2.74 4.18-4.5 7.31-4.5M16 7C11.58 7 7.81 9.75 6 13c1.81 3.25 5.58 6 10 6s8.19-2.75 10-6c-1.81-3.25-5.58-6-10-6zm0 4a2 2 0 110 4 2 2 0 010-4z" id="pswp__icn-eye"/>',
+                                outlineID: 'pswp__icn-eye'
+                            },
+
+                            onInit: (el: HTMLElement, pswp: PhotoSwipeInstance) => {
+                                const PRIVATE_CLASS = 'pswp__button--visibility-private';
+                                const syncButton = () => {
+                                    const src = pswp.currSlide?.data?.src;
+                                    if (!src) return;
+                                    const fileName = getFileNameFromUrl(src);
+                                    const isPlaceholder =
+                                        src.includes('logo.png') ||
+                                        src.includes('placeholder') ||
+                                        !/\.i\d+$/i.test(fileName);
+                                    if (isPlaceholder) {
+                                        el.style.display = 'none';
+                                        return;
+                                    }
+                                    el.style.display = '';
+                                    const isPrivate = privateNamesRef.current.has(fileName.toLowerCase());
+                                    el.classList.toggle(PRIVATE_CLASS, isPrivate);
+                                    el.setAttribute(
+                                        'title',
+                                        isPrivate ? 'Make visible to patient' : 'Hide from patient'
+                                    );
+                                    el.setAttribute(
+                                        'aria-label',
+                                        isPrivate ? 'Make visible to patient' : 'Hide from patient'
+                                    );
+                                };
+                                el.addEventListener('click', async () => {
+                                    const src = pswp.currSlide?.data?.src;
+                                    if (!src) return;
+                                    const fileName = getFileNameFromUrl(src);
+                                    if (!/\.i\d+$/i.test(fileName)) return;
+                                    await togglePhotoPrivacy(fileName);
+                                    syncButton();
+                                });
+                                pswp.on('change', syncButton);
+                                // Initial sync
+                                syncButton();
                             }
                         });
 
@@ -572,6 +686,12 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 {imageElements.map(element => {
                     const imageSrc = getImageSrc(element);
                     const imageProps = getImageProps(element);
+                    const image = images[element.index];
+                    const showBadge =
+                        !element.isLogo && image && image.name && /\.i\d+$/i.test(image.name);
+                    const isPrivate = showBadge
+                        ? privateNames.has(image!.name.toLowerCase())
+                        : false;
 
 
                     return (
@@ -583,6 +703,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                             data-pswp-height={imageProps.height}
                             target="_blank"
                             rel="noreferrer"
+                            className={styles.galleryCell}
                         >
                             <img
                                 id={element.id}
@@ -592,6 +713,15 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                                 onMouseEnter={handleImageMouseEnter}
                                 onMouseLeave={handleImageMouseLeave}
                             />
+                            {showBadge && (
+                                <span
+                                    className={`${styles.visibilityBadge} ${isPrivate ? styles.visibilityBadgePrivate : ''}`}
+                                    title={isPrivate ? 'Hidden from patient' : 'Visible to patient'}
+                                    aria-hidden="true"
+                                >
+                                    <i className={isPrivate ? 'fas fa-eye-slash' : 'fas fa-eye'}></i>
+                                </span>
+                            )}
                         </a>
                     );
                 })}

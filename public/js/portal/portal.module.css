@@ -1,0 +1,569 @@
+/* Patient Portal — standalone mobile-first stylesheet.
+   Intentionally independent from the staff app: no shared tokens, no sidebar. */
+
+/* ---------- shared primitives ---------- */
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #e3e7ef;
+  border-top-color: #007bff;
+  border-radius: 50%;
+  animation: portalSpin 0.9s linear infinite;
+}
+
+@keyframes portalSpin {
+  to { transform: rotate(360deg); }
+}
+
+.bootScreen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  height: 100vh;
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
+.errorBox {
+  background: #fff4f4;
+  border: 1px solid #f5c2c7;
+  color: #842029;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.loadingRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6c757d;
+}
+
+.emptyIcon {
+  font-size: 2.5rem;
+  color: #c7cfda;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.emptyHint {
+  font-size: 0.85rem;
+  color: #8b94a1;
+  margin-top: 0.25rem;
+}
+
+/* ---------- login ---------- */
+.loginPage {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: linear-gradient(180deg, #e9f1ff 0%, #f5f7fb 100%);
+}
+
+.loginCard {
+  width: 100%;
+  max-width: 380px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0, 40, 90, 0.1);
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.loginHeader {
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.loginIcon {
+  font-size: 2rem;
+  color: #007bff;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.loginTitle {
+  font-size: 1.35rem;
+  margin: 0;
+  color: #1b2430;
+}
+
+.loginSubtitle {
+  margin: 0.2rem 0 0 0;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.fieldLabel {
+  font-size: 0.85rem;
+  color: #495057;
+  font-weight: 500;
+}
+
+.input {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #d5dbe3;
+  border-radius: 10px;
+  font-size: 1rem;
+  background: #fff;
+  color: #1b2430;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  font-family: inherit;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+}
+
+.input:disabled {
+  background: #f6f7f9;
+  color: #8b94a1;
+}
+
+.primaryButton {
+  padding: 0.85rem 1rem;
+  background: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: #0065d1;
+}
+
+.primaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loginHint {
+  font-size: 0.8rem;
+  color: #6c757d;
+  text-align: center;
+  margin: 0.5rem 0 0;
+  line-height: 1.4;
+}
+
+/* ---------- dashboard shell ---------- */
+.dashboard {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 72px; /* leave room for fixed tab bar */
+  background: #f5f7fb;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+  border-bottom: 1px solid #e3e7ef;
+}
+
+.headerInner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0.9rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.headerTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #1b2430;
+  min-width: 0;
+}
+
+.headerTitle i {
+  color: #007bff;
+  font-size: 1.35rem;
+}
+
+.headerHello {
+  font-size: 0.75rem;
+  color: #8b94a1;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.headerName {
+  font-size: 1rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 12rem;
+}
+
+.logoutButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: 1px solid #d5dbe3;
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.85rem;
+  color: #495057;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.logoutButton:hover {
+  background: #f5f7fb;
+  color: #1b2430;
+}
+
+.content {
+  flex: 1;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.tabPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ---------- bottom tab bar ---------- */
+.tabBar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: #fff;
+  border-top: 1px solid #e3e7ef;
+  box-shadow: 0 -4px 12px rgba(0, 40, 90, 0.04);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tabButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0.65rem 0.25rem;
+  border: none;
+  background: transparent;
+  color: #6c757d;
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.tabButton i {
+  font-size: 1.1rem;
+}
+
+.tabActive {
+  color: #007bff;
+}
+
+/* ---------- appointment tab ---------- */
+.appointmentCard {
+  background: #fff;
+  border-radius: 14px;
+  padding: 1.25rem 1.25rem 1.5rem;
+  box-shadow: 0 2px 10px rgba(0, 40, 90, 0.05);
+  border: 1px solid #e3e7ef;
+}
+
+.appointmentLabel {
+  font-size: 0.75rem;
+  color: #8b94a1;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.appointmentDate {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #1b2430;
+  line-height: 1.3;
+}
+
+.appointmentTime {
+  margin-top: 0.25rem;
+  color: #007bff;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.appointmentRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  color: #495057;
+  font-size: 0.9rem;
+}
+
+.appointmentRow i {
+  color: #8b94a1;
+  width: 1.1rem;
+  text-align: center;
+}
+
+/* ---------- photos tab ---------- */
+.tpScroller {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.25rem 0 0.75rem;
+  margin: 0 -1rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  scroll-snap-type: x proximity;
+}
+
+.tpChip {
+  flex: 0 0 auto;
+  background: #fff;
+  border: 1px solid #e3e7ef;
+  border-radius: 10px;
+  padding: 0.5rem 0.85rem;
+  text-align: start;
+  cursor: pointer;
+  color: #495057;
+  font-family: inherit;
+  scroll-snap-align: start;
+  min-width: 7rem;
+}
+
+.tpChipActive {
+  border-color: #007bff;
+  background: #e9f1ff;
+  color: #0056b3;
+}
+
+.tpChipDate {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.tpChipDesc {
+  font-size: 0.7rem;
+  color: #8b94a1;
+  margin-top: 0.15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 10rem;
+}
+
+.photoGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.photoCell {
+  aspect-ratio: 1;
+  border: none;
+  padding: 0;
+  background: #e3e7ef;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.photoImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.lightboxImg {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.lightboxClose {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.lightboxClose:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ---------- visits tab ---------- */
+.visitList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.visitItem {
+  background: #fff;
+  border: 1px solid #e3e7ef;
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.visitDate {
+  font-weight: 600;
+  color: #1b2430;
+  margin-bottom: 0.35rem;
+}
+
+.visitSummary {
+  color: #495057;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.visitBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.visitBadge {
+  background: #e9f1ff;
+  color: #0056b3;
+  font-size: 0.72rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.visitBadgeAccent {
+  background: #fff3cd;
+  color: #7a5e00;
+}
+
+/* ---------- payments tab ---------- */
+.totalCard {
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  color: #fff;
+  border-radius: 14px;
+  padding: 1.25rem;
+  box-shadow: 0 4px 14px rgba(0, 82, 170, 0.25);
+}
+
+.totalLabel {
+  font-size: 0.75rem;
+  opacity: 0.85;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.totalValue {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-top: 0.25rem;
+}
+
+.paymentList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #e3e7ef;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.paymentItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #eef1f6;
+}
+
+.paymentItem:last-child {
+  border-bottom: none;
+}
+
+.paymentDate {
+  color: #495057;
+  font-size: 0.9rem;
+}
+
+.paymentAmount {
+  font-weight: 600;
+  color: #1b2430;
+}
+
+/* ---------- larger screens ---------- */
+@media (min-width: 720px) {
+  .photoGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
