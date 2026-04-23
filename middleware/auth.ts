@@ -203,6 +203,13 @@ export function authenticateWeb(
     return next();
   }
 
+  // Skip for Vite-built static assets. The portal SPA (public) and staff SPA
+  // share /dist/assets/*; gating these behind staff auth redirects module
+  // script requests to /login.html and breaks strict-MIME loading.
+  if (req.path.startsWith('/assets/')) {
+    return next();
+  }
+
   // If logged in, continue
   if (req.session && req.session.userId) {
     return next();
