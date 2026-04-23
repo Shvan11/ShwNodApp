@@ -234,7 +234,7 @@ async function initializeApplication(): Promise<AppInitResult> {
     });
 
     // Patient portal SPA shell (public; portal handles its own auth)
-    app.get(['/portal', '/portal/*'], (_req: Request, res: Response) => {
+    app.get(['/portal', '/portal/*splat'], (_req: Request, res: Response) => {
       // In production the built bundle is at dist/portal.html; in dev Vite
       // serves it directly and this route isn't hit (vite proxy handles /api).
       const builtPath = path.join(process.cwd(), './dist/portal.html');
