@@ -66,12 +66,12 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
             if (expense) {
                 // Edit mode - populate with expense data
                 setFormData({
-                    expenseDate: expense.ExpenseDate?.split('T')[0] || '',
+                    expenseDate: expense.expenseDate?.split('T')[0] || '',
                     amount: expense.Amount || 0,
                     currency: (expense.Currency || '').trim() || 'IQD',
                     categoryId: expense.CategoryID || '',
                     subcategoryId: expense.SubcategoryID || '',
-                    note: expense.Description || ''
+                    note: expense.Note || ''
                 });
                 setDisplayAmount(expense.Amount ? formatNumber(expense.Amount) : '');
                 setCategoryId(expense.CategoryID || '');

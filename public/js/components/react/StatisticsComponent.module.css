@@ -632,9 +632,13 @@ th.qasaColumn {
 /* Modal Body */
 .statisticsModalBody {
     flex: 1;
-    padding: 2rem;
+    padding: 0 2rem 2rem 2rem;
     overflow-y: auto;
     overflow-x: hidden;
+}
+
+.statisticsModalBody > *:first-child {
+    margin-top: 2rem;
 }
 
 /* Invoice Summary */
@@ -684,22 +688,24 @@ th.qasaColumn {
 /* Invoices Table */
 .statisticsInvoicesTable {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: 0.9rem;
 }
 
 .statisticsInvoicesTable thead {
-    background-color: var(--info-color);
     color: white;
-    position: sticky;
-    top: 0;
-    z-index: 10;
 }
 
 .statisticsInvoicesTable th {
     padding: 0.75rem;
     text-align: left;
     font-weight: 600;
+    background-color: var(--info-color);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .statisticsInvoicesTable td {
@@ -1468,21 +1474,3 @@ th.qasaColumn {
     }
 }
 
-/* Helper classes for card types */
-.revenue {}
-.expenses {}
-.profit {}
-.cashbox {}
-.currency {}
-.amount {}
-.negative {}
-.grandTotal {}
-.summaryItem {}
-.label {}
-.value {}
-.highlight {}
-.active {}
-.time {}
-.iqd {}
-.usd {}
-.change {}

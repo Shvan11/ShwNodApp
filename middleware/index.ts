@@ -51,6 +51,13 @@ export {
  * @param app - Express application
  */
 export function setupMiddleware(app: Application): void {
+  // Node sits behind Caddy on the same host (Caddy proxies both
+  // local.shwan-orthodontics.com and remote.shwan-orthodontics.com, the latter
+  // via Cloudflare DNS). Trusting 'loopback' lets express-rate-limit read the
+  // real client IP from X-Forwarded-For while rejecting spoofed headers from
+  // any non-localhost connection.
+  app.set('trust proxy', 'loopback');
+
   // CORS middleware
   app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');

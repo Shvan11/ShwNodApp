@@ -19,15 +19,15 @@ export interface ExpenseFilters {
  * Expense data
  */
 export interface Expense {
-  ExpenseID: number;
+  ID: number;
   Amount: number;
   Currency: string;
   CategoryID?: number;
   CategoryName?: string;
   SubcategoryID?: number;
   SubcategoryName?: string;
-  Description?: string;
-  ExpenseDate?: string;
+  Note?: string;
+  expenseDate?: string;
   [key: string]: unknown;
 }
 

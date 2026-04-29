@@ -3,7 +3,7 @@
  */
 import { Request } from 'tedious';
 import type { ColumnValue } from '../../../types/database.types.js';
-import { executeStoredProcedure, executeMultipleResultSets, TYPES } from '../index.js';
+import { executeQuery, executeStoredProcedure, executeMultipleResultSets, TYPES } from '../index.js';
 
 // Type definitions
 export interface AppointmentRow {
@@ -223,4 +223,32 @@ export async function getDailyAppointmentsOptimized(
   }
 
   return { allAppointments, checkedInAppointments, stats };
+}
+
+export interface AppointmentNotificationRow {
+  AppointmentID: number;
+  AppDate: Date;
+  PatientName: string;
+  Phone: string | null;
+  PersonID: number;
+}
+
+export async function getAppointmentForNotification(
+  appointmentId: number
+): Promise<AppointmentNotificationRow | null> {
+  const result = await executeQuery<AppointmentNotificationRow>(
+    `SELECT a.AppointmentID, a.AppDate, p.PatientName, p.Phone, p.PersonID
+     FROM dbo.tblappointments a
+     INNER JOIN dbo.tblpatients p ON p.PersonID = a.PersonID
+     WHERE a.AppointmentID = @appointmentId`,
+    [['appointmentId', TYPES.Int, appointmentId]],
+    (columns: ColumnValue[]) => ({
+      AppointmentID: columns[0].value as number,
+      AppDate: columns[1].value as Date,
+      PatientName: columns[2].value as string,
+      Phone: columns[3].value as string | null,
+      PersonID: columns[4].value as number,
+    })
+  );
+  return result[0] || null;
 }

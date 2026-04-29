@@ -221,7 +221,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                                                 <td data-label="Patient Name" className={`${styles.patientName} text-rtl`}>
                                                     {invoice.PatientName}
                                                 </td>
-                                                <td data-label="Time" className={styles.time}>{formatTime(invoice.SysStartTime)}</td>
+                                                <td data-label="Time">{formatTime(invoice.SysStartTime)}</td>
                                                 <td data-label="Treatment Currency" className={styles.currencyBadge}>
                                                     <span className={`badge ${invoice.currency}`}>
                                                         {invoice.currency}

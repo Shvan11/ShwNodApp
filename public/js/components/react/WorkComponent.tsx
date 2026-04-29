@@ -676,36 +676,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     };
 
     const handlePrintReceipt = (work: Work) => {
-        console.log('🖨️ [PRINT RECEIPT] Button clicked for work:', work.workid);
-
         window.open(`/api/templates/receipt/work/${work.workid}`, '_blank');
-        console.log('🖨️ [PRINT RECEIPT] Receipt window opened');
-
-        console.log('📱 [WHATSAPP] Starting WhatsApp send for work:', work.workid);
-        fetch('/api/wa/send-receipt', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ workId: work.workid })
-        })
-            .then(res => {
-                console.log('📱 [WHATSAPP] Response status:', res.status);
-                return res.json();
-            })
-            .then(result => {
-                console.log('📱 [WHATSAPP] Response data:', result);
-                if (result.success) {
-                    toast.success('Receipt sent via WhatsApp!', 3000);
-                    console.log('✅ [WHATSAPP] Success toast shown');
-                } else {
-                    const errorMsg = result.message || 'Failed to send WhatsApp receipt';
-                    toast.error(errorMsg, 5000);
-                    console.error('❌ [WHATSAPP] Error:', errorMsg);
-                }
-            })
-            .catch((err) => {
-                toast.error('Network error: Could not send WhatsApp receipt', 5000);
-                console.error('❌ [WHATSAPP] Network error:', err);
-            });
     };
 
     const toggleWorkExpanded = (workId: number) => {

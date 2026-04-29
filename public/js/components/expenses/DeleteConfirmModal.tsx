@@ -25,7 +25,7 @@ export default function DeleteConfirmModal({ isOpen, expense, onConfirm, onCance
         return new Date(dateString).toLocaleDateString('en-US');
     };
 
-    const date = formatDate(expense.ExpenseDate);
+    const date = formatDate(expense.expenseDate);
     const amount = formatNumber(expense.Amount);
     const currency = (expense.Currency || '').trim();
 
@@ -52,7 +52,7 @@ export default function DeleteConfirmModal({ isOpen, expense, onConfirm, onCance
                     <p><strong>Date:</strong> {date}</p>
                     <p><strong>Amount:</strong> {amount} {currency}</p>
                     <p><strong>Category:</strong> {expense.CategoryName || '-'}</p>
-                    {expense.Description && <p><strong>Note:</strong> {expense.Description}</p>}
+                    {expense.Note && <p><strong>Note:</strong> {expense.Note}</p>}
                 </div>
             </div>
 

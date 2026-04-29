@@ -758,6 +758,23 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                     newBalance: ((workData!.TotalRequired || 0) - Number(workData!.Discount ?? 0) - (workData!.TotalPaid || 0) - amountPaid)
                 });
 
+                fetch('/api/wa/send-receipt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ workId: workData!.workid })
+                })
+                    .then(res => res.json())
+                    .then((waResult: { success: boolean; message?: string }) => {
+                        if (waResult.success) {
+                            toast.success('Receipt sent via WhatsApp!');
+                        } else {
+                            toast.warning(waResult.message || 'Failed to send WhatsApp');
+                        }
+                    })
+                    .catch(err => {
+                        toast.error('WhatsApp error: ' + err.message);
+                    });
+
                 if (onSuccess) {
                     onSuccess(result);
                 }
@@ -791,37 +808,12 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             printWindow.document.write(html);
             printWindow.document.close();
 
-            // Wait for load then print
+            // Wait for load, then print and close (matches Videos.tsx pattern)
             printWindow.onload = function() {
                 printWindow.focus();
                 printWindow.print();
+                printWindow.close();
             };
-
-            // Auto-send WhatsApp receipt (non-blocking)
-            console.log('[PAYMENT MODAL] Starting WhatsApp send for work:', workData!.workid);
-            fetch('/api/wa/send-receipt', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ workId: workData!.workid })
-            })
-            .then(res => {
-                console.log('[PAYMENT MODAL] Response status:', res.status);
-                return res.json();
-            })
-            .then((result: { success: boolean; message?: string }) => {
-                console.log('[PAYMENT MODAL] Response data:', result);
-                if (result.success) {
-                    toast.success('Receipt sent via WhatsApp!');
-                    console.log('[PAYMENT MODAL] Success toast shown');
-                } else {
-                    toast.warning(result.message || 'Failed to send WhatsApp');
-                    console.warn('[PAYMENT MODAL] Warning:', result.message);
-                }
-            })
-            .catch(err => {
-                toast.error('WhatsApp error: ' + err.message);
-                console.error('[PAYMENT MODAL] Network error:', err);
-            });
         } catch (err) {
             console.error('Error printing receipt:', err);
             toast.error(`Failed to print receipt: ${(err as Error).message}`);

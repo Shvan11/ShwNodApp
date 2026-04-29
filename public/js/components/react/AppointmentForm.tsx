@@ -1,6 +1,7 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import cn from 'classnames';
 import SimplifiedCalendarPicker from './SimplifiedCalendarPicker';
+import { useToast } from '../../contexts/ToastContext';
 import styles from './AppointmentForm.module.css';
 
 interface AppointmentFormData {
@@ -49,6 +50,7 @@ interface ApiErrorResponse {
  */
 
 const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps) => {
+    const toast = useToast();
     const [formData, setFormData] = useState<AppointmentFormData>({
         PersonID: personId ?? '',
         AppDate: '',
@@ -168,6 +170,23 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
 
             const result = await response.json();
             if (result.success) {
+                fetch('/api/wa/send-appointment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ appointmentId: result.appointmentID })
+                })
+                    .then(res => res.json())
+                    .then((waResult: { success: boolean; message?: string }) => {
+                        if (waResult.success) {
+                            toast.success('Appointment confirmation sent via WhatsApp!');
+                        } else {
+                            toast.warning(waResult.message || 'Failed to send WhatsApp');
+                        }
+                    })
+                    .catch(err => {
+                        toast.error('WhatsApp error: ' + err.message);
+                    });
+
                 // Only call onSuccess, it will handle navigation
                 // Don't call onClose as it might interfere with navigation
                 if (onSuccess) {

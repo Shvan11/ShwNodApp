@@ -66,16 +66,16 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
                 </thead>
                 <tbody>
                     {expenses.map((expense, index) => {
-                        const date = formatDate(expense.ExpenseDate);
+                        const date = formatDate(expense.expenseDate);
                         const amount = formatNumber(expense.Amount);
                         const currency = (expense.Currency || '').trim();
                         const currencyLower = currency.toLowerCase();
                         const category = expense.CategoryName || '-';
                         const subcategory = expense.SubcategoryName || '-';
-                        const note = expense.Description || '-';
+                        const note = expense.Note || '-';
 
                         return (
-                            <tr key={expense.ExpenseID ?? `expense-${index}`} data-expense-id={expense.ExpenseID}>
+                            <tr key={expense.ID ?? `expense-${index}`} data-expense-id={expense.ID}>
                                 <td>{date}</td>
                                 <td className={`${styles.amountCell} ${getCurrencyClass(currencyLower)}`}>
                                     {amount}
@@ -94,14 +94,14 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
                                     <div className={styles.actionButtons}>
                                         <button
                                             className="btn-edit"
-                                            onClick={() => onEdit(expense.ExpenseID)}
+                                            onClick={() => onEdit(expense.ID)}
                                             aria-label="Edit expense"
                                         >
                                             Edit
                                         </button>
                                         <button
                                             className="btn-delete"
-                                            onClick={() => onDelete(expense.ExpenseID)}
+                                            onClick={() => onDelete(expense.ID)}
                                             aria-label="Delete expense"
                                         >
                                             Delete

@@ -28,6 +28,7 @@ import {
   createStandardMessage
 } from '../../services/messaging/websocket-events.js';
 import { getReceiptData } from '../../services/templates/receipt-service.js';
+import { getAppointmentForNotification } from '../../services/database/queries/appointment-queries.js';
 
 // Utilities
 import config from '../../config/config.js';
@@ -59,6 +60,10 @@ interface SendXrayQuery {
 
 interface SendReceiptBody {
   workId: number | string;
+}
+
+interface SendAppointmentBody {
+  appointmentId: number | string;
 }
 
 interface SendMediaBody {
@@ -417,25 +422,14 @@ router.post(
         return;
       }
 
-      // Format date for appointment
-      const appointmentText = receiptData.patient.AppDate
-        ? new Date(receiptData.patient.AppDate).toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-          })
-        : 'Not scheduled';
-
       // Compose WhatsApp message
       const message = `Receipt - Shwan Orthodontics
-━━━━━━━━━━━━━━━━━━━━━
-Patient: ${receiptData.patient.PatientName}
-Date: ${new Date().toLocaleDateString('en-GB')}
+
+Dear ${receiptData.patient.PatientName},
 
 Amount Paid: ${Math.round(receiptData.payment.AmountPaidToday).toLocaleString('en-US')} ${receiptData.payment.Currency}
 Remaining Balance: ${Math.round(receiptData.payment.RemainingBalance).toLocaleString('en-US')} ${receiptData.payment.Currency}
-
-Appointment: ${appointmentText}
+Date: ${new Date().toLocaleDateString('en-GB')}
 
 Thank you for your payment!`;
 
@@ -468,6 +462,129 @@ Thank you for your payment!`;
     } catch (error) {
       log.error(
         `Error sending receipt via WhatsApp: ${(error as Error).message}`
+      );
+      res.json({
+        success: false,
+        message: 'Internal error'
+      });
+    }
+  }
+);
+
+/**
+ * Send appointment confirmation via WhatsApp to patient
+ * POST /send-appointment (mounted at /api/wa)
+ * Body: { appointmentId: number }
+ */
+router.post(
+  '/send-appointment',
+  async (
+    req: Request<unknown, unknown, SendAppointmentBody>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { appointmentId } = req.body;
+
+      if (!appointmentId) {
+        log.warn('WhatsApp appointment send missing appointmentId');
+        ErrorResponses.badRequest(res, 'Missing required parameters', {
+          required: ['appointmentId']
+        });
+        return;
+      }
+
+      if (isNaN(parseInt(String(appointmentId)))) {
+        log.warn('WhatsApp appointment send invalid appointmentId', { appointmentId });
+        ErrorResponses.badRequest(res, 'Invalid input', {
+          details: 'appointmentId must be a valid number'
+        });
+        return;
+      }
+
+      log.info(`WhatsApp appointment send request - AppointmentID: ${appointmentId}`);
+
+      if (!whatsapp.isReady()) {
+        res.json({
+          success: false,
+          message: 'WhatsApp not connected'
+        });
+        return;
+      }
+
+      const appointment = await getAppointmentForNotification(parseInt(String(appointmentId)));
+      if (!appointment) {
+        log.warn(`Appointment not found: ${appointmentId}`);
+        res.json({
+          success: false,
+          message: 'Appointment not found'
+        });
+        return;
+      }
+
+      if (!appointment.Phone || appointment.Phone.trim() === '') {
+        log.warn(`No phone number for patient ${appointment.PersonID}`);
+        res.json({
+          success: false,
+          message: 'No phone number for patient'
+        });
+        return;
+      }
+
+      const phoneNumber = PhoneFormatter.forWhatsApp(appointment.Phone, '964');
+      if (!PhoneFormatter.isValid(phoneNumber, '964')) {
+        log.warn(`Invalid phone format: ${appointment.Phone}`);
+        res.json({
+          success: false,
+          message: 'Invalid phone number'
+        });
+        return;
+      }
+
+      const appDateObj = new Date(appointment.AppDate);
+      const appDate = appDateObj.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      const dayOfWeek = appDateObj.toLocaleDateString('en-GB', { weekday: 'long' });
+
+      const message = `Shwan Orthodontics
+
+Dear ${appointment.PatientName},
+
+Your appointment is confirmed for:
+${appDate} (${dayOfWeek})
+
+Thank you.`;
+
+      log.info(
+        `Sending appointment confirmation to ${phoneNumber} for patient ${appointment.PatientName}`
+      );
+
+      const result = await whatsapp.sendMessage(
+        phoneNumber,
+        message,
+        appointment.PatientName
+      );
+
+      if (result.success) {
+        log.info(
+          `Appointment confirmation sent successfully to ${phoneNumber} - MessageID: ${result.messageId}`
+        );
+        res.json({
+          success: true,
+          messageId: result.messageId
+        });
+      } else {
+        log.error(`Failed to send appointment confirmation: ${result.error}`);
+        res.json({
+          success: false,
+          message: 'Failed to send message'
+        });
+      }
+    } catch (error) {
+      log.error(
+        `Error sending appointment confirmation via WhatsApp: ${(error as Error).message}`
       );
       res.json({
         success: false,
