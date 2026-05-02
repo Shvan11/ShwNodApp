@@ -155,6 +155,10 @@
     --color-purple-light: #667eea;
     --color-purple-dark: #764ba2;
     --color-purple-medium: #6d67c6;
+    --selection-color: #ec4899;
+    /* Rose-pink — semantic "selected" state (calendar day, time slot, future selectables) */
+    --selection-color-rgb: 236, 72, 153;
+    /* RGB tuple for rgba(var(--selection-color-rgb), <alpha>) usage */
     --whatsapp-green: #25D366;
     --neutral-gray: #6c757d;
     --neutral-gray-dark: #495057;

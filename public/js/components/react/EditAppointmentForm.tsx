@@ -1,7 +1,8 @@
-import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from 'react';
 import { useLocation } from 'react-router-dom';
 import cn from 'classnames';
 import SimplifiedCalendarPicker from './SimplifiedCalendarPicker';
+import { useToast } from '../../contexts/ToastContext';
 import styles from './AppointmentForm.module.css';
 
 interface AppointmentFormData {
@@ -50,6 +51,7 @@ interface EditAppointmentFormProps {
 
 const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: EditAppointmentFormProps) => {
     const location = useLocation();
+    const toast = useToast();
     const existingAppointment = (location.state as { appointment?: ExistingAppointment } | null)?.appointment;
 
     const [formData, setFormData] = useState<AppointmentFormData>({
@@ -59,12 +61,18 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
         AppDetail: '',
         DrID: ''
     });
+    const [originalDate, setOriginalDate] = useState<string>('');
     const [doctors, setDoctors] = useState<Doctor[]>([]);
     const [details, setDetails] = useState<AppointmentDetail[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [loadingData, setLoadingData] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [validation, setValidation] = useState<ValidationErrors>({});
+    const [timeJustChanged, setTimeJustChanged] = useState<boolean>(false);
+    const doctorSelectRef = useRef<HTMLSelectElement>(null);
+    const detailSelectRef = useRef<HTMLSelectElement>(null);
+    const formColumnRef = useRef<HTMLDivElement>(null);
+    const timeFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Load appointment data if not passed via state
     useEffect(() => {
@@ -79,6 +87,12 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
     useEffect(() => {
         loadDoctors();
         loadDetails();
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (timeFlashTimerRef.current) clearTimeout(timeFlashTimerRef.current);
+        };
     }, []);
 
     const loadAppointmentData = async (id: number | string): Promise<void> => {
@@ -108,13 +122,15 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
         const hours = String(dateTime.getHours()).padStart(2, '0');
         const minutes = String(dateTime.getMinutes()).padStart(2, '0');
 
+        const datePart = `${year}-${month}-${day}`;
         setFormData({
             PersonID: appointment.PersonID ?? '',
-            AppDate: `${year}-${month}-${day}`,
+            AppDate: datePart,
             AppTime: `${hours}:${minutes}`,
             AppDetail: appointment.AppDetail || '',
             DrID: String(appointment.DrID || '')
         });
+        setOriginalDate(datePart);
     };
 
     const loadDoctors = async (): Promise<void> => {
@@ -148,6 +164,9 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
         if (validation[name]) {
             setValidation(prev => ({ ...prev, [name]: null }));
         }
+        if (name === 'DrID' && value && !formData.AppDetail) {
+            setTimeout(() => detailSelectRef.current?.focus(), 0);
+        }
     };
 
     const handleDateTimeSelection = (dateTime: Date | string): void => {
@@ -164,6 +183,37 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
             AppTime: `${hours}:${minutes}`
         }));
         setValidation(prev => ({ ...prev, AppDate: null, AppTime: null }));
+
+        // Brief rose flash on .selectedTime — compensates for slot feedback
+        // being scrolled off-screen on mobile, and ties the slot click to the
+        // form readout visually on PC.
+        if (timeFlashTimerRef.current) clearTimeout(timeFlashTimerRef.current);
+        setTimeJustChanged(false);
+        requestAnimationFrame(() => {
+            setTimeJustChanged(true);
+            timeFlashTimerRef.current = setTimeout(() => {
+                setTimeJustChanged(false);
+                timeFlashTimerRef.current = null;
+            }, 600);
+        });
+
+        if (typeof window !== 'undefined' && window.matchMedia('(max-width: 992px)').matches) {
+            const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            formColumnRef.current?.scrollIntoView({
+                behavior: reduced ? 'auto' : 'smooth',
+                block: 'start'
+            });
+        }
+
+        // In edit mode both fields are usually already filled, so this is a no-op
+        // on the common path — only fires if the original record was missing one.
+        setTimeout(() => {
+            if (!formData.DrID) {
+                doctorSelectRef.current?.focus();
+            } else if (!formData.AppDetail) {
+                detailSelectRef.current?.focus();
+            }
+        }, 0);
     };
 
     const validateForm = (): boolean => {
@@ -203,6 +253,28 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
 
             const result = await response.json();
             if (result.success) {
+                const dateChanged = formData.AppDate !== originalDate;
+                const apptId = appointmentId || existingAppointment?.appointmentID;
+
+                if (dateChanged && apptId) {
+                    fetch('/api/wa/send-appointment', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ appointmentId: apptId })
+                    })
+                        .then(res => res.json())
+                        .then((waResult: { success: boolean; message?: string }) => {
+                            if (waResult.success) {
+                                toast.success('Appointment confirmation sent via WhatsApp!');
+                            } else {
+                                toast.warning(waResult.message || 'Failed to send WhatsApp');
+                            }
+                        })
+                        .catch(err => {
+                            toast.error('WhatsApp error: ' + err.message);
+                        });
+                }
+
                 onSuccess && onSuccess(result);
                 onClose && onClose();
             } else {
@@ -263,7 +335,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                 />
 
                 {/* RIGHT COLUMN: Form */}
-                <div className={styles.formColumn}>
+                <div className={styles.formColumn} ref={formColumnRef}>
                     <div className={styles.formHeader}>
                         <h2><i className="fas fa-clipboard-list"></i> Appointment Details</h2>
                     </div>
@@ -278,7 +350,10 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
 
                         <div className={styles.formField}>
                             <label><i className="fas fa-calendar-check"></i> Selected Time</label>
-                            <div className={cn(styles.selectedTime, { [styles.hasValue]: formData.AppDate && formData.AppTime })}>
+                            <div className={cn(styles.selectedTime, {
+                                [styles.hasValue]: formData.AppDate && formData.AppTime,
+                                [styles.justChanged]: timeJustChanged
+                            })}>
                                 {getDateTimeDisplay()}
                             </div>
                             {(validation.AppDate || validation.AppTime) && (
@@ -291,6 +366,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                             <select
                                 id="doctor"
                                 name="DrID"
+                                ref={doctorSelectRef}
                                 value={formData.DrID}
                                 onChange={handleInputChange}
                                 className={validation.DrID ? styles.error : ''}
@@ -310,6 +386,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                             <select
                                 id="details"
                                 name="AppDetail"
+                                ref={detailSelectRef}
                                 value={formData.AppDetail}
                                 onChange={handleInputChange}
                                 className={validation.AppDetail ? styles.error : ''}

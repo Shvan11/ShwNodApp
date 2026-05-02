@@ -61,6 +61,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
     const [showAfternoonSlots, setShowAfternoonSlots] = useState(false);
     const [showExtendedSlotsDefault, setShowExtendedSlotsDefault] = useState(false);
     const [daysAhead, setDaysAhead] = useState('');
+    const [selectedSlotKey, setSelectedSlotKey] = useState<string | null>(null);
 
     // Early and late slot times (loaded from settings)
     const [earlySlotTimes, setEarlySlotTimes] = useState<string[]>(['12:00', '12:30', '13:00', '13:30']);
@@ -189,9 +190,16 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
     };
 
     const handleSlotClick = (slot: TimeSlot) => {
+        setSelectedSlotKey(`${slot.date}T${slot.time}`);
         const dateTime = new Date(`${slot.date}T${slot.time}:00`);
         onSelectDateTime(dateTime);
     };
+
+    // Clear the persistent selection marker when the day changes so it
+    // doesn't bleed across days. The form retains the actual value.
+    useEffect(() => {
+        setSelectedSlotKey(null);
+    }, [selectedDate]);
 
     const goToPreviousMonth = () => {
         setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
@@ -293,6 +301,8 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
         const isFull = slot.slotStatus === 'full';
         const isPast = slot.slotStatus === 'past';
         const canBook = isAvailable || isBooked;
+        const slotKey = `${slot.date}T${slot.time}`;
+        const isSelected = canBook && slotKey === selectedSlotKey;
 
         return (
             <div
@@ -302,7 +312,8 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                     [styles.booked]: isBooked,
                     [styles.full]: isFull,
                     [styles.past]: isPast,
-                    [styles.clickable]: canBook
+                    [styles.clickable]: canBook,
+                    [styles.selected]: isSelected
                 })}
                 onClick={() => canBook && handleSlotClick(slot)}
             >

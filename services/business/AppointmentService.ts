@@ -319,15 +319,15 @@ export async function validateAndCreateAppointment(
             AppDetail,
             DrID,
             LastUpdated
-        ) VALUES (@personID, CAST(@appDate AS datetime2), @appDetail, @drID, GETDATE())
+        ) VALUES (@personID, CAST(@appDate AS datetime2), @appDetail, @drID, GETDATE());
+        SELECT SCOPE_IDENTITY() AS appointmentID;
     `;
 
   interface InsertResult {
-    insertId?: number;
-    recordset?: { appointmentID: number }[];
+    appointmentID: number;
   }
 
-  const result = (await database.executeQuery(
+  const result = await database.executeQuery<InsertResult>(
     insertQuery,
     [
       ['personID', database.TYPES.Int, parseInt(String(PersonID))],
@@ -335,11 +335,12 @@ export async function validateAndCreateAppointment(
       ['appDetail', database.TYPES.NVarChar, AppDetail],
       ['drID', database.TYPES.Int, parseInt(String(DrID))],
     ],
-    (columns) => ({ value: columns[0]?.value })
-  )) as unknown as InsertResult;
+    (columns) => ({
+      appointmentID: columns[0].value as number,
+    })
+  );
 
-  const newAppointmentId =
-    result.insertId || result.recordset?.[0]?.appointmentID;
+  const newAppointmentId = result?.[0]?.appointmentID;
 
   log.info(
     `Appointment created: ID ${newAppointmentId}, Patient ${PersonID}, Doctor ${doctor.employeeName}, Date ${AppDate}`

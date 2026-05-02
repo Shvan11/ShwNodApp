@@ -196,9 +196,10 @@
 }
 
 .calendarDay.selected {
-    background: var(--color-purple-light);
-    color: white;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    background: linear-gradient(135deg, rgba(var(--selection-color-rgb), 0.22) 0%, rgba(var(--selection-color-rgb), 0.12) 100%);
+    color: var(--selection-color);
+    font-weight: 700;
+    box-shadow: 0 0 0 3px rgba(var(--selection-color-rgb), 0.2);
 }
 
 .calendarDay.holiday {
@@ -416,6 +417,46 @@
 .timeSlot.past {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+/* Selected slot — fill (var(--selection-color)) + corner badge tell you "this
+   is selected," while the slot's original border (green for available, blue
+   for booked) is preserved so you can still read the underlying status at a
+   glance. The selection color is intentionally distinct from any other slot
+   state. The fill stays inside the slot's footprint — no outer halo. */
+.timeSlot.selected,
+.timeSlot.selected.available,
+.timeSlot.selected.booked {
+    background: linear-gradient(135deg, rgba(var(--selection-color-rgb), 0.22) 0%, rgba(var(--selection-color-rgb), 0.12) 100%);
+    background-clip: padding-box;
+    position: relative;
+    z-index: 1;
+}
+
+.timeSlot.selected.available:hover,
+.timeSlot.selected.booked:hover {
+    transform: translateY(-2px);
+    box-shadow: none;
+}
+
+.timeSlot.selected::after {
+    content: '\f00c'; /* fa-check */
+    font-family: 'Font Awesome 5 Free', 'Font Awesome 6 Free', 'FontAwesome';
+    font-weight: 900;
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    background: var(--selection-color);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    box-shadow: 0 2px 6px rgba(var(--selection-color-rgb), 0.45);
+    border: 2px solid white;
 }
 
 .slotHeader {

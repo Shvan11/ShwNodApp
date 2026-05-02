@@ -206,8 +206,8 @@ export const EventMetadata: Partial<Record<WebSocketEventType, EventMetadataEntr
 
   [WebSocketEvents.APPOINTMENTS_UPDATED]: {
     direction: EventDirection.SERVER_TO_CLIENT,
-    description: 'Appointment data has been updated',
-    data: { tableData: 'object', date: 'string' },
+    description: 'Appointment data has been updated; clients refetch by date',
+    data: { date: 'string' },
   },
 
   [WebSocketEvents.REQUEST_APPOINTMENTS]: {

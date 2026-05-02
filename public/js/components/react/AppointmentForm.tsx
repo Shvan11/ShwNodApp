@@ -1,4 +1,4 @@
-import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from 'react';
 import cn from 'classnames';
 import SimplifiedCalendarPicker from './SimplifiedCalendarPicker';
 import { useToast } from '../../contexts/ToastContext';
@@ -63,10 +63,21 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [validation, setValidation] = useState<ValidationErrors>({});
+    const [timeJustChanged, setTimeJustChanged] = useState<boolean>(false);
+    const doctorSelectRef = useRef<HTMLSelectElement>(null);
+    const detailSelectRef = useRef<HTMLSelectElement>(null);
+    const formColumnRef = useRef<HTMLDivElement>(null);
+    const timeFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         loadDoctors();
         loadDetails();
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (timeFlashTimerRef.current) clearTimeout(timeFlashTimerRef.current);
+        };
     }, []);
 
     const loadDoctors = async (): Promise<void> => {
@@ -100,6 +111,10 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
         if (validation[name]) {
             setValidation(prev => ({ ...prev, [name]: null }));
         }
+        // Keyboard-flow: after Doctor is picked, advance focus to Type if empty
+        if (name === 'DrID' && value && !formData.AppDetail) {
+            setTimeout(() => detailSelectRef.current?.focus(), 0);
+        }
     };
 
     const handleDateTimeSelection = (dateTime: Date | string): void => {
@@ -117,6 +132,39 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
             AppTime: `${hours}:${minutes}`
         }));
         setValidation(prev => ({ ...prev, AppDate: null, AppTime: null }));
+
+        // Brief rose flash on .selectedTime — compensates for slot feedback
+        // being scrolled off-screen on mobile, and ties the slot click to the
+        // form readout visually on PC. Reset-then-rAF-set restarts the
+        // animation cleanly on rapid re-clicks.
+        if (timeFlashTimerRef.current) clearTimeout(timeFlashTimerRef.current);
+        setTimeJustChanged(false);
+        requestAnimationFrame(() => {
+            setTimeJustChanged(true);
+            timeFlashTimerRef.current = setTimeout(() => {
+                setTimeJustChanged(false);
+                timeFlashTimerRef.current = null;
+            }, 600);
+        });
+
+        // Mobile (<=992px, the breakpoint where columns stack): bring form into view
+        if (typeof window !== 'undefined' && window.matchMedia('(max-width: 992px)').matches) {
+            const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            formColumnRef.current?.scrollIntoView({
+                behavior: reduced ? 'auto' : 'smooth',
+                block: 'start'
+            });
+        }
+
+        // Focus the next un-filled field. Defer so React commits state first
+        // and (on mobile) the scroll has begun.
+        setTimeout(() => {
+            if (!formData.DrID) {
+                doctorSelectRef.current?.focus();
+            } else if (!formData.AppDetail) {
+                detailSelectRef.current?.focus();
+            }
+        }, 0);
     };
 
     const validateForm = (): boolean => {
@@ -241,7 +289,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                 />
 
                 {/* RIGHT COLUMN: Form */}
-                <div className={styles.formColumn}>
+                <div className={styles.formColumn} ref={formColumnRef}>
                     <div className={styles.formHeader}>
                         <h2><i className="fas fa-clipboard-list"></i> Appointment Details</h2>
                     </div>
@@ -256,7 +304,10 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
 
                         <div className={styles.formField}>
                             <label><i className="fas fa-calendar-check"></i> Selected Time</label>
-                            <div className={cn(styles.selectedTime, { [styles.hasValue]: formData.AppDate && formData.AppTime })}>
+                            <div className={cn(styles.selectedTime, {
+                                [styles.hasValue]: formData.AppDate && formData.AppTime,
+                                [styles.justChanged]: timeJustChanged
+                            })}>
                                 {getDateTimeDisplay()}
                             </div>
                             {(validation.AppDate || validation.AppTime) && (
@@ -269,6 +320,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                             <select
                                 id="doctor"
                                 name="DrID"
+                                ref={doctorSelectRef}
                                 value={formData.DrID}
                                 onChange={handleInputChange}
                                 className={validation.DrID ? styles.error : ''}
@@ -288,6 +340,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                             <select
                                 id="details"
                                 name="AppDetail"
+                                ref={detailSelectRef}
                                 value={formData.AppDetail}
                                 onChange={handleInputChange}
                                 className={validation.AppDetail ? styles.error : ''}
