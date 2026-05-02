@@ -197,7 +197,8 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
             }, 600);
         });
 
-        if (typeof window !== 'undefined' && window.matchMedia('(max-width: 992px)').matches) {
+        // Bring form into view on all viewports.
+        if (typeof window !== 'undefined') {
             const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             formColumnRef.current?.scrollIntoView({
                 behavior: reduced ? 'auto' : 'smooth',

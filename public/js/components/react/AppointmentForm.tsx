@@ -147,8 +147,11 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
             }, 600);
         });
 
-        // Mobile (<=992px, the breakpoint where columns stack): bring form into view
-        if (typeof window !== 'undefined' && window.matchMedia('(max-width: 992px)').matches) {
+        // Bring form into view on all viewports. On mobile (<=992px) the form
+        // is below the calendar after stacking; on desktop the form column's
+        // top aligns with the page top, so this scrolls back up if the user
+        // had scrolled down through the calendar.
+        if (typeof window !== 'undefined') {
             const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             formColumnRef.current?.scrollIntoView({
                 behavior: reduced ? 'auto' : 'smooth',
