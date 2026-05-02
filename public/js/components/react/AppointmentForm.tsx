@@ -63,11 +63,11 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [validation, setValidation] = useState<ValidationErrors>({});
-    const [timeJustChanged, setTimeJustChanged] = useState<boolean>(false);
     const doctorSelectRef = useRef<HTMLSelectElement>(null);
     const detailSelectRef = useRef<HTMLSelectElement>(null);
     const formColumnRef = useRef<HTMLDivElement>(null);
-    const timeFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const selectedTimeRef = useRef<HTMLDivElement>(null);
+    const flashAnimRef = useRef<Animation | null>(null);
 
     useEffect(() => {
         loadDoctors();
@@ -76,7 +76,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
 
     useEffect(() => {
         return () => {
-            if (timeFlashTimerRef.current) clearTimeout(timeFlashTimerRef.current);
+            flashAnimRef.current?.cancel();
         };
     }, []);
 
@@ -113,7 +113,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
         }
         // Keyboard-flow: after Doctor is picked, advance focus to Type if empty
         if (name === 'DrID' && value && !formData.AppDetail) {
-            setTimeout(() => detailSelectRef.current?.focus({ preventScroll: true }), 0);
+            setTimeout(() => detailSelectRef.current?.focus(), 0);
         }
     };
 
@@ -134,40 +134,49 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
         setValidation(prev => ({ ...prev, AppDate: null, AppTime: null }));
 
         // Brief rose flash on .selectedTime — compensates for slot feedback
-        // being scrolled off-screen on mobile, and ties the slot click to the
-        // form readout visually on PC. Reset-then-rAF-set restarts the
-        // animation cleanly on rapid re-clicks.
-        if (timeFlashTimerRef.current) clearTimeout(timeFlashTimerRef.current);
-        setTimeJustChanged(false);
-        requestAnimationFrame(() => {
-            setTimeJustChanged(true);
-            timeFlashTimerRef.current = setTimeout(() => {
-                setTimeJustChanged(false);
-                timeFlashTimerRef.current = null;
-            }, 600);
-        });
-
-        // Bring form into view on all viewports. On mobile (<=992px) the form
-        // is below the calendar after stacking; on desktop the form column's
-        // top aligns with the page top, so this scrolls back up if the user
-        // had scrolled down through the calendar.
-        if (typeof window !== 'undefined') {
-            const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            formColumnRef.current?.scrollIntoView({
-                behavior: reduced ? 'auto' : 'smooth',
-                block: 'start'
-            });
+        // being scrolled off-screen on mobile, and ties the slot click to
+        // the form readout visually on PC. Driven via Web Animations API
+        // rather than a CSS @keyframes rule so it plays under
+        // prefers-reduced-motion: reduce (it's a color-only flash with no
+        // positional motion, so it doesn't engage the vestibular concerns
+        // the preference is meant to address) without needing !important to
+        // beat reset.css's blanket reduced-motion override. Cancelling the
+        // previous animation keeps rapid re-clicks clean.
+        if (selectedTimeRef.current) {
+            flashAnimRef.current?.cancel();
+            const cs = getComputedStyle(selectedTimeRef.current);
+            const successColor = cs.getPropertyValue('--success-color').trim();
+            const success50 = cs.getPropertyValue('--success-50').trim();
+            const selectionColor = cs.getPropertyValue('--selection-color').trim();
+            const selectionRgb = cs.getPropertyValue('--selection-color-rgb').trim();
+            const selectionTint = `rgba(${selectionRgb}, 0.22)`;
+            flashAnimRef.current = selectedTimeRef.current.animate([
+                { borderColor: successColor, backgroundColor: success50 },
+                { borderColor: selectionColor, backgroundColor: selectionTint, offset: 0.15 },
+                { borderColor: selectionColor, backgroundColor: selectionTint, offset: 0.70 },
+                { borderColor: successColor, backgroundColor: success50 }
+            ], { duration: 600, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' });
         }
 
-        // Focus the next un-filled field. Defer so React commits state first.
-        // preventScroll: true keeps the smooth scrollIntoView above as the
-        // sole source of motion — without it the focus call triggers an
-        // implicit instant scroll that fights the smooth one.
+        // Mobile (<=992px, where columns stack): bring the form into view.
+        // On desktop the form is already visible in the right column, so no
+        // page scroll is needed — focus on the un-filled select below
+        // handles intra-column scrolling natively.
+        // html { scroll-behavior: smooth } in reset.css makes both the
+        // scrollIntoView and the focus-scroll smooth, with the
+        // prefers-reduced-motion override in the same file for a11y.
+        if (typeof window !== 'undefined' && window.matchMedia('(max-width: 992px)').matches) {
+            formColumnRef.current?.scrollIntoView({ block: 'start' });
+        }
+
+        // Focus the next un-filled field. The browser's native focus-scroll
+        // brings the select into view (intra-column on desktop, window-level
+        // on mobile where it converges with the scrollIntoView above).
         setTimeout(() => {
             if (!formData.DrID) {
-                doctorSelectRef.current?.focus({ preventScroll: true });
+                doctorSelectRef.current?.focus();
             } else if (!formData.AppDetail) {
-                detailSelectRef.current?.focus({ preventScroll: true });
+                detailSelectRef.current?.focus();
             }
         }, 0);
     };
@@ -309,10 +318,12 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
 
                         <div className={styles.formField}>
                             <label><i className="fas fa-calendar-check"></i> Selected Time</label>
-                            <div className={cn(styles.selectedTime, {
-                                [styles.hasValue]: formData.AppDate && formData.AppTime,
-                                [styles.justChanged]: timeJustChanged
-                            })}>
+                            <div
+                                ref={selectedTimeRef}
+                                className={cn(styles.selectedTime, {
+                                    [styles.hasValue]: formData.AppDate && formData.AppTime
+                                })}
+                            >
                                 {getDateTimeDisplay()}
                             </div>
                             {(validation.AppDate || validation.AppTime) && (

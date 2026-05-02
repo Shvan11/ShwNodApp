@@ -68,11 +68,11 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
     const [loadingData, setLoadingData] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [validation, setValidation] = useState<ValidationErrors>({});
-    const [timeJustChanged, setTimeJustChanged] = useState<boolean>(false);
     const doctorSelectRef = useRef<HTMLSelectElement>(null);
     const detailSelectRef = useRef<HTMLSelectElement>(null);
     const formColumnRef = useRef<HTMLDivElement>(null);
-    const timeFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const selectedTimeRef = useRef<HTMLDivElement>(null);
+    const flashAnimRef = useRef<Animation | null>(null);
 
     // Load appointment data if not passed via state
     useEffect(() => {
@@ -91,7 +91,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
 
     useEffect(() => {
         return () => {
-            if (timeFlashTimerRef.current) clearTimeout(timeFlashTimerRef.current);
+            flashAnimRef.current?.cancel();
         };
     }, []);
 
@@ -165,7 +165,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
             setValidation(prev => ({ ...prev, [name]: null }));
         }
         if (name === 'DrID' && value && !formData.AppDetail) {
-            setTimeout(() => detailSelectRef.current?.focus({ preventScroll: true }), 0);
+            setTimeout(() => detailSelectRef.current?.focus(), 0);
         }
     };
 
@@ -184,37 +184,40 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
         }));
         setValidation(prev => ({ ...prev, AppDate: null, AppTime: null }));
 
-        // Brief rose flash on .selectedTime — compensates for slot feedback
-        // being scrolled off-screen on mobile, and ties the slot click to the
-        // form readout visually on PC.
-        if (timeFlashTimerRef.current) clearTimeout(timeFlashTimerRef.current);
-        setTimeJustChanged(false);
-        requestAnimationFrame(() => {
-            setTimeJustChanged(true);
-            timeFlashTimerRef.current = setTimeout(() => {
-                setTimeJustChanged(false);
-                timeFlashTimerRef.current = null;
-            }, 600);
-        });
-
-        // Bring form into view on all viewports.
-        if (typeof window !== 'undefined') {
-            const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            formColumnRef.current?.scrollIntoView({
-                behavior: reduced ? 'auto' : 'smooth',
-                block: 'start'
-            });
+        // Brief rose flash on .selectedTime via Web Animations API — see
+        // AppointmentForm.tsx for the rationale (plays under
+        // prefers-reduced-motion since it's color-only, and avoids fighting
+        // reset.css's blanket reduced-motion override with !important).
+        if (selectedTimeRef.current) {
+            flashAnimRef.current?.cancel();
+            const cs = getComputedStyle(selectedTimeRef.current);
+            const successColor = cs.getPropertyValue('--success-color').trim();
+            const success50 = cs.getPropertyValue('--success-50').trim();
+            const selectionColor = cs.getPropertyValue('--selection-color').trim();
+            const selectionRgb = cs.getPropertyValue('--selection-color-rgb').trim();
+            const selectionTint = `rgba(${selectionRgb}, 0.22)`;
+            flashAnimRef.current = selectedTimeRef.current.animate([
+                { borderColor: successColor, backgroundColor: success50 },
+                { borderColor: selectionColor, backgroundColor: selectionTint, offset: 0.15 },
+                { borderColor: selectionColor, backgroundColor: selectionTint, offset: 0.70 },
+                { borderColor: successColor, backgroundColor: success50 }
+            ], { duration: 600, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' });
         }
 
-        // In edit mode both fields are usually already filled, so this is a no-op
-        // on the common path — only fires if the original record was missing one.
-        // preventScroll: true keeps the smooth scrollIntoView above as the sole
-        // source of motion.
+        // Mobile (<=992px, where columns stack): bring the form into view.
+        // On desktop the focus-scroll below handles intra-column scrolling.
+        // Smooth + reduced-motion come from html { scroll-behavior }.
+        if (typeof window !== 'undefined' && window.matchMedia('(max-width: 992px)').matches) {
+            formColumnRef.current?.scrollIntoView({ block: 'start' });
+        }
+
+        // In edit mode both fields are usually already filled, so this is a
+        // no-op on the common path.
         setTimeout(() => {
             if (!formData.DrID) {
-                doctorSelectRef.current?.focus({ preventScroll: true });
+                doctorSelectRef.current?.focus();
             } else if (!formData.AppDetail) {
-                detailSelectRef.current?.focus({ preventScroll: true });
+                detailSelectRef.current?.focus();
             }
         }, 0);
     };
@@ -353,10 +356,12 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
 
                         <div className={styles.formField}>
                             <label><i className="fas fa-calendar-check"></i> Selected Time</label>
-                            <div className={cn(styles.selectedTime, {
-                                [styles.hasValue]: formData.AppDate && formData.AppTime,
-                                [styles.justChanged]: timeJustChanged
-                            })}>
+                            <div
+                                ref={selectedTimeRef}
+                                className={cn(styles.selectedTime, {
+                                    [styles.hasValue]: formData.AppDate && formData.AppTime
+                                })}
+                            >
                                 {getDateTimeDisplay()}
                             </div>
                             {(validation.AppDate || validation.AppTime) && (

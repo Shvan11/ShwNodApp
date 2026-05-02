@@ -152,22 +152,10 @@
     font-weight: 600;
 }
 
-/* Rose flash when the slot pick lands here. Compensates for the slot's own
-   feedback being scrolled out of view on mobile (<=992px) and gives PC users
-   a visual rhyme with the slot they just clicked. Border + tint only — no
-   halo, stays inside the field. */
-@keyframes selectedTimeFlash {
-    0%   { border-color: var(--success-color); background-color: var(--success-50); }
-    15%  { border-color: var(--selection-color); background-color: rgba(var(--selection-color-rgb), 0.22); }
-    70%  { border-color: var(--selection-color); background-color: rgba(var(--selection-color-rgb), 0.22); }
-    100% { border-color: var(--success-color); background-color: var(--success-50); }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-    .selectedTime.justChanged {
-        animation: selectedTimeFlash 600ms cubic-bezier(0.4, 0, 0.2, 1);
-    }
-}
+/* Rose flash on slot pick is driven via Web Animations API in
+   AppointmentForm.tsx / EditAppointmentForm.tsx — see the handleDateTimeSelection
+   block. Animating from JS bypasses reset.css's reduced-motion blanket
+   without needing !important here. */
 
 .formField select {
     background: white;
