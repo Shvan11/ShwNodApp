@@ -113,7 +113,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
         }
         // Keyboard-flow: after Doctor is picked, advance focus to Type if empty
         if (name === 'DrID' && value && !formData.AppDetail) {
-            setTimeout(() => detailSelectRef.current?.focus(), 0);
+            setTimeout(() => detailSelectRef.current?.focus({ preventScroll: true }), 0);
         }
     };
 
@@ -156,13 +156,15 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
             });
         }
 
-        // Focus the next un-filled field. Defer so React commits state first
-        // and (on mobile) the scroll has begun.
+        // Focus the next un-filled field. Defer so React commits state first.
+        // preventScroll: true keeps the smooth scrollIntoView above as the
+        // sole source of motion — without it the focus call triggers an
+        // implicit instant scroll that fights the smooth one.
         setTimeout(() => {
             if (!formData.DrID) {
-                doctorSelectRef.current?.focus();
+                doctorSelectRef.current?.focus({ preventScroll: true });
             } else if (!formData.AppDetail) {
-                detailSelectRef.current?.focus();
+                detailSelectRef.current?.focus({ preventScroll: true });
             }
         }, 0);
     };

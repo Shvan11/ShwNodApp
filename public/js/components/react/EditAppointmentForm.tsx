@@ -165,7 +165,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
             setValidation(prev => ({ ...prev, [name]: null }));
         }
         if (name === 'DrID' && value && !formData.AppDetail) {
-            setTimeout(() => detailSelectRef.current?.focus(), 0);
+            setTimeout(() => detailSelectRef.current?.focus({ preventScroll: true }), 0);
         }
     };
 
@@ -207,11 +207,13 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
 
         // In edit mode both fields are usually already filled, so this is a no-op
         // on the common path — only fires if the original record was missing one.
+        // preventScroll: true keeps the smooth scrollIntoView above as the sole
+        // source of motion.
         setTimeout(() => {
             if (!formData.DrID) {
-                doctorSelectRef.current?.focus();
+                doctorSelectRef.current?.focus({ preventScroll: true });
             } else if (!formData.AppDetail) {
-                detailSelectRef.current?.focus();
+                detailSelectRef.current?.focus({ preventScroll: true });
             }
         }, 0);
     };
