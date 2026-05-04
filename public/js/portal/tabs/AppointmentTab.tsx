@@ -1,18 +1,9 @@
 import { useEffect, useState } from 'react';
+import type {
+  PortalNextAppointment,
+  PortalNextAppointmentResponse,
+} from '@/types/api.types';
 import styles from '../portal.module.css';
-
-interface NextAppointment {
-  appointmentID: number;
-  AppDate: string;
-  AppDetail: string | null;
-  DrName: string | null;
-}
-
-interface Response {
-  success: boolean;
-  appointment: NextAppointment | null;
-  error?: string;
-}
 
 function formatAppointmentDate(iso: string): { date: string; time: string } {
   const d = new Date(iso);
@@ -28,7 +19,7 @@ function formatAppointmentDate(iso: string): { date: string; time: string } {
 }
 
 const AppointmentTab = () => {
-  const [appt, setAppt] = useState<NextAppointment | null | undefined>(undefined);
+  const [appt, setAppt] = useState<PortalNextAppointment | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,7 +27,7 @@ const AppointmentTab = () => {
     (async () => {
       try {
         const res = await fetch('/api/portal/appointments/next', { credentials: 'same-origin' });
-        const data = (await res.json()) as Response;
+        const data = (await res.json()) as PortalNextAppointmentResponse;
         if (cancelled) return;
         if (!res.ok || !data.success) {
           setError(data.error || 'Unable to load your next appointment.');

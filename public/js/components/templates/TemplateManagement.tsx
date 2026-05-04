@@ -13,12 +13,7 @@ import { useToast } from '../../contexts/ToastContext';
 import type { Template } from './TemplateCard';
 import type { DocumentType, TemplateSubmissionData } from './CreateTemplateModal';
 import type { TemplateStatsData } from './TemplateStats';
-
-interface ApiResponse<T> {
-    status: 'success' | 'error';
-    data: T;
-    message?: string;
-}
+import type { ApiStatusResponse } from '@/types/api.types';
 
 function TemplateManagement() {
     const navigate = useNavigate();
@@ -58,7 +53,7 @@ function TemplateManagement() {
     const loadDocumentTypes = async () => {
         try {
             const response = await fetch('/api/templates/document-types');
-            const result: ApiResponse<DocumentType[]> = await response.json();
+            const result: ApiStatusResponse<DocumentType[]> = await response.json();
 
             if (result.status === 'success') {
                 setDocumentTypes(result.data);
@@ -75,7 +70,7 @@ function TemplateManagement() {
         try {
             setIsLoading(true);
             const response = await fetch('/api/templates');
-            const result: ApiResponse<Template[]> = await response.json();
+            const result: ApiStatusResponse<Template[]> = await response.json();
 
             if (result.status === 'success') {
                 setAllTemplates(result.data);
@@ -113,7 +108,7 @@ function TemplateManagement() {
                 body: JSON.stringify(templateData)
             });
 
-            const result: ApiResponse<{ template_id: number }> = await response.json();
+            const result: ApiStatusResponse<{ template_id: number }> = await response.json();
 
             if (result.status === 'success') {
                 setIsCreateModalOpen(false);
@@ -148,7 +143,7 @@ function TemplateManagement() {
                 })
             });
 
-            const result: ApiResponse<unknown> = await response.json();
+            const result: ApiStatusResponse<unknown> = await response.json();
 
             if (result.status === 'success') {
                 await loadAllTemplates();
@@ -173,7 +168,7 @@ function TemplateManagement() {
                 method: 'DELETE'
             });
 
-            const result: ApiResponse<unknown> = await response.json();
+            const result: ApiStatusResponse<unknown> = await response.json();
 
             if (result.status === 'success') {
                 await loadAllTemplates();

@@ -24,7 +24,8 @@ import {
   updateExchangeRate,
   getPaymentHistoryByWorkId,
   getExchangeRateForDate,
-  updateExchangeRateForDate
+  updateExchangeRateForDate,
+  listExchangeRates
 } from '../../services/database/queries/payment-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import {
@@ -278,6 +279,37 @@ router.get(
       res.json({ status: 'success', exchangeRate, date });
     } catch (error) {
       log.error('Error getting exchange rate for date:', error);
+      ErrorResponses.internalError(
+        res,
+        (error as Error).message,
+        error as Error
+      );
+    }
+  }
+);
+
+/**
+ * List exchange rates within a date range (newest first)
+ * GET /api/exchange-rates?from=YYYY-MM-DD&to=YYYY-MM-DD
+ */
+router.get(
+  '/exchange-rates',
+  async (
+    req: Request<unknown, unknown, unknown, { from?: string; to?: string }>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { from, to } = req.query;
+
+      if (!from || !to) {
+        ErrorResponses.missingParameter(res, 'from/to');
+        return;
+      }
+
+      const rates = await listExchangeRates(from, to);
+      res.json({ status: 'success', rates });
+    } catch (error) {
+      log.error('Error listing exchange rates:', error);
       ErrorResponses.internalError(
         res,
         (error as Error).message,

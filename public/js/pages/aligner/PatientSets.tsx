@@ -32,6 +32,7 @@ import type {
     AlignerBatch,
     AlignerNote,
 } from './aligner.types';
+import type { PaymentSaveData } from '@/types/api.types';
 import styles from './PatientSets.module.css';
 
 // Page-specific types
@@ -76,15 +77,6 @@ interface BatchStatusResponse {
         action?: string;
     };
     error?: string;
-}
-
-// PaymentSaveData matches what PaymentFormDrawer sends
-interface PaymentSaveData {
-    Amountpaid: number;
-    Dateofpayment: string;
-    ActualAmount: null;
-    ActualCur: string;
-    Change: null;
 }
 
 const PatientSets: React.FC = () => {

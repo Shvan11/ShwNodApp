@@ -1,18 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { PortalPatient } from './PortalApp';
+import type { LoginResponse } from '@/types/api.types';
 import styles from './portal.module.css';
 
 interface Props {
   onLogin: (patient: PortalPatient) => void;
-}
-
-interface LoginResponse {
-  success: boolean;
-  patientName?: string | null;
-  language?: number | null;
-  error?: string;
-  lockedUntil?: string;
 }
 
 function readPidFromUrl(): string {

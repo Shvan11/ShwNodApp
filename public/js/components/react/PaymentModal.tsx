@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import type { ChangeEvent, FormEvent, FocusEvent } from 'react';
+import type { ApiResult, ExchangeRateResult } from '@/types/api.types';
 import styles from './PaymentModal.module.css';
 import Modal from './Modal';
 import { parseFormattedNumber } from '../../utils/formatters';
@@ -62,17 +63,6 @@ interface Calculations {
     isShort: boolean;
     isExact: boolean;
     isOver: boolean;
-}
-
-interface ApiResult {
-    status: 'success' | 'error';
-    message?: string;
-}
-
-interface ExchangeRateResult {
-    status: 'success' | 'error';
-    exchangeRate?: number;
-    message?: string;
 }
 
 type EntryMode = 'amount' | 'cash';

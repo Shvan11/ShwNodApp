@@ -531,6 +531,23 @@ const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
 };
 ```
 
+### Frontend API Contract Types
+
+Shared frontend API request/response types live in **`public/js/types/api.types.ts`**. Don't redefine inline shapes for endpoints that already have a centralized type — extend the file instead.
+
+```typescript
+// CORRECT
+import type { ApiResponse, ExchangeRateResult } from '@/types/api.types';
+
+// WRONG - the @types/* alias is in tsconfig but NOT in vite.config.js
+import type { ApiResponse } from '@types/api.types';  // breaks at build for value exports
+```
+
+- Use `ApiResponse<T>` (`{ success, data?, error?, ... }`) for new endpoints — mirrors backend `types/api.types.ts`.
+- `ApiResult` / `ApiStatusResponse<T>` (`{ status: 'success' | 'error', ... }`) exist for the older status-string convention; don't introduce new uses.
+- Aligner-domain types stay in `pages/aligner/aligner.types.ts`, not `api.types.ts`.
+- UI form state, component props, and hook return types stay inline — only API boundary shapes belong in `api.types.ts`.
+
 ---
 
 ## Route Loaders

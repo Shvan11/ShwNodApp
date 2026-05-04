@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
+import type { PaymentSaveData } from '@/types/api.types';
 import { formatNumber } from '../../utils/formatters';
 
 // Types
@@ -19,13 +20,6 @@ interface WorkInfo {
 interface PaymentFormData {
     Amountpaid: string | number;
     Dateofpayment: string;
-}
-
-interface PaymentSaveData extends PaymentFormData {
-    Amountpaid: number;
-    ActualAmount: null;
-    ActualCur: string;
-    Change: null;
 }
 
 interface FormErrors {

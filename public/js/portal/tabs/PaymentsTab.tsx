@@ -1,16 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { PortalPaymentRow, PortalPaymentsResponse } from '@/types/api.types';
 import styles from '../portal.module.css';
-
-interface PaymentRow {
-  Payment: number;
-  Date: string;
-}
-
-interface Response {
-  success: boolean;
-  payments?: PaymentRow[];
-  error?: string;
-}
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -23,7 +13,7 @@ function formatAmount(v: number): string {
 }
 
 const PaymentsTab = () => {
-  const [payments, setPayments] = useState<PaymentRow[] | null>(null);
+  const [payments, setPayments] = useState<PortalPaymentRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,7 +21,7 @@ const PaymentsTab = () => {
     (async () => {
       try {
         const res = await fetch('/api/portal/payments', { credentials: 'same-origin' });
-        const data = (await res.json()) as Response;
+        const data = (await res.json()) as PortalPaymentsResponse;
         if (cancelled) return;
         if (!res.ok || !data.success || !data.payments) {
           setError(data.error || 'Unable to load your payments.');

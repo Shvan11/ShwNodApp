@@ -1,24 +1,6 @@
 import { useEffect, useState } from 'react';
+import type { PortalVisitSummary, PortalVisitsResponse } from '@/types/api.types';
 import styles from '../portal.module.css';
-
-interface VisitSummary {
-  PatientName: string;
-  WorkID: number;
-  ID: number;
-  VisitDate: string;
-  OPG: boolean;
-  IPhoto: boolean;
-  FPhoto: boolean;
-  PPhoto: boolean;
-  ApplianceRemoved: boolean;
-  Summary: string | null;
-}
-
-interface Response {
-  success: boolean;
-  visits?: VisitSummary[];
-  error?: string;
-}
 
 function formatVisitDate(iso: string): string {
   const d = new Date(iso);
@@ -27,7 +9,7 @@ function formatVisitDate(iso: string): string {
 }
 
 const VisitsTab = () => {
-  const [visits, setVisits] = useState<VisitSummary[] | null>(null);
+  const [visits, setVisits] = useState<PortalVisitSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,7 +17,7 @@ const VisitsTab = () => {
     (async () => {
       try {
         const res = await fetch('/api/portal/visits', { credentials: 'same-origin' });
-        const data = (await res.json()) as Response;
+        const data = (await res.json()) as PortalVisitsResponse;
         if (cancelled) return;
         if (!res.ok || !data.success || !data.visits) {
           setError(data.error || 'Unable to load your visit history.');

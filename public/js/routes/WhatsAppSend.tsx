@@ -15,25 +15,7 @@ import { APIClient } from '../utils/whatsapp-api-client';
 // WhatsApp send page styles - CSS Module
 import styles from './WhatsAppSend.module.css';
 
-/**
- * API response for reset endpoint
- */
-interface ResetResponse {
-  success: boolean;
-  data?: {
-    appointmentsReset?: number;
-  };
-  error?: string;
-}
-
-/**
- * API response for email endpoint
- */
-interface EmailResponse {
-  success: boolean;
-  appointmentCount?: number;
-  error?: string;
-}
+import type { WhatsAppResetResponse, EmailResponse } from '@/types/api.types';
 
 const apiClient = new APIClient();
 
@@ -95,7 +77,7 @@ export default function WhatsAppSend() {
     }
 
     try {
-      const result = await apiClient.post<ResetResponse>(API_ENDPOINTS.MESSAGE_RESET(currentDate));
+      const result = await apiClient.post<WhatsAppResetResponse>(API_ENDPOINTS.MESSAGE_RESET(currentDate));
 
       if (result.success) {
         toast.success(

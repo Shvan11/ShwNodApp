@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Editor as GrapesJSEditorType } from 'grapesjs';
+import type { ApiStatusResponse } from '@/types/api.types';
 
 import styles from './TemplateDesigner.module.css';
 import GrapesJSEditor from './GrapesJSEditor';
@@ -16,12 +17,6 @@ interface Template {
     template_id: number | null;
     template_name: string;
     template_file_path: string | null;
-}
-
-interface ApiResponse<T> {
-    status: 'success' | 'error';
-    data: T;
-    message?: string;
 }
 
 function TemplateDesigner() {
@@ -61,7 +56,7 @@ function TemplateDesigner() {
                 throw new Error(`Failed to load template (HTTP ${response.status}): ${errorText}`);
             }
 
-            const result: ApiResponse<Template> = await response.json();
+            const result: ApiStatusResponse<Template> = await response.json();
             console.log('Template loaded:', result);
 
             if (result.status === 'success') {
@@ -108,7 +103,7 @@ function TemplateDesigner() {
                 body: JSON.stringify({ html: completeHtml })
             });
 
-            const result: ApiResponse<unknown> = await response.json();
+            const result: ApiStatusResponse<unknown> = await response.json();
 
             if (result.status === 'success') {
                 toast.success('Template saved successfully!');

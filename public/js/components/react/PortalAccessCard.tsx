@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
+import type {
+  PortalStatus,
+  PortalStatusResponse,
+  PortalPinResetResponse,
+} from '@/types/api.types';
 import Modal from './Modal';
 import { useToast } from '../../contexts/ToastContext';
 import viewStyles from './ViewPatientInfo.module.css';
@@ -6,27 +11,6 @@ import styles from './PortalAccessCard.module.css';
 
 interface Props {
   personId: number;
-}
-
-interface PortalStatus {
-  enabled: boolean;
-  hasPin: boolean;
-  lockedUntil: string | null;
-  lastLoginAt: string | null;
-  failedAttempts: number;
-  qrDataUrl: string;
-  portalUrl: string;
-}
-
-interface StatusResponse extends Partial<PortalStatus> {
-  success: boolean;
-  error?: string;
-}
-
-interface ResetResponse {
-  success: boolean;
-  pin?: string;
-  error?: string;
 }
 
 function formatDateTime(iso: string | null): string {
@@ -59,7 +43,7 @@ const PortalAccessCard = ({ personId }: Props) => {
       const res = await fetch(`/api/patients/${personId}/portal`, {
         credentials: 'same-origin',
       });
-      const data = (await res.json()) as StatusResponse;
+      const data = (await res.json()) as PortalStatusResponse;
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Failed to load portal status');
       }
@@ -115,7 +99,7 @@ const PortalAccessCard = ({ personId }: Props) => {
         method: 'POST',
         credentials: 'same-origin',
       });
-      const data = (await res.json()) as ResetResponse;
+      const data = (await res.json()) as PortalPinResetResponse;
       if (!res.ok || !data.success || !data.pin) {
         throw new Error(data.error || 'Failed to reset PIN');
       }

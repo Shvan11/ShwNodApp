@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, ComponentType } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import type { UserResponse } from '@/types/api.types';
 
 // CSS Modules
 import styles from './SettingsContainer.module.css';
@@ -13,6 +14,7 @@ import EmployeeSettings from './EmployeeSettings';
 import UserManagement from './UserManagement';
 import AdminUserManagement from './AdminUserManagement';
 import CostPresetsSettings from './CostPresetsSettings';
+import ExchangeRatesSettings from './ExchangeRatesSettings';
 import LookupsSettings from './LookupsSettings';
 import ProtocolHandlersSettings from './ProtocolHandlersSettings';
 import CalendarTimesSettings from './CalendarTimesSettings';
@@ -38,13 +40,6 @@ interface TabDataState {
     };
 }
 
-interface UserResponse {
-    success: boolean;
-    user?: {
-        role: string;
-    };
-}
-
 const SettingsComponent: React.FC = () => {
     const { tab } = useParams<{ tab?: string }>();
     const navigate = useNavigate();
@@ -62,6 +57,7 @@ const SettingsComponent: React.FC = () => {
         email: { hasChanges: false },
         employees: { hasChanges: false },
         costPresets: { hasChanges: false },
+        exchangeRates: { hasChanges: false },
         lookups: { hasChanges: false },
         calendarTimes: { hasChanges: false },
         messaging: { hasChanges: false },
@@ -136,6 +132,13 @@ const SettingsComponent: React.FC = () => {
             icon: 'fas fa-dollar-sign',
             component: CostPresetsSettings,
             description: 'Manage estimated cost preset values'
+        },
+        {
+            id: 'exchangeRates',
+            label: 'Exchange Rates',
+            icon: 'fas fa-exchange-alt',
+            component: ExchangeRatesSettings,
+            description: "Edit today's USD→IQD rate and view historical rates"
         },
         {
             id: 'lookups',

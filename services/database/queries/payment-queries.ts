@@ -183,6 +183,29 @@ export function updateExchangeRateForDate(date: string, exchangeRate: number): P
 }
 
 /**
+ * Lists exchange rates within a date range (inclusive), newest first.
+ */
+export function listExchangeRates(
+  fromDate: string,
+  toDate: string
+): Promise<{ date: string; exchangeRate: number }[]> {
+  return executeQuery<{ date: string; exchangeRate: number }>(
+    `SELECT date, ExchangeRate FROM dbo.tblsms
+     WHERE ExchangeRate IS NOT NULL
+       AND date BETWEEN @fromDate AND @toDate
+     ORDER BY date DESC`,
+    [
+      ['fromDate', TYPES.Date, fromDate],
+      ['toDate', TYPES.Date, toDate],
+    ],
+    (columns: ColumnValue[]) => ({
+      date: (columns[0].value as Date).toISOString().split('T')[0],
+      exchangeRate: columns[1].value as number,
+    })
+  );
+}
+
+/**
  * Gets payment history for a specific work
  */
 export function getPaymentHistoryByWorkId(workId: number): Promise<PaymentRecord[]> {
