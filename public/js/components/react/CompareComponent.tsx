@@ -723,13 +723,11 @@ const CompareComponent = ({ personId, phone }: Props) => {
             setSendingMessage(true);
 
             const imageData = comparison.toDataURL();
-            const formData = new FormData();
-            formData.append('phone', phoneNumber);
-            formData.append('file', imageData);
 
             const response = await fetch('/api/wa/sendmedia', {
                 method: 'POST',
-                body: formData
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: phoneNumber, file: imageData })
             });
 
             if (response.ok) {
