@@ -36,11 +36,44 @@ interface VisitsComponentProps {
     personId?: number | null;
 }
 
+const SEARCHABLE_FIELDS: (keyof Visit)[] = [
+    'Others', 'BracketChange', 'WireBending', 'Elastics', 'NextVisit',
+];
+
+const visitMatches = (visit: Visit, term: string): boolean => {
+    if (!term) return true;
+    const needle = term.toLowerCase();
+    return SEARCHABLE_FIELDS.some(f => {
+        const value = visit[f];
+        return typeof value === 'string' && value.toLowerCase().includes(needle);
+    });
+};
+
+const highlight = (text: string | undefined, term: string, markClass: string): React.ReactNode => {
+    if (!text) return text;
+    if (!term) return text;
+    const needle = term.toLowerCase();
+    const lower = text.toLowerCase();
+    const parts: React.ReactNode[] = [];
+    let i = 0;
+    let key = 0;
+    let idx = lower.indexOf(needle, i);
+    while (idx !== -1) {
+        if (idx > i) parts.push(text.slice(i, idx));
+        parts.push(<mark key={key++} className={markClass}>{text.slice(idx, idx + term.length)}</mark>);
+        i = idx + term.length;
+        idx = lower.indexOf(needle, i);
+    }
+    if (i < text.length) parts.push(text.slice(i));
+    return parts;
+};
+
 const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
     const navigate = useNavigate();
     const [visits, setVisits] = useState<Visit[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
         if (workId) {
@@ -100,6 +133,10 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
 
     if (loading) return <div className={styles.loading}>Loading visits...</div>;
 
+    const filteredVisits = searchTerm
+        ? visits.filter(v => visitMatches(v, searchTerm))
+        : visits;
+
     return (
         <div className={styles.container}>
             <div className={styles.header}>
@@ -126,6 +163,22 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                 </div>
             )}
 
+            <div className={styles.searchBar}>
+                <i className="fas fa-search"></i>
+                <input
+                    type="search"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search notes, bracket, bending, elastics, next visit…"
+                    className={styles.searchInput}
+                />
+                {searchTerm && (
+                    <span className={styles.searchCount}>
+                        {filteredVisits.length} of {visits.length}
+                    </span>
+                )}
+            </div>
+
             <div className={styles.summary}>
                 <div className={styles.summaryCard}>
                     <h3>Total Visits</h3>
@@ -143,7 +196,7 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
 
             {/* Visit Cards View */}
             <div className={styles.cardsContainer}>
-                {visits.map((visit) => (
+                {filteredVisits.map((visit) => (
                     <div key={visit.ID} className={styles.card}>
                         {/* Header Row */}
                         <div className={styles.cardHeader}>
@@ -205,19 +258,19 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                                 {visit.BracketChange && (
                                     <div className={styles.treatmentInfoItem}>
                                         <span className={styles.treatmentInfoLabel}>Bracket: </span>
-                                        <span className={styles.treatmentInfoValue}>{visit.BracketChange}</span>
+                                        <span className={styles.treatmentInfoValue}>{highlight(visit.BracketChange, searchTerm, styles.highlight)}</span>
                                     </div>
                                 )}
                                 {visit.WireBending && (
                                     <div className={styles.treatmentInfoItem}>
                                         <span className={styles.treatmentInfoLabel}>Bending: </span>
-                                        <span className={styles.treatmentInfoValue}>{visit.WireBending}</span>
+                                        <span className={styles.treatmentInfoValue}>{highlight(visit.WireBending, searchTerm, styles.highlight)}</span>
                                     </div>
                                 )}
                                 {visit.Elastics && (
                                     <div className={styles.treatmentInfoItem}>
                                         <span className={styles.treatmentInfoLabel}>Elastics: </span>
-                                        <span className={styles.treatmentInfoValue}>{visit.Elastics}</span>
+                                        <span className={styles.treatmentInfoValue}>{highlight(visit.Elastics, searchTerm, styles.highlight)}</span>
                                     </div>
                                 )}
                             </div>
@@ -236,7 +289,7 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                         {visit.Others && (
                             <div className={styles.notesSection}>
                                 <strong><i className="fas fa-sticky-note"></i> Notes</strong>
-                                <p>{visit.Others}</p>
+                                <p>{highlight(visit.Others, searchTerm, styles.highlight)}</p>
                             </div>
                         )}
 
@@ -244,7 +297,7 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                         {visit.NextVisit && (
                             <div className={styles.nextVisitSection}>
                                 <strong><i className="fas fa-arrow-circle-right"></i> Next Visit</strong>
-                                <p>{visit.NextVisit}</p>
+                                <p>{highlight(visit.NextVisit, searchTerm, styles.highlight)}</p>
                             </div>
                         )}
                     </div>
@@ -253,6 +306,12 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                     <div className={styles.emptyState}>
                         <i className="fas fa-calendar-times"></i>
                         <p>No visits recorded yet.</p>
+                    </div>
+                )}
+                {visits.length > 0 && filteredVisits.length === 0 && (
+                    <div className={styles.emptyState}>
+                        <i className="fas fa-search"></i>
+                        <p>No visits match your search.</p>
                     </div>
                 )}
             </div>

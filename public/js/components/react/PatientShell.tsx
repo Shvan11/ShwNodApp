@@ -27,6 +27,7 @@ interface ContentParams {
     view?: string;
     filter?: string;
     workId?: string;
+    phone?: string;
     [key: string]: string | undefined;
 }
 
@@ -73,6 +74,7 @@ const PatientShell = () => {
         view: searchParams.get('view') ?? undefined,
         filter: searchParams.get('filter') ?? undefined,
         workId: effectiveWorkId ?? undefined,
+        phone: patient?.Phone ?? undefined,
     };
 
     return (

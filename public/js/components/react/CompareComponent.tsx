@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useRef, ChangeEvent, FormEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import Modal from './Modal';
 
 interface Props {
     personId?: number | null;
@@ -726,7 +727,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
             formData.append('phone', phoneNumber);
             formData.append('file', imageData);
 
-            const response = await fetch('/sendmedia', {
+            const response = await fetch('/api/wa/sendmedia', {
                 method: 'POST',
                 body: formData
             });
@@ -1206,74 +1207,65 @@ const CompareComponent = ({ personId, phone }: Props) => {
             </div>
 
             {/* WhatsApp Modal */}
-            {showWhatsAppModal && (
+            <Modal
+                isOpen={showWhatsAppModal}
+                onClose={() => setShowWhatsAppModal(false)}
+                ariaLabelledBy="compare-whatsapp-title"
+            >
                 <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000
+                    backgroundColor: 'white',
+                    padding: '30px',
+                    borderRadius: '8px',
+                    width: '400px',
+                    maxWidth: '90vw'
                 }}>
-                    <div style={{
-                        backgroundColor: 'white',
-                        padding: '30px',
-                        borderRadius: '8px',
-                        width: '400px',
-                        maxWidth: '90vw'
-                    }}>
-                        <h3>Send to WhatsApp</h3>
-                        <form onSubmit={handleWhatsAppSend}>
-                            <input
-                                type="tel"
-                                placeholder="Phone number"
-                                value={phoneNumber}
-                                onChange={(e: ChangeEvent<HTMLInputElement>) => setPhoneNumber(e.target.value)}
-                                required
+                    <h3 id="compare-whatsapp-title">Send to WhatsApp</h3>
+                    <form onSubmit={handleWhatsAppSend}>
+                        <input
+                            type="tel"
+                            placeholder="Phone number"
+                            value={phoneNumber}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setPhoneNumber(e.target.value)}
+                            required
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                marginBottom: '20px',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px'
+                            }}
+                        />
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                            <button
+                                type="button"
+                                onClick={() => setShowWhatsAppModal(false)}
                                 style={{
-                                    width: '100%',
-                                    padding: '10px',
-                                    marginBottom: '20px',
-                                    border: '1px solid #ddd',
+                                    padding: '10px 20px',
+                                    backgroundColor: '#6c757d',
+                                    color: 'white',
+                                    border: 'none',
                                     borderRadius: '4px'
                                 }}
-                            />
-                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowWhatsAppModal(false)}
-                                    style={{
-                                        padding: '10px 20px',
-                                        backgroundColor: '#6c757d',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px'
-                                    }}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={sendingMessage}
-                                    style={{
-                                        padding: '10px 20px',
-                                        backgroundColor: '#25d366',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px'
-                                    }}
-                                >
-                                    {sendingMessage ? 'Sending...' : 'Send'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={sendingMessage}
+                                style={{
+                                    padding: '10px 20px',
+                                    backgroundColor: '#25d366',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px'
+                                }}
+                            >
+                                {sendingMessage ? 'Sending...' : 'Send'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
-            )}
+            </Modal>
         </div>
     );
 };

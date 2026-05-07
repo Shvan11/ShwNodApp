@@ -148,7 +148,7 @@ const SendMessage = () => {
         formData.append('file', filePath);
 
         try {
-            const response = await fetch('/api/sendmedia2', {
+            const response = await fetch('/api/wa/sendmedia2', {
                 method: 'POST',
                 body: formData
             });

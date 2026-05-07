@@ -218,7 +218,7 @@ For the barcode, read the numbers printed under any barcode or near a QR code.
 For ItemName, combine the brand name and product name as shown on packaging.`;
 
       const generateRequest = {
-        model: 'gemini-2.5-flash',
+        model: process.env.GEMINI_MODEL ?? 'gemini-3-flash-preview',
         contents: [
           {
             role: 'user',
