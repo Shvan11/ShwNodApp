@@ -613,8 +613,9 @@ router.post(
   ): Promise<void> => {
     const { file: imgData, phone } = req.body;
     const base64Data = imgData.replace(/^data:image\/png;base64,/, '');
+    const formattedPhone = PhoneFormatter.forWhatsApp(phone);
     try {
-      await sendImg_(phone, base64Data);
+      await sendImg_(formattedPhone, base64Data);
       res.send('OK');
     } catch (error) {
       log.warn('WhatsApp send image failed', { phone, error: (error as Error).message });

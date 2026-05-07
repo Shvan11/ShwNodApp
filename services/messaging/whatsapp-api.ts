@@ -35,22 +35,40 @@ export async function sendImg_(number: string, base64Image: string): Promise<Sen
   try {
     const media = new MessageMedia('image/png', base64Image);
 
-    return waInstance.queueOperation(async (client: WhatsAppClient) => {
+    return await waInstance.queueOperation(async (client: WhatsAppClient) => {
       // Remove + prefix if present for WhatsApp number validation
       const cleanNumber = number.startsWith('+') ? number.substring(1) : number;
       let targetNumber = cleanNumber;
       if (!targetNumber.includes('@c.us')) {
-        const numberDetails = await client.getNumberId(targetNumber);
-        if (!numberDetails) return 'ERROR';
-        targetNumber = numberDetails._serialized;
+        try {
+          const numberDetails = await client.getNumberId(targetNumber);
+          if (!numberDetails) {
+            log.warn('sendImg_: getNumberId returned null', { number: targetNumber });
+            return 'ERROR';
+          }
+          targetNumber = numberDetails._serialized;
+        } catch (lookupError) {
+          log.error('sendImg_: getNumberId threw', {
+            number: targetNumber,
+            error: lookupError instanceof Error ? lookupError.message : String(lookupError),
+            stack: lookupError instanceof Error ? lookupError.stack : undefined,
+            raw: lookupError,
+          });
+          throw lookupError;
+        }
       }
 
       await client.sendMessage(targetNumber, media);
       return 'OK';
-    });
+    }, 'sendImg');
   } catch (error) {
-    log.error('Error in sendImg_:', { error: error instanceof Error ? error.message : String(error) });
-    return 'ERROR';
+    log.error('Error in sendImg_:', {
+      number,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      raw: error,
+    });
+    throw error;
   }
 }
 
