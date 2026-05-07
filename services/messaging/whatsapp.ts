@@ -1242,15 +1242,10 @@ class WhatsAppService extends EventEmitter {
         try {
           await Promise.race([
             (async () => {
-              if (reason !== 'restart') {
-                await this.clientState.client!.logout();
-                logger.whatsapp.info('WhatsApp client logged out successfully');
-              } else {
-                await this.clientState.client!.destroy();
-                logger.whatsapp.info(
-                  'WhatsApp client destroyed for restart (session preserved)'
-                );
-              }
+              await this.clientState.client!.destroy();
+              logger.whatsapp.info(
+                `WhatsApp client destroyed for ${reason} (session preserved)`
+              );
             })(),
             new Promise((_, reject) =>
               setTimeout(() => reject(new Error('Client destroy timeout')), 30000)
