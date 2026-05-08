@@ -101,6 +101,120 @@ interface ImageState {
     logo: string | null;
 }
 
+type ImageKey = 'img1' | 'img2' | 'logo';
+
+interface ImageRect {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+}
+
+interface DrawSize {
+    dw: number;
+    dh: number;
+}
+
+interface Point {
+    x: number;
+    y: number;
+}
+
+interface DragState {
+    mode: 'translate' | 'scale' | 'rotate';
+    key: ImageKey;
+    pointerId: number;
+    startCanvasX: number;
+    startCanvasY: number;
+    rectCx: number;
+    rectCy: number;
+    startTransform: Transform;
+    abort: AbortController;
+}
+
+const KEY_FOR_TOOL: Record<number, ImageKey> = { 1: 'img1', 2: 'img2', 3: 'logo' };
+const TOOL_FOR_KEY: Record<ImageKey, number> = { img1: 1, img2: 2, logo: 3 };
+const IMG_INDEX_FOR_KEY: Record<ImageKey, number> = { img1: 0, img2: 1, logo: 2 };
+
+// Mirrors renderVertical / renderHorizontal / drawLogo branches.
+function getContainerRect(
+    key: ImageKey,
+    orientation: 'vertical' | 'horizontal',
+    autoMode: boolean,
+    autoImageSize: AutoImageSize | undefined,
+    canvasWidth: number,
+    canvasHeight: number,
+    imgWidth: number,
+    imgHeight: number,
+): ImageRect | null {
+    if (key === 'logo') {
+        const logoWidth = autoMode ? canvasWidth * 0.15 : imgWidth / 6;
+        const logoHeight = (imgHeight * logoWidth) / imgWidth;
+        return {
+            x: canvasWidth / 2 - logoWidth / 2,
+            y: canvasHeight / 2 - logoHeight / 1.3,
+            w: logoWidth,
+            h: logoHeight,
+        };
+    }
+    if (orientation === 'vertical') {
+        if (autoMode && autoImageSize) {
+            const w = autoImageSize.width;
+            const h = autoImageSize.height;
+            return key === 'img1' ? { x: 0, y: 0, w, h } : { x: 0, y: h, w, h };
+        }
+        const halfH = canvasHeight / 2;
+        return key === 'img1'
+            ? { x: 0, y: 0, w: canvasWidth, h: halfH }
+            : { x: 0, y: halfH, w: canvasWidth, h: halfH };
+    }
+    if (autoMode && autoImageSize) {
+        const w = autoImageSize.width;
+        const h = autoImageSize.height;
+        return key === 'img1' ? { x: 0, y: 0, w, h } : { x: w, y: 0, w, h };
+    }
+    const halfW = canvasWidth / 2;
+    return key === 'img1'
+        ? { x: 0, y: 0, w: halfW, h: canvasHeight }
+        : { x: halfW, y: 0, w: halfW, h: canvasHeight };
+}
+
+// Mirrors aspect-fit math in drawImage transform path.
+function getDrawSize(imgWidth: number, imgHeight: number, containerW: number, containerH: number): DrawSize {
+    const aspectRatio = imgWidth / imgHeight;
+    const containerRatio = containerW / containerH;
+    if (aspectRatio > containerRatio) {
+        return { dw: containerW, dh: containerW / aspectRatio };
+    }
+    return { dw: containerH * aspectRatio, dh: containerH };
+}
+
+// Apply M = translate(cx + tx, cy + ty) · rotate(rot) · scale(s) to a local point.
+function applyTransform(lx: number, ly: number, cx: number, cy: number, t: Transform): Point {
+    const rad = (t.rotation * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const sx = lx * t.scale;
+    const sy = ly * t.scale;
+    return {
+        x: cx + t.x + sx * cos - sy * sin,
+        y: cy + t.y + sx * sin + sy * cos,
+    };
+}
+
+function getImageCorners(rect: ImageRect, drawSize: DrawSize, t: Transform): Point[] {
+    const cx = rect.x + rect.w / 2;
+    const cy = rect.y + rect.h / 2;
+    const halfW = drawSize.dw / 2;
+    const halfH = drawSize.dh / 2;
+    return [
+        applyTransform(-halfW, -halfH, cx, cy, t),
+        applyTransform(halfW, -halfH, cx, cy, t),
+        applyTransform(halfW, halfH, cx, cy, t),
+        applyTransform(-halfW, halfH, cx, cy, t),
+    ];
+}
+
 const CompareComponent = ({ personId, phone }: Props) => {
     const toast = useToast();
     const [timepoints, setTimepoints] = useState<Timepoint[]>([]);
@@ -121,6 +235,12 @@ const CompareComponent = ({ personId, phone }: Props) => {
 
     // Canvas ref for comparison
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const svgRef = useRef<SVGSVGElement>(null);
+    const dragRef = useRef<DragState | null>(null);
+    const [displaySize, setDisplaySize] = useState<{ width: number; height: number }>({ width: 800, height: 600 });
+    const [, setBoxVersion] = useState(0);
+    const bumpBox = () => setBoxVersion(v => v + 1);
 
     // Photo type options with improved categorization
     const photoTypes: PhotoType[] = [
@@ -173,6 +293,34 @@ const CompareComponent = ({ personId, phone }: Props) => {
             comparison.render();
         }
     }, [showLogo, comparison]);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ro = new ResizeObserver(entries => {
+            for (const entry of entries) {
+                const { width, height } = entry.contentRect;
+                if (width > 0 && height > 0) {
+                    setDisplaySize({ width, height });
+                }
+            }
+        });
+        ro.observe(canvas);
+        return () => ro.disconnect();
+    }, []);
+
+    useEffect(() => {
+        const wrapper = wrapperRef.current;
+        if (!wrapper || !comparison) return;
+        const handler = (e: WheelEvent) => {
+            if (comparison.images.length < 2) return;
+            e.preventDefault();
+            comparison.zoomImage(e.deltaY < 0 ? 'in' : 'out');
+            bumpBox();
+        };
+        wrapper.addEventListener('wheel', handler, { passive: false });
+        return () => wrapper.removeEventListener('wheel', handler);
+    }, [comparison]);
 
     useEffect(() => {
         if (canvasRef.current) {
@@ -523,10 +671,17 @@ const CompareComponent = ({ personId, phone }: Props) => {
                 const ctx = this.context;
                 const canvas = this.canvas;
 
+                // Scale stroke and dash to canvas size so the line is visible
+                // when the canvas is much larger than its CSS-displayed size.
+                const refDim = Math.max(canvas.width, canvas.height);
+                const lineWidth = Math.max(2, Math.round(refDim / 400));
+                const dashOn = Math.max(10, Math.round(refDim / 80));
+                const dashOff = Math.max(5, Math.round(refDim / 160));
+
                 ctx.save();
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-                ctx.lineWidth = 2;
-                ctx.setLineDash([10, 5]);
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.9)';
+                ctx.lineWidth = lineWidth;
+                ctx.setLineDash([dashOn, dashOff]);
 
                 ctx.beginPath();
                 if (this.orientation === 'vertical') {
@@ -567,7 +722,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
             rotateImage: function(direction: string) {
                 const key = this.selectedImage === 1 ? 'img1' : this.selectedImage === 2 ? 'img2' : 'logo';
                 const transform = this.transform[key as keyof TransformState];
-                const amount = direction === 'clockwise' ? 15 : -15;
+                const amount = direction === 'clockwise' ? 1 : -1;
 
                 transform.rotation += amount;
                 this.render();
@@ -761,6 +916,234 @@ const CompareComponent = ({ personId, phone }: Props) => {
         }
     };
 
+    const clientToCanvas = (clientX: number, clientY: number): Point => {
+        const canvas = canvasRef.current;
+        if (!canvas) return { x: 0, y: 0 };
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
+        return {
+            x: ((clientX - rect.left) * canvas.width) / rect.width,
+            y: ((clientY - rect.top) * canvas.height) / rect.height,
+        };
+    };
+
+    const getRectForKey = (key: ImageKey): ImageRect | null => {
+        if (!comparison) return null;
+        const img = comparison.images[IMG_INDEX_FOR_KEY[key]];
+        if (!img || !img.complete) return null;
+        return getContainerRect(
+            key,
+            comparison.orientation,
+            comparison.autoMode,
+            comparison.autoImageSize,
+            comparison.canvas.width,
+            comparison.canvas.height,
+            img.width,
+            img.height,
+        );
+    };
+
+    const startDrag = (e: React.PointerEvent, mode: DragState['mode'], key: ImageKey) => {
+        if (!comparison) return;
+        const rect = getRectForKey(key);
+        if (!rect) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const start = clientToCanvas(e.clientX, e.clientY);
+        const ctrl = new AbortController();
+        const drag: DragState = {
+            mode,
+            key,
+            pointerId: e.pointerId,
+            startCanvasX: start.x,
+            startCanvasY: start.y,
+            rectCx: rect.x + rect.w / 2,
+            rectCy: rect.y + rect.h / 2,
+            startTransform: { ...comparison.transform[key] },
+            abort: ctrl,
+        };
+        dragRef.current = drag;
+
+        const onMove = (ev: PointerEvent) => {
+            if (ev.pointerId !== drag.pointerId) return;
+            const cur = clientToCanvas(ev.clientX, ev.clientY);
+            const t = comparison.transform[drag.key];
+            if (drag.mode === 'translate') {
+                t.x = drag.startTransform.x + (cur.x - drag.startCanvasX);
+                t.y = drag.startTransform.y + (cur.y - drag.startCanvasY);
+            } else if (drag.mode === 'scale') {
+                const cxAbs = drag.rectCx + drag.startTransform.x;
+                const cyAbs = drag.rectCy + drag.startTransform.y;
+                const startDist = Math.hypot(drag.startCanvasX - cxAbs, drag.startCanvasY - cyAbs);
+                if (startDist < 1) return;
+                const curDist = Math.hypot(cur.x - cxAbs, cur.y - cyAbs);
+                t.scale = Math.max(0.1, Math.min(5, drag.startTransform.scale * (curDist / startDist)));
+            } else {
+                const cxAbs = drag.rectCx + drag.startTransform.x;
+                const cyAbs = drag.rectCy + drag.startTransform.y;
+                const startAngle = Math.atan2(drag.startCanvasY - cyAbs, drag.startCanvasX - cxAbs);
+                const curAngle = Math.atan2(cur.y - cyAbs, cur.x - cxAbs);
+                t.rotation = drag.startTransform.rotation + ((curAngle - startAngle) * 180) / Math.PI;
+            }
+            comparison.render();
+            bumpBox();
+        };
+        const onUp = (ev: PointerEvent) => {
+            if (ev.pointerId !== drag.pointerId) return;
+            ctrl.abort();
+            dragRef.current = null;
+            bumpBox();
+        };
+
+        window.addEventListener('pointermove', onMove, { signal: ctrl.signal });
+        window.addEventListener('pointerup', onUp, { signal: ctrl.signal });
+        window.addEventListener('pointercancel', onUp, { signal: ctrl.signal });
+    };
+
+    const renderOverlay = () => {
+        if (!comparison || comparison.images.length < 2) return null;
+
+        const dpi = canvasDimensions.width / Math.max(1, displaySize.width);
+        const handlePx = 10 * dpi;
+        const rotPx = 30 * dpi;
+        const strokeW = 1.5 * dpi;
+        const dashOn = 5 * dpi;
+        const dashOff = 4 * dpi;
+
+        const allKeys: ImageKey[] = ['img1', 'img2', 'logo'];
+        const selectedKey: ImageKey = KEY_FOR_TOOL[selectedTool] ?? 'img1';
+
+        type Geom = { rect: ImageRect; drawSize: DrawSize; corners: Point[]; transform: Transform };
+        const geom = new Map<ImageKey, Geom>();
+        for (const key of allKeys) {
+            if (key === 'logo' && !comparison.showLogo) continue;
+            const img = comparison.images[IMG_INDEX_FOR_KEY[key]];
+            if (!img || !img.complete) continue;
+            const rect = getContainerRect(
+                key,
+                comparison.orientation,
+                comparison.autoMode,
+                comparison.autoImageSize,
+                comparison.canvas.width,
+                comparison.canvas.height,
+                img.width,
+                img.height,
+            );
+            if (!rect) continue;
+            const drawSize = getDrawSize(img.width, img.height, rect.w, rect.h);
+            const transform = comparison.transform[key];
+            const corners = getImageCorners(rect, drawSize, transform);
+            geom.set(key, { rect, drawSize, corners, transform });
+        }
+
+        const ordered: ImageKey[] = [...allKeys.filter(k => k !== selectedKey), selectedKey];
+        const stroke = 'rgba(0, 123, 255, 0.95)';
+
+        return (
+            <svg
+                ref={svgRef}
+                style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    pointerEvents: 'none',
+                    overflow: 'visible',
+                }}
+                viewBox={`0 0 ${canvasDimensions.width} ${canvasDimensions.height}`}
+                preserveAspectRatio="none"
+            >
+                {ordered.map(key => {
+                    const g = geom.get(key);
+                    if (!g) return null;
+                    const points = g.corners.map(c => `${c.x},${c.y}`).join(' ');
+                    const isSelected = key === selectedKey;
+
+                    if (!isSelected) {
+                        return (
+                            <polygon
+                                key={key}
+                                points={points}
+                                fill="transparent"
+                                stroke="none"
+                                pointerEvents="all"
+                                style={{ cursor: 'pointer' }}
+                                onPointerDown={(e) => {
+                                    if (!comparison) return;
+                                    const newTool = TOOL_FOR_KEY[key];
+                                    setSelectedTool(newTool);
+                                    comparison.selectedImage = newTool;
+                                    startDrag(e, 'translate', key);
+                                }}
+                            />
+                        );
+                    }
+
+                    const cx = g.rect.x + g.rect.w / 2;
+                    const cy = g.rect.y + g.rect.h / 2;
+                    const topCenter = applyTransform(0, -g.drawSize.dh / 2, cx, cy, g.transform);
+                    const rotHandlePos = applyTransform(0, -g.drawSize.dh / 2 - rotPx, cx, cy, g.transform);
+
+                    return (
+                        <g key={key}>
+                            <polygon
+                                points={points}
+                                fill="transparent"
+                                stroke="none"
+                                pointerEvents="all"
+                                style={{ cursor: 'move' }}
+                                onPointerDown={(e) => startDrag(e, 'translate', key)}
+                            />
+                            <polygon
+                                points={points}
+                                fill="none"
+                                stroke={stroke}
+                                strokeWidth={strokeW}
+                                strokeDasharray={`${dashOn} ${dashOff}`}
+                                pointerEvents="none"
+                            />
+                            <line
+                                x1={topCenter.x}
+                                y1={topCenter.y}
+                                x2={rotHandlePos.x}
+                                y2={rotHandlePos.y}
+                                stroke={stroke}
+                                strokeWidth={strokeW}
+                                pointerEvents="none"
+                            />
+                            <circle
+                                cx={rotHandlePos.x}
+                                cy={rotHandlePos.y}
+                                r={handlePx / 1.4}
+                                fill="white"
+                                stroke={stroke}
+                                strokeWidth={strokeW}
+                                pointerEvents="all"
+                                style={{ cursor: 'grab' }}
+                                onPointerDown={(e) => startDrag(e, 'rotate', key)}
+                            />
+                            {g.corners.map((c, i) => (
+                                <rect
+                                    key={i}
+                                    x={c.x - handlePx / 2}
+                                    y={c.y - handlePx / 2}
+                                    width={handlePx}
+                                    height={handlePx}
+                                    fill="white"
+                                    stroke={stroke}
+                                    strokeWidth={strokeW}
+                                    pointerEvents="all"
+                                    style={{ cursor: i === 0 || i === 2 ? 'nwse-resize' : 'nesw-resize' }}
+                                    onPointerDown={(e) => startDrag(e, 'scale', key)}
+                                />
+                            ))}
+                        </g>
+                    );
+                })}
+            </svg>
+        );
+    };
+
     if (loading && timepoints.length === 0) {
         return (
             <div className="loading-spinner">
@@ -828,23 +1211,33 @@ const CompareComponent = ({ personId, phone }: Props) => {
                     border: '1px solid #dee2e6',
                     overflow: 'auto'
                 }}>
-                    <canvas
-                        ref={canvasRef}
-                        id="comparison-canvas"
-                        width={800}
-                        height={600}
+                    <div
+                        ref={wrapperRef}
                         style={{
+                            position: 'relative',
+                            display: 'inline-block',
+                            lineHeight: 0,
                             border: '1px solid #ccc',
                             borderRadius: '4px',
-                            backgroundColor: 'white',
-                            display: 'block',
-                            maxWidth: '600px',
-                            maxHeight: '800px',
-                            width: 'auto',
-                            height: 'auto',
-                            objectFit: 'contain'
+                            touchAction: 'none',
                         }}
-                    />
+                    >
+                        <canvas
+                            ref={canvasRef}
+                            id="comparison-canvas"
+                            width={800}
+                            height={600}
+                            style={{
+                                backgroundColor: 'white',
+                                display: 'block',
+                                maxWidth: '600px',
+                                maxHeight: '800px',
+                                width: 'auto',
+                                height: 'auto',
+                            }}
+                        />
+                        {renderOverlay()}
+                    </div>
                 </div>
 
                 {/* Controls Panel */}
@@ -1002,14 +1395,14 @@ const CompareComponent = ({ personId, phone }: Props) => {
                         </button>
                         <button
                             onClick={() => comparison && comparison.rotateImage('clockwise')}
-                            title="Rotate Clockwise - Rotate the selected image 15° clockwise"
+                            title="Rotate Clockwise - Rotate the selected image 1° clockwise"
                             style={{ padding: '8px', fontSize: '12px', backgroundColor: '#fd7e14', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                         >
                             ↻
                         </button>
                         <button
                             onClick={() => comparison && comparison.rotateImage('counterclockwise')}
-                            title="Rotate Counter-Clockwise - Rotate the selected image 15° counter-clockwise"
+                            title="Rotate Counter-Clockwise - Rotate the selected image 1° counter-clockwise"
                             style={{ padding: '8px', fontSize: '12px', backgroundColor: '#6f42c1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                         >
                             ↺
