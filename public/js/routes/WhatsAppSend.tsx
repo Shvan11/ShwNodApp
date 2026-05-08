@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useDateManager } from '../hooks/useDateManager';
 import { useWhatsAppWebSocket } from '../hooks/useWhatsAppWebSocket';
 import { useMessageCount } from '../hooks/useMessageCount';
@@ -159,7 +160,12 @@ export default function WhatsAppSend() {
       <main className={`${styles.container} ${styles.mainLayout}`} role="main">
         <div className={styles.pageHeaderArea}>
           <h2>WhatsApp Messaging</h2>
-          <div className={styles.connectionStatus} aria-live="polite">
+          <Link
+            to="/auth"
+            className={styles.connectionStatus}
+            aria-live="polite"
+            title="Open WhatsApp authentication page"
+          >
             <span
               className={`${styles.connectionIndicator} ${
                 clientReady ? styles.connected : styles.disconnected
@@ -169,7 +175,7 @@ export default function WhatsAppSend() {
             <span className={styles.connectionText}>
               {clientReady ? 'Client Ready' : 'Authentication Required'}
             </span>
-          </div>
+          </Link>
         </div>
 
         {/* Date Selection Panel */}

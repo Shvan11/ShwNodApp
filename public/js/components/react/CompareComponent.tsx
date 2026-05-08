@@ -9,6 +9,9 @@ import React, { useState, useEffect, useRef, ChangeEvent, FormEvent } from 'reac
 import { useToast } from '../../contexts/ToastContext';
 import Modal from './Modal';
 
+// Empirical: 4249×9798 (~42 MP) fails inside whatsapp-web.js; 2060×2700 (~5.6 MP) preset is offered.
+const MAX_WHATSAPP_PIXELS = 6_000_000;
+
 interface Props {
     personId?: number | null;
     phone?: string;
@@ -72,6 +75,7 @@ interface ComparisonHandler {
     updateDimensions: React.Dispatch<React.SetStateAction<CanvasDimensions>>;
     originalDimensions: CanvasDimensions;
     autoMode: boolean;
+    autoScale: number;
     autoImageSize?: AutoImageSize;
     loadImages: (urls: string[]) => Promise<void>;
     resizeCanvasToFitImages: () => void;
@@ -132,7 +136,9 @@ const CompareComponent = ({ personId, phone }: Props) => {
 
     // Canvas size options
     const canvasSizes: CanvasSize[] = [
-        { value: 'auto', label: 'Auto' },
+        { value: 'auto', label: 'Auto (100%)' },
+        { value: 'auto-50', label: '50% of source' },
+        { value: 'auto-25', label: '25% of source' },
         { value: '{"width":1080,"height":1350}', label: 'Post (1080 × 1350)' },
         { value: '{"width":1080,"height":1920}', label: 'Story (1080 × 1920)' },
         { value: '{"width":2060,"height":2700}', label: '2060 × 2700' }
@@ -253,6 +259,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
                 height: canvas.height
             },
             autoMode: true,
+            autoScale: 1,
 
             loadImages: async function(urls: string[]) {
                 console.log('Loading images:', urls);
@@ -320,8 +327,17 @@ const CompareComponent = ({ personId, phone }: Props) => {
                     canvasHeight = containerHeight;
                 }
 
-                // Store the common container size for rendering
-                this.autoImageSize = { width: containerWidth, height: containerHeight };
+                const scale = this.autoScale ?? 1;
+                if (scale !== 1) {
+                    canvasWidth = Math.round(canvasWidth * scale);
+                    canvasHeight = Math.round(canvasHeight * scale);
+                }
+
+                // Store the common container size for rendering (scaled to match canvas)
+                this.autoImageSize = {
+                    width: Math.round(containerWidth * scale),
+                    height: Math.round(containerHeight * scale)
+                };
 
                 // Apply the new dimensions
                 this.canvas.width = canvasWidth;
@@ -690,9 +706,9 @@ const CompareComponent = ({ personId, phone }: Props) => {
         setCanvasSize(value);
 
         if (canvasRef.current && comparison) {
-            if (value === 'auto') {
-                // Enable auto mode and resize to fit images
+            if (value === 'auto' || value === 'auto-50' || value === 'auto-25') {
                 comparison.autoMode = true;
+                comparison.autoScale = value === 'auto-50' ? 0.5 : value === 'auto-25' ? 0.25 : 1;
                 if (comparison.images.length >= 2) {
                     comparison.resizeCanvasToFitImages();
                 } else {
@@ -704,6 +720,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
             } else {
                 // Disable auto mode and use fixed size
                 comparison.autoMode = false;
+                comparison.autoScale = 1;
                 const size = JSON.parse(value) as CanvasDimensions;
                 canvasRef.current.width = size.width;
                 canvasRef.current.height = size.height;
@@ -1030,13 +1047,31 @@ const CompareComponent = ({ personId, phone }: Props) => {
                         >
                             Reset
                         </button>
-                        <button
-                            onClick={() => setShowWhatsAppModal(true)}
-                            title="Send to WhatsApp - Export the comparison image and send via WhatsApp"
-                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#25d366', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                        >
-                            WhatsApp
-                        </button>
+                        {(() => {
+                            const pixelCount = canvasDimensions.width * canvasDimensions.height;
+                            const isSendable = pixelCount <= MAX_WHATSAPP_PIXELS;
+                            return (
+                                <button
+                                    onClick={() => setShowWhatsAppModal(true)}
+                                    disabled={!isSendable}
+                                    title={isSendable
+                                        ? "Send to WhatsApp - Export the comparison image and send via WhatsApp"
+                                        : `Image too large for WhatsApp (${canvasDimensions.width}×${canvasDimensions.height}, ${(pixelCount / 1_000_000).toFixed(1)} MP). Choose a smaller size from the dropdown.`}
+                                    style={{
+                                        padding: '8px',
+                                        fontSize: '12px',
+                                        backgroundColor: isSendable ? '#25d366' : '#9da39d',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: isSendable ? 'pointer' : 'not-allowed',
+                                        opacity: isSendable ? 1 : 0.7,
+                                    }}
+                                >
+                                    WhatsApp
+                                </button>
+                            );
+                        })()}
                     </div>
                 </div>
 

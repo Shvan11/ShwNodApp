@@ -62,6 +62,15 @@
   background: var(--gray-50);
   border-radius: 8px;
   border: 1px solid var(--border-color);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.connectionStatus:hover,
+.connectionStatus:focus-visible {
+  background: var(--gray-100, #f1f3f5);
+  border-color: var(--primary-color);
 }
 
 .connectionIndicator {

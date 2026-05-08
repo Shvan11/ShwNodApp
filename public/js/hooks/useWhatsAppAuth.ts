@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalState } from '../contexts/GlobalStateContext';
+import { useToast } from '../contexts/ToastContext';
 import connectionManager from '../services/websocket-connection-manager';
 
 // Authentication States
@@ -91,6 +92,7 @@ export interface UseWhatsAppAuthReturn {
 export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   const navigate = useNavigate();
   const location = useLocation();
+  const toast = useToast();
 
   // Use GlobalStateContext for QR code and client ready status (single source of truth)
   const { whatsappQrCode: qrCode, whatsappClientReady: clientReady } = useGlobalState();
@@ -179,7 +181,13 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
       setAuthState(AUTH_STATES.AUTHENTICATED);
     } else if (data.qr) {
       console.log('QR code found in initial state');
-      setAuthState(AUTH_STATES.CHECKING_SESSION);
+      // Don't bounce back to CHECKING_SESSION if we've already settled.
+      setAuthState((currentState) =>
+        currentState === AUTH_STATES.QR_REQUIRED ||
+        currentState === AUTH_STATES.AUTHENTICATED
+          ? currentState
+          : AUTH_STATES.CHECKING_SESSION
+      );
 
       // Wait to see if session restores
       setTimeout(() => {
@@ -197,7 +205,15 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
       setError(data.error);
     } else {
       console.log('No specific state (no QR, no clientReady), checking for session');
-      setAuthState(AUTH_STATES.CHECKING_SESSION);
+      // Don't bounce back to CHECKING_SESSION if a later state already settled.
+      // Without this guard, repeated initial-state responses (multiple WS
+      // requests during init) keep resetting and the page never settles.
+      setAuthState((currentState) =>
+        currentState === AUTH_STATES.QR_REQUIRED ||
+        currentState === AUTH_STATES.AUTHENTICATED
+          ? currentState
+          : AUTH_STATES.CHECKING_SESSION
+      );
 
       setTimeout(() => {
         setAuthState((currentState) => {
@@ -210,6 +226,22 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
       }, 3000);
     }
   }, []);
+
+  // React to qrCode / clientReady arriving from GlobalStateContext (via the
+  // whatsapp_qr_updated and whatsapp_client_ready WS events). Without this,
+  // authState only transitions via handleInitialState's 3s timeout, which can
+  // race with repeated initial-state responses and leave the QR hidden.
+  useEffect(() => {
+    if (clientReady) {
+      setAuthState(AUTH_STATES.AUTHENTICATED);
+    } else if (qrCode) {
+      setAuthState((currentState) =>
+        currentState === AUTH_STATES.AUTHENTICATED
+          ? currentState
+          : AUTH_STATES.QR_REQUIRED
+      );
+    }
+  }, [qrCode, clientReady]);
 
   // Setup WebSocket connection using connection manager
   const setupWebSocket = useCallback(async () => {
@@ -312,6 +344,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   }, [requestInitialState]);
 
   const handleRestart = useCallback(async () => {
+    toast.info('Restarting WhatsApp client…');
     try {
       const response = await fetch('/api/wa/restart', {
         method: 'POST',
@@ -321,6 +354,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
 
       if (result.success) {
         setAuthState(AUTH_STATES.INITIALIZING);
+        toast.success('WhatsApp client restart initiated');
         setTimeout(() => {
           requestInitialState();
         }, CONFIG.CLIENT_RESTART_DELAY_MS);
@@ -330,11 +364,14 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     } catch (error) {
       console.error('Restart failed:', error);
       setAuthState(AUTH_STATES.ERROR);
-      setError('Restart failed');
+      const message = error instanceof Error ? error.message : 'Restart failed';
+      setError(message);
+      toast.error(`Restart failed: ${message}`);
     }
-  }, [requestInitialState]);
+  }, [requestInitialState, toast]);
 
   const handleDestroy = useCallback(async () => {
+    toast.info('Closing WhatsApp browser…');
     try {
       const response = await fetch('/api/wa/destroy', {
         method: 'POST',
@@ -344,17 +381,21 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
 
       if (result.success) {
         setAuthState(AUTH_STATES.INITIALIZING);
+        toast.success('WhatsApp browser closed');
       } else {
         throw new Error(result.error || 'Destroy failed');
       }
     } catch (error) {
       console.error('Destroy failed:', error);
       setAuthState(AUTH_STATES.ERROR);
-      setError('Destroy failed');
+      const message = error instanceof Error ? error.message : 'Destroy failed';
+      setError(message);
+      toast.error(`Failed to close browser: ${message}`);
     }
-  }, []);
+  }, [toast]);
 
   const handleLogout = useCallback(async () => {
+    toast.info('Logging out of WhatsApp…');
     try {
       console.log('Starting logout process...');
       const response = await fetch('/api/wa/logout', {
@@ -366,6 +407,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
       if (result.success) {
         console.log('Logout successful, restarting client...');
         setAuthState(AUTH_STATES.INITIALIZING);
+        toast.success('Logged out — restarting client');
 
         // Restart client after logout
         try {
@@ -392,9 +434,11 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     } catch (error) {
       console.error('Logout failed:', error);
       setAuthState(AUTH_STATES.ERROR);
-      setError('Logout failed');
+      const message = error instanceof Error ? error.message : 'Logout failed';
+      setError(message);
+      toast.error(`Logout failed: ${message}`);
     }
-  }, [requestInitialState]);
+  }, [requestInitialState, toast]);
 
   // Initialize WebSocket on mount (only once!)
   useEffect(() => {
@@ -467,19 +511,28 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authState]); // Only depend on authState changes
 
-  // Handle successful authentication redirect
+  // Auto-redirect only when the user actually went through QR scan on this
+  // page. If the page mounted with the client already ready, stay so the user
+  // can reach Restart / Close Browser / Logout.
+  const sawQrStateRef = useRef(false);
   useEffect(() => {
-    if (authState === AUTH_STATES.AUTHENTICATED) {
-      // Get return path from navigation state (cleaner than URL params)
-      const state = location.state as { returnPath?: string } | null;
-      const returnPath = state?.returnPath || '/send';
-
-      console.log('Authentication successful, redirecting to:', returnPath);
-      setTimeout(() => {
-        // Use navigate with replace to prevent back button going to auth page
-        navigate(returnPath, { replace: true });
-      }, 2000);
+    if (authState === AUTH_STATES.QR_REQUIRED) {
+      sawQrStateRef.current = true;
     }
+  }, [authState]);
+
+  useEffect(() => {
+    if (authState !== AUTH_STATES.AUTHENTICATED) return;
+    if (!sawQrStateRef.current) return;
+
+    const state = location.state as { returnPath?: string } | null;
+    const returnPath = state?.returnPath || '/send';
+
+    console.log('Authentication successful, redirecting to:', returnPath);
+    const timer = setTimeout(() => {
+      navigate(returnPath, { replace: true });
+    }, 2000);
+    return () => clearTimeout(timer);
   }, [authState, location.state, navigate]);
 
   return {

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useWhatsAppAuth, AUTH_STATES } from '../hooks/useWhatsAppAuth';
 import { StatusDisplay } from '../components/whatsapp-auth/StatusDisplay';
 import { QRCodeDisplay } from '../components/whatsapp-auth/QRCodeDisplay';
@@ -19,6 +20,26 @@ export default function WhatsAppAuth() {
     sessionRestorationProgress,
     actions
   } = useWhatsAppAuth();
+
+  // Dev-only: kick off backend init once on page mount. Server-boot
+  // auto-init is off in dev (.env.development sets WHATSAPP_AUTO_INIT=false)
+  // to avoid Ctrl+C corrupting the WA Web session, so this page is where
+  // on-demand init happens. Production is untouched: import.meta.env.DEV is
+  // false in prod builds and this effect compiles out.
+  //
+  // Uses /api/wa/initialize (fire-and-forget, returns 200 immediately) rather
+  // than /api/wa/restart, which awaits the whole init synchronously and 408s
+  // against the 30s global request timeout for a session-restore that takes
+  // longer than that.
+  const initRequestedRef = useRef(false);
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    if (initRequestedRef.current) return;
+    initRequestedRef.current = true;
+    fetch('/api/wa/initialize', { credentials: 'include' }).catch((err) => {
+      console.error('[WhatsAppAuth] dev auto-init request failed:', err);
+    });
+  }, []);
 
   const renderContent = (): ReactNode => {
     switch (authState) {

@@ -165,6 +165,7 @@ class ClientStateManager {
   public destroyInProgress = false;
   public initializationTimeout: NodeJS.Timeout | null = null;
   public sessionStabilized = false;
+  public authStabilizationStarted = false;
 
   private initializationLock: number | false = false;
   private lockWaiters: LockWaiter[] = [];
@@ -649,6 +650,11 @@ class WhatsAppService extends EventEmitter {
         throw new Error('Client initialization returned unexpected value');
       }
     } catch (error) {
+      // A failed initialize() leaves the Puppeteer Chrome alive and holding
+      // the userDataDir SingletonLock, so every subsequent retry fails with
+      // "browser is already running for ...session-client". Tear it down now.
+      await this.cleanupFailedClient();
+
       this.clientState.setState('ERROR', error as Error);
       await this.messageState.setClientReady(false);
 
@@ -665,6 +671,65 @@ class WhatsAppService extends EventEmitter {
     }
   }
 
+  private async cleanupFailedClient(): Promise<void> {
+    if (!this.clientState.client) {
+      return;
+    }
+
+    const failedClient = this.clientState.client;
+    this.clientState.client = null;
+
+    try {
+      this.removeClientEventHandlers(failedClient);
+    } catch (error) {
+      logger.whatsapp.debug('Error removing handlers from failed client', error);
+    }
+
+    try {
+      await Promise.race([
+        failedClient.destroy(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Destroy timeout after init failure')), 10000)
+        ),
+      ]);
+      logger.whatsapp.debug('Failed client destroyed gracefully');
+      return;
+    } catch (destroyError) {
+      logger.whatsapp.warn('Graceful destroy of failed client failed - force closing browser', {
+        error: (destroyError as Error).message,
+      });
+    }
+
+    const browser = failedClient.pupBrowser;
+    if (!browser) {
+      logger.whatsapp.debug('No pupBrowser on failed client - browser may not have launched');
+      return;
+    }
+
+    try {
+      await Promise.race([
+        browser.close(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Browser close timeout')), 5000)
+        ),
+      ]);
+      logger.whatsapp.info('Browser force-closed after init failure');
+      return;
+    } catch (closeError) {
+      logger.whatsapp.error('Browser close failed - killing process', closeError);
+    }
+
+    try {
+      const proc = browser.process();
+      if (proc) {
+        proc.kill('SIGKILL');
+        logger.whatsapp.warn('Browser process killed via SIGKILL after init failure');
+      }
+    } catch (killError) {
+      logger.whatsapp.error('Failed to kill browser process after init failure', killError);
+    }
+  }
+
   private async createAndInitializeClient(): Promise<boolean> {
     logger.whatsapp.info('Creating WhatsApp client');
 
@@ -672,11 +737,21 @@ class WhatsAppService extends EventEmitter {
       throw new Error('Initialization aborted due to timeout');
     }
 
+    // Dev-only: stop puppeteer's signal handlers from racing our
+    // gracefulShutdown. On Linux dev (tsx watch + concurrently) this race
+    // corrupts the WA Web IndexedDB MANIFEST. Production (Windows Service)
+    // keeps puppeteer defaults — its tested shutdown path is unchanged.
+    const isDev = process.env.NODE_ENV !== 'production';
     const client = new Client({
       authStrategy: new LocalAuth({ clientId: 'client' }),
       puppeteer: {
         headless: true,
         timeout: 30000,
+        ...(isDev && {
+          handleSIGINT: false,
+          handleSIGTERM: false,
+          handleSIGHUP: false,
+        }),
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -693,6 +768,7 @@ class WhatsAppService extends EventEmitter {
 
     this.clientState.client = client;
     this.clientState.sessionStabilized = false;
+    this.clientState.authStabilizationStarted = false;
 
     await this.setupClientEventHandlers(client);
 
@@ -825,9 +901,28 @@ class WhatsAppService extends EventEmitter {
             resolved = true;
             clearTimeout(timeout);
             clearInterval(progressInterval);
+
+            // Capture page state at moment of rejection - cheap to read, very
+            // useful when diagnosing inject failures (e.g. confirming WA Web
+            // navigated to ?post_logout=1 due to corrupted IndexedDB).
+            const pageState: Record<string, unknown> = {};
+            try {
+              const pupPage = (client as unknown as { pupPage?: unknown }).pupPage as
+                | { url?: () => string; mainFrame?: () => { url: () => string }; isClosed?: () => boolean }
+                | undefined;
+              if (pupPage) {
+                pageState.url = pupPage.url?.();
+                pageState.mainFrameUrl = pupPage.mainFrame?.().url();
+                pageState.closed = pupPage.isClosed?.();
+              }
+            } catch {
+              // best-effort
+            }
+
             logger.whatsapp.error('❌ client.initialize() promise rejected', {
               error: error.message,
               stack: error.stack,
+              pageState,
             });
             reject(error);
           }
@@ -932,6 +1027,14 @@ class WhatsAppService extends EventEmitter {
   }
 
   private async handleAuthenticated(): Promise<void> {
+    // whatsapp-web.js fires this event each time WA Web's app state syncs,
+    // which during initial multi-device sync happens several times. Guard so
+    // the side-effects (clear QR, schedule 60s stabilization) run once.
+    if (this.clientState.sessionStabilized || this.clientState.authStabilizationStarted) {
+      return;
+    }
+    this.clientState.authStabilizationStarted = true;
+
     logger.whatsapp.info('Client authenticated successfully');
 
     await this.messageState.setQR(null);
@@ -1875,6 +1978,25 @@ class WhatsAppService extends EventEmitter {
           logger.whatsapp.debug(
             `IndexedDB contains ${indexedDBDataFileCount} WhatsApp data files`
           );
+
+          // LevelDB needs a MANIFEST file pointed to by CURRENT. If Chromium
+          // was killed mid-MANIFEST-rewrite, CURRENT can reference a file that
+          // never finished being written. Chromium will then fail to open the
+          // database with "Internal error opening backing store", WA Web will
+          // log out, and every restore retry hits the same wall.
+          const currentPath = path.default.join(indexedDBWhatsAppPath, 'CURRENT');
+          if (fs.default.existsSync(currentPath)) {
+            const manifestName = fs.default.readFileSync(currentPath, 'utf8').trim();
+            if (manifestName) {
+              const manifestPath = path.default.join(indexedDBWhatsAppPath, manifestName);
+              if (!fs.default.existsSync(manifestPath)) {
+                logger.whatsapp.warn(
+                  `Session quality: corrupted (CURRENT references missing ${manifestName})`
+                );
+                return 'corrupted';
+              }
+            }
+          }
         } catch (error) {
           logger.whatsapp.warn('Session quality: corrupted (IndexedDB read error)', {
             error: (error as Error).message,
@@ -1922,6 +2044,16 @@ class WhatsAppService extends EventEmitter {
       calculateDirSize(sessionPath);
 
       if (totalSize > 1024 * 1024) {
+        // Mature session by total size, but the WA Web auth keys live
+        // exclusively in IndexedDB. If Chrome was killed mid-write and
+        // wiped the .ldb files, the session is unrecoverable even though
+        // Local Storage / cookies remain.
+        if (indexedDBDataFileCount === 0) {
+          logger.whatsapp.warn(
+            `Session quality: corrupted (size ${Math.floor(totalSize / 1024)}KB but 0 IndexedDB data files - auth keys gone)`
+          );
+          return 'corrupted';
+        }
         logger.whatsapp.info(
           `Session quality: valid (size ${Math.floor(totalSize / 1024)}KB, mature session)`
         );
