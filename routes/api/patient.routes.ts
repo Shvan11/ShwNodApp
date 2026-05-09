@@ -8,11 +8,9 @@
  * - Patient CRUD operations (create, read, update, delete)
  * - Patient search and phone number retrieval
  * - Patient folder settings
- * - Patient load/unload events for desktop application integration
  */
 
 import { Router, type Request, type Response } from 'express';
-import type { EventEmitter } from 'events';
 import { log } from '../../utils/logger.js';
 import * as database from '../../services/database/index.js';
 import {
@@ -35,7 +33,6 @@ import {
   requireRecordAge,
   getPatientCreationDate
 } from '../../middleware/time-based-auth.js';
-import { WebSocketEvents } from '../../services/messaging/websocket-events.js';
 import { getOption } from '../../services/database/queries/options-queries.js';
 import { ErrorResponses } from '../../utils/error-response.js';
 import * as PatientService from '../../services/business/PatientService.js';
@@ -44,16 +41,6 @@ import * as PatientPortalService from '../../services/business/PatientPortalServ
 import type { PatientSearchQuery } from '../../types/api.types.js';
 
 const router = Router();
-
-// WebSocket emitter will be injected to avoid circular imports
-let wsEmitter: EventEmitter | null = null;
-
-/**
- * Set the WebSocket emitter reference
- */
-export function setWebSocketEmitter(emitter: EventEmitter): void {
-  wsEmitter = emitter;
-}
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -355,52 +342,6 @@ router.get(
         message: (error as Error).message,
         note: 'X-ray processing tool may not be available in this environment'
       });
-    }
-  }
-);
-
-// ============================================================================
-// PATIENT LOAD/UNLOAD EVENTS
-// ============================================================================
-
-/**
- * Handle patient loaded event from desktop application
- * GET /patients/events/loaded?pid={personId}&screenid={screenId}
- */
-router.get(
-  '/patients/events/loaded',
-  (
-    req: Request<unknown, unknown, unknown, { pid?: string; screenid?: string }>,
-    res: Response
-  ): void => {
-    res.sendStatus(200);
-    const { pid, screenid: screenID } = req.query;
-    log.info(`PatientLoaded called with pid: ${pid}, screenID: ${screenID}`);
-
-    // Emit universal event only
-    if (wsEmitter) {
-      wsEmitter.emit(WebSocketEvents.PATIENT_LOADED, pid, screenID);
-    }
-  }
-);
-
-/**
- * Handle patient unloaded event from desktop application
- * GET /patients/events/unloaded?screenid={screenId}
- */
-router.get(
-  '/patients/events/unloaded',
-  (
-    req: Request<unknown, unknown, unknown, { screenid?: string }>,
-    res: Response
-  ): void => {
-    res.sendStatus(200);
-    const { screenid: screenID } = req.query;
-    log.info(`PatientUnloaded called with screenID: ${screenID}`);
-
-    // Emit universal event only
-    if (wsEmitter) {
-      wsEmitter.emit(WebSocketEvents.PATIENT_UNLOADED, screenID);
     }
   }
 );

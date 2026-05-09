@@ -281,10 +281,10 @@
 
 /* Action buttons in modal footer */
 .btnCancel {
-    background: var(--gray-500);
+    background: var(--secondary-color);
     color: white;
     padding: 0.75rem 1.5rem;
-    border: none;
+    border: 1px solid var(--secondary-color);
     border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
@@ -295,14 +295,15 @@
 }
 
 .btnCancel:hover {
-    background: var(--gray-600);
+    background: var(--secondary-hover);
+    border-color: var(--secondary-hover);
 }
 
 .btnSave {
-    background: var(--success-300);
+    background: var(--primary-color);
     color: white;
     padding: 0.75rem 1.5rem;
-    border: none;
+    border: 1px solid var(--primary-color);
     border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
@@ -313,7 +314,8 @@
 }
 
 .btnSave:hover {
-    background: var(--success-500);
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
 }
 
 /* Employees List - reuses table styles from aligner doctors */

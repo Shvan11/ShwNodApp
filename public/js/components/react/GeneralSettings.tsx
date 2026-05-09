@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import cn from 'classnames';
 import Modal from './Modal';
+import storage from '../../core/storage';
 import styles from './SettingsSection.module.css';
 
 interface OptionsMap {
@@ -22,6 +23,8 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     const [pendingChanges, setPendingChanges] = useState<OptionsMap>({});
     const [isLoading, setIsLoading] = useState(false);
     const [modal, setModal] = useState<ModalState>({ show: false, title: '', message: '' });
+    const [chairIdInput, setChairIdInput] = useState<string>(storage.chairId() ?? '');
+    const [chairIdSaved, setChairIdSaved] = useState<string | null>(storage.chairId());
 
     const loadSettings = useCallback(async () => {
         setIsLoading(true);
@@ -129,6 +132,27 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
         showModal('Info', 'Settings refreshed successfully.');
     };
 
+    const saveChairId = () => {
+        const trimmed = chairIdInput.trim();
+        if (trimmed === '') {
+            storage.setChairId(null);
+            setChairIdSaved(null);
+            showModal('Saved', 'Chair ID cleared on this PC.');
+            return;
+        }
+        if (!storage.setChairId(trimmed)) {
+            showModal('Invalid', 'Chair ID must be a whole number between 1 and 10.');
+            return;
+        }
+        setChairIdSaved(trimmed);
+        showModal('Saved', `This PC is now configured as Chair ${trimmed}.`);
+    };
+
+    const chairIdDirty = (chairIdInput.trim() || null) !== chairIdSaved;
+
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const secondaryDisplayUrl = `${origin}/chair-display?chair=N`;
+
     const formatSettingName = (key: string): string => {
         // Check if the key is ALL_UPPERCASE_WITH_UNDERSCORES (database option format)
         if (key === key.toUpperCase() && key.includes('_')) {
@@ -205,68 +229,125 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
 
     return (
         <div>
-            <h3 className={styles.pageTitle}>
-                <i className="fas fa-cog"></i>
-                System Options
-            </h3>
-            <p className={styles.sectionDescription}>
-                Configure general system settings and preferences
-            </p>
+            <section className={styles.subsection}>
+                <h3 className={styles.pageTitle}>
+                    <i className="fas fa-desktop"></i>
+                    This PC
+                </h3>
+                <p className={styles.sectionDescription}>
+                    Settings stored locally in this browser. Set the Chair ID on chair PCs so the
+                    public secondary display can show the patient currently being seen at this chair.
+                    Leave blank on non-chair PCs (admin laptops, etc).
+                </p>
 
-            <div className={styles.form}>
-                {isLoading ? (
-                    <div className={styles.loading}>
-                        <i className="fas fa-spinner fa-spin"></i>
-                        <span>Loading settings...</span>
+                <div className={styles.inlineRow}>
+                    <div className={cn(styles.settingGroup, chairIdDirty && styles.pendingChange)}>
+                        <label htmlFor="chair_id_input">Chair ID (1–10)</label>
+                        <input
+                            id="chair_id_input"
+                            type="number"
+                            min={1}
+                            max={10}
+                            step={1}
+                            value={chairIdInput}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setChairIdInput(e.target.value)}
+                            className={chairIdDirty ? styles.pendingChange : ''}
+                            placeholder="(blank = not a chair PC)"
+                        />
+                        <div className={styles.settingDescription}>
+                            {chairIdSaved
+                                ? `Currently configured as Chair ${chairIdSaved} on this PC.`
+                                : 'No chair configured on this PC.'}
+                        </div>
                     </div>
-                ) : (
-                    <div className={styles.formFields}>
-                        {Object.keys(options).length === 0 ? (
-                            <p className={styles.noSettings}>No settings found. Please check your database configuration.</p>
-                        ) : (
-                            Object.entries(options)
-                                // Filter out settings that have their own dedicated tabs
-                                .filter(([key]) => !key.startsWith('EMAIL_') && !key.startsWith('CALENDAR_'))
-                                .map(([key, value]) => (
-                                <div key={key} className={cn(styles.settingGroup, pendingChanges[key] !== undefined && styles.pendingChange)}>
-                                    <label htmlFor={`setting_${key.replace(/[^a-zA-Z0-9]/g, '_')}`}>
-                                        {formatSettingName(key)}
-                                    </label>
-                                    {renderSettingInput(key, value)}
-                                    <div className={styles.settingDescription}>Option: {key}</div>
-                                </div>
-                            ))
+                    <button
+                        className={cn('btn btn-primary', styles.inlineAction)}
+                        onClick={saveChairId}
+                        disabled={!chairIdDirty}
+                    >
+                        <i className="fas fa-save"></i>
+                        Save Chair ID
+                    </button>
+                </div>
+
+                <div className={styles.settingGroup}>
+                    <label>Secondary Display URL</label>
+                    <code className={styles.urlReference}>{secondaryDisplayUrl}</code>
+                    <div className={styles.settingDescription}>
+                        Open this URL in fullscreen on the patient-facing display PC. Replace
+                        <code> N </code> with the chair number (1–10) the display is paired with —
+                        e.g. <code>?chair=1</code> for Chair 1.
+                        {chairIdSaved && (
+                            <> This PC's chair URL: <code>{`${origin}/chair-display?chair=${chairIdSaved}`}</code></>
                         )}
                     </div>
-                )}
-            </div>
+                </div>
+            </section>
 
-            <div className={styles.actions}>
-                <button
-                    className="btn btn-primary"
-                    onClick={saveAllChanges}
-                    disabled={!hasChanges}
-                >
-                    <i className="fas fa-save"></i>
-                    {hasChanges
-                        ? `Save Changes (${Object.keys(pendingChanges).length})`
-                        : 'Save Changes'
-                    }
-                </button>
-                <button
-                    className="btn btn-secondary"
-                    onClick={refreshSettings}
-                >
-                    <i className="fas fa-sync-alt"></i>
-                    Refresh Settings
-                </button>
-            </div>
+            <section className={styles.subsection}>
+                <h3 className={styles.pageTitle}>
+                    <i className="fas fa-cog"></i>
+                    System Options
+                </h3>
+                <p className={styles.sectionDescription}>
+                    Configure general system settings and preferences
+                </p>
+
+                <div className={styles.form}>
+                    {isLoading ? (
+                        <div className={styles.loading}>
+                            <i className="fas fa-spinner fa-spin"></i>
+                            <span>Loading settings...</span>
+                        </div>
+                    ) : (
+                        <div className={styles.formFields}>
+                            {Object.keys(options).length === 0 ? (
+                                <p className={styles.noSettings}>No settings found. Please check your database configuration.</p>
+                            ) : (
+                                Object.entries(options)
+                                    // Filter out settings that have their own dedicated tabs
+                                    .filter(([key]) => !key.startsWith('EMAIL_') && !key.startsWith('CALENDAR_'))
+                                    .map(([key, value]) => (
+                                    <div key={key} className={cn(styles.settingGroup, pendingChanges[key] !== undefined && styles.pendingChange)}>
+                                        <label htmlFor={`setting_${key.replace(/[^a-zA-Z0-9]/g, '_')}`}>
+                                            {formatSettingName(key)}
+                                        </label>
+                                        {renderSettingInput(key, value)}
+                                        <div className={styles.settingDescription}>Option: {key}</div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <div className={styles.actions}>
+                    <button
+                        className="btn btn-primary"
+                        onClick={saveAllChanges}
+                        disabled={!hasChanges}
+                    >
+                        <i className="fas fa-save"></i>
+                        {hasChanges
+                            ? `Save Changes (${Object.keys(pendingChanges).length})`
+                            : 'Save Changes'
+                        }
+                    </button>
+                    <button
+                        className="btn btn-secondary"
+                        onClick={refreshSettings}
+                    >
+                        <i className="fas fa-sync-alt"></i>
+                        Refresh Settings
+                    </button>
+                </div>
+            </section>
 
             {/* Modal */}
             <Modal
                 isOpen={modal.show}
                 onClose={hideModal}
-                contentClassName="modal-content"
+                contentClassName={styles.infoModal}
                 ariaLabelledBy="general-settings-modal-title"
             >
                 <div className="modal-header">

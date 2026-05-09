@@ -3,7 +3,6 @@
  * A robust WebSocket client with automatic reconnection, heartbeat, and message queuing
  */
 import EventEmitter from '../core/events';
-import storage from '../core/storage';
 import { WebSocketEvents } from '../constants/websocket-events';
 
 // Type definitions
@@ -72,7 +71,6 @@ interface WebSocketState {
   messageQueue: QueuedMessage[];
   pendingMessages: Map<number, PendingMessage>;
   forceClose: boolean;
-  screenId: string | null;
   hasConnectedBefore: boolean;
   sequenceNumbers: Map<string, number>;
   missedEventRequests: Set<string>;
@@ -153,7 +151,6 @@ export class WebSocketService extends EventEmitter {
       messageQueue: [],
       pendingMessages: new Map(),
       forceClose: false,
-      screenId: null,
       hasConnectedBefore: false,
       sequenceNumbers: new Map(),
       missedEventRequests: new Set(),
@@ -942,13 +939,6 @@ export class WebSocketService extends EventEmitter {
    */
   private buildConnectionUrl(params: ConnectionParams = {}): string {
     const url = new URL(this.options.baseUrl);
-
-    if (params.clientType === 'appointments') {
-      if (!this.state.screenId) {
-        this.state.screenId = storage.screenId() || 'unknown';
-      }
-      url.searchParams.append('screenID', this.state.screenId);
-    }
 
     let dateParam: string;
     if (params.PDate) {

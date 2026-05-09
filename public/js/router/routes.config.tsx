@@ -40,7 +40,6 @@ const Statistics = React.lazy(() => import('../routes/Statistics'));
 const Expenses = React.lazy(() => import('../routes/Expenses'));
 const Videos = React.lazy(() => import('../routes/Videos'));
 const PatientManagement = React.lazy(() => import('../routes/PatientManagement'));
-const CompilerTest = React.lazy(() => import('../test-compiler'));
 
 // Lazy-loaded route components - Settings & Templates
 const SettingsComponent = React.lazy(() => import('../components/react/SettingsComponent'));
@@ -59,6 +58,9 @@ const ArchformMatcher = React.lazy(() => import('../pages/aligner/ArchformMatche
 
 // Lazy-loaded route components - Patient
 const PatientShell = React.lazy(() => import('../components/react/PatientShell'));
+
+// Lazy-loaded route components - Chair-side public display (open access, no auth)
+const ChairDisplay = React.lazy(() => import('../routes/ChairDisplay'));
 
 // Lazy-loaded route components - Stand / Mini Pharmacy
 const Stand = React.lazy(() => import('../routes/Stand'));
@@ -79,6 +81,18 @@ const WhatsAppAuth = React.lazy(() => import('../routes/WhatsAppAuth'));
  * Each route object includes: path, element, loader (optional), errorElement
  */
 export const routesConfig: RouteObject[] = [
+  // Chair-side public display — top-level route OUTSIDE RootLayout so it has no
+  // header, no auth, no global providers. The kiosk browser bookmarks
+  // `/chair-display?chair=N` and runs in fullscreen kiosk mode.
+  {
+    path: '/chair-display',
+    element: (
+      <React.Suspense fallback={<div />}>
+        <ChairDisplay />
+      </React.Suspense>
+    ),
+    errorElement: <RouteError />,
+  },
   {
     // Root layout wraps all routes
     element: <RootLayout />,
@@ -104,16 +118,6 @@ export const routesConfig: RouteObject[] = [
         element: (
           <RouteErrorBoundary routeName="Dashboard">
             <Dashboard />
-          </RouteErrorBoundary>
-        ),
-      },
-
-      // Test Compiler
-      {
-        path: '/test-compiler',
-        element: (
-          <RouteErrorBoundary routeName="Compiler Test">
-            <CompilerTest />
           </RouteErrorBoundary>
         ),
       },

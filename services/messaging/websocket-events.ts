@@ -15,8 +15,8 @@ import { log } from '../../utils/logger.js';
  * Naming Convention:
  * - Use SCREAMING_SNAKE_CASE for constants
  * - Use descriptive, consistent patterns
- * - Server events: noun_verb (e.g., PATIENT_LOADED)
- * - Client events: verb_noun (e.g., REQUEST_PATIENT)
+ * - Server events: noun_verb (e.g., APPOINTMENTS_UPDATED)
+ * - Client events: verb_noun (e.g., REQUEST_APPOINTMENTS)
  * - Status events: noun_status (e.g., CLIENT_READY)
  */
 export const WebSocketEvents = {
@@ -56,26 +56,14 @@ export const WebSocketEvents = {
   APPOINTMENTS_DATA: 'appointments_data',
 
   // ===========================================
-  // PATIENT MANAGEMENT EVENTS
+  // CHAIR DISPLAY EVENTS
   // ===========================================
 
-  /** Patient data loaded and displayed */
-  PATIENT_LOADED: 'patient_loaded',
+  /** Patient data loaded for chair-side public display */
+  CHAIR_DISPLAY_PATIENT_LOADED: 'chair_display_patient_loaded',
 
-  /** Patient data unloaded/cleared */
-  PATIENT_UNLOADED: 'patient_unloaded',
-
-  /** Request patient data */
-  REQUEST_PATIENT: 'request_patient',
-
-  /** Patient data response */
-  PATIENT_DATA: 'patient_data',
-
-  /** Patient images loaded */
-  PATIENT_IMAGES_LOADED: 'patient_images_loaded',
-
-  /** Patient visit data updated */
-  PATIENT_VISIT_UPDATED: 'patient_visit_updated',
+  /** Chair-side public display should clear patient data */
+  CHAIR_DISPLAY_PATIENT_CLEARED: 'chair_display_patient_cleared',
 
   // ===========================================
   // WHATSAPP MESSAGING EVENTS
@@ -222,28 +210,16 @@ export const EventMetadata: Partial<Record<WebSocketEventType, EventMetadataEntr
     data: { tableData: 'object', date: 'string' },
   },
 
-  [WebSocketEvents.PATIENT_LOADED]: {
+  [WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED]: {
     direction: EventDirection.SERVER_TO_CLIENT,
-    description: 'Patient data loaded and should be displayed',
-    data: { pid: 'string', images: 'array', latestVisit: 'object?' },
+    description: 'Chair-side public display: patient loaded with intraoral images and (if ortho) latest visit note',
+    data: { pid: 'string', patientName: 'string?', images: 'array', latestVisit: 'object?' },
   },
 
-  [WebSocketEvents.PATIENT_UNLOADED]: {
+  [WebSocketEvents.CHAIR_DISPLAY_PATIENT_CLEARED]: {
     direction: EventDirection.SERVER_TO_CLIENT,
-    description: 'Patient data should be unloaded/cleared',
+    description: 'Chair-side public display: clear current patient and return to idle',
     data: {},
-  },
-
-  [WebSocketEvents.REQUEST_PATIENT]: {
-    direction: EventDirection.CLIENT_TO_SERVER,
-    description: 'Request patient data',
-    data: { patientId: 'string' },
-  },
-
-  [WebSocketEvents.PATIENT_DATA]: {
-    direction: EventDirection.SERVER_TO_CLIENT,
-    description: 'Patient data response',
-    data: { pid: 'string', images: 'array', latestVisit: 'object?' },
   },
 
   [WebSocketEvents.WHATSAPP_CLIENT_READY]: {
@@ -415,7 +391,7 @@ export function createStandardMessage(
 interface EventsByCategory {
   connection: WebSocketEventType[];
   appointments: WebSocketEventType[];
-  patient: WebSocketEventType[];
+  chairDisplay: WebSocketEventType[];
   whatsapp: WebSocketEventType[];
   system: WebSocketEventType[];
 }
@@ -438,13 +414,9 @@ export function getEventsByCategory(): EventsByCategory {
       WebSocketEvents.REQUEST_APPOINTMENTS,
       WebSocketEvents.APPOINTMENTS_DATA,
     ],
-    patient: [
-      WebSocketEvents.PATIENT_LOADED,
-      WebSocketEvents.PATIENT_UNLOADED,
-      WebSocketEvents.REQUEST_PATIENT,
-      WebSocketEvents.PATIENT_DATA,
-      WebSocketEvents.PATIENT_IMAGES_LOADED,
-      WebSocketEvents.PATIENT_VISIT_UPDATED,
+    chairDisplay: [
+      WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,
+      WebSocketEvents.CHAIR_DISPLAY_PATIENT_CLEARED,
     ],
     whatsapp: [
       WebSocketEvents.WHATSAPP_CLIENT_READY,

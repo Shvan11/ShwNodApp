@@ -150,12 +150,46 @@
 
 /* Settings Form */
 .form {
-    min-height: 300px;
+    /* No min-height — small forms (e.g. single field) shouldn't reserve empty space.
+       The loading state has its own height. */
 }
 
 .formFields {
     display: grid;
     gap: 1.5rem;
+}
+
+/* Subsection — used to group related settings within a page so adjacent
+   logical blocks (e.g. "This PC" vs "System Options") have clear separation
+   without nesting heavy card-in-card visuals. */
+.subsection {
+    padding-bottom: 2rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.subsection:last-child {
+    padding-bottom: 0;
+    margin-bottom: 0;
+    border-bottom: none;
+}
+
+/* Inline row — pairs a compact field with its action button on the same line.
+   Useful for single-field sections where a full-width footer button looks empty. */
+.inlineRow {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.inlineRow .settingGroup {
+    flex: 0 1 320px;
+    min-width: 200px;
+}
+
+.inlineRow .inlineAction {
+    margin-top: 1.65rem; /* aligns with the input, accounting for the label above */
 }
 
 /* Settings Actions footer */
@@ -214,6 +248,64 @@
     font-size: 0.85rem;
     color: var(--text-secondary);
     margin-top: 0.25rem;
+}
+
+.urlReference {
+    display: inline-block;
+    padding: 0.5rem 0.75rem;
+    background: var(--gray-100, #f5f5f5);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    user-select: all;
+    word-break: break-all;
+}
+
+/* Panel style for the settings info/error modal (shared <Modal> wrapper handles
+   the overlay; this is the inner content panel). */
+.infoModal {
+    background: white;
+    border-radius: var(--radius-xl, 12px);
+    box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04));
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* The global .modal-body / .modal-footer rules in public/css/components/modal.css
+   only ship padding when scoped under .alert-modal, so we provide our own here. */
+.infoModal :global(.modal-body) {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.infoModal :global(.modal-body) p {
+    margin: 0;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.infoModal :global(.modal-footer) {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--gray-200);
+    background: var(--gray-50, #fafafa);
+}
+
+.settingDescription code {
+    padding: 0.1rem 0.3rem;
+    background: var(--gray-100, #f5f5f5);
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.85rem;
 }
 
 /* Success/Error states */

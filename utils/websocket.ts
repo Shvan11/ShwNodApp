@@ -7,10 +7,17 @@ import { getPresentAps } from '../services/database/queries/appointment-queries.
 import messageState from '../services/state/messageState.js';
 import { getTimePointImgs } from '../services/database/queries/timepoint-queries.js';
 import { getLatestVisitsSum } from '../services/database/queries/visit-queries.js';
+import { getActiveWork } from '../services/database/queries/work-queries.js';
+import { getPatientById } from '../services/database/queries/patient-queries.js';
 import { createWebSocketMessage, validateWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
 import { WebSocketEvents, createStandardMessage } from '../services/messaging/websocket-events.js';
 import { logger } from '../services/core/Logger.js';
 import qrcode from 'qrcode';
+
+// Mirror of public/js/config/workTypeConfig.ts ORTHO_WORK_TYPES — visit notes only show
+// for active orthodontic work on the chair-side display.
+const ORTHO_WORK_TYPE_IDS: ReadonlySet<number> = new Set([1, 2, 11, 19, 20]);
+const CHAIR_DISPLAY_INTRAORAL_EXTS = ['.i20', '.i22', '.i21'] as const;
 
 // ===========================================
 // TYPES
@@ -19,13 +26,13 @@ import qrcode from 'qrcode';
 /**
  * Connection type identifiers
  */
-type ConnectionType = 'screen' | 'waStatus' | 'auth' | 'daily-appointments' | 'generic';
+type ConnectionType = 'chair-display' | 'waStatus' | 'auth' | 'daily-appointments' | 'generic';
 
 /**
  * Connection metadata for different client types
  */
 interface ConnectionMetadata {
-  screenId?: string;
+  chairId?: string;
   date?: string | null;
   ipAddress?: string;
   viewerId?: string;
@@ -58,7 +65,7 @@ interface ExtendedWebSocket extends WebSocket {
  */
 interface ConnectionCounts {
   total: number;
-  screens: number;
+  chairDisplays: number;
   waStatus: number;
   dailyAppointments: number;
 }
@@ -93,14 +100,14 @@ type BroadcastFilter = (ws: ExtendedWebSocket, capabilities: ClientCapabilities 
  * No AckManager, no sequence numbers, no complexity
  */
 class ConnectionManager {
-  screenConnections: Map<string, ExtendedWebSocket>;
+  chairDisplayConnections: Map<string, ExtendedWebSocket>;
   waStatusConnections: Set<ExtendedWebSocket>;
   dailyAppointmentsConnections: Set<ExtendedWebSocket>;
   allConnections: Set<ExtendedWebSocket>;
   clientCapabilities: WeakMap<ExtendedWebSocket, ClientCapabilities>;
 
   constructor() {
-    this.screenConnections = new Map();
+    this.chairDisplayConnections = new Map();
     this.waStatusConnections = new Set();
     this.dailyAppointmentsConnections = new Set();
     this.allConnections = new Set();
@@ -117,9 +124,17 @@ class ConnectionManager {
       lastActivity: Date.now()
     });
 
-    if (type === 'screen' && metadata.screenId) {
-      this.screenConnections.set(metadata.screenId, ws);
-      logger.websocket.debug('Registered screen connection', { screenId: metadata.screenId });
+    if (type === 'chair-display' && metadata.chairId) {
+      // If a prior WS is registered for the same chairId (e.g. the kiosk
+      // reconnected before the previous socket's close event fired), close
+      // it explicitly so its eventual close handler doesn't unregister the
+      // new entry. See unregisterConnection below for the identity guard.
+      const prev = this.chairDisplayConnections.get(metadata.chairId);
+      if (prev && prev !== ws) {
+        try { prev.close(1000, 'Replaced by new chair-display connection'); } catch { /* ignore */ }
+      }
+      this.chairDisplayConnections.set(metadata.chairId, ws);
+      logger.websocket.debug('Registered chair-display connection', { chairId: metadata.chairId });
     } else if (type === 'waStatus') {
       this.waStatusConnections.add(ws);
       logger.websocket.debug('Registered WhatsApp status connection');
@@ -137,9 +152,14 @@ class ConnectionManager {
     const capabilities = this.clientCapabilities.get(ws);
     if (!capabilities) return;
 
-    if (capabilities.type === 'screen' && capabilities.metadata.screenId) {
-      this.screenConnections.delete(capabilities.metadata.screenId);
-      logger.websocket.debug('Unregistered screen connection', { screenId: capabilities.metadata.screenId });
+    if (capabilities.type === 'chair-display' && capabilities.metadata.chairId) {
+      // Identity guard: only delete the map entry if it still points to THIS
+      // ws. Without this, a stale OLD_WS firing 'close' after the kiosk has
+      // already reconnected would silently delete the NEW_WS's mapping.
+      if (this.chairDisplayConnections.get(capabilities.metadata.chairId) === ws) {
+        this.chairDisplayConnections.delete(capabilities.metadata.chairId);
+      }
+      logger.websocket.debug('Unregistered chair-display connection', { chairId: capabilities.metadata.chairId });
     } else if (capabilities.type === 'waStatus') {
       this.waStatusConnections.delete(ws);
       logger.websocket.debug('Unregistered WhatsApp status connection');
@@ -154,15 +174,15 @@ class ConnectionManager {
     this.clientCapabilities.delete(ws);
   }
 
-  sendToScreen(screenId: string, message: unknown): boolean {
-    const ws = this.screenConnections.get(screenId);
+  sendToChairDisplay(chairId: string, message: unknown): boolean {
+    const ws = this.chairDisplayConnections.get(chairId);
     if (!ws || ws.readyState !== WebSocket.OPEN) return false;
 
     try {
       this.sendToClient(ws, message);
       return true;
     } catch (error) {
-      logger.websocket.error('Error sending to screen', { error: (error as Error).message, screenId });
+      logger.websocket.error('Error sending to chair-display', { error: (error as Error).message, chairId });
       return false;
     }
   }
@@ -178,23 +198,6 @@ class ConnectionManager {
         sentCount++;
       } catch (error) {
         logger.websocket.error('Error sending to WhatsApp status client', error as Error);
-      }
-    }
-    return sentCount;
-  }
-
-  broadcastToScreens(message: unknown, filter: BroadcastFilter | null = null): number {
-    let sentCount = 0;
-    for (const [screenId, ws] of this.screenConnections.entries()) {
-      if (ws.readyState !== WebSocket.OPEN) continue;
-      const capabilities = this.clientCapabilities.get(ws);
-      if (filter && !filter(ws, capabilities)) continue;
-
-      try {
-        this.sendToClient(ws, message);
-        sentCount++;
-      } catch (error) {
-        logger.websocket.error('Error sending to screen', { error: (error as Error).message, screenId });
       }
     }
     return sentCount;
@@ -273,6 +276,12 @@ class ConnectionManager {
       const capabilities = this.clientCapabilities.get(ws);
       if (!capabilities) continue;
 
+      // Chair-displays are read-only kiosks: they never send inbound traffic,
+      // and only get push events when staff opens/closes a patient. A quiet
+      // morning would otherwise trip the inactivity sweep and force needless
+      // reconnects. Skip them — they're naturally cleaned up on disconnect.
+      if (capabilities.type === 'chair-display') continue;
+
       const inactiveTime = now - capabilities.lastActivity;
       if (inactiveTime > timeout) {
         inactive.push(ws);
@@ -300,7 +309,7 @@ class ConnectionManager {
   getConnectionCounts(): ConnectionCounts {
     return {
       total: this.allConnections.size,
-      screens: this.screenConnections.size,
+      chairDisplays: this.chairDisplayConnections.size,
       waStatus: this.waStatusConnections.size,
       dailyAppointments: this.dailyAppointmentsConnections.size
     };
@@ -381,6 +390,19 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
           logger.websocket.debug('Registering daily appointments client');
           connectionManager.registerConnection(extWs, 'daily-appointments', {
             date: date,
+            ipAddress: req.socket.remoteAddress
+          });
+
+        } else if (clientType === 'chair-display') {
+          const chairIdParam = url.searchParams.get('chairId');
+          if (!chairIdParam || !/^([1-9]|10)$/.test(chairIdParam)) {
+            logger.websocket.warn('Rejecting chair-display connection: invalid chairId', { chairIdParam });
+            extWs.close(1008, 'Invalid chairId');
+            return;
+          }
+          logger.websocket.debug('Registering chair-display client', { chairId: chairIdParam });
+          connectionManager.registerConnection(extWs, 'chair-display', {
+            chairId: chairIdParam,
             ipAddress: req.socket.remoteAddress
           });
         }
@@ -505,12 +527,6 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
         }
         break;
       }
-
-      case WebSocketEvents.REQUEST_PATIENT:
-        if (message.data?.patientId) {
-          await sendPatientData(ws, message.data.patientId as string, connectionManager);
-        }
-        break;
 
       case WebSocketEvents.CLIENT_CAPABILITIES:
         connectionManager.updateClientCapabilities(ws, (message.data?.capabilities as Partial<ClientCapabilities>) || {});
@@ -667,55 +683,6 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
     }
   }
 
-  async function sendPatientData(
-    ws: ExtendedWebSocket,
-    patientId: string,
-    connectionManager: ConnectionManager
-  ): Promise<void> {
-    if (!patientId || ws.readyState !== WebSocket.OPEN) return;
-    logger.websocket.debug('Fetching patient data', { patientId });
-
-    try {
-      const images = await getPatientImages(patientId);
-      const latestVisit = await getLatestVisitsSum(parseInt(patientId, 10));
-
-      const message = createStandardMessage(
-        WebSocketEvents.PATIENT_DATA,
-        {
-          pid: patientId,
-          images,
-          latestVisit
-        }
-      );
-
-      connectionManager.sendToClient(ws, message);
-      logger.websocket.debug('Sent patient data', { patientId });
-    } catch (error) {
-      logger.websocket.error('Error sending patient data', { error: (error as Error).message, patientId });
-
-      const errorMessage = createWebSocketMessage(
-        MessageSchemas.WebSocketMessage.ERROR,
-        { error: `Failed to fetch patient data for ${patientId}` }
-      );
-      connectionManager.sendToClient(ws, errorMessage);
-    }
-  }
-
-  async function getPatientImages(pid: string): Promise<PatientImage[]> {
-    try {
-      const tp = "0";
-      const images = await getTimePointImgs(pid, tp);
-
-      return images.map((code: string | number) => {
-        const name = `${pid}0${tp}.i${code}`;
-        return { name };
-      });
-    } catch (error) {
-      logger.websocket.error('Error getting patient images', error as Error);
-      return [];
-    }
-  }
-
   return wsEmitter;
 }
 
@@ -737,15 +704,10 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
         { date: dateParam }
       );
 
-      // Broadcast to all daily appointments clients
       const sentCount = connectionManager.broadcastToDailyAppointments(message);
 
-      // Also broadcast to legacy screens
-      const screenCount = connectionManager.broadcastToScreens(message);
-
       logger.websocket.info('Broadcast appointment updates', {
-        dailyAppointments: sentCount,
-        screens: screenCount
+        dailyAppointments: sentCount
       });
     } catch (error) {
       logger.websocket.error('Error broadcasting appointment update', { error: (error as Error).message, date: dateParam });
@@ -754,59 +716,60 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
 
   emitter.on(WebSocketEvents.DATA_UPDATED, handleAppointmentUpdate);
 
-  // Patient loaded event
-  const handlePatientLoaded = async (pid: string, targetScreenID: string): Promise<void> => {
-    logger.websocket.info('Patient loaded event', { patientId: pid, screenId: targetScreenID });
+  // Chair-display: patient loaded
+  const handleChairDisplayPatientLoaded = async (pid: string, targetChairId: string): Promise<void> => {
+    logger.websocket.info('Chair-display patient loaded', { patientId: pid, chairId: targetChairId });
 
-    const screenConnection = connectionManager.screenConnections.get(targetScreenID);
-    if (!screenConnection || screenConnection.readyState !== WebSocket.OPEN) {
-      logger.websocket.debug('Screen not connected', { screenId: targetScreenID });
-      return;
-    }
-
-    const capabilities = connectionManager.clientCapabilities.get(screenConnection);
-    if (!capabilities || capabilities.type !== 'screen') {
-      logger.websocket.debug('Not an appointments screen', { screenId: targetScreenID });
+    const chairConnection = connectionManager.chairDisplayConnections.get(targetChairId);
+    if (!chairConnection || chairConnection.readyState !== WebSocket.OPEN) {
+      logger.websocket.debug('Chair display not connected', { chairId: targetChairId });
       return;
     }
 
     try {
+      const personId = parseInt(pid, 10);
+
       const allImages = await getPatientImagesLocal(pid);
-      logger.websocket.debug('All images for patient', { patientId: pid, imageCount: allImages.length });
-
       const filteredImages = allImages.filter(img =>
-        ['.i20', '.i22', '.i21'].some(ext => img.name.toLowerCase().endsWith(ext))
+        CHAIR_DISPLAY_INTRAORAL_EXTS.some(ext => img.name.toLowerCase().endsWith(ext))
       );
-
-      const sortOrder = ['.i20', '.i22', '.i21'];
       filteredImages.sort((a, b) => {
-        const aExt = sortOrder.find(ext => a.name.toLowerCase().endsWith(ext)) || '';
-        const bExt = sortOrder.find(ext => b.name.toLowerCase().endsWith(ext)) || '';
-        return sortOrder.indexOf(aExt) - sortOrder.indexOf(bExt);
+        const aExt = CHAIR_DISPLAY_INTRAORAL_EXTS.find(ext => a.name.toLowerCase().endsWith(ext)) || '';
+        const bExt = CHAIR_DISPLAY_INTRAORAL_EXTS.find(ext => b.name.toLowerCase().endsWith(ext)) || '';
+        return CHAIR_DISPLAY_INTRAORAL_EXTS.indexOf(aExt as typeof CHAIR_DISPLAY_INTRAORAL_EXTS[number])
+          - CHAIR_DISPLAY_INTRAORAL_EXTS.indexOf(bExt as typeof CHAIR_DISPLAY_INTRAORAL_EXTS[number]);
       });
 
-      logger.websocket.debug('Filtered images', { patientId: pid, filteredCount: filteredImages.length });
+      const activeWork = await getActiveWork(personId);
+      const isOrtho = !!(activeWork && ORTHO_WORK_TYPE_IDS.has(activeWork.Typeofwork as number));
+      const [latestVisit, patientRecord] = await Promise.all([
+        isOrtho ? getLatestVisitsSum(personId) : Promise.resolve(null),
+        getPatientById(personId),
+      ]);
 
-      const latestVisit = await getLatestVisitsSum(parseInt(pid, 10));
+      const name = patientRecord?.PatientName?.trim() ||
+        [patientRecord?.FirstName, patientRecord?.LastName].filter(Boolean).join(' ').trim() ||
+        null;
 
       const message = createStandardMessage(
-        WebSocketEvents.PATIENT_LOADED,
+        WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,
         {
           pid,
+          name,
           images: filteredImages,
           latestVisit
         }
       );
 
-      const success = connectionManager.sendToScreen(targetScreenID, message);
+      const success = connectionManager.sendToChairDisplay(targetChairId, message);
 
       if (success) {
-        logger.websocket.debug('Sent patient data to screen', { patientId: pid, screenId: targetScreenID });
+        logger.websocket.debug('Sent patient data to chair display', { patientId: pid, chairId: targetChairId, isOrtho });
       } else {
-        logger.websocket.warn('Failed to send patient data', { screenId: targetScreenID });
+        logger.websocket.warn('Failed to send patient data', { chairId: targetChairId });
       }
     } catch (error) {
-      logger.websocket.error('Error processing patient loaded event', error as Error);
+      logger.websocket.error('Error processing chair-display patient loaded', error as Error);
     }
 
     async function getPatientImagesLocal(pid: string): Promise<PatientImage[]> {
@@ -825,39 +788,33 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
     }
   };
 
-  emitter.on(WebSocketEvents.PATIENT_LOADED, handlePatientLoaded);
+  emitter.on(WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED, handleChairDisplayPatientLoaded);
 
-  // Patient unloaded event
-  const handlePatientUnloaded = (targetScreenID: string): void => {
-    logger.websocket.info('Patient unloaded event', { screenId: targetScreenID });
+  // Chair-display: patient cleared
+  const handleChairDisplayPatientCleared = (targetChairId: string): void => {
+    logger.websocket.info('Chair-display patient cleared', { chairId: targetChairId });
 
-    const screenConnection = connectionManager.screenConnections.get(targetScreenID);
-    if (!screenConnection || screenConnection.readyState !== WebSocket.OPEN) {
-      logger.websocket.debug('Screen not connected', { screenId: targetScreenID });
-      return;
-    }
-
-    const capabilities = connectionManager.clientCapabilities.get(screenConnection);
-    if (!capabilities || capabilities.type !== 'screen') {
-      logger.websocket.debug('Not an appointments screen', { screenId: targetScreenID });
+    const chairConnection = connectionManager.chairDisplayConnections.get(targetChairId);
+    if (!chairConnection || chairConnection.readyState !== WebSocket.OPEN) {
+      logger.websocket.debug('Chair display not connected', { chairId: targetChairId });
       return;
     }
 
     const message = createStandardMessage(
-      WebSocketEvents.PATIENT_UNLOADED,
+      WebSocketEvents.CHAIR_DISPLAY_PATIENT_CLEARED,
       {}
     );
 
-    const success = connectionManager.sendToScreen(targetScreenID, message);
+    const success = connectionManager.sendToChairDisplay(targetChairId, message);
 
     if (success) {
-      logger.websocket.debug('Sent patient unloaded', { screenId: targetScreenID });
+      logger.websocket.debug('Sent patient cleared', { chairId: targetChairId });
     } else {
-      logger.websocket.warn('Failed to send patient unloaded', { screenId: targetScreenID });
+      logger.websocket.warn('Failed to send patient cleared', { chairId: targetChairId });
     }
   };
 
-  emitter.on(WebSocketEvents.PATIENT_UNLOADED, handlePatientUnloaded);
+  emitter.on(WebSocketEvents.CHAIR_DISPLAY_PATIENT_CLEARED, handleChairDisplayPatientCleared);
 
   // WhatsApp message updates with batching
   const statusUpdateBuffer = new Map<string, Array<{ messageId: string; status: string }>>();

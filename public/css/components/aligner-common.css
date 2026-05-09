@@ -337,37 +337,39 @@
 
 /* ===========================================
    BUTTON VARIANTS (Drawer-specific)
+   Scoped to .drawer-container so the canonical .btn-* definitions in
+   buttons.css remain authoritative everywhere outside aligner drawers.
    =========================================== */
 
-.btn-primary {
+.drawer-container .btn-primary {
     background: var(--blue-300);
     color: white;
 }
 
-.btn-primary:hover {
+.drawer-container .btn-primary:hover {
     background: var(--blue-800);
 }
 
-.btn-primary:disabled {
+.drawer-container .btn-primary:disabled {
     background: var(--gray-300);
     cursor: not-allowed;
 }
 
-.btn-secondary {
+.drawer-container .btn-secondary {
     background: var(--gray-200);
     color: var(--text-color);
 }
 
-.btn-secondary:hover {
+.drawer-container .btn-secondary:hover {
     background: var(--gray-300);
 }
 
-.btn-danger {
+.drawer-container .btn-danger {
     background: var(--error-color);
     color: white;
 }
 
-.btn-danger:hover {
+.drawer-container .btn-danger:hover {
     background: var(--error-500);
 }
 

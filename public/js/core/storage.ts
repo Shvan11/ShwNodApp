@@ -109,33 +109,39 @@ export function clear(): boolean {
   }
 }
 
+const CHAIR_ID_KEY = 'chairId';
+
+const CHAIR_ID_PATTERN = /^([1-9]|10)$/;
+
 /**
- * Get or set the screen ID
- * @param newId - New screen ID to set (optional)
- * @returns Current screen ID
+ * Get the chair ID for this PC.
+ *
+ * Returns the stored value (string '1'..'10'), or `null` if unset. This is a
+ * pure synchronous getter — no prompt. The chair ID is configured via the
+ * Settings UI on chair PCs, and left unset on non-chair PCs (admin laptops, etc).
  */
-export function screenId(newId?: string): string {
-  const SCREEN_ID_KEY = 'screenId';
+export function chairId(): string | null {
+  // getItem runs JSON.parse, so a stored "1" comes back as the number 1.
+  // Coerce to string and validate against the 1–10 range.
+  const stored = getItem<unknown>(CHAIR_ID_KEY);
+  if (stored === null || stored === undefined || stored === '') return null;
+  const str = String(stored);
+  return CHAIR_ID_PATTERN.test(str) ? str : null;
+}
 
-  // Set new ID if provided
-  if (newId) {
-    setItem(SCREEN_ID_KEY, newId);
-    return newId;
+/**
+ * Set the chair ID for this PC. Pass an empty string or null to clear it.
+ * Validates 1-10. Invalid values are rejected (returns false).
+ */
+export function setChairId(value: string | number | null | undefined): boolean {
+  if (value === null || value === undefined || value === '') {
+    return removeItem(CHAIR_ID_KEY);
   }
-
-  // Get existing ID
-  let existingId = getItem<string>(SCREEN_ID_KEY);
-
-  if (!existingId) {
-    // If no ID exists, prompt user to input screen ID
-    const userInput = window.prompt('Which screen is this PC connected to?');
-    existingId = userInput ? userInput.trim() : 'unknown';
-
-    // Store in storage
-    setItem(SCREEN_ID_KEY, existingId);
+  const str = String(value).trim();
+  if (!CHAIR_ID_PATTERN.test(str)) {
+    return false;
   }
-
-  return existingId;
+  return setItem(CHAIR_ID_KEY, str);
 }
 
 export default {
@@ -143,5 +149,6 @@ export default {
   setItem,
   removeItem,
   clear,
-  screenId,
+  chairId,
+  setChairId,
 };

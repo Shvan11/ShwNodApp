@@ -30,8 +30,9 @@ import type { EventEmitter } from 'events';
 
 // Import all route modules
 // Note: Routes that haven't been migrated yet use .js, migrated ones use .js (ESM resolution)
-import patientRoutes, { setWebSocketEmitter as setPatientWS } from './patient.routes.js';
+import patientRoutes from './patient.routes.js';
 import appointmentRoutes, { setWebSocketEmitter as setAppointmentWS } from './appointment.routes.js';
+import chairDisplayRoutes, { setWebSocketEmitter as setChairDisplayWS } from './chair-display.routes.js';
 import paymentRoutes from './payment.routes.js';
 import workRoutes from './work.routes.js';
 import visitRoutes from './visit.routes.js';
@@ -69,8 +70,8 @@ export function setWebSocketEmitter(emitter: EventEmitter): void {
   wsEmitter = emitter;
 
   // Inject WebSocket emitter into modules that need it
-  setPatientWS(emitter);
   setAppointmentWS(emitter);
+  setChairDisplayWS(emitter);
   setWhatsappWS(emitter);
   setMessagingWS(emitter);
 }
@@ -84,6 +85,7 @@ router.use('/templates', templateRouter);
 // Core entity routes
 router.use('/', patientRoutes);       // Patient management
 router.use('/', appointmentRoutes);   // Appointment scheduling
+router.use('/', chairDisplayRoutes);  // Chair-side public display events
 router.use('/', paymentRoutes);       // Payments and invoices
 router.use('/', workRoutes);          // Treatment work/plans
 router.use('/', visitRoutes);         // Visit tracking

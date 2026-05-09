@@ -133,8 +133,8 @@ export type {
   // Event data types
   ConnectionEstablishedData,
   AppointmentUpdateData,
-  PatientLoadedData,
-  PatientUnloadedData,
+  ChairDisplayPatientLoadedData,
+  ChairDisplayPatientClearedData,
 
   // WhatsApp types
   WhatsAppMessageStatusValue,

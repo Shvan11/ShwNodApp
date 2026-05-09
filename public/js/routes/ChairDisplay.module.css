@@ -1,0 +1,219 @@
+.root {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(135deg, #f6f8fb 0%, #e9eef5 100%);
+    color: #1f2933;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+}
+
+.chairBadge {
+    position: absolute;
+    top: 1.25rem;
+    left: 1.25rem;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--primary-color, #007bff);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    z-index: 10;
+}
+
+.connectionBadge {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    z-index: 10;
+}
+
+.connectionConnected {
+    background: rgba(40, 167, 69, 0.12);
+    color: #197131;
+}
+
+.connectionLost {
+    background: rgba(220, 53, 69, 0.14);
+    color: #b1182f;
+}
+
+.notConfigured {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    padding: 2rem;
+}
+
+.notConfigured h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #6c757d;
+}
+
+.notConfigured p {
+    font-size: 1.2rem;
+    color: #6c757d;
+    max-width: 50ch;
+    line-height: 1.5;
+}
+
+.notConfigured code {
+    background: rgba(0, 0, 0, 0.06);
+    padding: 0.2em 0.5em;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 0.95em;
+    color: #1f2933;
+}
+
+.idle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 2rem;
+}
+
+.idleClockWrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.clinicCaption {
+    font-size: clamp(1.5rem, 4vw, 2.4rem);
+    font-weight: 300;
+    color: #495057;
+    letter-spacing: 0.04em;
+    text-align: center;
+}
+
+.clinicCaption strong {
+    color: var(--primary-color, #007bff);
+    font-weight: 600;
+}
+
+.patientView {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    height: 100%;
+    /* top padding clears the absolutely-positioned .chairBadge (top: 1.25rem,
+       ~2rem tall) so it never sits on top of the "Now Seeing" label. */
+    padding: 4rem 2rem 1.5rem;
+    gap: 1.5rem;
+}
+
+.patientHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 2rem;
+}
+
+.patientHeaderLeft {
+    flex: 1;
+    min-width: 0;
+}
+
+.patientLabel {
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #6c757d;
+    margin-bottom: 0.4rem;
+}
+
+.patientName {
+    font-size: clamp(2rem, 4.5vw, 3.2rem);
+    font-weight: 700;
+    color: #1f2933;
+    line-height: 1.1;
+    margin: 0;
+}
+
+.cornerClock {
+    flex-shrink: 0;
+}
+
+.imagesGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+    align-items: center;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.imagesGrid img {
+    width: 100%;
+    height: 100%;
+    max-height: 60vh;
+    object-fit: contain;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    background: #fff;
+}
+
+.noImages {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 30vh;
+    color: #6c757d;
+    font-size: 1.2rem;
+}
+
+.visitNote {
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    border-left: 4px solid var(--primary-color, #007bff);
+}
+
+.visitNoteLabel {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--primary-color, #007bff);
+    margin-bottom: 0.4rem;
+}
+
+.visitNoteContent {
+    font-size: 1.1rem;
+    line-height: 1.5;
+    color: #1f2933;
+    word-wrap: break-word;
+}
+
+/* The SP wraps the "Next: …" line in <font color=blue>; renderVisitSummary
+   rewrites it to <span class="visit-next"> for safe colored emphasis. */
+.visitNoteContent :global(.visit-next) {
+    color: var(--primary-color, #007bff);
+    font-weight: 600;
+}
+
+@media (max-width: 900px) {
+    .imagesGrid {
+        grid-template-columns: 1fr;
+    }
+    .patientView {
+        padding: 1rem;
+    }
+}

@@ -42,26 +42,14 @@ export const WebSocketEvents = {
   APPOINTMENTS_DATA: 'appointments_data',
 
   // ===========================================
-  // PATIENT MANAGEMENT EVENTS
+  // CHAIR DISPLAY EVENTS
   // ===========================================
 
-  /** Patient data loaded and displayed */
-  PATIENT_LOADED: 'patient_loaded',
+  /** Patient data loaded for chair-side public display */
+  CHAIR_DISPLAY_PATIENT_LOADED: 'chair_display_patient_loaded',
 
-  /** Patient data unloaded/cleared */
-  PATIENT_UNLOADED: 'patient_unloaded',
-
-  /** Request patient data */
-  REQUEST_PATIENT: 'request_patient',
-
-  /** Patient data response */
-  PATIENT_DATA: 'patient_data',
-
-  /** Patient images loaded */
-  PATIENT_IMAGES_LOADED: 'patient_images_loaded',
-
-  /** Patient visit data updated */
-  PATIENT_VISIT_UPDATED: 'patient_visit_updated',
+  /** Chair-side public display should clear patient data */
+  CHAIR_DISPLAY_PATIENT_CLEARED: 'chair_display_patient_cleared',
 
   // ===========================================
   // WHATSAPP MESSAGING EVENTS
@@ -124,7 +112,7 @@ export type WebSocketEventKey = keyof typeof WebSocketEvents;
 export interface EventsByCategory {
   connection: WebSocketEventType[];
   appointments: WebSocketEventType[];
-  patient: WebSocketEventType[];
+  chairDisplay: WebSocketEventType[];
   whatsapp: WebSocketEventType[];
   system: WebSocketEventType[];
 }
@@ -157,13 +145,9 @@ export function getEventsByCategory(): EventsByCategory {
       WebSocketEvents.REQUEST_APPOINTMENTS,
       WebSocketEvents.APPOINTMENTS_DATA,
     ],
-    patient: [
-      WebSocketEvents.PATIENT_LOADED,
-      WebSocketEvents.PATIENT_UNLOADED,
-      WebSocketEvents.REQUEST_PATIENT,
-      WebSocketEvents.PATIENT_DATA,
-      WebSocketEvents.PATIENT_IMAGES_LOADED,
-      WebSocketEvents.PATIENT_VISIT_UPDATED,
+    chairDisplay: [
+      WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,
+      WebSocketEvents.CHAIR_DISPLAY_PATIENT_CLEARED,
     ],
     whatsapp: [
       WebSocketEvents.WHATSAPP_CLIENT_READY,

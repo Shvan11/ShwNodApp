@@ -69,13 +69,9 @@ export const WebSocketEvents = {
   REQUEST_APPOINTMENTS: 'request_appointments',
   APPOINTMENTS_DATA: 'appointments_data',
 
-  // Patient Management
-  PATIENT_LOADED: 'patient_loaded',
-  PATIENT_UNLOADED: 'patient_unloaded',
-  REQUEST_PATIENT: 'request_patient',
-  PATIENT_DATA: 'patient_data',
-  PATIENT_IMAGES_LOADED: 'patient_images_loaded',
-  PATIENT_VISIT_UPDATED: 'patient_visit_updated',
+  // Chair-side public display
+  CHAIR_DISPLAY_PATIENT_LOADED: 'chair_display_patient_loaded',
+  CHAIR_DISPLAY_PATIENT_CLEARED: 'chair_display_patient_cleared',
 
   // WhatsApp Messaging
   WHATSAPP_CLIENT_READY: 'whatsapp_client_ready',
@@ -122,20 +118,20 @@ export interface AppointmentUpdateData {
 }
 
 /**
- * Patient loaded event data
+ * Chair-display: patient loaded event payload
  */
-export interface PatientLoadedData {
-  personId: number;
-  patientName: string;
-  timestamp: number;
+export interface ChairDisplayPatientLoadedData {
+  pid: string;
+  images: Array<{ name: string }>;
+  latestVisit: unknown | null;
 }
 
 /**
- * Patient unloaded event data
+ * Chair-display: patient cleared event payload (intentionally empty)
  */
-export interface PatientUnloadedData {
-  personId: number;
-  timestamp: number;
+export interface ChairDisplayPatientClearedData {
+  // no fields
+  [key: string]: never;
 }
 
 // ===========================================

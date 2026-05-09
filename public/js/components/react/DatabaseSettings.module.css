@@ -255,13 +255,16 @@
 }
 
 .btnSecondary {
-    background: var(--gray-100);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
+    background: var(--secondary-color);
+    color: white;
+    border: 1px solid var(--secondary-color);
 }
 
 .btnSecondary:hover:not(:disabled) {
-    background: var(--gray-200);
+    background: var(--secondary-hover);
+    border-color: var(--secondary-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
 }
 
 .btnWarning {

@@ -1,7 +1,38 @@
+import { useEffect } from 'react';
 import { useParams, useSearchParams, Link, useLoaderData } from 'react-router-dom';
 import Navigation from './Navigation';
 import ContentRenderer from './ContentRenderer';
+import storage from '../../core/storage';
 import type { PatientShellLoaderResult } from '../../router/loaders';
+
+/**
+ * Fire-and-forget POST to the chair-display endpoint. Uses navigator.sendBeacon
+ * (the textbook fire-and-forget primitive) so the call cannot block the JS
+ * thread, never delays the staff workflow, and survives the page unloading.
+ * Falls back to fetch with keepalive if sendBeacon is unavailable. Errors are
+ * silently swallowed — chair-display is non-critical and must never disrupt
+ * the main app.
+ */
+const notifyChairDisplay = (path: '/api/chair-display/patient-loaded' | '/api/chair-display/patient-cleared', payload: object): void => {
+    try {
+        const body = JSON.stringify(payload);
+        if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+            const blob = new Blob([body], { type: 'application/json' });
+            navigator.sendBeacon(path, blob);
+            return;
+        }
+        // Fallback: still non-blocking (no await), keepalive survives unload
+        void fetch(path, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body,
+            keepalive: true,
+            credentials: 'same-origin',
+        }).catch(() => { /* swallow */ });
+    } catch {
+        /* swallow — chair display is non-critical */
+    }
+};
 
 // CSS Module for PatientShell
 import styles from './PatientShell.module.css';
@@ -55,6 +86,24 @@ const PatientShell = () => {
 
     // Validated PersonID from loader data (null if invalid or new patient)
     const validatedPersonId = patient?.PersonID ?? null;
+
+    // Notify the chair-side public display (if this PC is configured as a chair)
+    // when a patient is opened/closed. Fire-and-forget via sendBeacon — never
+    // blocks the main app, even when the server is unreachable.
+    useEffect(() => {
+        if (validatedPersonId === null) return;
+        const chairId = storage.chairId();
+        if (!chairId) return;
+
+        notifyChairDisplay('/api/chair-display/patient-loaded', {
+            chairId,
+            personId: validatedPersonId,
+        });
+
+        return () => {
+            notifyChairDisplay('/api/chair-display/patient-cleared', { chairId });
+        };
+    }, [validatedPersonId]);
 
     // Patient display name from loader data
     const patientName = isNewPatient
