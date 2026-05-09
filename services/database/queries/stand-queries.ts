@@ -441,7 +441,7 @@ export async function addStandItem(data: StandItemCreateData): Promise<{ ItemID:
     ['costPrice', TYPES.Int, data.costPrice],
     ['sellPrice', TYPES.Int, data.sellPrice],
     ['currentStock', TYPES.Int, initialStock],
-    ['reorderLevel', TYPES.Int, data.reorderLevel ?? 5],
+    ['reorderLevel', TYPES.Int, data.reorderLevel ?? 1],
     ['expiryDate', TYPES.Date, data.expiryDate || null],
     ['unit', TYPES.NVarChar, data.unit || null],
     ['notes', TYPES.NVarChar, data.notes || null],

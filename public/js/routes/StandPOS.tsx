@@ -110,8 +110,8 @@ export default function StandPOS() {
           <div className={styles.scanSection}>
             <h2>Add Items</h2>
             <div className={styles.scanInputs}>
-              <BarcodeInput onScan={handleBarcodeScan} placeholder="Scan barcode or type..." />
               <POSItemSearch onSelect={addToCart} />
+              <BarcodeInput onScan={handleBarcodeScan} placeholder="Scan barcode or type..." />
             </div>
           </div>
 

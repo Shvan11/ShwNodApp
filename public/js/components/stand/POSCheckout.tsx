@@ -30,6 +30,7 @@ const POSCheckout: React.FC<POSCheckoutProps> = ({
   disabled = false,
 }) => {
   const [amountPaidRaw, setAmountPaidRaw] = useState('');
+  const [amountPaidEdited, setAmountPaidEdited] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [customerNote, setCustomerNote] = useState('');
 
@@ -70,6 +71,16 @@ const POSCheckout: React.FC<POSCheckoutProps> = ({
       }
     };
   }, []);
+
+  // Pre-fill Amount Paid with cart total; reset on cart clear; preserve user edits
+  useEffect(() => {
+    if (total === 0) {
+      setAmountPaidRaw('');
+      setAmountPaidEdited(false);
+    } else if (!amountPaidEdited) {
+      setAmountPaidRaw(formatNumber(total));
+    }
+  }, [total, amountPaidEdited]);
 
   const searchPatients = useCallback(async (query: string) => {
     if (query.length < 2) {
@@ -131,6 +142,7 @@ const POSCheckout: React.FC<POSCheckoutProps> = ({
       // Allow digits and commas only
       const value = e.target.value.replace(/[^0-9,]/g, '');
       setAmountPaidRaw(value);
+      setAmountPaidEdited(true);
     },
     []
   );

@@ -114,7 +114,7 @@ const DEFAULT_FORM: FormData = {
   costPrice: 0,
   sellPrice: 0,
   currentStock: 0,
-  reorderLevel: 5,
+  reorderLevel: 1,
   expiryDate: '',
   unit: '',
   notes: '',
