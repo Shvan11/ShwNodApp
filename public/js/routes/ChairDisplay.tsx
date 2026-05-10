@@ -202,7 +202,6 @@ const ChairDisplay = () => {
                                     key={img.name}
                                     src={`/DolImgs/${img.name}`}
                                     alt={`Intraoral ${img.name}`}
-                                    loading="lazy"
                                 />
                             ))
                         )}
