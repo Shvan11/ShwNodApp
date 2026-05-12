@@ -19,6 +19,14 @@
     --background-light: #ffffff;
     --border-color: #cccccc;
 
+    /* Semantic surface tokens — used by modal content, cards, toasts, lookup
+       editor, route-error, appointment calendar, etc. Map to the white/gray
+       surface scale so `background: var(--background-primary)` resolves to
+       an opaque elevated surface instead of falling back to transparent. */
+    --background-primary: #ffffff;
+    --background-secondary: #f9fafb;
+    --background-tertiary: #f3f4f6;
+
     /* Gradients (from your existing CSS) */
     --gradient-primary: linear-gradient(45deg, #9cc4c2, #ffffff);
     --gradient-secondary: linear-gradient(45deg, #aedfd0, #ffffff);
@@ -362,6 +370,57 @@
     /* Layout dimensions */
     --header-height: 50px;
     /* Universal header height */
+
+    /* ===================================================================
+       Component-CSS back-compat tokens
+       These names are referenced from existing component stylesheets but
+       were never canonical here. Defined as aliases pointing at the
+       canonical token so the call sites resolve correctly.
+       =================================================================== */
+
+    /* Surface aliases */
+    --bg-light: var(--gray-50);
+    --bg-muted: #f5f7fb;
+    --bg-secondary: var(--gray-100);
+    --table-header-bg: var(--gray-100);
+    --white: #ffffff;
+
+    /* Text aliases */
+    --text-dark: var(--text-primary);
+    --text-medium: var(--gray-600);
+    --text-muted: var(--gray-400);
+
+    /* Primary scale (blue-tinted; matches existing --blue-* scale) */
+    --primary-50: #eff6ff;
+    --primary-100: #dbeafe;
+    --primary-300: var(--blue-300);
+    --primary-700: var(--blue-700);
+    --primary-dark: var(--primary-hover);
+    --primary-color-dark: var(--primary-hover);
+
+    /* Blue scale fills (extends existing --blue-* set) */
+    --blue-100: #dbeafe;
+    --blue-200: #bfdbfe;
+    --blue-600: #2563eb;
+
+    /* Amber scale (warning-adjacent; used for advisory states) */
+    --amber-50: #fffbeb;
+    --amber-300: #fcd34d;
+    --amber-600: #d97706;
+    --amber-800: #92400e;
+
+    /* Purple / accent */
+    --purple-500: #8b5cf6;
+    --accent-dark: var(--success-green);
+
+    /* WhatsApp brand */
+    --whatsapp-dark: #128C7E;
+
+    /* Misc */
+    --error-alpha: rgba(220, 53, 69, 0.25);
+    --font-family-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
+    --border-radius: var(--radius-md);
+    --spacing-2xl: var(--spacing-xxl);
 }
 
 /* RTL (Right-to-Left) Support */

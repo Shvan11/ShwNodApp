@@ -5,7 +5,7 @@
  * Memoized to prevent unnecessary re-renders when props haven't changed
  */
 
-import React, { useState, useEffect, useRef, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect, useMemo, useRef, ChangeEvent, FormEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import Modal from './Modal';
 
@@ -225,20 +225,26 @@ const CompareComponent = ({ personId, phone }: Props) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [canvasSize, setCanvasSize] = useState('auto');
-    const [selectedTool, setSelectedTool] = useState(1);
+    const [selectedTool, setSelectedTool] = useState(0);
     const [comparison, setComparison] = useState<ComparisonHandler | null>(null);
     const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
     const [phoneNumber, setPhoneNumber] = useState(phone || '');
     const [sendingMessage, setSendingMessage] = useState(false);
     const [showLogo, setShowLogo] = useState(true);
     const [canvasDimensions, setCanvasDimensions] = useState<CanvasDimensions>({ width: 800, height: 600 });
+    const [slideshowActive, setSlideshowActive] = useState(false);
+    const [slideshowIndex, setSlideshowIndex] = useState(0);
 
     // Canvas ref for comparison
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const fullscreenRef = useRef<HTMLDivElement>(null);
     const svgRef = useRef<SVGSVGElement>(null);
     const dragRef = useRef<DragState | null>(null);
+    const isSharingRef = useRef(false);
+    const canNativeShare = typeof navigator !== 'undefined' && 'share' in navigator && 'canShare' in navigator;
     const [displaySize, setDisplaySize] = useState<{ width: number; height: number }>({ width: 800, height: 600 });
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const [, setBoxVersion] = useState(0);
     const bumpBox = () => setBoxVersion(v => v + 1);
 
@@ -264,8 +270,9 @@ const CompareComponent = ({ personId, phone }: Props) => {
         { value: '{"width":2060,"height":2700}', label: '2060 × 2700' }
     ];
 
-    // Tool selection options
+    // Tool selection options (0 = no selection — bounding box hidden, manipulation buttons disabled)
     const tools: Tool[] = [
+        { value: 0, label: '— None (Deselect) —' },
         { value: 1, label: 'Image 1' },
         { value: 2, label: 'Image 2' },
         { value: 3, label: 'Logo' }
@@ -286,6 +293,17 @@ const CompareComponent = ({ personId, phone }: Props) => {
             loadComparisonImages();
         }
     }, [selectedTimepoints, selectedPhotoType, comparison]);
+
+    // Clear selectedPhotoType if the user changes a timepoint and the previously-
+    // chosen photo type is no longer present in both. Prevents the canvas from
+    // attempting to render a missing image (404).
+    useEffect(() => {
+        if (!selectedPhotoType || selectedTimepoints.length !== 2) return;
+        const current = photoTypes.find(p => p.id === selectedPhotoType);
+        if (current && !isPhotoTypeAvailable(current.code)) {
+            setSelectedPhotoType('');
+        }
+    }, [selectedTimepoints, timepointImages]);
 
     useEffect(() => {
         if (comparison) {
@@ -314,6 +332,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
         if (!wrapper || !comparison) return;
         const handler = (e: WheelEvent) => {
             if (comparison.images.length < 2) return;
+            if (comparison.selectedImage === 0) return;
             e.preventDefault();
             comparison.zoomImage(e.deltaY < 0 ? 'in' : 'out');
             bumpBox();
@@ -331,20 +350,178 @@ const CompareComponent = ({ personId, phone }: Props) => {
         }
     }, [canvasRef.current]);
 
-    // Helper function to check if a photo type is available
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            const inFullscreen = document.fullscreenElement === fullscreenRef.current;
+            setIsFullscreen(inFullscreen);
+            // System gesture / F11 exit while slideshow was active: end the slideshow too
+            if (!inFullscreen) setSlideshowActive(false);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
+    const deselect = () => {
+        setSelectedTool(0);
+        if (comparison) comparison.selectedImage = 0;
+    };
+
+    const selectTool = (toolValue: number) => {
+        setSelectedTool(toolValue);
+        if (comparison) comparison.selectedImage = toolValue;
+    };
+
+    const toggleFullscreen = async () => {
+        if (!fullscreenRef.current) return;
+        try {
+            if (document.fullscreenElement) {
+                await document.exitFullscreen();
+            } else {
+                await fullscreenRef.current.requestFullscreen();
+            }
+        } catch (err) {
+            toast.error('Fullscreen not supported: ' + (err instanceof Error ? err.message : 'Unknown error'));
+        }
+    };
+
+    const buildExportFileName = (): string => {
+        const ts = new Date().toISOString().slice(0, 10);
+        return personId ? `comparison_${personId}_${ts}.png` : `comparison_${ts}.png`;
+    };
+
+    // Sync conversion from data URI to Blob — preserves the user gesture chain
+    // through navigator.share(). Mirrors the share approach used in GridComponent.
+    const dataURItoBlob = (dataURI: string): Blob => {
+        const [header, data] = dataURI.split(',');
+        const mime = header.match(/:(.*?);/)?.[1] || 'image/png';
+        const binary = atob(data);
+        const array = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+        return new Blob([array], { type: mime });
+    };
+
+    const handleSave = () => {
+        if (!comparison) return;
+        try {
+            const dataURI = comparison.toDataURL();
+            const a = document.createElement('a');
+            a.href = dataURI;
+            a.download = buildExportFileName();
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            toast.success('Comparison saved');
+        } catch (err) {
+            toast.error('Failed to save: ' + (err instanceof Error ? err.message : 'Unknown error'));
+        }
+    };
+
+    // IMPORTANT: Must be synchronous until navigator.share() to preserve user gesture.
+    // Pattern lifted from GridComponent.handleNativeShare which is the working reference.
+    const handleShare = () => {
+        if (isSharingRef.current) return;
+        if (!comparison) return;
+        if (!canNativeShare) {
+            toast.warning('Sharing is not supported on this device');
+            return;
+        }
+        isSharingRef.current = true;
+        try {
+            const dataURI = comparison.toDataURL();
+            const blob = dataURItoBlob(dataURI);
+            const file = new File([blob], buildExportFileName(), { type: 'image/png' });
+            if (!navigator.canShare({ files: [file] })) {
+                toast.warning('Cannot share this file type');
+                isSharingRef.current = false;
+                return;
+            }
+            navigator.share({ files: [file] })
+                .catch((err: Error) => {
+                    if (err.name !== 'AbortError') {
+                        toast.error('Failed to share comparison');
+                    }
+                })
+                .finally(() => {
+                    isSharingRef.current = false;
+                });
+        } catch (err) {
+            toast.error('Failed to share: ' + (err instanceof Error ? err.message : 'Unknown error'));
+            isSharingRef.current = false;
+        }
+    };
+
+    // A pair is selectable only when the image exists in EVERY selected timepoint.
+    // A pending fetch (no entry in timepointImages yet) correctly disables the pair
+    // until the fetch resolves — see fetchTimepointImages which returns [] on failure.
     const isPhotoTypeAvailable = (photoCode: string): boolean => {
         if (selectedTimepoints.length === 0) return true;
-
-        const hasImageData = selectedTimepoints.some(tpCode => timepointImages[tpCode]);
-        if (!hasImageData) return true;
-
-        const allHaveImageData = selectedTimepoints.every(tpCode => timepointImages[tpCode]);
-        if (!allHaveImageData) return true;
-
         return selectedTimepoints.every(tpCode => {
             const images = timepointImages[tpCode];
-            return images && images.includes(photoCode);
+            return Array.isArray(images) && images.includes(photoCode);
         });
+    };
+
+    const availablePhotoTypes = useMemo(
+        () => photoTypes.filter(p => {
+            if (selectedTimepoints.length === 0) return false;
+            return selectedTimepoints.every(tpCode => {
+                const images = timepointImages[tpCode];
+                return Array.isArray(images) && images.includes(p.code);
+            });
+        }),
+        [selectedTimepoints, timepointImages]
+    );
+
+    const startSlideshow = async () => {
+        if (availablePhotoTypes.length === 0) return;
+        setSlideshowIndex(0);
+        setSelectedPhotoType(availablePhotoTypes[0].id);
+        if (comparison) comparison.reset();
+        setSlideshowActive(true);
+        if (fullscreenRef.current && !document.fullscreenElement) {
+            try { await fullscreenRef.current.requestFullscreen(); } catch { /* fall through */ }
+        }
+    };
+
+    const stepSlideshow = (delta: 1 | -1) => {
+        const next = slideshowIndex + delta;
+        if (next < 0 || next >= availablePhotoTypes.length) return;
+        setSlideshowIndex(next);
+        if (comparison) comparison.reset();
+        setSelectedPhotoType(availablePhotoTypes[next].id);
+    };
+
+    const stopSlideshow = async () => {
+        setSlideshowActive(false);
+        if (document.fullscreenElement) {
+            try { await document.exitFullscreen(); } catch { /* ignore */ }
+        }
+    };
+
+    useEffect(() => {
+        const handleKey = (e: KeyboardEvent) => {
+            if (slideshowActive) {
+                if (e.key === 'ArrowRight') { e.preventDefault(); stepSlideshow(1); return; }
+                if (e.key === 'ArrowLeft')  { e.preventDefault(); stepSlideshow(-1); return; }
+                if (e.key === 'Escape')     { e.preventDefault(); stopSlideshow(); return; }
+            } else if (e.key === 'Escape') {
+                deselect();
+            }
+        };
+        document.addEventListener('keydown', handleKey);
+        return () => document.removeEventListener('keydown', handleKey);
+    }, [comparison, slideshowActive, slideshowIndex, availablePhotoTypes]);
+
+    // Returns the list of image codes ('10','12',...) available for the given timepoint.
+    // Empty array on failure — callers use it to disable photo types whose image is missing.
+    const fetchTimepointImages = async (tpCode: number): Promise<string[]> => {
+        try {
+            const response = await fetch(`/api/patients/${personId}/timepoints/${tpCode}/images`);
+            if (!response.ok) return [];
+            return await response.json() as string[];
+        } catch {
+            return [];
+        }
     };
 
     const loadTimepoints = async () => {
@@ -363,14 +540,27 @@ const CompareComponent = ({ personId, phone }: Props) => {
             setTimepoints(data);
 
             // Auto-select first and last timepoints (skip tpCode 0)
+            let autoSelected: number[] = [];
             if (data.length >= 2) {
                 const validTimepoints = data.filter(tp => tp.tpCode > 0);
 
                 if (validTimepoints.length >= 2) {
-                    setSelectedTimepoints([validTimepoints[0].tpCode, validTimepoints[validTimepoints.length - 1].tpCode]);
+                    autoSelected = [validTimepoints[0].tpCode, validTimepoints[validTimepoints.length - 1].tpCode];
                 } else if (validTimepoints.length === 1 && data.length >= 2) {
-                    setSelectedTimepoints([data[0].tpCode, data[1].tpCode]);
+                    autoSelected = [data[0].tpCode, data[1].tpCode];
                 }
+            }
+
+            if (autoSelected.length > 0) {
+                setSelectedTimepoints(autoSelected);
+                // Pre-fetch image lists so isPhotoTypeAvailable can correctly disable
+                // photo types missing in either timepoint on initial render.
+                const results = await Promise.all(autoSelected.map(tp => fetchTimepointImages(tp)));
+                setTimepointImages(prev => {
+                    const next = { ...prev };
+                    autoSelected.forEach((tp, i) => { next[tp] = results[i]; });
+                    return next;
+                });
             }
         } catch (err) {
             console.error('Error loading timepoints:', err);
@@ -399,7 +589,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
             },
             orientation: 'vertical',
             showBisect: false,
-            selectedImage: 1,
+            selectedImage: 0,
             showLogo: showLogo,
             updateDimensions: setCanvasDimensions,
             originalDimensions: {
@@ -616,8 +806,13 @@ const CompareComponent = ({ personId, phone }: Props) => {
 
                     ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
                 } else {
-                    // Standard mode with transforms
+                    // Standard mode with transforms - clip to container so the
+                    // image cannot bleed into the other half of the canvas.
                     ctx.save();
+                    ctx.beginPath();
+                    ctx.rect(x, y, width, height);
+                    ctx.clip();
+
                     ctx.translate(x + width / 2 + transform.x, y + height / 2 + transform.y);
                     ctx.rotate(transform.rotation * Math.PI / 180);
                     ctx.scale(transform.scale, transform.scale);
@@ -677,12 +872,14 @@ const CompareComponent = ({ personId, phone }: Props) => {
                 const lineWidth = Math.max(2, Math.round(refDim / 400));
                 const dashOn = Math.max(10, Math.round(refDim / 80));
                 const dashOff = Math.max(5, Math.round(refDim / 160));
+                const crossArm = Math.max(12, Math.round(refDim / 30));
 
                 ctx.save();
                 ctx.strokeStyle = 'rgba(255, 0, 0, 0.9)';
                 ctx.lineWidth = lineWidth;
-                ctx.setLineDash([dashOn, dashOff]);
 
+                // Dashed bisecting line splitting the two halves
+                ctx.setLineDash([dashOn, dashOff]);
                 ctx.beginPath();
                 if (this.orientation === 'vertical') {
                     ctx.moveTo(0, canvas.height / 2);
@@ -692,13 +889,33 @@ const CompareComponent = ({ personId, phone }: Props) => {
                     ctx.lineTo(canvas.width / 2, canvas.height);
                 }
                 ctx.stroke();
+
+                // Solid centered cross in each half — alignment reference markers
+                ctx.setLineDash([]);
+                const drawCross = (cx: number, cy: number) => {
+                    ctx.beginPath();
+                    ctx.moveTo(cx - crossArm, cy);
+                    ctx.lineTo(cx + crossArm, cy);
+                    ctx.moveTo(cx, cy - crossArm);
+                    ctx.lineTo(cx, cy + crossArm);
+                    ctx.stroke();
+                };
+                if (this.orientation === 'vertical') {
+                    drawCross(canvas.width / 2, canvas.height / 4);
+                    drawCross(canvas.width / 2, (canvas.height * 3) / 4);
+                } else {
+                    drawCross(canvas.width / 4, canvas.height / 2);
+                    drawCross((canvas.width * 3) / 4, canvas.height / 2);
+                }
+
                 ctx.restore();
             },
 
             // Control methods
             moveImage: function(direction: string, amount: number = 10) {
-                const key = this.selectedImage === 1 ? 'img1' : this.selectedImage === 2 ? 'img2' : 'logo';
-                const transform = this.transform[key as keyof TransformState];
+                const key = KEY_FOR_TOOL[this.selectedImage];
+                if (!key) return;
+                const transform = this.transform[key];
 
                 switch (direction) {
                     case 'left': transform.x -= amount; break;
@@ -710,8 +927,9 @@ const CompareComponent = ({ personId, phone }: Props) => {
             },
 
             zoomImage: function(direction: string) {
-                const key = this.selectedImage === 1 ? 'img1' : this.selectedImage === 2 ? 'img2' : 'logo';
-                const transform = this.transform[key as keyof TransformState];
+                const key = KEY_FOR_TOOL[this.selectedImage];
+                if (!key) return;
+                const transform = this.transform[key];
                 const factor = direction === 'in' ? 1.1 : 0.9;
 
                 transform.scale *= factor;
@@ -720,8 +938,9 @@ const CompareComponent = ({ personId, phone }: Props) => {
             },
 
             rotateImage: function(direction: string) {
-                const key = this.selectedImage === 1 ? 'img1' : this.selectedImage === 2 ? 'img2' : 'logo';
-                const transform = this.transform[key as keyof TransformState];
+                const key = KEY_FOR_TOOL[this.selectedImage];
+                if (!key) return;
+                const transform = this.transform[key];
                 const amount = direction === 'clockwise' ? 1 : -1;
 
                 transform.rotation += amount;
@@ -757,9 +976,14 @@ const CompareComponent = ({ personId, phone }: Props) => {
                     logo: { x: 0, y: 0, scale: 1, rotation: 0 }
                 };
 
-                // Reset canvas to original dimensions
-                const canvas = this.canvas;
-                if (this.originalDimensions) {
+                // In auto mode, recompute canvas + autoImageSize from the actual
+                // images so reset restores the same layout the user first saw.
+                // Falling back to originalDimensions here would leave a stale
+                // autoImageSize and draw the images huge on a tiny canvas.
+                if (this.autoMode && this.images.length >= 2) {
+                    this.resizeCanvasToFitImages();
+                } else if (this.originalDimensions) {
+                    const canvas = this.canvas;
                     canvas.width = this.originalDimensions.width;
                     canvas.height = this.originalDimensions.height;
                     if (this.updateDimensions) {
@@ -836,22 +1060,9 @@ const CompareComponent = ({ personId, phone }: Props) => {
                 return;
             }
 
-            try {
-                const response = await fetch(`/api/patients/${personId}/timepoints/${tpCode}/images`);
-                let images: string[];
-                if (!response.ok) {
-                    images = ['10', '12', '13', '20', '21', '22', '23', '24'];
-                } else {
-                    images = await response.json();
-                }
-
-                setTimepointImages(prev => ({ ...prev, [tpCode]: images }));
-                setSelectedTimepoints([...selectedTimepoints, tpCode]);
-            } catch {
-                const defaultImages = ['10', '12', '13', '20', '21', '22', '23', '24'];
-                setTimepointImages(prev => ({ ...prev, [tpCode]: defaultImages }));
-                setSelectedTimepoints([...selectedTimepoints, tpCode]);
-            }
+            const images = await fetchTimepointImages(tpCode);
+            setTimepointImages(prev => ({ ...prev, [tpCode]: images }));
+            setSelectedTimepoints([...selectedTimepoints, tpCode]);
         } else {
             setSelectedTimepoints(selectedTimepoints.filter(tp => tp !== tpCode));
         }
@@ -1011,7 +1222,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
         const dashOff = 4 * dpi;
 
         const allKeys: ImageKey[] = ['img1', 'img2', 'logo'];
-        const selectedKey: ImageKey = KEY_FOR_TOOL[selectedTool] ?? 'img1';
+        const selectedKey: ImageKey | null = KEY_FOR_TOOL[selectedTool] ?? null;
 
         type Geom = { rect: ImageRect; drawSize: DrawSize; corners: Point[]; transform: Transform };
         const geom = new Map<ImageKey, Geom>();
@@ -1036,7 +1247,9 @@ const CompareComponent = ({ personId, phone }: Props) => {
             geom.set(key, { rect, drawSize, corners, transform });
         }
 
-        const ordered: ImageKey[] = [...allKeys.filter(k => k !== selectedKey), selectedKey];
+        const ordered: ImageKey[] = selectedKey
+            ? [...allKeys.filter(k => k !== selectedKey), selectedKey]
+            : allKeys;
         const stroke = 'rgba(0, 123, 255, 0.95)';
 
         return (
@@ -1053,6 +1266,15 @@ const CompareComponent = ({ personId, phone }: Props) => {
                 viewBox={`0 0 ${canvasDimensions.width} ${canvasDimensions.height}`}
                 preserveAspectRatio="none"
             >
+                <style>{`
+                    .cmp-rotate-zone {
+                        cursor: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 12 A 7 7 0 1 1 12 5' stroke='white' stroke-width='3.5'/%3E%3Cpath d='M12 2 L12 5 L15 5' stroke='white' stroke-width='3.5'/%3E%3Cpath d='M19 12 A 7 7 0 1 1 12 5' stroke='black' stroke-width='1.6'/%3E%3Cpath d='M12 2 L12 5 L15 5' stroke='black' stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E") 12 12, grab;
+                    }
+                    .cmp-rotate-zone:hover {
+                        stroke: rgba(0, 123, 255, 0.55);
+                        stroke-dasharray: ${dashOn * 0.5} ${dashOff * 0.5};
+                    }
+                `}</style>
                 {ordered.map(key => {
                     const g = geom.get(key);
                     if (!g) return null;
@@ -1070,9 +1292,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
                                 style={{ cursor: 'pointer' }}
                                 onPointerDown={(e) => {
                                     if (!comparison) return;
-                                    const newTool = TOOL_FOR_KEY[key];
-                                    setSelectedTool(newTool);
-                                    comparison.selectedImage = newTool;
+                                    selectTool(TOOL_FOR_KEY[key]);
                                     startDrag(e, 'translate', key);
                                 }}
                             />
@@ -1081,8 +1301,21 @@ const CompareComponent = ({ personId, phone }: Props) => {
 
                     const cx = g.rect.x + g.rect.w / 2;
                     const cy = g.rect.y + g.rect.h / 2;
-                    const topCenter = applyTransform(0, -g.drawSize.dh / 2, cx, cy, g.transform);
-                    const rotHandlePos = applyTransform(0, -g.drawSize.dh / 2 - rotPx, cx, cy, g.transform);
+                    const halfW = g.drawSize.dw / 2;
+                    const halfH = g.drawSize.dh / 2;
+                    const closeBtnPos = applyTransform(halfW + rotPx * 0.7, -halfH - rotPx * 0.7, cx, cy, g.transform);
+                    const closeR = handlePx;
+                    // Edge midpoints in image-local coords, then transformed to canvas space.
+                    const edges = [
+                        applyTransform(0, -halfH, cx, cy, g.transform),   // top
+                        applyTransform(halfW, 0, cx, cy, g.transform),    // right
+                        applyTransform(0, halfH, cx, cy, g.transform),    // bottom
+                        applyTransform(-halfW, 0, cx, cy, g.transform),   // left
+                    ];
+                    const edgeCursors = ['ns-resize', 'ew-resize', 'ns-resize', 'ew-resize'];
+                    // Toggle approach: scale handle inside the square, rotate just outside it.
+                    // Ring is invisible at rest; CSS :hover reveals a faint outline.
+                    const rotateRingR = handlePx * 1.6;
 
                     return (
                         <g key={key}>
@@ -1102,29 +1335,23 @@ const CompareComponent = ({ personId, phone }: Props) => {
                                 strokeDasharray={`${dashOn} ${dashOff}`}
                                 pointerEvents="none"
                             />
-                            <line
-                                x1={topCenter.x}
-                                y1={topCenter.y}
-                                x2={rotHandlePos.x}
-                                y2={rotHandlePos.y}
-                                stroke={stroke}
-                                strokeWidth={strokeW}
-                                pointerEvents="none"
-                            />
-                            <circle
-                                cx={rotHandlePos.x}
-                                cy={rotHandlePos.y}
-                                r={handlePx / 1.4}
-                                fill="white"
-                                stroke={stroke}
-                                strokeWidth={strokeW}
-                                pointerEvents="all"
-                                style={{ cursor: 'grab' }}
-                                onPointerDown={(e) => startDrag(e, 'rotate', key)}
-                            />
+                            {g.corners.map((c, i) => (
+                                <circle
+                                    key={`rot-${i}`}
+                                    className="cmp-rotate-zone"
+                                    cx={c.x}
+                                    cy={c.y}
+                                    r={rotateRingR}
+                                    fill="transparent"
+                                    stroke="transparent"
+                                    strokeWidth={strokeW * 0.6}
+                                    pointerEvents="all"
+                                    onPointerDown={(e) => startDrag(e, 'rotate', key)}
+                                />
+                            ))}
                             {g.corners.map((c, i) => (
                                 <rect
-                                    key={i}
+                                    key={`corner-${i}`}
                                     x={c.x - handlePx / 2}
                                     y={c.y - handlePx / 2}
                                     width={handlePx}
@@ -1137,6 +1364,56 @@ const CompareComponent = ({ personId, phone }: Props) => {
                                     onPointerDown={(e) => startDrag(e, 'scale', key)}
                                 />
                             ))}
+                            {edges.map((p, i) => (
+                                <rect
+                                    key={`edge-${i}`}
+                                    x={p.x - handlePx / 2}
+                                    y={p.y - handlePx / 2}
+                                    width={handlePx}
+                                    height={handlePx}
+                                    fill="white"
+                                    stroke={stroke}
+                                    strokeWidth={strokeW}
+                                    pointerEvents="all"
+                                    style={{ cursor: edgeCursors[i] }}
+                                    onPointerDown={(e) => startDrag(e, 'scale', key)}
+                                />
+                            ))}
+                            <circle
+                                cx={closeBtnPos.x}
+                                cy={closeBtnPos.y}
+                                r={closeR}
+                                fill="white"
+                                stroke="rgba(220, 53, 69, 0.95)"
+                                strokeWidth={strokeW}
+                                pointerEvents="all"
+                                style={{ cursor: 'pointer' }}
+                                onPointerDown={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    deselect();
+                                }}
+                            >
+                                <title>Deselect (Esc)</title>
+                            </circle>
+                            <line
+                                x1={closeBtnPos.x - closeR * 0.45}
+                                y1={closeBtnPos.y - closeR * 0.45}
+                                x2={closeBtnPos.x + closeR * 0.45}
+                                y2={closeBtnPos.y + closeR * 0.45}
+                                stroke="rgba(220, 53, 69, 0.95)"
+                                strokeWidth={strokeW * 1.5}
+                                pointerEvents="none"
+                            />
+                            <line
+                                x1={closeBtnPos.x + closeR * 0.45}
+                                y1={closeBtnPos.y - closeR * 0.45}
+                                x2={closeBtnPos.x - closeR * 0.45}
+                                y2={closeBtnPos.y + closeR * 0.45}
+                                stroke="rgba(220, 53, 69, 0.95)"
+                                strokeWidth={strokeW * 1.5}
+                                pointerEvents="none"
+                            />
                         </g>
                     );
                 })}
@@ -1200,26 +1477,216 @@ const CompareComponent = ({ personId, phone }: Props) => {
                 flexWrap: 'wrap'
             }}>
                 {/* Canvas Container */}
-                <div style={{
-                    flex: '1',
-                    minWidth: '600px',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    padding: '20px',
-                    backgroundColor: '#f8f9fa',
-                    borderRadius: '8px',
-                    border: '1px solid #dee2e6',
-                    overflow: 'auto'
-                }}>
+                <div
+                    ref={fullscreenRef}
+                    onPointerDown={() => deselect()}
+                    style={{
+                        flex: '1',
+                        minWidth: isFullscreen ? '0' : '600px',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        padding: '20px',
+                        backgroundColor: isFullscreen ? '#000' : '#f8f9fa',
+                        borderRadius: isFullscreen ? 0 : '8px',
+                        border: isFullscreen ? 'none' : '1px solid #dee2e6',
+                        overflow: 'auto',
+                        position: 'relative',
+                        width: isFullscreen ? '100vw' : undefined,
+                        height: isFullscreen ? '100vh' : undefined,
+                    }}
+                >
+                    <div style={{
+                        position: 'absolute',
+                        top: '10px',
+                        right: '10px',
+                        zIndex: 10,
+                        display: slideshowActive ? 'none' : 'flex',
+                        gap: '8px',
+                    }}>
+                        {canNativeShare && (
+                            <button
+                                onClick={handleShare}
+                                title="Share comparison"
+                                aria-label="Share comparison"
+                                style={{
+                                    padding: '8px 10px',
+                                    fontSize: '14px',
+                                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z" />
+                                </svg>
+                            </button>
+                        )}
+                        {(() => {
+                            const canSlideshow = selectedTimepoints.length === 2 && availablePhotoTypes.length > 0;
+                            return (
+                                <button
+                                    onClick={startSlideshow}
+                                    disabled={!canSlideshow}
+                                    title={canSlideshow
+                                        ? `Start slideshow (${availablePhotoTypes.length} pair${availablePhotoTypes.length === 1 ? '' : 's'})`
+                                        : 'Select two timepoints with shared images to enable slideshow'}
+                                    aria-label="Start pair slideshow"
+                                    style={{
+                                        padding: '8px 10px',
+                                        fontSize: '18px',
+                                        lineHeight: 1,
+                                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: canSlideshow ? 'pointer' : 'not-allowed',
+                                        opacity: canSlideshow ? 1 : 0.5,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        <path d="M8 5v14l11-7z" />
+                                    </svg>
+                                </button>
+                            );
+                        })()}
+                        <button
+                            onClick={toggleFullscreen}
+                            title={isFullscreen ? 'Exit Fullscreen (Esc)' : 'Fullscreen'}
+                            aria-label={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                            style={{
+                                padding: '8px 10px',
+                                fontSize: '18px',
+                                lineHeight: 1,
+                                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}
+                        >
+                            {isFullscreen ? '✕' : '⛶'}
+                        </button>
+                    </div>
+                    {slideshowActive && (
+                        <>
+                            <button
+                                onClick={stopSlideshow}
+                                title="Close slideshow (Esc)"
+                                aria-label="Close slideshow"
+                                style={{
+                                    position: 'absolute',
+                                    top: '20px',
+                                    right: '20px',
+                                    zIndex: 20,
+                                    width: '44px',
+                                    height: '44px',
+                                    fontSize: '22px',
+                                    lineHeight: 1,
+                                    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '50%',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >✕</button>
+                            <button
+                                onClick={() => stepSlideshow(-1)}
+                                disabled={slideshowIndex === 0}
+                                title="Previous pair (←)"
+                                aria-label="Previous pair"
+                                style={{
+                                    position: 'absolute',
+                                    left: '20px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    zIndex: 20,
+                                    width: '64px',
+                                    height: '64px',
+                                    fontSize: '36px',
+                                    lineHeight: 1,
+                                    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '50%',
+                                    cursor: slideshowIndex === 0 ? 'not-allowed' : 'pointer',
+                                    opacity: slideshowIndex === 0 ? 0.3 : 1,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >‹</button>
+                            <button
+                                onClick={() => stepSlideshow(1)}
+                                disabled={slideshowIndex === availablePhotoTypes.length - 1}
+                                title="Next pair (→)"
+                                aria-label="Next pair"
+                                style={{
+                                    position: 'absolute',
+                                    right: '20px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    zIndex: 20,
+                                    width: '64px',
+                                    height: '64px',
+                                    fontSize: '36px',
+                                    lineHeight: 1,
+                                    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '50%',
+                                    cursor: slideshowIndex === availablePhotoTypes.length - 1 ? 'not-allowed' : 'pointer',
+                                    opacity: slideshowIndex === availablePhotoTypes.length - 1 ? 0.3 : 1,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >›</button>
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    top: '20px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    zIndex: 20,
+                                    padding: '6px 14px',
+                                    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                                    color: 'white',
+                                    borderRadius: '999px',
+                                    fontSize: '14px',
+                                    fontWeight: 600,
+                                    fontFamily: 'monospace',
+                                }}
+                            >
+                                {slideshowIndex + 1} / {availablePhotoTypes.length}
+                            </div>
+                        </>
+                    )}
                     <div
                         ref={wrapperRef}
                         style={{
                             position: 'relative',
                             display: 'inline-block',
                             lineHeight: 0,
-                            border: '1px solid #ccc',
+                            border: isFullscreen ? 'none' : '1px solid #ccc',
                             borderRadius: '4px',
                             touchAction: 'none',
+                            maxWidth: '100%',
+                            maxHeight: '100%',
                         }}
                     >
                         <canvas
@@ -1230,10 +1697,11 @@ const CompareComponent = ({ personId, phone }: Props) => {
                             style={{
                                 backgroundColor: 'white',
                                 display: 'block',
-                                maxWidth: '600px',
-                                maxHeight: '800px',
+                                maxWidth: isFullscreen ? '100vw' : '600px',
+                                maxHeight: isFullscreen ? '100vh' : '800px',
                                 width: 'auto',
                                 height: 'auto',
+                                objectFit: 'contain',
                             }}
                         />
                         {renderOverlay()}
@@ -1312,11 +1780,8 @@ const CompareComponent = ({ personId, phone }: Props) => {
                         </label>
                         <select
                             value={selectedTool}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => {
-                                setSelectedTool(Number(e.target.value));
-                                if (comparison) comparison.selectedImage = Number(e.target.value);
-                            }}
-                            title="Choose which element to manipulate - Image 1 (top/left), Image 2 (bottom/right), or Logo (overlay)"
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => selectTool(Number(e.target.value))}
+                            title="Choose which element to manipulate - Image 1 (top/left), Image 2 (bottom/right), or Logo (overlay). 'None' deselects."
                             style={{
                                 width: '100%',
                                 padding: '8px',
@@ -1338,86 +1803,124 @@ const CompareComponent = ({ personId, phone }: Props) => {
                         <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', textAlign: 'center' }}>
                             Move Selected Image:
                         </label>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', maxWidth: '120px', margin: '0 auto' }}>
-                            <div />
-                            <button
-                                onClick={() => comparison && comparison.moveImage('up')}
-                                title="Move Up - Move the selected image upward"
-                                style={{ padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                            >
-                                ↑
-                            </button>
-                            <div />
-                            <button
-                                onClick={() => comparison && comparison.moveImage('left')}
-                                title="Move Left - Move the selected image to the left"
-                                style={{ padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                            >
-                                ←
-                            </button>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#666' }}>
-                                ⊕
-                            </div>
-                            <button
-                                onClick={() => comparison && comparison.moveImage('right')}
-                                title="Move Right - Move the selected image to the right"
-                                style={{ padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                            >
-                                →
-                            </button>
-                            <div />
-                            <button
-                                onClick={() => comparison && comparison.moveImage('down')}
-                                title="Move Down - Move the selected image downward"
-                                style={{ padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                            >
-                                ↓
-                            </button>
-                            <div />
-                        </div>
+                        {(() => {
+                            const hasSelection = selectedTool !== 0;
+                            const moveStyle = (bg: string) => ({
+                                padding: '8px',
+                                fontSize: '20px',
+                                lineHeight: 1,
+                                backgroundColor: bg,
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: hasSelection ? 'pointer' : 'not-allowed',
+                                opacity: hasSelection ? 1 : 0.5,
+                            });
+                            const disabledTitle = (base: string) =>
+                                hasSelection ? base : 'Select an image first (click a photo or use the dropdown)';
+                            return (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', maxWidth: '120px', margin: '0 auto' }}>
+                                    <div />
+                                    <button
+                                        onClick={() => comparison && comparison.moveImage('up')}
+                                        disabled={!hasSelection}
+                                        title={disabledTitle('Move Up - Move the selected image upward')}
+                                        style={moveStyle('#6c757d')}
+                                    >
+                                        ↑
+                                    </button>
+                                    <div />
+                                    <button
+                                        onClick={() => comparison && comparison.moveImage('left')}
+                                        disabled={!hasSelection}
+                                        title={disabledTitle('Move Left - Move the selected image to the left')}
+                                        style={moveStyle('#6c757d')}
+                                    >
+                                        ←
+                                    </button>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#666' }}>
+                                        ⊕
+                                    </div>
+                                    <button
+                                        onClick={() => comparison && comparison.moveImage('right')}
+                                        disabled={!hasSelection}
+                                        title={disabledTitle('Move Right - Move the selected image to the right')}
+                                        style={moveStyle('#6c757d')}
+                                    >
+                                        →
+                                    </button>
+                                    <div />
+                                    <button
+                                        onClick={() => comparison && comparison.moveImage('down')}
+                                        disabled={!hasSelection}
+                                        title={disabledTitle('Move Down - Move the selected image downward')}
+                                        style={moveStyle('#6c757d')}
+                                    >
+                                        ↓
+                                    </button>
+                                    <div />
+                                </div>
+                            );
+                        })()}
                     </div>
 
                     {/* Control Buttons */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
                         <button
-                            onClick={() => comparison && comparison.zoomImage('in')}
-                            title="Zoom In - Enlarge the selected image"
-                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            onClick={() => comparison && selectedTool !== 0 && comparison.zoomImage('in')}
+                            disabled={selectedTool === 0}
+                            title={selectedTool === 0 ? 'Select an image first (click a photo or use the dropdown)' : 'Zoom In - Enlarge the selected image'}
+                            style={{ padding: '8px', fontSize: '20px', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: selectedTool === 0 ? 'not-allowed' : 'pointer', opacity: selectedTool === 0 ? 0.5 : 1 }}
                         >
                             🔍+
                         </button>
                         <button
-                            onClick={() => comparison && comparison.zoomImage('out')}
-                            title="Zoom Out - Shrink the selected image"
-                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#17a2b8', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            onClick={() => comparison && selectedTool !== 0 && comparison.zoomImage('out')}
+                            disabled={selectedTool === 0}
+                            title={selectedTool === 0 ? 'Select an image first (click a photo or use the dropdown)' : 'Zoom Out - Shrink the selected image'}
+                            style={{ padding: '8px', fontSize: '20px', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#17a2b8', color: 'white', border: 'none', borderRadius: '4px', cursor: selectedTool === 0 ? 'not-allowed' : 'pointer', opacity: selectedTool === 0 ? 0.5 : 1 }}
                         >
                             🔍-
                         </button>
                         <button
-                            onClick={() => comparison && comparison.rotateImage('clockwise')}
-                            title="Rotate Clockwise - Rotate the selected image 1° clockwise"
-                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#fd7e14', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            onClick={() => comparison && selectedTool !== 0 && comparison.rotateImage('clockwise')}
+                            disabled={selectedTool === 0}
+                            title={selectedTool === 0 ? 'Select an image first (click a photo or use the dropdown)' : 'Rotate Clockwise - Rotate the selected image 1° clockwise'}
+                            style={{ padding: '8px', fontSize: '22px', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fd7e14', color: 'white', border: 'none', borderRadius: '4px', cursor: selectedTool === 0 ? 'not-allowed' : 'pointer', opacity: selectedTool === 0 ? 0.5 : 1 }}
+                            aria-label="Rotate Clockwise"
                         >
-                            ↻
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M21 12a9 9 0 1 1-3.2-6.9" />
+                                <polyline points="21 4 21 10 15 10" />
+                            </svg>
                         </button>
                         <button
-                            onClick={() => comparison && comparison.rotateImage('counterclockwise')}
-                            title="Rotate Counter-Clockwise - Rotate the selected image 1° counter-clockwise"
-                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#6f42c1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            onClick={() => comparison && selectedTool !== 0 && comparison.rotateImage('counterclockwise')}
+                            disabled={selectedTool === 0}
+                            title={selectedTool === 0 ? 'Select an image first (click a photo or use the dropdown)' : 'Rotate Counter-Clockwise - Rotate the selected image 1° counter-clockwise'}
+                            style={{ padding: '8px', fontSize: '22px', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#6f42c1', color: 'white', border: 'none', borderRadius: '4px', cursor: selectedTool === 0 ? 'not-allowed' : 'pointer', opacity: selectedTool === 0 ? 0.5 : 1 }}
+                            aria-label="Rotate Counter-Clockwise"
                         >
-                            ↺
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M3 12a9 9 0 1 0 3.2-6.9" />
+                                <polyline points="3 4 3 10 9 10" />
+                            </svg>
                         </button>
                         <button
                             onClick={() => comparison && comparison.toggleOrientation()}
                             title="Toggle Layout - Switch between vertical and horizontal image arrangement"
-                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            style={{ padding: '8px', fontSize: '20px', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            aria-label="Toggle Layout Orientation"
                         >
-                            ⟲
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <rect x="3" y="3" width="7" height="18" rx="1.2" />
+                                <rect x="14" y="3" width="7" height="18" rx="1.2" />
+                            </svg>
                         </button>
                         <button
                             onClick={() => comparison && comparison.toggleBisect()}
                             title="Toggle Bisect Line - Show/hide alignment line between images"
-                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            style={{ padding: '8px', fontSize: '22px', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                         >
                             ═
                         </button>
@@ -1439,6 +1942,14 @@ const CompareComponent = ({ personId, phone }: Props) => {
                             style={{ padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                         >
                             Reset
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            disabled={!comparison}
+                            title="Save - Download the comparison image as a PNG file"
+                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#0d6efd', color: 'white', border: 'none', borderRadius: '4px', cursor: comparison ? 'pointer' : 'not-allowed', opacity: comparison ? 1 : 0.5 }}
+                        >
+                            Save
                         </button>
                         {(() => {
                             const pixelCount = canvasDimensions.width * canvasDimensions.height;
