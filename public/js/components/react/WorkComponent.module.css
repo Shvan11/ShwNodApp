@@ -586,8 +586,8 @@
     padding: var(--spacing-lg);
 }
 
-.detailFormModal {
-    max-width: 700px !important;
+.modal.detailFormModal {
+    max-width: 700px;
     width: 95%;
 }
 
@@ -758,6 +758,61 @@
     text-align: center;
     color: var(--success-500);
     font-weight: 600;
+}
+
+/* ===== CONFIRMATION DIALOG ===== */
+/* Shared structure for delete/status confirmation modals.
+   Set `--confirm-accent` on the dialog root to theme the title color,
+   detail-box accent border, warning text, and action button.
+   Selectors are chained on `.confirmDialog` so they outrank the global
+   `.whatsapp-modal-title` / `.whatsapp-btn-send` cascade. */
+
+.confirmDialog {
+    --confirm-accent: var(--error-color);
+}
+
+.confirmDialog .confirmTitle {
+    color: var(--confirm-accent);
+}
+
+.confirmBody {
+    margin-bottom: var(--spacing-lg);
+}
+
+.confirmIntro {
+    margin-bottom: var(--spacing-md);
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
+}
+
+.confirmDetailsBox {
+    background: var(--background-secondary);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    border-left: 4px solid var(--confirm-accent);
+}
+
+.confirmDetailLine {
+    margin: 0 0 var(--spacing-sm) 0;
+}
+
+.confirmDetailLine:last-child {
+    margin-bottom: 0;
+}
+
+.confirmWarning {
+    margin-top: var(--spacing-md);
+    color: var(--confirm-accent);
+    font-weight: 500;
+    font-size: var(--font-size-sm);
+}
+
+.confirmWarningStrong {
+    font-weight: bold;
+}
+
+.confirmDialog .confirmActionButton {
+    background-color: var(--confirm-accent);
 }
 
 /* ===== RESPONSIVE DESIGN ===== */

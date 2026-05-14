@@ -1,4 +1,4 @@
-import React, { useState, useEffect, type FormEvent, type ChangeEvent, type SyntheticEvent, type MouseEvent } from 'react';
+import React, { useState, useEffect, type FormEvent, type ChangeEvent, type SyntheticEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WorkCard, { type Work, type WorkStatus } from './WorkCard';
 import PaymentModal from './PaymentModal';
@@ -97,6 +97,13 @@ interface WorkComponentProps {
     personId?: number | null;
 }
 
+// Work Status Constants (must match backend)
+const WORK_STATUS: WorkStatus = {
+    ACTIVE: 1,
+    FINISHED: 2,
+    DISCONTINUED: 3
+};
+
 /**
  * Work Component
  * Displays list of patient's treatment works
@@ -109,7 +116,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const isAdmin = user?.role === 'admin';
     const [works, setWorks] = useState<Work[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'discontinued'>('all');
     const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -184,13 +190,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     // Implant manufacturers for dropdown
     const [implantManufacturers, setImplantManufacturers] = useState<ImplantManufacturer[]>([]);
 
-    // Work Status Constants (must match backend)
-    const WORK_STATUS: WorkStatus = {
-        ACTIVE: 1,
-        FINISHED: 2,
-        DISCONTINUED: 3
-    };
-
     useEffect(() => {
         if (personId) {
             loadWorks();
@@ -199,6 +198,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             loadTeethOptions();
             loadImplantManufacturers();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: these loaders are stable for the lifetime of a given personId
     }, [personId]);
 
     const loadTeethOptions = async () => {
@@ -289,7 +289,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             const data: Work[] = await response.json();
             setWorks(data);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
+            toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
         } finally {
             setLoading(false);
         }
@@ -469,7 +469,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         setShowTransferModal(true);
     };
 
-    const handleTransferSuccess = (result: { sourcePatientId: number; targetPatientId: number }) => {
+    const handleTransferSuccess = (_result: { sourcePatientId: number; targetPatientId: number }) => {
         setShowTransferModal(false);
         setWorkToTransfer(null);
         // Refresh works since the work was transferred away
@@ -490,7 +490,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             const data: WorkDetail[] = await response.json();
             setWorkDetails(data);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
+            toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
         }
     };
 
@@ -571,7 +571,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             }
             setShowDetailForm(false);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
+            toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
         }
     };
 
@@ -594,7 +594,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                 await loadWorkDetails(selectedWork.workid);
             }
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
+            toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
         }
     };
 
@@ -668,7 +668,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             const data: Payment[] = await response.json();
             setPaymentHistory(data);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
+            toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
             setPaymentHistory([]);
         } finally {
             setLoadingPayments(false);
@@ -722,8 +722,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
             setTimeout(() => setSuccessMessage(null), 5000);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
-            setTimeout(() => setError(null), 5000);
+            toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
         } finally {
             setCheckingIn(false);
         }
@@ -1414,43 +1413,33 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                 <Modal
                     isOpen={true}
                     onClose={cancelDeleteWork}
-                    contentClassName="whatsapp-modal"
+                    contentClassName={`whatsapp-modal ${styles.confirmDialog}`}
                     ariaLabelledBy="delete-work-title"
                 >
                         <div className="whatsapp-modal-header">
-                            <h3 id="delete-work-title" className="whatsapp-modal-title" style={{ color: 'var(--error-color)' }}>
+                            <h3 id="delete-work-title" className={`whatsapp-modal-title ${styles.confirmTitle}`}>
                                 <i className="fas fa-exclamation-triangle"></i> Confirm Delete Work
                             </h3>
                             <button onClick={cancelDeleteWork} className="whatsapp-modal-close">
                                 ×
                             </button>
                         </div>
-                        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-                            <p style={{ marginBottom: 'var(--spacing-md)', fontSize: 'var(--font-size-base)', color: 'var(--text-primary)' }}>
+                        <div className={styles.confirmBody}>
+                            <p className={styles.confirmIntro}>
                                 Are you sure you want to delete this work?
                             </p>
-                            <div style={{
-                                background: 'var(--background-secondary)',
-                                padding: 'var(--spacing-md)',
-                                borderRadius: 'var(--radius-md)',
-                                borderLeft: '4px solid var(--error-color)'
-                            }}>
-                                <p style={{ margin: '0 0 var(--spacing-sm) 0' }}>
+                            <div className={styles.confirmDetailsBox}>
+                                <p className={styles.confirmDetailLine}>
                                     <strong>Work Type:</strong> {workToDelete.TypeName || 'N/A'}
                                 </p>
-                                <p style={{ margin: '0 0 var(--spacing-sm) 0' }}>
+                                <p className={styles.confirmDetailLine}>
                                     <strong>Doctor:</strong> {workToDelete.DoctorName || 'N/A'}
                                 </p>
-                                <p style={{ margin: '0' }}>
+                                <p className={styles.confirmDetailLine}>
                                     <strong>Total Required:</strong> {formatCurrency(workToDelete.TotalRequired, workToDelete.Currency)}
                                 </p>
                             </div>
-                            <p style={{
-                                marginTop: 'var(--spacing-md)',
-                                color: 'var(--error-color)',
-                                fontWeight: 'bold',
-                                fontSize: 'var(--font-size-sm)'
-                            }}>
+                            <p className={`${styles.confirmWarning} ${styles.confirmWarningStrong}`}>
                                 ⚠️ This action cannot be undone!
                             </p>
                         </div>
@@ -1460,8 +1449,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                             </button>
                             <button
                                 onClick={confirmDeleteWork}
-                                className="whatsapp-btn-send"
-                                style={{ backgroundColor: 'var(--error-color)' }}
+                                className={`whatsapp-btn-send ${styles.confirmActionButton}`}
                             >
                                 <i className="fas fa-trash"></i> Delete Work
                             </button>
@@ -1477,57 +1465,48 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     <Modal
                         isOpen={true}
                         onClose={closeConfirmationModal}
-                        contentClassName="whatsapp-modal"
+                        contentClassName={`whatsapp-modal ${styles.confirmDialog}`}
                         ariaLabelledBy="confirm-action-title"
                     >
-                            <div className="whatsapp-modal-header">
-                                <h3 id="confirm-action-title" className="whatsapp-modal-title" style={{ color: config.color }}>
-                                    <i className={`fas ${config.icon}`}></i> {config.title}
-                                </h3>
-                                <button onClick={closeConfirmationModal} className="whatsapp-modal-close">
-                                    ×
-                                </button>
-                            </div>
-                            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-                                <p style={{ marginBottom: 'var(--spacing-md)', fontSize: 'var(--font-size-base)', color: 'var(--text-primary)' }}>
-                                    {config.message}
-                                </p>
-                                <div style={{
-                                    background: 'var(--background-secondary)',
-                                    padding: 'var(--spacing-md)',
-                                    borderRadius: 'var(--radius-md)',
-                                    borderLeft: `4px solid ${config.color}`
-                                }}>
-                                    <p style={{ margin: '0 0 var(--spacing-sm) 0' }}>
-                                        <strong>Work Type:</strong> {config.work.TypeName || 'N/A'}
+                            <div style={{ '--confirm-accent': config.color } as React.CSSProperties}>
+                                <div className="whatsapp-modal-header">
+                                    <h3 id="confirm-action-title" className={`whatsapp-modal-title ${styles.confirmTitle}`}>
+                                        <i className={`fas ${config.icon}`}></i> {config.title}
+                                    </h3>
+                                    <button onClick={closeConfirmationModal} className="whatsapp-modal-close">
+                                        ×
+                                    </button>
+                                </div>
+                                <div className={styles.confirmBody}>
+                                    <p className={styles.confirmIntro}>
+                                        {config.message}
                                     </p>
-                                    <p style={{ margin: '0 0 var(--spacing-sm) 0' }}>
-                                        <strong>Doctor:</strong> {config.work.DoctorName || 'N/A'}
-                                    </p>
-                                    <p style={{ margin: '0' }}>
-                                        <strong>Total Required:</strong> {formatCurrency(config.work.TotalRequired, config.work.Currency)}
+                                    <div className={styles.confirmDetailsBox}>
+                                        <p className={styles.confirmDetailLine}>
+                                            <strong>Work Type:</strong> {config.work.TypeName || 'N/A'}
+                                        </p>
+                                        <p className={styles.confirmDetailLine}>
+                                            <strong>Doctor:</strong> {config.work.DoctorName || 'N/A'}
+                                        </p>
+                                        <p className={styles.confirmDetailLine}>
+                                            <strong>Total Required:</strong> {formatCurrency(config.work.TotalRequired, config.work.Currency)}
+                                        </p>
+                                    </div>
+                                    <p className={styles.confirmWarning}>
+                                        {config.warning}
                                     </p>
                                 </div>
-                                <p style={{
-                                    marginTop: 'var(--spacing-md)',
-                                    color: config.color,
-                                    fontWeight: '500',
-                                    fontSize: 'var(--font-size-sm)'
-                                }}>
-                                    {config.warning}
-                                </p>
-                            </div>
-                            <div className="whatsapp-actions">
-                                <button onClick={closeConfirmationModal} className="whatsapp-btn-cancel">
-                                    <i className="fas fa-times"></i> Cancel
-                                </button>
-                                <button
-                                    onClick={executeConfirmedAction}
-                                    className="whatsapp-btn-send"
-                                    style={{ backgroundColor: config.color }}
-                                >
-                                    <i className={`fas ${config.buttonIcon}`}></i> {config.buttonText}
-                                </button>
+                                <div className="whatsapp-actions">
+                                    <button onClick={closeConfirmationModal} className="whatsapp-btn-cancel">
+                                        <i className="fas fa-times"></i> Cancel
+                                    </button>
+                                    <button
+                                        onClick={executeConfirmedAction}
+                                        className={`whatsapp-btn-send ${styles.confirmActionButton}`}
+                                    >
+                                        <i className={`fas ${config.buttonIcon}`}></i> {config.buttonText}
+                                    </button>
+                                </div>
                             </div>
                     </Modal>
                 );

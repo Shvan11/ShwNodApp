@@ -5,8 +5,6 @@ import { Outlet, useLocation } from 'react-router-dom';
 
 // Aligner section CSS - shared/common styles remain global
 import '../../css/components/aligner-common.css';
-import '../../css/components/aligner-set-card.css';
-import '../../css/components/aligner-drawer-form.css';
 
 // CSS Module for layout-specific styles
 import styles from './AlignerLayout.module.css';

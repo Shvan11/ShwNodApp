@@ -12,6 +12,7 @@
   
   body {
     font-family: var(--font-primary);
+    font-size: var(--font-size-base);
     font-weight: normal;
     min-height: 100%;
     margin: 0;
@@ -19,13 +20,17 @@
     line-height: 1.5;
     color: var(--text-color);
   }
-  
+
   h1, h2, h3, h4, h5, h6 {
     margin-top: 0;
     margin-bottom: 0.5rem;
     font-weight: var(--font-weight-bold);
     line-height: 1.2;
   }
+
+  h1 { font-size: 2rem; margin-bottom: 1rem; }
+  h2 { font-size: 1.75rem; margin-bottom: 0.75rem; }
+  h3 { font-size: 1.5rem; margin-bottom: 0.5rem; }
   
   p {
     margin-top: 0;
@@ -67,7 +72,12 @@
   table {
     border-collapse: collapse;
   }
-  
+
+  footer {
+    text-align: center;
+    padding: 1rem;
+  }
+
   /* Accessibility */
   @media (prefers-reduced-motion: reduce) {
     * {

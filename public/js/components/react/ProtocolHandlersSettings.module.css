@@ -1,0 +1,102 @@
+/* ===== PROTOCOL HANDLERS SETTINGS - CSS Module ===== */
+/* Component-specific styles. Shared layout (container, section, configGroup,
+   .btn variants, restartWarning, modal*) is imported from DatabaseSettings.module.css. */
+
+/* --- Section lead paragraphs --- */
+
+.sectionLead {
+    margin-bottom: var(--spacing-md);
+}
+
+.fileLocationNote {
+    margin-bottom: var(--spacing-lg);
+    color: var(--text-secondary);
+}
+
+/* --- Browser-not-supported block --- */
+
+.supportNotice {
+    margin-top: var(--spacing-md);
+}
+
+.supportList {
+    margin-top: var(--spacing-sm);
+    margin-left: var(--spacing-lg);
+}
+
+.supportList i {
+    margin-right: var(--spacing-sm);
+}
+
+.fallbackNote {
+    margin-top: var(--spacing-md);
+    color: var(--text-secondary);
+}
+
+/* --- File info row --- */
+
+.fileInfoRow {
+    display: flex;
+    gap: var(--spacing-lg);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.changeFileButton {
+    margin-left: auto;
+}
+
+/* --- Spacing helper for trailing action buttons --- */
+
+.spacedButton {
+    margin-left: var(--spacing-md);
+}
+
+/* --- Info notice (info-themed sibling of .restartWarning) --- */
+
+.infoNotice {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    background: var(--info-50);
+    border: 1px solid var(--info-200);
+    border-radius: var(--radius-md);
+    color: var(--info-800);
+    font-size: var(--font-size-sm);
+}
+
+.infoNotice i {
+    color: var(--info-color);
+    font-size: var(--font-size-lg);
+}
+
+.tipText {
+    margin-top: var(--spacing-sm);
+    font-size: 0.9em;
+}
+
+.keyboardKey {
+    background: var(--gray-200);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-family-mono);
+}
+
+/* --- Error state actions --- */
+
+.errorActions {
+    margin-top: var(--spacing-md);
+}
+
+/* --- Empty config message --- */
+
+.emptyMessage {
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.emptyMessage i {
+    margin-right: var(--spacing-sm);
+}

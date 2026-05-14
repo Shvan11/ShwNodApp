@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, forwardRef, useImperativeHandle, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext';
-import type { Editor as GrapesJSEditorType, BlockManagerConfig } from 'grapesjs';
+import type { Editor as GrapesJSEditorType } from 'grapesjs';
 
 interface Template {
     template_id: number | null;
@@ -70,7 +70,8 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
             }
             isInitializingRef.current = false;
         };
-    }, [isLoading]); // Run when isLoading changes (becomes false and container renders)
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: loadGrapesJS reads stable refs/setters and must only fire when isLoading transitions
+    }, [isLoading]);
 
     const loadGrapesJS = async () => {
         try {
@@ -104,6 +105,7 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
         if (editorRef.current && template) {
             loadTemplateContent();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: loadTemplateContent reads `template` (already a dep) plus stable refs
     }, [template]);
 
     const initializeEditor = (grapesjs: typeof import('grapesjs').default) => {
@@ -322,8 +324,8 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
 
     if (loadError) {
         return (
-            <div style={{ padding: '40px', textAlign: 'center' }}>
-                <h2 style={{ color: 'var(--error-color)' }}>Failed to Load Editor</h2>
+            <div className={styles.loadErrorContainer}>
+                <h2 className={styles.loadErrorTitle}>Failed to Load Editor</h2>
                 <p>{loadError}</p>
             </div>
         );
@@ -334,21 +336,7 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
     return (
         <>
             {isLoading && (
-                <div style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '40px',
-                    zIndex: 9999,
-                    background: 'white',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                }}>
+                <div className={styles.editorLoadingPanel}>
                     <div className={styles.loadingSpinner}></div>
                     <p>Loading template designer...</p>
                 </div>

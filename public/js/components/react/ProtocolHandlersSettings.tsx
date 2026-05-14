@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef, ChangeEvent } from 'react';
 import Modal from './Modal';
-import styles from './DatabaseSettings.module.css';
+import sharedStyles from './DatabaseSettings.module.css';
+import styles from './ProtocolHandlersSettings.module.css';
 import {
-    isFileSystemAccessSupported,
     checkBrowserSupport,
     pickIniFile,
     readTextFile,
@@ -14,8 +14,7 @@ import {
     ensurePermission,
     isAbortError,
     isNotFoundError,
-    type BrowserSupportResult,
-    type FileOperationResult
+    type BrowserSupportResult
 } from '../../core/fileSystemAccess';
 import {
     parseIniContent,
@@ -98,34 +97,6 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
     const [configError, setConfigError] = useState<string | null>(null);
 
     // ========================================================================
-    // INITIALIZATION
-    // ========================================================================
-
-    useEffect(() => {
-        // Check browser support on mount
-        const support = checkBrowserSupport();
-        setBrowserSupport(support);
-
-        if (support.isSupported) {
-            loadSavedHandle();
-        }
-    }, []);
-
-    useEffect(() => {
-        // Notify parent component about changes
-        if (onChangesUpdate) {
-            const hasChanges = Object.keys(pendingChanges).some(
-                section => Object.keys(pendingChanges[section]).length > 0
-            );
-            // Only call if value actually changed to prevent infinite loops
-            if (lastReportedChanges.current !== hasChanges) {
-                lastReportedChanges.current = hasChanges;
-                onChangesUpdate(hasChanges);
-            }
-        }
-    }, [pendingChanges, onChangesUpdate]);
-
-    // ========================================================================
     // FILE HANDLE MANAGEMENT
     // ========================================================================
 
@@ -149,6 +120,34 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
             console.error('Error loading saved handle:', error);
         }
     }, []);
+
+    // ========================================================================
+    // INITIALIZATION
+    // ========================================================================
+
+    useEffect(() => {
+        // Check browser support on mount
+        const support = checkBrowserSupport();
+        setBrowserSupport(support);
+
+        if (support.isSupported) {
+            loadSavedHandle();
+        }
+    }, [loadSavedHandle]);
+
+    useEffect(() => {
+        // Notify parent component about changes
+        if (onChangesUpdate) {
+            const hasChanges = Object.keys(pendingChanges).some(
+                section => Object.keys(pendingChanges[section]).length > 0
+            );
+            // Only call if value actually changed to prevent infinite loops
+            if (lastReportedChanges.current !== hasChanges) {
+                lastReportedChanges.current = hasChanges;
+                onChangesUpdate(hasChanges);
+            }
+        }
+    }, [pendingChanges, onChangesUpdate]);
 
     const selectIniFile = async (): Promise<void> => {
         setIsLoading(true);
@@ -505,14 +504,14 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
         };
 
         return (
-            <div key={sectionName} className={styles.configGroup}>
+            <div key={sectionName} className={sharedStyles.configGroup}>
                 <h4>
                     <i className={sectionIcons[sectionName] || 'fas fa-cog'}></i>
                     {sectionTitles[sectionName] || sectionName}
                 </h4>
 
-                {Object.entries(sectionData).map(([key, value]) => (
-                    <div key={key} className={styles.settingGroup}>
+                {Object.keys(sectionData).map(key => (
+                    <div key={key} className={sharedStyles.settingGroup}>
                         <label htmlFor={`${sectionName}_${key}`}>{key}</label>
                         {key === 'UseRunAsDate' ? (
                             <select
@@ -521,7 +520,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) =>
                                     handleInputChange(sectionName, key, e.target.value)
                                 }
-                                className={hasFieldChange(sectionName, key) ? styles.pendingChange : ''}
+                                className={hasFieldChange(sectionName, key) ? sharedStyles.pendingChange : ''}
                             >
                                 <option value="false">Disabled (use DolCtrl.exe)</option>
                                 <option value="true">Enabled (use RunAsDate + dolphin64.exe)</option>
@@ -535,10 +534,10 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                                     handleInputChange(sectionName, key, e.target.value)
                                 }
                                 placeholder={`Enter ${key}`}
-                                className={hasFieldChange(sectionName, key) ? styles.pendingChange : ''}
+                                className={hasFieldChange(sectionName, key) ? sharedStyles.pendingChange : ''}
                             />
                         )}
-                        <div className={styles.settingDescription}>
+                        <div className={sharedStyles.settingDescription}>
                             {KEY_DESCRIPTIONS[key] || `Configuration value for ${key}`}
                         </div>
                     </div>
@@ -548,19 +547,19 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
     };
 
     const renderBrowserNotSupported = () => (
-        <div className={`${styles.connectionStatus} ${styles.error}`}>
-            <div className={styles.statusHeader}>
+        <div className={`${sharedStyles.connectionStatus} ${sharedStyles.error}`}>
+            <div className={sharedStyles.statusHeader}>
                 <i className="fas fa-browser"></i>
                 <span>Browser Not Supported</span>
             </div>
-            <div className={styles.statusDetails}>
+            <div className={sharedStyles.statusDetails}>
                 <p>The File System Access API is required to edit local configuration files.</p>
-                <p style={{ marginTop: 'var(--spacing-md)' }}>Please use one of these browsers:</p>
-                <ul style={{ marginTop: 'var(--spacing-sm)', marginLeft: 'var(--spacing-lg)' }}>
-                    <li><i className="fab fa-chrome" style={{ marginRight: 'var(--spacing-sm)' }}></i>Google Chrome 86+</li>
-                    <li><i className="fab fa-edge" style={{ marginRight: 'var(--spacing-sm)' }}></i>Microsoft Edge 86+</li>
+                <p className={styles.supportNotice}>Please use one of these browsers:</p>
+                <ul className={styles.supportList}>
+                    <li><i className="fab fa-chrome"></i>Google Chrome 86+</li>
+                    <li><i className="fab fa-edge"></i>Microsoft Edge 86+</li>
                 </ul>
-                <p style={{ marginTop: 'var(--spacing-md)', color: 'var(--text-secondary)' }}>
+                <p className={styles.fallbackNote}>
                     Alternatively, you can manually edit the file at:<br />
                     <code>C:\ShwanOrtho\ProtocolHandlers.ini</code>
                 </p>
@@ -569,16 +568,16 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
     );
 
     const renderFileSelection = () => (
-        <div className={styles.configGroup}>
+        <div className={sharedStyles.configGroup}>
             <h4><i className="fas fa-file-alt"></i> Select Configuration File</h4>
-            <p style={{ marginBottom: 'var(--spacing-md)' }}>
+            <p className={styles.sectionLead}>
                 To edit the protocol handler configuration, you need to select the INI file on your local computer.
             </p>
-            <p style={{ marginBottom: 'var(--spacing-lg)', color: 'var(--text-secondary)' }}>
+            <p className={styles.fileLocationNote}>
                 Default location: <code>C:\ShwanOrtho\ProtocolHandlers.ini</code>
             </p>
             <button
-                className={`${styles.btn} ${styles.btnPrimary}`}
+                className={`${sharedStyles.btn} ${sharedStyles.btnPrimary}`}
                 onClick={selectIniFile}
                 disabled={isLoading}
             >
@@ -598,27 +597,26 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
     );
 
     const renderPermissionRequest = () => (
-        <div className={styles.configGroup}>
+        <div className={sharedStyles.configGroup}>
             <h4><i className="fas fa-key"></i> Permission Required</h4>
-            <p style={{ marginBottom: 'var(--spacing-md)' }}>
+            <p className={styles.sectionLead}>
                 The browser needs permission to access the configuration file.
             </p>
             {fileHandle && (
-                <p style={{ marginBottom: 'var(--spacing-lg)', color: 'var(--text-secondary)' }}>
+                <p className={styles.fileLocationNote}>
                     File: <code>{fileHandle.name}</code>
                 </p>
             )}
             <button
-                className={`${styles.btn} ${styles.btnPrimary}`}
+                className={`${sharedStyles.btn} ${sharedStyles.btnPrimary}`}
                 onClick={requestFilePermission}
             >
                 <i className="fas fa-key"></i>
                 Grant Permission
             </button>
             <button
-                className={`${styles.btn} ${styles.btnSecondary}`}
+                className={`${sharedStyles.btn} ${sharedStyles.btnSecondary} ${styles.spacedButton}`}
                 onClick={changeFile}
-                style={{ marginLeft: 'var(--spacing-md)' }}
             >
                 <i className="fas fa-file"></i>
                 Select Different File
@@ -627,9 +625,9 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
     );
 
     const renderFileInfo = () => (
-        <div className={styles.configGroup}>
+        <div className={sharedStyles.configGroup}>
             <h4><i className="fas fa-file-alt"></i> File Status</h4>
-            <div style={{ display: 'flex', gap: 'var(--spacing-lg)', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div className={styles.fileInfoRow}>
                 <div>
                     <strong>File:</strong>{' '}
                     <code>{fileInfo?.name || fileHandle?.name || 'Unknown'}</code>
@@ -646,9 +644,8 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                     </div>
                 )}
                 <button
-                    className={styles.btnLink}
+                    className={`${sharedStyles.btnLink} ${styles.changeFileButton}`}
                     onClick={changeFile}
-                    style={{ marginLeft: 'auto' }}
                 >
                     <i className="fas fa-exchange-alt"></i>
                     Change File
@@ -662,26 +659,26 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
     // ========================================================================
 
     return (
-        <div className={styles.container}>
-            <div className={styles.section}>
-                <h3 className={styles.sectionTitle}>
+        <div className={sharedStyles.container}>
+            <div className={sharedStyles.section}>
+                <h3 className={sharedStyles.sectionTitle}>
                     <i className="fas fa-link"></i>
                     Protocol Handler Configuration
                 </h3>
-                <p className={styles.sectionDescription}>
+                <p className={sharedStyles.sectionDescription}>
                     Configure Windows protocol handlers for Dolphin, CS Imaging, and other integrations.
                     File location: C:\ShwanOrtho\ProtocolHandlers.ini
                 </p>
 
-                <div className={styles.restartWarning} style={{ marginBottom: 'var(--spacing-lg)', background: 'var(--info-50, #eff6ff)', borderColor: 'var(--info-200, #bfdbfe)', color: 'var(--info-800, #1e40af)' }}>
-                    <i className="fas fa-info-circle" style={{ color: 'var(--info-color)' }}></i>
+                <div className={styles.infoNotice}>
+                    <i className="fas fa-info-circle"></i>
                     <div>
                         <div>
                             <strong>Note:</strong> This page edits the INI file on <strong>this computer</strong>.
                             Each PC has its own configuration file at C:\ShwanOrtho\ProtocolHandlers.ini.
                         </div>
-                        <div style={{ marginTop: 'var(--spacing-sm)', fontSize: '0.9em' }}>
-                            <strong>Tip:</strong> To copy a folder path, find it in Windows Explorer, hold <kbd style={{ background: '#e5e7eb', padding: '2px 6px', borderRadius: '3px', fontFamily: 'monospace' }}>Shift</kbd> + Right-Click → <em>"Copy as path"</em>, then paste here.
+                        <div className={styles.tipText}>
+                            <strong>Tip:</strong> To copy a folder path, find it in Windows Explorer, hold <kbd className={styles.keyboardKey}>Shift</kbd> + Right-Click → <em>"Copy as path"</em>, then paste here.
                         </div>
                     </div>
                 </div>
@@ -699,29 +696,28 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 {browserSupport?.isSupported && hasFileAccess && (
                     <>
                         {isLoading ? (
-                            <div className={styles.loadingSpinner}>
+                            <div className={sharedStyles.loadingSpinner}>
                                 <i className="fas fa-spinner fa-spin"></i>
                                 <span>Loading protocol handler configuration...</span>
                             </div>
                         ) : configError ? (
-                            <div className={`${styles.connectionStatus} ${styles.error}`}>
-                                <div className={styles.statusHeader}>
+                            <div className={`${sharedStyles.connectionStatus} ${sharedStyles.error}`}>
+                                <div className={sharedStyles.statusHeader}>
                                     <i className="fas fa-exclamation-circle"></i>
                                     <span>Configuration Error</span>
                                 </div>
-                                <div className={styles.statusDetails}>{configError}</div>
-                                <div style={{ marginTop: 'var(--spacing-md)' }}>
+                                <div className={sharedStyles.statusDetails}>{configError}</div>
+                                <div className={styles.errorActions}>
                                     <button
-                                        className={`${styles.btn} ${styles.btnSecondary}`}
+                                        className={`${sharedStyles.btn} ${sharedStyles.btnSecondary}`}
                                         onClick={reloadConfig}
                                     >
                                         <i className="fas fa-redo"></i>
                                         Retry
                                     </button>
                                     <button
-                                        className={`${styles.btn} ${styles.btnSecondary}`}
+                                        className={`${sharedStyles.btn} ${sharedStyles.btnSecondary} ${styles.spacedButton}`}
                                         onClick={changeFile}
-                                        style={{ marginLeft: 'var(--spacing-md)' }}
                                     >
                                         <i className="fas fa-file"></i>
                                         Select Different File
@@ -740,9 +736,9 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
 
                                 {/* Empty config message */}
                                 {Object.keys(config).length === 0 && (
-                                    <div className={styles.configGroup}>
-                                        <p style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>
-                                            <i className="fas fa-info-circle" style={{ marginRight: 'var(--spacing-sm)' }}></i>
+                                    <div className={sharedStyles.configGroup}>
+                                        <p className={styles.emptyMessage}>
+                                            <i className="fas fa-info-circle"></i>
                                             No configuration found in file. The file may be empty or have an invalid format.
                                         </p>
                                     </div>
@@ -755,9 +751,9 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
 
             {/* Action buttons - only show when file access is granted and no error */}
             {browserSupport?.isSupported && hasFileAccess && !configError && !isLoading && (
-                <div className={styles.actions}>
+                <div className={sharedStyles.actions}>
                     <button
-                        className={`${styles.btn} ${styles.btnPrimary}`}
+                        className={`${sharedStyles.btn} ${sharedStyles.btnPrimary}`}
                         onClick={saveConfiguration}
                         disabled={!hasChanges || isSaving}
                     >
@@ -778,7 +774,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                     </button>
 
                     <button
-                        className={`${styles.btn} ${styles.btnSecondary}`}
+                        className={`${sharedStyles.btn} ${sharedStyles.btnSecondary}`}
                         onClick={createBackup}
                     >
                         <i className="fas fa-copy"></i>
@@ -786,7 +782,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                     </button>
 
                     <button
-                        className={`${styles.btn} ${styles.btnWarning}`}
+                        className={`${sharedStyles.btn} ${sharedStyles.btnWarning}`}
                         onClick={restoreFromBackup}
                     >
                         <i className="fas fa-undo"></i>
@@ -794,7 +790,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                     </button>
 
                     <button
-                        className={`${styles.btn} ${styles.btnInfo}`}
+                        className={`${sharedStyles.btn} ${sharedStyles.btnInfo}`}
                         onClick={reloadConfig}
                         disabled={isLoading}
                     >
@@ -805,7 +801,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
             )}
 
             {hasChanges && (
-                <div className={styles.restartWarning}>
+                <div className={sharedStyles.restartWarning}>
                     <i className="fas fa-info-circle"></i>
                     <span>Protocol handlers will use the new settings immediately after saving.</span>
                 </div>
@@ -815,20 +811,20 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
             <Modal
                 isOpen={modal.show}
                 onClose={hideModal}
-                contentClassName={styles.modalContent}
+                contentClassName={sharedStyles.modalContent}
                 ariaLabelledBy="protocol-handlers-modal-title"
             >
-                <div className={styles.modalHeader}>
+                <div className={sharedStyles.modalHeader}>
                     <h3 id="protocol-handlers-modal-title">{modal.title}</h3>
-                    <button className={styles.modalClose} onClick={hideModal}>
+                    <button className={sharedStyles.modalClose} onClick={hideModal}>
                         <i className="fas fa-times"></i>
                     </button>
                 </div>
-                <div className={styles.modalBody}>
+                <div className={sharedStyles.modalBody}>
                     <pre>{modal.message}</pre>
                 </div>
-                <div className={styles.modalFooter}>
-                    <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={hideModal}>OK</button>
+                <div className={sharedStyles.modalFooter}>
+                    <button className={`${sharedStyles.btn} ${sharedStyles.btnPrimary}`} onClick={hideModal}>OK</button>
                 </div>
             </Modal>
         </div>

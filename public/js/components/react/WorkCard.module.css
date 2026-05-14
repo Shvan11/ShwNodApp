@@ -295,6 +295,22 @@
     color: var(--success-500);
 }
 
+.financialValueDiscount {
+    color: var(--warning-color);
+}
+
+.financialValueNet {
+    font-weight: bold;
+}
+
+.discountBadge {
+    margin-top: var(--spacing-sm);
+}
+
+.infoItem.discountBadge i {
+    color: var(--warning-color);
+}
+
 /* Additional Info Section */
 .additionalInfo {
     display: flex;

@@ -468,12 +468,8 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
             {/* More Actions Flyout Menu - OUTSIDE SIDEBAR FOR PROPER POSITIONING */}
             {moreActionsExpanded && (
                 <div
-                    className="more-actions-flyout"
-                    style={{
-                        bottom: `${window.innerHeight - moreActionsFlyoutPosition.bottom}px`,
-                        top: 'auto',
-                        transform: 'none'
-                    }}
+                    className="more-actions-flyout positioned"
+                    style={{ bottom: `${window.innerHeight - moreActionsFlyoutPosition.bottom}px` }}
                     onMouseEnter={() => setMoreActionsExpanded(true)}
                     onMouseLeave={() => setMoreActionsExpanded(false)}
                 >
@@ -513,7 +509,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             title={isNewPatient ? "Save patient first to access Dolphin Imaging" : "Launch Dolphin Imaging with patient data"}
                         >
                             <div className="action-item-icon">
-                                <img src="/images/dolphin-logo@2x.png" alt="Dolphin" style={{ width: '20px', height: '20px' }} />
+                                <img src="/images/dolphin-logo@2x.png" alt="Dolphin" />
                             </div>
                             <span className="action-item-label">Dolphin Imaging</span>
                         </Link>
@@ -530,7 +526,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             title={isNewPatient ? "Save patient first" : "Launch 3Shape Unite with patient data"}
                         >
                             <div className="action-item-icon">
-                                <img src="/images/3Shape_transparent_256x256.png" alt="3Shape" style={{ width: '20px', height: '20px' }} />
+                                <img src="/images/3Shape_transparent_256x256.png" alt="3Shape" />
                             </div>
                             <span className="action-item-label">3Shape</span>
                         </Link>
@@ -547,7 +543,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             title={isNewPatient ? "Save patient first" : "Add photos from memory card to Dolphin Imaging"}
                         >
                             <div className="action-item-icon">
-                                <img src="/images/dolphin-logo@2x.png" alt="Dolphin" style={{ width: '20px', height: '20px' }} />
+                                <img src="/images/dolphin-logo@2x.png" alt="Dolphin" />
                             </div>
                             <span className="action-item-label">Add Photos to Dolphin</span>
                         </Link>

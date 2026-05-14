@@ -20,42 +20,7 @@
     transform: none; /* Disable hover lift effect */
 }
 
-.month-day-cell.holiday .month-day-number {
-    color: var(--error-600, #dc2626);
-}
-
-.holiday-badge {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    color: var(--error-500, #ef4444);
-    font-size: var(--font-size-sm, 0.875rem);
-}
-
 /* Holiday tooltip */
-.day-tooltip.holiday-tooltip {
-    background-color: var(--error-50, #fef2f2);
-    border: 1px solid var(--error-200, #fecaca);
-}
-
-.day-tooltip .holiday-header {
-    color: var(--error-600, #dc2626);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm, 0.5rem);
-}
-
-.day-tooltip .tooltip-holiday-name {
-    font-weight: 600;
-    color: var(--error-700, #b91c1c);
-    padding: var(--spacing-sm, 0.5rem) 0;
-}
-
-.day-tooltip .tooltip-holiday-info {
-    font-size: var(--font-size-sm, 0.875rem);
-    color: var(--error-500, #ef4444);
-    font-style: italic;
-}
 
 /* ============================================
    Weekly Calendar (CalendarGrid) Holiday Styles
@@ -193,21 +158,6 @@
    SimplifiedCalendarPicker Holiday Styles
    ============================================ */
 
-.simplified-calendar .calendar-day.holiday {
-    background-color: var(--error-50, #fef2f2);
-    border-color: var(--error-200, #fecaca);
-    color: var(--error-600, #dc2626);
-    cursor: not-allowed;
-}
-
-.simplified-calendar .calendar-day.holiday:hover {
-    background-color: var(--error-100, #fee2e2);
-}
-
-.simplified-calendar .calendar-day.holiday.disabled {
-    pointer-events: none;
-}
-
 /* ============================================
    Settings/Lookup Holiday Table Styles
    ============================================ */
@@ -276,10 +226,6 @@
 /* ============================================
    Holiday Quick Modal (Calendar Add/Edit)
    ============================================ */
-
-.modal-overlay.holiday-quick-modal .modal-content {
-    max-width: 400px;
-}
 
 .holiday-quick-modal .modal-header h3 {
     display: flex;

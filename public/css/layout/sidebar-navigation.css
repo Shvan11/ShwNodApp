@@ -185,15 +185,6 @@
 }
 
 /* Ensure footer items also show tooltips */
-.compare-item:hover .nav-item-label,
-.xrays-item:hover .nav-item-label,
-.appointments-item:hover .nav-item-label,
-.calendar-item:hover .nav-item-label {
-    opacity: 1;
-    visibility: visible;
-    transform: translateX(0);
-    transition-delay: 0.15s;
-}
 
 /* Hide tooltip for photos button since it has a flyout menu */
 .photos-main-btn .nav-item-label {
@@ -415,6 +406,13 @@
     margin-top: -10px; /* Small gap */
 }
 
+/* When the flyout is positioned dynamically via inline `bottom: Xpx`,
+   this modifier neutralises the default `top` and `translateY(-100%)`. */
+.more-actions-flyout.positioned {
+    top: auto;
+    transform: none;
+}
+
 .more-actions-flyout .flyout-header {
     display: flex;
     align-items: center;
@@ -473,8 +471,9 @@
     color: var(--indigo-500);
 }
 
-.action-item-icon.dolphin-icon {
-    font-size: 1.25rem;
+.action-item-icon img {
+    width: 20px;
+    height: 20px;
 }
 
 .flyout-action-item.active .action-item-icon {

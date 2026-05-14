@@ -221,13 +221,13 @@ const WorkCard = ({
                             <>
                                 <div className={styles.financialItem}>
                                     <span className={styles.financialLabel}>Discount</span>
-                                    <span className={styles.financialValue} style={{ color: 'var(--warning-color, #c77700)' }}>
+                                    <span className={cn(styles.financialValue, styles.financialValueDiscount)}>
                                         -{formatCurrency(getDiscount(), work.Currency)}
                                     </span>
                                 </div>
                                 <div className={styles.financialItem}>
                                     <span className={styles.financialLabel}>Net</span>
-                                    <span className={styles.financialValue} style={{ fontWeight: 'bold' }}>
+                                    <span className={cn(styles.financialValue, styles.financialValueNet)}>
                                         {formatCurrency((work.TotalRequired || 0) - getDiscount(), work.Currency)}
                                     </span>
                                 </div>
@@ -247,8 +247,8 @@ const WorkCard = ({
 
                     {/* Discount badge with date and optional reason */}
                     {getDiscount() > 0 && (
-                        <div className={styles.infoItem} style={{ marginTop: 'var(--spacing-sm, 8px)' }}>
-                            <i className="fas fa-tag" style={{ color: 'var(--warning-color, #c77700)' }}></i>
+                        <div className={cn(styles.infoItem, styles.discountBadge)}>
+                            <i className="fas fa-tag"></i>
                             <span>
                                 Discount applied{work.DiscountDate ? ` on ${formatDate(work.DiscountDate)}` : ''}
                                 {work.DiscountReason ? ` — ${work.DiscountReason}` : ''}

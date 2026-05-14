@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ReactNode, ErrorInfo } from 'react';
+import styles from './ErrorBoundary.module.css';
 
 // Extend window interface for custom error logging
 declare global {
@@ -86,31 +87,18 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
             // Default fallback UI
             return (
-                <div style={{
-                    padding: 'var(--spacing-xl)',
-                    textAlign: 'center',
-                    backgroundColor: 'var(--background-secondary)',
-                    borderRadius: 'var(--radius-lg)',
-                    border: '2px solid var(--error-color)',
-                    margin: 'var(--spacing-md)'
-                }}>
-                    <h2 style={{ color: 'var(--error-color)', marginBottom: 'var(--spacing-md)' }}>
+                <div className={styles.fallback}>
+                    <h2 className={styles.title}>
                         ⚠️ Something went wrong
                     </h2>
-                    <p style={{ marginBottom: 'var(--spacing-md)', color: 'var(--text-secondary)' }}>
+                    <p className={styles.description}>
                         {componentName} encountered an error and couldn't render.
                     </p>
 
                     {this.state.errorCount > 3 && (
-                        <div style={{
-                            padding: 'var(--spacing-md)',
-                            backgroundColor: 'var(--warning-color)',
-                            borderRadius: 'var(--radius-md)',
-                            marginBottom: 'var(--spacing-md)',
-                            color: 'white'
-                        }}>
+                        <div className={styles.repeatedErrorsNotice}>
                             <strong>⚠️ Multiple errors detected ({this.state.errorCount})</strong>
-                            <p style={{ marginTop: 'var(--spacing-sm)', fontSize: 'var(--font-size-sm)' }}>
+                            <p className={styles.repeatedErrorsHint}>
                                 Consider refreshing the page or contacting support
                             </p>
                         </div>
@@ -118,53 +106,24 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
                     <button
                         onClick={this.handleReset}
-                        style={{
-                            padding: 'var(--spacing-sm) var(--spacing-lg)',
-                            backgroundColor: 'var(--primary-color)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: 'var(--radius-md)',
-                            cursor: 'pointer',
-                            fontSize: 'var(--font-size-base)',
-                            marginRight: 'var(--spacing-sm)'
-                        }}
+                        className={`${styles.actionButton} ${styles.actionButtonPrimary}`}
                     >
                         Try Again
                     </button>
 
                     <button
                         onClick={() => window.location.reload()}
-                        style={{
-                            padding: 'var(--spacing-sm) var(--spacing-lg)',
-                            backgroundColor: 'var(--secondary-color)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: 'var(--radius-md)',
-                            cursor: 'pointer',
-                            fontSize: 'var(--font-size-base)'
-                        }}
+                        className={`${styles.actionButton} ${styles.actionButtonSecondary}`}
                     >
                         Reload Page
                     </button>
 
                     {import.meta.env.DEV && this.state.error && (
-                        <details style={{
-                            marginTop: 'var(--spacing-lg)',
-                            textAlign: 'left',
-                            backgroundColor: 'var(--background-primary)',
-                            padding: 'var(--spacing-md)',
-                            borderRadius: 'var(--radius-md)',
-                            maxHeight: '300px',
-                            overflow: 'auto'
-                        }}>
-                            <summary style={{ cursor: 'pointer', fontWeight: 'bold', marginBottom: 'var(--spacing-sm)' }}>
+                        <details className={styles.errorDetails}>
+                            <summary className={styles.errorDetailsSummary}>
                                 Error Details (Development Mode)
                             </summary>
-                            <pre style={{
-                                fontSize: 'var(--font-size-sm)',
-                                whiteSpace: 'pre-wrap',
-                                wordBreak: 'break-word'
-                            }}>
+                            <pre className={styles.errorDetailsPre}>
                                 <strong>Error:</strong> {this.state.error.toString()}
                                 {'\n\n'}
                                 <strong>Component Stack:</strong>

@@ -162,6 +162,34 @@
     }
 }
 
+/* Editor load-error fallback (renders when GrapesJS fails to load) */
+.loadErrorContainer {
+    padding: 2.5rem;
+    text-align: center;
+}
+
+.loadErrorTitle {
+    color: var(--error-color);
+}
+
+/* Centered loading panel shown while GrapesJS is initializing.
+   Distinct from .loadingOverlay (used during save). */
+.editorLoadingPanel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem;
+    z-index: 9999;
+    background: white;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .designerHeader {

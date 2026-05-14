@@ -252,10 +252,6 @@ body:has(.appointment-calendar) {
     align-items: center;
 }
 
-.appointment-calendar .doctor-filter-label {
-    display: none;
-}
-
 .appointment-calendar .doctor-filter-select {
     padding: 4px 8px;
     border: 1px solid var(--border);
@@ -431,13 +427,6 @@ body:has(.appointment-calendar) {
 }
 
 /* Hide old day header elements */
-.day-header-name {
-    display: none;
-}
-
-.day-header-date {
-    display: none;
-}
 
 /* Calendar Grid - Modern Layout with Perfect Alignment */
 .calendar-grid {
@@ -782,34 +771,6 @@ body:has(.appointment-calendar) {
 /* Removed patient status indicators - calendar focuses on scheduling only */
 
 /* Empty Slot Content */
-.empty-slot-content {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.time-slot.available:hover .empty-slot-content {
-    opacity: 1;
-}
-
-.add-appointment-icon {
-    font-size: var(--font-size-2xl);
-    color: var(--primary-color);
-    margin-bottom: 3px;
-    font-weight: bold;
-}
-
-.add-appointment-text {
-    font-size: var(--font-size-sm);
-    color: var(--primary-color);
-    text-align: center;
-    line-height: 1.3;
-    font-weight: 600;
-}
 
 /* Calendar-Focused Appointment Status */
 
@@ -822,40 +783,10 @@ body:has(.appointment-calendar) {
     min-height: 400px;
 }
 
-.loading-container {
-    text-align: center;
-    padding: 40px;
-}
-
-.loading-spinner-large {
-    width: 50px;
-    height: 50px;
-    border: 4px solid var(--calendar-border);
-    border-top: 4px solid var(--primary-color);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 20px;
-}
-
 .calendar-grid.loading {
     position: relative;
     pointer-events: none;
     opacity: 0.7;
-}
-
-.loading-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--loading-overlay-bg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--z-index-modal);
-    -webkit-backdrop-filter: blur(2px);
-    backdrop-filter: blur(2px);
 }
 
 .header-loading {
@@ -891,48 +822,12 @@ body:has(.appointment-calendar) {
     min-height: 400px;
 }
 
-.error-container {
-    text-align: center;
-    max-width: 400px;
-}
-
-.error-container h3 {
-    color: var(--error-color);
-    margin-bottom: 16px;
-    font-size: var(--font-size-xl);
-}
-
-.error-container p {
-    color: var(--text-medium);
-    margin-bottom: 24px;
-    line-height: 1.5;
-}
-
-.error-container button {
-    margin: 0 8px;
-}
-
 /* Empty State */
 .calendar-grid.empty {
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 400px;
-}
-
-.empty-message {
-    text-align: center;
-    padding: 40px;
-    color: var(--text-medium);
-}
-
-.empty-message h3 {
-    margin-bottom: 16px;
-    color: var(--text-dark);
-}
-
-.empty-message button {
-    margin: 0 8px;
 }
 
 /* Animations */
@@ -1111,11 +1006,6 @@ body:has(.appointment-calendar) {
         --calendar-slot-min-height: 80px;
     }
 
-    .time-header {
-        height: 80px;
-        font-size: var(--font-size-sm);
-    }
-
     .time-slot-label {
         font-size: 15px;
         min-height: 80px;
@@ -1248,10 +1138,6 @@ body:has(.appointment-calendar) {
         box-shadow: none;
     }
 
-    .empty-slot-content {
-        display: none;
-    }
-
     .calendar-grid {
         overflow: visible;
     }
@@ -1291,7 +1177,7 @@ body:has(.appointment-calendar) {
         animation: none;
     }
 
-    .loading-spinner-large,
+    
     .loading-spinner-small {
         animation: none;
     }
@@ -1430,19 +1316,6 @@ body:has(.appointment-calendar) {
 }
 
 /* ===== DELETE CONFIRMATION MODAL ===== */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--z-index-modal);
-    animation: fadeIn 0.2s ease-out;
-}
 
 @keyframes fadeIn {
     from {

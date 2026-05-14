@@ -118,17 +118,6 @@
   border-color: var(--gray-400);
 }
 
-.btn-dark {
-  color: #fff;
-  background-color: var(--gray-800);
-  border-color: var(--gray-800);
-}
-
-.btn-dark:hover {
-  background-color: var(--gray-900);
-  border-color: var(--gray-900);
-}
-
 /* Outline Variants - Soft colored backgrounds with borders */
 .btn-outline-primary {
   color: var(--primary-color);
@@ -140,18 +129,6 @@
   color: var(--color-white);
   background-color: var(--primary-color);
   border-color: var(--primary-color);
-}
-
-.btn-outline-secondary {
-  color: var(--secondary-color);
-  border-color: var(--secondary-color);
-  background-color: var(--success-50);
-}
-
-.btn-outline-secondary:hover {
-  color: var(--color-white);
-  background-color: var(--secondary-color);
-  border-color: var(--secondary-color);
 }
 
 .btn-outline-success {
@@ -197,12 +174,6 @@
   border-radius: var(--radius-sm);
 }
 
-.btn-lg {
-  padding: 0.75rem 1.5rem;
-  font-size: 1.25rem;
-  border-radius: var(--radius-lg);
-}
-
 /* Block Button */
 .btn-block {
   display: flex;
@@ -225,13 +196,6 @@
   height: var(--icon-size-sm);
 }
 
-.btn-lg i,
-.btn-lg svg {
-  font-size: var(--icon-size-lg);
-  width: var(--icon-size-lg);
-  height: var(--icon-size-lg);
-}
-
 /* Icon Button (Square/Circle) */
 /* Only handles layout/sizing - inherits colors from variant classes */
 .btn-icon {
@@ -241,16 +205,6 @@
   justify-content: center;
   border-radius: var(--radius-md);
   transition: all var(--transition-base);
-}
-
-.btn-icon-sm {
-  padding: 0.25rem;
-  font-size: 0.875rem;
-}
-
-.btn-icon-lg {
-  padding: 0.75rem;
-  font-size: 1.25rem;
 }
 
 /* Action Buttons (Edit/Delete) */

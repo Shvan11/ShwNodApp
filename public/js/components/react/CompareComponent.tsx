@@ -5,9 +5,11 @@
  * Memoized to prevent unnecessary re-renders when props haven't changed
  */
 
-import React, { useState, useEffect, useMemo, useRef, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, ChangeEvent, FormEvent, CSSProperties } from 'react';
+import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
 import Modal from './Modal';
+import styles from './CompareComponent.module.css';
 
 // Empirical: 4249×9798 (~42 MP) fails inside whatsapp-web.js; 2060×2700 (~5.6 MP) preset is offered.
 const MAX_WHATSAPP_PIXELS = 6_000_000;
@@ -215,6 +217,34 @@ function getImageCorners(rect: ImageRect, drawSize: DrawSize, t: Transform): Poi
     ];
 }
 
+const PHOTO_TYPES: PhotoType[] = [
+    { id: 'profile', label: 'Facial Profile', code: '10', category: 'facial' },
+    { id: 'rest', label: 'Facial Rest', code: '12', category: 'facial' },
+    { id: 'smile', label: 'Facial Smile', code: '13', category: 'facial' },
+    { id: 'upper', label: 'Occlusal Upper', code: '23', category: 'occlusal' },
+    { id: 'lower', label: 'Occlusal Lower', code: '24', category: 'occlusal' },
+    { id: 'right', label: 'Intra-oral Right', code: '20', category: 'intraoral' },
+    { id: 'center', label: 'Intra-oral Center', code: '22', category: 'intraoral' },
+    { id: 'left', label: 'Intra-oral Left', code: '21', category: 'intraoral' },
+];
+
+const CANVAS_SIZES: CanvasSize[] = [
+    { value: 'auto', label: 'Auto (100%)' },
+    { value: 'auto-50', label: '50% of source' },
+    { value: 'auto-25', label: '25% of source' },
+    { value: '{"width":1080,"height":1350}', label: 'Post (1080 × 1350)' },
+    { value: '{"width":1080,"height":1920}', label: 'Story (1080 × 1920)' },
+    { value: '{"width":2060,"height":2700}', label: '2060 × 2700' },
+];
+
+// 0 = no selection — bounding box hidden, manipulation buttons disabled.
+const TOOLS: Tool[] = [
+    { value: 0, label: '— None (Deselect) —' },
+    { value: 1, label: 'Image 1' },
+    { value: 2, label: 'Image 2' },
+    { value: 3, label: 'Logo' },
+];
+
 const CompareComponent = ({ personId, phone }: Props) => {
     const toast = useToast();
     const [timepoints, setTimepoints] = useState<Timepoint[]>([]);
@@ -223,7 +253,6 @@ const CompareComponent = ({ personId, phone }: Props) => {
     const [timepointImages, setTimepointImages] = useState<Record<number, string[]>>({});
     const [, setImages] = useState<ImageState>({ img1: null, img2: null, logo: null });
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [canvasSize, setCanvasSize] = useState('auto');
     const [selectedTool, setSelectedTool] = useState(0);
     const [comparison, setComparison] = useState<ComparisonHandler | null>(null);
@@ -246,130 +275,17 @@ const CompareComponent = ({ personId, phone }: Props) => {
     const [displaySize, setDisplaySize] = useState<{ width: number; height: number }>({ width: 800, height: 600 });
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [, setBoxVersion] = useState(0);
-    const bumpBox = () => setBoxVersion(v => v + 1);
+    const bumpBox = useCallback(() => setBoxVersion(v => v + 1), []);
 
-    // Photo type options with improved categorization
-    const photoTypes: PhotoType[] = [
-        { id: 'profile', label: 'Facial Profile', code: '10', category: 'facial' },
-        { id: 'rest', label: 'Facial Rest', code: '12', category: 'facial' },
-        { id: 'smile', label: 'Facial Smile', code: '13', category: 'facial' },
-        { id: 'upper', label: 'Occlusal Upper', code: '23', category: 'occlusal' },
-        { id: 'lower', label: 'Occlusal Lower', code: '24', category: 'occlusal' },
-        { id: 'right', label: 'Intra-oral Right', code: '20', category: 'intraoral' },
-        { id: 'center', label: 'Intra-oral Center', code: '22', category: 'intraoral' },
-        { id: 'left', label: 'Intra-oral Left', code: '21', category: 'intraoral' }
-    ];
-
-    // Canvas size options
-    const canvasSizes: CanvasSize[] = [
-        { value: 'auto', label: 'Auto (100%)' },
-        { value: 'auto-50', label: '50% of source' },
-        { value: 'auto-25', label: '25% of source' },
-        { value: '{"width":1080,"height":1350}', label: 'Post (1080 × 1350)' },
-        { value: '{"width":1080,"height":1920}', label: 'Story (1080 × 1920)' },
-        { value: '{"width":2060,"height":2700}', label: '2060 × 2700' }
-    ];
-
-    // Tool selection options (0 = no selection — bounding box hidden, manipulation buttons disabled)
-    const tools: Tool[] = [
-        { value: 0, label: '— None (Deselect) —' },
-        { value: 1, label: 'Image 1' },
-        { value: 2, label: 'Image 2' },
-        { value: 3, label: 'Logo' }
-    ];
-
-    useEffect(() => {
-        loadTimepoints();
-    }, [personId]);
-
-    useEffect(() => {
-        if (canvasRef.current && !comparison) {
-            initializeComparison();
-        }
-    }, [canvasRef.current]);
-
-    useEffect(() => {
-        if (selectedTimepoints.length === 2 && selectedPhotoType) {
-            loadComparisonImages();
-        }
-    }, [selectedTimepoints, selectedPhotoType, comparison]);
-
-    // Clear selectedPhotoType if the user changes a timepoint and the previously-
-    // chosen photo type is no longer present in both. Prevents the canvas from
-    // attempting to render a missing image (404).
-    useEffect(() => {
-        if (!selectedPhotoType || selectedTimepoints.length !== 2) return;
-        const current = photoTypes.find(p => p.id === selectedPhotoType);
-        if (current && !isPhotoTypeAvailable(current.code)) {
-            setSelectedPhotoType('');
-        }
-    }, [selectedTimepoints, timepointImages]);
-
-    useEffect(() => {
-        if (comparison) {
-            comparison.showLogo = showLogo;
-            comparison.render();
-        }
-    }, [showLogo, comparison]);
-
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ro = new ResizeObserver(entries => {
-            for (const entry of entries) {
-                const { width, height } = entry.contentRect;
-                if (width > 0 && height > 0) {
-                    setDisplaySize({ width, height });
-                }
-            }
-        });
-        ro.observe(canvas);
-        return () => ro.disconnect();
-    }, []);
-
-    useEffect(() => {
-        const wrapper = wrapperRef.current;
-        if (!wrapper || !comparison) return;
-        const handler = (e: WheelEvent) => {
-            if (comparison.images.length < 2) return;
-            if (comparison.selectedImage === 0) return;
-            e.preventDefault();
-            comparison.zoomImage(e.deltaY < 0 ? 'in' : 'out');
-            bumpBox();
-        };
-        wrapper.addEventListener('wheel', handler, { passive: false });
-        return () => wrapper.removeEventListener('wheel', handler);
-    }, [comparison]);
-
-    useEffect(() => {
-        if (canvasRef.current) {
-            setCanvasDimensions({
-                width: canvasRef.current.width,
-                height: canvasRef.current.height
-            });
-        }
-    }, [canvasRef.current]);
-
-    useEffect(() => {
-        const handleFullscreenChange = () => {
-            const inFullscreen = document.fullscreenElement === fullscreenRef.current;
-            setIsFullscreen(inFullscreen);
-            // System gesture / F11 exit while slideshow was active: end the slideshow too
-            if (!inFullscreen) setSlideshowActive(false);
-        };
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    }, []);
-
-    const deselect = () => {
+    const deselect = useCallback(() => {
         setSelectedTool(0);
         if (comparison) comparison.selectedImage = 0;
-    };
+    }, [comparison]);
 
-    const selectTool = (toolValue: number) => {
+    const selectTool = useCallback((toolValue: number) => {
         setSelectedTool(toolValue);
         if (comparison) comparison.selectedImage = toolValue;
-    };
+    }, [comparison]);
 
     const toggleFullscreen = async () => {
         if (!fullscreenRef.current) return;
@@ -453,16 +369,16 @@ const CompareComponent = ({ personId, phone }: Props) => {
     // A pair is selectable only when the image exists in EVERY selected timepoint.
     // A pending fetch (no entry in timepointImages yet) correctly disables the pair
     // until the fetch resolves — see fetchTimepointImages which returns [] on failure.
-    const isPhotoTypeAvailable = (photoCode: string): boolean => {
+    const isPhotoTypeAvailable = useCallback((photoCode: string): boolean => {
         if (selectedTimepoints.length === 0) return true;
         return selectedTimepoints.every(tpCode => {
             const images = timepointImages[tpCode];
             return Array.isArray(images) && images.includes(photoCode);
         });
-    };
+    }, [selectedTimepoints, timepointImages]);
 
     const availablePhotoTypes = useMemo(
-        () => photoTypes.filter(p => {
+        () => PHOTO_TYPES.filter(p => {
             if (selectedTimepoints.length === 0) return false;
             return selectedTimepoints.every(tpCode => {
                 const images = timepointImages[tpCode];
@@ -472,7 +388,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
         [selectedTimepoints, timepointImages]
     );
 
-    const startSlideshow = async () => {
+    const startSlideshow = useCallback(async () => {
         if (availablePhotoTypes.length === 0) return;
         setSlideshowIndex(0);
         setSelectedPhotoType(availablePhotoTypes[0].id);
@@ -481,40 +397,26 @@ const CompareComponent = ({ personId, phone }: Props) => {
         if (fullscreenRef.current && !document.fullscreenElement) {
             try { await fullscreenRef.current.requestFullscreen(); } catch { /* fall through */ }
         }
-    };
+    }, [availablePhotoTypes, comparison]);
 
-    const stepSlideshow = (delta: 1 | -1) => {
+    const stepSlideshow = useCallback((delta: 1 | -1) => {
         const next = slideshowIndex + delta;
         if (next < 0 || next >= availablePhotoTypes.length) return;
         setSlideshowIndex(next);
         if (comparison) comparison.reset();
         setSelectedPhotoType(availablePhotoTypes[next].id);
-    };
+    }, [slideshowIndex, availablePhotoTypes, comparison]);
 
-    const stopSlideshow = async () => {
+    const stopSlideshow = useCallback(async () => {
         setSlideshowActive(false);
         if (document.fullscreenElement) {
             try { await document.exitFullscreen(); } catch { /* ignore */ }
         }
-    };
-
-    useEffect(() => {
-        const handleKey = (e: KeyboardEvent) => {
-            if (slideshowActive) {
-                if (e.key === 'ArrowRight') { e.preventDefault(); stepSlideshow(1); return; }
-                if (e.key === 'ArrowLeft')  { e.preventDefault(); stepSlideshow(-1); return; }
-                if (e.key === 'Escape')     { e.preventDefault(); stopSlideshow(); return; }
-            } else if (e.key === 'Escape') {
-                deselect();
-            }
-        };
-        document.addEventListener('keydown', handleKey);
-        return () => document.removeEventListener('keydown', handleKey);
-    }, [comparison, slideshowActive, slideshowIndex, availablePhotoTypes]);
+    }, []);
 
     // Returns the list of image codes ('10','12',...) available for the given timepoint.
     // Empty array on failure — callers use it to disable photo types whose image is missing.
-    const fetchTimepointImages = async (tpCode: number): Promise<string[]> => {
+    const fetchTimepointImages = useCallback(async (tpCode: number): Promise<string[]> => {
         try {
             const response = await fetch(`/api/patients/${personId}/timepoints/${tpCode}/images`);
             if (!response.ok) return [];
@@ -522,9 +424,9 @@ const CompareComponent = ({ personId, phone }: Props) => {
         } catch {
             return [];
         }
-    };
+    }, [personId]);
 
-    const loadTimepoints = async () => {
+    const loadTimepoints = useCallback(async () => {
         if (!personId) {
             setLoading(false);
             return;
@@ -564,13 +466,13 @@ const CompareComponent = ({ personId, phone }: Props) => {
             }
         } catch (err) {
             console.error('Error loading timepoints:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            toast.error('Failed to load timepoints: ' + (err instanceof Error ? err.message : 'Unknown error'));
         } finally {
             setLoading(false);
         }
-    };
+    }, [personId, fetchTimepointImages, toast]);
 
-    const initializeComparison = () => {
+    const initializeComparison = useCallback(() => {
         if (!canvasRef.current) return;
 
         const canvas = canvasRef.current;
@@ -1003,15 +905,15 @@ const CompareComponent = ({ personId, phone }: Props) => {
         };
 
         setComparison(comparisonHandler);
-    };
+    }, [showLogo]);
 
-    const loadComparisonImages = async () => {
+    const loadComparisonImages = useCallback(async () => {
         if (!comparison || selectedTimepoints.length !== 2 || !selectedPhotoType) return;
 
         try {
             setLoading(true);
 
-            const photoType = photoTypes.find(p => p.id === selectedPhotoType);
+            const photoType = PHOTO_TYPES.find(p => p.id === selectedPhotoType);
             if (!photoType) throw new Error('Invalid photo type');
 
             const sortedTimepoints = [...selectedTimepoints].sort((a, b) => a - b);
@@ -1042,11 +944,109 @@ const CompareComponent = ({ personId, phone }: Props) => {
 
         } catch (err) {
             console.error('Error loading comparison images:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            toast.error('Failed to load comparison images: ' + (err instanceof Error ? err.message : 'Unknown error'));
         } finally {
             setLoading(false);
         }
-    };
+    }, [comparison, selectedTimepoints, selectedPhotoType, personId, toast]);
+
+    useEffect(() => {
+        loadTimepoints();
+    }, [loadTimepoints]);
+
+    useEffect(() => {
+        if (canvasRef.current && !comparison) {
+            initializeComparison();
+        }
+    }, [comparison, initializeComparison]);
+
+    useEffect(() => {
+        if (selectedTimepoints.length === 2 && selectedPhotoType) {
+            loadComparisonImages();
+        }
+    }, [selectedTimepoints, selectedPhotoType, loadComparisonImages]);
+
+    // Clear selectedPhotoType if the user changes a timepoint and the previously-
+    // chosen photo type is no longer present in both. Prevents the canvas from
+    // attempting to render a missing image (404).
+    useEffect(() => {
+        if (!selectedPhotoType || selectedTimepoints.length !== 2) return;
+        const current = PHOTO_TYPES.find(p => p.id === selectedPhotoType);
+        if (current && !isPhotoTypeAvailable(current.code)) {
+            setSelectedPhotoType('');
+        }
+    }, [selectedTimepoints, selectedPhotoType, isPhotoTypeAvailable]);
+
+    useEffect(() => {
+        if (comparison) {
+            comparison.showLogo = showLogo;
+            comparison.render();
+        }
+    }, [showLogo, comparison]);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ro = new ResizeObserver(entries => {
+            for (const entry of entries) {
+                const { width, height } = entry.contentRect;
+                if (width > 0 && height > 0) {
+                    setDisplaySize({ width, height });
+                }
+            }
+        });
+        ro.observe(canvas);
+        return () => ro.disconnect();
+    }, []);
+
+    useEffect(() => {
+        const wrapper = wrapperRef.current;
+        if (!wrapper || !comparison) return;
+        const handler = (e: WheelEvent) => {
+            if (comparison.images.length < 2) return;
+            if (comparison.selectedImage === 0) return;
+            e.preventDefault();
+            comparison.zoomImage(e.deltaY < 0 ? 'in' : 'out');
+            bumpBox();
+        };
+        wrapper.addEventListener('wheel', handler, { passive: false });
+        return () => wrapper.removeEventListener('wheel', handler);
+    }, [comparison, bumpBox]);
+
+    // canvasRef is set on first commit; one-shot read after mount.
+    useEffect(() => {
+        if (canvasRef.current) {
+            setCanvasDimensions({
+                width: canvasRef.current.width,
+                height: canvasRef.current.height
+            });
+        }
+    }, []);
+
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            const inFullscreen = document.fullscreenElement === fullscreenRef.current;
+            setIsFullscreen(inFullscreen);
+            // System gesture / F11 exit while slideshow was active: end the slideshow too
+            if (!inFullscreen) setSlideshowActive(false);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
+    useEffect(() => {
+        const handleKey = (e: KeyboardEvent) => {
+            if (slideshowActive) {
+                if (e.key === 'ArrowRight') { e.preventDefault(); stepSlideshow(1); return; }
+                if (e.key === 'ArrowLeft')  { e.preventDefault(); stepSlideshow(-1); return; }
+                if (e.key === 'Escape')     { e.preventDefault(); stopSlideshow(); return; }
+            } else if (e.key === 'Escape') {
+                deselect();
+            }
+        };
+        document.addEventListener('keydown', handleKey);
+        return () => document.removeEventListener('keydown', handleKey);
+    }, [slideshowActive, deselect, stepSlideshow, stopSlideshow]);
 
     const handleTimepointSelection = async (tpCode: number, checked: boolean) => {
         if (checked) {
@@ -1252,29 +1252,16 @@ const CompareComponent = ({ personId, phone }: Props) => {
             : allKeys;
         const stroke = 'rgba(0, 123, 255, 0.95)';
 
+        // Dynamic dash pattern scales with DPI; static cursor + hover rules live in the module.
+        const rotateDashStyle = { '--rotate-dash': `${dashOn * 0.5} ${dashOff * 0.5}` } as CSSProperties;
+
         return (
             <svg
                 ref={svgRef}
-                style={{
-                    position: 'absolute',
-                    inset: 0,
-                    width: '100%',
-                    height: '100%',
-                    pointerEvents: 'none',
-                    overflow: 'visible',
-                }}
+                className={styles.svgOverlay}
                 viewBox={`0 0 ${canvasDimensions.width} ${canvasDimensions.height}`}
                 preserveAspectRatio="none"
             >
-                <style>{`
-                    .cmp-rotate-zone {
-                        cursor: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 12 A 7 7 0 1 1 12 5' stroke='white' stroke-width='3.5'/%3E%3Cpath d='M12 2 L12 5 L15 5' stroke='white' stroke-width='3.5'/%3E%3Cpath d='M19 12 A 7 7 0 1 1 12 5' stroke='black' stroke-width='1.6'/%3E%3Cpath d='M12 2 L12 5 L15 5' stroke='black' stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E") 12 12, grab;
-                    }
-                    .cmp-rotate-zone:hover {
-                        stroke: rgba(0, 123, 255, 0.55);
-                        stroke-dasharray: ${dashOn * 0.5} ${dashOff * 0.5};
-                    }
-                `}</style>
                 {ordered.map(key => {
                     const g = geom.get(key);
                     if (!g) return null;
@@ -1338,7 +1325,8 @@ const CompareComponent = ({ personId, phone }: Props) => {
                             {g.corners.map((c, i) => (
                                 <circle
                                     key={`rot-${i}`}
-                                    className="cmp-rotate-zone"
+                                    className={styles.rotateZone}
+                                    style={rotateDashStyle}
                                     cx={c.x}
                                     cy={c.y}
                                     r={rotateRingR}
@@ -1429,98 +1417,34 @@ const CompareComponent = ({ personId, phone }: Props) => {
         );
     }
 
-    if (error) {
-        return (
-            <div className="error-message">
-                <h3>Error</h3>
-                <p>{error}</p>
-                <button onClick={() => window.location.reload()}>Retry</button>
-            </div>
-        );
-    }
+    const isReady = selectedTimepoints.length === 2 && Boolean(selectedPhotoType);
 
     return (
-        <div
-            className="compare-container"
-            style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}
-        >
-            {/* Status indicator */}
-            <div
-                style={{
-                    padding: '15px',
-                    marginBottom: '20px',
-                    backgroundColor: selectedTimepoints.length === 2 && selectedPhotoType ? '#d4edda' : '#fff3cd',
-                    border: '2px solid',
-                    borderColor: selectedTimepoints.length === 2 && selectedPhotoType ? '#c3e6cb' : '#ffeaa7',
-                    borderRadius: '8px',
-                    color: selectedTimepoints.length === 2 && selectedPhotoType ? '#155724' : '#856404',
-                    fontSize: '16px',
-                    fontWeight: '500',
-                    textAlign: 'center'
-                }}
-            >
+        <div className={styles.container}>
+            <div className={cn(styles.statusBanner, isReady ? styles.statusBannerReady : styles.statusBannerPending)}>
                 <strong>Status: </strong>
                 <span>
                     {selectedTimepoints.length === 0 ? 'Select 2 timepoints to begin' :
                     selectedTimepoints.length === 1 ? 'Select 1 more timepoint' :
                     selectedTimepoints.length === 2 && !selectedPhotoType ? 'Now select a photo type' :
-                    selectedTimepoints.length === 2 && selectedPhotoType ? 'Ready! Images should appear in canvas below' :
+                    isReady ? 'Ready! Images should appear in canvas below' :
                     'Please select timepoints and photo type'}
                 </span>
             </div>
 
-            {/* Main Content Area - Canvas, Controls, and Selection */}
-            <div style={{
-                display: 'flex',
-                gap: '20px',
-                marginBottom: '20px',
-                flexWrap: 'wrap'
-            }}>
-                {/* Canvas Container */}
+            <div className={styles.mainArea}>
                 <div
                     ref={fullscreenRef}
                     onPointerDown={() => deselect()}
-                    style={{
-                        flex: '1',
-                        minWidth: isFullscreen ? '0' : '600px',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        padding: '20px',
-                        backgroundColor: isFullscreen ? '#000' : '#f8f9fa',
-                        borderRadius: isFullscreen ? 0 : '8px',
-                        border: isFullscreen ? 'none' : '1px solid #dee2e6',
-                        overflow: 'auto',
-                        position: 'relative',
-                        width: isFullscreen ? '100vw' : undefined,
-                        height: isFullscreen ? '100vh' : undefined,
-                    }}
+                    className={isFullscreen ? styles.canvasPanelFullscreen : styles.canvasPanel}
                 >
-                    <div style={{
-                        position: 'absolute',
-                        top: '10px',
-                        right: '10px',
-                        zIndex: 10,
-                        display: slideshowActive ? 'none' : 'flex',
-                        gap: '8px',
-                    }}>
+                    <div className={cn(styles.canvasToolbar, slideshowActive && styles.canvasToolbarHidden)}>
                         {canNativeShare && (
                             <button
                                 onClick={handleShare}
                                 title="Share comparison"
                                 aria-label="Share comparison"
-                                style={{
-                                    padding: '8px 10px',
-                                    fontSize: '14px',
-                                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                }}
+                                className={styles.toolbarButton}
                             >
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                     <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z" />
@@ -1537,20 +1461,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
                                         ? `Start slideshow (${availablePhotoTypes.length} pair${availablePhotoTypes.length === 1 ? '' : 's'})`
                                         : 'Select two timepoints with shared images to enable slideshow'}
                                     aria-label="Start pair slideshow"
-                                    style={{
-                                        padding: '8px 10px',
-                                        fontSize: '18px',
-                                        lineHeight: 1,
-                                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: canSlideshow ? 'pointer' : 'not-allowed',
-                                        opacity: canSlideshow ? 1 : 0.5,
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                    }}
+                                    className={cn(styles.toolbarButton, styles.toolbarButtonLarge)}
                                 >
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                         <path d="M8 5v14l11-7z" />
@@ -1562,19 +1473,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
                             onClick={toggleFullscreen}
                             title={isFullscreen ? 'Exit Fullscreen (Esc)' : 'Fullscreen'}
                             aria-label={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-                            style={{
-                                padding: '8px 10px',
-                                fontSize: '18px',
-                                lineHeight: 1,
-                                backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                            }}
+                            className={cn(styles.toolbarButton, styles.toolbarButtonLarge)}
                         >
                             {isFullscreen ? '✕' : '⛶'}
                         </button>
@@ -1585,187 +1484,67 @@ const CompareComponent = ({ personId, phone }: Props) => {
                                 onClick={stopSlideshow}
                                 title="Close slideshow (Esc)"
                                 aria-label="Close slideshow"
-                                style={{
-                                    position: 'absolute',
-                                    top: '20px',
-                                    right: '20px',
-                                    zIndex: 20,
-                                    width: '44px',
-                                    height: '44px',
-                                    fontSize: '22px',
-                                    lineHeight: 1,
-                                    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '50%',
-                                    cursor: 'pointer',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                }}
+                                className={styles.slideshowClose}
                             >✕</button>
                             <button
                                 onClick={() => stepSlideshow(-1)}
                                 disabled={slideshowIndex === 0}
                                 title="Previous pair (←)"
                                 aria-label="Previous pair"
-                                style={{
-                                    position: 'absolute',
-                                    left: '20px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    zIndex: 20,
-                                    width: '64px',
-                                    height: '64px',
-                                    fontSize: '36px',
-                                    lineHeight: 1,
-                                    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '50%',
-                                    cursor: slideshowIndex === 0 ? 'not-allowed' : 'pointer',
-                                    opacity: slideshowIndex === 0 ? 0.3 : 1,
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                }}
+                                className={cn(styles.slideshowArrow, styles.slideshowPrev)}
                             >‹</button>
                             <button
                                 onClick={() => stepSlideshow(1)}
                                 disabled={slideshowIndex === availablePhotoTypes.length - 1}
                                 title="Next pair (→)"
                                 aria-label="Next pair"
-                                style={{
-                                    position: 'absolute',
-                                    right: '20px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    zIndex: 20,
-                                    width: '64px',
-                                    height: '64px',
-                                    fontSize: '36px',
-                                    lineHeight: 1,
-                                    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '50%',
-                                    cursor: slideshowIndex === availablePhotoTypes.length - 1 ? 'not-allowed' : 'pointer',
-                                    opacity: slideshowIndex === availablePhotoTypes.length - 1 ? 0.3 : 1,
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                }}
+                                className={cn(styles.slideshowArrow, styles.slideshowNext)}
                             >›</button>
-                            <div
-                                style={{
-                                    position: 'absolute',
-                                    top: '20px',
-                                    left: '50%',
-                                    transform: 'translateX(-50%)',
-                                    zIndex: 20,
-                                    padding: '6px 14px',
-                                    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-                                    color: 'white',
-                                    borderRadius: '999px',
-                                    fontSize: '14px',
-                                    fontWeight: 600,
-                                    fontFamily: 'monospace',
-                                }}
-                            >
+                            <div className={styles.slideshowCounter}>
                                 {slideshowIndex + 1} / {availablePhotoTypes.length}
                             </div>
                         </>
                     )}
                     <div
                         ref={wrapperRef}
-                        style={{
-                            position: 'relative',
-                            display: 'inline-block',
-                            lineHeight: 0,
-                            border: isFullscreen ? 'none' : '1px solid #ccc',
-                            borderRadius: '4px',
-                            touchAction: 'none',
-                            maxWidth: '100%',
-                            maxHeight: '100%',
-                        }}
+                        className={isFullscreen ? styles.canvasWrapperFullscreen : styles.canvasWrapper}
                     >
                         <canvas
                             ref={canvasRef}
                             id="comparison-canvas"
                             width={800}
                             height={600}
-                            style={{
-                                backgroundColor: 'white',
-                                display: 'block',
-                                maxWidth: isFullscreen ? '100vw' : '600px',
-                                maxHeight: isFullscreen ? '100vh' : '800px',
-                                width: 'auto',
-                                height: 'auto',
-                                objectFit: 'contain',
-                            }}
+                            className={isFullscreen ? styles.canvasElFullscreen : styles.canvasEl}
                         />
                         {renderOverlay()}
                     </div>
                 </div>
 
-                {/* Controls Panel */}
-                <div style={{
-                    width: '280px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '8px',
-                    padding: '20px',
-                    height: 'fit-content'
-                }}>
-                    <h3 style={{ margin: '0 0 15px 0', color: '#495057' }}>
+                <div className={cn(styles.sidePanel, styles.controlsPanel)}>
+                    <h3 className={styles.panelHeading}>
                         Canvas Controls
                     </h3>
 
-                    {/* Canvas Dimensions Display */}
-                    <div style={{
-                        marginBottom: '20px',
-                        padding: '10px',
-                        backgroundColor: '#f8f9fa',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '6px',
-                        textAlign: 'center'
-                    }}>
-                        <div style={{
-                            fontSize: '12px',
-                            fontWeight: 'bold',
-                            color: '#6c757d',
-                            marginBottom: '5px'
-                        }}>
+                    <div className={styles.dimensionsBox}>
+                        <div className={styles.dimensionsLabel}>
                             Canvas Size
                         </div>
-                        <div style={{
-                            fontSize: '16px',
-                            fontWeight: 'bold',
-                            color: '#495057',
-                            fontFamily: 'monospace'
-                        }}>
+                        <div className={styles.dimensionsValue}>
                             {canvasDimensions.width} × {canvasDimensions.height}
                         </div>
                     </div>
 
-                    {/* Canvas Size */}
-                    <div style={{ marginBottom: '15px' }}>
-                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                    <div className={styles.controlGroup}>
+                        <label className={styles.controlLabel}>
                             Canvas Size:
                         </label>
                         <select
                             value={canvasSize}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => handleCanvasSizeChange(e.target.value)}
                             title="Choose canvas dimensions - Auto fits to container, other options set specific pixel dimensions for social media"
-                            style={{
-                                width: '100%',
-                                padding: '8px',
-                                border: '1px solid #ddd',
-                                borderRadius: '4px',
-                                cursor: 'pointer'
-                            }}
+                            className="form-control"
                         >
-                            {canvasSizes.map(size => (
+                            {CANVAS_SIZES.map(size => (
                                 <option key={size.value} value={size.value}>
                                     {size.label}
                                 </option>
@@ -1773,24 +1552,17 @@ const CompareComponent = ({ personId, phone }: Props) => {
                         </select>
                     </div>
 
-                    {/* Tool Selection */}
-                    <div style={{ marginBottom: '15px' }}>
-                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                    <div className={styles.controlGroup}>
+                        <label className={styles.controlLabel}>
                             Selected Tool:
                         </label>
                         <select
                             value={selectedTool}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => selectTool(Number(e.target.value))}
                             title="Choose which element to manipulate - Image 1 (top/left), Image 2 (bottom/right), or Logo (overlay). 'None' deselects."
-                            style={{
-                                width: '100%',
-                                padding: '8px',
-                                border: '1px solid #ddd',
-                                borderRadius: '4px',
-                                cursor: 'pointer'
-                            }}
+                            className="form-control"
                         >
-                            {tools.map(tool => (
+                            {TOOLS.map(tool => (
                                 <option key={tool.value} value={tool.value}>
                                     {tool.label}
                                 </option>
@@ -1798,34 +1570,22 @@ const CompareComponent = ({ personId, phone }: Props) => {
                         </select>
                     </div>
 
-                    {/* Movement Controls */}
-                    <div style={{ marginBottom: '15px' }}>
-                        <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', textAlign: 'center' }}>
+                    <div className={styles.controlGroup}>
+                        <label className={styles.controlLabelCentered}>
                             Move Selected Image:
                         </label>
                         {(() => {
                             const hasSelection = selectedTool !== 0;
-                            const moveStyle = (bg: string) => ({
-                                padding: '8px',
-                                fontSize: '20px',
-                                lineHeight: 1,
-                                backgroundColor: bg,
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                cursor: hasSelection ? 'pointer' : 'not-allowed',
-                                opacity: hasSelection ? 1 : 0.5,
-                            });
                             const disabledTitle = (base: string) =>
                                 hasSelection ? base : 'Select an image first (click a photo or use the dropdown)';
                             return (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', maxWidth: '120px', margin: '0 auto' }}>
+                                <div className={styles.movementGrid}>
                                     <div />
                                     <button
                                         onClick={() => comparison && comparison.moveImage('up')}
                                         disabled={!hasSelection}
                                         title={disabledTitle('Move Up - Move the selected image upward')}
-                                        style={moveStyle('#6c757d')}
+                                        className={styles.movementButton}
                                     >
                                         ↑
                                     </button>
@@ -1834,18 +1594,18 @@ const CompareComponent = ({ personId, phone }: Props) => {
                                         onClick={() => comparison && comparison.moveImage('left')}
                                         disabled={!hasSelection}
                                         title={disabledTitle('Move Left - Move the selected image to the left')}
-                                        style={moveStyle('#6c757d')}
+                                        className={styles.movementButton}
                                     >
                                         ←
                                     </button>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#666' }}>
+                                    <div className={styles.movementCenter}>
                                         ⊕
                                     </div>
                                     <button
                                         onClick={() => comparison && comparison.moveImage('right')}
                                         disabled={!hasSelection}
                                         title={disabledTitle('Move Right - Move the selected image to the right')}
-                                        style={moveStyle('#6c757d')}
+                                        className={styles.movementButton}
                                     >
                                         →
                                     </button>
@@ -1854,7 +1614,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
                                         onClick={() => comparison && comparison.moveImage('down')}
                                         disabled={!hasSelection}
                                         title={disabledTitle('Move Down - Move the selected image downward')}
-                                        style={moveStyle('#6c757d')}
+                                        className={styles.movementButton}
                                     >
                                         ↓
                                     </button>
@@ -1864,13 +1624,12 @@ const CompareComponent = ({ personId, phone }: Props) => {
                         })()}
                     </div>
 
-                    {/* Control Buttons */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                    <div className={styles.controlsGrid}>
                         <button
                             onClick={() => comparison && selectedTool !== 0 && comparison.zoomImage('in')}
                             disabled={selectedTool === 0}
                             title={selectedTool === 0 ? 'Select an image first (click a photo or use the dropdown)' : 'Zoom In - Enlarge the selected image'}
-                            style={{ padding: '8px', fontSize: '20px', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: selectedTool === 0 ? 'not-allowed' : 'pointer', opacity: selectedTool === 0 ? 0.5 : 1 }}
+                            className={cn('btn', 'btn-primary', styles.controlButtonIcon)}
                         >
                             🔍+
                         </button>
@@ -1878,7 +1637,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
                             onClick={() => comparison && selectedTool !== 0 && comparison.zoomImage('out')}
                             disabled={selectedTool === 0}
                             title={selectedTool === 0 ? 'Select an image first (click a photo or use the dropdown)' : 'Zoom Out - Shrink the selected image'}
-                            style={{ padding: '8px', fontSize: '20px', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#17a2b8', color: 'white', border: 'none', borderRadius: '4px', cursor: selectedTool === 0 ? 'not-allowed' : 'pointer', opacity: selectedTool === 0 ? 0.5 : 1 }}
+                            className={cn('btn', 'btn-info', styles.controlButtonIcon)}
                         >
                             🔍-
                         </button>
@@ -1886,7 +1645,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
                             onClick={() => comparison && selectedTool !== 0 && comparison.rotateImage('clockwise')}
                             disabled={selectedTool === 0}
                             title={selectedTool === 0 ? 'Select an image first (click a photo or use the dropdown)' : 'Rotate Clockwise - Rotate the selected image 1° clockwise'}
-                            style={{ padding: '8px', fontSize: '22px', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fd7e14', color: 'white', border: 'none', borderRadius: '4px', cursor: selectedTool === 0 ? 'not-allowed' : 'pointer', opacity: selectedTool === 0 ? 0.5 : 1 }}
+                            className={cn('btn', 'btn-warning', styles.controlButtonIcon)}
                             aria-label="Rotate Clockwise"
                         >
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1898,7 +1657,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
                             onClick={() => comparison && selectedTool !== 0 && comparison.rotateImage('counterclockwise')}
                             disabled={selectedTool === 0}
                             title={selectedTool === 0 ? 'Select an image first (click a photo or use the dropdown)' : 'Rotate Counter-Clockwise - Rotate the selected image 1° counter-clockwise'}
-                            style={{ padding: '8px', fontSize: '22px', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#6f42c1', color: 'white', border: 'none', borderRadius: '4px', cursor: selectedTool === 0 ? 'not-allowed' : 'pointer', opacity: selectedTool === 0 ? 0.5 : 1 }}
+                            className={cn('btn', 'btn-warning', styles.controlButtonIcon)}
                             aria-label="Rotate Counter-Clockwise"
                         >
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1909,7 +1668,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
                         <button
                             onClick={() => comparison && comparison.toggleOrientation()}
                             title="Toggle Layout - Switch between vertical and horizontal image arrangement"
-                            style={{ padding: '8px', fontSize: '20px', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            className={cn('btn', 'btn-success', styles.controlButtonIcon)}
                             aria-label="Toggle Layout Orientation"
                         >
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1920,7 +1679,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
                         <button
                             onClick={() => comparison && comparison.toggleBisect()}
                             title="Toggle Bisect Line - Show/hide alignment line between images"
-                            style={{ padding: '8px', fontSize: '22px', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            className={cn('btn', 'btn-danger', styles.controlButtonIcon)}
                         >
                             ═
                         </button>
@@ -1932,14 +1691,14 @@ const CompareComponent = ({ personId, phone }: Props) => {
                                 }
                             }}
                             title={showLogo ? 'Hide Logo - Remove logo from comparison' : 'Show Logo - Add logo to comparison'}
-                            style={{ padding: '8px', fontSize: '12px', backgroundColor: showLogo ? '#ffc107' : '#28a745', color: showLogo ? '#212529' : 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            className={cn('btn', showLogo ? 'btn-warning' : 'btn-success', styles.controlButton)}
                         >
                             {showLogo ? 'Hide Logo' : 'Show Logo'}
                         </button>
                         <button
                             onClick={() => comparison && comparison.reset()}
                             title="Reset All - Return all images to their original position, size, and rotation"
-                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            className={cn('btn', 'btn-light', styles.controlButton)}
                         >
                             Reset
                         </button>
@@ -1947,7 +1706,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
                             onClick={handleSave}
                             disabled={!comparison}
                             title="Save - Download the comparison image as a PNG file"
-                            style={{ padding: '8px', fontSize: '12px', backgroundColor: '#0d6efd', color: 'white', border: 'none', borderRadius: '4px', cursor: comparison ? 'pointer' : 'not-allowed', opacity: comparison ? 1 : 0.5 }}
+                            className={cn('btn', 'btn-primary', styles.controlButton)}
                         >
                             Save
                         </button>
@@ -1961,16 +1720,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
                                     title={isSendable
                                         ? "Send to WhatsApp - Export the comparison image and send via WhatsApp"
                                         : `Image too large for WhatsApp (${canvasDimensions.width}×${canvasDimensions.height}, ${(pixelCount / 1_000_000).toFixed(1)} MP). Choose a smaller size from the dropdown.`}
-                                    style={{
-                                        padding: '8px',
-                                        fontSize: '12px',
-                                        backgroundColor: isSendable ? '#25d366' : '#9da39d',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: isSendable ? 'pointer' : 'not-allowed',
-                                        opacity: isSendable ? 1 : 0.7,
-                                    }}
+                                    className={cn('btn', styles.controlButton, styles.whatsappBrandButton)}
                                 >
                                     WhatsApp
                                 </button>
@@ -1979,72 +1729,29 @@ const CompareComponent = ({ personId, phone }: Props) => {
                     </div>
                 </div>
 
-                {/* Merged Selection Panel (Timepoints + Photo Types) */}
-                <div style={{
-                    width: '320px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '8px',
-                    padding: '20px',
-                    height: 'fit-content',
-                    maxHeight: '600px',
-                    overflowY: 'auto'
-                }}>
-                    <h3 style={{ margin: '0 0 20px 0', color: '#495057', textAlign: 'center' }}>
+                <div className={cn(styles.sidePanel, styles.selectionPanel)}>
+                    <h3 className={styles.panelHeadingCentered}>
                         Image Selection
                     </h3>
 
-                    {/* Step 1: Timepoints Selection */}
-                    <div style={{
-                        marginBottom: '25px',
-                        padding: '15px',
-                        backgroundColor: '#f8f9fa',
-                        borderRadius: '6px',
-                        border: '1px solid #e9ecef'
-                    }}>
-                        <h4 style={{
-                            margin: '0 0 15px 0',
-                            color: '#495057',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span style={{
-                                backgroundColor: selectedTimepoints.length === 2 ? '#28a745' : '#6c757d',
-                                color: 'white',
-                                borderRadius: '50%',
-                                width: '20px',
-                                height: '20px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '12px',
-                                fontWeight: 'bold'
-                            }}>
+                    <div className={styles.stepBox}>
+                        <h4 className={styles.stepHeader}>
+                            <span className={cn(styles.stepNumber, selectedTimepoints.length === 2 && styles.stepNumberComplete)}>
                                 1
                             </span>
                             <span>Select 2 Timepoints</span>
                         </h4>
-                        <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                        <div className={styles.timepointList}>
                             {timepoints.map(tp => (
                                 <label
                                     key={tp.tpCode}
-                                    style={{
-                                        display: 'block',
-                                        marginBottom: '8px',
-                                        padding: '8px',
-                                        backgroundColor: selectedTimepoints.includes(tp.tpCode) ? '#e3f2fd' : 'white',
-                                        border: '1px solid #ddd',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        fontSize: '14px'
-                                    }}
+                                    className={cn(styles.checkboxRow, selectedTimepoints.includes(tp.tpCode) && styles.checkboxRowSelected)}
                                 >
                                     <input
                                         type="checkbox"
                                         checked={selectedTimepoints.includes(tp.tpCode)}
                                         onChange={(e: ChangeEvent<HTMLInputElement>) => handleTimepointSelection(tp.tpCode, e.target.checked)}
-                                        style={{ marginRight: '8px' }}
+                                        className={styles.checkboxInput}
                                     />
                                     <span>
                                         {tp.tpDescription} ({new Date(tp.tpDateTime).toLocaleDateString()})
@@ -2054,87 +1761,49 @@ const CompareComponent = ({ personId, phone }: Props) => {
                         </div>
                     </div>
 
-                    {/* Step 2: Photo Type Selection */}
-                    <div style={{
-                        padding: '15px',
-                        backgroundColor: selectedTimepoints.length === 2 ? '#f8f9fa' : '#f1f3f4',
-                        borderRadius: '6px',
-                        border: '1px solid #e9ecef',
-                        opacity: selectedTimepoints.length === 2 ? 1 : 0.6
-                    }}>
-                        <h4 style={{
-                            margin: '0 0 15px 0',
-                            color: '#495057',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span style={{
-                                backgroundColor: selectedTimepoints.length === 2 && selectedPhotoType ? '#28a745' : '#6c757d',
-                                color: 'white',
-                                borderRadius: '50%',
-                                width: '20px',
-                                height: '20px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '12px',
-                                fontWeight: 'bold'
-                            }}>
+                    <div className={cn(styles.stepBoxLast, selectedTimepoints.length !== 2 && styles.stepBoxDisabled)}>
+                        <h4 className={styles.stepHeader}>
+                            <span className={cn(styles.stepNumber, isReady && styles.stepNumberComplete)}>
                                 2
                             </span>
                             <span>Select Photo Type</span>
                         </h4>
                         {selectedTimepoints.length < 2 && (
-                            <p style={{
-                                margin: '0 0 15px 0',
-                                fontSize: '13px',
-                                color: '#6c757d',
-                                fontStyle: 'italic'
-                            }}>
+                            <p className={styles.stepHint}>
                                 Select 2 timepoints first
                             </p>
                         )}
-                        <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                        <div className={styles.photoTypeList}>
                             {['facial', 'occlusal', 'intraoral'].map(category => (
-                                <div key={category} style={{ marginBottom: '12px' }}>
-                                    <h5 style={{
-                                        margin: '0 0 8px 0',
-                                        textTransform: 'capitalize',
-                                        color: '#495057',
-                                        fontSize: '13px',
-                                        fontWeight: '600'
-                                    }}>
+                                <div key={category} className={styles.photoTypeCategory}>
+                                    <h5 className={styles.photoTypeCategoryTitle}>
                                         {category}
                                     </h5>
                                     <div>
-                                        {photoTypes.filter(pt => pt.category === category).map(photoType => (
-                                            <label
-                                                key={photoType.id}
-                                                style={{
-                                                    display: 'block',
-                                                    marginBottom: '4px',
-                                                    padding: '6px 8px',
-                                                    backgroundColor: selectedPhotoType === photoType.id ? '#e3f2fd' : 'white',
-                                                    border: '1px solid #ddd',
-                                                    borderRadius: '4px',
-                                                    cursor: isPhotoTypeAvailable(photoType.code) && selectedTimepoints.length === 2 ? 'pointer' : 'not-allowed',
-                                                    opacity: isPhotoTypeAvailable(photoType.code) && selectedTimepoints.length === 2 ? 1 : 0.5,
-                                                    fontSize: '13px'
-                                                }}
-                                            >
-                                                <input
-                                                    type="radio"
-                                                    name="photoType"
-                                                    value={photoType.id}
-                                                    checked={selectedPhotoType === photoType.id}
-                                                    disabled={!isPhotoTypeAvailable(photoType.code) || selectedTimepoints.length !== 2}
-                                                    onChange={(e: ChangeEvent<HTMLInputElement>) => setSelectedPhotoType(e.target.value)}
-                                                    style={{ marginRight: '6px' }}
-                                                />
-                                                <span>{photoType.label}</span>
-                                            </label>
-                                        ))}
+                                        {PHOTO_TYPES.filter(pt => pt.category === category).map(photoType => {
+                                            const available = isPhotoTypeAvailable(photoType.code) && selectedTimepoints.length === 2;
+                                            return (
+                                                <label
+                                                    key={photoType.id}
+                                                    className={cn(
+                                                        styles.radioRow,
+                                                        selectedPhotoType === photoType.id && styles.radioRowSelected,
+                                                        !available && styles.radioRowDisabled,
+                                                    )}
+                                                >
+                                                    <input
+                                                        type="radio"
+                                                        name="photoType"
+                                                        value={photoType.id}
+                                                        checked={selectedPhotoType === photoType.id}
+                                                        disabled={!available}
+                                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setSelectedPhotoType(e.target.value)}
+                                                        className={styles.radioInput}
+                                                    />
+                                                    <span>{photoType.label}</span>
+                                                </label>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             ))}
@@ -2143,19 +1812,12 @@ const CompareComponent = ({ personId, phone }: Props) => {
                 </div>
             </div>
 
-            {/* WhatsApp Modal */}
             <Modal
                 isOpen={showWhatsAppModal}
                 onClose={() => setShowWhatsAppModal(false)}
                 ariaLabelledBy="compare-whatsapp-title"
             >
-                <div style={{
-                    backgroundColor: 'white',
-                    padding: '30px',
-                    borderRadius: '8px',
-                    width: '400px',
-                    maxWidth: '90vw'
-                }}>
+                <div className={styles.modalCard}>
                     <h3 id="compare-whatsapp-title">Send to WhatsApp</h3>
                     <form onSubmit={handleWhatsAppSend}>
                         <input
@@ -2164,38 +1826,20 @@ const CompareComponent = ({ personId, phone }: Props) => {
                             value={phoneNumber}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setPhoneNumber(e.target.value)}
                             required
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                marginBottom: '20px',
-                                border: '1px solid #ddd',
-                                borderRadius: '4px'
-                            }}
+                            className={cn('form-control', styles.modalInput)}
                         />
-                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                        <div className={styles.modalActions}>
                             <button
                                 type="button"
                                 onClick={() => setShowWhatsAppModal(false)}
-                                style={{
-                                    padding: '10px 20px',
-                                    backgroundColor: '#6c757d',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '4px'
-                                }}
+                                className="btn btn-light"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
                                 disabled={sendingMessage}
-                                style={{
-                                    padding: '10px 20px',
-                                    backgroundColor: '#25d366',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '4px'
-                                }}
+                                className={cn('btn', styles.whatsappBrandButton)}
                             >
                                 {sendingMessage ? 'Sending...' : 'Send'}
                             </button>
