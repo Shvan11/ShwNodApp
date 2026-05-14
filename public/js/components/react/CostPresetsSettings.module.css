@@ -4,31 +4,6 @@
 
 .costPresetsSettings {
     width: 100%;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: var(--spacing-lg);
-}
-
-/* Header */
-.settingsHeader {
-    margin-bottom: var(--spacing-xl);
-    padding-bottom: var(--spacing-md);
-    border-bottom: 2px solid var(--border-color);
-}
-
-.settingsHeader h2 {
-    margin: 0 0 var(--spacing-sm) 0;
-    font-size: var(--font-size-2xl);
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
-
-.settingsHeader p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: var(--font-size-base);
 }
 
 /* Currency Tabs */
@@ -259,10 +234,6 @@
 }
 
 @media (max-width: 768px) {
-    .costPresetsSettings {
-        padding: var(--spacing-md);
-    }
-
     .currencyTabs {
         flex-wrap: wrap;
     }

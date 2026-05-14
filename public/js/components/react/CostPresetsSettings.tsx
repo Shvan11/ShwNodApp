@@ -194,13 +194,6 @@ const CostPresetsSettings = () => {
 
     return (
         <div className={styles.costPresetsSettings}>
-            <div className={styles.settingsHeader}>
-                <h2>
-                    <i className="fas fa-dollar-sign"></i> Estimated Cost Presets
-                </h2>
-                <p>Manage preset values for estimated treatment costs</p>
-            </div>
-
             {/* Currency Tabs */}
             <div className={styles.currencyTabs}>
                 <button

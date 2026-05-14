@@ -13,7 +13,6 @@ import EmailSettings from './EmailSettings';
 import EmployeeSettings from './EmployeeSettings';
 import UserManagement from './UserManagement';
 import AdminUserManagement from './AdminUserManagement';
-import CostPresetsSettings from './CostPresetsSettings';
 import ExchangeRatesSettings from './ExchangeRatesSettings';
 import LookupsSettings from './LookupsSettings';
 import ProtocolHandlersSettings from './ProtocolHandlersSettings';
@@ -56,7 +55,6 @@ const SettingsComponent: React.FC = () => {
         alignerDoctors: { hasChanges: false },
         email: { hasChanges: false },
         employees: { hasChanges: false },
-        costPresets: { hasChanges: false },
         exchangeRates: { hasChanges: false },
         lookups: { hasChanges: false },
         calendarTimes: { hasChanges: false },
@@ -125,13 +123,6 @@ const SettingsComponent: React.FC = () => {
             icon: 'fas fa-users',
             component: EmployeeSettings,
             description: 'Manage staff members and email notification settings'
-        },
-        {
-            id: 'costPresets',
-            label: 'Cost Presets',
-            icon: 'fas fa-dollar-sign',
-            component: CostPresetsSettings,
-            description: 'Manage estimated cost preset values'
         },
         {
             id: 'exchangeRates',

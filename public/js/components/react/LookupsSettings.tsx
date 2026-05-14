@@ -2,9 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import LookupEditor from './LookupEditor';
 import HolidayEditor from './HolidayEditor';
+import CostPresetsSettings from './CostPresetsSettings';
 
 // Import component-specific CSS
 import '../../../css/components/lookup-editor.css';
+
+// Synthetic table entry for cost presets — backed by /api/settings/cost-presets,
+// not the generic /api/admin/lookups CRUD (Decimal Amount column isn't
+// representable in the generic lookup-admin whitelist).
+const COST_PRESETS_TABLE_KEY = 'tblEstimatedCostPresets';
 
 // Types
 interface ColumnConfig {
@@ -54,7 +60,14 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
             const response = await fetch('/api/admin/lookups/tables');
             if (response.ok) {
                 const data: TableConfig[] = await response.json();
-                setTables(data);
+                const costPresetsEntry: TableConfig = {
+                    key: COST_PRESETS_TABLE_KEY,
+                    displayName: 'Cost Presets',
+                    icon: 'fas fa-dollar-sign',
+                    idColumn: 'PresetID',
+                    columns: [],
+                };
+                setTables([...data, costPresetsEntry]);
             } else {
                 toast.error('Failed to load lookup tables configuration');
             }
@@ -90,6 +103,11 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
             name: 'Templates',
             icon: 'fas fa-file-alt',
             keys: ['DocumentTypes']
+        },
+        {
+            name: 'Financial',
+            icon: 'fas fa-dollar-sign',
+            keys: [COST_PRESETS_TABLE_KEY]
         }
     ];
 
@@ -170,6 +188,8 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
                                                         columns={table.columns}
                                                         idColumn={table.idColumn}
                                                     />
+                                                ) : table.key === COST_PRESETS_TABLE_KEY ? (
+                                                    <CostPresetsSettings />
                                                 ) : (
                                                     <LookupEditor
                                                         tableKey={table.key}
@@ -228,6 +248,8 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
                                                         columns={table.columns}
                                                         idColumn={table.idColumn}
                                                     />
+                                                ) : table.key === COST_PRESETS_TABLE_KEY ? (
+                                                    <CostPresetsSettings />
                                                 ) : (
                                                     <LookupEditor
                                                         tableKey={table.key}
