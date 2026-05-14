@@ -412,7 +412,7 @@ const AppointmentCalendar = ({
                 existingHoliday: null,
                 appointmentWarning: data.success && data.count > 0 ? data : null
             });
-        } catch (error) {
+        } catch {
             // If check fails, still allow adding holiday
             setHolidayModal({
                 date: day.date,

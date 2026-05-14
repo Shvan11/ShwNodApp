@@ -1,6 +1,5 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
-import { formatNumber } from '../../utils/formatters';
 import styles from './CostPresetsSettings.module.css';
 
 type Currency = 'IQD' | 'USD' | 'EUR';
@@ -52,6 +51,7 @@ const CostPresetsSettings = () => {
 
     useEffect(() => {
         loadPresets();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Filter presets by currency

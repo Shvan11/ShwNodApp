@@ -169,7 +169,7 @@ const LabelPreviewModal = ({
     // Single batch mode props
     isOpen = false,
     onClose,
-    onGenerate,
+    onGenerate: _onGenerate,
     batch,
     set,
     patient,

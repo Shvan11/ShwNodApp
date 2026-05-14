@@ -34,10 +34,6 @@ interface WorkIdParams {
   workId: string;
 }
 
-interface PatientIdParams {
-  patientId: string;
-}
-
 interface TemplateQueryParams {
   documentTypeId?: string;
   isActive?: string;

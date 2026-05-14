@@ -62,7 +62,7 @@ export default function AdminUserManagement() {
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to load users' });
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Network error loading users' });
     } finally {
       setLoading(false);
@@ -91,7 +91,7 @@ export default function AdminUserManagement() {
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to create user' });
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Network error creating user' });
     }
   };
@@ -113,7 +113,7 @@ export default function AdminUserManagement() {
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to update status' });
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Network error' });
     }
   };
@@ -142,7 +142,7 @@ export default function AdminUserManagement() {
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to reset password' });
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Network error' });
     }
   };
@@ -164,7 +164,7 @@ export default function AdminUserManagement() {
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to delete user' });
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Network error' });
     }
   };

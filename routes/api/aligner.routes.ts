@@ -37,7 +37,6 @@ import {
   getArchformPatientById,
   updateArchformPatient,
   deleteArchformPatient,
-  closeArchformDb,
   isArchformAvailable,
   ArchformDbUnavailableError,
 } from '../../services/archform/archform-db.js';

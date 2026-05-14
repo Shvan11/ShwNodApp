@@ -13,7 +13,7 @@ interface AlignerDoctorsSettingsProps {
     onChangesUpdate?: (hasChanges: boolean) => void;
 }
 
-const AlignerDoctorsSettings = ({ onChangesUpdate }: AlignerDoctorsSettingsProps) => {
+const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDoctorsSettingsProps) => {
     const toast = useToast();
     const [doctors, setDoctors] = useState<AlignerDoctor[]>([]);
     const [loading, setLoading] = useState(true);

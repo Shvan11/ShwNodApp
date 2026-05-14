@@ -14,7 +14,7 @@
 - **Templates**: GrapesJS visual designer for receipts/invoices/prescriptions
 
 ### Tech Stack
-- **Backend**: Node.js, Express 5.1, **TypeScript 5.9**, SQL Server (Tedious 18), WebSocket (ws 8)
+- **Backend**: Node.js, Express 5.1, **TypeScript 5.9**, SQL Server (mssql 12 / tarn pool), WebSocket (ws 8)
 - **Frontend**: React 19.2, **TypeScript 5.9**, React Router v7.9 (Data Router), Vite 7.2, CSS Modules
 - **External**: WhatsApp Web.js, Twilio, Telegram Bot API, Google Drive, WebCeph
 
@@ -82,9 +82,8 @@ npm run auth:migrate-roles      # Migrate to two-tier roles
 ```
 index.ts                 # Entry point, server setup, graceful shutdown
 
-/config/                 # 3 files
+/config/                 # 2 files
   config.ts              # Environment configuration
-  database.ts            # Database connection config
   ssl.ts                 # SSL certificate config
 
 /routes/                 # 31 total route files
@@ -133,8 +132,8 @@ index.ts                 # Entry point, server setup, graceful shutdown
     MessagingService.ts
     FinancialReportService.ts
   /database/             # Database layer
-    index.ts             # Database exports
-    ConnectionPool.ts    # Connection pooling
+    index.ts             # mssql-backed facade (withRequest / withTransaction)
+    pool.ts              # mssql ConnectionPool (tarn) + stats + shutdown hook
     /queries/            # 17 query modules
       patient-queries.ts
       appointment-queries.ts
@@ -640,7 +639,18 @@ POST   /api/auth/logout
 
 ## Database
 
-SQL Server via Tedious with connection pooling (max 10 connections).
+SQL Server via **mssql v12** with tarn connection pooling (max 10 connections, 30s connection/request timeout — aligned with Express `TIMEOUTS.DEFAULT`).
+
+**Facade API** (`services/database/index.ts`) — preserves the public shape used by all 17 query modules:
+- `withRequest(fn)` / `withTransaction(fn)` replace the old `withConnection` / `getConnection`+`releaseConnection`.
+- `TYPES` is re-exported from the facade — **query modules must import `TYPES` from `'../index.js'`, never from `'tedious'`** (tedious TYPES passed to `req.input` silently produce `param.type = undefined` and crash mssql's validator).
+- Column shim uses `recordset.columns[*].meta.name` so original SQL column names survive even when mssql aliases duplicates as `_1`/`_2`.
+- TVPs auto-convert inside `applyInputs(req, params)`: detects `TYPES.TVP` and rebuilds as `sql.Table`. TVP column types need explicit lengths (e.g. `TYPES.NVarChar(50)`).
+- Output params: pass `outputs: SqlOutputParam[]` (the old `beforeExec` hook is gone).
+- Non-SELECT queries return `recordset === undefined`; the shim null-checks it.
+- `result.rowsAffected` is an array in mssql; the facade `.reduce()`s it to a single number.
+
+**ESM import:** mssql v12 ships default-export only — use `import sql from 'mssql'`, NOT `import * as sql from 'mssql'`.
 
 **Connection Details (from .mcp.json):**
 - Server: `Clinic\DOLPHIN`
@@ -748,7 +758,7 @@ Use variables from `/public/css/base/variables.css`:
 
 **Backend:**
 - `express@5.1.0` - Web framework
-- `tedious@18.6.1` - SQL Server client
+- `mssql@12.5.2` - SQL Server client (tarn-pooled; bundles `tedious@19` transitively)
 - `ws@8.18.3` - WebSocket server
 - `winston@3.18.3` - Logging
 - `whatsapp-web.js@1.34.2` - WhatsApp client

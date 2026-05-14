@@ -30,6 +30,7 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
 
     useEffect(() => {
         loadAppointments();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [personId]);
 
     const loadAppointments = async (): Promise<void> => {

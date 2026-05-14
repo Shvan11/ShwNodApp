@@ -133,11 +133,6 @@
     direction: rtl;
 }
 
-/* Statistics & Reports RTL */
-[dir="rtl"] .summary-card {
-    direction: rtl;
-}
-
 /* Responsive RTL Adjustments */
 @media (max-width: 768px) {
     [dir="rtl"] .header-right {

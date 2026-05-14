@@ -2,9 +2,9 @@
 
 .card {
     position: relative;
-    background: white;
+    background: var(--surface);
     border-radius: var(--radius-lg);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--shadow-card);
     transition: all 0.2s ease;
     border-left: 4px solid transparent;
     overflow: visible;
@@ -35,7 +35,7 @@
 .discontinued {
     border-left-color: var(--warning-color);
     opacity: 0.75;
-    background: linear-gradient(135deg, #fff 0%, #fffbeb 100%);
+    background: linear-gradient(135deg, var(--color-white) 0%, var(--amber-50) 100%);
 }
 
 /* Collapsed Header - Always Visible */
@@ -162,7 +162,7 @@
     position: absolute;
     right: 0;
     top: 100%;
-    background: white;
+    background: var(--surface);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
     min-width: 11.25rem;
@@ -178,7 +178,7 @@
     width: 100%;
     padding: var(--spacing-sm) var(--spacing-md);
     border: none;
-    background: white;
+    background: var(--surface);
     color: var(--gray-700);
     cursor: pointer;
     font-size: var(--font-size-sm);
@@ -241,14 +241,14 @@
 .progressBarContainer {
     height: 8px;
     background: var(--gray-200);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     overflow: hidden;
 }
 
 .progressBarFill {
     height: 100%;
     background: linear-gradient(90deg, var(--success-500) 0%, var(--success-300) 100%);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     transition: width 0.5s ease;
 }
 

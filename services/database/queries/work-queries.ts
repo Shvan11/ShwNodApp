@@ -1,10 +1,8 @@
 /**
  * Work-related database queries
  */
-import { Connection, Request } from 'tedious';
 import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery, executeStoredProcedure, TYPES, SqlParam } from '../index.js';
-import ConnectionPool from '../ConnectionPool.js';
+import { executeQuery, TYPES, SqlParam } from '../index.js';
 
 /**
  * Work Status Constants
@@ -603,88 +601,65 @@ export async function addWorkWithInvoice(
   workData: WorkData
 ): Promise<{ workId: number; invoiceId: number }> {
   const today = new Date().toISOString().split('T')[0];
-  let connection: Connection | null = null;
+  const usdReceived =
+    workData.Currency === 'USD' || workData.Currency === 'EUR' ? workData.TotalRequired : 0;
+  const iqdReceived = workData.Currency === 'IQD' ? workData.TotalRequired : 0;
 
-  try {
-    connection = await ConnectionPool.getConnection();
+  const result = await executeQuery<{ workId: number; invoiceId: number }, { workId: number; invoiceId: number }>(
+    `BEGIN TRANSACTION;
 
-    const result = await new Promise<{ workId: number; invoiceId: number }>((resolve, reject) => {
-      let workId: number | null = null;
-      let invoiceId: number | null = null;
+    DECLARE @workId INT;
 
-      const usdReceived =
-        workData.Currency === 'USD' || workData.Currency === 'EUR' ? workData.TotalRequired : 0;
-      const iqdReceived = workData.Currency === 'IQD' ? workData.TotalRequired : 0;
+    INSERT INTO tblwork (
+      PersonID, TotalRequired, Currency, Typeofwork, Notes, Status,
+      StartDate, DebondDate, FPhotoDate, IPhotoDate, EstimatedDuration,
+      DrID, NotesDate, KeyWordID1, KeyWordID2, KeywordID3, KeywordID4, KeywordID5
+    )
+    VALUES (
+      @PersonID, @TotalRequired, @Currency, @Typeofwork, @Notes, 2,
+      @StartDate, @DebondDate, @FPhotoDate, @IPhotoDate, @EstimatedDuration,
+      @DrID, @NotesDate, @KeyWordID1, @KeyWordID2, @KeywordID3, @KeywordID4, @KeywordID5
+    );
 
-      const request = new Request(
-        `BEGIN TRANSACTION;
+    SET @workId = SCOPE_IDENTITY();
 
-        DECLARE @workId INT;
+    INSERT INTO dbo.tblInvoice (workid, Amountpaid, Dateofpayment, USDReceived, IQDReceived, Change)
+    VALUES (@workId, @TotalRequired, @paymentDate, @usdReceived, @iqdReceived, @change);
 
-        INSERT INTO tblwork (
-          PersonID, TotalRequired, Currency, Typeofwork, Notes, Status,
-          StartDate, DebondDate, FPhotoDate, IPhotoDate, EstimatedDuration,
-          DrID, NotesDate, KeyWordID1, KeyWordID2, KeywordID3, KeywordID4, KeywordID5
-        )
-        VALUES (
-          @PersonID, @TotalRequired, @Currency, @Typeofwork, @Notes, 2,
-          @StartDate, @DebondDate, @FPhotoDate, @IPhotoDate, @EstimatedDuration,
-          @DrID, @NotesDate, @KeyWordID1, @KeyWordID2, @KeywordID3, @KeywordID4, @KeywordID5
-        );
+    COMMIT TRANSACTION;
 
-        SET @workId = SCOPE_IDENTITY();
+    SELECT @workId AS workId, SCOPE_IDENTITY() AS invoiceId;`,
+    [
+      ['PersonID', TYPES.Int, workData.PersonID],
+      ['TotalRequired', TYPES.Int, workData.TotalRequired ?? null],
+      ['Currency', TYPES.NVarChar, workData.Currency || null],
+      ['Typeofwork', TYPES.Int, workData.Typeofwork ?? null],
+      ['Notes', TYPES.NVarChar, workData.Notes || null],
+      ['StartDate', TYPES.Date, workData.StartDate || null],
+      ['DebondDate', TYPES.Date, workData.DebondDate || null],
+      ['FPhotoDate', TYPES.Date, workData.FPhotoDate || null],
+      ['IPhotoDate', TYPES.Date, workData.IPhotoDate || null],
+      ['EstimatedDuration', TYPES.TinyInt, workData.EstimatedDuration ?? null],
+      ['DrID', TYPES.Int, workData.DrID],
+      ['NotesDate', TYPES.Date, workData.NotesDate || null],
+      ['KeyWordID1', TYPES.Int, workData.KeyWordID1 || null],
+      ['KeyWordID2', TYPES.Int, workData.KeyWordID2 || null],
+      ['KeywordID3', TYPES.Int, workData.KeywordID3 || null],
+      ['KeywordID4', TYPES.Int, workData.KeywordID4 || null],
+      ['KeywordID5', TYPES.Int, workData.KeywordID5 || null],
+      ['paymentDate', TYPES.Date, today],
+      ['usdReceived', TYPES.Int, usdReceived],
+      ['iqdReceived', TYPES.Int, iqdReceived],
+      ['change', TYPES.Int, null],
+    ],
+    (columns: ColumnValue[]) => ({
+      workId: columns[0].value as number,
+      invoiceId: columns[1].value as number,
+    }),
+    (rows, _out) => rows[0]
+  );
 
-        INSERT INTO dbo.tblInvoice (workid, Amountpaid, Dateofpayment, USDReceived, IQDReceived, Change)
-        VALUES (@workId, @TotalRequired, @paymentDate, @usdReceived, @iqdReceived, @change);
-
-        COMMIT TRANSACTION;
-
-        SELECT @workId AS workId, SCOPE_IDENTITY() AS invoiceId;`,
-        (err) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve({ workId: workId!, invoiceId: invoiceId! });
-          }
-        }
-      );
-
-      request.on('row', (columns: ColumnValue[]) => {
-        workId = columns[0].value as number;
-        invoiceId = columns[1].value as number;
-      });
-
-      request.addParameter('PersonID', TYPES.Int, workData.PersonID);
-      request.addParameter('TotalRequired', TYPES.Int, workData.TotalRequired ?? null);
-      request.addParameter('Currency', TYPES.NVarChar, workData.Currency || null);
-      request.addParameter('Typeofwork', TYPES.Int, workData.Typeofwork ?? null);
-      request.addParameter('Notes', TYPES.NVarChar, workData.Notes || null);
-      request.addParameter('StartDate', TYPES.Date, workData.StartDate || null);
-      request.addParameter('DebondDate', TYPES.Date, workData.DebondDate || null);
-      request.addParameter('FPhotoDate', TYPES.Date, workData.FPhotoDate || null);
-      request.addParameter('IPhotoDate', TYPES.Date, workData.IPhotoDate || null);
-      request.addParameter('EstimatedDuration', TYPES.TinyInt, workData.EstimatedDuration ?? null);
-      request.addParameter('DrID', TYPES.Int, workData.DrID);
-      request.addParameter('NotesDate', TYPES.Date, workData.NotesDate || null);
-      request.addParameter('KeyWordID1', TYPES.Int, workData.KeyWordID1 || null);
-      request.addParameter('KeyWordID2', TYPES.Int, workData.KeyWordID2 || null);
-      request.addParameter('KeywordID3', TYPES.Int, workData.KeywordID3 || null);
-      request.addParameter('KeywordID4', TYPES.Int, workData.KeywordID4 || null);
-      request.addParameter('KeywordID5', TYPES.Int, workData.KeywordID5 || null);
-      request.addParameter('paymentDate', TYPES.Date, today);
-      request.addParameter('usdReceived', TYPES.Int, usdReceived);
-      request.addParameter('iqdReceived', TYPES.Int, iqdReceived);
-      request.addParameter('change', TYPES.Int, null);
-
-      connection!.execSql(request);
-    });
-
-    return result;
-  } finally {
-    if (connection) {
-      ConnectionPool.releaseConnection(connection);
-    }
-  }
+  return result;
 }
 
 export async function deleteWork(

@@ -59,16 +59,11 @@ import templateRouter from '../template-api.js';
 
 const router = Router();
 
-// WebSocket emitter will be injected to avoid circular imports
-let wsEmitter: EventEmitter | null = null;
-
 /**
  * Set the WebSocket emitter reference for all modules that need it
  * @param emitter - WebSocket event emitter
  */
 export function setWebSocketEmitter(emitter: EventEmitter): void {
-  wsEmitter = emitter;
-
   // Inject WebSocket emitter into modules that need it
   setAppointmentWS(emitter);
   setChairDisplayWS(emitter);

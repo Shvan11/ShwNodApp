@@ -593,6 +593,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
 
             initPhotoSwipe();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loading, images]);
 
     // Load timepoints when component mounts
@@ -600,6 +601,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         if (personId) {
             loadTimepoints();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [personId]);
 
     // Load images when component mounts or dependencies change
@@ -607,6 +609,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         if (personId) {
             loadGalleryImages();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [personId, tpCode]);
 
     // Cleanup on unmount

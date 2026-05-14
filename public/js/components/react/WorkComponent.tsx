@@ -1394,7 +1394,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                             setShowPaymentHistoryModal(false);
                                             handleAddPayment(selectedWorkForPayment);
                                         }}
-                                        className="btn btn-primary btn-add-payment"
+                                        className={`btn btn-primary ${styles.addPaymentBtn}`}
                                     >
                                         <i className="fas fa-plus"></i> Add New Payment
                                     </button>

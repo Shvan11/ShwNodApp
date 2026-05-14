@@ -1,18 +1,17 @@
-// services/database/index.ts
 /**
- * Enhanced Database service with connection pooling and better error handling
- * Provides methods for database operations with improved resource management
+ * Database facade — mssql-backed, preserves public API for all 17 query modules.
  */
-import { Connection, Request, TYPES } from 'tedious';
+import sql from 'mssql';
 import type { ColumnValue } from '../../types/database.types.js';
-
-import ConnectionPool from './ConnectionPool.js';
-import ResourceManager from '../core/ResourceManager.js';
+import { getPool, getStats as getPoolStats } from './pool.js';
 import { log } from '../../utils/logger.js';
 
-// Type definitions
-export type TediousType = (typeof TYPES)[keyof typeof TYPES];
-export type SqlParam = [string, TediousType, unknown];
+// ── Public types ──────────────────────────────────────────────────────────────
+
+export type MssqlType = sql.ISqlType | (() => sql.ISqlType);
+export type TediousType = MssqlType; // back-compat alias used by query modules
+export type SqlParam = [string, MssqlType, unknown];
+export type SqlOutputParam = [string, MssqlType];
 export type RowMapper<T> = (columns: ColumnValue[]) => T;
 export type ResultMapper<T, R> = (result: T[], outputParams: OutputParam[]) => R;
 
@@ -57,296 +56,189 @@ interface HealthCheckResult {
   details: DatabaseStats & { connectionTest?: TestResult };
 }
 
-// Extended array type with rowsAffected property
 interface QueryResult<T> extends Array<T> {
   rowsAffected?: number;
 }
 
-// Register database service with resource manager
-ResourceManager.register('database-service', null, async () => {
-  log.info('Shutting down database service');
-  await ConnectionPool.cleanup();
-});
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function applyInputs(req: sql.Request, params: SqlParam[]): void {
+  for (const [name, type, value] of params) {
+    // Detect TVP: { columns, rows }
+    if (
+      type === sql.TYPES.TVP &&
+      value !== null &&
+      typeof value === 'object' &&
+      'columns' in value &&
+      'rows' in value
+    ) {
+      const tvpDef = value as { columns: { name: string; type: any }[]; rows: any[][] };
+      const tvp = new sql.Table();
+      for (const col of tvpDef.columns) (tvp.columns as any).add(col.name, col.type);
+      for (const row of tvpDef.rows) tvp.rows.add(...row);
+      (req as any).input(name, tvp);
+    } else {
+      (req as any).input(name, type, value);
+    }
+  }
+}
 
 /**
- * Enhanced executeQuery function using connection pool
- * @param query - SQL query string
- * @param params - Array of [name, type, value] tuples
- * @param rowMapper - Optional function to map each row (required for SELECT, optional for INSERT/UPDATE/DELETE)
- * @param resultMapper - Optional function to transform the final result array
+ * Rebuild tedious-style ColumnValue[] from an mssql recordset row.
+ * Sort by column index so positional access (columns[0], columns[1]…) works.
  */
+function buildColumns(row: Record<string, unknown>, recordsetColumns: sql.IColumnMetadata): ColumnValue[] {
+  const entries = Object.entries(recordsetColumns).sort(
+    ([, a], [, b]) => (a as sql.IColumnMetadata[string]).index - (b as sql.IColumnMetadata[string]).index
+  );
+  return entries.map(([key, meta]) => ({
+    value: row[key],
+    metadata: {
+      colName: (meta as sql.IColumnMetadata[string] & { name?: string }).name ?? key,
+      // Populate required ColumnMetadata fields with safe defaults
+      type: { name: 'unknown' },
+      nullable: true,
+      caseSensitive: false,
+    },
+  }));
+}
+
+function shimRows<T>(
+  recordset: sql.IRecordSet<Record<string, unknown>> | undefined | null,
+  rowMapper?: RowMapper<T>
+): QueryResult<T> {
+  const result: QueryResult<T> = [] as unknown as QueryResult<T>;
+  if (!recordset) return result;
+  if (rowMapper) {
+    for (const row of recordset) {
+      result.push(rowMapper(buildColumns(row, recordset.columns)));
+    }
+  } else {
+    for (const row of recordset) {
+      result.push(row as unknown as T);
+    }
+  }
+  return result;
+}
+
+// ── Core facade functions ─────────────────────────────────────────────────────
+
 export function executeQuery<T = Record<string, unknown>, R = T[]>(
   query: string,
   params: SqlParam[] = [],
   rowMapper?: RowMapper<T>,
-  resultMapper: ResultMapper<T, R> = ((result: T[]) => result) as unknown as ResultMapper<T, R>
+  resultMapper: ResultMapper<T, R> = ((r: T[]) => r) as unknown as ResultMapper<T, R>
 ): Promise<R & { rowsAffected?: number }> {
-  return ConnectionPool.withConnection(async (connection: Connection) => {
-    return new Promise((resolve, reject) => {
-      // Validate inputs
-      if (!query || typeof query !== 'string') {
-        reject(new Error('Query must be a non-empty string'));
-        return;
-      }
+  return (async () => {
+    if (!query || typeof query !== 'string') throw new Error('Query must be a non-empty string');
 
-      const result: QueryResult<T> = [] as unknown as QueryResult<T>;
-      const outputParams: OutputParam[] = [];
-      let selectRowCount = 0;
+    const pool = await getPool();
+    const req = pool.request();
+    applyInputs(req, params);
+    const result = await req.query<Record<string, unknown>>(query);
 
-      const request = new Request(query, (err: Error | null | undefined, rowCount?: number) => {
-        if (err) {
-          log.error('Query execution error', {
-            error: err.message,
-            query: query.substring(0, 100) + (query.length > 100 ? '...' : ''),
-            code: (err as Error & { code?: string }).code,
-          });
-          reject(err);
-          return;
-        }
+    const rows = shimRows<T>(result.recordset, rowMapper);
+    const rowsAffected = Array.isArray(result.rowsAffected)
+      ? result.rowsAffected.reduce((a, b) => a + b, 0)
+      : (result.rowsAffected ?? 0);
+    rows.rowsAffected = rowsAffected;
 
-        try {
-          log.debug(`Query completed: ${rowCount} rows affected/returned, ${selectRowCount} rows collected`);
-          result.rowsAffected = rowCount;
-          const finalResult = resultMapper(result, outputParams) as R & { rowsAffected?: number };
-          if (finalResult !== (result as unknown) && typeof finalResult === 'object' && finalResult !== null) {
-            finalResult.rowsAffected = rowCount;
-          }
-          resolve(finalResult);
-        } catch (resultMappingError) {
-          log.error('Result mapping error', {
-            error: (resultMappingError as Error).message,
-            rowCount: result.length,
-            query: query.substring(0, 50) + '...',
-          });
-          reject(new Error(`Result mapping failed: ${(resultMappingError as Error).message}`));
-        }
-      });
-
-      // Add parameters with validation
-      try {
-        (params || []).forEach((param, index) => {
-          if (!Array.isArray(param) || param.length < 3) {
-            throw new Error(`Invalid parameter at index ${index}: expected [name, type, value]`);
-          }
-          const [name, type, value] = param;
-          request.addParameter(name, type, value);
-        });
-      } catch (paramError) {
-        reject(paramError);
-        return;
-      }
-
-      // Handle row data (for SELECT queries)
-      request.on('row', (columns: ColumnValue[]) => {
-        try {
-          selectRowCount++;
-          const mappedRow = rowMapper ? rowMapper(columns) : (columns as unknown as T);
-          result.push(mappedRow);
-        } catch (mappingError) {
-          log.error('Row mapping error', {
-            error: (mappingError as Error).message,
-            rowIndex: selectRowCount - 1,
-            query: query.substring(0, 50) + '...',
-          });
-          reject(new Error(`Row mapping failed at row ${selectRowCount - 1}: ${(mappingError as Error).message}`));
-        }
-      });
-
-      // Handle output parameters
-      request.on('returnValue', (parameterName: string, value: unknown) => {
-        outputParams.push({ parameterName, value });
-        log.debug(`Output parameter: ${parameterName} = ${value}`);
-      });
-
-      // Handle request errors
-      request.on('error', (error: Error) => {
-        log.error('Request error', {
-          error: error.message,
-          code: (error as Error & { code?: string }).code,
-          query: query.substring(0, 100) + (query.length > 100 ? '...' : ''),
-        });
-        reject(error);
-      });
-
-      // Execute the request
-      try {
-        connection.execSql(request);
-      } catch (execError) {
-        log.error('SQL execution error', { error: (execError as Error).message });
-        reject(execError);
-      }
+    const mapped = resultMapper(rows, []) as R & { rowsAffected?: number };
+    if (mapped && typeof mapped === 'object' && mapped !== (rows as unknown)) {
+      mapped.rowsAffected = rowsAffected;
+    }
+    return mapped;
+  })().catch((err: Error) => {
+    log.error('Query execution error', {
+      error: err.message,
+      query: query.substring(0, 100) + (query.length > 100 ? '...' : ''),
     });
+    throw err;
   });
 }
 
-/**
- * Enhanced executeStoredProcedure function using connection pool
- */
 export function executeStoredProcedure<T, R = T[]>(
   procedureName: string,
   params: SqlParam[],
-  beforeExec?: (request: Request) => void,
+  outputs?: SqlOutputParam[] | ((req: never) => void),
   rowMapper?: RowMapper<T>,
   resultMapper?: ResultMapper<T, R>
 ): Promise<R> {
-  return ConnectionPool.withConnection(async (connection: Connection) => {
-    return new Promise((resolve, reject) => {
-      // Validate inputs
-      if (!procedureName || typeof procedureName !== 'string') {
-        reject(new Error('Procedure name must be a non-empty string'));
-        return;
-      }
+  // Back-compat: if outputs is a function (old beforeExec callback), ignore it and
+  // warn — callers that still pass beforeExec must be migrated to outputs array.
+  const outputsList: SqlOutputParam[] = typeof outputs === 'function' ? [] : (outputs ?? []);
+  if (typeof outputs === 'function') {
+    log.warn(`executeStoredProcedure called with beforeExec callback for '${procedureName}' — migrate to outputs array`);
+  }
 
-      const request = new Request(procedureName, (err: Error | null | undefined) => {
-        if (err) {
-          log.error('Stored procedure execution error', {
-            error: err.message,
-            procedure: procedureName,
-            code: (err as Error & { code?: string }).code,
-          });
-          reject(err);
-          return;
-        }
-      });
+  return (async () => {
+    if (!procedureName || typeof procedureName !== 'string') {
+      throw new Error('Procedure name must be a non-empty string');
+    }
 
-      // Add parameters with validation
-      try {
-        (params || []).forEach((param, index) => {
-          if (!Array.isArray(param) || param.length < 3) {
-            throw new Error(`Invalid parameter at index ${index}: expected [name, type, value]`);
-          }
-          const [name, type, value] = param;
-          request.addParameter(name, type, value);
-        });
-      } catch (paramError) {
-        reject(paramError);
-        return;
-      }
+    const pool = await getPool();
+    const req = pool.request();
+    applyInputs(req, params);
+    for (const [n, t] of outputsList) {
+      (req as any).output(n, t);
+    }
 
-      // Execute beforeExec callback with error handling
-      if (beforeExec) {
-        try {
-          beforeExec(request);
-        } catch (beforeExecError) {
-          log.error('beforeExec callback error', {
-            error: (beforeExecError as Error).message,
-            procedure: procedureName,
-          });
-          reject(new Error(`beforeExec callback failed: ${(beforeExecError as Error).message}`));
-          return;
-        }
-      }
+    const result = await req.execute<Record<string, unknown>>(procedureName);
 
-      const result: T[] = [];
-      const outParams: OutputParam[] = [];
-      let rowCount = 0;
+    const rows = shimRows<T>(result.recordset, rowMapper);
+    const outParams: OutputParam[] = Object.entries(result.output ?? {}).map(
+      ([parameterName, value]) => ({ parameterName, value })
+    );
 
-      // Handle row data
-      request.on('row', (columns: ColumnValue[]) => {
-        try {
-          rowCount++;
-          const mappedRow = rowMapper ? rowMapper(columns) : (columns as unknown as T);
-          result.push(mappedRow);
-        } catch (mappingError) {
-          log.error('Row mapping error in stored procedure', {
-            error: (mappingError as Error).message,
-            rowIndex: rowCount - 1,
-            procedure: procedureName,
-          });
-          reject(new Error(`Row mapping failed at row ${rowCount - 1}: ${(mappingError as Error).message}`));
-        }
-      });
-
-      // Handle return values/output parameters
-      request.on('returnValue', (parameterName: string, value: unknown) => {
-        outParams.push({ parameterName, value });
-      });
-
-      // Handle completion
-      request.on('requestCompleted', () => {
-        try {
-          const finalResult = resultMapper ? resultMapper(result, outParams) : (result as unknown as R);
-          resolve(finalResult);
-        } catch (resultMappingError) {
-          log.error('Result mapping error in stored procedure', {
-            error: (resultMappingError as Error).message,
-            procedure: procedureName,
-            rowCount: result.length,
-          });
-          reject(new Error(`Result mapping failed: ${(resultMappingError as Error).message}`));
-        }
-      });
-
-      // Handle request errors
-      request.on('error', (error: Error) => {
-        log.error('Stored procedure request error', {
-          error: error.message,
-          code: (error as Error & { code?: string }).code,
-          procedure: procedureName,
-        });
-        reject(error);
-      });
-
-      // Execute the stored procedure
-      try {
-        connection.callProcedure(request);
-      } catch (execError) {
-        log.error('Stored procedure execution error', { error: (execError as Error).message });
-        reject(execError);
-      }
+    return resultMapper ? resultMapper(rows, outParams) : (rows as unknown as R);
+  })().catch((err: Error) => {
+    log.error('Stored procedure execution error', {
+      error: err.message,
+      procedure: procedureName,
     });
+    throw err;
   });
 }
 
-/**
- * Execute multiple operations within a single connection
- */
-export function withConnection<T>(operations: (connection: Connection) => Promise<T>): Promise<T> {
-  return ConnectionPool.withConnection(operations);
-}
-
-/**
- * Execute a raw SQL query with a specific connection
- */
-export function executeRawQuery(
-  connection: Connection,
-  query: string,
+export function executeMultipleResultSets<T extends object>(
+  procedureName: string,
   params: SqlParam[] = []
-): Promise<ColumnValue[][]> {
-  return new Promise((resolve, reject) => {
-    const request = new Request(query, (err: Error | null | undefined) => {
-      if (err) {
-        reject(err);
-        return;
-      }
+): Promise<T[][]> {
+  return (async () => {
+    const pool = await getPool();
+    const req = pool.request();
+    applyInputs(req, params);
+    const result = await req.execute<T>(procedureName);
+    return result.recordsets as T[][];
+  })().catch((err: Error) => {
+    log.error('Stored procedure execution error', {
+      error: err.message,
+      procedure: procedureName,
     });
-
-    // Add parameters
-    params.forEach((param) => {
-      request.addParameter(param[0], param[1], param[2]);
-    });
-
-    const result: ColumnValue[][] = [];
-
-    request.on('row', (columns: ColumnValue[]) => {
-      result.push(columns);
-    });
-
-    request.on('requestCompleted', () => {
-      resolve(result);
-    });
-
-    request.on('error', (error: Error) => {
-      reject(error);
-    });
-
-    connection.execSql(request);
+    throw err;
   });
 }
 
-/**
- * Test database connectivity
- */
+export function withRequest<T>(cb: (req: sql.Request) => Promise<T>): Promise<T> {
+  return getPool().then((pool) => cb(pool.request()));
+}
+
+export async function withTransaction<T>(cb: (tx: sql.Transaction) => Promise<T>): Promise<T> {
+  const pool = await getPool();
+  const tx = new sql.Transaction(pool);
+  await tx.begin();
+  try {
+    const result = await cb(tx);
+    await tx.commit();
+    return result;
+  } catch (e) {
+    try { await tx.rollback(); } catch { /* tx may have auto-aborted */ }
+    throw e;
+  }
+}
+
+// ── Diagnostics / lifecycle ───────────────────────────────────────────────────
+
 export async function testConnection(): Promise<TestResult> {
   try {
     const testResult = await executeQuery<ConnectionTestResult>(
@@ -365,15 +257,11 @@ export async function testConnection(): Promise<TestResult> {
     );
 
     log.info('Database connection test successful');
-    log.debug('Session settings:', {
-      QUOTED_IDENTIFIER: testResult[0]?.quotedIdentifier,
-      ANSI_NULLS: testResult[0]?.ansiNulls,
-    });
     return {
       success: true,
       message: 'Database connection successful',
       data: testResult[0],
-      poolStats: ConnectionPool.getStats(),
+      poolStats: getPoolStats(),
     };
   } catch (error) {
     log.error('Database connection test failed:', { error: error instanceof Error ? error.message : String(error) });
@@ -381,14 +269,11 @@ export async function testConnection(): Promise<TestResult> {
       success: false,
       message: 'Database connection failed',
       error: error instanceof Error ? error.message : String(error),
-      poolStats: ConnectionPool.getStats(),
+      poolStats: getPoolStats(),
     };
   }
 }
 
-/**
- * Test database connectivity with retry logic for service startup
- */
 export async function testConnectionWithRetry(maxRetries = 5, retryDelay = 15000): Promise<TestResult> {
   let lastError: string | null = null;
 
@@ -396,14 +281,10 @@ export async function testConnectionWithRetry(maxRetries = 5, retryDelay = 15000
     try {
       log.info(`Database connection attempt ${attempt}/${maxRetries}...`);
       const result = await testConnection();
-
       if (result.success) {
-        if (attempt > 1) {
-          log.info(`Database connection successful after ${attempt} attempts`);
-        }
+        if (attempt > 1) log.info(`Database connection successful after ${attempt} attempts`);
         return result;
       }
-
       lastError = result.error || null;
     } catch (error) {
       lastError = (error as Error).message;
@@ -423,22 +304,15 @@ export async function testConnectionWithRetry(maxRetries = 5, retryDelay = 15000
   };
 }
 
-/**
- * Get database and connection pool statistics
- */
 export function getDatabaseStats(): DatabaseStats {
-  const poolStats = ConnectionPool.getStats();
-
+  const poolStats = getPoolStats();
   return {
     connectionPool: poolStats,
     timestamp: Date.now(),
-    healthy: !poolStats.isShuttingDown && poolStats.totalConnections > 0,
+    healthy: !poolStats.isShuttingDown,
   };
 }
 
-/**
- * Health check for database service
- */
 export async function healthCheck(): Promise<HealthCheckResult> {
   try {
     const stats = getDatabaseStats();
@@ -452,16 +326,12 @@ export async function healthCheck(): Promise<HealthCheckResult> {
     }
 
     const connectionTest = await testConnection();
-
     return {
       healthy: connectionTest.success,
       message: connectionTest.success
         ? 'Database is healthy and responsive'
         : 'Database connectivity issues detected',
-      details: {
-        ...stats,
-        connectionTest: connectionTest,
-      },
+      details: { ...stats, connectionTest },
     };
   } catch (error) {
     return {
@@ -473,87 +343,11 @@ export async function healthCheck(): Promise<HealthCheckResult> {
   }
 }
 
-/**
- * Execute a stored procedure that returns multiple result sets
- */
-export function executeMultipleResultSets<T extends object>(
-  procedureName: string,
-  params: SqlParam[] = []
-): Promise<T[][]> {
-  return ConnectionPool.withConnection(async (connection: Connection) => {
-    return new Promise((resolve, reject) => {
-      const request = new Request(procedureName, (err: Error | null | undefined) => {
-        if (err) {
-          log.error('Stored procedure execution error:', {
-            error: err.message,
-            procedure: procedureName,
-            code: (err as Error & { code?: string }).code,
-          });
-          reject(err);
-          return;
-        }
-      });
-
-      // Add parameters with validation
-      try {
-        params.forEach((param, index) => {
-          if (!Array.isArray(param) || param.length < 3) {
-            throw new Error(`Invalid parameter at index ${index}: expected [name, type, value]`);
-          }
-          const [name, type, value] = param;
-          request.addParameter(name, type, value);
-        });
-      } catch (paramError) {
-        reject(paramError);
-        return;
-      }
-
-      const resultSets: T[][] = [];
-      let currentSet: T[] = [];
-
-      // Handle row data
-      request.on('row', (columns: ColumnValue[]) => {
-        const row = {} as T;
-        columns.forEach((col) => {
-          (row as Record<string, unknown>)[col.metadata.colName] = col.value;
-        });
-        currentSet.push(row);
-      });
-
-      // Handle result set completion
-      request.on('doneInProc', () => {
-        resultSets.push([...currentSet]);
-        currentSet = [];
-      });
-
-      // Handle final completion
-      request.on('requestCompleted', () => {
-        log.debug(`Stored procedure '${procedureName}' completed: ${resultSets.length} result sets returned`);
-        resolve(resultSets);
-      });
-
-      // Handle errors
-      request.on('error', (error: Error) => {
-        log.error('Request error:', {
-          error: error.message,
-          procedure: procedureName,
-          code: (error as Error & { code?: string }).code,
-        });
-        reject(error);
-      });
-
-      connection.callProcedure(request);
-    });
-  });
-}
-
-/**
- * Graceful shutdown of database service
- */
 export async function shutdown(): Promise<void> {
   log.info('Initiating database service shutdown');
   try {
-    await ConnectionPool.cleanup();
+    const pool = await getPool().catch(() => null);
+    if (pool) await pool.close();
     log.info('Database service shutdown completed');
   } catch (error) {
     log.error('Error during database service shutdown:', { error: error instanceof Error ? error.message : String(error) });
@@ -561,5 +355,6 @@ export async function shutdown(): Promise<void> {
   }
 }
 
-// Export TYPES for use in query modules
-export { TYPES };
+// Re-export TYPES so query modules don't need to import mssql directly
+export { sql };
+export const TYPES = sql.TYPES;

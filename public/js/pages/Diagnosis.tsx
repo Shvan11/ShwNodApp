@@ -148,6 +148,7 @@ const Diagnosis = () => {
 
     useEffect(() => {
         loadData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [personId, workId]);
 
     const loadData = async () => {

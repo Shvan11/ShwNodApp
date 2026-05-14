@@ -82,6 +82,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
         } else if (appointmentId) {
             loadAppointmentData(appointmentId);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [existingAppointment, appointmentId]);
 
     useEffect(() => {

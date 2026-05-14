@@ -147,6 +147,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         if (workData && !paymentSuccess) {
             initializeFormData();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [workData, paymentSuccess]);
 
     useEffect(() => {
@@ -160,6 +161,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         if (entryMode === 'amount' && formData.amountToRegister && exchangeRate) {
             calculateSuggestedCash();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [formData.amountToRegister, formData.paymentCurrency, exchangeRate, entryMode]);
 
     // Recalculate when actual cash amounts change
@@ -167,6 +169,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         if (exchangeRate) {
             calculateTotalAndChange();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [formData.actualUSD, formData.actualIQD, formData.amountToRegister, exchangeRate]);
 
     // Auto-format display values when formData changes (handles auto-population)

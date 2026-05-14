@@ -215,6 +215,7 @@ const EditPatientComponent = ({ personId }: Props) => {
         loadPatientData();
         loadWebcephData();
         loadPhotoTypes();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [personId, loadDropdownData, loadPatientData]);
 
     // Load WebCeph data for patient

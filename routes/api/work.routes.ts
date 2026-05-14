@@ -59,9 +59,7 @@ import {
   getTransferPreview,
   validateDiscount,
   WorkValidationError,
-  type WorkStatusType,
-  type WorkErrorDetails,
-  type DeleteResult
+  type WorkStatusType
 } from '../../services/business/WorkService.js';
 import { getWorkDetails as getWorkDetailsFromQueries } from '../../services/database/queries/work-queries.js';
 

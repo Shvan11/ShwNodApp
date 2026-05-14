@@ -106,6 +106,9 @@ const AnalogClock = ({ size, showDate = true, className }: AnalogClockProps) => 
 
     // Date label only changes once per day; memo so it isn't re-formatted
     // on every per-second tick.
+    const dayOfMonth = now.date.getDate();
+    const monthOfYear = now.date.getMonth();
+    const fullYear = now.date.getFullYear();
     const dateLabel = useMemo(() => {
         if (!showDate) return null;
         return now.date.toLocaleDateString(undefined, {
@@ -113,7 +116,8 @@ const AnalogClock = ({ size, showDate = true, className }: AnalogClockProps) => 
             month: 'short',
             day: 'numeric',
         });
-    }, [showDate, now.date.getDate(), now.date.getMonth(), now.date.getFullYear()]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showDate, dayOfMonth, monthOfYear, fullYear]);
 
     return (
         <svg

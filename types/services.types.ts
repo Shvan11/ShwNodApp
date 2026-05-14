@@ -1,89 +1,19 @@
 /**
  * Service Types
  * Type definitions for service layer operations
+ *
+ * Database/pool/query types live with the mssql facade in
+ * `services/database/index.ts` and `services/database/pool.ts` — import
+ * `RowMapper`, `ResultMapper`, `SqlParam`, `SqlOutputParam`, `PoolStats` from
+ * there directly. This file is for non-database service layer types only.
  */
-
-import type { Connection, TYPES } from 'tedious';
-
-// ===========================================
-// DATABASE QUERY TYPES
-// ===========================================
-
-/**
- * Tedious SQL type - derived from the TYPES object
- */
-export type TediousType = (typeof TYPES)[keyof typeof TYPES];
-
-/**
- * SQL parameter value types that tedious accepts
- */
-export type SqlParameterValue = string | number | boolean | Date | Buffer | null | undefined;
-
-/**
- * Query parameter tuple: [name, type, value, options?]
- */
-export type QueryParameter = [
-  name: string,
-  type: TediousType,
-  value: SqlParameterValue,
-  options?: { length?: number; precision?: number; scale?: number }
-];
-
-/**
- * Column metadata from tedious
- */
-export interface ColumnMetadata {
-  colName: string;
-  type: {
-    name: string;
-  };
-  nullable?: boolean;
-  caseSensitive?: boolean;
-  identity?: boolean;
-  readOnly?: boolean;
-}
-
-/**
- * Column data from query result
- */
-export interface ColumnData {
-  value: SqlParameterValue;
-  metadata: ColumnMetadata;
-}
-
-/**
- * Row mapper function - transforms columns to typed object
- */
-export type RowMapper<T> = (columns: ColumnData[]) => T;
-
-/**
- * Result mapper function - transforms array of results
- */
-export type ResultMapper<T, R = T[]> = (result: T[], outputParams?: OutputParameter[]) => R;
-
-/**
- * Output parameter from stored procedure
- */
-export interface OutputParameter {
-  parameterName: string;
-  value: SqlParameterValue;
-  type?: TediousType;
-}
-
-/**
- * Query execution options
- */
-export interface QueryOptions {
-  timeout?: number;
-  useTransaction?: boolean;
-}
 
 // ===========================================
 // CONNECTION POOL TYPES
 // ===========================================
 
 /**
- * Connection pool statistics
+ * Connection pool statistics (kept for cross-cutting consumers like HealthCheck).
  */
 export interface PoolStats {
   totalConnections: number;
@@ -91,28 +21,6 @@ export interface PoolStats {
   waitingRequests: number;
   maxConnections: number;
   isShuttingDown: boolean;
-}
-
-/**
- * Queue entry for waiting connection requests
- */
-export interface QueueEntry {
-  resolve: (connection: Connection) => void;
-  reject: (error: Error) => void;
-  timeout: NodeJS.Timeout;
-  timestamp: number;
-  timeoutMs: number;
-}
-
-/**
- * Connection pool interface
- */
-export interface ConnectionPoolInterface {
-  getConnection(timeoutMs?: number): Promise<Connection>;
-  releaseConnection(connection: Connection): void;
-  withConnection<T>(operation: (connection: Connection) => Promise<T>): Promise<T>;
-  getStats(): PoolStats;
-  cleanup(): Promise<void>;
 }
 
 // ===========================================

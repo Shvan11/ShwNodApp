@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, type ChangeEvent, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
 import cn from 'classnames';
 import styles from './SimplifiedCalendarPicker.module.css';
@@ -68,7 +68,10 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
     const [lateSlotTimes, setLateSlotTimes] = useState<string[]>(['21:00', '21:30', '22:00', '22:30']);
 
     // Combined extended times for filtering (includes 14:00 and 14:30 which are also rarely used)
-    const rareAfternoonTimes = [...earlySlotTimes, '14:00', '14:30', ...lateSlotTimes];
+    const rareAfternoonTimes = useMemo(
+        () => [...earlySlotTimes, '14:00', '14:30', ...lateSlotTimes],
+        [earlySlotTimes, lateSlotTimes]
+    );
 
     // Fetch extended slot settings on mount
     useEffect(() => {

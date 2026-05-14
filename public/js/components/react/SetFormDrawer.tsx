@@ -70,7 +70,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
     const [saving, setSaving] = useState<boolean>(false);
     const [activeTab, setActiveTab] = useState<string>('details');
     const [pdfFile, setPdfFile] = useState<File | null>(null);
-    const [uploadingPdf, setUploadingPdf] = useState<boolean>(false);
+    const [, setUploadingPdf] = useState<boolean>(false);
     const [deletingPdf, setDeletingPdf] = useState<boolean>(false);
     const [displaySetCost, setDisplaySetCost] = useState('');
 

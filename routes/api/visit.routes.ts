@@ -12,9 +12,6 @@ import { Router, type Request, type Response } from 'express';
 import {
   getWires,
   getVisitsSummary,
-  addVisit,
-  updateVisit,
-  deleteVisit,
   getVisitDetailsByID,
   getLatestWire,
   getVisitsByWorkId,
@@ -38,28 +35,6 @@ interface VisitQueryParams {
   VID?: string;
   workId?: string;
   visitId?: string;
-}
-
-interface AddVisitBody {
-  PID: string | number;
-  visitDate: string;
-  upperWireID?: number;
-  lowerWireID?: number;
-  others?: string;
-  next?: string;
-}
-
-interface UpdateVisitBody {
-  VID: string | number;
-  visitDate: string;
-  upperWireID?: number;
-  lowerWireID?: number;
-  others?: string;
-  next?: string;
-}
-
-interface DeleteVisitBody {
-  VID: string | number;
 }
 
 interface AddVisitByWorkBody {

@@ -23,13 +23,6 @@ interface ChangePasswordBody {
   newPassword: string;
 }
 
-interface UserInfo {
-  userId: number;
-  username: string;
-  fullName: string;
-  role: string;
-}
-
 // Extend Express Session
 declare module 'express-session' {
   interface SessionData {

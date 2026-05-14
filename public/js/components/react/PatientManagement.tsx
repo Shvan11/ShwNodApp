@@ -42,12 +42,6 @@ const LAST_APPOINTMENT_OPTIONS: LastAppointmentOption[] = [
     { value: 'custom', label: 'Before specific date...' },
 ];
 
-interface SearchResponse {
-    patients: Patient[];
-    totalCount: number;
-    hasMore: boolean;
-}
-
 interface SavedState {
     patients: Patient[];
     hasSearched: boolean;
@@ -539,9 +533,9 @@ const PatientManagement = () => {
 
             {hasSearched && (
                 <div className={styles.resultsSummary}>
-                    <div className="summary-card">
+                    <div className={styles.summaryCard}>
                         <h3>Results</h3>
-                        <span className="summary-value">
+                        <span className={styles.summaryValue}>
                             {patients.length}
                             {totalCount > patients.length && <span className={styles.totalCountLabel}> of {totalCount}</span>}
                         </span>

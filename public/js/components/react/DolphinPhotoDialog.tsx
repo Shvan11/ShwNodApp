@@ -54,6 +54,7 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
 
     useEffect(() => {
         loadPhotoDates();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [personId]);
 
     const loadPhotoDates = async () => {

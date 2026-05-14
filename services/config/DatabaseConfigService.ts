@@ -5,7 +5,7 @@
  */
 
 import EnvironmentManager, { DatabaseConfig, EnvironmentValidation, FileStatus } from './EnvironmentManager.js';
-import { Connection, ConnectionConfiguration } from 'tedious';
+import sql from 'mssql';
 import { log } from '../../utils/logger.js';
 
 /**
@@ -123,134 +123,76 @@ class DatabaseConfigService {
    * Test database connection with provided configuration
    */
   async testConnection(testConfig: Partial<DatabaseConfig>): Promise<ConnectionTestResult> {
-    return new Promise((resolve) => {
-      const startTime = Date.now();
+    const startTime = Date.now();
 
-      try {
-        // Validate required fields
-        const required: Array<keyof DatabaseConfig> = [
-          'DB_SERVER',
-          'DB_INSTANCE',
-          'DB_DATABASE',
-          'DB_USER',
-          'DB_PASSWORD',
-        ];
-        const missing = required.filter(
-          (field) => !testConfig[field] || testConfig[field]!.trim() === ''
-        );
+    const required: Array<keyof DatabaseConfig> = [
+      'DB_SERVER',
+      'DB_INSTANCE',
+      'DB_DATABASE',
+      'DB_USER',
+      'DB_PASSWORD',
+    ];
+    const missing = required.filter(
+      (field) => !testConfig[field] || testConfig[field]!.trim() === ''
+    );
 
-        if (missing.length > 0) {
-          return resolve({
-            success: false,
-            message: 'Missing required configuration',
-            details: `Required fields: ${missing.join(', ')}`,
-            duration: Date.now() - startTime,
-          });
-        }
+    if (missing.length > 0) {
+      return {
+        success: false,
+        message: 'Missing required configuration',
+        details: `Required fields: ${missing.join(', ')}`,
+        duration: Date.now() - startTime,
+      };
+    }
 
-        // Prepare Tedious connection configuration
-        const connectionConfig: ConnectionConfiguration = {
-          server: testConfig.DB_SERVER!,
-          options: {
-            instanceName: testConfig.DB_INSTANCE,
-            database: testConfig.DB_DATABASE,
-            encrypt: testConfig.DB_ENCRYPT === 'true',
-            trustServerCertificate: testConfig.DB_TRUST_CERTIFICATE === 'true',
-            connectTimeout: parseInt(testConfig.DB_CONNECTION_TIMEOUT || '30000'),
-            requestTimeout: parseInt(testConfig.DB_REQUEST_TIMEOUT || '15000'),
-            rowCollectionOnRequestCompletion: true,
-          },
-          authentication: {
-            type: 'default',
-            options: {
-              userName: testConfig.DB_USER!,
-              password: testConfig.DB_PASSWORD!,
-            },
-          },
-        };
+    const mssqlConfig: sql.config = {
+      server: testConfig.DB_SERVER!,
+      database: testConfig.DB_DATABASE,
+      user: testConfig.DB_USER!,
+      password: testConfig.DB_PASSWORD!,
+      options: {
+        instanceName: testConfig.DB_INSTANCE,
+        encrypt: testConfig.DB_ENCRYPT === 'true',
+        trustServerCertificate: testConfig.DB_TRUST_CERTIFICATE === 'true',
+      },
+      connectionTimeout: parseInt(testConfig.DB_CONNECTION_TIMEOUT || '30000'),
+      requestTimeout: parseInt(testConfig.DB_REQUEST_TIMEOUT || '15000'),
+      pool: { max: 1, min: 0, idleTimeoutMillis: 1_000 },
+    };
 
-        log.info(`Testing database connection to ${testConfig.DB_SERVER}\\${testConfig.DB_INSTANCE}`);
+    log.info(`Testing database connection to ${testConfig.DB_SERVER}\\${testConfig.DB_INSTANCE}`);
 
-        const connection = new Connection(connectionConfig);
-        let connectionResult: ConnectionTestResult | null = null;
+    let pool: sql.ConnectionPool | null = null;
+    try {
+      pool = await new sql.ConnectionPool(mssqlConfig).connect();
+      const versionRow = await pool.request().query<{ version: string }>(
+        "SELECT CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR(64)) AS version"
+      );
+      const serverVersion = versionRow.recordset[0]?.version ?? 'Unknown';
 
-        // Set up event handlers
-        connection.on('connect', (err) => {
-          if (err) {
-            log.error('Database connection test failed:', err.message);
-            connectionResult = {
-              success: false,
-              message: 'Connection failed',
-              details: err.message,
-              errorCode: (err as Error & { code?: string }).code,
-              duration: Date.now() - startTime,
-            };
-          } else {
-            log.info('Database connection test successful');
-            connectionResult = {
-              success: true,
-              message: 'Connection successful',
-              details: `Connected to ${testConfig.DB_SERVER}\\${testConfig.DB_INSTANCE}`,
-              serverVersion: (connection as unknown as { serverName?: string }).serverName || 'Unknown',
-              duration: Date.now() - startTime,
-            };
-          }
-
-          // Close connection
-          connection.close();
-        });
-
-        connection.on('end', () => {
-          log.info('Database connection test completed');
-          if (connectionResult) {
-            resolve(connectionResult);
-          }
-        });
-
-        connection.on('error', (err) => {
-          log.error('Database connection error:', err.message);
-          if (!connectionResult) {
-            connectionResult = {
-              success: false,
-              message: 'Connection error',
-              details: err.message,
-              errorCode: (err as Error & { code?: string }).code,
-              duration: Date.now() - startTime,
-            };
-            resolve(connectionResult);
-          }
-        });
-
-        // Set timeout to prevent hanging
-        const timeout = setTimeout(() => {
-          if (!connectionResult) {
-            log.warn('Database connection test timed out');
-            connection.close();
-            resolve({
-              success: false,
-              message: 'Connection timeout',
-              details: 'Connection attempt timed out after 30 seconds',
-              duration: Date.now() - startTime,
-            });
-          }
-        }, 30000);
-
-        // Clear timeout when connection completes
-        connection.on('end', () => clearTimeout(timeout));
-        connection.on('error', () => clearTimeout(timeout));
-
-        // Initiate connection
-        connection.connect();
-      } catch (error) {
-        log.error('Database connection test error:', { error: error instanceof Error ? error.message : String(error) });
-        resolve({
-          success: false,
-          message: 'Test configuration error',
-          details: error instanceof Error ? error.message : String(error),
-          duration: Date.now() - startTime,
-        });
+      log.info('Database connection test successful');
+      return {
+        success: true,
+        message: 'Connection successful',
+        details: `Connected to ${testConfig.DB_SERVER}\\${testConfig.DB_INSTANCE}`,
+        serverVersion,
+        duration: Date.now() - startTime,
+      };
+    } catch (error) {
+      const err = error as Error & { code?: string };
+      log.error('Database connection test failed:', err.message);
+      return {
+        success: false,
+        message: 'Connection failed',
+        details: err.message,
+        errorCode: err.code,
+        duration: Date.now() - startTime,
+      };
+    } finally {
+      if (pool) {
+        await pool.close().catch(() => {});
       }
-    });
+    }
   }
 
   /**

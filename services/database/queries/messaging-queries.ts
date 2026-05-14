@@ -2,10 +2,7 @@
  * Enhanced Messaging Queries Module with new infrastructure integration
  * Provides functions for WhatsApp and SMS messaging database operations
  */
-import { Connection, Request, TYPES } from 'tedious';
-import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery, executeStoredProcedure, SqlParam } from '../index.js';
-import ConnectionPool from '../ConnectionPool.js';
+import { executeStoredProcedure, TYPES } from '../index.js';
 import { createWebSocketMessage, MessageSchemas } from '../../messaging/schemas.js';
 import { logger } from '../../core/Logger.js';
 
@@ -102,17 +99,9 @@ interface SmsStatusMessage {
   status: string;
 }
 
-interface OutputParam {
-  parameterName: string;
-  value: unknown;
-}
-
 interface WebSocketEmitter {
   emit: (event: string, message: unknown) => void;
 }
-
-type RowMapper<T> = (columns: ColumnValue[]) => T;
-type ResultMapper<T, R> = (result: T[], outParams: OutputParam[]) => R;
 
 /**
  * Circuit breaker for database operations
@@ -201,71 +190,6 @@ class DatabaseCircuitBreaker {
 
 const dbCircuitBreaker = new DatabaseCircuitBreaker();
 
-/**
- * Helper function to execute stored procedure with existing connection
- */
-async function executeStoredProcedureWithConnection<T, R = T[]>(
-  connection: Connection,
-  procedureName: string,
-  params: SqlParam[] | null,
-  beforeExec: ((request: Request) => void) | null,
-  rowMapper: RowMapper<T> | null,
-  resultMapper?: ResultMapper<T, R>
-): Promise<R> {
-  return new Promise((resolve, reject) => {
-    const request = new Request(procedureName, (err) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-    });
-
-    // Add parameters
-    (params || []).forEach((param) => {
-      request.addParameter(param[0], param[1], param[2]);
-    });
-
-    // Execute beforeExec callback
-    if (beforeExec) {
-      try {
-        beforeExec(request);
-      } catch (error) {
-        reject(error);
-        return;
-      }
-    }
-
-    const result: T[] = [];
-    const outParams: OutputParam[] = [];
-
-    request.on('row', (columns: ColumnValue[]) => {
-      try {
-        result.push(rowMapper ? rowMapper(columns) : (columns as unknown as T));
-      } catch (error) {
-        reject(error);
-      }
-    });
-
-    request.on('returnValue', (parameterName: string, value: unknown) => {
-      outParams.push({ parameterName, value });
-    });
-
-    request.on('requestCompleted', () => {
-      try {
-        resolve(resultMapper ? resultMapper(result, outParams) : (result as unknown as R));
-      } catch (error) {
-        reject(error);
-      }
-    });
-
-    request.on('error', (error: Error) => {
-      reject(error);
-    });
-
-    // Execute the stored procedure
-    connection.callProcedure(request);
-  });
-}
 
 /**
  * Helper function to convert WhatsApp acknowledgment status codes to text
@@ -348,8 +272,8 @@ export async function updateWhatsAppDeliveryStatus(
         columns: [
           { name: 'AppointmentID', type: TYPES.Int },
           { name: 'SentWa', type: TYPES.Bit },
-          { name: 'DeliveredWa', type: TYPES.NVarChar },
-          { name: 'WaMessageID', type: TYPES.NVarChar },
+          { name: 'DeliveredWa', type: TYPES.NVarChar(50) },
+          { name: 'WaMessageID', type: TYPES.NVarChar(255) },
           { name: 'LastUpdated', type: TYPES.DateTime },
           { name: 'SentTimestamp', type: TYPES.DateTime },
         ],
@@ -363,53 +287,35 @@ export async function updateWhatsAppDeliveryStatus(
         serverCount: number;
       }
 
-      // Use direct connection to avoid transaction conflicts
-      return ConnectionPool.withConnection(async (connection) => {
-        return executeStoredProcedureWithConnection<StatusStats, UpdateResult>(
-          connection,
-          'UpdateWhatsAppDeliveryStatus',
-          [['AIDS', TYPES.TVP, tableDefinition]],
-          null,
-          (columns) => {
-            if (columns.length >= 4) {
-              return {
-                totalUpdated: columns[0].value as number,
-                readCount: columns[1].value as number,
-                deliveredCount: columns[2].value as number,
-                serverCount: columns[3].value as number,
-              };
-            }
+      return executeStoredProcedure<StatusStats, UpdateResult>(
+        'UpdateWhatsAppDeliveryStatus',
+        [['AIDS', TYPES.TVP, tableDefinition]],
+        undefined,
+        (columns) => {
+          if (columns.length >= 4) {
             return {
-              totalUpdated: 0,
-              readCount: 0,
-              deliveredCount: 0,
-              serverCount: 0,
-            };
-          },
-          (result) => {
-            if (result && result.length > 0) {
-              const stats = result[0];
-              logger.message.info('WhatsApp status update completed', {
-                totalUpdated: stats.totalUpdated,
-                readCount: stats.readCount,
-                deliveredCount: stats.deliveredCount,
-                serverCount: stats.serverCount,
-              });
-              return {
-                success: true,
-                updatedCount: stats.totalUpdated,
-                stats: stats,
-              };
-            }
-
-            return {
-              success: true,
-              updatedCount: rows.length,
-              stats: null,
+              totalUpdated: columns[0].value as number,
+              readCount: columns[1].value as number,
+              deliveredCount: columns[2].value as number,
+              serverCount: columns[3].value as number,
             };
           }
-        );
-      });
+          return { totalUpdated: 0, readCount: 0, deliveredCount: 0, serverCount: 0 };
+        },
+        (result) => {
+          if (result && result.length > 0) {
+            const stats = result[0];
+            logger.message.info('WhatsApp status update completed', {
+              totalUpdated: stats.totalUpdated,
+              readCount: stats.readCount,
+              deliveredCount: stats.deliveredCount,
+              serverCount: stats.serverCount,
+            });
+            return { success: true, updatedCount: stats.totalUpdated, stats };
+          }
+          return { success: true, updatedCount: rows.length, stats: null };
+        }
+      );
     }, operationName)
     .catch((error: Error) => {
       logger.message.error('WhatsApp delivery status update failed', { operationName , error: error.message });
@@ -433,75 +339,56 @@ export async function getWhatsAppMessages(
     .execute(async () => {
       logger.message.debug('Retrieving WhatsApp messages', { date });
 
-      return ConnectionPool.withConnection(async (connection) => {
-        return executeStoredProcedureWithConnection<
-          WhatsAppMessage,
-          [string[], string[], number[], string[]]
-        >(
-          connection,
-          'GetWhatsAppMessagesToSend',
-          [['ADate', TYPES.Date, date]],
-          null,
-          (columns) => {
-            if (columns.length >= 5) {
-              return {
-                id: columns[0].value as number,
-                number: columns[1].value as string,
-                name: columns[2].value as string,
-                message: columns[3].value as string,
-                appTime: columns[4].value as Date,
-              };
-            }
+      return executeStoredProcedure<WhatsAppMessage, [string[], string[], number[], string[]]>(
+        'GetWhatsAppMessagesToSend',
+        [['ADate', TYPES.Date, date]],
+        undefined,
+        (columns) => {
+          if (columns.length >= 5) {
             return {
-              id: 0,
-              number: '',
-              name: '',
-              message: '',
-              appTime: new Date(),
+              id: columns[0].value as number,
+              number: columns[1].value as string,
+              name: columns[2].value as string,
+              message: columns[3].value as string,
+              appTime: columns[4].value as Date,
             };
-          },
-          (result) => {
-            const numbers = result.map((r) => r.number || '');
-            const messages = result.map((r) => r.message || '');
-            const ids = result.map((r) => r.id || 0);
-            const names = result.map((r) => r.name || '');
-
-            logger.message.debug('WhatsApp messages retrieved successfully', {
-              messageCount: result.length,
-              date,
-            });
-
-            if (result.length > 0) {
-              // Log appointment time distribution for insights
-              const timeGroups: Record<number, number> = {};
-              result.forEach((r) => {
-                const hour = new Date(r.appTime).getHours();
-                if (!timeGroups[hour]) timeGroups[hour] = 0;
-                timeGroups[hour]++;
-              });
-
-              logger.message.debug('Appointment time distribution analysis', { timeGroups });
-
-              // Log sample messages for debugging
-              const sampleCount = Math.min(3, result.length);
-              for (let i = 0; i < sampleCount; i++) {
-                const message = result[i].message || '';
-                const msgPreview =
-                  message.length > 30 ? message.substring(0, 30) + '...' : message;
-                logger.message.debug('Sample message preview', {
-                  sampleNumber: i + 1,
-                  appointmentId: result[i].id,
-                  appointmentTime: new Date(result[i].appTime).toLocaleTimeString(),
-                  phoneNumber: result[i].number,
-                  messagePreview: msgPreview,
-                });
-              }
-            }
-
-            return [numbers, messages, ids, names];
           }
-        );
-      });
+          return { id: 0, number: '', name: '', message: '', appTime: new Date() };
+        },
+        (result) => {
+          const numbers = result.map((r) => r.number || '');
+          const messages = result.map((r) => r.message || '');
+          const ids = result.map((r) => r.id || 0);
+          const names = result.map((r) => r.name || '');
+
+          logger.message.debug('WhatsApp messages retrieved successfully', { messageCount: result.length, date });
+
+          if (result.length > 0) {
+            const timeGroups: Record<number, number> = {};
+            result.forEach((r) => {
+              const hour = new Date(r.appTime).getHours();
+              if (!timeGroups[hour]) timeGroups[hour] = 0;
+              timeGroups[hour]++;
+            });
+            logger.message.debug('Appointment time distribution analysis', { timeGroups });
+
+            const sampleCount = Math.min(3, result.length);
+            for (let i = 0; i < sampleCount; i++) {
+              const message = result[i].message || '';
+              const msgPreview = message.length > 30 ? message.substring(0, 30) + '...' : message;
+              logger.message.debug('Sample message preview', {
+                sampleNumber: i + 1,
+                appointmentId: result[i].id,
+                appointmentTime: new Date(result[i].appTime).toLocaleTimeString(),
+                phoneNumber: result[i].number,
+                messagePreview: msgPreview,
+              });
+            }
+          }
+
+          return [numbers, messages, ids, names];
+        }
+      );
     }, operationName)
     .catch((error: Error) => {
       logger.message.error('Failed to retrieve WhatsApp messages', { operationName , error: error.message });
@@ -559,8 +446,8 @@ export async function updateWhatsAppStatus(
         columns: [
           { name: 'AppointmentID', type: TYPES.Int },
           { name: 'SentWa', type: TYPES.Bit },
-          { name: 'DeliveredWa', type: TYPES.NVarChar },
-          { name: 'WaMessageID', type: TYPES.NVarChar },
+          { name: 'DeliveredWa', type: TYPES.NVarChar(50) },
+          { name: 'WaMessageID', type: TYPES.NVarChar(255) },
           { name: 'LastUpdated', type: TYPES.DateTime },
           { name: 'SentTimestamp', type: TYPES.DateTime },
         ],
@@ -571,31 +458,22 @@ export async function updateWhatsAppStatus(
         updatedCount: number;
       }
 
-      // Execute with direct connection to avoid transaction conflicts
-      return ConnectionPool.withConnection(async (connection) => {
-        return executeStoredProcedureWithConnection<UpdateCount, UpdateResult>(
-          connection,
-          'UpdateWhatsAppStatus',
-          [['AIDS', TYPES.TVP, tableDefinition]],
-          null,
-          (columns) => {
-            if (columns.length >= 1) {
-              return { updatedCount: columns[0].value as number };
-            }
-            return { updatedCount: 0 };
-          },
-          (result) => {
-            const updatedCount =
-              result && result.length > 0 ? result[0].updatedCount : rows.length;
-            logger.message.info('WhatsApp status update completed successfully', { updatedCount });
-
-            return {
-              success: true,
-              updatedCount: updatedCount,
-            };
+      return executeStoredProcedure<UpdateCount, UpdateResult>(
+        'UpdateWhatsAppStatus',
+        [['AIDS', TYPES.TVP, tableDefinition]],
+        undefined,
+        (columns) => {
+          if (columns.length >= 1) {
+            return { updatedCount: columns[0].value as number };
           }
-        );
-      });
+          return { updatedCount: 0 };
+        },
+        (result) => {
+          const updatedCount = result && result.length > 0 ? result[0].updatedCount : rows.length;
+          logger.message.info('WhatsApp status update completed successfully', { updatedCount });
+          return { success: true, updatedCount };
+        }
+      );
     }, operationName)
     .catch((error: Error) => {
       logger.message.error('WhatsApp status update failed', { operationName , error: error.message });
@@ -638,9 +516,7 @@ export async function updateSingleMessageStatus(
           ['Status', TYPES.NVarChar, statusText],
           ['LastUpdated', TYPES.DateTime, currentTimestamp],
         ],
-        (request) => {
-          request.addOutputParameter('Result', TYPES.Int);
-        },
+        [['Result', TYPES.Int]],
         (columns) => {
           if (columns.length >= 5) {
             return {
@@ -712,42 +588,29 @@ export async function getWhatsAppDeliveryStatus(
     .execute(async () => {
       logger.message.info('Retrieving WhatsApp delivery status', { date });
 
-      return ConnectionPool.withConnection(async (connection) => {
-        return executeStoredProcedureWithConnection<WhatsAppDeliveryMessage>(
-          connection,
-          'ProcFetch',
-          [['ADate', TYPES.Date, date]],
-          null,
-          (columns) => ({
-            id: columns[0].value as number, // appointmentID
-            number: columns[1].value as string, // Phone number with @c.us
-            wamid: columns[2].value as string, // WaMessageID
-          }),
-          (result) => {
-            logger.message.info('WhatsApp messages retrieved for status checking', {
-              messageCount: result.length,
-              date,
-            });
+      return executeStoredProcedure<WhatsAppDeliveryMessage>(
+        'ProcFetch',
+        [['ADate', TYPES.Date, date]],
+        undefined,
+        (columns) => ({
+          id: columns[0].value as number,
+          number: columns[1].value as string,
+          wamid: columns[2].value as string,
+        }),
+        (result) => {
+          logger.message.info('WhatsApp messages retrieved for status checking', { messageCount: result.length, date });
 
-            if (result.length > 0) {
-              // Log the first few for debugging
-              const sampleCount = Math.min(5, result.length);
-              logger.message.debug('Sample messages for status check', {
-                sampleCount,
-                totalCount: result.length,
-              });
-              for (let i = 0; i < sampleCount; i++) {
-                logger.message.debug('Status check message sample', {
-                  appointmentId: result[i].id,
-                  messageId: result[i].wamid,
-                });
-              }
+          if (result.length > 0) {
+            const sampleCount = Math.min(5, result.length);
+            logger.message.debug('Sample messages for status check', { sampleCount, totalCount: result.length });
+            for (let i = 0; i < sampleCount; i++) {
+              logger.message.debug('Status check message sample', { appointmentId: result[i].id, messageId: result[i].wamid });
             }
-
-            return result;
           }
-        );
-      });
+
+          return result;
+        }
+      );
     }, operationName)
     .catch((error: Error) => {
       logger.message.error('Failed to retrieve WhatsApp delivery status', { operationName , error: error.message });

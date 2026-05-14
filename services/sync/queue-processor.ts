@@ -4,8 +4,6 @@
  */
 
 import { executeQuery, TYPES } from '../database/index.js';
-import { Connection, Request } from 'tedious';
-import ConnectionPool from '../database/ConnectionPool.js';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { log } from '../../utils/logger.js';
@@ -185,40 +183,8 @@ class QueueProcessor {
     query: string,
     params: [string, typeof TYPES[keyof typeof TYPES], unknown][]
   ): Promise<number> {
-    return ConnectionPool.withConnection(async (connection: Connection) => {
-      return new Promise((resolve, reject) => {
-        let actualRowCount = 0;
-
-        const request = new Request(query, (err, rowCount) => {
-          if (err) {
-            log.error('Update query error', { error: err.message });
-            reject(err);
-            return;
-          }
-          // Store the actual row count from the callback
-          actualRowCount = rowCount || 0;
-        });
-
-        // Add parameters
-        (params || []).forEach((param) => {
-          request.addParameter(param[0], param[1], param[2]);
-        });
-
-        // Listen for requestCompleted event - this fires when query is done
-        request.on('requestCompleted', () => {
-          // Resolve with the row count we got from the main callback
-          resolve(actualRowCount);
-        });
-
-        // Listen for errors
-        request.on('error', (err) => {
-          log.error('UPDATE request error', { error: err.message });
-          reject(err);
-        });
-
-        connection.execSql(request);
-      });
-    });
+    const result = await executeQuery<unknown, unknown[]>(query, params as [string, typeof TYPES[keyof typeof TYPES], unknown][], () => ({}));
+    return (result as { rowsAffected?: number }).rowsAffected ?? 0;
   }
 
   /**

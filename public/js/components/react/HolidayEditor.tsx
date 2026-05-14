@@ -172,7 +172,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
                 const error = await response.json();
                 toast.error(error.error || `Failed to load ${tableName}`);
             }
-        } catch (error) {
+        } catch {
             toast.error(`Error loading ${tableName}`);
         } finally {
             setLoading(false);
@@ -227,7 +227,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
                 const error = await response.json();
                 toast.error(error.error || 'Failed to delete holiday');
             }
-        } catch (error) {
+        } catch {
             toast.error('Error deleting holiday');
         } finally {
             setDeleteConfirm(null);
@@ -309,7 +309,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
                 const error = await response.json();
                 toast.error(error.error || 'Failed to save holiday');
             }
-        } catch (error) {
+        } catch {
             toast.error('Error saving holiday');
         }
     };

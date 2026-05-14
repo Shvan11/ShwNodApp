@@ -44,13 +44,15 @@ const UniversalHeader = () => {
     // Load user info once on mount
     useEffect(() => {
         loadCurrentUser();
-    }, []); // Only run once on mount
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Load patient data and setup navigation context when route changes
     useEffect(() => {
         loadPatientData();
         setupNavigationContext();
-    }, [location.pathname]); // Re-run when route changes
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.pathname]);
 
     const loadPatientData = () => {
         const patientCode = extractPatientCodeFromURL();

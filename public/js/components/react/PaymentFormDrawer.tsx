@@ -36,7 +36,7 @@ interface PaymentFormDrawerProps {
     workInfo?: WorkInfo;
 }
 
-const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo }: PaymentFormDrawerProps) => {
+const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }: PaymentFormDrawerProps) => {
     const [formData, setFormData] = useState<PaymentFormData>({
         Amountpaid: 0,
         Dateofpayment: new Date().toISOString().split('T')[0]

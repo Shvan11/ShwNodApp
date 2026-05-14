@@ -107,7 +107,8 @@ const DailyAppointments = () => {
 
         console.log('📅 [DailyAppointments] Date changed, fetching new data');
         loadAppointments(selectedDate);
-    }, [selectedDate]); // Only depend on selectedDate
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedDate]);
 
     // 11. Handle WebSocket reconnection
     useEffect(() => {

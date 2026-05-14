@@ -2,10 +2,8 @@
  * Stand / Mini-Pharmacy database queries
  */
 import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery, withConnection, TYPES } from '../index.js';
+import { executeQuery, withTransaction, sql, TYPES } from '../index.js';
 import type { SqlParam } from '../index.js';
-import { Connection, Request } from 'tedious';
-import { log } from '../../../utils/logger.js';
 
 // ============================================================================
 // TYPES
@@ -173,46 +171,6 @@ interface TopItemRow {
   TotalProfit: number;
 }
 
-// ============================================================================
-// HELPER: execute raw SQL on a connection, returning rows + rowsAffected
-// ============================================================================
-
-function execOnConnection(
-  connection: Connection,
-  query: string,
-  params: SqlParam[] = []
-): Promise<{ rows: unknown[][]; rowsAffected: number }> {
-  return new Promise((resolve, reject) => {
-    const rows: unknown[][] = [];
-    let affected = 0;
-
-    const request = new Request(query, (err: Error | null | undefined, rowCount?: number) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      affected = rowCount ?? 0;
-    });
-
-    params.forEach(([name, type, value]) => {
-      request.addParameter(name, type, value);
-    });
-
-    request.on('row', (columns: ColumnValue[]) => {
-      rows.push(columns.map(c => c.value));
-    });
-
-    request.on('requestCompleted', () => {
-      resolve({ rows, rowsAffected: affected });
-    });
-
-    request.on('error', (error: Error) => {
-      reject(error);
-    });
-
-    connection.execSql(request);
-  });
-}
 
 // ============================================================================
 // CATEGORIES
@@ -611,97 +569,70 @@ export async function getExpiringItems(daysAhead: number = 30): Promise<StandIte
 // ============================================================================
 
 export async function createStandSaleTransaction(data: SaleCreateInput): Promise<{ SaleID: number }> {
-  return withConnection(async (connection: Connection) => {
-    // BEGIN TRANSACTION
-    await execOnConnection(connection, 'BEGIN TRANSACTION');
-
-    try {
-      // 1. Insert sale header
-      const saleResult = await execOnConnection(
-        connection,
+  return withTransaction(async (tx) => {
+    // 1. Insert sale header
+    const saleResult = await new sql.Request(tx)
+      .input('totalAmount', TYPES.Int, data.totalAmount)
+      .input('totalCost', TYPES.Int, data.totalCost)
+      .input('totalProfit', TYPES.Int, data.totalProfit)
+      .input('amountPaid', TYPES.Int, data.amountPaid)
+      .input('change', TYPES.Int, data.change)
+      .input('paymentMethod', TYPES.NVarChar, data.paymentMethod)
+      .input('customerNote', TYPES.NVarChar, data.customerNote || null)
+      .input('personId', TYPES.Int, data.personId || null)
+      .input('cashierId', TYPES.Int, data.cashierId || null)
+      .query<{ SaleID: number }>(
         `INSERT INTO dbo.tblStandSales
           (TotalAmount, TotalCost, TotalProfit, AmountPaid, Change, PaymentMethod, CustomerNote, PersonID, CashierID)
          VALUES (@totalAmount, @totalCost, @totalProfit, @amountPaid, @change, @paymentMethod, @customerNote, @personId, @cashierId);
-         SELECT SCOPE_IDENTITY() AS SaleID;`,
-        [
-          ['totalAmount', TYPES.Int, data.totalAmount],
-          ['totalCost', TYPES.Int, data.totalCost],
-          ['totalProfit', TYPES.Int, data.totalProfit],
-          ['amountPaid', TYPES.Int, data.amountPaid],
-          ['change', TYPES.Int, data.change],
-          ['paymentMethod', TYPES.NVarChar, data.paymentMethod],
-          ['customerNote', TYPES.NVarChar, data.customerNote || null],
-          ['personId', TYPES.Int, data.personId || null],
-          ['cashierId', TYPES.Int, data.cashierId || null],
-        ]
+         SELECT SCOPE_IDENTITY() AS SaleID;`
       );
 
-      const saleId = saleResult.rows[0]?.[0] as number;
-      if (!saleId) throw new Error('Failed to create sale: no ID returned');
+    const saleId = saleResult.recordset[0]?.SaleID as number;
+    if (!saleId) throw new Error('Failed to create sale: no ID returned');
 
-      // 2-4. For each line item: insert sale item, decrement stock, insert movement
-      for (let i = 0; i < data.items.length; i++) {
-        const item = data.items[i];
-
-        // Insert sale item
-        await execOnConnection(
-          connection,
+    // 2-4. For each line item: insert sale item, decrement stock, insert movement
+    for (const item of data.items) {
+      await new sql.Request(tx)
+        .input('saleId', TYPES.Int, saleId)
+        .input('itemId', TYPES.Int, item.itemId)
+        .input('qty', TYPES.Int, item.quantity)
+        .input('unitPrice', TYPES.Int, item.unitPrice)
+        .input('unitCost', TYPES.Int, item.unitCost)
+        .input('lineTotal', TYPES.Int, item.lineTotal)
+        .query(
           `INSERT INTO dbo.tblStandSaleItems (SaleID, ItemID, Quantity, UnitPrice, UnitCost, LineTotal)
-           VALUES (@saleId, @itemId, @qty, @unitPrice, @unitCost, @lineTotal)`,
-          [
-            ['saleId', TYPES.Int, saleId],
-            ['itemId', TYPES.Int, item.itemId],
-            ['qty', TYPES.Int, item.quantity],
-            ['unitPrice', TYPES.Int, item.unitPrice],
-            ['unitCost', TYPES.Int, item.unitCost],
-            ['lineTotal', TYPES.Int, item.lineTotal],
-          ]
+           VALUES (@saleId, @itemId, @qty, @unitPrice, @unitCost, @lineTotal)`
         );
 
-        // Decrement stock — check rowsAffected to ensure sufficient stock
-        const stockResult = await execOnConnection(
-          connection,
+      const stockResult = await new sql.Request(tx)
+        .input('qty', TYPES.Int, item.quantity)
+        .input('itemId', TYPES.Int, item.itemId)
+        .query(
           `UPDATE dbo.tblStandItems
            SET CurrentStock = CurrentStock - @qty, ModifiedDate = SYSDATETIME()
-           WHERE ItemID = @itemId AND CurrentStock >= @qty`,
-          [
-            ['qty', TYPES.Int, item.quantity],
-            ['itemId', TYPES.Int, item.itemId],
-          ]
+           WHERE ItemID = @itemId AND CurrentStock >= @qty`
         );
 
-        if (stockResult.rowsAffected !== 1) {
-          throw new Error(`INSUFFICIENT_STOCK:${item.itemId}`);
-        }
+      const affected = Array.isArray(stockResult.rowsAffected)
+        ? stockResult.rowsAffected.reduce((a, b) => a + b, 0)
+        : stockResult.rowsAffected;
+      if (affected !== 1) throw new Error(`INSUFFICIENT_STOCK:${item.itemId}`);
 
-        // Insert stock movement (negative qty for sale)
-        await execOnConnection(
-          connection,
+      await new sql.Request(tx)
+        .input('itemId', TYPES.Int, item.itemId)
+        .input('qty', TYPES.Int, -item.quantity)
+        .input('unitCost', TYPES.Int, item.unitCost)
+        .input('saleId', TYPES.Int, saleId)
+        .input('cashierId', TYPES.Int, data.cashierId || null)
+        .query(
           `INSERT INTO dbo.tblStandStockMovements
             (ItemID, MovementType, Quantity, UnitCost, RelatedSaleID, PerformedBy)
-           VALUES (@itemId, 'sale', @qty, @unitCost, @saleId, @cashierId)`,
-          [
-            ['itemId', TYPES.Int, item.itemId],
-            ['qty', TYPES.Int, -item.quantity],
-            ['unitCost', TYPES.Int, item.unitCost],
-            ['saleId', TYPES.Int, saleId],
-            ['cashierId', TYPES.Int, data.cashierId || null],
-          ]
+           VALUES (@itemId, 'sale', @qty, @unitCost, @saleId, @cashierId)`
         );
-      }
-
-      // COMMIT
-      await execOnConnection(connection, 'COMMIT TRANSACTION');
-      return { SaleID: saleId };
-    } catch (err) {
-      // ROLLBACK on any failure
-      try {
-        await execOnConnection(connection, 'ROLLBACK TRANSACTION');
-      } catch (rollbackErr) {
-        log.error('Rollback failed during sale transaction', { error: (rollbackErr as Error).message });
-      }
-      throw err;
     }
+
+    return { SaleID: saleId };
   });
 }
 
@@ -833,73 +764,45 @@ export async function voidStandSale(
   reason: string,
   userId: number | null
 ): Promise<void> {
-  return withConnection(async (connection: Connection) => {
-    await execOnConnection(connection, 'BEGIN TRANSACTION');
-
-    try {
-      // Mark sale as voided
-      await execOnConnection(
-        connection,
+  return withTransaction(async (tx) => {
+    await new sql.Request(tx)
+      .input('saleId', TYPES.Int, saleId)
+      .input('userId', TYPES.Int, userId)
+      .input('reason', TYPES.NVarChar, reason)
+      .query(
         `UPDATE dbo.tblStandSales
          SET VoidedDate = SYSDATETIME(), VoidedBy = @userId, VoidReason = @reason
-         WHERE SaleID = @saleId AND VoidedDate IS NULL`,
-        [
-          ['saleId', TYPES.Int, saleId],
-          ['userId', TYPES.Int, userId],
-          ['reason', TYPES.NVarChar, reason],
-        ]
+         WHERE SaleID = @saleId AND VoidedDate IS NULL`
       );
 
-      // Get line items for stock reversal
-      const lineItems = await execOnConnection(
-        connection,
-        `SELECT ItemID, Quantity, UnitCost FROM dbo.tblStandSaleItems WHERE SaleID = @saleId`,
-        [['saleId', TYPES.Int, saleId]]
+    const lineItems = await new sql.Request(tx)
+      .input('saleId', TYPES.Int, saleId)
+      .query<{ ItemID: number; Quantity: number; UnitCost: number }>(
+        `SELECT ItemID, Quantity, UnitCost FROM dbo.tblStandSaleItems WHERE SaleID = @saleId`
       );
 
-      // Reverse stock for each line item
-      for (const row of lineItems.rows) {
-        const itemId = row[0] as number;
-        const quantity = row[1] as number;
-        const unitCost = row[2] as number;
-
-        // Re-add stock
-        await execOnConnection(
-          connection,
+    for (const row of lineItems.recordset) {
+      await new sql.Request(tx)
+        .input('qty', TYPES.Int, row.Quantity)
+        .input('itemId', TYPES.Int, row.ItemID)
+        .query(
           `UPDATE dbo.tblStandItems
            SET CurrentStock = CurrentStock + @qty, ModifiedDate = SYSDATETIME()
-           WHERE ItemID = @itemId`,
-          [
-            ['qty', TYPES.Int, quantity],
-            ['itemId', TYPES.Int, itemId],
-          ]
+           WHERE ItemID = @itemId`
         );
 
-        // Insert reverse movement
-        await execOnConnection(
-          connection,
+      await new sql.Request(tx)
+        .input('itemId', TYPES.Int, row.ItemID)
+        .input('qty', TYPES.Int, row.Quantity)
+        .input('unitCost', TYPES.Int, row.UnitCost)
+        .input('saleId', TYPES.Int, saleId)
+        .input('reason', TYPES.NVarChar, `Void: ${reason}`)
+        .input('userId', TYPES.Int, userId)
+        .query(
           `INSERT INTO dbo.tblStandStockMovements
             (ItemID, MovementType, Quantity, UnitCost, RelatedSaleID, Reason, PerformedBy)
-           VALUES (@itemId, 'void', @qty, @unitCost, @saleId, @reason, @userId)`,
-          [
-            ['itemId', TYPES.Int, itemId],
-            ['qty', TYPES.Int, quantity],
-            ['unitCost', TYPES.Int, unitCost],
-            ['saleId', TYPES.Int, saleId],
-            ['reason', TYPES.NVarChar, `Void: ${reason}`],
-            ['userId', TYPES.Int, userId],
-          ]
+           VALUES (@itemId, 'void', @qty, @unitCost, @saleId, @reason, @userId)`
         );
-      }
-
-      await execOnConnection(connection, 'COMMIT TRANSACTION');
-    } catch (err) {
-      try {
-        await execOnConnection(connection, 'ROLLBACK TRANSACTION');
-      } catch (rollbackErr) {
-        log.error('Rollback failed during void transaction', { error: (rollbackErr as Error).message });
-      }
-      throw err;
     }
   });
 }
@@ -946,41 +849,27 @@ export async function restockItem(
   unitCost: number,
   userId: number | null
 ): Promise<void> {
-  return withConnection(async (connection: Connection) => {
-    await execOnConnection(connection, 'BEGIN TRANSACTION');
-    try {
-      // Update stock
-      await execOnConnection(
-        connection,
+  return withTransaction(async (tx) => {
+    await new sql.Request(tx)
+      .input('qty', TYPES.Int, quantity)
+      .input('itemId', TYPES.Int, itemId)
+      .query(
         `UPDATE dbo.tblStandItems
          SET CurrentStock = CurrentStock + @qty, ModifiedDate = SYSDATETIME()
-         WHERE ItemID = @itemId`,
-        [
-          ['qty', TYPES.Int, quantity],
-          ['itemId', TYPES.Int, itemId],
-        ]
+         WHERE ItemID = @itemId`
       );
 
-      // Insert movement
-      await execOnConnection(
-        connection,
+    await new sql.Request(tx)
+      .input('itemId', TYPES.Int, itemId)
+      .input('qty', TYPES.Int, quantity)
+      .input('unitCost', TYPES.Int, unitCost)
+      .input('totalCost', TYPES.Int, quantity * unitCost)
+      .input('userId', TYPES.Int, userId)
+      .query(
         `INSERT INTO dbo.tblStandStockMovements
           (ItemID, MovementType, Quantity, UnitCost, TotalCost, PerformedBy)
-         VALUES (@itemId, 'restock', @qty, @unitCost, @totalCost, @userId)`,
-        [
-          ['itemId', TYPES.Int, itemId],
-          ['qty', TYPES.Int, quantity],
-          ['unitCost', TYPES.Int, unitCost],
-          ['totalCost', TYPES.Int, quantity * unitCost],
-          ['userId', TYPES.Int, userId],
-        ]
+         VALUES (@itemId, 'restock', @qty, @unitCost, @totalCost, @userId)`
       );
-
-      await execOnConnection(connection, 'COMMIT TRANSACTION');
-    } catch (err) {
-      try { await execOnConnection(connection, 'ROLLBACK TRANSACTION'); } catch { /* ignore */ }
-      throw err;
-    }
   });
 }
 
@@ -990,46 +879,34 @@ export async function adjustStock(
   reason: string,
   userId: number | null
 ): Promise<void> {
-  return withConnection(async (connection: Connection) => {
-    await execOnConnection(connection, 'BEGIN TRANSACTION');
-    try {
-      // Update stock (ensure non-negative)
-      const result = await execOnConnection(
-        connection,
+  return withTransaction(async (tx) => {
+    const result = await new sql.Request(tx)
+      .input('delta', TYPES.Int, delta)
+      .input('itemId', TYPES.Int, itemId)
+      .query(
         `UPDATE dbo.tblStandItems
          SET CurrentStock = CurrentStock + @delta, ModifiedDate = SYSDATETIME()
-         WHERE ItemID = @itemId AND (CurrentStock + @delta) >= 0`,
-        [
-          ['delta', TYPES.Int, delta],
-          ['itemId', TYPES.Int, itemId],
-        ]
+         WHERE ItemID = @itemId AND (CurrentStock + @delta) >= 0`
       );
 
-      if (result.rowsAffected !== 1) {
-        throw new Error('INSUFFICIENT_STOCK_FOR_ADJUSTMENT');
-      }
+    const affected = Array.isArray(result.rowsAffected)
+      ? result.rowsAffected.reduce((a, b) => a + b, 0)
+      : result.rowsAffected;
+    if (affected !== 1) throw new Error('INSUFFICIENT_STOCK_FOR_ADJUSTMENT');
 
-      const movementType = delta < 0 ? 'waste' : 'adjustment';
+    const movementType = delta < 0 ? 'waste' : 'adjustment';
 
-      await execOnConnection(
-        connection,
+    await new sql.Request(tx)
+      .input('itemId', TYPES.Int, itemId)
+      .input('type', TYPES.NVarChar, movementType)
+      .input('delta', TYPES.Int, delta)
+      .input('reason', TYPES.NVarChar, reason)
+      .input('userId', TYPES.Int, userId)
+      .query(
         `INSERT INTO dbo.tblStandStockMovements
           (ItemID, MovementType, Quantity, Reason, PerformedBy)
-         VALUES (@itemId, @type, @delta, @reason, @userId)`,
-        [
-          ['itemId', TYPES.Int, itemId],
-          ['type', TYPES.NVarChar, movementType],
-          ['delta', TYPES.Int, delta],
-          ['reason', TYPES.NVarChar, reason],
-          ['userId', TYPES.Int, userId],
-        ]
+         VALUES (@itemId, @type, @delta, @reason, @userId)`
       );
-
-      await execOnConnection(connection, 'COMMIT TRANSACTION');
-    } catch (err) {
-      try { await execOnConnection(connection, 'ROLLBACK TRANSACTION'); } catch { /* ignore */ }
-      throw err;
-    }
   });
 }
 

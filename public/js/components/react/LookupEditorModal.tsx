@@ -42,7 +42,7 @@ interface LookupEditorModalProps {
  * Positioned modal for adding/editing lookup table items
  * Appears next to the anchor element (edit button or add button)
  */
-const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, onSave, columns, editingItem, tableName, idColumn, anchorEl }) => {
+const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, onSave, columns, editingItem, tableName, idColumn: _idColumn, anchorEl }) => {
     const [formData, setFormData] = useState<FormData>({});
     const [errors, setErrors] = useState<FormErrors>({});
     const [isSaving, setIsSaving] = useState<boolean>(false);

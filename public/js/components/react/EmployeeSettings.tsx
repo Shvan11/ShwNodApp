@@ -34,7 +34,7 @@ interface EmployeeSettingsProps {
     onChangesUpdate?: (hasChanges: boolean) => void;
 }
 
-const EmployeeSettings = ({ onChangesUpdate }: EmployeeSettingsProps) => {
+const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSettingsProps) => {
     const toast = useToast();
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [positions, setPositions] = useState<Position[]>([]);

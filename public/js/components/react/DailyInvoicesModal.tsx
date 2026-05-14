@@ -51,6 +51,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
         if (dateValue) {
             fetchDailyInvoices();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dateValue]);
 
     const fetchDailyInvoices = async (): Promise<void> => {

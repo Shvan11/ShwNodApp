@@ -52,6 +52,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
 
     useEffect(() => {
         loadCurrentConfig();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -59,7 +60,9 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
         if (onChangesUpdate) {
             onChangesUpdate(Object.keys(pendingChanges).length > 0);
         }
-    }, [pendingChanges]); // Remove onChangesUpdate from deps since it should be stable
+        // onChangesUpdate intentionally excluded — parent should provide a stable ref
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pendingChanges]);
 
     const loadCurrentConfig = async () => {
         setIsLoading(true);

@@ -1,7 +1,7 @@
 // services/monitoring/HealthCheck.ts
 import EventEmitter from 'events';
 import ResourceManager from '../core/ResourceManager.js';
-import ConnectionPool from '../database/ConnectionPool.js';
+import { getDatabaseStats } from '../database/index.js';
 import messageState from '../state/messageState.js';
 import { log } from '../../utils/logger.js';
 
@@ -92,12 +92,12 @@ class HealthCheckService extends EventEmitter {
     this.registerCheck(
       'database',
       async () => {
-        const stats = ConnectionPool.getStats();
-        const healthy = stats.totalConnections > 0 && !stats.isShuttingDown;
+        const stats = getDatabaseStats().connectionPool;
+        const healthy = !stats.isShuttingDown;
 
         return {
           healthy,
-          details: stats,
+          details: stats as unknown as Record<string, unknown>,
           message: healthy ? 'Database pool is healthy' : 'Database pool is unhealthy',
         };
       },
@@ -347,7 +347,7 @@ class HealthCheckService extends EventEmitter {
         pid: process.pid,
       },
       resourceStats: ResourceManager.getStats(),
-      databaseStats: ConnectionPool.getStats(),
+      databaseStats: getDatabaseStats().connectionPool as unknown as Record<string, unknown>,
     };
   }
 

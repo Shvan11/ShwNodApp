@@ -28,7 +28,7 @@ interface ContentRendererProps {
     isNewPatient?: boolean;
 }
 
-const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient = false }: ContentRendererProps) => {
+const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient: _isNewPatient = false }: ContentRendererProps) => {
     const navigate = useNavigate();
     const wildcardParams = useParams<{ '*': string }>();
     const [searchParams] = useSearchParams();

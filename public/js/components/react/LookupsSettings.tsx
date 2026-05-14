@@ -37,7 +37,7 @@ interface LookupsSettingsProps {
  * Main Lookups Settings tab component
  * Displays all lookup tables in an accordion layout
  */
-const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate }) => {
+const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onChangesUpdate }) => {
     const toast = useToast();
     const [tables, setTables] = useState<TableConfig[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
@@ -45,6 +45,7 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate }) =>
 
     useEffect(() => {
         loadTableConfigs();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const loadTableConfigs = async (): Promise<void> => {
@@ -57,7 +58,7 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate }) =>
             } else {
                 toast.error('Failed to load lookup tables configuration');
             }
-        } catch (error) {
+        } catch {
             toast.error('Error loading lookup tables');
         } finally {
             setLoading(false);

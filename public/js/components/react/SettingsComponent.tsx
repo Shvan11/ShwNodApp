@@ -192,6 +192,7 @@ const SettingsComponent: React.FC = () => {
         if (tab && tabs.find(t => t.id === tab && !t.disabled)) {
             setActiveTab(tab);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tab]);
 
     const handleTabChange = (tabId: string): void => {

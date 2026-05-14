@@ -14,7 +14,6 @@ import styles from './WhatsAppAuth.module.css';
 export default function WhatsAppAuth() {
   const {
     authState,
-    clientReady,
     qrCode,
     error,
     sessionRestorationProgress,

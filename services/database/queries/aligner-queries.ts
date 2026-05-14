@@ -10,7 +10,6 @@
  * - Aligner payments
  */
 import type { ColumnValue } from '../../../types/database.types.js';
-import type { Request as TediousRequest } from 'tedious';
 import { executeQuery, executeStoredProcedure, TYPES, SqlParam } from '../index.js';
 import { log } from '../../../utils/logger.js';
 
@@ -238,19 +237,6 @@ interface DeactivatedBatchInfo {
     batchId: number;
     batchSequence: number;
   };
-}
-
-/**
- * Result from usp_MarkBatchDelivered stored procedure
- */
-interface MarkBatchDeliveredRow {
-  AlignerBatchID: number;
-  BatchSequence: number;
-  AlignerSetID: number;
-  WasActivated: boolean;
-  WasAlreadyActive: boolean;
-  WasAlreadyDelivered: boolean;
-  PreviouslyActiveBatchSequence: number | null;
 }
 
 /**
@@ -1085,26 +1071,15 @@ export async function createBatch(batchData: BatchData): Promise<number | null> 
     ['HasLowerTemplate', TYPES.Bit, HasLowerTemplate ?? false],
   ];
 
-  // Add output parameter for NewBatchID
-  const beforeExec = (request: TediousRequest) => {
-    request.addOutputParameter('NewBatchID', TYPES.Int);
-  };
-
-  // Result mapper to extract output parameter
-  const resultMapper = (
-    _rows: unknown[],
-    outParams: Array<{ parameterName: string; value: unknown }>
-  ): number | null => {
-    const newBatchIdParam = outParams.find((p) => p.parameterName === 'NewBatchID');
-    return newBatchIdParam ? (newBatchIdParam.value as number) : null;
-  };
-
   return executeStoredProcedure<unknown, number | null>(
     'usp_CreateAlignerBatch',
     params,
-    beforeExec,
+    [['NewBatchID', TYPES.Int]],
     undefined,
-    resultMapper
+    (_rows, outParams) => {
+      const p = outParams.find((p) => p.parameterName === 'NewBatchID');
+      return p ? (p.value as number) : null;
+    }
   );
 }
 

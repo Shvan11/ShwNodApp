@@ -194,6 +194,7 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
       setDisplaySell('');
     }
     setErrors({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, item]);
 
   useEffect(() => {

@@ -65,7 +65,7 @@ async function getImageSizes(pid: string, tp: string): Promise<(ImageDimension |
           width: dimensions.width || 0,
           height: dimensions.height || 0,
         };
-      } catch (err) {
+      } catch {
         // Return null for missing or invalid images
         return null;
       }

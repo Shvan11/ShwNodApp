@@ -88,7 +88,7 @@ const StatisticsComponent = () => {
     // For Yearly view: year range
     const [yearRangeStart, setYearRangeStart] = useState(new Date().getFullYear() - 4);
     const [yearRangeEnd, setYearRangeEnd] = useState(new Date().getFullYear());
-    const [exchangeRate, setExchangeRate] = useState(1450);
+    const [exchangeRate] = useState(1450);
     const [selectedDate, setSelectedDate] = useState<DailyData | null>(null);
     const [viewMode, setViewMode] = useState<ViewMode>((searchParams.get('view') as ViewMode) || VIEW_MODES.DAILY);
 
@@ -373,6 +373,7 @@ const StatisticsComponent = () => {
                 revenueTrendChartInstance.current.destroy();
             }
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [statistics, exchangeRate, viewMode, month, year, yearlyData, loadingYearly, multiYearData, loadingMultiYear, yearRangeStart, yearRangeEnd]);
 
     // Navigation handlers

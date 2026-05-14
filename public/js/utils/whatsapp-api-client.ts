@@ -87,7 +87,7 @@ export class APIClient {
     this.abortControllers.set(requestKey, abortController);
 
     // Extract custom options before passing to fetch
-    const { cancelPrevious, expectedFields, ...fetchOptions } = options;
+    const { cancelPrevious: _cancelPrevious, expectedFields, ...fetchOptions } = options;
 
     try {
       return await RetryManager.withRetry<T>(

@@ -2,12 +2,12 @@
    WorkCard component styles live in WorkCard.module.css.
    TeethSelector component styles live in TeethSelector.module.css.
    This file holds only the global `.btn-card-*` button modifiers consumed
-   via className strings, plus a few small global helpers. */
+   via className strings. */
 
 /* --- Button modifiers for work-card action icons --- */
 
 .btn-card-action i {
-    font-size: 1rem;
+    font-size: var(--icon-size-sm);
 }
 
 .btn-card-action.btn-new-visit i {
@@ -23,7 +23,7 @@
 }
 
 .btn-card-action.btn-diagnosis i {
-    color: #ec4899;
+    color: var(--selection-color);
 }
 
 .btn-card-action.btn-details i {
@@ -62,69 +62,11 @@
     background: var(--indigo-500);
 }
 
-/* --- Patient name (used by PatientManagement / WorkCard) --- */
-
-.patient-name {
-    margin: 0;
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-semibold);
-    color: var(--gray-900);
-}
-
-/* --- Summary card (PatientManagement) --- */
-
-.summary-card {
-    background-color: white;
-    padding: 1.5rem;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    border: 1px solid var(--gray-200);
-    text-align: center;
-}
-
-.summary-card h3 {
-    margin: 0 0 0.5rem 0;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--gray-500);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.summary-value {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--gray-900);
-    line-height: 1.2;
-}
-
-/* --- Add Payment standalone button --- */
-
-.btn-add-payment {
-    background-color: var(--success-300);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-/* --- Required field indicator (AlertModal etc.) --- */
-
-.required {
-    color: var(--error-500);
-    font-weight: bold;
-}
-
 /* --- Responsive --- */
 
 @media (max-width: 768px) {
     .btn-secondary,
     .btn-primary {
         width: 100%;
-    }
-}
-
-@media (max-width: 480px) {
-    .patient-name {
-        font-size: var(--font-size-sm);
     }
 }

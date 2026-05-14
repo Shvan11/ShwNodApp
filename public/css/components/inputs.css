@@ -1,5 +1,11 @@
 /* inputs.css - Global Form Input Component */
 
+/* Required field indicator (asterisk in form labels) */
+.required {
+    color: var(--error-500);
+    font-weight: bold;
+}
+
 /* Base Input Style */
 .form-control {
     display: block;

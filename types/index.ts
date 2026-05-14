@@ -187,20 +187,8 @@ export type {
 
 // Service types
 export type {
-  // Query types
-  TediousType,
-  QueryParameter,
-  ColumnMetadata,
-  ColumnData,
-  RowMapper,
-  ResultMapper,
-  OutputParameter,
-  QueryOptions,
-
-  // Pool types
+  // Pool stats (cross-cutting consumers like HealthCheck)
   PoolStats,
-  QueueEntry,
-  ConnectionPoolInterface,
 
   // Service result types
   ServiceResult,

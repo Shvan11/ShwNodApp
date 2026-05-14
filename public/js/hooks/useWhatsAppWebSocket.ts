@@ -235,11 +235,14 @@ export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketR
       console.error('Failed to setup WebSocket listeners:', error);
       setConnectionStatus(UI_STATES.ERROR);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency - only setup once on mount
 
   // Setup WebSocket on mount (only once)
   useEffect(() => {
     let cleanup: (() => void) | undefined;
+    const reconnectTimer = reconnectTimerRef;
+    const lastRequestedDate = lastRequestedDateRef;
 
     setupWebSocket()
       .then((cleanupFn) => {
@@ -256,11 +259,11 @@ export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketR
       // Remove our client type from connection manager
       connectionManager.removeClientType('waStatus');
       // Clear any reconnect timers
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
+      if (reconnectTimer.current) {
+        clearTimeout(reconnectTimer.current);
       }
       // Reset last requested date
-      lastRequestedDateRef.current = null;
+      lastRequestedDate.current = null;
     };
   }, [setupWebSocket]);
 

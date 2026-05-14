@@ -149,6 +149,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
         if (workId) {
             loadWorkData();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [personId, workId]);
 
     // Auto-format display value when formData changes

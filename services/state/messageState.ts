@@ -1,7 +1,7 @@
 // services/state/messageState.ts
 import stateEvents from './stateEvents.js';
 import StateManager from './StateManager.js';
-import { MessageSchemas, MessageStatus } from '../messaging/schemas.js';
+import { MessageStatus } from '../messaging/schemas.js';
 import { log } from '../../utils/logger.js';
 
 /**
@@ -14,8 +14,6 @@ const STATE_KEYS = {
   MESSAGE_STATUSES: 'message_statuses',
   QR_STATUS: 'qr_status',
 } as const;
-
-type StateKey = (typeof STATE_KEYS)[keyof typeof STATE_KEYS];
 
 /**
  * Client status interface

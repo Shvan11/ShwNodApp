@@ -394,7 +394,7 @@ export async function showDirectoryPickerDialog(
  */
 export async function readTextFile(
   handle: FileSystemFileHandle,
-  encoding: string = 'utf-8'
+  _encoding: string = 'utf-8'
 ): Promise<FileOperationResult<string>> {
   try {
     const file = await handle.getFile();

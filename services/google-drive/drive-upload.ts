@@ -172,7 +172,7 @@ class DriveUploadService {
         fields: 'id, name',
       });
       return rootFolderId;
-    } catch (error) {
+    } catch {
       throw new Error(
         `Cannot access Google Drive folder (${rootFolderId}). Please ensure the folder exists and is shared with the service account.`
       );

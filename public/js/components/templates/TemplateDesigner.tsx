@@ -42,6 +42,7 @@ function TemplateDesigner() {
                 template_file_path: null
             });
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [templateId]);
 
     const loadTemplate = async (id: string) => {

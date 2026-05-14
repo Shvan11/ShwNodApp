@@ -12,6 +12,7 @@ import { getPatientById } from '../services/database/queries/patient-queries.js'
 import { createWebSocketMessage, validateWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
 import { WebSocketEvents, createStandardMessage } from '../services/messaging/websocket-events.js';
 import { logger } from '../services/core/Logger.js';
+import stateEvents from '../services/state/stateEvents.js';
 import qrcode from 'qrcode';
 
 // Mirror of public/js/config/workTypeConfig.ts ORTHO_WORK_TYPES — visit notes only show
@@ -58,6 +59,7 @@ interface ExtendedWebSocket extends WebSocket {
   viewerId: string;
   waDate?: string | null;
   isWaClient?: boolean;
+  isAlive?: boolean;
 }
 
 /**
@@ -149,26 +151,16 @@ class ConnectionManager {
 
   unregisterConnection(ws: ExtendedWebSocket): void {
     this.allConnections.delete(ws);
-    const capabilities = this.clientCapabilities.get(ws);
-    if (!capabilities) return;
+    this.waStatusConnections.delete(ws);
+    this.dailyAppointmentsConnections.delete(ws);
 
-    if (capabilities.type === 'chair-display' && capabilities.metadata.chairId) {
-      // Identity guard: only delete the map entry if it still points to THIS
-      // ws. Without this, a stale OLD_WS firing 'close' after the kiosk has
-      // already reconnected would silently delete the NEW_WS's mapping.
-      if (this.chairDisplayConnections.get(capabilities.metadata.chairId) === ws) {
-        this.chairDisplayConnections.delete(capabilities.metadata.chairId);
+    // Chair-display Map: locate the entry by value so a stale OLD_WS close
+    // event never unmaps a NEW_WS that already took the same chairId.
+    for (const [chairId, mapped] of this.chairDisplayConnections) {
+      if (mapped === ws) {
+        this.chairDisplayConnections.delete(chairId);
+        break;
       }
-      logger.websocket.debug('Unregistered chair-display connection', { chairId: capabilities.metadata.chairId });
-    } else if (capabilities.type === 'waStatus') {
-      this.waStatusConnections.delete(ws);
-      logger.websocket.debug('Unregistered WhatsApp status connection');
-    } else if (capabilities.type === 'auth') {
-      this.waStatusConnections.delete(ws);
-      logger.websocket.debug('Unregistered auth connection');
-    } else if (capabilities.type === 'daily-appointments') {
-      this.dailyAppointmentsConnections.delete(ws);
-      logger.websocket.debug('Unregistered daily appointments connection');
     }
 
     this.clientCapabilities.delete(ws);
@@ -339,6 +331,8 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
     const extWs = ws as ExtendedWebSocket;
     logger.websocket.debug('Client connected');
     extWs.qrViewerRegistered = false;
+    extWs.isAlive = true;
+    extWs.on('pong', () => { extWs.isAlive = true; });
 
     try {
       const url = new URL(req.url || '', 'http://localhost');
@@ -572,18 +566,16 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
       try {
         const whatsappService = (await import('../services/messaging/whatsapp.js')).default;
         clientStatus = whatsappService.getStatus();
-
-        if (clientStatus.state === 'DISCONNECTED' &&
-            !clientStatus.hasClient &&
-            messageState.activeQRViewers > 0) {
-          logger.websocket.info('No client instance with active QR viewers - triggering initialization');
-          whatsappService.initialize().catch((error: Error) => {
-            logger.websocket.error('Failed to initialize WhatsApp client', error);
-          });
-        }
       } catch (error) {
         logger.websocket.warn('Could not get WhatsApp status', error as Error);
         clientStatus = { active: false };
+      }
+
+      // Delegate init to the WhatsApp service via the existing event bus.
+      // initializeOnDemand() in whatsapp.ts performs the DISCONNECTED /
+      // activeQRViewers / circuit-breaker checks itself.
+      if (messageState.activeQRViewers > 0) {
+        stateEvents.emit('whatsapp_initialization_requested');
       }
 
       let html = '';
@@ -883,13 +875,22 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
 // PERIODIC CLEANUP
 // ===========================================
 
+const _periodicTimers: ReturnType<typeof setInterval>[] = [];
+
+function teardownPeriodicCleanup(): void {
+  for (const handle of _periodicTimers) {
+    clearInterval(handle);
+  }
+  _periodicTimers.length = 0;
+}
+
 /**
  * Periodic cleanup
  */
 function setupPeriodicCleanup(connectionManager: ConnectionManager): void {
   const inactivityTimeout = 30 * 60 * 1000; // 30 minutes
 
-  setInterval(() => {
+  _periodicTimers.push(setInterval(() => {
     const closed = connectionManager.closeInactiveConnections(inactivityTimeout);
     if (closed > 0) {
       logger.websocket.info('Closed inactive connections', { count: closed });
@@ -897,9 +898,9 @@ function setupPeriodicCleanup(connectionManager: ConnectionManager): void {
 
     const counts = connectionManager.getConnectionCounts();
     logger.websocket.debug('Active connections', counts);
-  }, 10 * 60 * 1000); // Every 10 minutes
+  }, 10 * 60 * 1000)); // Every 10 minutes
 
-  setInterval(() => {
+  _periodicTimers.push(setInterval(() => {
     const activeViewerIds: string[] = [];
     connectionManager.waStatusConnections.forEach(ws => {
       if (ws.qrViewerRegistered && ws.viewerId) {
@@ -918,7 +919,22 @@ function setupPeriodicCleanup(connectionManager: ConnectionManager): void {
         qrViewersRegistered: activeViewerIds.length
       });
     }
-  }, 60000); // Every minute
+  }, 60000)); // Every minute
+
+  // TCP-level heartbeat: terminate sockets that miss a pong within 30s.
+  // Complements the 30-min inactivity sweep (which handles app-level idleness).
+  // Chair-displays are included here — the activity sweep skips them, but
+  // transport-dead kiosks should still be cleaned up promptly.
+  _periodicTimers.push(setInterval(() => {
+    for (const ws of connectionManager.allConnections) {
+      if (ws.isAlive === false) {
+        ws.terminate();
+        continue;
+      }
+      ws.isAlive = false;
+      try { ws.ping(); } catch { /* socket already dead */ }
+    }
+  }, 30_000)); // Every 30 seconds
 }
 
-export { setupWebSocketServer };
+export { setupWebSocketServer, teardownPeriodicCleanup };

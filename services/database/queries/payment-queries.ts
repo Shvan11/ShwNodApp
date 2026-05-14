@@ -2,7 +2,7 @@
  * Payment-related database queries
  */
 import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery, TYPES, SqlParam } from '../index.js';
+import { executeQuery, TYPES } from '../index.js';
 
 // Type definitions
 interface Payment {

@@ -129,6 +129,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         };
 
         loadDropdownData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {

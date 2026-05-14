@@ -155,6 +155,7 @@ const ArchformMatcher: React.FC = () => {
             label: formatSetLabel(set),
             isDisabled: matched.has(set.AlignerSetID),
         }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [alignerSets]);
 
     const formatDate = (dateString: string | null): string => {

@@ -40,7 +40,7 @@ class ResourceManager {
       log.error('Uncaught exception', { error: error.message, stack: error.stack });
       this.gracefulShutdown('uncaughtException');
     });
-    process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+    process.on('unhandledRejection', (reason: unknown) => {
       log.error('Unhandled rejection', { reason: String(reason) });
     });
   }

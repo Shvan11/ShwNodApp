@@ -1,7 +1,6 @@
 /**
  * Appointment-related database queries
  */
-import { Request } from 'tedious';
 import type { ColumnValue } from '../../../types/database.types.js';
 import { executeQuery, executeStoredProcedure, executeMultipleResultSets, TYPES } from '../index.js';
 
@@ -82,12 +81,7 @@ export function getPresentAps(PDate: string): Promise<AppointmentsResponse> {
   return executeStoredProcedure<AppointmentRow, AppointmentsResponse>(
     'PTodayAppsWeb',
     [['AppsDate', TYPES.NVarChar, PDate]],
-    (request: Request) => {
-      request.addOutputParameter('all', TYPES.Int);
-      request.addOutputParameter('present', TYPES.Int);
-      request.addOutputParameter('waiting', TYPES.Int);
-      request.addOutputParameter('completed', TYPES.Int);
-    },
+    [['all', TYPES.Int], ['present', TYPES.Int], ['waiting', TYPES.Int], ['completed', TYPES.Int]],
     (columns: ColumnValue[]) => ({
       Num: columns[0].value as number,
       apptime: columns[1].value as string,

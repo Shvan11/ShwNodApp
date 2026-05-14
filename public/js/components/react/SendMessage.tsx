@@ -56,6 +56,7 @@ const SendMessage = () => {
         loadContacts('pat');
 
         // No cleanup needed - useWhatsAppWebSocket hook handles WebSocket lifecycle
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Load contacts based on source

@@ -2,7 +2,6 @@
 import EventEmitter from 'events';
 import messageState, { type Person as StatePersonType } from '../state/messageState.js';
 import stateEvents from '../state/stateEvents.js';
-import * as database from '../database/index.js';
 import { getWhatsAppMessages } from '../database/queries/messaging-queries.js';
 import * as messagingQueries from '../database/queries/messaging-queries.js';
 import { createWebSocketMessage, MessageSchemas } from './schemas.js';

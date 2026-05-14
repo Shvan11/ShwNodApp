@@ -25,6 +25,7 @@ const XraysComponent = ({ personId }: Props) => {
         if (personId) {
             loadXrays();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [personId]);
 
     const loadXrays = async () => {

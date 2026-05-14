@@ -7,6 +7,12 @@
     background: var(--surface);
 }
 
+/* Payment-history footer "Add New Payment" button — overrides .btn-primary's blue with success green */
+.addPaymentBtn.addPaymentBtn {
+    background-color: var(--success-300);
+    border-color: var(--success-300);
+}
+
 .loading {
     padding: 2rem;
     text-align: center;

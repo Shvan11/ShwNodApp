@@ -100,7 +100,7 @@ const PatientSets: React.FC = () => {
         workid: parseInt(workId || '0'),
     } : null;
 
-    const [patient, setPatient] = useState<Patient | null>(initialPatient);
+    const [patient] = useState<Patient | null>(initialPatient);
     const [alignerSets, setAlignerSets] = useState<AlignerSet[]>([]);
     const [doctors, setDoctors] = useState<AlignerDoctorWithAliases[]>([]);
     const [expandedSets, setExpandedSets] = useState<Record<number, boolean>>({});
@@ -192,6 +192,7 @@ const PatientSets: React.FC = () => {
     useEffect(() => {
         loadAlignerSetsOnly();
         loadDoctors();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [workId]);
 
     const loadDoctors = async (): Promise<void> => {

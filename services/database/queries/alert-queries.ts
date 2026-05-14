@@ -1,9 +1,8 @@
 /**
  * Alert-related database queries
  */
-import { TYPES } from 'tedious';
 import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery } from '../index.js';
+import { executeQuery, TYPES } from '../index.js';
 
 // Type definitions
 interface Alert {

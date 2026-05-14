@@ -4,10 +4,7 @@
  * Replaces the old direct-query sync method with a trigger-based queue system
  */
 
-import { Request, TYPES } from 'tedious';
-import type { Connection } from 'tedious';
-import type { ColumnValue } from '../../types/database.types.js';
-import ConnectionPool from '../database/ConnectionPool.js';
+import { executeQuery, TYPES } from '../database/index.js';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { log } from '../../utils/logger.js';
@@ -79,49 +76,11 @@ const supabase: SupabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 // HELPER FUNCTIONS
 // =============================================================================
 
-/**
- * Execute SQL query
- */
-function executeQuery<T>(
-  connection: Connection,
-  sql: string,
-  params: [string, typeof TYPES[keyof typeof TYPES], unknown][] = []
-): Promise<T[]> {
-  return new Promise((resolve, reject) => {
-    const results: T[] = [];
-    const request = new Request(sql, (err) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(results);
-      }
-    });
-
-    params.forEach(([name, type, value]) => {
-      request.addParameter(name, type, value);
-    });
-
-    request.on('row', (columns: ColumnValue[]) => {
-      const row: Record<string, unknown> = {};
-      columns.forEach((col) => {
-        row[col.metadata.colName] = col.value;
-      });
-      results.push(row as T);
-    });
-
-    connection.execSql(request);
-  });
-}
-
-/**
- * Get pending records from SyncQueue
- */
 async function getPendingSyncRecords(
-  connection: Connection,
   tableName: string | null = null,
   limit: number = 1000
 ): Promise<PendingSyncRecord[]> {
-  const sql = `
+  const sqlText = `
     SELECT TOP ${limit}
       QueueID,
       TableName,
@@ -134,52 +93,35 @@ async function getPendingSyncRecords(
       ${tableName ? 'AND TableName = @tableName' : ''}
     ORDER BY CreatedAt ASC
   `;
-
-  const params: [string, typeof TYPES[keyof typeof TYPES], string][] = tableName
-    ? [['tableName', TYPES.NVarChar, tableName]]
-    : [];
-  return executeQuery<PendingSyncRecord>(connection, sql, params);
+  const params = tableName ? [['tableName', TYPES.NVarChar, tableName] as [string, typeof TYPES[keyof typeof TYPES], unknown]] : [];
+  return executeQuery<PendingSyncRecord>(sqlText, params, (cols) => ({
+    QueueID: cols[0].value as number,
+    TableName: cols[1].value as string,
+    RecordID: cols[2].value as number,
+    Operation: cols[3].value as string,
+    JsonData: cols[4].value as string,
+    CreatedAt: cols[5].value as Date,
+  }));
 }
 
-/**
- * Mark records as synced
- */
-async function markAsSynced(connection: Connection, queueIds: number[]): Promise<void> {
+async function markAsSynced(queueIds: number[]): Promise<void> {
   if (queueIds.length === 0) return;
-
   const idList = queueIds.join(',');
-  const sql = `
-    UPDATE SyncQueue
-    SET Status = 'Synced',
-        LastAttempt = GETDATE(),
-        Attempts = ISNULL(Attempts, 0) + 1
-    WHERE QueueID IN (${idList})
-  `;
-
-  await executeQuery(connection, sql);
+  await executeQuery(
+    `UPDATE SyncQueue SET Status = 'Synced', LastAttempt = GETDATE(), Attempts = ISNULL(Attempts, 0) + 1 WHERE QueueID IN (${idList})`,
+    [],
+    () => ({})
+  );
 }
 
-/**
- * Mark records as failed
- */
-async function markAsFailed(
-  connection: Connection,
-  queueIds: number[],
-  errorMessage: string
-): Promise<void> {
+async function markAsFailed(queueIds: number[], errorMessage: string): Promise<void> {
   if (queueIds.length === 0) return;
-
   const idList = queueIds.join(',');
-  const sql = `
-    UPDATE SyncQueue
-    SET Status = 'Failed',
-        LastAttempt = GETDATE(),
-        LastError = @error,
-        Attempts = ISNULL(Attempts, 0) + 1
-    WHERE QueueID IN (${idList})
-  `;
-
-  await executeQuery(connection, sql, [['error', TYPES.NVarChar, errorMessage]]);
+  await executeQuery(
+    `UPDATE SyncQueue SET Status = 'Failed', LastAttempt = GETDATE(), LastError = @error, Attempts = ISNULL(Attempts, 0) + 1 WHERE QueueID IN (${idList})`,
+    [['error', TYPES.NVarChar, errorMessage]],
+    () => ({})
+  );
 }
 
 // =============================================================================
@@ -244,11 +186,8 @@ const syncHandlers: SyncHandlers = {
 /**
  * Process sync queue for a specific table
  */
-async function processSyncForTable(
-  connection: Connection,
-  tableName: string
-): Promise<TableSyncStats> {
-  const records = await getPendingSyncRecords(connection, tableName);
+async function processSyncForTable(tableName: string): Promise<TableSyncStats> {
+  const records = await getPendingSyncRecords(tableName);
 
   if (records.length === 0) {
     return { synced: 0, failed: 0 };
@@ -265,13 +204,13 @@ async function processSyncForTable(
   try {
     const synced = await handler(records);
     const queueIds = records.map((r) => r.QueueID);
-    await markAsSynced(connection, queueIds);
+    await markAsSynced(queueIds);
     log.info(`✅ Synced ${synced} ${tableName} records`);
     return { synced, failed: 0 };
   } catch (error) {
     log.error(`❌ Error syncing ${tableName}:`, (error as Error).message);
     const queueIds = records.map((r) => r.QueueID);
-    await markAsFailed(connection, queueIds, (error as Error).message);
+    await markAsFailed(queueIds, (error as Error).message);
     return { synced: 0, failed: records.length };
   }
 }
@@ -290,38 +229,37 @@ export async function processAllPendingSyncs(): Promise<SyncStats> {
   };
 
   try {
-    await ConnectionPool.withConnection(async (connection: Connection) => {
-      // Get list of tables with pending syncs
-      const tablesWithPending = await executeQuery<TableWithPending>(
-        connection,
-        `
-        SELECT DISTINCT TableName, COUNT(*) as PendingCount
-        FROM SyncQueue
-        WHERE Status = 'Pending'
-        GROUP BY TableName
-        ORDER BY TableName
+    const tablesWithPending = await executeQuery<TableWithPending>(
       `
-      );
+      SELECT DISTINCT TableName, COUNT(*) as PendingCount
+      FROM SyncQueue
+      WHERE Status = 'Pending'
+      GROUP BY TableName
+      ORDER BY TableName
+      `,
+      [],
+      (cols) => ({
+        TableName: cols[0].value as string,
+        PendingCount: cols[1].value as number,
+      })
+    );
 
-      if (tablesWithPending.length === 0) {
-        log.info('ℹ️  No pending syncs');
-        return;
-      }
-
+    if (tablesWithPending.length === 0) {
+      log.info('ℹ️  No pending syncs');
+    } else {
       log.info(`Found pending syncs for ${tablesWithPending.length} tables:\n`);
       tablesWithPending.forEach((t) => {
         log.info(`  - ${t.TableName}: ${t.PendingCount} records`);
       });
       log.info('');
 
-      // Process each table
       for (const { TableName } of tablesWithPending) {
-        const result = await processSyncForTable(connection, TableName);
+        const result = await processSyncForTable(TableName);
         stats.byTable[TableName] = result;
         stats.totalSynced += result.synced;
         stats.totalFailed += result.failed;
       }
-    });
+    }
 
     log.info('\n==========================================');
     log.info('✅ Sync Process Complete');
@@ -333,10 +271,8 @@ export async function processAllPendingSyncs(): Promise<SyncStats> {
   } catch (error) {
     log.error('❌ Sync process failed:', error);
     throw error;
-  } finally {
-    await ConnectionPool.cleanup();
   }
 }
 
-// Export for use in other scripts
 export { processSyncForTable, syncHandlers };
+

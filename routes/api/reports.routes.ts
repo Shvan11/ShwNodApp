@@ -52,14 +52,6 @@ interface DailyInvoicesQuery {
 }
 
 /**
- * Invoice row from ProDailyInvoices stored procedure
- * Used for daily invoice listing, extended from BaseInvoice
- */
-interface InvoiceRow extends BaseInvoice {
-  [key: string]: string | number | Date | null | undefined;
-}
-
-/**
  * Monthly data row from stored procedure
  */
 interface MonthlyDataRow {

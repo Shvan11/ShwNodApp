@@ -443,6 +443,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   // Initialize WebSocket on mount (only once!)
   useEffect(() => {
     let cleanup: (() => void) | undefined;
+    const reconnectTimer = reconnectTimerRef;
 
     setupWebSocket()
       .then((cleanupFn) => {
@@ -463,8 +464,8 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
       // Remove our client type from connection manager
       connectionManager.removeClientType('auth');
       // Clear reconnect timer
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
+      if (reconnectTimer.current) {
+        clearTimeout(reconnectTimer.current);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

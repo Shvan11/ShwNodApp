@@ -16,8 +16,7 @@
  *   node db-utility.js count tblappointments
  */
 
-import { executeQuery, testConnection, healthCheck, TYPES } from './services/database/index.js';
-import { logger } from './services/core/Logger.js';
+import { executeQuery, healthCheck, TYPES } from './services/database/index.js';
 
 // Command definitions
 const COMMANDS = {
@@ -466,7 +465,7 @@ async function getStoredProcedureCode(procedureName) {
       if (sqlServerResult.length > 0) {
         procedureInfo = sqlServerResult[0];
       }
-    } catch (sqlServerError) {
+    } catch {
       console.log('Note: SQL Server specific query failed, trying INFORMATION_SCHEMA...');
     }
 

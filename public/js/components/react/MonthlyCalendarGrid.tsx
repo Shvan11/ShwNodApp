@@ -22,7 +22,7 @@ const MonthlyCalendarGrid = ({
     onDayClick,
     onDayContextMenu,
     currentDate,
-    mode = 'view'
+    mode: _mode = 'view'
 }: MonthlyCalendarGridProps) => {
     const [expandedDay, setExpandedDay] = useState<string | null>(null);
     const gridRef = useRef<HTMLDivElement>(null);

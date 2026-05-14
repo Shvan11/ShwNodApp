@@ -59,7 +59,9 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
         if (onChangesUpdate) {
             onChangesUpdate(Object.keys(pendingChanges).length > 0);
         }
-    }, [pendingChanges]); // Removed onChangesUpdate from dependencies to prevent infinite loop
+        // onChangesUpdate intentionally excluded to prevent infinite loop
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pendingChanges]);
 
     const showModal = (title: string, message: string, type: ModalState['type'] = 'info') => {
         setModal({ show: true, title, message, type });

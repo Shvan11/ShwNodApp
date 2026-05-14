@@ -65,6 +65,7 @@ export function useWebSocketSync(
       console.log('[useWebSocketSync] Cleanup');
       connectionManager.removeClientType('daily-appointments');
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Listen for connection events

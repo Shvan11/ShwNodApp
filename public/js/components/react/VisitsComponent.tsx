@@ -79,6 +79,7 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
         if (workId) {
             loadVisits();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [workId]);
 
     const loadVisits = async () => {

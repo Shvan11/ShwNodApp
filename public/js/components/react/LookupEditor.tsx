@@ -153,7 +153,7 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
                 const error = await response.json();
                 toast.error(error.error || `Failed to load ${tableName}`);
             }
-        } catch (error) {
+        } catch {
             toast.error(`Error loading ${tableName}`);
         } finally {
             setLoading(false);
@@ -208,7 +208,7 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
                 const error = await response.json();
                 toast.error(error.error || 'Failed to delete item');
             }
-        } catch (error) {
+        } catch {
             toast.error('Error deleting item');
         } finally {
             setDeleteConfirm(null);
@@ -240,7 +240,7 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
                 const error = await response.json();
                 toast.error(error.error || 'Failed to save item');
             }
-        } catch (error) {
+        } catch {
             toast.error('Error saving item');
         }
     };

@@ -7,7 +7,7 @@
 
 import { useCallback, useMemo } from 'react';
 import type { MouseEvent } from 'react';
-import type { SlotData, CalendarAppointment, CalendarMode } from './calendar.types';
+import type { SlotData, CalendarMode } from './calendar.types';
 
 interface TimeSlotProps {
     slotData: SlotData;
@@ -26,19 +26,15 @@ const TimeSlot = ({
     isSelected = false,
     uniformHeight,
     mode = 'view',
-    showOnlyAvailable = false,
+    showOnlyAvailable: _showOnlyAvailable = false,
     isHoliday = false,
-    holidayName = null
+    holidayName: _holidayName = null
 }: TimeSlotProps) => {
     const {
         date,
         time,
-        dayName,
         appointments = [],
-        slotStatus,
-        appointmentID,
-        appDetail,
-        patientName
+        slotStatus
     } = slotData;
 
     // Determine slot appearance classes - SUPPORTS MULTIPLE APPOINTMENTS

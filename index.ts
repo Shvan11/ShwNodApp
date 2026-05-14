@@ -9,7 +9,7 @@ import { createServer, Server as HTTPServer } from 'http';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import config from './config/config.js';
-import { setupWebSocketServer } from './utils/websocket.js';
+import { setupWebSocketServer, teardownPeriodicCleanup } from './utils/websocket.js';
 import { setupMiddleware } from './middleware/index.js';
 import apiRoutes from './routes/api/index.js';
 import webRoutes from './routes/web.js';
@@ -34,10 +34,8 @@ import { createWebSocketMessage, MessageSchemas } from './services/messaging/sch
 import { EventEmitter } from 'events';
 
 // ===== ADDED: Import new infrastructure components =====
-import ResourceManager from './services/core/ResourceManager.js';
 import HealthCheck from './services/monitoring/HealthCheck.js';
-import ConnectionPool from './services/database/ConnectionPool.js';
-import { testConnection, testConnectionWithRetry } from './services/database/index.js';
+import { testConnection, testConnectionWithRetry, shutdown as shutdownDatabase } from './services/database/index.js';
 import { createPathResolver } from './utils/path-resolver.js';
 import queueProcessor from './services/sync/queue-processor.js';
 import { startPeriodicPolling, stopPeriodicPolling } from './services/sync/reverse-sync-poller.js';
@@ -565,9 +563,13 @@ async function gracefulShutdown(signal: string): Promise<void> {
       await messageState.cleanup();
     }
 
+    // Stop WebSocket periodic timers
+    log.info('🔌 Stopping WebSocket timers...');
+    teardownPeriodicCleanup();
+
     // Close database connections
     log.info('🗄️  Closing database connections...');
-    await ConnectionPool.cleanup();
+    await shutdownDatabase();
 
     // Final resource cleanup via Resource Manager
     log.info('🧹 Final resource cleanup...');

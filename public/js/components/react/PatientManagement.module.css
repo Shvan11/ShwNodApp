@@ -244,6 +244,35 @@
     gap: var(--spacing-md);
 }
 
+.summaryCard {
+    background-color: var(--surface);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    border: var(--border-width-thin) solid var(--gray-200);
+    text-align: center;
+}
+
+:global([dir="rtl"]) .summaryCard {
+    direction: rtl;
+}
+
+.summaryCard h3 {
+    margin: 0 0 var(--spacing-sm) 0;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.summaryValue {
+    font-size: 1.25rem;
+    font-weight: var(--font-weight-bold);
+    color: var(--gray-900);
+    line-height: 1.2;
+}
+
 .sortControls {
     display: flex;
     align-items: center;

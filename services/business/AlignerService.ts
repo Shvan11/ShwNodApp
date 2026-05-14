@@ -15,7 +15,6 @@
 
 import { log } from '../../utils/logger.js';
 import * as alignerQueries from '../database/queries/aligner-queries.js';
-import type { AlignerSet, AlignerBatch, AlignerPartner } from '../../types/database.types.js';
 
 /**
  * Aligner error codes
