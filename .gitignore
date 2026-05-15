@@ -177,3 +177,6 @@ data/*.db
 data/*.json
 data/sessions.db
 data/reverse-sync-state.json
+
+# Archived historical migrations (kept locally for reference, not tracked)
+migrations/archive/

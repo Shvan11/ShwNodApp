@@ -712,10 +712,6 @@ export async function deletePatient(personId: number): Promise<{ success: boolea
       ['personId', TYPES.Int, personId],
     ], () => ({}));
 
-    await executeQuery('DELETE FROM dbo.tblOpened WHERE PersonID = @personId', [
-      ['personId', TYPES.Int, personId],
-    ], () => ({}));
-
     await executeQuery('DELETE FROM dbo.tblscrews WHERE PersonID = @personId', [
       ['personId', TYPES.Int, personId],
     ], () => ({}));
