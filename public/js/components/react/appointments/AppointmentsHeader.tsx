@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react';
-import ConnectionStatus, { type ConnectionStatusType } from './ConnectionStatus';
+import ConnectionStatus, { type ConnectionStatusType, type FreshnessType } from './ConnectionStatus';
 import styles from './AppointmentsHeader.module.css';
 
 interface AppointmentsHeaderProps {
@@ -10,6 +10,8 @@ interface AppointmentsHeaderProps {
     searchTerm: string;
     onSearchChange: (term: string) => void;
     connectionStatus: ConnectionStatusType;
+    freshness: FreshnessType;
+    isViewingToday: boolean;
     showFlash: boolean;
 }
 
@@ -25,6 +27,8 @@ const AppointmentsHeader = ({
     searchTerm,
     onSearchChange,
     connectionStatus,
+    freshness,
+    isViewingToday,
     showFlash
 }: AppointmentsHeaderProps) => {
     // Format date for display
@@ -92,7 +96,12 @@ const AppointmentsHeader = ({
                     )}
                 </div>
             </div>
-            <ConnectionStatus status={connectionStatus} showFlash={showFlash} />
+            <ConnectionStatus
+                status={connectionStatus}
+                freshness={freshness}
+                isViewingToday={isViewingToday}
+                showFlash={showFlash}
+            />
         </div>
     );
 };

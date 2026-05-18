@@ -5,7 +5,7 @@ import StatsCards from './StatsCards';
 import MobileViewToggle, { type ViewType } from './MobileViewToggle';
 import AppointmentsList from './AppointmentsList';
 import type { DailyAppointment } from './AppointmentCard';
-import type { ConnectionStatusType } from './ConnectionStatus';
+import type { ConnectionStatusType, FreshnessType } from './ConnectionStatus';
 import styles from './DailyAppointments.module.css';
 
 import { useAppointments } from '../../../hooks/useAppointments';
@@ -73,15 +73,16 @@ const DailyAppointments = () => {
         setTimeout(() => setShowFlash(false), 1000);
     }, []);
 
-    // 7. WebSocket update handler - stable reference to prevent re-subscription churn
-    const handleWebSocketUpdate = useCallback(() => {
-        console.log('📡 [DailyAppointments] WebSocket update received - reloading appointments');
-        loadAppointments(selectedDate);
-        flashUpdateIndicator();
+    // 7. WebSocket update handler — return success so the hook can detect
+    // recovery-fetch failure and trigger markStale + retry.
+    const handleWebSocketUpdate = useCallback(async (): Promise<boolean> => {
+        const ok = await loadAppointments(selectedDate);
+        if (ok) flashUpdateIndicator();
+        return ok;
     }, [selectedDate, loadAppointments, flashUpdateIndicator]);
 
     // 8. WebSocket integration
-    const { connectionStatus } = useWebSocketSync(selectedDate, handleWebSocketUpdate);
+    const { connectionStatus, dataFreshness } = useWebSocketSync(selectedDate, handleWebSocketUpdate);
 
     // 9. Sync URL when date changes (component-driven updates)
     useEffect(() => {
@@ -110,19 +111,9 @@ const DailyAppointments = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedDate]);
 
-    // 11. Handle WebSocket reconnection
-    useEffect(() => {
-        const handleReconnect = (): void => {
-            console.log('[DailyAppointments] 🔄 Connection restored - refreshing appointments');
-            loadAppointments(selectedDate);
-        };
-
-        window.addEventListener('websocket_reconnected', handleReconnect);
-
-        return () => {
-            window.removeEventListener('websocket_reconnected', handleReconnect);
-        };
-    }, [selectedDate, loadAppointments]);
+    // 11. Reconnect-driven refetch is handled inside useWebSocketSync via the
+    // debounced recovery trigger (wsService 'reconnected' + window 'online' +
+    // visibilitychange). No additional listener needed here.
 
     // 12. Handle date change (updates state + URL)
     const handleDateChange = (newDate: string): void => {
@@ -213,6 +204,8 @@ const DailyAppointments = () => {
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 connectionStatus={connectionStatus as ConnectionStatusType}
+                freshness={dataFreshness as FreshnessType}
+                isViewingToday={selectedDate === getTodayDate()}
                 showFlash={showFlash}
             />
 

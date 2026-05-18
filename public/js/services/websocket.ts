@@ -8,7 +8,12 @@ import { WebSocketEvents } from '../constants/websocket-events';
 // Type definitions
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 export type MessagePriority = 'high' | 'normal' | 'low';
-export type SyncStatus = 'synced' | 'syncing' | 'out_of_sync';
+export type Freshness = 'fresh' | 'stale';
+
+// 2x the server heartbeat interval (15s) — one missed heartbeat tolerated.
+const FRESHNESS_STALE_THRESHOLD_MS = 30_000;
+// Internal poll cadence for freshness transitions; throttled by browser when tab is hidden.
+const FRESHNESS_POLL_INTERVAL_MS = 5_000;
 
 export interface WebSocketOptions {
   baseUrl?: string;
@@ -72,20 +77,12 @@ interface WebSocketState {
   pendingMessages: Map<number, PendingMessage>;
   forceClose: boolean;
   hasConnectedBefore: boolean;
-  sequenceNumbers: Map<string, number>;
-  missedEventRequests: Set<string>;
-  syncStatus: SyncStatus;
-  pendingEventCount: number;
-}
-
-interface SyncStatusInfo {
-  date?: string;
-  lastSequenceNum?: number;
-  isSyncing?: boolean;
-  syncStatus: SyncStatus;
-  pendingEventCount?: number;
-  trackedDates?: string[];
-  sequenceNumbers?: Record<string, number>;
+  // performance.now() at last received message — monotonic; immune to wall-clock jumps.
+  // 0 means stale (either never received or forcibly cleared on close/error).
+  lastMessageReceivedAtMonotonic: number;
+  // Last emitted freshness value, so we only emit freshness_changed on transitions.
+  lastEmittedFreshness: Freshness;
+  freshnessPollTimer: ReturnType<typeof setInterval> | null;
 }
 
 export class WebSocketService extends EventEmitter {
@@ -152,11 +149,12 @@ export class WebSocketService extends EventEmitter {
       pendingMessages: new Map(),
       forceClose: false,
       hasConnectedBefore: false,
-      sequenceNumbers: new Map(),
-      missedEventRequests: new Set(),
-      syncStatus: 'synced',
-      pendingEventCount: 0,
+      lastMessageReceivedAtMonotonic: 0,
+      lastEmittedFreshness: 'stale',
+      freshnessPollTimer: null,
     };
+
+    this.startFreshnessPoll();
 
     // Bind methods to ensure correct 'this' context
     this.connect = this.connect.bind(this);
@@ -526,20 +524,9 @@ export class WebSocketService extends EventEmitter {
     // Process queued messages
     this.processQueue();
 
-    // Request state verification on reconnect
+    // Emit reconnected so subscribers can run idempotent recovery (e.g. REST refetch).
     if (wasReconnect) {
-      this.log('[PHASE 1] Reconnected - requesting state verification');
-      this.state.syncStatus = 'syncing';
-
-      this.emit('reconnected', {
-        sequenceNumbers: Object.fromEntries(this.state.sequenceNumbers),
-      });
-
-      setTimeout(() => {
-        if (this.state.syncStatus === 'syncing') {
-          this.state.syncStatus = 'synced';
-        }
-      }, 5000);
+      this.emit('reconnected', { timestamp: Date.now() });
     }
 
     this.emit('connected', _event);
@@ -557,6 +544,7 @@ export class WebSocketService extends EventEmitter {
     // Update state
     this.state.status = 'disconnected';
     this.state.ws = null;
+    this.markStale();
 
     // Emit event
     this.emit('disconnected', {
@@ -585,14 +573,22 @@ export class WebSocketService extends EventEmitter {
 
     this.emit('error', event);
     this.state.status = 'error';
+    this.markStale();
   }
 
   /**
    * Handle WebSocket message event
    */
   private onMessage(event: MessageEvent): void {
-    // Update last activity
+    // Update last activity and freshness on every message receipt. Using
+    // performance.now() so a wall-clock jump (NTP sync, suspend/resume) can't
+    // mask staleness.
     this.state.lastActivity = Date.now();
+    this.state.lastMessageReceivedAtMonotonic = performance.now();
+    if (this.state.lastEmittedFreshness !== 'fresh') {
+      this.state.lastEmittedFreshness = 'fresh';
+      this.emit('freshness_changed', { freshness: 'fresh' });
+    }
 
     try {
       let message: unknown;
@@ -610,39 +606,17 @@ export class WebSocketService extends EventEmitter {
 
       const msgObj = message as Record<string, unknown>;
 
+      // SERVER_HEARTBEAT is a freshness signal only — consume silently.
+      if (typeof message === 'object' && msgObj.type === WebSocketEvents.SERVER_HEARTBEAT) {
+        return;
+      }
+
       // Send ACK for messages that require it
       if (typeof message === 'object' && msgObj.requiresAck && msgObj.id) {
-        this.log(`[PHASE 1] Sending ACK for message ${msgObj.id}`);
         this.send(
           { type: 'ack', messageId: msgObj.id },
           { queueIfDisconnected: false }
         );
-      }
-
-      // Handle sequence numbers for appointment events
-      if (typeof message === 'object' && msgObj.sequenceNum !== undefined && msgObj.date) {
-        const lastSeq = this.state.sequenceNumbers.get(msgObj.date as string) || 0;
-        const receivedSeq = msgObj.sequenceNum as number;
-
-        this.log(
-          `[PHASE 1] Sequence check - Date: ${msgObj.date}, Last: ${lastSeq}, Received: ${receivedSeq}`
-        );
-
-        if (receivedSeq > lastSeq + 1) {
-          console.warn(
-            `[PHASE 1] Sequence gap detected! Expected ${lastSeq + 1}, got ${receivedSeq}`
-          );
-          this.handleSequenceGap(msgObj.date as string, lastSeq, receivedSeq);
-        }
-
-        this.state.sequenceNumbers.set(msgObj.date as string, receivedSeq);
-      }
-
-      // Handle full refresh request from server
-      if (typeof message === 'object' && msgObj.fullRefreshRequired) {
-        console.warn(`[PHASE 1] Server requesting full refresh: ${msgObj.reason || 'unknown'}`);
-        this.emit('fullRefreshRequired', { date: msgObj.date, reason: msgObj.reason });
-        return;
       }
 
       // Check if it's a heartbeat/ping response
@@ -711,31 +685,47 @@ export class WebSocketService extends EventEmitter {
   }
 
   /**
-   * Handle sequence gap - request missed events
+   * Compute current data freshness. Stale if socket isn't OPEN, or no message
+   * (including SERVER_HEARTBEAT) has arrived within FRESHNESS_STALE_THRESHOLD_MS.
    */
-  private handleSequenceGap(date: string, lastSeq: number, receivedSeq: number): void {
-    if (this.state.missedEventRequests.has(date)) {
-      this.log(`[PHASE 1] Already requested missed events for ${date}, skipping`);
-      return;
+  getFreshness(): Freshness {
+    if (!this.state.ws || this.state.ws.readyState !== WebSocket.OPEN) {
+      return 'stale';
     }
+    if (this.state.lastMessageReceivedAtMonotonic === 0) {
+      return 'stale';
+    }
+    const elapsed = performance.now() - this.state.lastMessageReceivedAtMonotonic;
+    return elapsed > FRESHNESS_STALE_THRESHOLD_MS ? 'stale' : 'fresh';
+  }
 
-    this.log(`[PHASE 1] Requesting missed events for ${date} (seq ${lastSeq + 1} to ${receivedSeq - 1})`);
-    this.state.syncStatus = 'syncing';
-    this.state.missedEventRequests.add(date);
+  /**
+   * Force the freshness signal to 'stale' immediately. Used by recovery-fetch
+   * failure handlers so the indicator reflects the data gap without waiting
+   * for the next heartbeat miss.
+   */
+  markStale(): void {
+    this.state.lastMessageReceivedAtMonotonic = 0;
+    if (this.state.lastEmittedFreshness !== 'stale') {
+      this.state.lastEmittedFreshness = 'stale';
+      this.emit('freshness_changed', { freshness: 'stale' });
+    }
+  }
 
-    this.send(
-      {
-        type: 'request_missed_events',
-        date: date,
-        lastSequenceNum: lastSeq,
-      },
-      { queueIfDisconnected: false }
-    );
-
-    setTimeout(() => {
-      this.state.missedEventRequests.delete(date);
-      this.state.syncStatus = 'synced';
-    }, 10000);
+  /**
+   * Internal poll that emits freshness_changed on transitions. Browsers throttle
+   * setInterval in hidden tabs, but a hidden tab is stale by definition so
+   * polling fidelity there is irrelevant.
+   */
+  private startFreshnessPoll(): void {
+    if (this.state.freshnessPollTimer) return;
+    this.state.freshnessPollTimer = setInterval(() => {
+      const current = this.getFreshness();
+      if (current !== this.state.lastEmittedFreshness) {
+        this.state.lastEmittedFreshness = current;
+        this.emit('freshness_changed', { freshness: current });
+      }
+    }, FRESHNESS_POLL_INTERVAL_MS);
   }
 
   /**
@@ -974,42 +964,6 @@ export class WebSocketService extends EventEmitter {
     }
   }
 
-  /**
-   * Get sync status for a specific date
-   */
-  getSyncStatus(date: string | null = null): SyncStatusInfo {
-    if (date) {
-      return {
-        date,
-        lastSequenceNum: this.state.sequenceNumbers.get(date) || 0,
-        isSyncing: this.state.missedEventRequests.has(date),
-        syncStatus: this.state.syncStatus,
-      };
-    }
-
-    return {
-      syncStatus: this.state.syncStatus,
-      pendingEventCount: this.state.pendingEventCount,
-      trackedDates: Array.from(this.state.sequenceNumbers.keys()),
-      sequenceNumbers: Object.fromEntries(this.state.sequenceNumbers),
-    };
-  }
-
-  /**
-   * Get last sequence number for a date
-   */
-  getLastSequenceNumber(date: string): number {
-    return this.state.sequenceNumbers.get(date) || 0;
-  }
-
-  /**
-   * Reset sequence tracking for a date
-   */
-  resetSequenceTracking(date: string): void {
-    this.state.sequenceNumbers.delete(date);
-    this.state.missedEventRequests.delete(date);
-    this.log(`[PHASE 1] Reset sequence tracking for ${date}`);
-  }
 }
 
 /**

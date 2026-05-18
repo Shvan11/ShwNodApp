@@ -28,6 +28,9 @@ export const WebSocketEvents = {
   /** Heartbeat pong response */
   HEARTBEAT_PONG: 'heartbeat_pong',
 
+  /** Server-pushed liveness heartbeat (server -> client every 15s) */
+  SERVER_HEARTBEAT: 'server_heartbeat',
+
   // ===========================================
   // APPOINTMENT SYSTEM EVENTS
   // ===========================================
@@ -139,6 +142,7 @@ export function getEventsByCategory(): EventsByCategory {
       WebSocketEvents.CONNECTION_RECONNECTING,
       WebSocketEvents.HEARTBEAT_PING,
       WebSocketEvents.HEARTBEAT_PONG,
+      WebSocketEvents.SERVER_HEARTBEAT,
     ],
     appointments: [
       WebSocketEvents.APPOINTMENTS_UPDATED,

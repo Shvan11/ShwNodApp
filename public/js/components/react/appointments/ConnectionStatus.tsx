@@ -1,41 +1,53 @@
 import styles from './ConnectionStatus.module.css';
 
 type ConnectionStatusType = 'connected' | 'disconnected' | 'reconnecting' | 'error' | 'connecting';
+type FreshnessType = 'fresh' | 'stale';
 
 interface ConnectionStatusProps {
     status: ConnectionStatusType;
+    freshness: FreshnessType;
+    isViewingToday: boolean;
     showFlash?: boolean;
 }
 
 /**
  * ConnectionStatus Component
- * Shows WebSocket connection status indicator
+ * Honest indicator: only shows "Live" when both the socket is OPEN and the
+ * server heartbeat has been received recently. Past/future dates render as
+ * "Static" because WebSocket subscriptions don't apply to non-today views.
  */
-const ConnectionStatus = ({ status, showFlash = false }: ConnectionStatusProps) => {
+const ConnectionStatus = ({ status, freshness, isViewingToday, showFlash = false }: ConnectionStatusProps) => {
+    type EffectiveState = 'static' | 'live' | 'stale' | 'reconnecting' | 'disconnected' | 'error' | 'connecting';
+
+    const effective: EffectiveState = !isViewingToday
+        ? 'static'
+        : status === 'connected'
+            ? (freshness === 'fresh' ? 'live' : 'stale')
+            : status;
+
     const getStatusText = (): string => {
-        switch (status) {
-            case 'connected':
-                return 'Live';
-            case 'disconnected':
-                return 'Offline';
-            case 'reconnecting':
-                return 'Reconnecting...';
-            case 'error':
-                return 'Connection Error';
-            default:
-                return 'Connecting...';
+        switch (effective) {
+            case 'static': return 'Static';
+            case 'live': return 'Live';
+            case 'stale': return 'Stale — Resyncing';
+            case 'disconnected': return 'Offline';
+            case 'reconnecting': return 'Reconnecting...';
+            case 'error': return 'Connection Error';
+            default: return 'Connecting...';
         }
     };
 
     const getStatusClass = (): string => {
-        const statusStyles: Record<ConnectionStatusType, string> = {
-            connected: styles.connected,
+        const map: Record<EffectiveState, string> = {
+            static: styles.static,
+            live: styles.connected,
+            stale: styles.stale,
             disconnected: styles.disconnected,
             reconnecting: styles.reconnecting,
             error: styles.error,
-            connecting: styles.connecting
+            connecting: styles.connecting,
         };
-        return `${statusStyles[status] || styles.indicator}${showFlash ? ` ${styles.flash}` : ''}`;
+        return `${map[effective] || styles.indicator}${showFlash ? ` ${styles.flash}` : ''}`;
     };
 
     return (
@@ -46,5 +58,5 @@ const ConnectionStatus = ({ status, showFlash = false }: ConnectionStatusProps) 
     );
 };
 
-export type { ConnectionStatusType, ConnectionStatusProps };
+export type { ConnectionStatusType, ConnectionStatusProps, FreshnessType };
 export default ConnectionStatus;

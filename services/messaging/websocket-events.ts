@@ -42,6 +42,9 @@ export const WebSocketEvents = {
   /** Heartbeat pong response */
   HEARTBEAT_PONG: 'heartbeat_pong',
 
+  /** Server-pushed liveness heartbeat (server -> client every 15s) */
+  SERVER_HEARTBEAT: 'server_heartbeat',
+
   // ===========================================
   // APPOINTMENT SYSTEM EVENTS
   // ===========================================
@@ -190,6 +193,12 @@ export const EventMetadata: Partial<Record<WebSocketEventType, EventMetadataEntr
     direction: EventDirection.BIDIRECTIONAL,
     description: 'Heartbeat pong response',
     data: { timestamp: 'number', originalId: 'string?' },
+  },
+
+  [WebSocketEvents.SERVER_HEARTBEAT]: {
+    direction: EventDirection.SERVER_TO_CLIENT,
+    description: 'Server-pushed liveness heartbeat; clients use receipt to compute data freshness',
+    data: { id: 'string', timestamp: 'number' },
   },
 
   [WebSocketEvents.APPOINTMENTS_UPDATED]: {
@@ -408,6 +417,7 @@ export function getEventsByCategory(): EventsByCategory {
       WebSocketEvents.CONNECTION_RECONNECTING,
       WebSocketEvents.HEARTBEAT_PING,
       WebSocketEvents.HEARTBEAT_PONG,
+      WebSocketEvents.SERVER_HEARTBEAT,
     ],
     appointments: [
       WebSocketEvents.APPOINTMENTS_UPDATED,
