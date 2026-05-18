@@ -115,6 +115,38 @@
     composes: indicator;
 }
 
+/* Stale State - Amber pulse: socket OPEN but data flow has gone quiet. */
+.stale {
+    composes: indicator;
+    border-color: var(--warning-orange);
+    background-color: var(--warning-50);
+}
+
+.stale .dot {
+    background-color: var(--warning-orange);
+    animation: pulseOrange 1.5s ease-in-out infinite;
+}
+
+.stale .text {
+    color: var(--warning-orange-dark);
+}
+
+/* Static State - Neutral gray: viewing a non-today date (no live data expected). */
+.static {
+    composes: indicator;
+    border-color: var(--neutral-gray);
+    background-color: var(--hover-bg);
+    opacity: 0.7;
+}
+
+.static .dot {
+    background-color: var(--neutral-gray);
+}
+
+.static .text {
+    color: var(--neutral-gray-dark);
+}
+
 /* Flash animation when data updates */
 .flash {
     animation: flashIndicator 1s ease-in-out;
@@ -138,7 +170,9 @@
     .disconnected,
     .reconnecting,
     .error,
-    .connecting {
+    .connecting,
+    .stale,
+    .static {
         font-size: var(--font-size-xs);
         padding: var(--spacing-xs) 0.75rem;
         gap: var(--spacing-xs);

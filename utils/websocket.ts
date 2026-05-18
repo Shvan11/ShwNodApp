@@ -1,4 +1,4 @@
-// utils/websocket.ts - SIMPLIFIED VERSION
+// utils/websocket.ts
 import { WebSocketServer, WebSocket, RawData } from 'ws';
 import { EventEmitter } from 'events';
 import type { IncomingMessage } from 'http';
@@ -19,6 +19,12 @@ import qrcode from 'qrcode';
 // for active orthodontic work on the chair-side display.
 const ORTHO_WORK_TYPE_IDS: ReadonlySet<number> = new Set([1, 2, 11, 19, 20]);
 const CHAIR_DISPLAY_INTRAORAL_EXTS = ['.i20', '.i22', '.i21'] as const;
+
+// Process-local map of which patient is currently loaded on each chair. Used
+// to replay the patient-loaded event when a kiosk reconnects after a network
+// blip. Lost on server restart by design — staff one-click restores via the
+// next patient-loaded POST.
+const chairCurrentPatient = new Map<string, { personId: number; loadedAt: number }>();
 
 // ===========================================
 // TYPES
@@ -98,8 +104,7 @@ type BroadcastFilter = (ws: ExtendedWebSocket, capabilities: ClientCapabilities 
 // ===========================================
 
 /**
- * WebSocket Connection Manager - SIMPLIFIED
- * No AckManager, no sequence numbers, no complexity
+ * WebSocket Connection Manager
  */
 class ConnectionManager {
   chairDisplayConnections: Map<string, ExtendedWebSocket>;
@@ -313,7 +318,7 @@ class ConnectionManager {
 // ===========================================
 
 /**
- * Setup WebSocket server - SIMPLIFIED
+ * Setup WebSocket server
  */
 function setupWebSocketServer(server: HTTPServer): EventEmitter {
   const wsEmitter = new EventEmitter();
@@ -399,6 +404,22 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
             chairId: chairIdParam,
             ipAddress: req.socket.remoteAddress
           });
+
+          // Replay current patient (if any) so a kiosk reconnect restores
+          // without manual reload. Reuses the existing patient-loaded handler
+          // for all payload assembly (images, latest visit, patient name).
+          const stored = chairCurrentPatient.get(chairIdParam);
+          if (stored) {
+            logger.websocket.debug('Replaying patient-loaded on chair-display reconnect', {
+              chairId: chairIdParam,
+              personId: stored.personId,
+            });
+            wsEmitter.emit(
+              WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,
+              String(stored.personId),
+              chairIdParam
+            );
+          }
         }
       }
 
@@ -434,7 +455,6 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
             messageType: typeof parsedMessage
           });
 
-          // SIMPLIFIED: No ACK handling, just basic typed messages
           if (typeof parsedMessage === 'object' && parsedMessage.type) {
             handleTypedMessage(extWs, parsedMessage, date, connectionManager);
           }
@@ -477,7 +497,7 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
 
 
   /**
-   * Handle typed messages - SIMPLIFIED
+   * Handle typed messages
    */
   async function handleTypedMessage(
     ws: ExtendedWebSocket,
@@ -683,10 +703,9 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
 // ===========================================
 
 /**
- * Global event handlers - SIMPLIFIED
+ * Global event handlers
  */
 function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: ConnectionManager): void {
-  // SIMPLIFIED: Just broadcast the date, clients will reload
   const handleAppointmentUpdate = async (dateParam: string): Promise<void> => {
     logger.websocket.info('Appointment update event', { date: dateParam });
 
@@ -711,6 +730,13 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
   // Chair-display: patient loaded
   const handleChairDisplayPatientLoaded = async (pid: string, targetChairId: string): Promise<void> => {
     logger.websocket.info('Chair-display patient loaded', { patientId: pid, chairId: targetChairId });
+
+    const parsedId = parseInt(pid, 10);
+    if (Number.isFinite(parsedId) && parsedId > 0) {
+      // Record state even if the kiosk isn't currently connected — a later
+      // reconnect will trigger replay using this entry.
+      chairCurrentPatient.set(targetChairId, { personId: parsedId, loadedAt: Date.now() });
+    }
 
     const chairConnection = connectionManager.chairDisplayConnections.get(targetChairId);
     if (!chairConnection || chairConnection.readyState !== WebSocket.OPEN) {
@@ -785,6 +811,8 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
   // Chair-display: patient cleared
   const handleChairDisplayPatientCleared = (targetChairId: string): void => {
     logger.websocket.info('Chair-display patient cleared', { chairId: targetChairId });
+
+    chairCurrentPatient.delete(targetChairId);
 
     const chairConnection = connectionManager.chairDisplayConnections.get(targetChairId);
     if (!chairConnection || chairConnection.readyState !== WebSocket.OPEN) {
@@ -935,6 +963,19 @@ function setupPeriodicCleanup(connectionManager: ConnectionManager): void {
       try { ws.ping(); } catch { /* socket already dead */ }
     }
   }, 30_000)); // Every 30 seconds
+
+  // Application-level heartbeat: push a JSON SERVER_HEARTBEAT to every open
+  // connection every 15s. Clients use receipt to compute data freshness — the
+  // socket being OPEN is not sufficient evidence that messages still flow.
+  const heartbeatHandle = setInterval(() => {
+    const heartbeat = createStandardMessage(
+      WebSocketEvents.SERVER_HEARTBEAT,
+      { id: `hb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, timestamp: Date.now() }
+    );
+    connectionManager.broadcastToAll(heartbeat);
+  }, 15_000);
+  heartbeatHandle.unref(); // Don't block process exit if graceful shutdown is bypassed.
+  _periodicTimers.push(heartbeatHandle);
 }
 
 export { setupWebSocketServer, teardownPeriodicCleanup };

@@ -42,7 +42,7 @@ export interface UseAppointmentsReturn {
   checkedInAppointments: Appointment[];
   loading: boolean;
   error: string | null;
-  loadAppointments: (date: string) => Promise<void>;
+  loadAppointments: (date: string) => Promise<boolean>;
   checkInPatient: (appointmentId: number, currentDate: string) => Promise<{ success: boolean }>;
   markSeated: (appointmentId: number, currentDate: string) => Promise<{ success: boolean }>;
   markDismissed: (appointmentId: number, currentDate: string) => Promise<{ success: boolean }>;
@@ -94,8 +94,8 @@ export function useAppointments(
    * Fetch appointments for a specific date
    * Called on: initial load, date change, WebSocket update
    */
-  const loadAppointments = useCallback(async (date: string): Promise<void> => {
-    if (!date) return;
+  const loadAppointments = useCallback(async (date: string): Promise<boolean> => {
+    if (!date) return false;
 
     console.log('Loading appointments for date:', date);
 
@@ -120,9 +120,11 @@ export function useAppointments(
       setAllAppointments(data.allAppointments || []);
       setCheckedInAppointments(data.checkedInAppointments || []);
       setStats(data.stats || { total: 0, checkedIn: 0, absent: 0, waiting: 0 });
+      return true;
     } catch (err) {
       console.error('Error loading appointments:', err);
       setError(err instanceof Error ? err.message : 'Failed to load appointments');
+      return false;
     } finally {
       setLoading(false);
     }

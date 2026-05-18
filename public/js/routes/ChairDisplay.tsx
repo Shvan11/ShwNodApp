@@ -59,6 +59,14 @@ const buildWsUrl = (chairId: string): string => {
     return `${protocol}//${host}/?${params.toString()}`;
 };
 
+// Trigger a forced reconnect if the kiosk hasn't seen any message (including
+// the 15s server heartbeat) in this many ms. Tolerates one missed heartbeat.
+const KIOSK_STALE_THRESHOLD_MS = 35_000;
+const KIOSK_LIVENESS_POLL_MS = 10_000;
+// Only force a reconnect on visibility-return if the tab was hidden for at
+// least this long — short Alt-Tabs don't need disruption.
+const KIOSK_VISIBILITY_RESUME_MS = 2 * 60 * 1000;
+
 const ChairDisplay = () => {
     const [searchParams] = useSearchParams();
     const chairParam = searchParams.get('chair');
@@ -68,6 +76,8 @@ const ChairDisplay = () => {
     const [patient, setPatient] = useState<PatientPayload | null>(null);
     const reconnectTimerRef = useRef<number | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
+    const lastMessageAtRef = useRef<number>(Date.now());
+    const hiddenSinceRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (!chairId) return;
@@ -83,10 +93,12 @@ const ChairDisplay = () => {
                 ws.onopen = () => {
                     if (cancelled) return;
                     setConnected(true);
+                    lastMessageAtRef.current = Date.now();
                 };
 
                 ws.onmessage = (event) => {
                     if (cancelled) return;
+                    lastMessageAtRef.current = Date.now();
                     let data: { type?: string; data?: unknown } | null = null;
                     try {
                         data = JSON.parse(event.data);
@@ -121,8 +133,43 @@ const ChairDisplay = () => {
 
         connect();
 
+        // Liveness check: if no message (including 15s SERVER_HEARTBEAT) has
+        // arrived in KIOSK_STALE_THRESHOLD_MS, force-close the socket so the
+        // reconnect path runs and the indicator flips to "Reconnecting…".
+        const livenessInterval = window.setInterval(() => {
+            if (cancelled) return;
+            const elapsed = Date.now() - lastMessageAtRef.current;
+            if (elapsed > KIOSK_STALE_THRESHOLD_MS && wsRef.current) {
+                try {
+                    wsRef.current.close(1000, 'liveness timeout');
+                } catch {
+                    /* ignore */
+                }
+            }
+        }, KIOSK_LIVENESS_POLL_MS);
+
+        const handleVisibility = () => {
+            if (cancelled) return;
+            if (document.visibilityState === 'hidden') {
+                hiddenSinceRef.current = Date.now();
+                return;
+            }
+            const since = hiddenSinceRef.current;
+            hiddenSinceRef.current = null;
+            if (since && Date.now() - since > KIOSK_VISIBILITY_RESUME_MS && wsRef.current) {
+                try {
+                    wsRef.current.close(1000, 'visibility resume');
+                } catch {
+                    /* ignore */
+                }
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
+
         return () => {
             cancelled = true;
+            window.clearInterval(livenessInterval);
+            document.removeEventListener('visibilitychange', handleVisibility);
             if (reconnectTimerRef.current !== null) {
                 clearTimeout(reconnectTimerRef.current);
                 reconnectTimerRef.current = null;
