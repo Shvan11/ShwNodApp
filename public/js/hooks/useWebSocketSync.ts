@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import connectionManager from '../services/websocket-connection-manager';
 import wsService, { type Freshness } from '../services/websocket';
 import { WebSocketEvents } from '../constants/websocket-events';
@@ -60,6 +60,53 @@ export function useWebSocketSync(
   const currentDateRef = useRef(currentDate);
   currentDateRef.current = currentDate;
 
+  // Debounced recovery + retry state. Held in refs so both the event-driven
+  // subscriptions (reconnect/online/visibility) and the periodic safety net
+  // share the same coalescing window and retry attempt counter.
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryAttemptRef = useRef(0);
+  const cancelledRef = useRef(false);
+
+  const runRecovery = useCallback(async () => {
+    const date = currentDateRef.current;
+    clearLoaderCacheKey(`daily-appointments:${date}`);
+    try {
+      const result = await callbackRef.current({ date });
+      if (cancelledRef.current) return;
+      // Treat explicit `false` as failure; undefined/void/true as success.
+      if (result === false) {
+        throw new Error('recovery callback returned false');
+      }
+      retryAttemptRef.current = 0;
+    } catch (err) {
+      if (cancelledRef.current) return;
+      wsService.markStale();
+      const delay = RECOVERY_RETRY_DELAYS_MS[
+        Math.min(retryAttemptRef.current, RECOVERY_RETRY_DELAYS_MS.length - 1)
+      ];
+      console.warn('[useWebSocketSync] Recovery fetch failed; retrying', {
+        attempt: retryAttemptRef.current + 1,
+        delayMs: delay,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      retryAttemptRef.current++;
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = setTimeout(() => {
+        retryTimerRef.current = null;
+        runRecovery();
+      }, delay);
+    }
+  }, []);
+
+  const triggerRecoveryFetch = useCallback(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
+      runRecovery();
+    }, RECOVERY_DEBOUNCE_MS);
+  }, [runRecovery]);
+
   // Initialize WebSocket connection — re-runs when currentDate changes so the
   // server-side registration metadata stays in sync (PDate query param).
   useEffect(() => {
@@ -110,51 +157,9 @@ export function useWebSocketSync(
     };
   }, []);
 
-  // Debounced recovery + retry plumbing. Mounted once per hook instance.
+  // Recovery trigger subscriptions. Mounted once per hook instance.
   useEffect(() => {
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let retryAttempt = 0;
-    let cancelled = false;
-
-    const runRecovery = async () => {
-      const date = currentDateRef.current;
-      clearLoaderCacheKey(`daily-appointments:${date}`);
-      try {
-        const result = await callbackRef.current({ date });
-        if (cancelled) return;
-        // Treat explicit `false` as failure; undefined/void/true as success.
-        if (result === false) {
-          throw new Error('recovery callback returned false');
-        }
-        retryAttempt = 0;
-      } catch (err) {
-        if (cancelled) return;
-        wsService.markStale();
-        const delay = RECOVERY_RETRY_DELAYS_MS[
-          Math.min(retryAttempt, RECOVERY_RETRY_DELAYS_MS.length - 1)
-        ];
-        console.warn('[useWebSocketSync] Recovery fetch failed; retrying', {
-          attempt: retryAttempt + 1,
-          delayMs: delay,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        retryAttempt++;
-        if (retryTimer) clearTimeout(retryTimer);
-        retryTimer = setTimeout(() => {
-          retryTimer = null;
-          runRecovery();
-        }, delay);
-      }
-    };
-
-    const triggerRecoveryFetch = () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        debounceTimer = null;
-        runRecovery();
-      }, RECOVERY_DEBOUNCE_MS);
-    };
+    cancelledRef.current = false;
 
     const handleReconnected = () => triggerRecoveryFetch();
     const handleOnline = () => triggerRecoveryFetch();
@@ -169,14 +174,14 @@ export function useWebSocketSync(
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
       wsService.off('reconnected', handleReconnected);
       window.removeEventListener('online', handleOnline);
       document.removeEventListener('visibilitychange', handleVisibility);
-      if (debounceTimer) clearTimeout(debounceTimer);
-      if (retryTimer) clearTimeout(retryTimer);
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     };
-  }, []);
+  }, [triggerRecoveryFetch]);
 
   // APPOINTMENTS_UPDATED stream — server hint, client filters by date.
   useEffect(() => {
@@ -207,21 +212,20 @@ export function useWebSocketSync(
 
   // Periodic safety net — only on today. Run regardless of connectionStatus:
   // the whole point is to backstop a connection that's lying about being
-  // healthy. Re-route through the same callback path so failures benefit from
-  // retry/markStale.
+  // healthy. Route through triggerRecoveryFetch so a failure here surfaces as
+  // "Stale — Resyncing" and gets retried with the same backoff schedule.
   useEffect(() => {
     const isViewingToday = currentDate === getTodayDate();
     if (!isViewingToday) return;
 
     const syncInterval = setInterval(() => {
-      clearLoaderCacheKey(`daily-appointments:${currentDate}`);
-      callbackRef.current({ date: currentDate });
+      triggerRecoveryFetch();
     }, PERIODIC_SYNC_INTERVAL_MS);
 
     return () => {
       clearInterval(syncInterval);
     };
-  }, [currentDate]);
+  }, [currentDate, triggerRecoveryFetch]);
 
   return {
     connectionStatus,
