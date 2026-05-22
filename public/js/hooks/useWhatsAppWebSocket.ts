@@ -126,9 +126,11 @@ export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketR
     try {
       console.log('[useWhatsAppWebSocket] Setting up WebSocket connection');
 
-      // Use connection manager to ensure single connection
+      // Use connection manager to ensure single connection.
+      // Date is sent via REGISTER message data; server stores it on the
+      // capability's metadata for the wa_message_update date filter.
       await connectionManager.ensureConnected('waStatus', {
-        PDate: currentDate,
+        date: currentDate,
       });
 
       console.log('[useWhatsAppWebSocket] WebSocket connected via connection manager');

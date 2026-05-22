@@ -43,7 +43,7 @@ const renderVisitSummary = (raw: string): string => {
         .replace(/&lt;\/font&gt;/gi, '</span>');
 };
 
-const buildWsUrl = (chairId: string): string => {
+const buildWsUrl = (): string => {
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const apiUrl = import.meta.env.VITE_API_URL;
     let host: string;
@@ -52,11 +52,7 @@ const buildWsUrl = (chairId: string): string => {
     } catch {
         host = location.host;
     }
-    const params = new URLSearchParams({
-        clientType: 'chair-display',
-        chairId,
-    });
-    return `${protocol}//${host}/?${params.toString()}`;
+    return `${protocol}//${host}/`;
 };
 
 // Trigger a forced reconnect if the kiosk hasn't seen any message (including
@@ -87,13 +83,23 @@ const ChairDisplay = () => {
         const connect = () => {
             if (cancelled) return;
             try {
-                const ws = new WebSocket(buildWsUrl(chairId));
+                const ws = new WebSocket(buildWsUrl());
                 wsRef.current = ws;
 
                 ws.onopen = () => {
                     if (cancelled) return;
                     setConnected(true);
                     lastMessageAtRef.current = performance.now();
+                    // Register chair-display with chairId via message rather than
+                    // URL params — single registration path, survives reconnects.
+                    try {
+                        ws.send(JSON.stringify({
+                            type: WebSocketEvents.REGISTER_CLIENT_TYPE,
+                            data: { clientType: 'chair-display', chairId },
+                        }));
+                    } catch {
+                        /* socket may have died between open and send */
+                    }
                 };
 
                 ws.onmessage = (event) => {
@@ -118,6 +124,9 @@ const ChairDisplay = () => {
                     if (cancelled) return;
                     setConnected(false);
                     wsRef.current = null;
+                    if (reconnectTimerRef.current !== null) {
+                        clearTimeout(reconnectTimerRef.current);
+                    }
                     reconnectTimerRef.current = window.setTimeout(connect, 3000);
                 };
 
@@ -126,6 +135,9 @@ const ChairDisplay = () => {
                 };
             } catch {
                 if (!cancelled) {
+                    if (reconnectTimerRef.current !== null) {
+                        clearTimeout(reconnectTimerRef.current);
+                    }
                     reconnectTimerRef.current = window.setTimeout(connect, 3000);
                 }
             }

@@ -248,11 +248,9 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     try {
       console.log('[useWhatsAppAuth] Setting up WebSocket connection');
 
-      // Use connection manager to ensure single connection
-      await connectionManager.ensureConnected('auth', {
-        needsQR: true,
-        timestamp: Date.now(),
-      });
+      // Auth always registers as a QR viewer server-side — no extra options
+      // needed in the REGISTER payload.
+      await connectionManager.ensureConnected('auth');
 
       console.log('[useWhatsAppAuth] WebSocket connected via connection manager');
 

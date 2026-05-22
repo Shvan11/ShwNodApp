@@ -48,13 +48,6 @@ export interface SendOptions {
   priority?: MessagePriority;
 }
 
-export interface ConnectionParams {
-  clientType?: string;
-  PDate?: string;
-  timestamp?: number;
-  [key: string]: string | number | boolean | undefined;
-}
-
 interface PendingMessage {
   resolve: (value: unknown) => void;
   reject: (reason: Error) => void;
@@ -213,11 +206,11 @@ export class WebSocketService extends EventEmitter {
   }
 
   /**
-   * Connect to WebSocket server
-   * @param params - Connection parameters
-   * @returns This service instance
+   * Connect to WebSocket server. Connection state (client-type subscriptions)
+   * is managed via REGISTER_CLIENT_TYPE messages by ConnectionManager; the
+   * upgrade URL itself carries no parameters.
    */
-  connect(params: ConnectionParams = {}): Promise<WebSocketService> {
+  connect(): Promise<WebSocketService> {
     this.log('Connecting to WebSocket server...');
 
     // If already connected or connecting, return
@@ -258,10 +251,7 @@ export class WebSocketService extends EventEmitter {
       this.state.ws = null;
     }
 
-    // Build connection URL with parameters
-    const url = this.buildConnectionUrl(params);
-
-    // Log connection attempt
+    const url = this.options.baseUrl;
     this.log(`Attempting to connect to: ${url}`);
     console.log('[WebSocket] Connecting to:', url);
 
@@ -1031,33 +1021,6 @@ export class WebSocketService extends EventEmitter {
       clearTimeout(this.state.heartbeatTimeoutTimer);
       this.state.heartbeatTimeoutTimer = null;
     }
-  }
-
-  /**
-   * Build connection URL with parameters
-   */
-  private buildConnectionUrl(params: ConnectionParams = {}): string {
-    const url = new URL(this.options.baseUrl);
-
-    let dateParam: string;
-    if (params.PDate) {
-      dateParam = params.PDate;
-    } else {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      dateParam = `${year}-${month}-${day}`;
-    }
-    url.searchParams.append('PDate', dateParam);
-
-    for (const [key, value] of Object.entries(params)) {
-      if (key !== 'PDate' && value !== undefined && value !== null) {
-        url.searchParams.append(key, String(value));
-      }
-    }
-
-    return url.toString();
   }
 
   /**
