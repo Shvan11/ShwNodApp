@@ -3,7 +3,6 @@ import { WebSocketServer, WebSocket, RawData } from 'ws';
 import { EventEmitter } from 'events';
 import type { IncomingMessage } from 'http';
 import type { Server as HTTPServer } from 'http';
-import { getPresentAps } from '../services/database/queries/appointment-queries.js';
 import messageState from '../services/state/messageState.js';
 import { getTimePointImgs } from '../services/database/queries/timepoint-queries.js';
 import { getLatestVisitsSum } from '../services/database/queries/visit-queries.js';
@@ -402,9 +401,11 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
           }
 
         } else if (clientType === 'daily-appointments') {
+          // Daily-appointments is today-only by design (see useWebSocketSync.ts).
+          // No metadata.date is stored — broadcasts go to every registered
+          // client, and the client-side filter rejects stray non-today payloads.
           logger.websocket.debug('Registering daily appointments client');
           connectionManager.registerConnection(extWs, 'daily-appointments', {
-            date: date,
             ipAddress: req.socket.remoteAddress
           });
 
@@ -446,9 +447,8 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
         });
       }
 
-      if (clientTypes.includes('daily-appointments')) {
-        sendInitialData(extWs, date, connectionManager);
-      }
+      // Daily-appointments initial data comes from the route loader (REST),
+      // not over the WebSocket — no WS initial payload needed.
 
       // Handle messages
       extWs.on('message', async (message: RawData) => {
@@ -547,14 +547,6 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
         connectionManager.updateClientCapabilities(ws, { supportsPing: true });
         break;
 
-      case WebSocketEvents.REQUEST_APPOINTMENTS: {
-        const requestDate = (message.data?.date as string) || date;
-        if (requestDate) {
-          await sendAppointmentsData(ws, requestDate, connectionManager);
-        }
-        break;
-      }
-
       case WebSocketEvents.CLIENT_CAPABILITIES:
         connectionManager.updateClientCapabilities(ws, (message.data?.capabilities as Partial<ClientCapabilities>) || {});
         break;
@@ -590,21 +582,6 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
 
       default:
         logger.websocket.warn('Unknown message type', { messageType: message.type });
-    }
-  }
-
-  async function sendInitialData(
-    ws: ExtendedWebSocket,
-    date: string | null,
-    connectionManager: ConnectionManager
-  ): Promise<void> {
-    if (!date || ws.readyState !== WebSocket.OPEN) return;
-    logger.websocket.debug('Sending initial data', { date });
-
-    try {
-      await sendAppointmentsData(ws, date, connectionManager);
-    } catch (error) {
-      logger.websocket.error('Error sending initial data', error as Error);
     }
   }
 
@@ -699,39 +676,6 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
     }
   }
 
-  async function sendAppointmentsData(
-    ws: ExtendedWebSocket,
-    date: string,
-    connectionManager: ConnectionManager
-  ): Promise<void> {
-    if (!date || ws.readyState !== WebSocket.OPEN) return;
-    logger.websocket.debug('Fetching appointments data', { date });
-
-    try {
-      const result = await getPresentAps(date);
-      logger.websocket.debug('Got appointments data', {
-        date,
-        appointmentCount: result.appointments ? result.appointments.length : 0
-      });
-
-      const message = createStandardMessage(
-        WebSocketEvents.APPOINTMENTS_DATA,
-        { tableData: result, date }
-      );
-
-      connectionManager.sendToClient(ws, message);
-      logger.websocket.debug('Sent appointments data', { date });
-    } catch (error) {
-      logger.websocket.error('Error fetching appointment data', { error: (error as Error).message, date });
-
-      const errorMessage = createWebSocketMessage(
-        MessageSchemas.WebSocketMessage.ERROR,
-        { error: `Failed to fetch appointments for ${date}` }
-      );
-      connectionManager.sendToClient(ws, errorMessage);
-    }
-  }
-
   return wsEmitter;
 }
 
@@ -747,14 +691,15 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
     logger.websocket.info('Appointment update event', { date: dateParam });
 
     try {
+      // Today-only contract: all registered daily-appointments clients are
+      // viewing today. Fan out to every one — they discard non-matching dates
+      // client-side (defense against midnight rollover / stray broadcasts).
       const message = createStandardMessage(
         WebSocketEvents.APPOINTMENTS_UPDATED,
         { date: dateParam }
       );
 
-      const dateFilter: BroadcastFilter = (_ws, capabilities) =>
-        capabilities?.metadata?.date === dateParam;
-      const sentCount = connectionManager.broadcastToDailyAppointments(message, dateFilter);
+      const sentCount = connectionManager.broadcastToDailyAppointments(message);
 
       logger.websocket.info('Broadcast appointment updates', {
         dailyAppointments: sentCount

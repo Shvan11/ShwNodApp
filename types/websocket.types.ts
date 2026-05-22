@@ -40,14 +40,6 @@ export interface WebSocketMessage<T = unknown> {
   clientId?: string;
 }
 
-/**
- * Message with acknowledgment
- */
-export interface AckMessage<T = unknown> extends WebSocketMessage<T> {
-  ackId?: string;
-  requiresAck?: boolean;
-}
-
 // ===========================================
 // EVENT TYPES
 // ===========================================
@@ -66,8 +58,6 @@ export const WebSocketEvents = {
 
   // Appointment System
   APPOINTMENTS_UPDATED: 'appointments_updated',
-  REQUEST_APPOINTMENTS: 'request_appointments',
-  APPOINTMENTS_DATA: 'appointments_data',
 
   // Chair-side public display
   CHAIR_DISPLAY_PATIENT_LOADED: 'chair_display_patient_loaded',

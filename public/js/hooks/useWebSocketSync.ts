@@ -6,7 +6,7 @@ import { clearLoaderCacheKey } from '../router/loaders';
 
 // Periodic safety net for missed WebSocket messages on the today view.
 const PERIODIC_SYNC_INTERVAL_MS = 5 * 60 * 1000;
-// Coalesce reconnect / online / visibility bursts that fire in rapid succession.
+// Coalesce reconnect / online bursts that fire in rapid succession.
 const RECOVERY_DEBOUNCE_MS = 1_000;
 // Linear backoff (capped) for retrying a failed recovery fetch — covers the
 // boot-storm window where WS upgrades land before REST routes are ready.
@@ -40,11 +40,15 @@ function getTodayDate(): string {
 }
 
 /**
- * Real-time appointment sync.
+ * Real-time appointment sync — **today-only by design.**
  *
- * Database is the source of truth; WebSocket is a hint that something changed.
- * Recovery is idempotent REST refetch coalesced across multiple trigger sources
- * (reconnect, network resume, tab returning to foreground while stale).
+ * Past/future dates render a static snapshot from the loader: no WS
+ * registration, no broadcast listener, no recovery triggers, no periodic
+ * refetch. The UI surfaces this as the "Static" indicator.
+ *
+ * For today: database is the source of truth; WebSocket is a hint that
+ * something changed. Recovery is idempotent REST refetch coalesced across
+ * multiple trigger sources (reconnect, network resume, periodic safety net).
  */
 export function useWebSocketSync(
   currentDate: string,
@@ -52,6 +56,10 @@ export function useWebSocketSync(
 ): UseWebSocketSyncReturn {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
   const [dataFreshness, setDataFreshness] = useState<Freshness>(wsService.getFreshness());
+
+  // Single source of truth for "should this hook do anything real-time?"
+  // Drives every effect below. Non-today => static view, no subscriptions.
+  const isViewingToday = currentDate === getTodayDate();
 
   // Keep a ref to the latest callback so the debounced trigger always invokes
   // the current closure without needing to recreate the debouncer on every render.
@@ -61,8 +69,8 @@ export function useWebSocketSync(
   currentDateRef.current = currentDate;
 
   // Debounced recovery + retry state. Held in refs so both the event-driven
-  // subscriptions (reconnect/online/visibility) and the periodic safety net
-  // share the same coalescing window and retry attempt counter.
+  // subscriptions (reconnect/online) and the periodic safety net share the
+  // same coalescing window and retry attempt counter.
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryAttemptRef = useRef(0);
@@ -107,14 +115,18 @@ export function useWebSocketSync(
     }, RECOVERY_DEBOUNCE_MS);
   }, [runRecovery]);
 
-  // Initialize WebSocket connection — re-runs when currentDate changes so the
-  // server-side registration metadata stays in sync (PDate query param).
+  // 1. Connection lifecycle — only register the daily-appointments client type
+  // when viewing today. Past/future views opt out entirely: no socket churn,
+  // no broadcast slot taken on the server.
   useEffect(() => {
+    if (!isViewingToday) {
+      setConnectionStatus('disconnected');
+      return;
+    }
+
     const initializeWebSocket = async () => {
       try {
-        await connectionManager.ensureConnected('daily-appointments', {
-          PDate: currentDate,
-        });
+        await connectionManager.ensureConnected('daily-appointments');
         setConnectionStatus('connected');
       } catch (err) {
         console.error('[useWebSocketSync] Connection failed, auto-reconnect will retry:', err);
@@ -127,9 +139,11 @@ export function useWebSocketSync(
     return () => {
       connectionManager.removeClientType('daily-appointments');
     };
-  }, [currentDate]);
+  }, [isViewingToday]);
 
-  // Connection lifecycle + freshness events
+  // 2. Connection lifecycle + freshness event mirrors. Always mounted — these
+  // are cheap pass-throughs from the shared singleton and keep local state
+  // coherent across switches between today and other dates without resubscribing.
   useEffect(() => {
     const handleConnected = () => setConnectionStatus('connected');
     const handleDisconnected = () => setConnectionStatus('disconnected');
@@ -157,10 +171,11 @@ export function useWebSocketSync(
     };
   }, []);
 
-  // Recovery trigger subscriptions. Mounted once per hook instance.
-  // Visibility/pageshow/offline are handled inside wsService — when those
-  // events force a reconnect, the resulting 'reconnected' event fires here.
+  // 3. Recovery triggers (reconnect / online). Today-only: a refetch is
+  // meaningless for a static snapshot of a past/future date.
   useEffect(() => {
+    if (!isViewingToday) return;
+
     cancelledRef.current = false;
 
     const handleReconnected = () => triggerRecoveryFetch();
@@ -176,10 +191,16 @@ export function useWebSocketSync(
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     };
-  }, [triggerRecoveryFetch]);
+  }, [isViewingToday, triggerRecoveryFetch]);
 
-  // APPOINTMENTS_UPDATED stream — server hint, client filters by date.
+  // 4. APPOINTMENTS_UPDATED broadcast listener — today-only. The server no
+  // longer filters by date for daily-appointments (every today-viewer gets
+  // every broadcast), so the client double-checks: ignore any broadcast whose
+  // date doesn't match the view. This protects against midnight rollover and
+  // stray non-today broadcasts.
   useEffect(() => {
+    if (!isViewingToday) return;
+
     const normalizeDate = (dateStr: string | undefined | null): string => {
       if (!dateStr) return '';
       return dateStr.split('T')[0];
@@ -212,14 +233,12 @@ export function useWebSocketSync(
     return () => {
       wsService.off(WebSocketEvents.APPOINTMENTS_UPDATED, handleAppointmentsUpdated);
     };
-  }, [currentDate, triggerRecoveryFetch]);
+  }, [isViewingToday, currentDate, triggerRecoveryFetch]);
 
-  // Periodic safety net — only on today. Run regardless of connectionStatus:
-  // the whole point is to backstop a connection that's lying about being
-  // healthy. Route through triggerRecoveryFetch so a failure here surfaces as
-  // "Stale — Resyncing" and gets retried with the same backoff schedule.
+  // 5. Periodic safety net — today-only. Backstops a connection that's lying
+  // about being healthy. Route through triggerRecoveryFetch so a failure here
+  // surfaces as "Stale — Resyncing" and gets retried with the backoff schedule.
   useEffect(() => {
-    const isViewingToday = currentDate === getTodayDate();
     if (!isViewingToday) return;
 
     const syncInterval = setInterval(() => {
@@ -229,7 +248,7 @@ export function useWebSocketSync(
     return () => {
       clearInterval(syncInterval);
     };
-  }, [currentDate, triggerRecoveryFetch]);
+  }, [isViewingToday, triggerRecoveryFetch]);
 
   return {
     connectionStatus,

@@ -125,7 +125,6 @@ export type {
 
   // Message types
   WebSocketMessage,
-  AckMessage,
 
   // Event types
   WebSocketEventName,

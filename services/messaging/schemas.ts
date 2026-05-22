@@ -135,7 +135,6 @@ export function validateWebSocketMessage(message: unknown): ValidationResult {
     WebSocketEvents.HEARTBEAT_PING,
     WebSocketEvents.HEARTBEAT_PONG,
     'heartbeat',
-    'ack',
   ];
 
   if (simpleMessageTypes.includes(msg.type as string)) {

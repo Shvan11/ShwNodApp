@@ -16,7 +16,7 @@ import { log } from '../../utils/logger.js';
  * - Use SCREAMING_SNAKE_CASE for constants
  * - Use descriptive, consistent patterns
  * - Server events: noun_verb (e.g., APPOINTMENTS_UPDATED)
- * - Client events: verb_noun (e.g., REQUEST_APPOINTMENTS)
+ * - Client events: verb_noun (e.g., REQUEST_WHATSAPP_INITIAL_STATE)
  * - Status events: noun_status (e.g., CLIENT_READY)
  */
 export const WebSocketEvents = {
@@ -51,12 +51,6 @@ export const WebSocketEvents = {
 
   /** Appointment data loaded/updated */
   APPOINTMENTS_UPDATED: 'appointments_updated',
-
-  /** Request appointment data for specific date */
-  REQUEST_APPOINTMENTS: 'request_appointments',
-
-  /** Appointment data response */
-  APPOINTMENTS_DATA: 'appointments_data',
 
   // ===========================================
   // CHAIR DISPLAY EVENTS
@@ -215,18 +209,6 @@ export const EventMetadata: Partial<Record<WebSocketEventType, EventMetadataEntr
     direction: EventDirection.SERVER_TO_CLIENT,
     description: 'Appointment data has been updated; clients refetch by date',
     data: { date: 'string' },
-  },
-
-  [WebSocketEvents.REQUEST_APPOINTMENTS]: {
-    direction: EventDirection.CLIENT_TO_SERVER,
-    description: 'Request appointment data for specific date',
-    data: { date: 'string' },
-  },
-
-  [WebSocketEvents.APPOINTMENTS_DATA]: {
-    direction: EventDirection.SERVER_TO_CLIENT,
-    description: 'Appointment data response',
-    data: { tableData: 'object', date: 'string' },
   },
 
   [WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED]: {
@@ -431,8 +413,6 @@ export function getEventsByCategory(): EventsByCategory {
     ],
     appointments: [
       WebSocketEvents.APPOINTMENTS_UPDATED,
-      WebSocketEvents.REQUEST_APPOINTMENTS,
-      WebSocketEvents.APPOINTMENTS_DATA,
     ],
     chairDisplay: [
       WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,

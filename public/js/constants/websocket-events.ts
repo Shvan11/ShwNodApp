@@ -38,12 +38,6 @@ export const WebSocketEvents = {
   /** Appointment data loaded/updated */
   APPOINTMENTS_UPDATED: 'appointments_updated',
 
-  /** Request appointment data for specific date */
-  REQUEST_APPOINTMENTS: 'request_appointments',
-
-  /** Appointment data response */
-  APPOINTMENTS_DATA: 'appointments_data',
-
   // ===========================================
   // CHAIR DISPLAY EVENTS
   // ===========================================
@@ -156,8 +150,6 @@ export function getEventsByCategory(): EventsByCategory {
     ],
     appointments: [
       WebSocketEvents.APPOINTMENTS_UPDATED,
-      WebSocketEvents.REQUEST_APPOINTMENTS,
-      WebSocketEvents.APPOINTMENTS_DATA,
     ],
     chairDisplay: [
       WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,

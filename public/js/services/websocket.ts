@@ -635,14 +635,6 @@ export class WebSocketService extends EventEmitter {
         return;
       }
 
-      // Send ACK for messages that require it
-      if (typeof message === 'object' && msgObj.requiresAck && msgObj.id) {
-        this.send(
-          { type: 'ack', messageId: msgObj.id },
-          { queueIfDisconnected: false }
-        );
-      }
-
       // Check if it's a heartbeat/ping response
       if (
         typeof message === 'object' &&
