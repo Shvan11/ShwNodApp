@@ -14,7 +14,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { EventEmitter } from 'events';
 import { log } from '../../utils/logger.js';
-import { WebSocketEvents } from '../../services/messaging/websocket-events.js';
+import { InternalEmitterEvents } from '../../services/messaging/websocket-events.js';
 
 const router = Router();
 
@@ -53,7 +53,7 @@ router.post(
     }
 
     if (wsEmitter) {
-      wsEmitter.emit(WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED, String(personId), chairId);
+      wsEmitter.emit(InternalEmitterEvents.CHAIR_PATIENT_LOAD, String(personId), chairId);
     }
   }
 );
@@ -70,7 +70,7 @@ router.post(
     }
 
     if (wsEmitter) {
-      wsEmitter.emit(WebSocketEvents.CHAIR_DISPLAY_PATIENT_CLEARED, chairId);
+      wsEmitter.emit(InternalEmitterEvents.CHAIR_PATIENT_CLEAR, chairId);
     }
   }
 );

@@ -61,6 +61,10 @@ export const InternalEmitterEvents = {
   DATA_UPDATED: 'data_updated',
   /** Pre-formed WS message to route to the appropriate broadcast set */
   BROADCAST_MESSAGE: 'broadcast_message',
+  /** Staff loaded a patient on a chair — build the payload and broadcast to the kiosk */
+  CHAIR_PATIENT_LOAD: 'chair_patient_load',
+  /** Staff cleared a chair — tell the kiosk to return to idle */
+  CHAIR_PATIENT_CLEAR: 'chair_patient_clear',
 } as const;
 
 export type InternalEmitterEvent = (typeof InternalEmitterEvents)[keyof typeof InternalEmitterEvents];
