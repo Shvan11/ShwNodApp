@@ -95,11 +95,6 @@ interface PatientImage {
   name: string;
 }
 
-/**
- * Filter function for broadcast operations
- */
-type BroadcastFilter = (ws: ExtendedWebSocket, capabilities: ClientCapabilities | undefined) => boolean;
-
 // ===========================================
 // CONNECTION MANAGER
 // ===========================================
@@ -168,12 +163,10 @@ class ConnectionManager {
     }
   }
 
-  broadcastToWaStatus(message: unknown, filter: BroadcastFilter | null = null): number {
+  broadcastToWaStatus(message: unknown): number {
     let sentCount = 0;
     for (const ws of this.waStatusConnections) {
       if (ws.readyState !== WebSocket.OPEN) continue;
-      if (filter && !filter(ws, this.clientCapabilities.get(ws))) continue;
-
       try {
         this.sendToClient(ws, message);
         sentCount++;
@@ -184,13 +177,10 @@ class ConnectionManager {
     return sentCount;
   }
 
-  broadcastToDailyAppointments(message: unknown, filter: BroadcastFilter | null = null): number {
+  broadcastToDailyAppointments(message: unknown): number {
     let sentCount = 0;
     for (const ws of this.dailyAppointmentsConnections) {
       if (ws.readyState !== WebSocket.OPEN) continue;
-      const capabilities = this.clientCapabilities.get(ws);
-      if (filter && !filter(ws, capabilities)) continue;
-
       try {
         this.sendToClient(ws, message);
         sentCount++;
@@ -201,13 +191,10 @@ class ConnectionManager {
     return sentCount;
   }
 
-  broadcastToAll(message: unknown, filter: BroadcastFilter | null = null): number {
+  broadcastToAll(message: unknown): number {
     let sentCount = 0;
     for (const ws of this.allConnections) {
       if (ws.readyState !== WebSocket.OPEN) continue;
-      const capabilities = this.clientCapabilities.get(ws);
-      if (filter && !filter(ws, capabilities)) continue;
-
       try {
         this.sendToClient(ws, message);
         sentCount++;

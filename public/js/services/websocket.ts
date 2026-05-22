@@ -827,8 +827,14 @@ export class WebSocketService extends EventEmitter {
     this.state.messageQueue = [];
 
     for (const message of queue) {
+      if (!this.state.ws || this.state.ws.readyState !== WebSocket.OPEN) {
+        // Socket died mid-drain — requeue what's left and bail; the next
+        // 'connected' event will retry.
+        this.state.messageQueue.push(message);
+        continue;
+      }
       try {
-        this.state.ws!.send(message.data);
+        this.state.ws.send(message.data);
 
         const pendingMessage = this.state.pendingMessages.get(message.id);
         if (pendingMessage) {
