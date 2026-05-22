@@ -463,7 +463,7 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
               });
               const replay = createStandardMessage(
                 WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,
-                stored.payload as unknown as Record<string, unknown>,
+                stored.payload,
               );
               connectionManager.sendToChairDisplay(data.chairId, replay);
             } else if (stored) {
@@ -705,7 +705,7 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
 
       const message = createStandardMessage(
         WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,
-        payload as unknown as Record<string, unknown>,
+        payload,
       );
       const success = connectionManager.sendToChairDisplay(targetChairId, message);
 

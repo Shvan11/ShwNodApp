@@ -71,10 +71,13 @@ export type InternalEmitterEvent = (typeof InternalEmitterEvents)[keyof typeof I
 
 /**
  * Standard message envelope produced by `createStandardMessage`.
+ * Generic on the `data` payload so typed payloads (e.g. ChairPatientPayload)
+ * round-trip without an unsafe cast — every downstream consumer just
+ * `JSON.stringify`s the envelope anyway.
  */
-export interface StandardMessage {
+export interface StandardMessage<TData extends object = Record<string, unknown>> {
   type: string;
-  data: Record<string, unknown>;
+  data: TData;
   timestamp: number;
   id: string;
   source?: string;
@@ -91,11 +94,11 @@ function generateMessageId(): string {
 /**
  * Build a standardized WS message envelope.
  */
-export function createStandardMessage(
+export function createStandardMessage<TData extends object = Record<string, unknown>>(
   eventType: string,
-  data: Record<string, unknown> = {},
+  data: TData = {} as TData,
   metadata: Record<string, unknown> = {}
-): StandardMessage {
+): StandardMessage<TData> {
   return {
     type: eventType,
     data,
