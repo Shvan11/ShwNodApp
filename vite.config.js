@@ -93,6 +93,12 @@ export default defineConfig(({ mode }) => {
         changeOrigin: true,
         secure: false
       },
+      // Public SSE for chair-display kiosk (no auth, separate from /api).
+      // http-proxy passes chunked text/event-stream transparently.
+      '/sse': {
+        target: apiUrl,
+        changeOrigin: true
+      },
       '/health': {
         target: apiUrl,
         changeOrigin: true

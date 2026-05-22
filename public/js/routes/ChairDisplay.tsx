@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AnalogClock from '../components/react/AnalogClock';
-import { WebSocketEvents } from '../constants/websocket-events';
-import {
-  LIVENESS_STALE_THRESHOLD_MS,
-  VISIBILITY_RESUME_THRESHOLD_MS,
-} from '../constants/websocket-liveness';
+import { VISIBILITY_RESUME_THRESHOLD_MS } from '../constants/websocket-liveness';
 import styles from './ChairDisplay.module.css';
 
 interface ImageEntry {
@@ -47,23 +43,6 @@ const renderVisitSummary = (raw: string): string => {
         .replace(/&lt;\/font&gt;/gi, '</span>');
 };
 
-const buildWsUrl = (): string => {
-    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const apiUrl = import.meta.env.VITE_API_URL;
-    let host: string;
-    try {
-        host = apiUrl ? new URL(apiUrl).host : location.host;
-    } catch {
-        host = location.host;
-    }
-    return `${protocol}//${host}/`;
-};
-
-// Poll cadence is kiosk-specific (less aggressive than the singleton's 5s — no
-// UI indicator to drive). Stale + visibility-resume thresholds are shared with
-// the singleton so they can't drift on a tuning pass.
-const KIOSK_LIVENESS_POLL_MS = 10_000;
-
 const ChairDisplay = () => {
     const [searchParams] = useSearchParams();
     const chairParam = searchParams.get('chair');
@@ -71,9 +50,7 @@ const ChairDisplay = () => {
 
     const [connected, setConnected] = useState(false);
     const [patient, setPatient] = useState<PatientPayload | null>(null);
-    const reconnectTimerRef = useRef<number | null>(null);
-    const wsRef = useRef<WebSocket | null>(null);
-    const lastMessageAtRef = useRef<number>(performance.now());
+    const esRef = useRef<EventSource | null>(null);
     const hiddenSinceRef = useRef<number | null>(null);
 
     useEffect(() => {
@@ -81,85 +58,47 @@ const ChairDisplay = () => {
 
         let cancelled = false;
 
-        const connect = () => {
+        // Native EventSource auto-reconnects per the server's `retry: 3000`
+        // directive — no manual reconnect loop or liveness timer needed.
+        // visibilitychange / pageshow handle the silent-NAT-drop case.
+        const open = () => {
             if (cancelled) return;
-            try {
-                const ws = new WebSocket(buildWsUrl());
-                wsRef.current = ws;
-
-                ws.onopen = () => {
-                    if (cancelled) return;
-                    setConnected(true);
-                    lastMessageAtRef.current = performance.now();
-                    // Register chair-display with chairId via message rather than
-                    // URL params — single registration path, survives reconnects.
-                    try {
-                        ws.send(JSON.stringify({
-                            type: WebSocketEvents.REGISTER_CLIENT_TYPE,
-                            data: { clientType: 'chair-display', chairId },
-                        }));
-                    } catch {
-                        /* socket may have died between open and send */
-                    }
-                };
-
-                ws.onmessage = (event) => {
-                    if (cancelled) return;
-                    lastMessageAtRef.current = performance.now();
-                    let data: { type?: string; data?: unknown } | null = null;
-                    try {
-                        data = JSON.parse(event.data);
-                    } catch {
-                        return;
-                    }
-                    if (!data || typeof data !== 'object') return;
-
-                    if (data.type === WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED) {
-                        setPatient(data.data as PatientPayload);
-                    } else if (data.type === WebSocketEvents.CHAIR_DISPLAY_PATIENT_CLEARED) {
-                        setPatient(null);
-                    }
-                };
-
-                ws.onclose = () => {
-                    if (cancelled) return;
-                    setConnected(false);
-                    wsRef.current = null;
-                    if (reconnectTimerRef.current !== null) {
-                        clearTimeout(reconnectTimerRef.current);
-                    }
-                    reconnectTimerRef.current = window.setTimeout(connect, 3000);
-                };
-
-                ws.onerror = () => {
-                    // Let onclose handle reconnect
-                };
-            } catch {
-                if (!cancelled) {
-                    if (reconnectTimerRef.current !== null) {
-                        clearTimeout(reconnectTimerRef.current);
-                    }
-                    reconnectTimerRef.current = window.setTimeout(connect, 3000);
-                }
+            // Tear down any previous handle before opening a new one.
+            if (esRef.current) {
+                try { esRef.current.close(); } catch { /* ignore */ }
+                esRef.current = null;
             }
+            const es = new EventSource(`/sse/chair-display/${chairId}`);
+            esRef.current = es;
+
+            es.onopen = () => {
+                if (cancelled) return;
+                setConnected(true);
+            };
+
+            es.onerror = () => {
+                if (cancelled) return;
+                // CONNECTING means the browser is auto-reconnecting; CLOSED
+                // means it gave up (e.g. 4xx). UI shows "Reconnecting…" either way.
+                setConnected(false);
+            };
+
+            es.addEventListener('chair_display_patient_loaded', (evt) => {
+                if (cancelled) return;
+                try {
+                    setPatient(JSON.parse((evt as MessageEvent).data) as PatientPayload);
+                } catch {
+                    /* malformed payload — ignore */
+                }
+            });
+
+            es.addEventListener('chair_display_patient_cleared', () => {
+                if (cancelled) return;
+                setPatient(null);
+            });
         };
 
-        connect();
-
-        // Liveness check: if no message (including 15s SERVER_HEARTBEAT) has
-        // arrived in LIVENESS_STALE_THRESHOLD_MS, force-close the socket so
-        // the reconnect path runs and the indicator flips to "Reconnecting…".
-        const livenessInterval = window.setInterval(() => {
-            if (cancelled) return;
-            const elapsed = performance.now() - lastMessageAtRef.current;
-            if (elapsed > LIVENESS_STALE_THRESHOLD_MS && wsRef.current) {
-                try {
-                    wsRef.current.close(1000, 'liveness timeout');
-                } catch {
-                    /* ignore */
-                }
-            }
-        }, KIOSK_LIVENESS_POLL_MS);
+        open();
 
         const handleVisibility = () => {
             if (cancelled) return;
@@ -169,35 +108,25 @@ const ChairDisplay = () => {
             }
             const since = hiddenSinceRef.current;
             hiddenSinceRef.current = null;
-            if (since && performance.now() - since > VISIBILITY_RESUME_THRESHOLD_MS && wsRef.current) {
-                try {
-                    wsRef.current.close(1000, 'visibility resume');
-                } catch {
-                    /* ignore */
-                }
+            if (since && performance.now() - since > VISIBILITY_RESUME_THRESHOLD_MS) {
+                open();
             }
         };
         document.addEventListener('visibilitychange', handleVisibility);
 
+        const handlePageShow = (evt: PageTransitionEvent) => {
+            if (cancelled) return;
+            if (evt.persisted) open(); // iOS bfcache restore
+        };
+        window.addEventListener('pageshow', handlePageShow);
+
         return () => {
             cancelled = true;
-            window.clearInterval(livenessInterval);
             document.removeEventListener('visibilitychange', handleVisibility);
-            if (reconnectTimerRef.current !== null) {
-                clearTimeout(reconnectTimerRef.current);
-                reconnectTimerRef.current = null;
-            }
-            if (wsRef.current) {
-                wsRef.current.onopen = null;
-                wsRef.current.onmessage = null;
-                wsRef.current.onclose = null;
-                wsRef.current.onerror = null;
-                try {
-                    wsRef.current.close();
-                } catch {
-                    /* ignore */
-                }
-                wsRef.current = null;
+            window.removeEventListener('pageshow', handlePageShow);
+            if (esRef.current) {
+                try { esRef.current.close(); } catch { /* ignore */ }
+                esRef.current = null;
             }
         };
     }, [chairId]);

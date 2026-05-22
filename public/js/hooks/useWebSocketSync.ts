@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import connectionManager from '../services/websocket-connection-manager';
-import wsService, { type Freshness } from '../services/websocket';
-import { WebSocketEvents } from '../constants/websocket-events';
+import sseAppointments, { type Freshness } from '../services/sse-appointments';
 import { clearLoaderCacheKey } from '../router/loaders';
 
 // Periodic safety net for missed WebSocket messages on the today view.
@@ -55,7 +53,7 @@ export function useWebSocketSync(
   onAppointmentsUpdated: AppointmentsUpdateCallback
 ): UseWebSocketSyncReturn {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
-  const [dataFreshness, setDataFreshness] = useState<Freshness>(wsService.getFreshness());
+  const [dataFreshness, setDataFreshness] = useState<Freshness>(sseAppointments.getFreshness());
 
   // Single source of truth for "should this hook do anything real-time?"
   // Drives every effect below. Non-today => static view, no subscriptions.
@@ -89,7 +87,7 @@ export function useWebSocketSync(
       retryAttemptRef.current = 0;
     } catch (err) {
       if (cancelledRef.current) return;
-      wsService.markStale();
+      sseAppointments.markStale();
       const delay = RECOVERY_RETRY_DELAYS_MS[
         Math.min(retryAttemptRef.current, RECOVERY_RETRY_DELAYS_MS.length - 1)
       ];
@@ -115,29 +113,29 @@ export function useWebSocketSync(
     }, RECOVERY_DEBOUNCE_MS);
   }, [runRecovery]);
 
-  // 1. Connection lifecycle — only register the daily-appointments client type
-  // when viewing today. Past/future views opt out entirely: no socket churn,
-  // no broadcast slot taken on the server.
+  // 1. Connection lifecycle — open the shared SSE stream only when viewing
+  // today. Past/future views opt out entirely: no EventSource opened, no
+  // server resources held.
   useEffect(() => {
     if (!isViewingToday) {
       setConnectionStatus('disconnected');
       return;
     }
 
-    const initializeWebSocket = async () => {
+    const initialize = async () => {
       try {
-        await connectionManager.ensureConnected('daily-appointments');
+        await sseAppointments.ensureConnected();
         setConnectionStatus('connected');
       } catch (err) {
-        console.error('[useWebSocketSync] Connection failed, auto-reconnect will retry:', err);
+        console.error('[useWebSocketSync] SSE connection failed, will retry:', err);
         setConnectionStatus('connecting');
       }
     };
 
-    initializeWebSocket();
+    initialize();
 
     return () => {
-      connectionManager.removeClientType('daily-appointments');
+      sseAppointments.release();
     };
   }, [isViewingToday]);
 
@@ -156,18 +154,18 @@ export function useWebSocketSync(
       }
     };
 
-    wsService.on('connected', handleConnected);
-    wsService.on('disconnected', handleDisconnected);
-    wsService.on('reconnecting', handleReconnecting);
-    wsService.on('error', handleError);
-    wsService.on('freshness_changed', handleFreshness);
+    sseAppointments.on('connected', handleConnected);
+    sseAppointments.on('disconnected', handleDisconnected);
+    sseAppointments.on('reconnecting', handleReconnecting);
+    sseAppointments.on('error', handleError);
+    sseAppointments.on('freshness_changed', handleFreshness);
 
     return () => {
-      wsService.off('connected', handleConnected);
-      wsService.off('disconnected', handleDisconnected);
-      wsService.off('reconnecting', handleReconnecting);
-      wsService.off('error', handleError);
-      wsService.off('freshness_changed', handleFreshness);
+      sseAppointments.off('connected', handleConnected);
+      sseAppointments.off('disconnected', handleDisconnected);
+      sseAppointments.off('reconnecting', handleReconnecting);
+      sseAppointments.off('error', handleError);
+      sseAppointments.off('freshness_changed', handleFreshness);
     };
   }, []);
 
@@ -181,23 +179,22 @@ export function useWebSocketSync(
     const handleReconnected = () => triggerRecoveryFetch();
     const handleOnline = () => triggerRecoveryFetch();
 
-    wsService.on('reconnected', handleReconnected);
+    sseAppointments.on('reconnected', handleReconnected);
     window.addEventListener('online', handleOnline);
 
     return () => {
       cancelledRef.current = true;
-      wsService.off('reconnected', handleReconnected);
+      sseAppointments.off('reconnected', handleReconnected);
       window.removeEventListener('online', handleOnline);
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     };
   }, [isViewingToday, triggerRecoveryFetch]);
 
-  // 4. APPOINTMENTS_UPDATED broadcast listener — today-only. The server no
-  // longer filters by date for daily-appointments (every today-viewer gets
-  // every broadcast), so the client double-checks: ignore any broadcast whose
-  // date doesn't match the view. This protects against midnight rollover and
-  // stray non-today broadcasts.
+  // 4. appointments_updated broadcast listener — today-only. The server no
+  // longer filters by date (every today-viewer gets every broadcast), so the
+  // client double-checks: ignore any broadcast whose date doesn't match the
+  // view. This protects against midnight rollover and stray non-today broadcasts.
   useEffect(() => {
     if (!isViewingToday) return;
 
@@ -206,8 +203,9 @@ export function useWebSocketSync(
       return dateStr.split('T')[0];
     };
 
-    const handleAppointmentsUpdated = async (data: AppointmentsUpdatedData) => {
-      const receivedDate = normalizeDate(data?.date);
+    const handleAppointmentsUpdated = async (payload: unknown) => {
+      const data = (payload ?? {}) as AppointmentsUpdatedData;
+      const receivedDate = normalizeDate(data.date);
       const expectedDate = normalizeDate(currentDate);
 
       if (receivedDate && receivedDate === expectedDate) {
@@ -222,16 +220,16 @@ export function useWebSocketSync(
             throw new Error('refetch returned false');
           }
         } catch {
-          wsService.markStale();
+          sseAppointments.markStale();
           triggerRecoveryFetch();
         }
       }
     };
 
-    wsService.on(WebSocketEvents.APPOINTMENTS_UPDATED, handleAppointmentsUpdated);
+    sseAppointments.on('appointments_updated', handleAppointmentsUpdated);
 
     return () => {
-      wsService.off(WebSocketEvents.APPOINTMENTS_UPDATED, handleAppointmentsUpdated);
+      sseAppointments.off('appointments_updated', handleAppointmentsUpdated);
     };
   }, [isViewingToday, currentDate, triggerRecoveryFetch]);
 
