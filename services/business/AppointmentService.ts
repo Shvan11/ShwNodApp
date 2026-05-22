@@ -16,6 +16,7 @@ import { log } from '../../utils/logger.js';
 import * as database from '../database/index.js';
 import {
   getDailyAppointmentsOptimized,
+  updatePresent,
   type DailyAppointmentsOptimizedResult,
 } from '../database/queries/appointment-queries.js';
 import { isDateHoliday } from '../database/queries/holiday-queries.js';
@@ -31,6 +32,7 @@ export type AppointmentErrorCode =
   | 'APPOINTMENT_CONFLICT'
   | 'HOLIDAY_CONFLICT'
   | 'INVALID_PERSON_ID'
+  | 'INVALID_STATE_TRANSITION'
   | 'MISSING_DATE';
 
 /**
@@ -441,20 +443,22 @@ export async function quickCheckIn(
       };
     }
 
-    // Scenario 2: Appointment exists but not checked in - update with Present time
-    await database.executeQuery(
-      `
-            UPDATE tblappointments
-            SET Present = @presentTime,
-                LastUpdated = GETDATE()
-            WHERE appointmentID = @appointmentID
-        `,
-      [
-        ['presentTime', database.TYPES.VarChar, presentTimeString],
-        ['appointmentID', database.TYPES.Int, apt.appointmentID],
-      ],
-      (columns) => ({ value: columns[0]?.value })
-    );
+    // Scenario 2: Appointment exists but not checked in - route through the
+    // state-machine proc so a stale view can't re-check-in a patient who has
+    // already moved to Seated or Dismissed since the existence check above.
+    try {
+      await updatePresent(apt.appointmentID, 'Present', presentTimeString);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('[INVALID_STATE_TRANSITION]')) {
+        throw new AppointmentValidationError(
+          message,
+          'INVALID_STATE_TRANSITION',
+          { existingAppointmentID: apt.appointmentID }
+        );
+      }
+      throw err;
+    }
 
     log.info(
       `Patient ${PersonID} checked in to existing appointment ${apt.appointmentID}`

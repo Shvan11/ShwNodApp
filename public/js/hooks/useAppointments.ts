@@ -144,6 +144,25 @@ export function useAppointments(
     return fetchPromise;
   }, []);
 
+  // The server rejects forward state transitions when the caller's view of the
+  // appointment is stale (typically a missed WebSocket DATA_UPDATED). When that
+  // happens we don't want to surface a hard error — the right recovery is a
+  // silent reload of the truth. Returns true if the response was a conflict and
+  // a reload was issued.
+  const recoverFromConflict = useCallback(
+    async (response: Response, currentDate: string): Promise<boolean> => {
+      if (response.status !== 400) return false;
+      const errorData = await response.clone().json().catch(() => null);
+      if (errorData?.details?.code === 'INVALID_STATE_TRANSITION') {
+        window.toast?.warning('Patient state changed — refreshing');
+        await loadAppointments(currentDate);
+        return true;
+      }
+      return false;
+    },
+    [loadAppointments]
+  );
+
   /**
    * Check in a patient (Scheduled -> Present)
    * SIMPLIFIED: Wait for server, then reload
@@ -166,6 +185,10 @@ export function useAppointments(
           }),
         });
 
+        if (await recoverFromConflict(response, currentDate)) {
+          return { success: false };
+        }
+
         if (!response.ok) {
           throw new Error('Failed to check in patient');
         }
@@ -185,7 +208,7 @@ export function useAppointments(
         setLoading(false);
       }
     },
-    [loadAppointments]
+    [loadAppointments, recoverFromConflict]
   );
 
   /**
@@ -210,6 +233,10 @@ export function useAppointments(
           }),
         });
 
+        if (await recoverFromConflict(response, currentDate)) {
+          return { success: false };
+        }
+
         if (!response.ok) {
           throw new Error('Failed to seat patient');
         }
@@ -229,7 +256,7 @@ export function useAppointments(
         setLoading(false);
       }
     },
-    [loadAppointments]
+    [loadAppointments, recoverFromConflict]
   );
 
   /**
@@ -254,6 +281,10 @@ export function useAppointments(
           }),
         });
 
+        if (await recoverFromConflict(response, currentDate)) {
+          return { success: false };
+        }
+
         if (!response.ok) {
           throw new Error('Failed to complete visit');
         }
@@ -273,7 +304,7 @@ export function useAppointments(
         setLoading(false);
       }
     },
-    [loadAppointments]
+    [loadAppointments, recoverFromConflict]
   );
 
   /**
@@ -300,6 +331,10 @@ export function useAppointments(
           }),
         });
 
+        if (await recoverFromConflict(response, currentDate)) {
+          return { success: false };
+        }
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => null);
           if (errorData && errorData.error) {
@@ -323,7 +358,7 @@ export function useAppointments(
         setLoading(false);
       }
     },
-    [loadAppointments]
+    [loadAppointments, recoverFromConflict]
   );
 
   /**

@@ -273,6 +273,19 @@ router.post(
       });
     } catch (error) {
       log.error('Error updating appointment state:', error);
+
+      // State-machine rejection from the UpdatePresent proc — the caller's view
+      // of the appointment was stale (typical cause: missed WebSocket update).
+      const err = error as Error;
+      if (err.message && err.message.includes('[INVALID_STATE_TRANSITION]')) {
+        ErrorResponses.badRequest(res, err.message, {
+          code: 'INVALID_STATE_TRANSITION',
+          appointmentID: req.body.appointmentID,
+          attempted: req.body.state
+        });
+        return;
+      }
+
       ErrorResponses.internalError(
         res,
         'Failed to update appointment state',
