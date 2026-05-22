@@ -21,7 +21,7 @@ import {
   updatePresent,
   undoAppointmentState
 } from '../../services/database/queries/appointment-queries.js';
-import { WebSocketEvents } from '../../services/messaging/websocket-events.js';
+import { InternalEmitterEvents } from '../../services/messaging/websocket-events.js';
 import { ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 import {
@@ -145,7 +145,7 @@ router.get(
 
     // Emit universal event only
     if (wsEmitter) {
-      wsEmitter.emit(WebSocketEvents.DATA_UPDATED, PDate);
+      wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, PDate);
     }
   }
 );
@@ -262,7 +262,7 @@ router.post(
 
       if (wsEmitter) {
         log.info(`Broadcasting state change for appointment ${appointmentID}`);
-        wsEmitter.emit(WebSocketEvents.DATA_UPDATED, appointmentDate);
+        wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, appointmentDate);
       }
 
       res.json({
@@ -313,7 +313,7 @@ router.post(
       const appointmentDate = `${year}-${month}-${day}`;
 
       if (wsEmitter) {
-        wsEmitter.emit(WebSocketEvents.DATA_UPDATED, appointmentDate);
+        wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, appointmentDate);
       }
 
       res.json(result);
@@ -386,7 +386,7 @@ router.post(
           const day = String(appointmentDate.getDate()).padStart(2, '0');
           appointmentDay = `${year}-${month}-${day}`;
         }
-        wsEmitter.emit(WebSocketEvents.DATA_UPDATED, appointmentDay);
+        wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, appointmentDay);
       }
 
       res.json({
@@ -668,7 +668,7 @@ router.post(
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const day = String(now.getDate()).padStart(2, '0');
         const todayDateOnly = `${year}-${month}-${day}`;
-        wsEmitter.emit(WebSocketEvents.DATA_UPDATED, todayDateOnly);
+        wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, todayDateOnly);
       }
 
       res.json(result);

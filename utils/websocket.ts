@@ -9,7 +9,7 @@ import { getLatestVisitsSum } from '../services/database/queries/visit-queries.j
 import { getActiveWork } from '../services/database/queries/work-queries.js';
 import { getPatientById } from '../services/database/queries/patient-queries.js';
 import { createWebSocketMessage, validateWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
-import { WebSocketEvents, createStandardMessage } from '../services/messaging/websocket-events.js';
+import { WebSocketEvents, InternalEmitterEvents, createStandardMessage } from '../services/messaging/websocket-events.js';
 import { logger } from '../services/core/Logger.js';
 import stateEvents from '../services/state/stateEvents.js';
 import qrcode from 'qrcode';
@@ -24,6 +24,11 @@ const CHAIR_DISPLAY_INTRAORAL_EXTS = ['.i20', '.i22', '.i21'] as const;
 // blip. Lost on server restart by design — staff one-click restores via the
 // next patient-loaded POST.
 const chairCurrentPatient = new Map<string, { personId: number; loadedAt: number }>();
+
+// Drop stale replay entries on read instead of running a sweep timer.
+// 12 h covers a workday + buffer; staff arriving the next morning will not
+// see yesterday's patient.
+const CHAIR_PATIENT_REPLAY_TTL_MS = 12 * 60 * 60 * 1000;
 
 // ===========================================
 // TYPES
@@ -61,8 +66,6 @@ interface ClientCapabilities {
 interface ExtendedWebSocket extends WebSocket {
   qrViewerRegistered: boolean;
   viewerId: string;
-  waDate?: string | null;
-  isWaClient?: boolean;
   isAlive?: boolean;
 }
 
@@ -92,11 +95,6 @@ interface PatientImage {
   name: string;
 }
 
-/**
- * Filter function for broadcast operations
- */
-type BroadcastFilter = (ws: ExtendedWebSocket, capabilities: ClientCapabilities | undefined) => boolean;
-
 // ===========================================
 // CONNECTION MANAGER
 // ===========================================
@@ -120,6 +118,11 @@ class ConnectionManager {
   }
 
   registerConnection(ws: ExtendedWebSocket, type: ConnectionType, metadata: ConnectionMetadata = {}): void {
+    // Every new socket enters as 'generic' and joins allConnections only.
+    // Type-specific Set/Map membership is established later via the
+    // REGISTER_CLIENT_TYPE message — this collapses the dual registration
+    // paths (URL params + REGISTER) into one and removes the silent broadcast
+    // loss after auto-reconnect (where URL params were dropped).
     this.allConnections.add(ws);
     this.clientCapabilities.set(ws, {
       type,
@@ -128,28 +131,6 @@ class ConnectionManager {
       supportsPing: true,
       lastActivity: Date.now()
     });
-
-    if (type === 'chair-display' && metadata.chairId) {
-      // If a prior WS is registered for the same chairId (e.g. the kiosk
-      // reconnected before the previous socket's close event fired), close
-      // it explicitly so its eventual close handler doesn't unregister the
-      // new entry. See unregisterConnection below for the identity guard.
-      const prev = this.chairDisplayConnections.get(metadata.chairId);
-      if (prev && prev !== ws) {
-        try { prev.close(1000, 'Replaced by new chair-display connection'); } catch { /* ignore */ }
-      }
-      this.chairDisplayConnections.set(metadata.chairId, ws);
-      logger.websocket.debug('Registered chair-display connection', { chairId: metadata.chairId });
-    } else if (type === 'waStatus') {
-      this.waStatusConnections.add(ws);
-      logger.websocket.debug('Registered WhatsApp status connection');
-    } else if (type === 'auth') {
-      this.waStatusConnections.add(ws);
-      logger.websocket.debug('Registered auth connection (QR enabled)');
-    } else if (type === 'daily-appointments') {
-      this.dailyAppointmentsConnections.add(ws);
-      logger.websocket.debug('Registered daily appointments connection');
-    }
   }
 
   unregisterConnection(ws: ExtendedWebSocket): void {
@@ -182,12 +163,10 @@ class ConnectionManager {
     }
   }
 
-  broadcastToWaStatus(message: unknown, filter: BroadcastFilter | null = null): number {
+  broadcastToWaStatus(message: unknown): number {
     let sentCount = 0;
     for (const ws of this.waStatusConnections) {
       if (ws.readyState !== WebSocket.OPEN) continue;
-      if (filter && !filter(ws, this.clientCapabilities.get(ws))) continue;
-
       try {
         this.sendToClient(ws, message);
         sentCount++;
@@ -198,13 +177,10 @@ class ConnectionManager {
     return sentCount;
   }
 
-  broadcastToDailyAppointments(message: unknown, filter: BroadcastFilter | null = null): number {
+  broadcastToDailyAppointments(message: unknown): number {
     let sentCount = 0;
     for (const ws of this.dailyAppointmentsConnections) {
       if (ws.readyState !== WebSocket.OPEN) continue;
-      const capabilities = this.clientCapabilities.get(ws);
-      if (filter && !filter(ws, capabilities)) continue;
-
       try {
         this.sendToClient(ws, message);
         sentCount++;
@@ -215,13 +191,10 @@ class ConnectionManager {
     return sentCount;
   }
 
-  broadcastToAll(message: unknown, filter: BroadcastFilter | null = null): number {
+  broadcastToAll(message: unknown): number {
     let sentCount = 0;
     for (const ws of this.allConnections) {
       if (ws.readyState !== WebSocket.OPEN) continue;
-      const capabilities = this.clientCapabilities.get(ws);
-      if (filter && !filter(ws, capabilities)) continue;
-
       try {
         this.sendToClient(ws, message);
         sentCount++;
@@ -346,169 +319,66 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
   // Set up cleanup interval
   setupPeriodicCleanup(connectionManager);
 
-  // Handle new connections
+  // Handle new connections. The upgrade URL carries no parameters — every
+  // connection enters as 'generic' and is promoted to its specific
+  // type(s) only after the client sends REGISTER_CLIENT_TYPE messages.
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     const extWs = ws as ExtendedWebSocket;
-    logger.websocket.debug('Client connected');
     extWs.qrViewerRegistered = false;
     extWs.isAlive = true;
+    const clientIP = req.socket.remoteAddress || 'unknown';
+    extWs.viewerId = `${clientIP}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     extWs.on('pong', () => { extWs.isAlive = true; });
 
-    try {
-      const url = new URL(req.url || '', 'http://localhost');
-      const date = url.searchParams.get('PDate');
-      const clientTypeParam = url.searchParams.get('clientType');
-      const clientTypes = clientTypeParam ? clientTypeParam.split(',').map(t => t.trim()) : [];
-      const clientIP = req.socket.remoteAddress || 'unknown';
-      const viewerId = `${clientIP}-${clientTypes.join('-')}-${date || 'unknown'}-${Date.now()}`;
+    logger.websocket.debug('Client connected', { viewerId: extWs.viewerId });
 
-      extWs.viewerId = viewerId;
-      extWs.qrViewerRegistered = false;
-      logger.websocket.debug('New connection', { date, clientTypes });
+    connectionManager.registerConnection(extWs, 'generic', { ipAddress: clientIP });
 
-      const needsQR = url.searchParams.get('needsQR') === 'true';
-
-      // Register for each client type
-      for (const clientType of clientTypes) {
-        if (clientType === 'waStatus') {
-          logger.websocket.debug('Registering WhatsApp status client');
-          connectionManager.registerConnection(extWs, 'waStatus', {
-            date: date,
-            ipAddress: req.socket.remoteAddress,
-            viewerId: viewerId
-          });
-
-          if (needsQR && messageState && typeof messageState.registerQRViewer === 'function' && !extWs.qrViewerRegistered) {
-            messageState.registerQRViewer(viewerId);
-            extWs.qrViewerRegistered = true;
-            logger.websocket.debug('QR viewer registered', { viewerId });
-          }
-
-          extWs.waDate = date;
-          extWs.isWaClient = true;
-
-        } else if (clientType === 'auth') {
-          logger.websocket.debug('Registering authentication client');
-          connectionManager.registerConnection(extWs, 'auth', {
-            ipAddress: req.socket.remoteAddress,
-            viewerId: viewerId
-          });
-
-          if (needsQR && messageState && typeof messageState.registerQRViewer === 'function' && !extWs.qrViewerRegistered) {
-            messageState.registerQRViewer(viewerId);
-            extWs.qrViewerRegistered = true;
-            logger.websocket.debug('QR viewer registered for auth client', { viewerId });
-          }
-
-        } else if (clientType === 'daily-appointments') {
-          // Daily-appointments is today-only by design (see useWebSocketSync.ts).
-          // No metadata.date is stored — broadcasts go to every registered
-          // client, and the client-side filter rejects stray non-today payloads.
-          logger.websocket.debug('Registering daily appointments client');
-          connectionManager.registerConnection(extWs, 'daily-appointments', {
-            ipAddress: req.socket.remoteAddress
-          });
-
-        } else if (clientType === 'chair-display') {
-          const chairIdParam = url.searchParams.get('chairId');
-          if (!chairIdParam || !/^([1-9]|10)$/.test(chairIdParam)) {
-            logger.websocket.warn('Rejecting chair-display connection: invalid chairId', { chairIdParam });
-            extWs.close(1008, 'Invalid chairId');
-            return;
-          }
-          logger.websocket.debug('Registering chair-display client', { chairId: chairIdParam });
-          connectionManager.registerConnection(extWs, 'chair-display', {
-            chairId: chairIdParam,
-            ipAddress: req.socket.remoteAddress
-          });
-
-          // Replay current patient (if any) so a kiosk reconnect restores
-          // without manual reload. Reuses the existing patient-loaded handler
-          // for all payload assembly (images, latest visit, patient name).
-          const stored = chairCurrentPatient.get(chairIdParam);
-          if (stored) {
-            logger.websocket.debug('Replaying patient-loaded on chair-display reconnect', {
-              chairId: chairIdParam,
-              personId: stored.personId,
-            });
-            wsEmitter.emit(
-              WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,
-              String(stored.personId),
-              chairIdParam
-            );
-          }
+    extWs.on('message', async (message: RawData) => {
+      try {
+        const capabilities = connectionManager.clientCapabilities.get(extWs);
+        if (capabilities) {
+          capabilities.lastActivity = Date.now();
         }
-      }
 
-      if (clientTypes.length === 0) {
-        logger.websocket.debug('Generic client connected');
-        connectionManager.registerConnection(extWs, 'generic', {
-          ipAddress: req.socket.remoteAddress
-        });
-      }
-
-      // Daily-appointments initial data comes from the route loader (REST),
-      // not over the WebSocket — no WS initial payload needed.
-
-      // Handle messages
-      extWs.on('message', async (message: RawData) => {
+        let parsedMessage: TypedMessage | string;
+        const messageStr = message.toString();
         try {
-          const capabilities = connectionManager.clientCapabilities.get(extWs);
-          if (capabilities) {
-            capabilities.lastActivity = Date.now();
-          }
-
-          let parsedMessage: TypedMessage | string;
-          const messageStr = message.toString();
-
-          try {
-            parsedMessage = JSON.parse(messageStr) as TypedMessage;
-          } catch {
-            parsedMessage = messageStr;
-          }
-
-          logger.websocket.debug('Received message', {
-            messageType: typeof parsedMessage
-          });
-
-          if (typeof parsedMessage === 'object' && parsedMessage.type) {
-            handleTypedMessage(extWs, parsedMessage, date, connectionManager);
-          }
-        } catch (msgError) {
-          logger.websocket.error('Error processing message', msgError as Error);
-        }
-      });
-
-      // Handle errors
-      extWs.on('error', (error: Error) => {
-        logger.websocket.error('WebSocket error', error);
-
-        const capabilities = connectionManager.clientCapabilities.get(extWs);
-        if (capabilities && (capabilities.type === 'waStatus' || capabilities.type === 'auth') && extWs.qrViewerRegistered) {
-          if (messageState && typeof messageState.unregisterQRViewer === 'function') {
-            messageState.unregisterQRViewer(extWs.viewerId);
-          }
+          parsedMessage = JSON.parse(messageStr) as TypedMessage;
+        } catch {
+          parsedMessage = messageStr;
         }
 
-        connectionManager.unregisterConnection(extWs);
-      });
-
-      extWs.on('close', (code: number, reason: Buffer) => {
-        const capabilities = connectionManager.clientCapabilities.get(extWs);
-        if (capabilities && (capabilities.type === 'waStatus' || capabilities.type === 'auth') && extWs.qrViewerRegistered) {
-          if (messageState && typeof messageState.unregisterQRViewer === 'function') {
-            messageState.unregisterQRViewer(extWs.viewerId);
-            logger.websocket.debug('Unregistered QR viewer on connection close', { viewerId: extWs.viewerId });
-          }
+        if (typeof parsedMessage === 'object' && parsedMessage.type) {
+          handleTypedMessage(extWs, parsedMessage, connectionManager);
         }
+      } catch (msgError) {
+        logger.websocket.error('Error processing message', msgError as Error);
+      }
+    });
 
-        connectionManager.unregisterConnection(extWs);
-        logger.websocket.debug('Client disconnected', { code, reason: reason.toString() || 'unknown' });
+    const handleSocketGone = (code: number | null, reason: Buffer | null) => {
+      // QR viewer cleanup is gated purely on the qrViewerRegistered flag —
+      // no need to consult capabilities.type, which is just informational now.
+      if (extWs.qrViewerRegistered && messageState && typeof messageState.unregisterQRViewer === 'function') {
+        messageState.unregisterQRViewer(extWs.viewerId);
+        extWs.qrViewerRegistered = false;
+      }
+      connectionManager.unregisterConnection(extWs);
+      logger.websocket.debug('Client disconnected', {
+        code: code ?? 'n/a',
+        reason: reason?.toString() || 'unknown',
       });
+    };
 
-    } catch (error) {
-      logger.websocket.error('Error setting up WebSocket connection', error as Error);
-    }
+    extWs.on('error', (error: Error) => {
+      logger.websocket.error('WebSocket error', error);
+      handleSocketGone(null, null);
+    });
+
+    extWs.on('close', (code: number, reason: Buffer) => {
+      handleSocketGone(code, reason);
+    });
   });
 
 
@@ -518,7 +388,6 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
   async function handleTypedMessage(
     ws: ExtendedWebSocket,
     message: TypedMessage,
-    date: string | null,
     connectionManager: ConnectionManager
   ): Promise<void> {
     if (!message || typeof message !== 'object' || !message.type) {
@@ -533,49 +402,137 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
 
     // Handle different message types
     switch (message.type) {
-      case WebSocketEvents.HEARTBEAT_PING: {
-        const pongMessage = {
-          type: WebSocketEvents.HEARTBEAT_PONG,
-          timestamp: Date.now(),
-          originalId: message.id
-        };
-        connectionManager.sendToClient(ws, pongMessage);
-        break;
-      }
-
-      case WebSocketEvents.HEARTBEAT_PONG:
-        connectionManager.updateClientCapabilities(ws, { supportsPing: true });
-        break;
-
-      case WebSocketEvents.CLIENT_CAPABILITIES:
-        connectionManager.updateClientCapabilities(ws, (message.data?.capabilities as Partial<ClientCapabilities>) || {});
-        break;
-
       case WebSocketEvents.REQUEST_WHATSAPP_INITIAL_STATE:
         logger.websocket.debug('Received request for initial state via WebSocket');
         await sendInitialStateForWaClient(ws, message.data, connectionManager);
         break;
 
       case WebSocketEvents.REGISTER_CLIENT_TYPE: {
-        const clientType = message.data?.clientType as string | undefined;
-        if (clientType === 'waStatus') {
-          connectionManager.waStatusConnections.add(ws);
-          logger.websocket.debug('Registered waStatus via register_client_type');
-        } else if (clientType === 'daily-appointments') {
-          connectionManager.dailyAppointmentsConnections.add(ws);
-          logger.websocket.debug('Registered daily-appointments via register_client_type');
+        const data = (message.data || {}) as {
+          clientType?: string;
+          date?: string;
+          chairId?: string;
+        };
+        switch (data.clientType) {
+          case 'waStatus': {
+            connectionManager.waStatusConnections.add(ws);
+            const existing = connectionManager.clientCapabilities.get(ws);
+            connectionManager.updateClientCapabilities(ws, {
+              type: 'waStatus',
+              metadata: { ...(existing?.metadata ?? {}), date: data.date ?? null },
+            });
+            logger.websocket.debug('Registered waStatus', { date: data.date ?? null });
+            break;
+          }
+
+          case 'daily-appointments': {
+            connectionManager.dailyAppointmentsConnections.add(ws);
+            connectionManager.updateClientCapabilities(ws, { type: 'daily-appointments' });
+            logger.websocket.debug('Registered daily-appointments');
+            break;
+          }
+
+          case 'auth': {
+            connectionManager.waStatusConnections.add(ws);
+            connectionManager.updateClientCapabilities(ws, { type: 'auth' });
+            if (
+              messageState &&
+              typeof messageState.registerQRViewer === 'function' &&
+              !ws.qrViewerRegistered
+            ) {
+              messageState.registerQRViewer(ws.viewerId);
+              ws.qrViewerRegistered = true;
+              logger.websocket.debug('Registered auth (QR enabled)', { viewerId: ws.viewerId });
+            } else {
+              logger.websocket.debug('Registered auth (QR already registered)');
+            }
+            break;
+          }
+
+          case 'chair-display': {
+            if (!data.chairId || !/^([1-9]|10)$/.test(data.chairId)) {
+              logger.websocket.warn('Rejecting chair-display REGISTER: invalid chairId', { chairId: data.chairId });
+              try { ws.close(1008, 'Invalid chairId'); } catch { /* already gone */ }
+              break;
+            }
+
+            // If a prior socket is mapped to the same chairId (kiosk reconnected
+            // before the previous socket's close event fired), close it
+            // explicitly so its eventual close handler doesn't unregister us.
+            const prev = connectionManager.chairDisplayConnections.get(data.chairId);
+            if (prev && prev !== ws) {
+              try { prev.close(1000, 'Replaced by new chair-display connection'); } catch { /* ignore */ }
+            }
+
+            connectionManager.chairDisplayConnections.set(data.chairId, ws);
+            connectionManager.updateClientCapabilities(ws, {
+              type: 'chair-display',
+              metadata: { chairId: data.chairId },
+            });
+            logger.websocket.debug('Registered chair-display', { chairId: data.chairId });
+
+            // Replay current patient if recorded and not stale.
+            const stored = chairCurrentPatient.get(data.chairId);
+            if (stored && Date.now() - stored.loadedAt < CHAIR_PATIENT_REPLAY_TTL_MS) {
+              logger.websocket.debug('Replaying patient-loaded on chair-display REGISTER', {
+                chairId: data.chairId,
+                personId: stored.personId,
+              });
+              wsEmitter.emit(
+                WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,
+                String(stored.personId),
+                data.chairId,
+              );
+            } else if (stored) {
+              chairCurrentPatient.delete(data.chairId);
+            }
+            break;
+          }
+
+          default:
+            logger.websocket.warn('REGISTER_CLIENT_TYPE: unknown clientType', { clientType: data.clientType });
         }
         break;
       }
 
       case WebSocketEvents.UNREGISTER_CLIENT_TYPE: {
-        const clientType = message.data?.clientType as string | undefined;
-        if (clientType === 'waStatus') {
-          connectionManager.waStatusConnections.delete(ws);
-          logger.websocket.debug('Unregistered waStatus via unregister_client_type');
-        } else if (clientType === 'daily-appointments') {
-          connectionManager.dailyAppointmentsConnections.delete(ws);
-          logger.websocket.debug('Unregistered daily-appointments via unregister_client_type');
+        const data = (message.data || {}) as { clientType?: string };
+        switch (data.clientType) {
+          case 'waStatus':
+            connectionManager.waStatusConnections.delete(ws);
+            logger.websocket.debug('Unregistered waStatus');
+            break;
+
+          case 'daily-appointments':
+            connectionManager.dailyAppointmentsConnections.delete(ws);
+            logger.websocket.debug('Unregistered daily-appointments');
+            break;
+
+          case 'auth':
+            connectionManager.waStatusConnections.delete(ws);
+            if (ws.qrViewerRegistered && messageState && typeof messageState.unregisterQRViewer === 'function') {
+              messageState.unregisterQRViewer(ws.viewerId);
+              ws.qrViewerRegistered = false;
+            }
+            logger.websocket.debug('Unregistered auth');
+            break;
+
+          case 'chair-display': {
+            // Locate by value — UNREGISTER doesn't carry chairId. unregisterConnection
+            // does the same scan so we delegate; but UNREGISTER intentionally doesn't
+            // tear down the whole socket — just removes the chair-display Map entry.
+            for (const [chairId, mapped] of connectionManager.chairDisplayConnections) {
+              if (mapped === ws) {
+                connectionManager.chairDisplayConnections.delete(chairId);
+                break;
+              }
+            }
+            logger.websocket.debug('Unregistered chair-display');
+            break;
+          }
+
+          default:
+            logger.websocket.warn('UNREGISTER_CLIENT_TYPE: unknown clientType', { clientType: data.clientType });
         }
         break;
       }
@@ -709,7 +666,7 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
     }
   };
 
-  emitter.on(WebSocketEvents.DATA_UPDATED, handleAppointmentUpdate);
+  emitter.on(InternalEmitterEvents.DATA_UPDATED, handleAppointmentUpdate);
 
   // Chair-display: patient loaded
   const handleChairDisplayPatientLoaded = async (pid: string, targetChairId: string): Promise<void> => {
@@ -820,47 +777,9 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
 
   emitter.on(WebSocketEvents.CHAIR_DISPLAY_PATIENT_CLEARED, handleChairDisplayPatientCleared);
 
-  // WhatsApp message updates with batching
-  const statusUpdateBuffer = new Map<string, Array<{ messageId: string; status: string }>>();
-  const BATCH_DELAY = 1000;
-
-  emitter.on('wa_message_update', (messageId: string, status: string, date: string) => {
-    logger.websocket.debug('WhatsApp message update', { messageId, status, date });
-
-    if (!statusUpdateBuffer.has(date)) {
-      statusUpdateBuffer.set(date, []);
-    }
-
-    statusUpdateBuffer.get(date)!.push({ messageId, status });
-
-    setTimeout(() => {
-      const updates = statusUpdateBuffer.get(date);
-      if (updates && updates.length > 0) {
-        const message = createWebSocketMessage(
-          MessageSchemas.WebSocketMessage.BATCH_STATUS,
-          {
-            statusUpdates: updates,
-            date
-          }
-        );
-
-        const dateFilter: BroadcastFilter = (_ws, capabilities) => {
-          if (!date) return true;
-          return capabilities !== undefined &&
-                 capabilities.metadata !== undefined &&
-                 capabilities.metadata.date === date;
-        };
-
-        const updateCount = connectionManager.broadcastToWaStatus(message, dateFilter);
-        logger.websocket.info('Broadcast batched WhatsApp updates', { updateCount });
-
-        statusUpdateBuffer.delete(date);
-      }
-    }, BATCH_DELAY);
-  });
-
-  // Broadcast messages
-  emitter.on('broadcast_message', (message: { type: string }) => {
+  // Route pre-formed broadcast messages emitted by routes/services to the
+  // appropriate connection-set fan-out based on the message's `type`.
+  emitter.on(InternalEmitterEvents.BROADCAST_MESSAGE, (message: { type: string }) => {
     const validation = validateWebSocketMessage(message);
     if (!validation.valid) {
       logger.websocket.warn('Invalid message format', { error: validation.error });

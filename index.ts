@@ -31,6 +31,7 @@ import SQLiteStore from 'connect-sqlite3';
 import driveClient from './services/google-drive/google-drive-client.js';
 import messageState from './services/state/messageState.js';
 import { createWebSocketMessage, MessageSchemas } from './services/messaging/schemas.js';
+import { InternalEmitterEvents } from './services/messaging/websocket-events.js';
 import { EventEmitter } from 'events';
 
 // ===== ADDED: Import new infrastructure components =====
@@ -311,7 +312,7 @@ async function initializeApplication(): Promise<AppInitResult> {
                         appointmentId: person.appointmentId
                     }
                 );
-                wsEmitter.emit('broadcast_message', message);
+                wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
 
                 // Also emit progress update using proper message creation
                 const stats = messageState.dump();
@@ -323,7 +324,7 @@ async function initializeApplication(): Promise<AppInitResult> {
                         finished: stats.finishedSending
                     }
                 );
-                wsEmitter.emit('broadcast_message', progressMessage);
+                wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, progressMessage);
             }
 
             log.info("MessageSent processed successfully");
@@ -353,7 +354,7 @@ async function initializeApplication(): Promise<AppInitResult> {
                         appointmentId: person.appointmentId
                     }
                 );
-                wsEmitter.emit('broadcast_message', message);
+                wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
 
                 // Also emit progress update using proper message creation
                 const stats = messageState.dump();
@@ -365,7 +366,7 @@ async function initializeApplication(): Promise<AppInitResult> {
                         finished: stats.finishedSending
                     }
                 );
-                wsEmitter.emit('broadcast_message', progressMessage);
+                wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, progressMessage);
             }
 
             log.info("MessageFailed processed successfully");
@@ -391,7 +392,7 @@ async function initializeApplication(): Promise<AppInitResult> {
                         total: stats.sentMessages + stats.failedMessages
                     }
                 );
-                wsEmitter.emit('broadcast_message', message);
+                wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
             }
         } catch (error) {
             log.error("Error handling finishedSending event:", { error });
@@ -409,7 +410,7 @@ async function initializeApplication(): Promise<AppInitResult> {
                     MessageSchemas.WebSocketMessage.CLIENT_READY,
                     { clientReady: true }
                 );
-                wsEmitter.emit('broadcast_message', message);
+                wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
             }
 
             log.info("✅ WhatsApp client is ready and state updated");
@@ -429,7 +430,7 @@ async function initializeApplication(): Promise<AppInitResult> {
                     MessageSchemas.WebSocketMessage.QR_UPDATE,
                     { qr, clientReady: false }
                 );
-                wsEmitter.emit('broadcast_message', message);
+                wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
             }
         } catch (error) {
             log.error("Error handling QR event:", { error });

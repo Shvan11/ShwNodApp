@@ -80,7 +80,6 @@ export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketR
   );
 
   const wsRef = useRef<WebSocketService | null>(null);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentDateRef = useRef(currentDate);
   const lastRequestedDateRef = useRef<string | null>(null);
 
@@ -126,9 +125,10 @@ export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketR
     try {
       console.log('[useWhatsAppWebSocket] Setting up WebSocket connection');
 
-      // Use connection manager to ensure single connection
+      // Use connection manager to ensure single connection. Date goes in the
+      // REGISTER payload so the server can target date-scoped broadcasts.
       await connectionManager.ensureConnected('waStatus', {
-        PDate: currentDate,
+        date: currentDate,
       });
 
       console.log('[useWhatsAppWebSocket] WebSocket connected via connection manager');
@@ -241,7 +241,6 @@ export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketR
   // Setup WebSocket on mount (only once)
   useEffect(() => {
     let cleanup: (() => void) | undefined;
-    const reconnectTimer = reconnectTimerRef;
     const lastRequestedDate = lastRequestedDateRef;
 
     setupWebSocket()
@@ -254,15 +253,8 @@ export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketR
       });
 
     return () => {
-      console.log('[useWhatsAppWebSocket] Cleanup - removing event listeners');
       if (cleanup) cleanup();
-      // Remove our client type from connection manager
       connectionManager.removeClientType('waStatus');
-      // Clear any reconnect timers
-      if (reconnectTimer.current) {
-        clearTimeout(reconnectTimer.current);
-      }
-      // Reset last requested date
       lastRequestedDate.current = null;
     };
   }, [setupWebSocket]);

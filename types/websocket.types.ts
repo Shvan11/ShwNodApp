@@ -41,46 +41,6 @@ export interface WebSocketMessage<T = unknown> {
 }
 
 // ===========================================
-// EVENT TYPES
-// ===========================================
-
-/**
- * WebSocket event names (mirrors websocket-events.js)
- */
-export const WebSocketEvents = {
-  // Connection & Lifecycle
-  CONNECTION_ESTABLISHED: 'connection_established',
-  CONNECTION_LOST: 'connection_lost',
-  CONNECTION_ERROR: 'connection_error',
-  CONNECTION_RECONNECTING: 'connection_reconnecting',
-  HEARTBEAT_PING: 'heartbeat_ping',
-  HEARTBEAT_PONG: 'heartbeat_pong',
-
-  // Appointment System
-  APPOINTMENTS_UPDATED: 'appointments_updated',
-
-  // Chair-side public display
-  CHAIR_DISPLAY_PATIENT_LOADED: 'chair_display_patient_loaded',
-  CHAIR_DISPLAY_PATIENT_CLEARED: 'chair_display_patient_cleared',
-
-  // WhatsApp Messaging
-  WHATSAPP_CLIENT_READY: 'whatsapp_client_ready',
-  WHATSAPP_CLIENT_INITIALIZING: 'whatsapp_client_initializing',
-  WHATSAPP_CLIENT_DISCONNECTED: 'whatsapp_client_disconnected',
-  WHATSAPP_SESSION_RESTORING: 'whatsapp_session_restoring',
-  WHATSAPP_QR_UPDATED: 'whatsapp_qr_updated',
-  WHATSAPP_MESSAGE_STATUS: 'whatsapp_message_status',
-  WHATSAPP_BATCH_STATUS: 'whatsapp_batch_status',
-  WHATSAPP_SESSION_STATUS: 'whatsapp_session_status',
-
-  // System Events
-  SYSTEM_NOTIFICATION: 'system_notification',
-  ERROR: 'error',
-} as const;
-
-export type WebSocketEventName = typeof WebSocketEvents[keyof typeof WebSocketEvents];
-
-// ===========================================
 // EVENT DATA TYPES
 // ===========================================
 

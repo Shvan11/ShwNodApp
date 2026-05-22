@@ -27,8 +27,6 @@ export const WebSocketMessageTypes = {
   MESSAGE_STATUS: WebSocketEvents.WHATSAPP_MESSAGE_STATUS,
   BATCH_STATUS: WebSocketEvents.WHATSAPP_MESSAGE_BATCH_STATUS,
   ERROR: WebSocketEvents.SYSTEM_ERROR,
-  PING: WebSocketEvents.HEARTBEAT_PING,
-  PONG: WebSocketEvents.HEARTBEAT_PONG,
 } as const;
 
 export type WebSocketMessageType = (typeof WebSocketMessageTypes)[keyof typeof WebSocketMessageTypes];
@@ -128,18 +126,6 @@ export function validateWebSocketMessage(message: unknown): ValidationResult {
 
   if (!validTypes.includes(msg.type as string)) {
     return { valid: false, error: `Unknown message type: ${msg.type}` };
-  }
-
-  // Allow messages without data field for simple ping/pong and other control messages
-  const simpleMessageTypes = [
-    WebSocketEvents.HEARTBEAT_PING,
-    WebSocketEvents.HEARTBEAT_PONG,
-    'heartbeat',
-  ];
-
-  if (simpleMessageTypes.includes(msg.type as string)) {
-    // Simple messages don't require data or timestamp
-    return { valid: true };
   }
 
   // For other message types, require data but make timestamp optional

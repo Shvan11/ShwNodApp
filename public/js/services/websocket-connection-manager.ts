@@ -1,154 +1,81 @@
 /**
  * WebSocket Connection Manager
  *
- * Coordinates WebSocket connections across multiple components to prevent
- * connection thrashing and race conditions.
+ * Multiplexes a single shared WebSocket across multiple feature hooks
+ * (`useWebSocketSync`, `useWhatsAppWebSocket`, `useWhatsAppAuth`).
  *
- * Key Features:
- * - Single connection shared across all components
- * - Prevents duplicate connection attempts
- * - Tracks which client types need the connection
- * - Graceful handling of connection failures
+ * All client-type registration goes through `REGISTER_CLIENT_TYPE` /
+ * `UNREGISTER_CLIENT_TYPE` messages — never URL params — so every reconnect
+ * carries the same registration state without relying on a fragile URL
+ * round-trip that auto-reconnect would have dropped.
  */
 
-import wsService, { WebSocketService } from './websocket';
+import wsService, { type WebSocketService } from './websocket';
 import { WebSocketEvents } from '../constants/websocket-events';
 
 const DEBUG = false;
 
-export interface ConnectionOptions {
-  PDate?: string;
-  clientType?: string;
-  [key: string]: string | number | boolean | undefined;
-}
-
-export interface ConnectionStatus {
-  isConnected: boolean;
-  isConnecting: boolean;
-  status: string;
-  clientTypes: string[];
-  hasActiveConnection: boolean;
-}
+export type ClientTypeOptions = Record<string, unknown>;
 
 class WebSocketConnectionManager {
-  private connectionPromise: Promise<WebSocketService> | null = null;
-  private clientTypes: Set<string> = new Set();
-  private isConnecting = false;
-  private lastConnectionAttempt: number | null = null;
-  private readonly CONNECTION_DEBOUNCE_MS = 100;
+  /**
+   * The source of truth for what this tab is subscribed to. Keyed by
+   * clientType, value is the options last passed by the hook (e.g. `{ date }`
+   * for `'waStatus'`). The `'connected'` handler iterates this map on every
+   * (re)connect and re-issues REGISTER for each entry.
+   */
+  private clientTypes = new Map<string, ClientTypeOptions>();
 
   constructor() {
-    // Initialize
+    // Single source of registration: every successful (re)connect re-issues
+    // REGISTER for each tracked type with its options. Server REGISTER is
+    // idempotent (Set.add, qrViewerRegistered guard) so duplicates are safe.
+    wsService.on('connected', () => {
+      for (const [clientType, options] of this.clientTypes) {
+        this.sendRegister(clientType, options);
+      }
+    });
   }
 
   /**
-   * Ensure WebSocket is connected
-   * @param clientType - Type of client requesting connection
-   * @param options - Additional connection options
-   * @returns Connected WebSocket service
+   * Ensure the shared socket is open and this clientType is registered.
+   * Safe to call repeatedly; subsequent calls update the stored options and
+   * re-issue REGISTER (server-side idempotent).
    */
   async ensureConnected(
     clientType: string,
-    options: ConnectionOptions = {}
+    options: ClientTypeOptions = {}
   ): Promise<WebSocketService> {
-    // Detect whether this is a genuinely new type before adding to the Set.
-    const isNew = !this.clientTypes.has(clientType);
-    this.clientTypes.add(clientType);
+    this.clientTypes.set(clientType, options);
+    if (DEBUG) console.log('[ConnectionManager] ensureConnected', { clientType, options });
 
-    if (DEBUG) console.log(`[ConnectionManager] Connection requested by ${clientType}`);
-    if (DEBUG) console.log(`[ConnectionManager] Active client types:`, Array.from(this.clientTypes));
-
-    // If already connected, inform the server about the newly added type so its
-    // broadcast filters include this socket going forward.
     if (wsService.isConnected) {
-      if (isNew) {
-        wsService
-          .send(
-            { type: WebSocketEvents.REGISTER_CLIENT_TYPE, data: { clientType } },
-            { queueIfDisconnected: false }
-          )
-          .catch(() => { /* fire-and-forget; server resync on reconnect */ });
-      }
-      if (DEBUG) console.log(`[ConnectionManager] Already connected - returning existing connection`);
+      // Send REGISTER immediately — handles the "already connected, new type
+      // mounted" case without waiting for a (re)connect cycle.
+      this.sendRegister(clientType, options);
       return wsService;
     }
 
-    // If connection in progress, wait for it
-    if (this.connectionPromise) {
-      if (DEBUG) console.log(`[ConnectionManager] Connection in progress - waiting for completion`);
-      try {
-        await this.connectionPromise;
-        return wsService;
-      } catch {
-        // Connection failed, but we'll try again below
-        if (DEBUG) console.log(`[ConnectionManager] Previous connection attempt failed, retrying`);
-      }
-    }
-
-    // Check if we should debounce (multiple rapid requests)
-    const now = Date.now();
-    if (this.lastConnectionAttempt && now - this.lastConnectionAttempt < this.CONNECTION_DEBOUNCE_MS) {
-      if (DEBUG) console.log(`[ConnectionManager] Debouncing connection request`);
-      await new Promise((resolve) => setTimeout(resolve, this.CONNECTION_DEBOUNCE_MS));
-
-      // After debounce, check if connection was established
-      if (wsService.isConnected) {
-        return wsService;
-      }
-    }
-
-    // Start new connection
-    this.lastConnectionAttempt = now;
-    this.isConnecting = true;
-
-    if (DEBUG) console.log(
-      `[ConnectionManager] Starting new connection for client types:`,
-      Array.from(this.clientTypes)
-    );
-
-    // Build connection parameters
-    const connectionParams: ConnectionOptions = {
-      // Pass all client types as comma-separated string
-      clientType: Array.from(this.clientTypes).join(','),
-      timestamp: Date.now(),
-      ...options,
-    };
-
-    // Create connection promise
-    this.connectionPromise = wsService
-      .connect(connectionParams)
-      .then(() => {
-        if (DEBUG) console.log(`[ConnectionManager] Connection established successfully`);
-        this.isConnecting = false;
-        return wsService;
-      })
-      .catch((error: Error) => {
-        console.error('[ConnectionManager] Connection failed:', error);
-        this.isConnecting = false;
-        this.connectionPromise = null;
-        throw error;
-      });
-
-    try {
-      await this.connectionPromise;
+    if (wsService.status === 'connecting') {
+      // Auto-reconnect is already running; the 'connected' handler in the
+      // constructor will fire REGISTER for every tracked type once it lands.
+      await this.waitForNextConnected();
       return wsService;
-    } catch (error) {
-      this.connectionPromise = null;
-      throw error;
     }
+
+    // Truly disconnected, no connect in flight — kick one off.
+    await wsService.connect();
+    return wsService;
   }
 
   /**
-   * Remove a client type from the connection
-   * @param clientType - Type of client disconnecting
+   * Remove a clientType subscription. Sends UNREGISTER if connected; the
+   * socket stays open for any other types still mounted.
    */
   removeClientType(clientType: string): void {
-    this.clientTypes.delete(clientType);
-    if (DEBUG) console.log(`[ConnectionManager] Client type ${clientType} removed`);
-    if (DEBUG) console.log(`[ConnectionManager] Remaining client types:`, Array.from(this.clientTypes));
+    if (!this.clientTypes.delete(clientType)) return;
+    if (DEBUG) console.log('[ConnectionManager] removeClientType', { clientType });
 
-    // Inform the server so it removes this socket from the relevant broadcast
-    // Set. The socket stays open — other registered types may still be active.
     if (wsService.isConnected) {
       wsService
         .send(
@@ -160,39 +87,45 @@ class WebSocketConnectionManager {
   }
 
   /**
-   * Disconnect and reset
-   * Only call this on page unload or critical errors
+   * Tear down the shared connection (page unload / critical errors only).
    */
   disconnect(): void {
-    if (DEBUG) console.log('[ConnectionManager] Disconnecting WebSocket');
-    this.connectionPromise = null;
     this.clientTypes.clear();
-    this.isConnecting = false;
     wsService.disconnect();
   }
 
-  /**
-   * Get connection status
-   * @returns Connection status information
-   */
-  getStatus(): ConnectionStatus {
-    return {
-      isConnected: wsService.isConnected,
-      isConnecting: this.isConnecting,
-      status: wsService.status,
-      clientTypes: Array.from(this.clientTypes),
-      hasActiveConnection: this.connectionPromise !== null,
-    };
-  }
-
-  /**
-   * Get the WebSocket service instance
-   * @returns WebSocket service
-   */
+  /** Expose the underlying singleton for hooks that subscribe directly. */
   getService(): WebSocketService {
     return wsService;
   }
+
+  private sendRegister(clientType: string, options: ClientTypeOptions): void {
+    wsService
+      .send(
+        {
+          type: WebSocketEvents.REGISTER_CLIENT_TYPE,
+          data: { clientType, ...options },
+        },
+        { queueIfDisconnected: false }
+      )
+      .catch(() => { /* next 'connected' will retry */ });
+  }
+
+  private waitForNextConnected(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const cleanup = () => {
+        wsService.off('connected', onConnected);
+        wsService.off('error', onError);
+      };
+      const onConnected = () => { cleanup(); resolve(); };
+      const onError = (e: unknown) => {
+        cleanup();
+        reject(e instanceof Error ? e : new Error('WebSocket connection failed'));
+      };
+      wsService.once('connected', onConnected);
+      wsService.once('error', onError);
+    });
+  }
 }
 
-// Export singleton instance
 export default new WebSocketConnectionManager();

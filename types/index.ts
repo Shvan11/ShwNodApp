@@ -126,9 +126,6 @@ export type {
   // Message types
   WebSocketMessage,
 
-  // Event types
-  WebSocketEventName,
-
   // Event data types
   ConnectionEstablishedData,
   AppointmentUpdateData,
@@ -152,9 +149,6 @@ export type {
   WSClientInfo,
   BroadcastOptions,
 } from './websocket.types.js';
-
-// Re-export WebSocket event constants
-export { WebSocketEvents } from './websocket.types.js';
 
 // Config types
 export type {

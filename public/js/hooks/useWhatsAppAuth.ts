@@ -105,7 +105,6 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
 
   const wsRef = useRef<WebSocketService | null>(null);
   const qrRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Request initial state from server (using singleton service)
   const requestInitialState = useCallback(() => {
@@ -149,18 +148,18 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     }
   }, []);
 
-  // Handle session restoration progress
+  // Handle session restoration progress. Functional updater avoids capturing
+  // authState; the previous [authState] dep would never re-run setupWebSocket
+  // (which has empty deps and stores this handler in wsRef), so any captured
+  // authState was permanently stale anyway.
   const handleSessionRestorationProgress = useCallback(
     (data: SessionRestorationProgress) => {
-      console.log('Session restoration progress:', data);
       setSessionRestorationProgress(data);
-
-      // Update auth state to show we're checking session
-      if (authState !== AUTH_STATES.CHECKING_SESSION) {
-        setAuthState(AUTH_STATES.CHECKING_SESSION);
-      }
+      setAuthState((prev) =>
+        prev === AUTH_STATES.CHECKING_SESSION ? prev : AUTH_STATES.CHECKING_SESSION
+      );
     },
-    [authState]
+    []
   );
 
   // Handle initial state - now only manages authState, not qrCode/clientReady
@@ -248,11 +247,9 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     try {
       console.log('[useWhatsAppAuth] Setting up WebSocket connection');
 
-      // Use connection manager to ensure single connection
-      await connectionManager.ensureConnected('auth', {
-        needsQR: true,
-        timestamp: Date.now(),
-      });
+      // Auth always registers as a QR viewer server-side — no extra options
+      // needed in the REGISTER payload.
+      await connectionManager.ensureConnected('auth');
 
       console.log('[useWhatsAppAuth] WebSocket connected via connection manager');
 
@@ -443,7 +440,6 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   // Initialize WebSocket on mount (only once!)
   useEffect(() => {
     let cleanup: (() => void) | undefined;
-    const reconnectTimer = reconnectTimerRef;
 
     setupWebSocket()
       .then((cleanupFn) => {
@@ -456,17 +452,9 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
       });
 
     return () => {
-      console.log('[useWhatsAppAuth] Cleanup - removing event listeners');
       stopQRRefreshTimer();
-      if (cleanup) {
-        cleanup();
-      }
-      // Remove our client type from connection manager
+      if (cleanup) cleanup();
       connectionManager.removeClientType('auth');
-      // Clear reconnect timer
-      if (reconnectTimer.current) {
-        clearTimeout(reconnectTimer.current);
-      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty array = run only once on mount
