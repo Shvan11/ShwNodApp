@@ -158,26 +158,21 @@ export function useWebSocketSync(
   }, []);
 
   // Recovery trigger subscriptions. Mounted once per hook instance.
+  // Visibility/pageshow/offline are handled inside wsService — when those
+  // events force a reconnect, the resulting 'reconnected' event fires here.
   useEffect(() => {
     cancelledRef.current = false;
 
     const handleReconnected = () => triggerRecoveryFetch();
     const handleOnline = () => triggerRecoveryFetch();
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && wsService.getFreshness() === 'stale') {
-        triggerRecoveryFetch();
-      }
-    };
 
     wsService.on('reconnected', handleReconnected);
     window.addEventListener('online', handleOnline);
-    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       cancelledRef.current = true;
       wsService.off('reconnected', handleReconnected);
       window.removeEventListener('online', handleOnline);
-      document.removeEventListener('visibilitychange', handleVisibility);
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     };

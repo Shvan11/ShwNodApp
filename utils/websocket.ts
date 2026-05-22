@@ -247,12 +247,29 @@ class ConnectionManager {
         : String(message);
     }
 
-    ws.send(formattedMessage);
+    // Callback form so async write errors (ECONNRESET, EPIPE, clean proxy
+    // RSTs from Cloudflare Tunnel idle drops) clean up the dead socket within
+    // one heartbeat cycle instead of waiting up to 60s for the TCP ping sweep.
+    // Doesn't help with silent mobile NAT drops — those still need the TCP
+    // ping (no error packet ever arrives to trigger the callback).
+    ws.send(formattedMessage, (err) => {
+      if (err) this.handleSendError(ws, err);
+    });
 
     const fullCapabilities = this.clientCapabilities.get(ws);
     if (fullCapabilities) {
       fullCapabilities.lastActivity = Date.now();
     }
+  }
+
+  handleSendError(ws: ExtendedWebSocket, err: Error): void {
+    const capabilities = this.clientCapabilities.get(ws);
+    logger.websocket.warn('Send failed; dropping dead socket', {
+      error: err.message,
+      type: capabilities?.type,
+    });
+    this.unregisterConnection(ws);
+    try { ws.terminate(); } catch { /* already dead */ }
   }
 
   updateClientCapabilities(ws: ExtendedWebSocket, capabilities: Partial<ClientCapabilities>): void {

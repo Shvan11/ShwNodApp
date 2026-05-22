@@ -14,6 +14,14 @@ export type Freshness = 'fresh' | 'stale';
 const FRESHNESS_STALE_THRESHOLD_MS = 30_000;
 // Internal poll cadence for freshness transitions; throttled by browser when tab is hidden.
 const FRESHNESS_POLL_INTERVAL_MS = 5_000;
+// Force-close the socket when no message (including 15s server heartbeat) has
+// arrived in this window — survives one missed heartbeat plus jitter buffer.
+// Mirrors the chair-display kiosk pattern (KIOSK_STALE_THRESHOLD_MS).
+const LIVENESS_STALE_THRESHOLD_MS = 35_000;
+// On visibility-return, only force a reconnect if the tab was hidden longer
+// than this — short Alt-Tabs don't need disruption; NAT/tunnel idle drops
+// take minutes to manifest.
+const VISIBILITY_RESUME_THRESHOLD_MS = 2 * 60 * 1000;
 
 export interface WebSocketOptions {
   baseUrl?: string;
@@ -83,6 +91,9 @@ interface WebSocketState {
   // Last emitted freshness value, so we only emit freshness_changed on transitions.
   lastEmittedFreshness: Freshness;
   freshnessPollTimer: ReturnType<typeof setInterval> | null;
+  // performance.now() at the moment the tab became hidden, or null if visible.
+  // Drives the visibility-resume zombie check.
+  hiddenSinceMonotonic: number | null;
 }
 
 export class WebSocketService extends EventEmitter {
@@ -152,9 +163,8 @@ export class WebSocketService extends EventEmitter {
       lastMessageReceivedAtMonotonic: 0,
       lastEmittedFreshness: 'stale',
       freshnessPollTimer: null,
+      hiddenSinceMonotonic: null,
     };
-
-    this.startFreshnessPoll();
 
     // Bind methods to ensure correct 'this' context
     this.connect = this.connect.bind(this);
@@ -164,6 +174,19 @@ export class WebSocketService extends EventEmitter {
     this.onOpen = this.onOpen.bind(this);
     this.onClose = this.onClose.bind(this);
     this.onError = this.onError.bind(this);
+    this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
+    this.handlePageShow = this.handlePageShow.bind(this);
+    this.handleOffline = this.handleOffline.bind(this);
+
+    this.startFreshnessPoll();
+
+    // Browser lifecycle hooks: detect long-hidden returns, bfcache restores,
+    // and network drops so a zombie socket gets force-reconnected immediately
+    // instead of waiting for the next freshness-poll tick (which is throttled
+    // when the tab is hidden anyway).
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    window.addEventListener('pageshow', this.handlePageShow);
+    window.addEventListener('offline', this.handleOffline);
 
     // Auto-connect if specified
     if (this.options.autoConnect) {
@@ -714,9 +737,18 @@ export class WebSocketService extends EventEmitter {
   }
 
   /**
-   * Internal poll that emits freshness_changed on transitions. Browsers throttle
-   * setInterval in hidden tabs, but a hidden tab is stale by definition so
-   * polling fidelity there is irrelevant.
+   * Internal 5s poll. Two jobs in one tick (no overlapping intervals, no drift):
+   *
+   * 1. Emit `freshness_changed` on transitions so the indicator updates.
+   * 2. **Zombie-socket killer**: if the WS reports OPEN but no message
+   *    (including the 15s server heartbeat) has arrived in LIVENESS_STALE_THRESHOLD_MS,
+   *    force-close so the reconnect path runs. This is what catches silent
+   *    mobile NAT drops and Cloudflare Tunnel idle drops — the OS never gets
+   *    a FIN/RST, so `readyState` lies until we actively probe.
+   *
+   * Browsers throttle setInterval in hidden tabs, so this won't fire reliably
+   * while backgrounded — the `visibilitychange` / `pageshow` handlers are the
+   * safety net for the long-hidden case.
    */
   private startFreshnessPoll(): void {
     if (this.state.freshnessPollTimer) return;
@@ -726,6 +758,15 @@ export class WebSocketService extends EventEmitter {
         this.state.lastEmittedFreshness = current;
         this.emit('freshness_changed', { freshness: current });
       }
+
+      const last = this.state.lastMessageReceivedAtMonotonic;
+      if (
+        last > 0 &&
+        performance.now() - last > LIVENESS_STALE_THRESHOLD_MS &&
+        this.state.ws?.readyState === WebSocket.OPEN
+      ) {
+        this.forceReconnect('liveness timeout');
+      }
     }, FRESHNESS_POLL_INTERVAL_MS);
   }
 
@@ -734,6 +775,74 @@ export class WebSocketService extends EventEmitter {
       clearInterval(this.state.freshnessPollTimer);
       this.state.freshnessPollTimer = null;
     }
+  }
+
+  /**
+   * Defensively close the current socket and schedule a reconnect. Drives the
+   * reconnect itself rather than depending on `onClose` firing — bfcache
+   * restores leave the underlying descriptor dead, and `close()` on a torn-down
+   * socket can throw or silently no-op without ever delivering the close event.
+   */
+  private forceReconnect(reason: string): void {
+    this.log(`Force reconnect: ${reason}`);
+    const dead = this.state.ws;
+    this.state.ws = null;
+    if (dead) {
+      // Null listeners first so any delayed open/message/close/error events
+      // from the torn-down socket can't bleed into our state machine.
+      dead.onopen = null;
+      dead.onmessage = null;
+      dead.onclose = null;
+      dead.onerror = null;
+      try {
+        dead.close(1000, reason);
+      } catch {
+        /* descriptor may already be gone (bfcache) */
+      }
+    }
+    this.clearTimers();
+    this.state.status = 'disconnected';
+    this.markStale();
+    this.emit('disconnected', { code: 1000, reason, wasClean: true });
+    if (!this.state.forceClose && this.options.autoReconnect) {
+      this.scheduleReconnect();
+    }
+  }
+
+  private handleVisibilityChange(): void {
+    if (document.visibilityState === 'hidden') {
+      this.state.hiddenSinceMonotonic = performance.now();
+      return;
+    }
+    // Don't materialize a connection on visibility-resume if the app never
+    // opened one. hasConnectedBefore gates this on "we previously had a
+    // working connection that needs restoring".
+    if (!this.state.hasConnectedBefore) {
+      this.state.hiddenSinceMonotonic = null;
+      return;
+    }
+    const since = this.state.hiddenSinceMonotonic;
+    this.state.hiddenSinceMonotonic = null;
+    if (since !== null && performance.now() - since > VISIBILITY_RESUME_THRESHOLD_MS) {
+      this.forceReconnect('visibility resume');
+      return;
+    }
+    if (this.getFreshness() === 'stale') {
+      this.forceReconnect('visible while stale');
+    }
+  }
+
+  private handlePageShow(event: PageTransitionEvent): void {
+    if (event.persisted && this.state.hasConnectedBefore) {
+      // iOS Safari bfcache restore: the socket descriptor is torn down even
+      // though the JS WebSocket object still reports readyState === OPEN.
+      this.forceReconnect('pageshow bfcache');
+    }
+  }
+
+  private handleOffline(): void {
+    // Surface the gap immediately instead of waiting for the next 5s poll tick.
+    this.markStale();
   }
 
   /**
