@@ -10,6 +10,11 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import config from './config/config.js';
 import { setupWebSocketServer, teardownPeriodicCleanup } from './utils/websocket.js';
+import {
+  createAppointmentsSseRouter,
+  createChairDisplaySseRouter,
+  teardownSseBroadcaster,
+} from './services/messaging/sse-broadcaster.js';
 import { setupMiddleware } from './middleware/index.js';
 import apiRoutes from './routes/api/index.js';
 import webRoutes from './routes/web.js';
@@ -216,6 +221,13 @@ async function initializeApplication(): Promise<AppInitResult> {
     const { setWebSocketEmitter } = await import('./routes/api/index.js');
     setWebSocketEmitter(wsEmitter);
 
+    // Set up SSE broadcaster (consumes the same wsEmitter as the WS handler).
+    // Two distinct mounts: chair-display is public (kiosk has no session and
+    // matches the legacy WS posture); appointments is mounted after the auth
+    // middleware below so it inherits the /api gate.
+    log.info('📡 Setting up SSE broadcaster...');
+    app.use('/sse', createChairDisplaySseRouter(wsEmitter));
+
     // Use routes
     log.info('🛣️  Setting up routes...');
 
@@ -257,6 +269,9 @@ async function initializeApplication(): Promise<AppInitResult> {
     }
 
     // ===== MOUNT ROUTES (AFTER AUTHENTICATION) =====
+    // Appointments SSE — mounted under /api so it inherits the auth gate above.
+    app.use('/api/sse', createAppointmentsSseRouter(wsEmitter));
+
     app.use('/api', apiRoutes);
     app.use('/api/calendar', calendarRoutes);
     app.use('/api/email', emailApiRoutes);
@@ -567,6 +582,10 @@ async function gracefulShutdown(signal: string): Promise<void> {
     // Stop WebSocket periodic timers
     log.info('🔌 Stopping WebSocket timers...');
     teardownPeriodicCleanup();
+
+    // Stop SSE broadcaster (clears keep-alive timer, ends open streams)
+    log.info('📡 Stopping SSE broadcaster...');
+    teardownSseBroadcaster();
 
     // Close database connections
     log.info('🗄️  Closing database connections...');

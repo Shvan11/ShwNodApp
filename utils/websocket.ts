@@ -4,31 +4,12 @@ import { EventEmitter } from 'events';
 import type { IncomingMessage } from 'http';
 import type { Server as HTTPServer } from 'http';
 import messageState from '../services/state/messageState.js';
-import { getTimePointImgs } from '../services/database/queries/timepoint-queries.js';
-import { getLatestVisitsSum } from '../services/database/queries/visit-queries.js';
-import { getActiveWork } from '../services/database/queries/work-queries.js';
-import { getPatientById } from '../services/database/queries/patient-queries.js';
+import { buildChairPatientPayload, type ChairPatientPayload } from '../services/messaging/chair-payload-builder.js';
 import { createWebSocketMessage, validateWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
 import { WebSocketEvents, InternalEmitterEvents, createStandardMessage } from '../services/messaging/websocket-events.js';
 import { logger } from '../services/core/Logger.js';
 import stateEvents from '../services/state/stateEvents.js';
 import qrcode from 'qrcode';
-
-// Mirror of public/js/config/workTypeConfig.ts ORTHO_WORK_TYPES — visit notes only show
-// for active orthodontic work on the chair-side display.
-const ORTHO_WORK_TYPE_IDS: ReadonlySet<number> = new Set([1, 2, 11, 19, 20]);
-const CHAIR_DISPLAY_INTRAORAL_EXTS = ['.i20', '.i22', '.i21'] as const;
-
-/**
- * Payload shape sent to the chair-display kiosk when a patient is loaded.
- * Same shape goes out on the initial broadcast and on reconnect replay.
- */
-interface ChairPatientPayload {
-  pid: string;
-  name: string | null;
-  images: Array<{ name: string }>;
-  latestVisit: { VisitDate?: Date; Summary?: string | null } | null | undefined;
-}
 
 /**
  * Process-local cache of the most recent patient-loaded payload per chair.
@@ -88,13 +69,6 @@ interface TypedMessage {
   type: string;
   id?: string;
   data?: Record<string, unknown>;
-}
-
-/**
- * Patient image entry
- */
-interface PatientImage {
-  name: string;
 }
 
 // ===========================================
@@ -651,86 +625,34 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
 
   emitter.on(InternalEmitterEvents.DATA_UPDATED, handleAppointmentUpdate);
 
-  // Chair-display: patient loaded. Builds the payload once from the DB,
-  // caches it, and broadcasts to the kiosk. A later kiosk reconnect replays
-  // straight from the cache in the REGISTER handler — no DB round-trip.
+  // Chair-display: patient loaded. Delegates payload construction to the
+  // shared builder so the SSE broadcaster and this WS handler stay in sync
+  // during the SSE migration. A later kiosk reconnect replays straight from
+  // the cache in the REGISTER handler — no DB round-trip.
   const handleChairDisplayPatientLoaded = async (pid: string, targetChairId: string): Promise<void> => {
     logger.websocket.info('Chair-display patient loaded', { patientId: pid, chairId: targetChairId });
 
-    const personId = parseInt(pid, 10);
-    if (!Number.isFinite(personId) || personId <= 0) {
-      logger.websocket.warn('Invalid personId for chair-display load', { pid });
+    const payload = await buildChairPatientPayload(pid, targetChairId);
+    if (!payload) return;
+
+    chairCurrentPatient.set(targetChairId, { payload, loadedAt: Date.now() });
+
+    const chairConnection = connectionManager.chairDisplayConnections.get(targetChairId);
+    if (!chairConnection || chairConnection.readyState !== WebSocket.OPEN) {
+      logger.websocket.debug('Chair display not connected; payload cached for replay', { chairId: targetChairId });
       return;
     }
 
-    try {
-      const allImages = await getPatientImagesLocal(pid);
-      const filteredImages = allImages.filter(img =>
-        CHAIR_DISPLAY_INTRAORAL_EXTS.some(ext => img.name.toLowerCase().endsWith(ext))
-      );
-      filteredImages.sort((a, b) => {
-        const aExt = CHAIR_DISPLAY_INTRAORAL_EXTS.find(ext => a.name.toLowerCase().endsWith(ext)) || '';
-        const bExt = CHAIR_DISPLAY_INTRAORAL_EXTS.find(ext => b.name.toLowerCase().endsWith(ext)) || '';
-        return CHAIR_DISPLAY_INTRAORAL_EXTS.indexOf(aExt as typeof CHAIR_DISPLAY_INTRAORAL_EXTS[number])
-          - CHAIR_DISPLAY_INTRAORAL_EXTS.indexOf(bExt as typeof CHAIR_DISPLAY_INTRAORAL_EXTS[number]);
-      });
+    const message = createStandardMessage(
+      WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,
+      payload,
+    );
+    const success = connectionManager.sendToChairDisplay(targetChairId, message);
 
-      const activeWork = await getActiveWork(personId);
-      const isOrtho = !!(activeWork && ORTHO_WORK_TYPE_IDS.has(activeWork.Typeofwork as number));
-      const [latestVisit, patientRecord] = await Promise.all([
-        isOrtho ? getLatestVisitsSum(personId) : Promise.resolve(null),
-        getPatientById(personId),
-      ]);
-
-      const name = patientRecord?.PatientName?.trim() ||
-        [patientRecord?.FirstName, patientRecord?.LastName].filter(Boolean).join(' ').trim() ||
-        null;
-
-      const payload: ChairPatientPayload = {
-        pid,
-        name,
-        images: filteredImages,
-        latestVisit,
-      };
-
-      // Cache the built payload — kiosk reconnect replays from this without
-      // re-running the queries above.
-      chairCurrentPatient.set(targetChairId, { payload, loadedAt: Date.now() });
-
-      const chairConnection = connectionManager.chairDisplayConnections.get(targetChairId);
-      if (!chairConnection || chairConnection.readyState !== WebSocket.OPEN) {
-        logger.websocket.debug('Chair display not connected; payload cached for replay', { chairId: targetChairId });
-        return;
-      }
-
-      const message = createStandardMessage(
-        WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,
-        payload,
-      );
-      const success = connectionManager.sendToChairDisplay(targetChairId, message);
-
-      if (success) {
-        logger.websocket.debug('Sent patient data to chair display', { patientId: pid, chairId: targetChairId, isOrtho });
-      } else {
-        logger.websocket.warn('Failed to send patient data', { chairId: targetChairId });
-      }
-    } catch (error) {
-      logger.websocket.error('Error processing chair-display patient loaded', error as Error);
-    }
-
-    async function getPatientImagesLocal(pid: string): Promise<PatientImage[]> {
-      try {
-        const tp = "0";
-        const images = await getTimePointImgs(pid, tp);
-
-        return images.map((code: string | number) => {
-          const name = `${pid}0${tp}.i${code}`;
-          return { name };
-        });
-      } catch (error) {
-        logger.websocket.error('Error getting patient images', error as Error);
-        return [];
-      }
+    if (success) {
+      logger.websocket.debug('Sent patient data to chair display', { patientId: pid, chairId: targetChairId });
+    } else {
+      logger.websocket.warn('Failed to send patient data', { chairId: targetChairId });
     }
   };
 
