@@ -126,6 +126,16 @@ export const WebSocketEvents = {
 
   /** Client capabilities response */
   CLIENT_CAPABILITIES: 'client_capabilities',
+
+  // ===========================================
+  // CONNECTION MULTIPLEXING EVENTS
+  // ===========================================
+
+  /** Client requests to be added to an additional connection type after initial handshake */
+  REGISTER_CLIENT_TYPE: 'register_client_type',
+
+  /** Client requests to be removed from a connection type without closing the socket */
+  UNREGISTER_CLIENT_TYPE: 'unregister_client_type',
 } as const;
 
 export type WebSocketEventType = (typeof WebSocketEvents)[keyof typeof WebSocketEvents];
@@ -448,6 +458,8 @@ export function getEventsByCategory(): EventsByCategory {
       WebSocketEvents.BROADCAST_MESSAGE,
       WebSocketEvents.REQUEST_CAPABILITIES,
       WebSocketEvents.CLIENT_CAPABILITIES,
+      WebSocketEvents.REGISTER_CLIENT_TYPE,
+      WebSocketEvents.UNREGISTER_CLIENT_TYPE,
     ],
   };
 }

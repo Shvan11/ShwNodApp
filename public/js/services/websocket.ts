@@ -339,6 +339,7 @@ export class WebSocketService extends EventEmitter {
 
     // Clear timers
     this.clearTimers();
+    this.stopFreshnessPoll();
 
     // Clear message queue
     this.state.messageQueue = [];
@@ -726,6 +727,13 @@ export class WebSocketService extends EventEmitter {
         this.emit('freshness_changed', { freshness: current });
       }
     }, FRESHNESS_POLL_INTERVAL_MS);
+  }
+
+  private stopFreshnessPoll(): void {
+    if (this.state.freshnessPollTimer) {
+      clearInterval(this.state.freshnessPollTimer);
+      this.state.freshnessPollTimer = null;
+    }
   }
 
   /**

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 /**
  * Appointment statistics from API
@@ -82,6 +82,11 @@ export function useAppointments(
   const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(initialData?.error || null);
 
+  // In-flight dedup: if two callers request the same date concurrently, share
+  // the promise so we only hit the network once. Keyed by date so a rapid
+  // date-flip during an in-flight fetch doesn't block the new date.
+  const inFlightFetchesRef = useRef<Map<string, Promise<boolean>>>(new Map());
+
   /**
    * Get current time in HH:MM:SS format
    */
@@ -97,37 +102,46 @@ export function useAppointments(
   const loadAppointments = useCallback(async (date: string): Promise<boolean> => {
     if (!date) return false;
 
+    const existing = inFlightFetchesRef.current.get(date);
+    if (existing) return existing;
+
     console.log('Loading appointments for date:', date);
 
-    try {
-      setLoading(true);
-      setError(null);
+    const fetchPromise = (async (): Promise<boolean> => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      const response = await fetch(`/api/getDailyAppointments?AppsDate=${date}`);
+        const response = await fetch(`/api/getDailyAppointments?AppsDate=${date}`);
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch appointments');
+        if (!response.ok) {
+          throw new Error('Failed to fetch appointments');
+        }
+
+        const data = await response.json();
+
+        console.log('Loaded appointments:', {
+          all: data.allAppointments?.length || 0,
+          checkedIn: data.checkedInAppointments?.length || 0,
+          stats: data.stats,
+        });
+
+        setAllAppointments(data.allAppointments || []);
+        setCheckedInAppointments(data.checkedInAppointments || []);
+        setStats(data.stats || { total: 0, checkedIn: 0, absent: 0, waiting: 0 });
+        return true;
+      } catch (err) {
+        console.error('Error loading appointments:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load appointments');
+        return false;
+      } finally {
+        setLoading(false);
+        inFlightFetchesRef.current.delete(date);
       }
+    })();
 
-      const data = await response.json();
-
-      console.log('Loaded appointments:', {
-        all: data.allAppointments?.length || 0,
-        checkedIn: data.checkedInAppointments?.length || 0,
-        stats: data.stats,
-      });
-
-      setAllAppointments(data.allAppointments || []);
-      setCheckedInAppointments(data.checkedInAppointments || []);
-      setStats(data.stats || { total: 0, checkedIn: 0, absent: 0, waiting: 0 });
-      return true;
-    } catch (err) {
-      console.error('Error loading appointments:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load appointments');
-      return false;
-    } finally {
-      setLoading(false);
-    }
+    inFlightFetchesRef.current.set(date, fetchPromise);
+    return fetchPromise;
   }, []);
 
   /**

@@ -76,7 +76,7 @@ const ChairDisplay = () => {
     const [patient, setPatient] = useState<PatientPayload | null>(null);
     const reconnectTimerRef = useRef<number | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
-    const lastMessageAtRef = useRef<number>(Date.now());
+    const lastMessageAtRef = useRef<number>(performance.now());
     const hiddenSinceRef = useRef<number | null>(null);
 
     useEffect(() => {
@@ -93,12 +93,12 @@ const ChairDisplay = () => {
                 ws.onopen = () => {
                     if (cancelled) return;
                     setConnected(true);
-                    lastMessageAtRef.current = Date.now();
+                    lastMessageAtRef.current = performance.now();
                 };
 
                 ws.onmessage = (event) => {
                     if (cancelled) return;
-                    lastMessageAtRef.current = Date.now();
+                    lastMessageAtRef.current = performance.now();
                     let data: { type?: string; data?: unknown } | null = null;
                     try {
                         data = JSON.parse(event.data);
@@ -138,7 +138,7 @@ const ChairDisplay = () => {
         // reconnect path runs and the indicator flips to "Reconnecting…".
         const livenessInterval = window.setInterval(() => {
             if (cancelled) return;
-            const elapsed = Date.now() - lastMessageAtRef.current;
+            const elapsed = performance.now() - lastMessageAtRef.current;
             if (elapsed > KIOSK_STALE_THRESHOLD_MS && wsRef.current) {
                 try {
                     wsRef.current.close(1000, 'liveness timeout');
@@ -151,12 +151,12 @@ const ChairDisplay = () => {
         const handleVisibility = () => {
             if (cancelled) return;
             if (document.visibilityState === 'hidden') {
-                hiddenSinceRef.current = Date.now();
+                hiddenSinceRef.current = performance.now();
                 return;
             }
             const since = hiddenSinceRef.current;
             hiddenSinceRef.current = null;
-            if (since && Date.now() - since > KIOSK_VISIBILITY_RESUME_MS && wsRef.current) {
+            if (since && performance.now() - since > KIOSK_VISIBILITY_RESUME_MS && wsRef.current) {
                 try {
                     wsRef.current.close(1000, 'visibility resume');
                 } catch {

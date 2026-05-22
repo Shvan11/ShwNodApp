@@ -103,6 +103,31 @@ Schema baseline: `migrations/init_script.sql` (UTF-8 snapshot of the full DB). H
 
 ---
 
+## Realtime / WebSockets
+
+**Server entry**: `utils/websocket.ts` — `setupWebSocketServer(server)` returns `wsEmitter` (Node `EventEmitter`). Routes inject the emitter via `setWebSocketEmitter()` at boot and trigger broadcasts with `wsEmitter.emit(WebSocketEvents.DATA_UPDATED, date)` or `wsEmitter.emit('broadcast_message', msg)`. All periodic timers are cleared on graceful shutdown via `teardownPeriodicCleanup()` (chained from `index.ts`).
+
+**Client types** (registered via `?clientType=...` URL param at upgrade): `daily-appointments`, `waStatus`, `auth`, `chair-display`, `generic`. The upgrade is currently unauthenticated — internal-LAN assumption; revisit if exposed beyond the clinic network.
+
+**Three heartbeat layers** (each catches a different failure mode):
+- **TCP ping** (30 s, server-driven): terminates dead transports.
+- **`SERVER_HEARTBEAT`** (15 s, server push): drives client freshness signal — receipt timestamp is what makes the indicator honest.
+- **`HEARTBEAT_PING`** (60 s, client-driven, 30 s pong timeout): active probe; force-closes on missed pong.
+
+**Freshness signal**: `wsService.getFreshness()` returns `'fresh'` if a message arrived within 30 s. Uses `performance.now()` — wall-clock-immune. `wsService.markStale()` forces stale immediately (called on recovery-fetch failure so the indicator reflects the data gap).
+
+**"Live" indicator** (`public/js/components/react/appointments/ConnectionStatus.tsx`): states are **Live** | **Stale — Resyncing** | **Static** (non-today views) | **Offline** | **Reconnecting…** | **Connection Error**.
+
+**Client singleton**: `public/js/services/websocket.ts` (`wsService`) + multiplexer `websocket-connection-manager.ts` (`connectionManager`). **Hooks share one physical socket** — never `new WebSocket()` directly except for the kiosk (`ChairDisplay.tsx`, intentional standalone). When a hook mounts with a new client type on an already-open socket, the manager sends `register_client_type` to the server; on unmount it sends `unregister_client_type`. This keeps the server's broadcast Sets accurate without reconnecting.
+
+**Event constants** live in **two files that must stay in sync**: `services/messaging/websocket-events.ts` (server) and `public/js/constants/websocket-events.ts` (client). Add new events to both.
+
+**Chair-display state**: server keeps an in-memory `chairCurrentPatient` map so a kiosk reconnect replays the current patient via the existing `patient-loaded` handler — no DB write or new endpoint needed. Lost on server restart by design.
+
+**Don't bypass the manager**: a stray `new WebSocket(...)` in app code skips reconnect/freshness/type-registration.
+
+---
+
 ## TypeScript / Path aliases
 
 Dual config: `tsconfig.json` (backend), `tsconfig.frontend.json` (frontend), `tsconfig.build.json` (prod build). Strict mode on both.

@@ -12,6 +12,9 @@
  */
 
 import wsService, { WebSocketService } from './websocket';
+import { WebSocketEvents } from '../constants/websocket-events';
+
+const DEBUG = false;
 
 export interface ConnectionOptions {
   PDate?: string;
@@ -48,34 +51,44 @@ class WebSocketConnectionManager {
     clientType: string,
     options: ConnectionOptions = {}
   ): Promise<WebSocketService> {
-    // Track this client type
+    // Detect whether this is a genuinely new type before adding to the Set.
+    const isNew = !this.clientTypes.has(clientType);
     this.clientTypes.add(clientType);
 
-    console.log(`[ConnectionManager] Connection requested by ${clientType}`);
-    console.log(`[ConnectionManager] Active client types:`, Array.from(this.clientTypes));
+    if (DEBUG) console.log(`[ConnectionManager] Connection requested by ${clientType}`);
+    if (DEBUG) console.log(`[ConnectionManager] Active client types:`, Array.from(this.clientTypes));
 
-    // If already connected, return immediately
+    // If already connected, inform the server about the newly added type so its
+    // broadcast filters include this socket going forward.
     if (wsService.isConnected) {
-      console.log(`[ConnectionManager] Already connected - returning existing connection`);
+      if (isNew) {
+        wsService
+          .send(
+            { type: WebSocketEvents.REGISTER_CLIENT_TYPE, data: { clientType } },
+            { queueIfDisconnected: false }
+          )
+          .catch(() => { /* fire-and-forget; server resync on reconnect */ });
+      }
+      if (DEBUG) console.log(`[ConnectionManager] Already connected - returning existing connection`);
       return wsService;
     }
 
     // If connection in progress, wait for it
     if (this.connectionPromise) {
-      console.log(`[ConnectionManager] Connection in progress - waiting for completion`);
+      if (DEBUG) console.log(`[ConnectionManager] Connection in progress - waiting for completion`);
       try {
         await this.connectionPromise;
         return wsService;
       } catch {
         // Connection failed, but we'll try again below
-        console.log(`[ConnectionManager] Previous connection attempt failed, retrying`);
+        if (DEBUG) console.log(`[ConnectionManager] Previous connection attempt failed, retrying`);
       }
     }
 
     // Check if we should debounce (multiple rapid requests)
     const now = Date.now();
     if (this.lastConnectionAttempt && now - this.lastConnectionAttempt < this.CONNECTION_DEBOUNCE_MS) {
-      console.log(`[ConnectionManager] Debouncing connection request`);
+      if (DEBUG) console.log(`[ConnectionManager] Debouncing connection request`);
       await new Promise((resolve) => setTimeout(resolve, this.CONNECTION_DEBOUNCE_MS));
 
       // After debounce, check if connection was established
@@ -88,7 +101,7 @@ class WebSocketConnectionManager {
     this.lastConnectionAttempt = now;
     this.isConnecting = true;
 
-    console.log(
+    if (DEBUG) console.log(
       `[ConnectionManager] Starting new connection for client types:`,
       Array.from(this.clientTypes)
     );
@@ -105,7 +118,7 @@ class WebSocketConnectionManager {
     this.connectionPromise = wsService
       .connect(connectionParams)
       .then(() => {
-        console.log(`[ConnectionManager] Connection established successfully`);
+        if (DEBUG) console.log(`[ConnectionManager] Connection established successfully`);
         this.isConnecting = false;
         return wsService;
       })
@@ -131,12 +144,19 @@ class WebSocketConnectionManager {
    */
   removeClientType(clientType: string): void {
     this.clientTypes.delete(clientType);
-    console.log(`[ConnectionManager] Client type ${clientType} removed`);
-    console.log(`[ConnectionManager] Remaining client types:`, Array.from(this.clientTypes));
+    if (DEBUG) console.log(`[ConnectionManager] Client type ${clientType} removed`);
+    if (DEBUG) console.log(`[ConnectionManager] Remaining client types:`, Array.from(this.clientTypes));
 
-    // If no more client types, we could disconnect
-    // But for robustness, we'll keep the connection alive
-    // (it will be closed on page unload anyway)
+    // Inform the server so it removes this socket from the relevant broadcast
+    // Set. The socket stays open — other registered types may still be active.
+    if (wsService.isConnected) {
+      wsService
+        .send(
+          { type: WebSocketEvents.UNREGISTER_CLIENT_TYPE, data: { clientType } },
+          { queueIfDisconnected: false }
+        )
+        .catch(() => { /* fire-and-forget */ });
+    }
   }
 
   /**
@@ -144,7 +164,7 @@ class WebSocketConnectionManager {
    * Only call this on page unload or critical errors
    */
   disconnect(): void {
-    console.log('[ConnectionManager] Disconnecting WebSocket');
+    if (DEBUG) console.log('[ConnectionManager] Disconnecting WebSocket');
     this.connectionPromise = null;
     this.clientTypes.clear();
     this.isConnecting = false;

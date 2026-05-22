@@ -190,7 +190,7 @@ export function useWebSocketSync(
       return dateStr.split('T')[0];
     };
 
-    const handleAppointmentsUpdated = (data: AppointmentsUpdatedData) => {
+    const handleAppointmentsUpdated = async (data: AppointmentsUpdatedData) => {
       const receivedDate = normalizeDate(data?.date);
       const expectedDate = normalizeDate(currentDate);
 
@@ -198,8 +198,17 @@ export function useWebSocketSync(
         clearLoaderCacheKey(`daily-appointments:${currentDate}`);
         // Direct invocation here (not the debounced path) — broadcasts are
         // already coalesced server-side and we want minimal latency on the
-        // common case.
-        callbackRef.current({ ...data, date: currentDate });
+        // common case. On failure, mirror runRecovery: mark stale and engage
+        // the debounced backoff pipeline so the indicator reflects the gap.
+        try {
+          const result = await callbackRef.current({ ...data, date: currentDate });
+          if (result === false) {
+            throw new Error('refetch returned false');
+          }
+        } catch {
+          wsService.markStale();
+          triggerRecoveryFetch();
+        }
       }
     };
 
@@ -208,7 +217,7 @@ export function useWebSocketSync(
     return () => {
       wsService.off(WebSocketEvents.APPOINTMENTS_UPDATED, handleAppointmentsUpdated);
     };
-  }, [currentDate]);
+  }, [currentDate, triggerRecoveryFetch]);
 
   // Periodic safety net — only on today. Run regardless of connectionStatus:
   // the whole point is to backstop a connection that's lying about being

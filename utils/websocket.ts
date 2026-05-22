@@ -54,7 +54,6 @@ interface ClientCapabilities {
   supportsJson: boolean;
   supportsPing: boolean;
   lastActivity: number;
-  lastPong?: number;
 }
 
 /**
@@ -528,10 +527,7 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
       }
 
       case WebSocketEvents.HEARTBEAT_PONG:
-        connectionManager.updateClientCapabilities(ws, {
-          supportsPing: true,
-          lastPong: Date.now()
-        });
+        connectionManager.updateClientCapabilities(ws, { supportsPing: true });
         break;
 
       case WebSocketEvents.REQUEST_APPOINTMENTS: {
@@ -550,6 +546,30 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
         logger.websocket.debug('Received request for initial state via WebSocket');
         await sendInitialStateForWaClient(ws, message.data, connectionManager);
         break;
+
+      case WebSocketEvents.REGISTER_CLIENT_TYPE: {
+        const clientType = message.data?.clientType as string | undefined;
+        if (clientType === 'waStatus') {
+          connectionManager.waStatusConnections.add(ws);
+          logger.websocket.debug('Registered waStatus via register_client_type');
+        } else if (clientType === 'daily-appointments') {
+          connectionManager.dailyAppointmentsConnections.add(ws);
+          logger.websocket.debug('Registered daily-appointments via register_client_type');
+        }
+        break;
+      }
+
+      case WebSocketEvents.UNREGISTER_CLIENT_TYPE: {
+        const clientType = message.data?.clientType as string | undefined;
+        if (clientType === 'waStatus') {
+          connectionManager.waStatusConnections.delete(ws);
+          logger.websocket.debug('Unregistered waStatus via unregister_client_type');
+        } else if (clientType === 'daily-appointments') {
+          connectionManager.dailyAppointmentsConnections.delete(ws);
+          logger.websocket.debug('Unregistered daily-appointments via unregister_client_type');
+        }
+        break;
+      }
 
       default:
         logger.websocket.warn('Unknown message type', { messageType: message.type });
@@ -715,7 +735,9 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
         { date: dateParam }
       );
 
-      const sentCount = connectionManager.broadcastToDailyAppointments(message);
+      const dateFilter: BroadcastFilter = (_ws, capabilities) =>
+        capabilities?.metadata?.date === dateParam;
+      const sentCount = connectionManager.broadcastToDailyAppointments(message, dateFilter);
 
       logger.websocket.info('Broadcast appointment updates', {
         dailyAppointments: sentCount
@@ -918,7 +940,7 @@ function teardownPeriodicCleanup(): void {
 function setupPeriodicCleanup(connectionManager: ConnectionManager): void {
   const inactivityTimeout = 30 * 60 * 1000; // 30 minutes
 
-  _periodicTimers.push(setInterval(() => {
+  const inactivityHandle = setInterval(() => {
     const closed = connectionManager.closeInactiveConnections(inactivityTimeout);
     if (closed > 0) {
       logger.websocket.info('Closed inactive connections', { count: closed });
@@ -926,9 +948,11 @@ function setupPeriodicCleanup(connectionManager: ConnectionManager): void {
 
     const counts = connectionManager.getConnectionCounts();
     logger.websocket.debug('Active connections', counts);
-  }, 10 * 60 * 1000)); // Every 10 minutes
+  }, 10 * 60 * 1000); // Every 10 minutes
+  inactivityHandle.unref();
+  _periodicTimers.push(inactivityHandle);
 
-  _periodicTimers.push(setInterval(() => {
+  const qrHealthHandle = setInterval(() => {
     const activeViewerIds: string[] = [];
     connectionManager.waStatusConnections.forEach(ws => {
       if (ws.qrViewerRegistered && ws.viewerId) {
@@ -947,13 +971,15 @@ function setupPeriodicCleanup(connectionManager: ConnectionManager): void {
         qrViewersRegistered: activeViewerIds.length
       });
     }
-  }, 60000)); // Every minute
+  }, 60000); // Every minute
+  qrHealthHandle.unref();
+  _periodicTimers.push(qrHealthHandle);
 
   // TCP-level heartbeat: terminate sockets that miss a pong within 30s.
   // Complements the 30-min inactivity sweep (which handles app-level idleness).
   // Chair-displays are included here — the activity sweep skips them, but
   // transport-dead kiosks should still be cleaned up promptly.
-  _periodicTimers.push(setInterval(() => {
+  const tcpPingHandle = setInterval(() => {
     for (const ws of connectionManager.allConnections) {
       if (ws.isAlive === false) {
         ws.terminate();
@@ -962,7 +988,9 @@ function setupPeriodicCleanup(connectionManager: ConnectionManager): void {
       ws.isAlive = false;
       try { ws.ping(); } catch { /* socket already dead */ }
     }
-  }, 30_000)); // Every 30 seconds
+  }, 30_000); // Every 30 seconds
+  tcpPingHandle.unref();
+  _periodicTimers.push(tcpPingHandle);
 
   // Application-level heartbeat: push a JSON SERVER_HEARTBEAT to every open
   // connection every 15s. Clients use receipt to compute data freshness — the
