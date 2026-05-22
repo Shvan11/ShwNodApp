@@ -4,34 +4,21 @@ import { EventEmitter } from 'events';
 import type { IncomingMessage } from 'http';
 import type { Server as HTTPServer } from 'http';
 import messageState from '../services/state/messageState.js';
-import { buildChairPatientPayload, type ChairPatientPayload } from '../services/messaging/chair-payload-builder.js';
 import { createWebSocketMessage, validateWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
 import { WebSocketEvents, InternalEmitterEvents, createStandardMessage } from '../services/messaging/websocket-events.js';
 import { logger } from '../services/core/Logger.js';
 import stateEvents from '../services/state/stateEvents.js';
 import qrcode from 'qrcode';
 
-/**
- * Process-local cache of the most recent patient-loaded payload per chair.
- * Used to replay on kiosk reconnect without re-hitting the database — the
- * UX matches a never-disconnected kiosk (same data the chair was already
- * showing) and the reconnect is free. Lost on server restart by design.
- */
-const chairCurrentPatient = new Map<string, { payload: ChairPatientPayload; loadedAt: number }>();
-
-// Drop stale replay entries on read instead of running a sweep timer.
-// 12 h covers a workday + buffer; staff arriving the next morning will not
-// see yesterday's patient.
-const CHAIR_PATIENT_REPLAY_TTL_MS = 12 * 60 * 60 * 1000;
-
 // ===========================================
 // TYPES
 // ===========================================
 
 /**
- * Connection type identifiers
+ * Connection type identifiers. `daily-appointments` and `chair-display`
+ * channels moved to SSE (see services/messaging/sse-broadcaster.ts).
  */
-type ConnectionType = 'chair-display' | 'waStatus' | 'auth' | 'daily-appointments' | 'generic';
+type ConnectionType = 'waStatus' | 'auth' | 'generic';
 
 /**
  * Per-socket bookkeeping kept on the connection manager.
@@ -57,9 +44,7 @@ interface ExtendedWebSocket extends WebSocket {
  */
 interface ConnectionCounts {
   total: number;
-  chairDisplays: number;
   waStatus: number;
-  dailyAppointments: number;
 }
 
 /**
@@ -79,30 +64,24 @@ interface TypedMessage {
  * WebSocket Connection Manager
  */
 class ConnectionManager {
-  chairDisplayConnections: Map<string, ExtendedWebSocket>;
   /**
    * Holds both 'waStatus' and 'auth' sockets — auth clients also need the
    * QR_UPDATE / CLIENT_READY / message-status broadcasts that go through
    * this Set. The name reflects the broadcast channel, not the client type.
    */
   waStatusConnections: Set<ExtendedWebSocket>;
-  dailyAppointmentsConnections: Set<ExtendedWebSocket>;
   allConnections: Set<ExtendedWebSocket>;
   clientCapabilities: WeakMap<ExtendedWebSocket, ClientCapabilities>;
 
   constructor() {
-    this.chairDisplayConnections = new Map();
     this.waStatusConnections = new Set();
-    this.dailyAppointmentsConnections = new Set();
     this.allConnections = new Set();
     this.clientCapabilities = new WeakMap();
   }
 
   registerConnection(ws: ExtendedWebSocket, type: ConnectionType): void {
     // Every new socket enters as 'generic' and joins allConnections only.
-    // Type-specific Set/Map membership is established later via the
-    // REGISTER_CLIENT_TYPE message — single registration path, survives
-    // auto-reconnect (where URL params would have been dropped).
+    // Type-specific Set membership is established later via REGISTER_CLIENT_TYPE.
     this.allConnections.add(ws);
     this.clientCapabilities.set(ws, { type, lastActivity: Date.now() });
   }
@@ -110,31 +89,7 @@ class ConnectionManager {
   unregisterConnection(ws: ExtendedWebSocket): void {
     this.allConnections.delete(ws);
     this.waStatusConnections.delete(ws);
-    this.dailyAppointmentsConnections.delete(ws);
-
-    // Chair-display Map: locate the entry by value so a stale OLD_WS close
-    // event never unmaps a NEW_WS that already took the same chairId.
-    for (const [chairId, mapped] of this.chairDisplayConnections) {
-      if (mapped === ws) {
-        this.chairDisplayConnections.delete(chairId);
-        break;
-      }
-    }
-
     this.clientCapabilities.delete(ws);
-  }
-
-  sendToChairDisplay(chairId: string, message: unknown): boolean {
-    const ws = this.chairDisplayConnections.get(chairId);
-    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
-
-    try {
-      this.sendToClient(ws, message);
-      return true;
-    } catch (error) {
-      logger.websocket.error('Error sending to chair-display', { error: (error as Error).message, chairId });
-      return false;
-    }
   }
 
   broadcastToWaStatus(message: unknown): number {
@@ -146,20 +101,6 @@ class ConnectionManager {
         sentCount++;
       } catch (error) {
         logger.websocket.error('Error sending to WhatsApp status client', error as Error);
-      }
-    }
-    return sentCount;
-  }
-
-  broadcastToDailyAppointments(message: unknown): number {
-    let sentCount = 0;
-    for (const ws of this.dailyAppointmentsConnections) {
-      if (ws.readyState !== WebSocket.OPEN) continue;
-      try {
-        this.sendToClient(ws, message);
-        sentCount++;
-      } catch (error) {
-        logger.websocket.error('Error sending to daily appointments client', error as Error);
       }
     }
     return sentCount;
@@ -224,12 +165,6 @@ class ConnectionManager {
       const capabilities = this.clientCapabilities.get(ws);
       if (!capabilities) continue;
 
-      // Chair-displays are read-only kiosks: they never send inbound traffic,
-      // and only get push events when staff opens/closes a patient. A quiet
-      // morning would otherwise trip the inactivity sweep and force needless
-      // reconnects. Skip them — they're naturally cleaned up on disconnect.
-      if (capabilities.type === 'chair-display') continue;
-
       const inactiveTime = now - capabilities.lastActivity;
       if (inactiveTime > timeout) {
         inactive.push(ws);
@@ -257,9 +192,7 @@ class ConnectionManager {
   getConnectionCounts(): ConnectionCounts {
     return {
       total: this.allConnections.size,
-      chairDisplays: this.chairDisplayConnections.size,
-      waStatus: this.waStatusConnections.size,
-      dailyAppointments: this.dailyAppointmentsConnections.size
+      waStatus: this.waStatusConnections.size
     };
   }
 }
@@ -371,23 +304,12 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
         break;
 
       case WebSocketEvents.REGISTER_CLIENT_TYPE: {
-        const data = (message.data || {}) as {
-          clientType?: string;
-          date?: string;
-          chairId?: string;
-        };
+        const data = (message.data || {}) as { clientType?: string };
         switch (data.clientType) {
           case 'waStatus': {
             connectionManager.waStatusConnections.add(ws);
             connectionManager.updateClientCapabilities(ws, { type: 'waStatus' });
             logger.websocket.debug('Registered waStatus');
-            break;
-          }
-
-          case 'daily-appointments': {
-            connectionManager.dailyAppointmentsConnections.add(ws);
-            connectionManager.updateClientCapabilities(ws, { type: 'daily-appointments' });
-            logger.websocket.debug('Registered daily-appointments');
             break;
           }
 
@@ -408,44 +330,6 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
             break;
           }
 
-          case 'chair-display': {
-            if (!data.chairId || !/^([1-9]|10)$/.test(data.chairId)) {
-              logger.websocket.warn('Rejecting chair-display REGISTER: invalid chairId', { chairId: data.chairId });
-              try { ws.close(1008, 'Invalid chairId'); } catch { /* already gone */ }
-              break;
-            }
-
-            // If a prior socket is mapped to the same chairId (kiosk reconnected
-            // before the previous socket's close event fired), close it
-            // explicitly so its eventual close handler doesn't unregister us.
-            const prev = connectionManager.chairDisplayConnections.get(data.chairId);
-            if (prev && prev !== ws) {
-              try { prev.close(1000, 'Replaced by new chair-display connection'); } catch { /* ignore */ }
-            }
-
-            connectionManager.chairDisplayConnections.set(data.chairId, ws);
-            connectionManager.updateClientCapabilities(ws, { type: 'chair-display' });
-            logger.websocket.debug('Registered chair-display', { chairId: data.chairId });
-
-            // Replay the cached payload directly — no DB round-trip, exactly
-            // the data the kiosk was last showing.
-            const stored = chairCurrentPatient.get(data.chairId);
-            if (stored && Date.now() - stored.loadedAt < CHAIR_PATIENT_REPLAY_TTL_MS) {
-              logger.websocket.debug('Replaying patient-loaded on chair-display REGISTER', {
-                chairId: data.chairId,
-                pid: stored.payload.pid,
-              });
-              const replay = createStandardMessage(
-                WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,
-                stored.payload,
-              );
-              connectionManager.sendToChairDisplay(data.chairId, replay);
-            } else if (stored) {
-              chairCurrentPatient.delete(data.chairId);
-            }
-            break;
-          }
-
           default:
             logger.websocket.warn('REGISTER_CLIENT_TYPE: unknown clientType', { clientType: data.clientType });
         }
@@ -460,11 +344,6 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
             logger.websocket.debug('Unregistered waStatus');
             break;
 
-          case 'daily-appointments':
-            connectionManager.dailyAppointmentsConnections.delete(ws);
-            logger.websocket.debug('Unregistered daily-appointments');
-            break;
-
           case 'auth':
             connectionManager.waStatusConnections.delete(ws);
             if (ws.qrViewerRegistered && messageState && typeof messageState.unregisterQRViewer === 'function') {
@@ -473,20 +352,6 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
             }
             logger.websocket.debug('Unregistered auth');
             break;
-
-          case 'chair-display': {
-            // Locate by value — UNREGISTER doesn't carry chairId. unregisterConnection
-            // does the same scan so we delegate; but UNREGISTER intentionally doesn't
-            // tear down the whole socket — just removes the chair-display Map entry.
-            for (const [chairId, mapped] of connectionManager.chairDisplayConnections) {
-              if (mapped === ws) {
-                connectionManager.chairDisplayConnections.delete(chairId);
-                break;
-              }
-            }
-            logger.websocket.debug('Unregistered chair-display');
-            break;
-          }
 
           default:
             logger.websocket.warn('UNREGISTER_CLIENT_TYPE: unknown clientType', { clientType: data.clientType });
@@ -601,90 +466,10 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
  * Global event handlers
  */
 function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: ConnectionManager): void {
-  const handleAppointmentUpdate = async (dateParam: string): Promise<void> => {
-    logger.websocket.info('Appointment update event', { date: dateParam });
-
-    try {
-      // Today-only contract: all registered daily-appointments clients are
-      // viewing today. Fan out to every one — they discard non-matching dates
-      // client-side (defense against midnight rollover / stray broadcasts).
-      const message = createStandardMessage(
-        WebSocketEvents.APPOINTMENTS_UPDATED,
-        { date: dateParam }
-      );
-
-      const sentCount = connectionManager.broadcastToDailyAppointments(message);
-
-      logger.websocket.info('Broadcast appointment updates', {
-        dailyAppointments: sentCount
-      });
-    } catch (error) {
-      logger.websocket.error('Error broadcasting appointment update', { error: (error as Error).message, date: dateParam });
-    }
-  };
-
-  emitter.on(InternalEmitterEvents.DATA_UPDATED, handleAppointmentUpdate);
-
-  // Chair-display: patient loaded. Delegates payload construction to the
-  // shared builder so the SSE broadcaster and this WS handler stay in sync
-  // during the SSE migration. A later kiosk reconnect replays straight from
-  // the cache in the REGISTER handler — no DB round-trip.
-  const handleChairDisplayPatientLoaded = async (pid: string, targetChairId: string): Promise<void> => {
-    logger.websocket.info('Chair-display patient loaded', { patientId: pid, chairId: targetChairId });
-
-    const payload = await buildChairPatientPayload(pid, targetChairId);
-    if (!payload) return;
-
-    chairCurrentPatient.set(targetChairId, { payload, loadedAt: Date.now() });
-
-    const chairConnection = connectionManager.chairDisplayConnections.get(targetChairId);
-    if (!chairConnection || chairConnection.readyState !== WebSocket.OPEN) {
-      logger.websocket.debug('Chair display not connected; payload cached for replay', { chairId: targetChairId });
-      return;
-    }
-
-    const message = createStandardMessage(
-      WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,
-      payload,
-    );
-    const success = connectionManager.sendToChairDisplay(targetChairId, message);
-
-    if (success) {
-      logger.websocket.debug('Sent patient data to chair display', { patientId: pid, chairId: targetChairId });
-    } else {
-      logger.websocket.warn('Failed to send patient data', { chairId: targetChairId });
-    }
-  };
-
-  emitter.on(InternalEmitterEvents.CHAIR_PATIENT_LOAD, handleChairDisplayPatientLoaded);
-
-  // Chair-display: patient cleared
-  const handleChairDisplayPatientCleared = (targetChairId: string): void => {
-    logger.websocket.info('Chair-display patient cleared', { chairId: targetChairId });
-
-    chairCurrentPatient.delete(targetChairId);
-
-    const chairConnection = connectionManager.chairDisplayConnections.get(targetChairId);
-    if (!chairConnection || chairConnection.readyState !== WebSocket.OPEN) {
-      logger.websocket.debug('Chair display not connected', { chairId: targetChairId });
-      return;
-    }
-
-    const message = createStandardMessage(
-      WebSocketEvents.CHAIR_DISPLAY_PATIENT_CLEARED,
-      {}
-    );
-
-    const success = connectionManager.sendToChairDisplay(targetChairId, message);
-
-    if (success) {
-      logger.websocket.debug('Sent patient cleared', { chairId: targetChairId });
-    } else {
-      logger.websocket.warn('Failed to send patient cleared', { chairId: targetChairId });
-    }
-  };
-
-  emitter.on(InternalEmitterEvents.CHAIR_PATIENT_CLEAR, handleChairDisplayPatientCleared);
+  // Appointments + chair-display events now flow through the SSE broadcaster
+  // (services/messaging/sse-broadcaster.ts) which subscribes to the same
+  // wsEmitter — emit sites in appointment.routes.ts and chair-display.routes.ts
+  // are unchanged.
 
   // Route pre-formed broadcast messages emitted by routes/services to the
   // appropriate connection-set fan-out based on the message's `type`.

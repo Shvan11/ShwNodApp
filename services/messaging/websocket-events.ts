@@ -5,12 +5,12 @@
  * Two distinct namespaces:
  *
  * - `WebSocketEvents`: message `type` values that travel over the wire,
- *   in either direction. This list is mirrored verbatim in
- *   `public/js/constants/websocket-events.ts` for the client.
+ *   in either direction. Mirrored in `public/js/constants/websocket-events.ts`.
  *
  * - `InternalEmitterEvents`: names used on the in-process Node `EventEmitter`
  *   that routes/services use to fan out broadcasts. These never leave the
- *   server and have no client counterpart.
+ *   server and have no client counterpart. Consumed by the WS server
+ *   (waStatus/auth fan-out) AND the SSE broadcaster (appointments + chair).
  */
 
 /**
@@ -21,13 +21,8 @@ export const WebSocketEvents = {
   /** Server-pushed liveness heartbeat (server → client every 15s) */
   SERVER_HEARTBEAT: 'server_heartbeat',
 
-  // Appointments
-  /** Appointment data has been updated; clients refetch by date */
-  APPOINTMENTS_UPDATED: 'appointments_updated',
-
-  // Chair-side public display
-  CHAIR_DISPLAY_PATIENT_LOADED: 'chair_display_patient_loaded',
-  CHAIR_DISPLAY_PATIENT_CLEARED: 'chair_display_patient_cleared',
+  // Note: APPOINTMENTS_UPDATED / CHAIR_DISPLAY_* events moved to SSE — see
+  // services/messaging/sse-broadcaster.ts. Wire names are hard-coded there.
 
   // WhatsApp messaging
   WHATSAPP_CLIENT_READY: 'whatsapp_client_ready',
@@ -57,13 +52,13 @@ export type WebSocketEventType = (typeof WebSocketEvents)[keyof typeof WebSocket
  * over-the-wire protocol.
  */
 export const InternalEmitterEvents = {
-  /** Appointment data changed for a date — fan out APPOINTMENTS_UPDATED to today-viewers */
+  /** Appointment data changed for a date — fan out via SSE to today-viewers */
   DATA_UPDATED: 'data_updated',
   /** Pre-formed WS message to route to the appropriate broadcast set */
   BROADCAST_MESSAGE: 'broadcast_message',
-  /** Staff loaded a patient on a chair — build the payload and broadcast to the kiosk */
+  /** Staff loaded a patient on a chair — build the payload and push to the kiosk via SSE */
   CHAIR_PATIENT_LOAD: 'chair_patient_load',
-  /** Staff cleared a chair — tell the kiosk to return to idle */
+  /** Staff cleared a chair — tell the kiosk via SSE to return to idle */
   CHAIR_PATIENT_CLEAR: 'chair_patient_clear',
 } as const;
 

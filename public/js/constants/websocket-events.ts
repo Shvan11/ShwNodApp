@@ -13,12 +13,9 @@ export const WebSocketEvents = {
   // Liveness
   SERVER_HEARTBEAT: 'server_heartbeat',
 
-  // Appointments
-  APPOINTMENTS_UPDATED: 'appointments_updated',
-
-  // Chair-side public display
-  CHAIR_DISPLAY_PATIENT_LOADED: 'chair_display_patient_loaded',
-  CHAIR_DISPLAY_PATIENT_CLEARED: 'chair_display_patient_cleared',
+  // Note: APPOINTMENTS_UPDATED / CHAIR_DISPLAY_* events moved to SSE — see
+  // public/js/services/sse-appointments.ts and public/js/routes/ChairDisplay.tsx.
+  // The wire-event strings are hard-coded at those call sites.
 
   // WhatsApp messaging
   WHATSAPP_CLIENT_READY: 'whatsapp_client_ready',
