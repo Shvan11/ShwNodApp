@@ -20,6 +20,10 @@ import { logger } from '../core/Logger.js';
 const appointmentsClients = new Set<Response>();
 const chairClients = new Map<string, Response>();
 const chairCurrentPatient = new Map<string, { payload: ChairPatientPayload; loadedAt: number }>();
+// Monotonic per-chair counter — bumped synchronously on every LOAD/CLEAR so an
+// async LOAD that resolves AFTER a later CLEAR (or another LOAD) can detect
+// it's been superseded and skip writing stale state to the cache/kiosk.
+const chairEpoch = new Map<string, number>();
 
 // 12 h covers a workday + buffer; staff arriving the next morning won't see
 // yesterday's patient. Same TTL the legacy WS replay used.
@@ -53,8 +57,13 @@ function ensureInitialized(emitter: EventEmitter): void {
   };
 
   const onChairPatientLoad = async (pid: string, chairId: string): Promise<void> => {
+    const epoch = (chairEpoch.get(chairId) ?? 0) + 1;
+    chairEpoch.set(chairId, epoch);
     const payload = await buildChairPatientPayload(pid, chairId);
     if (!payload) return;
+    // A later LOAD or CLEAR bumped the epoch while we were awaiting the DB —
+    // commit nothing, or we'd resurrect a cleared patient in the cache (12 h TTL).
+    if (chairEpoch.get(chairId) !== epoch) return;
     chairCurrentPatient.set(chairId, { payload, loadedAt: Date.now() });
     const res = chairClients.get(chairId);
     if (!res) return; // No active kiosk for this chair — payload stays cached for next connect.
@@ -62,6 +71,7 @@ function ensureInitialized(emitter: EventEmitter): void {
   };
 
   const onChairPatientClear = (chairId: string): void => {
+    chairEpoch.set(chairId, (chairEpoch.get(chairId) ?? 0) + 1);
     chairCurrentPatient.delete(chairId);
     const res = chairClients.get(chairId);
     if (!res) return;
@@ -105,7 +115,8 @@ function openStream(req: Request, res: Response): void {
     'X-Accel-Buffering': 'no',
   });
   res.flushHeaders();
-  res.write('retry: 3000\n\n');
+  // Jitter 2500–3500 ms so all clients don't reconnect in lockstep after a restart.
+  res.write(`retry: ${2500 + Math.floor(Math.random() * 1000)}\n\n`);
 }
 
 export function createAppointmentsSseRouter(emitter: EventEmitter): Router {
@@ -190,5 +201,6 @@ export function teardownSseBroadcaster(): void {
   }
   chairClients.clear();
   chairCurrentPatient.clear();
+  chairEpoch.clear();
   initialized = false;
 }

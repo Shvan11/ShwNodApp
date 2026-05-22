@@ -112,7 +112,7 @@ const DailyAppointments = () => {
     }, [selectedDate]);
 
     // 11. Reconnect-driven refetch is handled inside useWebSocketSync via the
-    // debounced recovery trigger (wsService 'reconnected' + window 'online' +
+    // debounced recovery trigger (sseAppointments 'reconnected' + window 'online' +
     // visibilitychange). No additional listener needed here.
 
     // 12. Handle date change (updates state + URL)

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import sseAppointments, { type Freshness } from '../services/sse-appointments';
 import { clearLoaderCacheKey } from '../router/loaders';
 
-// Periodic safety net for missed WebSocket messages on the today view.
+// Periodic safety net for missed SSE messages on the today view.
 const PERIODIC_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 // Coalesce reconnect / online bursts that fire in rapid succession.
 const RECOVERY_DEBOUNCE_MS = 1_000;
@@ -40,11 +40,11 @@ function getTodayDate(): string {
 /**
  * Real-time appointment sync — **today-only by design.**
  *
- * Past/future dates render a static snapshot from the loader: no WS
- * registration, no broadcast listener, no recovery triggers, no periodic
+ * Past/future dates render a static snapshot from the loader: no SSE
+ * subscription, no broadcast listener, no recovery triggers, no periodic
  * refetch. The UI surfaces this as the "Static" indicator.
  *
- * For today: database is the source of truth; WebSocket is a hint that
+ * For today: database is the source of truth; SSE is a hint that
  * something changed. Recovery is idempotent REST refetch coalesced across
  * multiple trigger sources (reconnect, network resume, periodic safety net).
  */

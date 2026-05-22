@@ -139,11 +139,14 @@ router.get(
     req: Request<unknown, unknown, unknown, AppointmentQueryParams>,
     res: Response
   ): Promise<void> => {
-    res.sendStatus(200);
     const { PDate } = req.query;
+    if (typeof PDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(PDate)) {
+      res.status(400).json({ success: false, error: 'PDate query parameter required (YYYY-MM-DD)' });
+      return;
+    }
+    res.sendStatus(200);
     log.info(`AppsUpdated called with date: ${PDate}`);
 
-    // Emit universal event only
     if (wsEmitter) {
       wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, PDate);
     }
