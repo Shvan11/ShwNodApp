@@ -87,6 +87,14 @@ interface WebSocketState {
   // performance.now() at the moment the tab became hidden, or null if visible.
   // Drives the visibility-resume zombie check.
   hiddenSinceMonotonic: number | null;
+  // Server-stamped connection identity from the last heartbeat. Reset on close
+  // / forceReconnect so a stale id from a torn-down socket can't suppress the
+  // first heartbeat's diff on the replacement socket.
+  serverConnectionId: string | null;
+  // Authoritative broadcast-Set membership reported by the most recent
+  // heartbeat. The connection manager diffs this against its tracked
+  // clientTypes to detect (and re-register) subscriptions the server forgot.
+  serverSubscriptions: ReadonlySet<string>;
 }
 
 export class WebSocketService extends EventEmitter {
@@ -150,6 +158,8 @@ export class WebSocketService extends EventEmitter {
       lastEmittedFreshness: 'stale',
       freshnessPollTimer: null,
       hiddenSinceMonotonic: null,
+      serverConnectionId: null,
+      serverSubscriptions: new Set(),
     };
 
     // Bind methods to ensure correct 'this' context
@@ -514,6 +524,7 @@ export class WebSocketService extends EventEmitter {
    */
   private onOpen(_event: Event): void {
     this.log('WebSocket connected');
+    console.info('[WebSocket] connected');
 
     // Update state
     this.state.status = 'connected';
@@ -537,6 +548,7 @@ export class WebSocketService extends EventEmitter {
    */
   private onClose(event: CloseEvent): void {
     this.log(`WebSocket closed: ${event.code} - ${event.reason}`);
+    console.info('[WebSocket] disconnected', { code: event.code, reason: event.reason });
 
     // Clear timers
     this.clearTimers();
@@ -544,6 +556,10 @@ export class WebSocketService extends EventEmitter {
     // Update state
     this.state.status = 'disconnected';
     this.state.ws = null;
+    // Clear server-stamped identity so the next socket's first heartbeat is
+    // treated as a fresh registration, not as a `connectionIdChanged` event.
+    this.state.serverConnectionId = null;
+    this.state.serverSubscriptions = new Set();
     this.markStale();
 
     // Emit event
@@ -604,8 +620,31 @@ export class WebSocketService extends EventEmitter {
 
       const msgObj = message as Record<string, unknown>;
 
-      // SERVER_HEARTBEAT is a freshness signal only — consume silently.
+      // SERVER_HEARTBEAT carries the server's authoritative view of this
+      // socket's identity and broadcast-Set membership. Freshness is already
+      // updated above; here we diff and emit `subscriptions_changed` on real
+      // changes so the connection manager can re-register anything missing.
       if (typeof message === 'object' && msgObj.type === WebSocketEvents.SERVER_HEARTBEAT) {
+        const hbData = (msgObj.data ?? {}) as { connectionId?: string; subscriptions?: string[] };
+        if (hbData.connectionId) {
+          const nextConnId = hbData.connectionId;
+          const nextSubs = new Set(hbData.subscriptions ?? []);
+          const prevConnId = this.state.serverConnectionId;
+          const prevSubs = this.state.serverSubscriptions;
+          const subsChanged =
+            nextSubs.size !== prevSubs.size ||
+            [...nextSubs].some((s) => !prevSubs.has(s));
+          const connIdChanged = prevConnId !== null && prevConnId !== nextConnId;
+          if (connIdChanged || subsChanged || prevConnId === null) {
+            this.state.serverConnectionId = nextConnId;
+            this.state.serverSubscriptions = nextSubs;
+            this.emit('subscriptions_changed', {
+              connectionId: nextConnId,
+              subscriptions: Array.from(nextSubs),
+              connectionIdChanged: connIdChanged,
+            });
+          }
+        }
         return;
       }
 
@@ -730,6 +769,7 @@ export class WebSocketService extends EventEmitter {
    */
   private forceReconnect(reason: string): void {
     this.log(`Force reconnect: ${reason}`);
+    console.warn('[WebSocket] force reconnect', { reason });
     const dead = this.state.ws;
     this.state.ws = null;
     if (dead) {
@@ -747,6 +787,9 @@ export class WebSocketService extends EventEmitter {
     }
     this.clearTimers();
     this.state.status = 'disconnected';
+    // Clear server-stamped identity — see onClose for rationale.
+    this.state.serverConnectionId = null;
+    this.state.serverSubscriptions = new Set();
     this.markStale();
     this.emit('disconnected', { code: 1000, reason, wasClean: true });
     if (!this.state.forceClose && this.options.autoReconnect) {

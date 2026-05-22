@@ -35,6 +35,39 @@ class WebSocketConnectionManager {
         this.sendRegister(clientType, options);
       }
     });
+
+    // Heartbeat-driven subscription reconciliation. The server stamps every
+    // SERVER_HEARTBEAT with its authoritative broadcast-Set membership for
+    // this socket. If our tracked clientTypes are not all present, we silently
+    // re-register the missing ones — self-healing drift within ~15s no matter
+    // what caused it (lost REGISTER, stale Set entry, NAT/tunnel reconnect).
+    wsService.on('subscriptions_changed', (payload: {
+      connectionId: string;
+      subscriptions: string[];
+      connectionIdChanged: boolean;
+    }) => {
+      const serverSubs = new Set(payload.subscriptions);
+      if (payload.connectionIdChanged) {
+        // Different server-side socket than we last saw — re-register
+        // everything; we can't trust prior REGISTERs were delivered to this id.
+        console.warn('[ConnectionManager] Server connectionId changed; re-registering all', {
+          connectionId: payload.connectionId,
+        });
+        for (const [clientType, options] of this.clientTypes) {
+          this.sendRegister(clientType, options);
+        }
+        return;
+      }
+      for (const [clientType, options] of this.clientTypes) {
+        if (!serverSubs.has(clientType)) {
+          console.warn('[ConnectionManager] Server missing subscription; re-registering', {
+            clientType,
+            serverSubs: payload.subscriptions,
+          });
+          this.sendRegister(clientType, options);
+        }
+      }
+    });
   }
 
   /**

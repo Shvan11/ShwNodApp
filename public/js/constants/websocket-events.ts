@@ -11,6 +11,11 @@
 
 export const WebSocketEvents = {
   // Liveness
+  /**
+   * Server → client every 15s. Payload: `{ id, timestamp, connectionId, subscriptions }`.
+   * The connection manager diffs `subscriptions` against tracked clientTypes
+   * and silently re-registers anything the server has forgotten.
+   */
   SERVER_HEARTBEAT: 'server_heartbeat',
 
   // Appointments

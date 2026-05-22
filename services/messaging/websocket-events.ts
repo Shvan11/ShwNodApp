@@ -18,7 +18,15 @@
  */
 export const WebSocketEvents = {
   // Liveness
-  /** Server-pushed liveness heartbeat (server → client every 15s) */
+  /**
+   * Server-pushed liveness heartbeat (server → client every 15s).
+   * Payload: `{ id, timestamp, connectionId, subscriptions }`.
+   * - `connectionId` — server's per-socket id (reuses `extWs.viewerId`).
+   * - `subscriptions` — authoritative broadcast-Set membership for this socket:
+   *   `'daily-appointments' | 'waStatus' | 'auth' | 'chair-display:<chairId>'`.
+   * The client diffs `subscriptions` against its tracked clientTypes and
+   * silently re-registers anything missing, self-healing drift within 15s.
+   */
   SERVER_HEARTBEAT: 'server_heartbeat',
 
   // Appointments

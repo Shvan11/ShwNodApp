@@ -225,9 +225,12 @@ class ConnectionManager {
 
   handleSendError(ws: ExtendedWebSocket, err: Error): void {
     const capabilities = this.clientCapabilities.get(ws);
+    const priorSubscriptions = this.getSubscriptionsForSocket(ws);
     logger.websocket.warn('Send failed; dropping dead socket', {
+      viewerId: ws.viewerId,
       error: err.message,
       type: capabilities?.type,
+      priorSubscriptions,
     });
     this.unregisterConnection(ws);
     try { ws.terminate(); } catch { /* already dead */ }
@@ -288,6 +291,25 @@ class ConnectionManager {
       dailyAppointments: this.dailyAppointmentsConnections.size
     };
   }
+
+  /**
+   * Authoritative list of broadcast Sets this socket is a member of. Published
+   * on every heartbeat so the client can detect subscription drift and
+   * re-register anything that was lost.
+   */
+  getSubscriptionsForSocket(ws: ExtendedWebSocket): string[] {
+    const caps = this.clientCapabilities.get(ws);
+    const subs: string[] = [];
+    if (this.dailyAppointmentsConnections.has(ws)) subs.push('daily-appointments');
+    if (this.waStatusConnections.has(ws)) {
+      // 'auth' and 'waStatus' share the Set — disambiguate via the registered type.
+      subs.push(caps?.type === 'auth' ? 'auth' : 'waStatus');
+    }
+    for (const [chairId, mapped] of this.chairDisplayConnections) {
+      if (mapped === ws) { subs.push(`chair-display:${chairId}`); break; }
+    }
+    return subs;
+  }
 }
 
 // ===========================================
@@ -319,7 +341,7 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
     extWs.viewerId = `${clientIP}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     extWs.on('pong', () => { extWs.isAlive = true; });
 
-    logger.websocket.debug('Client connected', { viewerId: extWs.viewerId });
+    logger.websocket.info('Client connected', { viewerId: extWs.viewerId, clientIP });
 
     connectionManager.registerConnection(extWs, 'generic');
 
@@ -353,10 +375,16 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
         messageState.unregisterQRViewer(extWs.viewerId);
         extWs.qrViewerRegistered = false;
       }
+      // Capture subscription membership BEFORE unregister so the log shows
+      // which broadcast Sets this socket was in when we lost it.
+      const priorSubscriptions = connectionManager.getSubscriptionsForSocket(extWs);
       connectionManager.unregisterConnection(extWs);
-      logger.websocket.debug('Client disconnected', {
+      logger.websocket.info('Client disconnected', {
+        viewerId: extWs.viewerId,
+        clientIP,
         code: code ?? 'n/a',
         reason: reason?.toString() || 'unknown',
+        priorSubscriptions,
       });
     };
 
@@ -406,14 +434,17 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
           case 'waStatus': {
             connectionManager.waStatusConnections.add(ws);
             connectionManager.updateClientCapabilities(ws, { type: 'waStatus' });
-            logger.websocket.debug('Registered waStatus');
+            logger.websocket.info('Registered waStatus', { viewerId: ws.viewerId });
             break;
           }
 
           case 'daily-appointments': {
             connectionManager.dailyAppointmentsConnections.add(ws);
             connectionManager.updateClientCapabilities(ws, { type: 'daily-appointments' });
-            logger.websocket.debug('Registered daily-appointments');
+            logger.websocket.info('Registered daily-appointments', {
+              viewerId: ws.viewerId,
+              setSize: connectionManager.dailyAppointmentsConnections.size,
+            });
             break;
           }
 
@@ -427,9 +458,9 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
             ) {
               messageState.registerQRViewer(ws.viewerId);
               ws.qrViewerRegistered = true;
-              logger.websocket.debug('Registered auth (QR enabled)', { viewerId: ws.viewerId });
+              logger.websocket.info('Registered auth (QR enabled)', { viewerId: ws.viewerId });
             } else {
-              logger.websocket.debug('Registered auth (QR already registered)');
+              logger.websocket.info('Registered auth (QR already registered)', { viewerId: ws.viewerId });
             }
             break;
           }
@@ -451,7 +482,10 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
 
             connectionManager.chairDisplayConnections.set(data.chairId, ws);
             connectionManager.updateClientCapabilities(ws, { type: 'chair-display' });
-            logger.websocket.debug('Registered chair-display', { chairId: data.chairId });
+            logger.websocket.info('Registered chair-display', {
+              viewerId: ws.viewerId,
+              chairId: data.chairId,
+            });
 
             // Replay the cached payload directly — no DB round-trip, exactly
             // the data the kiosk was last showing.
@@ -483,12 +517,15 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
         switch (data.clientType) {
           case 'waStatus':
             connectionManager.waStatusConnections.delete(ws);
-            logger.websocket.debug('Unregistered waStatus');
+            logger.websocket.info('Unregistered waStatus', { viewerId: ws.viewerId });
             break;
 
           case 'daily-appointments':
             connectionManager.dailyAppointmentsConnections.delete(ws);
-            logger.websocket.debug('Unregistered daily-appointments');
+            logger.websocket.info('Unregistered daily-appointments', {
+              viewerId: ws.viewerId,
+              setSize: connectionManager.dailyAppointmentsConnections.size,
+            });
             break;
 
           case 'auth':
@@ -497,7 +534,7 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
               messageState.unregisterQRViewer(ws.viewerId);
               ws.qrViewerRegistered = false;
             }
-            logger.websocket.debug('Unregistered auth');
+            logger.websocket.info('Unregistered auth', { viewerId: ws.viewerId });
             break;
 
           case 'chair-display': {
@@ -510,7 +547,7 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
                 break;
               }
             }
-            logger.websocket.debug('Unregistered chair-display');
+            logger.websocket.info('Unregistered chair-display', { viewerId: ws.viewerId });
             break;
           }
 
@@ -639,10 +676,18 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
         { date: dateParam }
       );
 
+      const setSize = connectionManager.dailyAppointmentsConnections.size;
       const sentCount = connectionManager.broadcastToDailyAppointments(message);
 
-      logger.websocket.info('Broadcast appointment updates', {
-        dailyAppointments: sentCount
+      // sentCount < setSize means the broadcast loop skipped sockets that
+      // weren't in WebSocket.OPEN state — a leading indicator of stale Set
+      // membership (the bug heartbeat reconciliation is designed to heal).
+      logger.websocket.info('Broadcast dispatch', {
+        event: WebSocketEvents.APPOINTMENTS_UPDATED,
+        target: 'dailyAppts',
+        date: dateParam,
+        sentCount,
+        setSize,
       });
     } catch (error) {
       logger.websocket.error('Error broadcasting appointment update', { error: (error as Error).message, date: dateParam });
@@ -850,7 +895,17 @@ function setupPeriodicCleanup(connectionManager: ConnectionManager): void {
   const tcpPingHandle = setInterval(() => {
     for (const ws of connectionManager.allConnections) {
       if (ws.isAlive === false) {
-        ws.terminate();
+        // Synchronously remove from broadcast Sets BEFORE terminate() — the
+        // 'close' event is async and may fire after the next broadcast tick,
+        // leaving the dead socket as a phantom Set member in the meantime.
+        const priorSubscriptions = connectionManager.getSubscriptionsForSocket(ws);
+        logger.websocket.warn('TCP ping termination', {
+          viewerId: ws.viewerId,
+          priorSubscriptions,
+          reason: 'ping miss',
+        });
+        connectionManager.unregisterConnection(ws);
+        try { ws.terminate(); } catch { /* already dead */ }
         continue;
       }
       ws.isAlive = false;
@@ -860,15 +915,26 @@ function setupPeriodicCleanup(connectionManager: ConnectionManager): void {
   tcpPingHandle.unref();
   _periodicTimers.push(tcpPingHandle);
 
-  // Application-level heartbeat: push a JSON SERVER_HEARTBEAT to every open
-  // connection every 15s. Clients use receipt to compute data freshness — the
-  // socket being OPEN is not sufficient evidence that messages still flow.
+  // Application-level heartbeat: push a per-socket SERVER_HEARTBEAT every 15s
+  // carrying { connectionId, subscriptions }. Clients use receipt to compute
+  // freshness (the socket being OPEN is not sufficient evidence that messages
+  // still flow) AND diff the published subscription list against their tracked
+  // clientTypes — any drift is silently re-registered, self-healing the
+  // broadcast Set membership within one heartbeat cycle.
   const heartbeatHandle = setInterval(() => {
-    const heartbeat = createStandardMessage(
-      WebSocketEvents.SERVER_HEARTBEAT,
-      { id: `hb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, timestamp: Date.now() }
-    );
-    connectionManager.broadcastToAll(heartbeat);
+    for (const ws of connectionManager.allConnections) {
+      if (ws.readyState !== WebSocket.OPEN) continue;
+      const hb = createStandardMessage(
+        WebSocketEvents.SERVER_HEARTBEAT,
+        {
+          id: `hb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          timestamp: Date.now(),
+          connectionId: ws.viewerId,
+          subscriptions: connectionManager.getSubscriptionsForSocket(ws),
+        }
+      );
+      try { connectionManager.sendToClient(ws, hb); } catch { /* dropped on next cycle */ }
+    }
   }, 15_000);
   heartbeatHandle.unref(); // Don't block process exit if graceful shutdown is bypassed.
   _periodicTimers.push(heartbeatHandle);
