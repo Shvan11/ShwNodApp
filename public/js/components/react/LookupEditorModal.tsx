@@ -2,13 +2,22 @@ import React, { useState, useEffect, useLayoutEffect, useRef, FormEvent, ChangeE
 import { createPortal } from 'react-dom';
 
 // Types
+interface ReferenceConfig {
+    table: string;
+    idColumn: string;
+    displayColumn: string;
+}
+
 interface ColumnConfig {
     name: string;
     label: string;
     type: string;
     required?: boolean;
     maxLength?: number;
+    reference?: ReferenceConfig;
 }
+
+type ReferenceOption = { id: string | number; label: string };
 
 interface LookupItem {
     [key: string]: any;
@@ -47,7 +56,45 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
     const [errors, setErrors] = useState<FormErrors>({});
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [position, setPosition] = useState<Position | null>(null);
+    const [referenceOptions, setReferenceOptions] = useState<Record<string, ReferenceOption[]>>({});
     const modalRef = useRef<HTMLDivElement>(null);
+
+    // Fetch dropdown options for any reference columns when the modal opens.
+    // Cached per referenced-table name so multiple columns pointing at the same
+    // table share one fetch, and re-opens reuse the cache.
+    useEffect(() => {
+        if (!isOpen) return;
+        const refColumns = columns.filter(c => c.type === 'reference' && c.reference);
+        if (refColumns.length === 0) return;
+
+        const needed = Array.from(new Set(refColumns.map(c => c.reference!.table)))
+            .filter(table => !referenceOptions[table]);
+        if (needed.length === 0) return;
+
+        let cancelled = false;
+        (async () => {
+            const fetched: Record<string, ReferenceOption[]> = {};
+            await Promise.all(needed.map(async (table) => {
+                const refCol = refColumns.find(c => c.reference!.table === table)!.reference!;
+                try {
+                    const res = await fetch(`/api/admin/lookups/${table}`);
+                    if (!res.ok) return;
+                    const rows = await res.json() as LookupItem[];
+                    fetched[table] = rows.map(r => ({
+                        id: r[refCol.idColumn],
+                        label: String(r[refCol.displayColumn] ?? ''),
+                    }));
+                } catch {
+                    // leave undefined; renderInput shows a disabled select
+                }
+            }));
+            if (!cancelled && Object.keys(fetched).length > 0) {
+                setReferenceOptions(prev => ({ ...prev, ...fetched }));
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [isOpen, columns, referenceOptions]);
 
     // Initialize form data when modal opens or editingItem changes
     useEffect(() => {
@@ -227,6 +274,25 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
                         className={errors[column.name] ? 'input-error' : ''}
                     />
                 );
+
+            case 'reference': {
+                const options = column.reference ? referenceOptions[column.reference.table] : undefined;
+                const isLoading = column.reference && !options;
+                return (
+                    <select
+                        id={inputId}
+                        value={value === null || value === undefined ? '' : String(value)}
+                        onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange(column.name, e.target.value)}
+                        disabled={isSaving || isLoading}
+                        className={errors[column.name] ? 'input-error' : ''}
+                    >
+                        <option value="">{isLoading ? 'Loading…' : '— Select —'}</option>
+                        {(options ?? []).map(opt => (
+                            <option key={String(opt.id)} value={String(opt.id)}>{opt.label}</option>
+                        ))}
+                    </select>
+                );
+            }
 
             case 'date': {
                 // Format date value for input (YYYY-MM-DD)

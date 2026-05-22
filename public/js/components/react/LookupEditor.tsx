@@ -4,12 +4,19 @@ import { useToast } from '../../contexts/ToastContext';
 import LookupEditorModal from './LookupEditorModal';
 
 // Types
+interface ReferenceConfig {
+    table: string;
+    idColumn: string;
+    displayColumn: string;
+}
+
 interface ColumnConfig {
     name: string;
     label: string;
     type: string;
     required?: boolean;
     maxLength?: number;
+    reference?: ReferenceConfig;
 }
 
 interface LookupItem {
@@ -250,7 +257,8 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
         if (!searchTerm) return true;
         const lowerSearch = searchTerm.toLowerCase();
         return columns.some(col => {
-            const value = item[col.name];
+            const lookupKey = col.type === 'reference' ? `${col.name}_display` : col.name;
+            const value = item[lookupKey];
             if (value === null || value === undefined) return false;
             return String(value).toLowerCase().includes(lowerSearch);
         });
@@ -258,6 +266,10 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
 
     // Get display value for a cell
     const getCellValue = (item: LookupItem, column: ColumnConfig): React.ReactNode => {
+        if (column.type === 'reference') {
+            const display = item[`${column.name}_display`];
+            return display === null || display === undefined || display === '' ? '-' : String(display);
+        }
         const value = item[column.name];
         if (value === null || value === undefined) return '-';
         if (column.type === 'bit') {

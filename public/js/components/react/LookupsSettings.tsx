@@ -13,12 +13,19 @@ import '../../../css/components/lookup-editor.css';
 const COST_PRESETS_TABLE_KEY = 'tblEstimatedCostPresets';
 
 // Types
+interface ReferenceConfig {
+    table: string;
+    idColumn: string;
+    displayColumn: string;
+}
+
 interface ColumnConfig {
     name: string;
     label: string;
     type: string;
     required?: boolean;
     maxLength?: number;
+    reference?: ReferenceConfig;
 }
 
 interface TableConfig {
@@ -107,7 +114,7 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
         {
             name: 'Financial',
             icon: 'fas fa-dollar-sign',
-            keys: [COST_PRESETS_TABLE_KEY]
+            keys: [COST_PRESETS_TABLE_KEY, 'tblExpenseCategories', 'tblExpenseSubcategories']
         }
     ];
 

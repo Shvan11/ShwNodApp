@@ -8,12 +8,26 @@ import type { ColumnValue } from '../../../types/database.types.js';
 import { executeQuery, TYPES, SqlParam, TediousType } from '../index.js';
 
 // Type definitions
+interface ReferenceConfig {
+  table: string;
+  idColumn: string;
+  displayColumn: string;
+}
+
 interface ColumnConfig {
   name: string;
   label: string;
-  type: 'int' | 'varchar' | 'nvarchar' | 'bit' | 'uniqueidentifier' | 'date';
+  type: 'int' | 'varchar' | 'nvarchar' | 'bit' | 'uniqueidentifier' | 'date' | 'reference';
   maxLength?: number;
   required?: boolean;
+  reference?: ReferenceConfig;
+}
+
+export class ReferentialError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ReferentialError';
+  }
 }
 
 interface LookupTableConfig {
@@ -199,6 +213,35 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
       { name: 'MyTime', label: 'Time', type: 'varchar', maxLength: 30, required: true },
     ],
   },
+  tblExpenseCategories: {
+    tableName: 'tblExpenseCategories',
+    idColumn: 'CategoryID',
+    displayColumn: 'CategoryName',
+    displayName: 'Expense Categories',
+    icon: 'fas fa-folder',
+    idType: 'int',
+    columns: [
+      { name: 'CategoryName', label: 'Category Name', type: 'nvarchar', maxLength: 50, required: true },
+    ],
+  },
+  tblExpenseSubcategories: {
+    tableName: 'tblExpenseSubcategories',
+    idColumn: 'SubcategoryID',
+    displayColumn: 'SubcategoryName',
+    displayName: 'Expense Subcategories',
+    icon: 'fas fa-folder-open',
+    idType: 'int',
+    columns: [
+      { name: 'SubcategoryName', label: 'Name', type: 'nvarchar', maxLength: 100, required: true },
+      {
+        name: 'CategoryID',
+        label: 'Category',
+        type: 'reference',
+        required: true,
+        reference: { table: 'tblExpenseCategories', idColumn: 'CategoryID', displayColumn: 'CategoryName' },
+      },
+    ],
+  },
 };
 
 /**
@@ -207,6 +250,7 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
 function mapSqlType(typeStr: string): TediousType {
   const typeMap: Record<string, TediousType> = {
     int: TYPES.Int,
+    reference: TYPES.Int,
     varchar: TYPES.VarChar,
     nvarchar: TYPES.NVarChar,
     bit: TYPES.Bit,
@@ -245,11 +289,29 @@ export async function getLookupItems(tableKey: string): Promise<LookupItem[]> {
     throw new Error(`Invalid lookup table: ${tableKey}`);
   }
 
-  const columnNames = [config.idColumn, ...config.columns.map((c) => c.name)];
+  const baseAlias = 't';
+  const selectParts: string[] = [
+    `${baseAlias}.${config.idColumn}`,
+    ...config.columns.map((c) => `${baseAlias}.${c.name}`),
+  ];
+  const joinParts: string[] = [];
+
+  config.columns.forEach((col, idx) => {
+    if (col.type === 'reference' && col.reference) {
+      const joinAlias = `r${idx}`;
+      joinParts.push(
+        `LEFT JOIN dbo.${col.reference.table} AS ${joinAlias} ` +
+          `ON ${joinAlias}.${col.reference.idColumn} = ${baseAlias}.${col.name}`
+      );
+      selectParts.push(`${joinAlias}.${col.reference.displayColumn} AS ${col.name}_display`);
+    }
+  });
+
   const query = `
-    SELECT ${columnNames.join(', ')}
-    FROM dbo.${config.tableName}
-    ORDER BY ${config.displayColumn}
+    SELECT ${selectParts.join(', ')}
+    FROM dbo.${config.tableName} AS ${baseAlias}
+    ${joinParts.join(' ')}
+    ORDER BY ${baseAlias}.${config.displayColumn}
   `;
 
   return executeQuery<LookupItem>(query, [], (columns: ColumnValue[]) => {
@@ -298,7 +360,12 @@ export async function createLookupItem(
     // Handle type conversions
     if (col.type === 'bit') {
       value = value === true || value === 'true' || value === 1 ? 1 : 0;
-    } else if (col.type === 'int' && value !== null && value !== undefined && value !== '') {
+    } else if (
+      (col.type === 'int' || col.type === 'reference') &&
+      value !== null &&
+      value !== undefined &&
+      value !== ''
+    ) {
       value = parseInt(value as string, 10);
       if (isNaN(value as number)) value = null;
     }
@@ -342,7 +409,12 @@ export async function updateLookupItem(
     // Handle type conversions
     if (col.type === 'bit') {
       value = value === true || value === 'true' || value === 1 ? 1 : 0;
-    } else if (col.type === 'int' && value !== null && value !== undefined && value !== '') {
+    } else if (
+      (col.type === 'int' || col.type === 'reference') &&
+      value !== null &&
+      value !== undefined &&
+      value !== ''
+    ) {
       value = parseInt(value as string, 10);
       if (isNaN(value as number)) value = null;
     }
@@ -371,7 +443,17 @@ export async function deleteLookupItem(tableKey: string, id: string | number): P
   `;
 
   const idType = mapSqlType(config.idType);
-  await executeQuery(query, [['id', idType, id]]);
+  try {
+    await executeQuery(query, [['id', idType, id]]);
+  } catch (err) {
+    const sqlNumber = (err as { number?: number }).number;
+    if (sqlNumber === 547) {
+      throw new ReferentialError(
+        'Cannot delete: this item is still referenced elsewhere.'
+      );
+    }
+    throw err;
+  }
 }
 
 /**

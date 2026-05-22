@@ -14,7 +14,8 @@ import {
   updateLookupItem,
   deleteLookupItem,
   isValidTableKey,
-  getTableConfig
+  getTableConfig,
+  ReferentialError
 } from '../../services/database/queries/lookup-admin-queries.js';
 import { ErrorResponses } from '../../utils/error-response.js';
 
@@ -238,6 +239,17 @@ router.delete(
         message: 'Item deleted successfully'
       });
     } catch (error) {
+      if (error instanceof ReferentialError) {
+        log.info('Refused to delete lookup item: still referenced', {
+          table: req.params.tableName,
+          id: req.params.id
+        });
+        res.status(409).json({
+          success: false,
+          error: error.message
+        });
+        return;
+      }
       log.error('Error deleting lookup item:', {
         table: req.params.tableName,
         id: req.params.id,
