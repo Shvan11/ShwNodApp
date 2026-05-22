@@ -19,11 +19,24 @@ import qrcode from 'qrcode';
 const ORTHO_WORK_TYPE_IDS: ReadonlySet<number> = new Set([1, 2, 11, 19, 20]);
 const CHAIR_DISPLAY_INTRAORAL_EXTS = ['.i20', '.i22', '.i21'] as const;
 
-// Process-local map of which patient is currently loaded on each chair. Used
-// to replay the patient-loaded event when a kiosk reconnects after a network
-// blip. Lost on server restart by design — staff one-click restores via the
-// next patient-loaded POST.
-const chairCurrentPatient = new Map<string, { personId: number; loadedAt: number }>();
+/**
+ * Payload shape sent to the chair-display kiosk when a patient is loaded.
+ * Same shape goes out on the initial broadcast and on reconnect replay.
+ */
+interface ChairPatientPayload {
+  pid: string;
+  name: string | null;
+  images: Array<{ name: string }>;
+  latestVisit: { VisitDate?: Date; Summary?: string | null } | null | undefined;
+}
+
+/**
+ * Process-local cache of the most recent patient-loaded payload per chair.
+ * Used to replay on kiosk reconnect without re-hitting the database — the
+ * UX matches a never-disconnected kiosk (same data the chair was already
+ * showing) and the reconnect is free. Lost on server restart by design.
+ */
+const chairCurrentPatient = new Map<string, { payload: ChairPatientPayload; loadedAt: number }>();
 
 // Drop stale replay entries on read instead of running a sweep timer.
 // 12 h covers a workday + buffer; staff arriving the next morning will not
@@ -40,23 +53,12 @@ const CHAIR_PATIENT_REPLAY_TTL_MS = 12 * 60 * 60 * 1000;
 type ConnectionType = 'chair-display' | 'waStatus' | 'auth' | 'daily-appointments' | 'generic';
 
 /**
- * Connection metadata for different client types
- */
-interface ConnectionMetadata {
-  chairId?: string;
-  date?: string | null;
-  ipAddress?: string;
-  viewerId?: string;
-}
-
-/**
- * Client capabilities stored for each connection
+ * Per-socket bookkeeping kept on the connection manager.
+ * `type` is informational (used by the inactivity sweep to skip chair-displays);
+ * `lastActivity` drives the same sweep.
  */
 interface ClientCapabilities {
   type: ConnectionType;
-  metadata: ConnectionMetadata;
-  supportsJson: boolean;
-  supportsPing: boolean;
   lastActivity: number;
 }
 
@@ -104,6 +106,11 @@ interface PatientImage {
  */
 class ConnectionManager {
   chairDisplayConnections: Map<string, ExtendedWebSocket>;
+  /**
+   * Holds both 'waStatus' and 'auth' sockets — auth clients also need the
+   * QR_UPDATE / CLIENT_READY / message-status broadcasts that go through
+   * this Set. The name reflects the broadcast channel, not the client type.
+   */
   waStatusConnections: Set<ExtendedWebSocket>;
   dailyAppointmentsConnections: Set<ExtendedWebSocket>;
   allConnections: Set<ExtendedWebSocket>;
@@ -117,20 +124,13 @@ class ConnectionManager {
     this.clientCapabilities = new WeakMap();
   }
 
-  registerConnection(ws: ExtendedWebSocket, type: ConnectionType, metadata: ConnectionMetadata = {}): void {
+  registerConnection(ws: ExtendedWebSocket, type: ConnectionType): void {
     // Every new socket enters as 'generic' and joins allConnections only.
     // Type-specific Set/Map membership is established later via the
-    // REGISTER_CLIENT_TYPE message — this collapses the dual registration
-    // paths (URL params + REGISTER) into one and removes the silent broadcast
-    // loss after auto-reconnect (where URL params were dropped).
+    // REGISTER_CLIENT_TYPE message — single registration path, survives
+    // auto-reconnect (where URL params would have been dropped).
     this.allConnections.add(ws);
-    this.clientCapabilities.set(ws, {
-      type,
-      metadata,
-      supportsJson: true,
-      supportsPing: true,
-      lastActivity: Date.now()
-    });
+    this.clientCapabilities.set(ws, { type, lastActivity: Date.now() });
   }
 
   unregisterConnection(ws: ExtendedWebSocket): void {
@@ -206,31 +206,20 @@ class ConnectionManager {
   }
 
   sendToClient(ws: ExtendedWebSocket, message: unknown): void {
-    const capabilities = this.clientCapabilities.get(ws) || { supportsJson: true };
-    let formattedMessage: string;
-
-    if (typeof message === 'string') {
-      formattedMessage = message;
-    } else if (capabilities.supportsJson) {
-      formattedMessage = JSON.stringify(message);
-    } else {
-      formattedMessage = typeof (message as { toString?: () => string }).toString === 'function'
-        ? (message as { toString: () => string }).toString()
-        : String(message);
-    }
+    const formattedMessage = typeof message === 'string' ? message : JSON.stringify(message);
 
     // Callback form so async write errors (ECONNRESET, EPIPE, clean proxy
-    // RSTs from Cloudflare Tunnel idle drops) clean up the dead socket within
-    // one heartbeat cycle instead of waiting up to 60s for the TCP ping sweep.
+    // RSTs from Cloudflare Tunnel idle drops) clean up the dead socket
+    // within one heartbeat cycle instead of waiting for the TCP ping sweep.
     // Doesn't help with silent mobile NAT drops — those still need the TCP
     // ping (no error packet ever arrives to trigger the callback).
     ws.send(formattedMessage, (err) => {
       if (err) this.handleSendError(ws, err);
     });
 
-    const fullCapabilities = this.clientCapabilities.get(ws);
-    if (fullCapabilities) {
-      fullCapabilities.lastActivity = Date.now();
+    const capabilities = this.clientCapabilities.get(ws);
+    if (capabilities) {
+      capabilities.lastActivity = Date.now();
     }
   }
 
@@ -332,7 +321,7 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
 
     logger.websocket.debug('Client connected', { viewerId: extWs.viewerId });
 
-    connectionManager.registerConnection(extWs, 'generic', { ipAddress: clientIP });
+    connectionManager.registerConnection(extWs, 'generic');
 
     extWs.on('message', async (message: RawData) => {
       try {
@@ -416,12 +405,8 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
         switch (data.clientType) {
           case 'waStatus': {
             connectionManager.waStatusConnections.add(ws);
-            const existing = connectionManager.clientCapabilities.get(ws);
-            connectionManager.updateClientCapabilities(ws, {
-              type: 'waStatus',
-              metadata: { ...(existing?.metadata ?? {}), date: data.date ?? null },
-            });
-            logger.websocket.debug('Registered waStatus', { date: data.date ?? null });
+            connectionManager.updateClientCapabilities(ws, { type: 'waStatus' });
+            logger.websocket.debug('Registered waStatus');
             break;
           }
 
@@ -465,24 +450,22 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
             }
 
             connectionManager.chairDisplayConnections.set(data.chairId, ws);
-            connectionManager.updateClientCapabilities(ws, {
-              type: 'chair-display',
-              metadata: { chairId: data.chairId },
-            });
+            connectionManager.updateClientCapabilities(ws, { type: 'chair-display' });
             logger.websocket.debug('Registered chair-display', { chairId: data.chairId });
 
-            // Replay current patient if recorded and not stale.
+            // Replay the cached payload directly — no DB round-trip, exactly
+            // the data the kiosk was last showing.
             const stored = chairCurrentPatient.get(data.chairId);
             if (stored && Date.now() - stored.loadedAt < CHAIR_PATIENT_REPLAY_TTL_MS) {
               logger.websocket.debug('Replaying patient-loaded on chair-display REGISTER', {
                 chairId: data.chairId,
-                personId: stored.personId,
+                pid: stored.payload.pid,
               });
-              wsEmitter.emit(
+              const replay = createStandardMessage(
                 WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,
-                String(stored.personId),
-                data.chairId,
+                stored.payload as unknown as Record<string, unknown>,
               );
+              connectionManager.sendToChairDisplay(data.chairId, replay);
             } else if (stored) {
               chairCurrentPatient.delete(data.chairId);
             }
@@ -668,26 +651,19 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
 
   emitter.on(InternalEmitterEvents.DATA_UPDATED, handleAppointmentUpdate);
 
-  // Chair-display: patient loaded
+  // Chair-display: patient loaded. Builds the payload once from the DB,
+  // caches it, and broadcasts to the kiosk. A later kiosk reconnect replays
+  // straight from the cache in the REGISTER handler — no DB round-trip.
   const handleChairDisplayPatientLoaded = async (pid: string, targetChairId: string): Promise<void> => {
     logger.websocket.info('Chair-display patient loaded', { patientId: pid, chairId: targetChairId });
 
-    const parsedId = parseInt(pid, 10);
-    if (Number.isFinite(parsedId) && parsedId > 0) {
-      // Record state even if the kiosk isn't currently connected — a later
-      // reconnect will trigger replay using this entry.
-      chairCurrentPatient.set(targetChairId, { personId: parsedId, loadedAt: Date.now() });
-    }
-
-    const chairConnection = connectionManager.chairDisplayConnections.get(targetChairId);
-    if (!chairConnection || chairConnection.readyState !== WebSocket.OPEN) {
-      logger.websocket.debug('Chair display not connected', { chairId: targetChairId });
+    const personId = parseInt(pid, 10);
+    if (!Number.isFinite(personId) || personId <= 0) {
+      logger.websocket.warn('Invalid personId for chair-display load', { pid });
       return;
     }
 
     try {
-      const personId = parseInt(pid, 10);
-
       const allImages = await getPatientImagesLocal(pid);
       const filteredImages = allImages.filter(img =>
         CHAIR_DISPLAY_INTRAORAL_EXTS.some(ext => img.name.toLowerCase().endsWith(ext))
@@ -710,16 +686,27 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
         [patientRecord?.FirstName, patientRecord?.LastName].filter(Boolean).join(' ').trim() ||
         null;
 
+      const payload: ChairPatientPayload = {
+        pid,
+        name,
+        images: filteredImages,
+        latestVisit,
+      };
+
+      // Cache the built payload — kiosk reconnect replays from this without
+      // re-running the queries above.
+      chairCurrentPatient.set(targetChairId, { payload, loadedAt: Date.now() });
+
+      const chairConnection = connectionManager.chairDisplayConnections.get(targetChairId);
+      if (!chairConnection || chairConnection.readyState !== WebSocket.OPEN) {
+        logger.websocket.debug('Chair display not connected; payload cached for replay', { chairId: targetChairId });
+        return;
+      }
+
       const message = createStandardMessage(
         WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED,
-        {
-          pid,
-          name,
-          images: filteredImages,
-          latestVisit
-        }
+        payload as unknown as Record<string, unknown>,
       );
-
       const success = connectionManager.sendToChairDisplay(targetChairId, message);
 
       if (success) {
@@ -747,7 +734,7 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
     }
   };
 
-  emitter.on(WebSocketEvents.CHAIR_DISPLAY_PATIENT_LOADED, handleChairDisplayPatientLoaded);
+  emitter.on(InternalEmitterEvents.CHAIR_PATIENT_LOAD, handleChairDisplayPatientLoaded);
 
   // Chair-display: patient cleared
   const handleChairDisplayPatientCleared = (targetChairId: string): void => {
@@ -775,7 +762,7 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
     }
   };
 
-  emitter.on(WebSocketEvents.CHAIR_DISPLAY_PATIENT_CLEARED, handleChairDisplayPatientCleared);
+  emitter.on(InternalEmitterEvents.CHAIR_PATIENT_CLEAR, handleChairDisplayPatientCleared);
 
   // Route pre-formed broadcast messages emitted by routes/services to the
   // appropriate connection-set fan-out based on the message's `type`.

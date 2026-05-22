@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AnalogClock from '../components/react/AnalogClock';
 import { WebSocketEvents } from '../constants/websocket-events';
+import {
+  LIVENESS_STALE_THRESHOLD_MS,
+  VISIBILITY_RESUME_THRESHOLD_MS,
+} from '../constants/websocket-liveness';
 import styles from './ChairDisplay.module.css';
 
 interface ImageEntry {
@@ -55,13 +59,10 @@ const buildWsUrl = (): string => {
     return `${protocol}//${host}/`;
 };
 
-// Trigger a forced reconnect if the kiosk hasn't seen any message (including
-// the 15s server heartbeat) in this many ms. Tolerates one missed heartbeat.
-const KIOSK_STALE_THRESHOLD_MS = 35_000;
+// Poll cadence is kiosk-specific (less aggressive than the singleton's 5s — no
+// UI indicator to drive). Stale + visibility-resume thresholds are shared with
+// the singleton so they can't drift on a tuning pass.
 const KIOSK_LIVENESS_POLL_MS = 10_000;
-// Only force a reconnect on visibility-return if the tab was hidden for at
-// least this long — short Alt-Tabs don't need disruption.
-const KIOSK_VISIBILITY_RESUME_MS = 2 * 60 * 1000;
 
 const ChairDisplay = () => {
     const [searchParams] = useSearchParams();
@@ -146,12 +147,12 @@ const ChairDisplay = () => {
         connect();
 
         // Liveness check: if no message (including 15s SERVER_HEARTBEAT) has
-        // arrived in KIOSK_STALE_THRESHOLD_MS, force-close the socket so the
-        // reconnect path runs and the indicator flips to "Reconnecting…".
+        // arrived in LIVENESS_STALE_THRESHOLD_MS, force-close the socket so
+        // the reconnect path runs and the indicator flips to "Reconnecting…".
         const livenessInterval = window.setInterval(() => {
             if (cancelled) return;
             const elapsed = performance.now() - lastMessageAtRef.current;
-            if (elapsed > KIOSK_STALE_THRESHOLD_MS && wsRef.current) {
+            if (elapsed > LIVENESS_STALE_THRESHOLD_MS && wsRef.current) {
                 try {
                     wsRef.current.close(1000, 'liveness timeout');
                 } catch {
@@ -168,7 +169,7 @@ const ChairDisplay = () => {
             }
             const since = hiddenSinceRef.current;
             hiddenSinceRef.current = null;
-            if (since && performance.now() - since > KIOSK_VISIBILITY_RESUME_MS && wsRef.current) {
+            if (since && performance.now() - since > VISIBILITY_RESUME_THRESHOLD_MS && wsRef.current) {
                 try {
                     wsRef.current.close(1000, 'visibility resume');
                 } catch {

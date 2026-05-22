@@ -13,6 +13,10 @@
  */
 import EventEmitter from '../core/events';
 import { WebSocketEvents } from '../constants/websocket-events';
+import {
+  LIVENESS_STALE_THRESHOLD_MS,
+  VISIBILITY_RESUME_THRESHOLD_MS,
+} from '../constants/websocket-liveness';
 
 // Type definitions
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
@@ -23,14 +27,6 @@ export type Freshness = 'fresh' | 'stale';
 const FRESHNESS_STALE_THRESHOLD_MS = 30_000;
 // Internal poll cadence for freshness transitions; throttled by browser when tab is hidden.
 const FRESHNESS_POLL_INTERVAL_MS = 5_000;
-// Force-close the socket when no message (including 15s server heartbeat) has
-// arrived in this window — survives one missed heartbeat plus jitter buffer.
-// Mirrors the chair-display kiosk pattern (KIOSK_STALE_THRESHOLD_MS).
-const LIVENESS_STALE_THRESHOLD_MS = 35_000;
-// On visibility-return, only force a reconnect if the tab was hidden longer
-// than this — short Alt-Tabs don't need disruption; NAT/tunnel idle drops
-// take minutes to manifest.
-const VISIBILITY_RESUME_THRESHOLD_MS = 2 * 60 * 1000;
 
 export interface WebSocketOptions {
   baseUrl?: string;
@@ -77,7 +73,6 @@ interface WebSocketState {
   ws: WebSocket | null;
   reconnectAttempts: number;
   lastMessageId: number;
-  lastActivity: number;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   messageQueue: QueuedMessage[];
   pendingMessages: Map<number, PendingMessage>;
@@ -146,7 +141,6 @@ export class WebSocketService extends EventEmitter {
       ws: null,
       reconnectAttempts: 0,
       lastMessageId: 0,
-      lastActivity: Date.now(),
       reconnectTimer: null,
       messageQueue: [],
       pendingMessages: new Map(),
@@ -483,9 +477,6 @@ export class WebSocketService extends EventEmitter {
       );
       this.state.ws!.send(messageData);
 
-      // Update last activity
-      this.state.lastActivity = Date.now();
-
       // If expecting response, return promise
       if (sendOptions.expectResponse) {
         return new Promise((resolve, reject) => {
@@ -527,7 +518,6 @@ export class WebSocketService extends EventEmitter {
     // Update state
     this.state.status = 'connected';
     this.state.reconnectAttempts = 0;
-    this.state.lastActivity = Date.now();
     const wasReconnect = this.state.hasConnectedBefore;
     this.state.hasConnectedBefore = true;
 
@@ -590,10 +580,8 @@ export class WebSocketService extends EventEmitter {
    * Handle WebSocket message event
    */
   private onMessage(event: MessageEvent): void {
-    // Update last activity and freshness on every message receipt. Using
-    // performance.now() so a wall-clock jump (NTP sync, suspend/resume) can't
-    // mask staleness.
-    this.state.lastActivity = Date.now();
+    // Update freshness on every message receipt. Using performance.now() so
+    // a wall-clock jump (NTP sync, suspend/resume) can't mask staleness.
     this.state.lastMessageReceivedAtMonotonic = performance.now();
     if (this.state.lastEmittedFreshness !== 'fresh') {
       this.state.lastEmittedFreshness = 'fresh';
