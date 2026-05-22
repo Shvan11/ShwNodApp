@@ -1,6 +1,15 @@
 /**
  * WebSocket Service
- * A robust WebSocket client with automatic reconnection, heartbeat, and message queuing
+ *
+ * A robust WebSocket client with automatic reconnection, message queuing,
+ * and freshness tracking. Liveness is enforced by:
+ *   1. The server's TCP-level ws.ping() (30 s).
+ *   2. A SERVER_HEARTBEAT message every 15 s — receipt drives the freshness signal.
+ *   3. A 5 s freshness-poll zombie killer that force-reconnects if no message
+ *      (including SERVER_HEARTBEAT) has arrived in 35 s.
+ *
+ * There is no client→server heartbeat ping; the freshness-poll catches everything
+ * a client-side ping could detect, faster.
  */
 import EventEmitter from '../core/events';
 import { WebSocketEvents } from '../constants/websocket-events';
@@ -31,8 +40,6 @@ export interface WebSocketOptions {
   maxReconnectAttempts?: number | null;
   initialConnectionTimeout?: number;
   reconnectionTimeout?: number;
-  heartbeatInterval?: number;
-  heartbeatTimeout?: number;
   maxQueueSize?: number;
   autoReconnect?: boolean;
   autoConnect?: boolean;
@@ -72,8 +79,6 @@ interface WebSocketState {
   lastMessageId: number;
   lastActivity: number;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
-  heartbeatTimer: ReturnType<typeof setTimeout> | null;
-  heartbeatTimeoutTimer: ReturnType<typeof setTimeout> | null;
   messageQueue: QueuedMessage[];
   pendingMessages: Map<number, PendingMessage>;
   forceClose: boolean;
@@ -125,10 +130,6 @@ export class WebSocketService extends EventEmitter {
       initialConnectionTimeout: 45000,
       reconnectionTimeout: 15000,
 
-      // Heartbeat configuration
-      heartbeatInterval: 60000,
-      heartbeatTimeout: 30000,
-
       // Message handling
       maxQueueSize: 100,
       autoReconnect: true,
@@ -147,8 +148,6 @@ export class WebSocketService extends EventEmitter {
       lastMessageId: 0,
       lastActivity: Date.now(),
       reconnectTimer: null,
-      heartbeatTimer: null,
-      heartbeatTimeoutTimer: null,
       messageQueue: [],
       pendingMessages: new Map(),
       forceClose: false,
@@ -532,9 +531,6 @@ export class WebSocketService extends EventEmitter {
     const wasReconnect = this.state.hasConnectedBefore;
     this.state.hasConnectedBefore = true;
 
-    // Start heartbeat
-    this.startHeartbeat();
-
     // Process queued messages
     this.processQueue();
 
@@ -622,27 +618,6 @@ export class WebSocketService extends EventEmitter {
 
       // SERVER_HEARTBEAT is a freshness signal only — consume silently.
       if (typeof message === 'object' && msgObj.type === WebSocketEvents.SERVER_HEARTBEAT) {
-        return;
-      }
-
-      // Check if it's a heartbeat/ping response
-      if (
-        typeof message === 'object' &&
-        (msgObj.type === WebSocketEvents.HEARTBEAT_PING ||
-          msgObj.type === WebSocketEvents.HEARTBEAT_PONG)
-      ) {
-        if (msgObj.type === WebSocketEvents.HEARTBEAT_PING) {
-          this.send({ type: WebSocketEvents.HEARTBEAT_PONG }, { queueIfDisconnected: false });
-        } else if (msgObj.type === WebSocketEvents.HEARTBEAT_PONG) {
-          this.log('Received heartbeat pong response');
-
-          if (this.state.heartbeatTimeoutTimer) {
-            clearTimeout(this.state.heartbeatTimeoutTimer);
-            this.state.heartbeatTimeoutTimer = null;
-          }
-
-          this.scheduleNextHeartbeat();
-        }
         return;
       }
 
@@ -828,45 +803,6 @@ export class WebSocketService extends EventEmitter {
   }
 
   /**
-   * Set heartbeat timeout
-   */
-  private setHeartbeatTimeout(): void {
-    if (this.state.heartbeatTimeoutTimer) {
-      clearTimeout(this.state.heartbeatTimeoutTimer);
-    }
-
-    this.log('Setting heartbeat timeout timer');
-
-    this.state.heartbeatTimeoutTimer = setTimeout(() => {
-      this.log('Heartbeat timeout - no pong received');
-
-      if (this.state.ws && this.state.ws.readyState === WebSocket.OPEN) {
-        this.log('Forcing close due to heartbeat timeout');
-        this.state.ws.close(1000, 'Heartbeat timeout');
-        this.state.ws = null;
-        this.state.status = 'disconnected';
-        this.scheduleReconnect();
-      }
-    }, this.options.heartbeatTimeout);
-  }
-
-  /**
-   * Schedule next heartbeat
-   */
-  private scheduleNextHeartbeat(delay: number | null = null): void {
-    if (this.state.heartbeatTimer) {
-      clearTimeout(this.state.heartbeatTimer);
-    }
-
-    const interval = delay || this.options.heartbeatInterval;
-    this.log(`Scheduling next heartbeat in ${interval}ms`);
-
-    this.state.heartbeatTimer = setTimeout(() => {
-      this.sendHeartbeat();
-    }, interval);
-  }
-
-  /**
    * Process queued messages
    */
   private processQueue(): void {
@@ -961,65 +897,12 @@ export class WebSocketService extends EventEmitter {
   }
 
   /**
-   * Start heartbeat
-   */
-  private startHeartbeat(): void {
-    this.log('Starting heartbeat');
-    this.clearHeartbeatTimers();
-    this.sendHeartbeat();
-  }
-
-  /**
-   * Clear heartbeat timers
-   */
-  private clearHeartbeatTimers(): void {
-    if (this.state.heartbeatTimer) {
-      this.log('Clearing existing heartbeat timer');
-      clearTimeout(this.state.heartbeatTimer);
-      this.state.heartbeatTimer = null;
-    }
-
-    if (this.state.heartbeatTimeoutTimer) {
-      this.log('Clearing existing heartbeat timeout timer');
-      clearTimeout(this.state.heartbeatTimeoutTimer);
-      this.state.heartbeatTimeoutTimer = null;
-    }
-  }
-
-  /**
-   * Send heartbeat
-   */
-  private sendHeartbeat(): void {
-    this.log('Sending heartbeat (ping)');
-
-    this.send({ type: WebSocketEvents.HEARTBEAT_PING }, { queueIfDisconnected: false })
-      .then(() => {
-        this.log('Heartbeat (ping) sent successfully');
-        this.setHeartbeatTimeout();
-      })
-      .catch((error) => {
-        this.log('Error sending heartbeat:', error);
-        this.scheduleNextHeartbeat(5000);
-      });
-  }
-
-  /**
    * Clear all timers
    */
   private clearTimers(): void {
     if (this.state.reconnectTimer) {
       clearTimeout(this.state.reconnectTimer);
       this.state.reconnectTimer = null;
-    }
-
-    if (this.state.heartbeatTimer) {
-      clearTimeout(this.state.heartbeatTimer);
-      this.state.heartbeatTimer = null;
-    }
-
-    if (this.state.heartbeatTimeoutTimer) {
-      clearTimeout(this.state.heartbeatTimeoutTimer);
-      this.state.heartbeatTimeoutTimer = null;
     }
   }
 

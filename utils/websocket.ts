@@ -9,7 +9,7 @@ import { getLatestVisitsSum } from '../services/database/queries/visit-queries.j
 import { getActiveWork } from '../services/database/queries/work-queries.js';
 import { getPatientById } from '../services/database/queries/patient-queries.js';
 import { createWebSocketMessage, validateWebSocketMessage, MessageSchemas } from '../services/messaging/schemas.js';
-import { WebSocketEvents, createStandardMessage } from '../services/messaging/websocket-events.js';
+import { WebSocketEvents, InternalEmitterEvents, createStandardMessage } from '../services/messaging/websocket-events.js';
 import { logger } from '../services/core/Logger.js';
 import stateEvents from '../services/state/stateEvents.js';
 import qrcode from 'qrcode';
@@ -415,24 +415,6 @@ function setupWebSocketServer(server: HTTPServer): EventEmitter {
 
     // Handle different message types
     switch (message.type) {
-      case WebSocketEvents.HEARTBEAT_PING: {
-        const pongMessage = {
-          type: WebSocketEvents.HEARTBEAT_PONG,
-          timestamp: Date.now(),
-          originalId: message.id
-        };
-        connectionManager.sendToClient(ws, pongMessage);
-        break;
-      }
-
-      case WebSocketEvents.HEARTBEAT_PONG:
-        connectionManager.updateClientCapabilities(ws, { supportsPing: true });
-        break;
-
-      case WebSocketEvents.CLIENT_CAPABILITIES:
-        connectionManager.updateClientCapabilities(ws, (message.data?.capabilities as Partial<ClientCapabilities>) || {});
-        break;
-
       case WebSocketEvents.REQUEST_WHATSAPP_INITIAL_STATE:
         logger.websocket.debug('Received request for initial state via WebSocket');
         await sendInitialStateForWaClient(ws, message.data, connectionManager);
@@ -697,7 +679,7 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
     }
   };
 
-  emitter.on(WebSocketEvents.DATA_UPDATED, handleAppointmentUpdate);
+  emitter.on(InternalEmitterEvents.DATA_UPDATED, handleAppointmentUpdate);
 
   // Chair-display: patient loaded
   const handleChairDisplayPatientLoaded = async (pid: string, targetChairId: string): Promise<void> => {
@@ -808,47 +790,9 @@ function setupGlobalEventHandlers(emitter: EventEmitter, connectionManager: Conn
 
   emitter.on(WebSocketEvents.CHAIR_DISPLAY_PATIENT_CLEARED, handleChairDisplayPatientCleared);
 
-  // WhatsApp message updates with batching
-  const statusUpdateBuffer = new Map<string, Array<{ messageId: string; status: string }>>();
-  const BATCH_DELAY = 1000;
-
-  emitter.on('wa_message_update', (messageId: string, status: string, date: string) => {
-    logger.websocket.debug('WhatsApp message update', { messageId, status, date });
-
-    if (!statusUpdateBuffer.has(date)) {
-      statusUpdateBuffer.set(date, []);
-    }
-
-    statusUpdateBuffer.get(date)!.push({ messageId, status });
-
-    setTimeout(() => {
-      const updates = statusUpdateBuffer.get(date);
-      if (updates && updates.length > 0) {
-        const message = createWebSocketMessage(
-          MessageSchemas.WebSocketMessage.BATCH_STATUS,
-          {
-            statusUpdates: updates,
-            date
-          }
-        );
-
-        const dateFilter: BroadcastFilter = (_ws, capabilities) => {
-          if (!date) return true;
-          return capabilities !== undefined &&
-                 capabilities.metadata !== undefined &&
-                 capabilities.metadata.date === date;
-        };
-
-        const updateCount = connectionManager.broadcastToWaStatus(message, dateFilter);
-        logger.websocket.info('Broadcast batched WhatsApp updates', { updateCount });
-
-        statusUpdateBuffer.delete(date);
-      }
-    }, BATCH_DELAY);
-  });
-
-  // Broadcast messages
-  emitter.on('broadcast_message', (message: { type: string }) => {
+  // Route pre-formed broadcast messages emitted by routes/services to the
+  // appropriate connection-set fan-out based on the message's `type`.
+  emitter.on(InternalEmitterEvents.BROADCAST_MESSAGE, (message: { type: string }) => {
     const validation = validateWebSocketMessage(message);
     if (!validation.valid) {
       logger.websocket.warn('Invalid message format', { error: validation.error });

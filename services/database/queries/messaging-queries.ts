@@ -4,6 +4,7 @@
  */
 import { executeStoredProcedure, TYPES } from '../index.js';
 import { createWebSocketMessage, MessageSchemas } from '../../messaging/schemas.js';
+import { InternalEmitterEvents } from '../../messaging/websocket-events.js';
 import { logger } from '../../core/Logger.js';
 
 // Type definitions
@@ -663,7 +664,7 @@ export async function batchUpdateMessageStatuses(
         stats: result.stats,
       });
 
-      wsEmitter.emit('broadcast_message', message);
+      wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
       logger.message.info('Batch status update broadcasted via WebSocket', {
         messageCount: updates.length,
       });

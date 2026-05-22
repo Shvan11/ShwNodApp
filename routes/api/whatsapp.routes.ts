@@ -25,6 +25,7 @@ import { sendgramfile } from '../../services/messaging/telegram.js';
 import messageState from '../../services/state/messageState.js';
 import {
   WebSocketEvents,
+  InternalEmitterEvents,
   createStandardMessage
 } from '../../services/messaging/websocket-events.js';
 import { getReceiptData } from '../../services/templates/receipt-service.js';
@@ -321,7 +322,7 @@ router.get(
             error: `Send process failed: ${error.message}`,
             date: dateparam
           });
-          wsEmitter.emit(WebSocketEvents.BROADCAST_MESSAGE, message);
+          wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
         }
       });
 
@@ -989,7 +990,7 @@ router.get('/initialize', (_req: Request, res: Response): void => {
               source: 'background_initialization'
             }
           );
-          wsEmitter.emit(WebSocketEvents.BROADCAST_MESSAGE, errorMessage);
+          wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, errorMessage);
         }
       }
     });

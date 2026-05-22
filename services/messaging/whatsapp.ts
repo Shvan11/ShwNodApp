@@ -5,6 +5,7 @@ import stateEvents from '../state/stateEvents.js';
 import { getWhatsAppMessages } from '../database/queries/messaging-queries.js';
 import * as messagingQueries from '../database/queries/messaging-queries.js';
 import { createWebSocketMessage, MessageSchemas } from './schemas.js';
+import { InternalEmitterEvents } from './websocket-events.js';
 import { messageSessionManager, type MessageLookupResult } from './MessageSessionManager.js';
 import { type MessageSession } from './MessageSession.js';
 import { logger } from '../core/Logger.js';
@@ -1218,7 +1219,7 @@ class WhatsAppService extends EventEmitter {
               message: 'Restarting WhatsApp client...',
             }
           );
-          this.wsEmitter.emit('broadcast_message', restartingMessage);
+          this.wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, restartingMessage);
           logger.whatsapp.debug('Broadcasted restarting state to clients');
         } catch (error) {
           logger.whatsapp.error('Error broadcasting restarting state', error);
@@ -1252,7 +1253,7 @@ class WhatsAppService extends EventEmitter {
               message: 'Initializing WhatsApp client...',
             }
           );
-          this.wsEmitter.emit('broadcast_message', initializingMessage);
+          this.wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, initializingMessage);
           logger.whatsapp.debug('Broadcasted initializing state to clients');
         } catch (error) {
           logger.whatsapp.error('Error broadcasting initializing state', error);
@@ -1381,7 +1382,7 @@ class WhatsAppService extends EventEmitter {
 
   private broadcastToClients(message: unknown): void {
     if (this.wsEmitter) {
-      this.wsEmitter.emit('broadcast_message', message);
+      this.wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
     }
   }
 
@@ -1425,7 +1426,7 @@ class WhatsAppService extends EventEmitter {
             },
             timestamp: Date.now(),
           };
-          this.wsEmitter.emit('broadcast_message', message);
+          this.wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
         }
 
         const results: SendResult[] = [];
