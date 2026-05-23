@@ -3,8 +3,6 @@
  * Provides functions for WhatsApp and SMS messaging database operations
  */
 import { executeStoredProcedure, TYPES } from '../index.js';
-import { createWebSocketMessage, MessageSchemas } from '../../messaging/schemas.js';
-import { InternalEmitterEvents } from '../../messaging/websocket-events.js';
 import { logger } from '../../core/Logger.js';
 
 // Type definitions
@@ -98,10 +96,6 @@ interface SmsIdMessage {
 interface SmsStatusMessage {
   id: number;
   status: string;
-}
-
-interface WebSocketEmitter {
-  emit: (event: string, message: unknown) => void;
 }
 
 /**
@@ -620,11 +614,10 @@ export async function getWhatsAppDeliveryStatus(
 }
 
 /**
- * Enhanced batch status update with WebSocket broadcasting
+ * Batch status update with DB circuit-breaker protection.
  */
 export async function batchUpdateMessageStatuses(
-  updates: StatusUpdateMessage[],
-  wsEmitter: WebSocketEmitter | null = null
+  updates: StatusUpdateMessage[]
 ): Promise<UpdateResult> {
   const operationName = 'batchUpdateMessageStatuses';
 
@@ -653,24 +646,7 @@ export async function batchUpdateMessageStatuses(
       ),
     });
 
-    // Execute database update
-    const result = await updateWhatsAppDeliveryStatus(updates);
-
-    // Broadcast status updates if WebSocket emitter provided
-    if (wsEmitter && result.success) {
-      const message = createWebSocketMessage(MessageSchemas.WebSocketMessage.BATCH_STATUS, {
-        statusUpdates: updates,
-        timestamp: Date.now(),
-        stats: result.stats,
-      });
-
-      wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
-      logger.message.info('Batch status update broadcasted via WebSocket', {
-        messageCount: updates.length,
-      });
-    }
-
-    return result;
+    return updateWhatsAppDeliveryStatus(updates);
   }, operationName);
 }
 

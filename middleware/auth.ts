@@ -30,15 +30,6 @@ export function authenticate(
   res: Response<ApiErrorResponse>,
   next: NextFunction
 ): void | Response<ApiErrorResponse> {
-  // Skip authentication for public routes
-  if (
-    req.path.startsWith('/api/auth') ||
-    req.path.startsWith('/api/settings/cost-presets') ||
-    req.path.startsWith('/api/portal')
-  ) {
-    return next();
-  }
-
   if (req.session && req.session.userId) {
     // User is authenticated
     return next();
@@ -154,11 +145,11 @@ export async function verifyCredentials(
     );
 
     const safeUser: SafeUser = {
-      UserID: user.userId,
-      Username: user.username,
-      FullName: user.fullName,
-      Role: user.role,
-      IsActive: user.isActive
+      userId: user.userId,
+      username: user.username,
+      fullName: user.fullName,
+      role: user.role,
+      isActive: user.isActive
     };
 
     return {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AnalogClock from '../components/react/AnalogClock';
-import { VISIBILITY_RESUME_THRESHOLD_MS } from '../constants/websocket-liveness';
+import { VISIBILITY_RESUME_THRESHOLD_MS } from '../constants/sse-liveness';
 import styles from './ChairDisplay.module.css';
 
 interface ImageEntry {

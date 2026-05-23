@@ -3,24 +3,20 @@
  * Shows different authentication status messages
  */
 
-import { AUTH_STATES, AuthState, SessionRestorationProgress } from '../../hooks/useWhatsAppAuth';
+import { AUTH_STATES, AuthState } from '../../hooks/useWhatsAppAuth';
 import styles from '../../routes/WhatsAppAuth.module.css';
 
 interface StatusContent {
   icon: string;
   title: string;
   message: string;
-  progress?: boolean;
-  elapsed?: number;
-  maxWait?: number;
 }
 
 interface StatusDisplayProps {
   authState: AuthState;
-  sessionRestorationProgress?: SessionRestorationProgress | null;
 }
 
-export const StatusDisplay = ({ authState, sessionRestorationProgress }: StatusDisplayProps) => {
+export const StatusDisplay = ({ authState }: StatusDisplayProps) => {
   const getStatusContent = (): StatusContent | null => {
     switch (authState) {
       case AUTH_STATES.INITIALIZING:
@@ -38,18 +34,6 @@ export const StatusDisplay = ({ authState, sessionRestorationProgress }: StatusD
         };
 
       case AUTH_STATES.CHECKING_SESSION:
-        if (sessionRestorationProgress) {
-          const elapsed = (sessionRestorationProgress.elapsed as number) || 0;
-          const maxWait = (sessionRestorationProgress.maxWait as number) || 30;
-          return {
-            icon: '🔍',
-            title: 'Restoring WhatsApp Session...',
-            message: `Attempting to restore existing session... ${elapsed}s / ${maxWait}s`,
-            progress: true,
-            elapsed,
-            maxWait,
-          };
-        }
         return {
           icon: '🔍',
           title: 'Checking for Existing Session...',
@@ -82,19 +66,6 @@ export const StatusDisplay = ({ authState, sessionRestorationProgress }: StatusD
       <div className={styles.statusText}>
         <h2>{content.title}</h2>
         <p>{content.message}</p>
-        {content.progress && content.elapsed !== undefined && content.maxWait !== undefined && (
-          <div className={styles.sessionRestorationProgress}>
-            <div className={styles.progressBar}>
-              <div
-                className={styles.progressBarFill}
-                style={{ width: `${(content.elapsed / content.maxWait) * 100}%` }}
-              />
-            </div>
-            <p className={styles.progressNote}>
-              If session restoration fails, a QR code will be displayed for re-authentication.
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@
 import { Router, type Request, type Response } from 'express';
 import { verifyCredentials, hashPassword } from '../middleware/auth.js';
 import { executeQuery, TYPES } from '../services/database/index.js';
+import { log } from '../utils/logger.js';
 
 const router = Router();
 
@@ -70,10 +71,10 @@ router.post(
       }
 
       // Create session
-      req.session.userId = result.user!.UserID;
-      req.session.username = result.user!.Username;
-      req.session.fullName = result.user!.FullName;
-      req.session.userRole = result.user!.Role;
+      req.session.userId = result.user!.userId;
+      req.session.username = result.user!.username;
+      req.session.fullName = result.user!.fullName;
+      req.session.userRole = result.user!.role;
 
       // Extend session if "Remember Me" is checked
       if (rememberMe) {
@@ -82,22 +83,23 @@ router.post(
         req.session.cookie.maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days default
       }
 
-      console.log(
-        `✅ User logged in: ${result.user!.Username} (${result.user!.Role})`
-      );
+      log.info('User logged in', {
+        username: result.user!.username,
+        role: result.user!.role
+      });
 
       // Session is automatically saved when modified (resave: false handles this)
       res.json({
         success: true,
         message: 'Login successful',
         user: {
-          username: result.user!.Username,
-          fullName: result.user!.FullName,
-          role: result.user!.Role
+          username: result.user!.username,
+          fullName: result.user!.fullName,
+          role: result.user!.role
         }
       });
     } catch (error) {
-      console.error('Login error:', error);
+      log.error('Login error', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: 'Login failed. Please try again.'
@@ -115,7 +117,7 @@ router.post('/logout', (req: Request, res: Response): void => {
 
   req.session.destroy((err) => {
     if (err) {
-      console.error('Logout error:', err);
+      log.error('Logout error', { error: err.message });
       res.status(500).json({
         success: false,
         error: 'Logout failed'
@@ -124,7 +126,7 @@ router.post('/logout', (req: Request, res: Response): void => {
     }
 
     res.clearCookie('shwan.sid');
-    console.log(`👋 User logged out: ${username}`);
+    log.info('User logged out', { username });
 
     res.json({
       success: true,
@@ -156,7 +158,7 @@ router.get('/me', (req: Request, res: Response): void => {
       }
     });
   } catch (error) {
-    console.error('[Auth /me] Error:', error);
+    log.error('[Auth /me] Error', { error: (error as Error).message });
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -229,14 +231,14 @@ router.post(
         ]
       );
 
-      console.log(`🔐 Password changed for user: ${req.session.username}`);
+      log.info('Password changed', { username: req.session.username });
 
       res.json({
         success: true,
         message: 'Password changed successfully'
       });
     } catch (error) {
-      console.error('Change password error:', error);
+      log.error('Change password error', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: 'Failed to change password. Please try again.'

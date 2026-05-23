@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import wsService from '../services/websocket';
-import { WebSocketEvents } from '../constants/websocket-events';
+import sseWhatsapp from '../services/sse-whatsapp';
 
 /**
  * Patient data structure
@@ -84,15 +83,11 @@ interface WhatsAppQRData {
   qr: string;
 }
 
-interface WhatsAppInitialStateData {
-  clientReady?: boolean;
-  qr?: string;
-}
-
 /**
  * Global State Provider — shared app-wide state.
- * The WebSocket itself is a singleton (`wsService`); this provider only
- * mirrors a few derived values into React state for convenient consumption.
+ * The SSE WhatsApp channel is a singleton (`sseWhatsapp`); this provider
+ * holds a refcount on it so QR/ready state stays live even on pages that
+ * don't mount a feature hook.
  */
 export function GlobalStateProvider({ children }: GlobalStateProviderProps): React.ReactElement {
   const [user, setUser] = useState<UserData | null>(() => {
@@ -121,8 +116,9 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
   const [whatsappClientReady, setWhatsappClientReady] = useState(false);
   const [whatsappQrCode, setWhatsappQrCode] = useState<string | null>(null);
 
-  // Mirror WhatsApp client state from the shared socket. The actual connection
-  // is initiated by feature hooks via ConnectionManager.
+  // Mirror WhatsApp client state from the shared SSE channel. Initial state
+  // is primed by the feature hooks via REST (/api/wa/initial-state); this
+  // effect only subscribes to live updates.
   useEffect(() => {
     const handleWhatsAppReady = (data: unknown): void => {
       const typed = data as WhatsAppReadyData | null;
@@ -136,21 +132,14 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
       if (typed.qr) setWhatsappClientReady(false);
     };
 
-    const handleInitialState = (data: unknown): void => {
-      const typed = data as WhatsAppInitialStateData | null;
-      if (!typed) return;
-      if (typed.clientReady !== undefined) setWhatsappClientReady(typed.clientReady);
-      setWhatsappQrCode(typed.qr ?? null);
-    };
-
-    wsService.on(WebSocketEvents.WHATSAPP_CLIENT_READY, handleWhatsAppReady);
-    wsService.on(WebSocketEvents.WHATSAPP_QR_UPDATED, handleWhatsAppQR);
-    wsService.on(WebSocketEvents.WHATSAPP_INITIAL_STATE_RESPONSE, handleInitialState);
+    sseWhatsapp.on('whatsapp_client_ready', handleWhatsAppReady);
+    sseWhatsapp.on('whatsapp_qr_updated', handleWhatsAppQR);
+    void sseWhatsapp.ensureConnected().catch(() => { /* hook will surface errors */ });
 
     return () => {
-      wsService.off(WebSocketEvents.WHATSAPP_CLIENT_READY, handleWhatsAppReady);
-      wsService.off(WebSocketEvents.WHATSAPP_QR_UPDATED, handleWhatsAppQR);
-      wsService.off(WebSocketEvents.WHATSAPP_INITIAL_STATE_RESPONSE, handleInitialState);
+      sseWhatsapp.off('whatsapp_client_ready', handleWhatsAppReady);
+      sseWhatsapp.off('whatsapp_qr_updated', handleWhatsAppQR);
+      sseWhatsapp.release();
     };
   }, []);
 

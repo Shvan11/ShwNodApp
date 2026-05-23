@@ -1,7 +1,7 @@
 // services/state/messageState.ts
 import stateEvents from './stateEvents.js';
 import StateManager from './StateManager.js';
-import { MessageStatus } from '../messaging/schemas.js';
+import { MessageStatus } from '../messaging/message-status.js';
 import { log } from '../../utils/logger.js';
 
 /**

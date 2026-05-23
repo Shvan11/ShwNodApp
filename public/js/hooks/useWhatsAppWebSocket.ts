@@ -1,11 +1,11 @@
 /**
- * Custom hook for WhatsApp WebSocket connection management
- * Uses centralized connection manager to prevent duplicate connections
+ * Custom hook for WhatsApp send-page state (replaces the WS waStatus channel).
+ * Subscribes to the shared SSE singleton and primes initial state via REST.
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useGlobalState } from '../contexts/GlobalStateContext';
 import { UI_STATES, type UIState } from '../utils/whatsapp-send-constants';
-import connectionManager from '../services/websocket-connection-manager';
+import sseWhatsapp from '../services/sse-whatsapp';
 
 /**
  * Sending progress data
@@ -19,7 +19,7 @@ export interface SendingProgress {
 }
 
 /**
- * Message status update data from WebSocket
+ * Message status update data from the WhatsApp channel
  */
 export interface MessageStatusUpdateData {
   date?: string;
@@ -40,16 +40,6 @@ interface InitialStateResponse {
 }
 
 /**
- * WebSocket service interface
- */
-interface WebSocketService {
-  isConnected: boolean;
-  on: (event: string, handler: (...args: unknown[]) => void) => void;
-  off: (event: string, handler: (...args: unknown[]) => void) => void;
-  send: (message: unknown) => Promise<void>;
-}
-
-/**
  * Return type for useWhatsAppWebSocket hook
  */
 export interface UseWhatsAppWebSocketReturn {
@@ -60,11 +50,7 @@ export interface UseWhatsAppWebSocketReturn {
   requestInitialState: () => void;
 }
 
-/**
- * Custom hook for managing WhatsApp WebSocket connection
- */
 export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketReturn {
-  // Use global state for clientReady instead of duplicating listener
   const { whatsappClientReady: clientReady } = useGlobalState();
 
   const [connectionStatus, setConnectionStatus] = useState<UIState>(UI_STATES.DISCONNECTED);
@@ -79,193 +65,136 @@ export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketR
     null
   );
 
-  const wsRef = useRef<WebSocketService | null>(null);
   const currentDateRef = useRef(currentDate);
   const lastRequestedDateRef = useRef<string | null>(null);
 
-  // Keep currentDateRef updated
   useEffect(() => {
     currentDateRef.current = currentDate;
   }, [currentDate]);
 
-  // Request initial state from server (defined before setupWebSocket)
-  const requestInitialState = useCallback(() => {
-    if (wsRef.current && wsRef.current.isConnected) {
-      const dateToRequest = currentDateRef.current;
-
-      // Prevent duplicate requests for the same date
-      if (lastRequestedDateRef.current === dateToRequest) {
-        console.log(
-          `[useWhatsAppWebSocket] Skipping duplicate initial state request for date: ${dateToRequest}`
-        );
-        return;
-      }
-
-      lastRequestedDateRef.current = dateToRequest;
-      console.log(
-        `[useWhatsAppWebSocket] Requesting initial state from server for date: ${dateToRequest}`
-      );
-
-      wsRef.current
-        .send({
-          type: 'request_whatsapp_initial_state',
-          data: {
-            date: dateToRequest,
-            timestamp: Date.now(),
-          },
-        })
-        .catch((error: Error) => {
-          console.error('Failed to request initial state:', error);
-        });
-    }
-  }, []); // No dependencies - uses ref
-
-  // Setup WebSocket service using connection manager
-  const setupWebSocket = useCallback(async () => {
-    try {
-      console.log('[useWhatsAppWebSocket] Setting up WebSocket connection');
-
-      // Use connection manager to ensure single connection. Date goes in the
-      // REGISTER payload so the server can target date-scoped broadcasts.
-      await connectionManager.ensureConnected('waStatus', {
-        date: currentDate,
+  const applyInitialState = useCallback((data: InitialStateResponse | null) => {
+    if (!data) return;
+    if (data.sendingProgress && data.sendingProgress.started && !data.sendingProgress.finished) {
+      setSendingProgress(data.sendingProgress);
+    } else if (data.sendingProgress && data.sendingProgress.finished) {
+      setSendingProgress({
+        started: false,
+        finished: false,
+        total: 0,
+        sent: 0,
+        failed: 0,
       });
-
-      console.log('[useWhatsAppWebSocket] WebSocket connected via connection manager');
-
-      // Get the WebSocket service from connection manager
-      const websocketService = connectionManager.getService() as WebSocketService;
-
-      // Setup event handlers
-      const handleConnecting = () => setConnectionStatus(UI_STATES.CONNECTING);
-      const handleConnected = () => {
-        setConnectionStatus(UI_STATES.CONNECTED);
-        requestInitialState();
-      };
-      const handleDisconnected = () => setConnectionStatus(UI_STATES.DISCONNECTED);
-      const handleError = (error: unknown) => {
-        setConnectionStatus(UI_STATES.ERROR);
-        console.error('WebSocket error:', error);
-      };
-
-      const handleMessageStatus = (data: MessageStatusUpdateData) => {
-        setMessageStatusUpdate(data);
-      };
-
-      const handleSendingStarted = (data: Partial<SendingProgress>) => {
-        setSendingProgress({
-          started: true,
-          finished: false,
-          total: data.total || 0,
-          sent: data.sent || 0,
-          failed: data.failed || 0,
-        });
-      };
-
-      const handleSendingProgress = (data: Partial<SendingProgress>) => {
-        setSendingProgress((prev) => ({
-          ...prev,
-          sent: data.sent || 0,
-          failed: data.failed || 0,
-          finished: data.finished || false,
-        }));
-      };
-
-      const handleSendingFinished = (_data: unknown) => {
-        setSendingProgress((prev) => ({
-          ...prev,
-          finished: true,
-        }));
-      };
-
-      const handleInitialState = (data: InitialStateResponse) => {
-        if (data) {
-          // clientReady is now managed by GlobalStateContext, no need to set it here
-
-          if (data.sendingProgress && data.sendingProgress.started && !data.sendingProgress.finished) {
-            setSendingProgress(data.sendingProgress);
-          } else if (data.sendingProgress && data.sendingProgress.finished) {
-            // Clear finished progress
-            setSendingProgress({
-              started: false,
-              finished: false,
-              total: 0,
-              sent: 0,
-              failed: 0,
-            });
-          }
-        }
-      };
-
-      // Register event handlers
-      // NOTE: whatsapp_client_ready is managed by GlobalStateContext - no duplicate listener needed
-      websocketService.on('connecting', handleConnecting);
-      websocketService.on('connected', handleConnected);
-      websocketService.on('disconnected', handleDisconnected);
-      websocketService.on('error', handleError);
-      websocketService.on('whatsapp_message_status', handleMessageStatus as (...args: unknown[]) => void);
-      websocketService.on('whatsapp_sending_started', handleSendingStarted as (...args: unknown[]) => void);
-      websocketService.on('whatsapp_sending_progress', handleSendingProgress as (...args: unknown[]) => void);
-      websocketService.on('whatsapp_sending_finished', handleSendingFinished as (...args: unknown[]) => void);
-      websocketService.on('whatsapp_initial_state_response', handleInitialState as (...args: unknown[]) => void);
-
-      // Set connection status based on current state
-      if (websocketService.isConnected) {
-        setConnectionStatus(UI_STATES.CONNECTED);
-        requestInitialState();
-      } else {
-        setConnectionStatus(UI_STATES.CONNECTING);
-      }
-
-      wsRef.current = websocketService;
-
-      // Cleanup function
-      return () => {
-        websocketService.off('connecting', handleConnecting);
-        websocketService.off('connected', handleConnected);
-        websocketService.off('disconnected', handleDisconnected);
-        websocketService.off('error', handleError);
-        websocketService.off('whatsapp_message_status', handleMessageStatus as (...args: unknown[]) => void);
-        websocketService.off('whatsapp_sending_started', handleSendingStarted as (...args: unknown[]) => void);
-        websocketService.off('whatsapp_sending_progress', handleSendingProgress as (...args: unknown[]) => void);
-        websocketService.off('whatsapp_sending_finished', handleSendingFinished as (...args: unknown[]) => void);
-        websocketService.off('whatsapp_initial_state_response', handleInitialState as (...args: unknown[]) => void);
-      };
-    } catch (error) {
-      console.error('Failed to setup WebSocket listeners:', error);
-      setConnectionStatus(UI_STATES.ERROR);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency - only setup once on mount
+  }, []);
 
-  // Setup WebSocket on mount (only once)
-  useEffect(() => {
-    let cleanup: (() => void) | undefined;
-    const lastRequestedDate = lastRequestedDateRef;
+  // Fetch initial state via REST (replaces the WS RPC). Preserves the
+  // per-date dedupe so a date-change effect doesn't re-fire for the same
+  // date during quick re-renders.
+  const requestInitialState = useCallback(() => {
+    const dateToRequest = currentDateRef.current;
+    if (lastRequestedDateRef.current === dateToRequest) {
+      return;
+    }
+    lastRequestedDateRef.current = dateToRequest;
 
-    setupWebSocket()
-      .then((cleanupFn) => {
-        cleanup = cleanupFn;
+    fetch('/api/wa/initial-state', { credentials: 'include' })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Initial state request failed: ${res.status}`);
+        return res.json() as Promise<InitialStateResponse>;
       })
-      .catch((error) => {
-        console.error('[useWhatsAppWebSocket] Failed to setup WebSocket:', error);
+      .then(applyInitialState)
+      .catch((err) => {
+        console.error('[useWhatsAppWebSocket] initial-state fetch failed', err);
+      });
+  }, [applyInitialState]);
+
+  // Subscribe to SSE lifecycle + event payloads on mount.
+  useEffect(() => {
+    const handleConnecting = () => setConnectionStatus(UI_STATES.CONNECTING);
+    const handleConnected = () => {
+      setConnectionStatus(UI_STATES.CONNECTED);
+      requestInitialState();
+    };
+    const handleDisconnected = () => setConnectionStatus(UI_STATES.DISCONNECTED);
+    const handleError = () => setConnectionStatus(UI_STATES.ERROR);
+    const handleReconnected = () => {
+      // Force a refresh on reconnect by clearing the dedupe.
+      lastRequestedDateRef.current = null;
+      requestInitialState();
+    };
+
+    const handleMessageStatus = (data: unknown) => {
+      setMessageStatusUpdate(data as MessageStatusUpdateData);
+    };
+
+    const handleSendingStarted = (data: unknown) => {
+      const typed = data as Partial<SendingProgress>;
+      setSendingProgress({
+        started: true,
+        finished: false,
+        total: typed.total || 0,
+        sent: typed.sent || 0,
+        failed: typed.failed || 0,
+      });
+    };
+
+    const handleSendingProgress = (data: unknown) => {
+      const typed = data as Partial<SendingProgress>;
+      setSendingProgress((prev) => ({
+        ...prev,
+        sent: typed.sent || 0,
+        failed: typed.failed || 0,
+        finished: typed.finished || false,
+      }));
+    };
+
+    const handleSendingFinished = () => {
+      setSendingProgress((prev) => ({
+        ...prev,
+        finished: true,
+      }));
+    };
+
+    sseWhatsapp.on('connecting', handleConnecting);
+    sseWhatsapp.on('connected', handleConnected);
+    sseWhatsapp.on('disconnected', handleDisconnected);
+    sseWhatsapp.on('error', handleError);
+    sseWhatsapp.on('reconnected', handleReconnected);
+    sseWhatsapp.on('whatsapp_message_status', handleMessageStatus);
+    sseWhatsapp.on('whatsapp_sending_started', handleSendingStarted);
+    sseWhatsapp.on('whatsapp_sending_progress', handleSendingProgress);
+    sseWhatsapp.on('whatsapp_sending_finished', handleSendingFinished);
+
+    setConnectionStatus(UI_STATES.CONNECTING);
+    sseWhatsapp
+      .ensureConnected()
+      .then(() => {
+        setConnectionStatus(UI_STATES.CONNECTED);
+        requestInitialState();
+      })
+      .catch((err) => {
+        console.error('[useWhatsAppWebSocket] Failed to open SSE:', err);
         setConnectionStatus(UI_STATES.ERROR);
       });
 
     return () => {
-      if (cleanup) cleanup();
-      connectionManager.removeClientType('waStatus');
-      lastRequestedDate.current = null;
+      sseWhatsapp.off('connecting', handleConnecting);
+      sseWhatsapp.off('connected', handleConnected);
+      sseWhatsapp.off('disconnected', handleDisconnected);
+      sseWhatsapp.off('error', handleError);
+      sseWhatsapp.off('reconnected', handleReconnected);
+      sseWhatsapp.off('whatsapp_message_status', handleMessageStatus);
+      sseWhatsapp.off('whatsapp_sending_started', handleSendingStarted);
+      sseWhatsapp.off('whatsapp_sending_progress', handleSendingProgress);
+      sseWhatsapp.off('whatsapp_sending_finished', handleSendingFinished);
+      sseWhatsapp.release();
+      lastRequestedDateRef.current = null;
     };
-  }, [setupWebSocket]);
+  }, [requestInitialState]);
 
-  // Request initial state when date changes (without reconnecting WebSocket)
+  // Request initial state when date changes (transport stays connected).
   useEffect(() => {
-    // Only request if we have an active connection
     if (connectionStatus === UI_STATES.CONNECTED && currentDate) {
-      console.log(
-        `[useWhatsAppWebSocket] Date changed to ${currentDate}, requesting initial state...`
-      );
       requestInitialState();
     }
   }, [currentDate, connectionStatus, requestInitialState]);

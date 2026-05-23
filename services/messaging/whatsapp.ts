@@ -4,7 +4,6 @@ import messageState, { type Person as StatePersonType } from '../state/messageSt
 import stateEvents from '../state/stateEvents.js';
 import { getWhatsAppMessages } from '../database/queries/messaging-queries.js';
 import * as messagingQueries from '../database/queries/messaging-queries.js';
-import { createWebSocketMessage, MessageSchemas } from './schemas.js';
 import { InternalEmitterEvents } from './websocket-events.js';
 import { messageSessionManager, type MessageLookupResult } from './MessageSessionManager.js';
 import { type MessageSession } from './MessageSession.js';
@@ -1009,19 +1008,16 @@ class WhatsAppService extends EventEmitter {
           scale: 6,
           errorCorrectionLevel: 'M',
         });
-
-        const message = createWebSocketMessage(MessageSchemas.WebSocketMessage.QR_UPDATE, {
+        this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_QR_UPDATED, {
           qr: qrImageUrl,
           clientReady: false,
         });
-        this.broadcastToClients(message);
       } catch (error) {
         logger.whatsapp.error('Failed to convert QR code to data URL:', error);
-        const message = createWebSocketMessage(MessageSchemas.WebSocketMessage.QR_UPDATE, {
+        this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_QR_UPDATED, {
           qr,
           clientReady: false,
         });
-        this.broadcastToClients(message);
       }
     }
   }
@@ -1072,12 +1068,11 @@ class WhatsAppService extends EventEmitter {
 
     this.emit('ClientIsReady');
     if (this.wsEmitter) {
-      const message = createWebSocketMessage(MessageSchemas.WebSocketMessage.CLIENT_READY, {
+      this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_CLIENT_READY, {
         clientReady: true,
         state: 'ready',
         message: 'WhatsApp client is ready!',
       });
-      this.broadcastToClients(message);
     }
   }
 
@@ -1122,13 +1117,12 @@ class WhatsAppService extends EventEmitter {
       });
 
       if (this.wsEmitter) {
-        const message = createWebSocketMessage(MessageSchemas.WebSocketMessage.MESSAGE_STATUS, {
+        this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_MESSAGE_STATUS, {
           messageId,
           appointmentId,
           sessionDate,
           status: ack,
         });
-        this.broadcastToClients(message);
       }
     } catch (error) {
       logger.whatsapp.error('Error updating message status', {
@@ -1211,15 +1205,11 @@ class WhatsAppService extends EventEmitter {
     try {
       if (this.wsEmitter) {
         try {
-          const restartingMessage = createWebSocketMessage(
-            MessageSchemas.WebSocketMessage.CLIENT_READY,
-            {
-              clientReady: false,
-              state: 'restarting',
-              message: 'Restarting WhatsApp client...',
-            }
-          );
-          this.wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, restartingMessage);
+          this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_CLIENT_READY, {
+            clientReady: false,
+            state: 'restarting',
+            message: 'Restarting WhatsApp client...',
+          });
           logger.whatsapp.debug('Broadcasted restarting state to clients');
         } catch (error) {
           logger.whatsapp.error('Error broadcasting restarting state', error);
@@ -1245,15 +1235,11 @@ class WhatsAppService extends EventEmitter {
 
       if (this.wsEmitter) {
         try {
-          const initializingMessage = createWebSocketMessage(
-            MessageSchemas.WebSocketMessage.CLIENT_READY,
-            {
-              clientReady: false,
-              state: 'initializing',
-              message: 'Initializing WhatsApp client...',
-            }
-          );
-          this.wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, initializingMessage);
+          this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_CLIENT_READY, {
+            clientReady: false,
+            state: 'initializing',
+            message: 'Initializing WhatsApp client...',
+          });
           logger.whatsapp.debug('Broadcasted initializing state to clients');
         } catch (error) {
           logger.whatsapp.error('Error broadcasting initializing state', error);
@@ -1380,12 +1366,6 @@ class WhatsAppService extends EventEmitter {
     );
   }
 
-  private broadcastToClients(message: unknown): void {
-    if (this.wsEmitter) {
-      this.wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
-    }
-  }
-
   async send(date: string): Promise<SendResult[] | void> {
     if (!this.isReady()) {
       throw new Error('WhatsApp client not ready to send messages');
@@ -1413,20 +1393,15 @@ class WhatsAppService extends EventEmitter {
         );
 
         if (this.wsEmitter) {
-          const message = {
-            type: 'whatsapp_sending_started',
-            data: {
-              total: numbers.length,
-              sent: 0,
-              failed: 0,
-              started: true,
-              finished: false,
-              sessionId: session.sessionId,
-              date: date,
-            },
-            timestamp: Date.now(),
-          };
-          this.wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
+          this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_SENDING_STARTED, {
+            total: numbers.length,
+            sent: 0,
+            failed: 0,
+            started: true,
+            finished: false,
+            sessionId: session.sessionId,
+            date: date,
+          });
         }
 
         const results: SendResult[] = [];

@@ -36,8 +36,8 @@ import chairDisplayRoutes, { setWebSocketEmitter as setChairDisplayWS } from './
 import paymentRoutes from './payment.routes.js';
 import workRoutes from './work.routes.js';
 import visitRoutes from './visit.routes.js';
-import whatsappRoutes, { setWebSocketEmitter as setWhatsappWS } from './whatsapp.routes.js';
-import messagingRoutes, { setWebSocketEmitter as setMessagingWS } from './messaging.routes.js';
+import whatsappRoutes from './whatsapp.routes.js';
+import messagingRoutes from './messaging.routes.js';
 import alignerRoutes from './aligner.routes.js';
 import employeeRoutes from './employee.routes.js';
 import expenseRoutes from './expense.routes.js';
@@ -67,8 +67,6 @@ export function setWebSocketEmitter(emitter: EventEmitter): void {
   // Inject WebSocket emitter into modules that need it
   setAppointmentWS(emitter);
   setChairDisplayWS(emitter);
-  setWhatsappWS(emitter);
-  setMessagingWS(emitter);
 }
 
 // Mount template routes

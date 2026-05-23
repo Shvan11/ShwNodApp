@@ -13,7 +13,6 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import type { EventEmitter } from 'events';
 import { log } from '../../utils/logger.js';
 import * as database from '../../services/database/index.js';
 import * as messagingQueries from '../../services/database/queries/messaging-queries.js';
@@ -145,17 +144,6 @@ function convertWhatsAppMessagesResult(
   return [numbers, messages, ids.map(String), names];
 }
 
-// WebSocket emitter will be injected to avoid circular imports
-let wsEmitter: EventEmitter | null = null;
-
-/**
- * Set the WebSocket emitter reference
- * @param emitter - WebSocket event emitter
- */
-export function setWebSocketEmitter(emitter: EventEmitter): void {
-  wsEmitter = emitter;
-}
-
 /**
  * Circuit breaker status for messaging operations
  */
@@ -208,10 +196,7 @@ router.post(
 
       // Convert BatchStatusUpdate[] to StatusUpdateMessage[] for messaging-queries compatibility
       const statusUpdates = updates.map(convertToStatusUpdateMessage);
-      const result = await messagingQueries.batchUpdateMessageStatuses(
-        statusUpdates,
-        wsEmitter
-      );
+      const result = await messagingQueries.batchUpdateMessageStatuses(statusUpdates);
       res.json(result);
     } catch (error) {
       log.error('Error in batch status update:', error);

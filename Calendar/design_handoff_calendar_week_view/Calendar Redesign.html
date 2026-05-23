@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Calendar — Week View Redesign</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="v0.css" />
+  <link rel="stylesheet" href="v4.css" />
+  <link rel="stylesheet" href="density.css" />
+
+  <style>
+    body { margin: 0; background: #f0eef6; }
+    .design-note {
+      font-family: "Inter", system-ui, sans-serif;
+      font-size: 0.8125rem;
+      line-height: 1.55;
+      color: #2d2842;
+    }
+    .design-note h3 {
+      margin: 0 0 6px 0;
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: #2d2842;
+      letter-spacing: -0.01em;
+    }
+    .design-note p { margin: 0 0 10px 0; }
+    .design-note ul { padding-left: 1.1em; margin: 0 0 14px 0; }
+    .design-note li { margin-bottom: 3px; }
+    .design-note .change { color: #1aa57a; font-weight: 600; }
+    .design-note .keep { color: #6d67c6; font-weight: 600; }
+
+    .rule-card {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 10px 16px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid #e8e5f0;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: #fafaff;
+    }
+    .rule-card .rule-mini {
+      width: 56px; height: 36px;
+      border-radius: 4px;
+      background: white;
+      border: 1px solid #ddd6f0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px;
+      padding: 2px;
+      position: relative;
+    }
+    .rule-card .rule-mini.dbl { height: 72px; grid-template-rows: 1fr 1fr; }
+    .rule-card .rule-mini .mini-lane {
+      background: oklch(96% 0.025 250); border-left: 2px solid oklch(60% 0.14 250);
+      border-radius: 2px;
+    }
+    .rule-card .rule-mini .mini-lane.b { background: oklch(96% 0.03 305); border-left-color: oklch(58% 0.16 305); }
+    .rule-card .rule-mini .mini-lane.c { background: oklch(95% 0.04 175); border-left-color: oklch(55% 0.13 175); }
+    .rule-card .rule-mini .mini-lane.d { background: oklch(96% 0.03 145); border-left-color: oklch(56% 0.13 145); }
+    .rule-card .rule-mini .mini-more {
+      background: white; border: 1px dashed #d0c8e0; border-radius: 2px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 8px; font-weight: 800; color: #6d67c6;
+    }
+    .rule-card .rule-mini.span1 { grid-template-columns: 1fr; }
+    .rule-card .rule-meta strong { display: block; font-size: 0.875rem; }
+    .rule-card .rule-meta span { color: #6e6884; font-size: 0.75rem; }
+  </style>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script src="calendar-data.js"></script>
+  <script src="density-data.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="v0-current.jsx"></script>
+  <script type="text/babel" src="v4-stacked.jsx"></script>
+  <script type="text/babel" src="density-shared.jsx"></script>
+  <script type="text/babel" src="density-a.jsx"></script>
+  <script type="text/babel" src="density-b.jsx"></script>
+  <script type="text/babel" src="density-c.jsx"></script>
+  <script type="text/babel" src="density-d.jsx"></script>
+
+  <script type="text/babel">
+    const { DesignCanvas, DCSection, DCArtboard } = window;
+    const W = 1480;
+    const H = 940;
+
+    function App() {
+      return (
+        <DesignCanvas>
+          <DCSection
+            id="v4"
+            title="Week view — uniform-height slots"
+            subtitle="Every slot is the same height. Content adapts to count: 1 = full · 2 = stacked · 3 = 2+1 · 4 = 2×2 · 5+ = 3 + “+N more”. Each 30-minute row has a unique colour band carried across all six days; adjacent rows sit on opposite sides of the colour wheel for maximum contrast.">
+            <DCArtboard
+              id="v4-week"
+              label="V4 · Week view"
+              width={W}
+              height={H}
+            >
+              <V4Stacked />
+            </DCArtboard>
+            <DCArtboard
+              id="v4-rules"
+              label="The packing model"
+              width={460}
+              height={H}
+            >
+              <div className="design-note" style={{ padding: 28, height: '100%', background: 'white', boxSizing: 'border-box', overflowY: 'auto' }}>
+                <h3>New: drag-and-drop</h3>
+                <p style={{ marginTop: 0 }}>Grab any appointment card and drop it on another time slot to reschedule. Source slot dims, the drop-target slot outlines in teal, holidays refuse drops (outline turns red). Works <b>between days too</b>.</p>
+
+                <h3>New: “+N more” popover</h3>
+                <p style={{ marginTop: 0 }}>Click any “+2 more” cell to see the hidden appointments. Each row in the popover is itself draggable, so you can grab a buried appointment and reschedule it directly without leaving the week view.</p>
+
+                <h3 style={{ marginTop: 18 }}>One slot, five layouts</h3>
+                <p>Every slot is <b>112 px tall</b>, no exceptions. Time alignment is rock-solid across all six days. Inside, content auto-arranges by appointment count.</p>
+
+                <div className="rule-card">
+                  <div className="rule-mini span1"><div className="mini-lane" style={{ gridColumn: '1 / -1', height: '100%' }} /></div>
+                  <div className="rule-meta"><strong>1 appt</strong><span>one card filling the slot</span></div>
+                </div>
+                <div className="rule-card">
+                  <div className="rule-mini" style={{ gridTemplateColumns: '1fr', gridTemplateRows: '1fr 1fr' }}>
+                    <div className="mini-lane" />
+                    <div className="mini-lane b" />
+                  </div>
+                  <div className="rule-meta"><strong>2 appts</strong><span>stacked, full-width each</span></div>
+                </div>
+                <div className="rule-card">
+                  <div className="rule-mini" style={{ gridTemplateRows: '1fr 1fr' }}>
+                    <div className="mini-lane" />
+                    <div className="mini-lane b" />
+                    <div className="mini-lane c" style={{ gridColumn: '1 / -1' }} />
+                  </div>
+                  <div className="rule-meta"><strong>3 appts</strong><span>row 1: two side-by-side · row 2: one full-width</span></div>
+                </div>
+                <div className="rule-card">
+                  <div className="rule-mini" style={{ gridTemplateRows: '1fr 1fr' }}>
+                    <div className="mini-lane" />
+                    <div className="mini-lane b" />
+                    <div className="mini-lane c" />
+                    <div className="mini-lane d" />
+                  </div>
+                  <div className="rule-meta"><strong>4 appts</strong><span>2 × 2 grid</span></div>
+                </div>
+                <div className="rule-card">
+                  <div className="rule-mini" style={{ gridTemplateRows: '1fr 1fr' }}>
+                    <div className="mini-lane" />
+                    <div className="mini-lane b" />
+                    <div className="mini-lane c" />
+                    <div className="mini-more">+2</div>
+                  </div>
+                  <div className="rule-meta"><strong>5+ appts</strong><span>3 visible · “+N more” cell opens a popover</span></div>
+                </div>
+
+                <h3 style={{ marginTop: 18 }}>Colour system</h3>
+                <p style={{ marginTop: 0 }}>14 hues — one per 30-minute slot — spread around the wheel so neighbours never look similar.</p>
+                <ul>
+                  <li>14:00 blue · 14:30 amber · 15:00 teal · 15:30 rose</li>
+                  <li>16:00 violet · 16:30 gold · 17:00 cerulean · 17:30 red</li>
+                  <li>18:00 magenta · 18:30 green · 19:00 indigo · 19:30 chartreuse</li>
+                  <li>20:00 purple · 20:30 orange</li>
+                </ul>
+                <p>All at the same lightness (97%) and chroma (0.03) — only the hue rotates — so the system reads as a single family with strong row-by-row contrast.</p>
+
+                <h3>Try it</h3>
+                <ul>
+                  <li>Saturday <b>17:00</b> → 5 appts: 3 visible + “+2 more”.</li>
+                  <li>Monday <b>16:00</b> → 4 appts: clean 2 × 2 grid.</li>
+                  <li>Thursday <b>17:00</b> → 4 appts (different mix).</li>
+                  <li>Most rows have 1 or 2 appts: full or stacked layouts.</li>
+                </ul>
+              </div>
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection
+            id="reference"
+            title="Reference — current production"
+            subtitle="Faithful rebuild of the live calendar at the same scale, for comparison.">
+            <DCArtboard
+              id="v0"
+              label="V0 · Live design (baseline)"
+              width={W}
+              height={H}
+            >
+              <V0Current />
+            </DCArtboard>
+            <DCArtboard
+              id="notes-v0"
+              label="What we&rsquo;re fixing"
+              width={420}
+              height={H}
+            >
+              <div className="design-note" style={{ padding: 32, height: '100%', background: 'white', boxSizing: 'border-box', overflowY: 'auto' }}>
+                <h3>Findings from the audit</h3>
+                <ul>
+                  <li><b>Heavy gradient header</b> carries no information, eats vertical space.</li>
+                  <li><b>Stats panel</b> takes too much room for four numbers.</li>
+                  <li><b>Empty vs booked look almost identical</b> — both white.</li>
+                  <li><b>Slot height grows unbounded</b> with multi-appt slots (1 day with 5 appts pushes the whole row to 5× height).</li>
+                  <li><b>Holidays</b> read as a day with a red header — the 14 fake-empty slots underneath still draw the eye.</li>
+                  <li><b>Patient names tiny + blue</b> — most important data is 12px.</li>
+                </ul>
+                <h3 style={{ marginTop: 18 }}>What V4 keeps</h3>
+                <ul>
+                  <li><span className="keep">Brand:</span> purple + teal palette.</li>
+                  <li><span className="keep">Layout:</span> time column + 6 day columns, Sat → Thu.</li>
+                  <li><span className="keep">RTL patient names</span> with LTR procedure beneath.</li>
+                </ul>
+              </div>
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection
+            id="density"
+            title="Density exploration (archived)"
+            subtitle="Earlier studies. V4 above synthesises strategy C (lanes) with a bounded-height variant of A (truncate + expand).">
+            <DCArtboard
+              id="density-a"
+              label="A · Adaptive"
+              width={360}
+              height={1200}
+            >
+              <StrategyA />
+            </DCArtboard>
+            <DCArtboard
+              id="density-b"
+              label="B · Chip grid"
+              width={360}
+              height={1200}
+            >
+              <StrategyB />
+            </DCArtboard>
+            <DCArtboard
+              id="density-c"
+              label="C · Vertical lanes"
+              width={360}
+              height={1200}
+            >
+              <StrategyC />
+            </DCArtboard>
+            <DCArtboard
+              id="density-d"
+              label="D · Spotlight + roster"
+              width={360}
+              height={1200}
+            >
+              <StrategyD />
+            </DCArtboard>
+          </DCSection>
+        </DesignCanvas>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

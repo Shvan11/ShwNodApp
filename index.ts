@@ -9,12 +9,15 @@ import { createServer, Server as HTTPServer } from 'http';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import config from './config/config.js';
-import { setupWebSocketServer, teardownPeriodicCleanup } from './utils/websocket.js';
 import {
   createAppointmentsSseRouter,
   createChairDisplaySseRouter,
   teardownSseBroadcaster,
 } from './services/messaging/sse-broadcaster.js';
+import {
+  createWhatsappSseRouter,
+  teardownWhatsappSseBroadcaster,
+} from './services/messaging/sse-whatsapp.js';
 import { setupMiddleware } from './middleware/index.js';
 import apiRoutes from './routes/api/index.js';
 import webRoutes from './routes/web.js';
@@ -35,7 +38,7 @@ import session from 'express-session';
 import SQLiteStore from 'connect-sqlite3';
 import driveClient from './services/google-drive/google-drive-client.js';
 import messageState from './services/state/messageState.js';
-import { createWebSocketMessage, MessageSchemas } from './services/messaging/schemas.js';
+import { MessageStatus } from './services/messaging/message-status.js';
 import { InternalEmitterEvents } from './services/messaging/websocket-events.js';
 import { EventEmitter } from 'events';
 
@@ -141,7 +144,7 @@ async function initializeApplication(): Promise<AppInitResult> {
     log.info('🔐 Setting up session management...');
     const SQLiteStoreSession = SQLiteStore(session);
 
-    app.use(session({
+    const staffSession = session({
       store: new SQLiteStoreSession({
         db: 'sessions.db',
         dir: './data'
@@ -158,7 +161,18 @@ async function initializeApplication(): Promise<AppInitResult> {
         path: '/' // Ensure cookie is sent for all paths
       },
       name: 'shwan.sid' // Custom cookie name
-    }));
+    });
+
+    // Skip staff session entirely on portal paths — portalSession runs there
+    // and overwriting req.session would waste a SQLite read per request.
+    app.use((req, res, next) => {
+      if (req.path === '/portal'
+        || req.path.startsWith('/portal/')
+        || req.path.startsWith('/api/portal')) {
+        return next();
+      }
+      return staffSession(req, res, next);
+    });
 
     // Patient portal session - separate cookie and store; scoped to portal paths
     const portalSession = session({
@@ -213,19 +227,20 @@ async function initializeApplication(): Promise<AppInitResult> {
     app.use('/data', express.static('./data')); // Serve data directory for template files
     app.use('/images', express.static('./public/images')); // Serve images directory for production mode
 
-    // Setup WebSocket
-    log.info('🔌 Setting up WebSocket server...');
-    const wsEmitter = setupWebSocketServer(server);
+    // Set up the in-process event bus that fans real-time updates into the
+    // SSE broadcasters. Replaces the legacy WebSocket server; the API is the
+    // same `EventEmitter` shape so route + service emit sites are unchanged.
+    log.info('📡 Setting up real-time event bus...');
+    const wsEmitter = new EventEmitter();
 
-    // Inject WebSocket emitter into API routes to avoid circular imports
+    // Inject the emitter into API routes that fan out (appointments, chair-display).
     const { setWebSocketEmitter } = await import('./routes/api/index.js');
     setWebSocketEmitter(wsEmitter);
 
-    // Set up SSE broadcaster (consumes the same wsEmitter as the WS handler).
-    // Two distinct mounts: chair-display is public (kiosk has no session and
-    // matches the legacy WS posture); appointments is mounted after the auth
-    // middleware below so it inherits the /api gate.
-    log.info('📡 Setting up SSE broadcaster...');
+    // chair-display SSE is the only public SSE route — kiosk has no session
+    // and matches the legacy WS posture. Appointments + WhatsApp SSE mount
+    // after the auth gate below.
+    log.info('📡 Setting up SSE broadcasters...');
     app.use('/sse', createChairDisplaySseRouter(wsEmitter));
 
     // Use routes
@@ -269,8 +284,11 @@ async function initializeApplication(): Promise<AppInitResult> {
     }
 
     // ===== MOUNT ROUTES (AFTER AUTHENTICATION) =====
-    // Appointments SSE — mounted under /api so it inherits the auth gate above.
+    // Appointments + WhatsApp SSE — mounted under /api so they inherit the
+    // auth gate above. Chair-display SSE is the only public SSE route (kiosk
+    // has no session and matches the legacy WS posture).
     app.use('/api/sse', createAppointmentsSseRouter(wsEmitter));
+    app.use('/api/sse', createWhatsappSseRouter(wsEmitter));
 
     app.use('/api', apiRoutes);
     app.use('/api/calendar', calendarRoutes);
@@ -313,33 +331,23 @@ async function initializeApplication(): Promise<AppInitResult> {
         try {
             await messageState.addPerson(person);
 
-            // Broadcast via WebSocket using proper WebSocket message creation
             if (wsEmitter) {
-                const message = createWebSocketMessage(
-                    MessageSchemas.WebSocketMessage.MESSAGE_STATUS,
-                    {
-                        messageId: person.messageId,
-                        status: MessageSchemas.MessageStatus.SERVER,
-                        patientName: person.name,
-                        phone: person.number,
-                        timeSent: new Date().toISOString(),
-                        message: '', // Will be populated from database if needed
-                        appointmentId: person.appointmentId
-                    }
-                );
-                wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
+                wsEmitter.emit(InternalEmitterEvents.WHATSAPP_MESSAGE_STATUS, {
+                    messageId: person.messageId,
+                    status: MessageStatus.SERVER,
+                    patientName: person.name,
+                    phone: person.number,
+                    timeSent: new Date().toISOString(),
+                    message: '',
+                    appointmentId: person.appointmentId
+                });
 
-                // Also emit progress update using proper message creation
                 const stats = messageState.dump();
-                const progressMessage = createWebSocketMessage(
-                    'whatsapp_sending_progress',
-                    {
-                        sent: stats.sentMessages,
-                        failed: stats.failedMessages,
-                        finished: stats.finishedSending
-                    }
-                );
-                wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, progressMessage);
+                wsEmitter.emit(InternalEmitterEvents.WHATSAPP_SENDING_PROGRESS, {
+                    sent: stats.sentMessages,
+                    failed: stats.failedMessages,
+                    finished: stats.finishedSending
+                });
             }
 
             log.info("MessageSent processed successfully");
@@ -354,34 +362,24 @@ async function initializeApplication(): Promise<AppInitResult> {
             person.success = '&times;';
             await messageState.addPerson(person);
 
-            // Broadcast failure using proper WebSocket message creation
             if (wsEmitter) {
-                const message = createWebSocketMessage(
-                    MessageSchemas.WebSocketMessage.MESSAGE_STATUS,
-                    {
-                        messageId: person.messageId || `failed_${Date.now()}`,
-                        status: MessageSchemas.MessageStatus.ERROR,
-                        patientName: person.name,
-                        phone: person.number,
-                        timeSent: null,
-                        message: '',
-                        error: person.error,
-                        appointmentId: person.appointmentId
-                    }
-                );
-                wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
+                wsEmitter.emit(InternalEmitterEvents.WHATSAPP_MESSAGE_STATUS, {
+                    messageId: person.messageId || `failed_${Date.now()}`,
+                    status: MessageStatus.ERROR,
+                    patientName: person.name,
+                    phone: person.number,
+                    timeSent: null,
+                    message: '',
+                    error: person.error,
+                    appointmentId: person.appointmentId
+                });
 
-                // Also emit progress update using proper message creation
                 const stats = messageState.dump();
-                const progressMessage = createWebSocketMessage(
-                    'whatsapp_sending_progress',
-                    {
-                        sent: stats.sentMessages,
-                        failed: stats.failedMessages,
-                        finished: stats.finishedSending
-                    }
-                );
-                wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, progressMessage);
+                wsEmitter.emit(InternalEmitterEvents.WHATSAPP_SENDING_PROGRESS, {
+                    sent: stats.sentMessages,
+                    failed: stats.failedMessages,
+                    finished: stats.finishedSending
+                });
             }
 
             log.info("MessageFailed processed successfully");
@@ -395,19 +393,14 @@ async function initializeApplication(): Promise<AppInitResult> {
         try {
             await messageState.setFinishedSending(true);
 
-            // Broadcast completion using proper WebSocket message creation
             if (wsEmitter) {
                 const stats = messageState.dump();
-                const message = createWebSocketMessage(
-                    'whatsapp_sending_finished',
-                    {
-                        finished: true,
-                        sent: stats.sentMessages,
-                        failed: stats.failedMessages,
-                        total: stats.sentMessages + stats.failedMessages
-                    }
-                );
-                wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
+                wsEmitter.emit(InternalEmitterEvents.WHATSAPP_SENDING_FINISHED, {
+                    finished: true,
+                    sent: stats.sentMessages,
+                    failed: stats.failedMessages,
+                    total: stats.sentMessages + stats.failedMessages
+                });
             }
         } catch (error) {
             log.error("Error handling finishedSending event:", { error });
@@ -419,13 +412,8 @@ async function initializeApplication(): Promise<AppInitResult> {
         try {
             await messageState.setClientReady(true);
 
-            // Broadcast client ready using proper WebSocket message creation
             if (wsEmitter) {
-                const message = createWebSocketMessage(
-                    MessageSchemas.WebSocketMessage.CLIENT_READY,
-                    { clientReady: true }
-                );
-                wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
+                wsEmitter.emit(InternalEmitterEvents.WHATSAPP_CLIENT_READY, { clientReady: true });
             }
 
             log.info("✅ WhatsApp client is ready and state updated");
@@ -441,11 +429,10 @@ async function initializeApplication(): Promise<AppInitResult> {
 
             // Only broadcast if there are active viewers
             if (messageState.activeQRViewers > 0 && wsEmitter) {
-                const message = createWebSocketMessage(
-                    MessageSchemas.WebSocketMessage.QR_UPDATE,
-                    { qr, clientReady: false }
-                );
-                wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
+                wsEmitter.emit(InternalEmitterEvents.WHATSAPP_QR_UPDATED, {
+                    qr,
+                    clientReady: false
+                });
             }
         } catch (error) {
             log.error("Error handling QR event:", { error });
@@ -579,13 +566,10 @@ async function gracefulShutdown(signal: string): Promise<void> {
       await messageState.cleanup();
     }
 
-    // Stop WebSocket periodic timers
-    log.info('🔌 Stopping WebSocket timers...');
-    teardownPeriodicCleanup();
-
-    // Stop SSE broadcaster (clears keep-alive timer, ends open streams)
-    log.info('📡 Stopping SSE broadcaster...');
+    // Stop SSE broadcasters (clears keep-alive timers, ends open streams)
+    log.info('📡 Stopping SSE broadcasters...');
     teardownSseBroadcaster();
+    teardownWhatsappSseBroadcaster();
 
     // Close database connections
     log.info('🗄️  Closing database connections...');

@@ -316,11 +316,11 @@ export interface User {
  * User without sensitive data
  */
 export interface SafeUser {
-  UserID: number;
-  Username: string;
-  FullName: string;
-  Role: UserRole;
-  IsActive: boolean;
+  userId: number;
+  username: string;
+  fullName: string;
+  role: UserRole;
+  isActive: boolean;
 }
 
 // ===========================================

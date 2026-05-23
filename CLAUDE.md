@@ -103,28 +103,41 @@ Schema baseline: `migrations/init_script.sql` (UTF-8 snapshot of the full DB). H
 
 ---
 
-## Realtime / WebSockets
+## Realtime / SSE
 
-**Server entry**: `utils/websocket.ts` — `setupWebSocketServer(server)` returns `wsEmitter` (Node `EventEmitter`). Routes inject the emitter via `setWebSocketEmitter()` at boot and trigger broadcasts with `wsEmitter.emit(WebSocketEvents.DATA_UPDATED, date)` or `wsEmitter.emit('broadcast_message', msg)`. All periodic timers are cleared on graceful shutdown via `teardownPeriodicCleanup()` (chained from `index.ts`).
+WebSockets have been retired. All server→client realtime now flows over **Server-Sent Events**. The legacy `utils/websocket.ts`, `wsService`, `connectionManager`, and `public/js/constants/websocket-events.ts` are gone — don't restore them.
 
-**Client types** (registered via `?clientType=...` URL param at upgrade): `daily-appointments`, `waStatus`, `auth`, `chair-display`, `generic`. The upgrade is currently unauthenticated — internal-LAN assumption; revisit if exposed beyond the clinic network.
+**Server entry**: `index.ts` creates a bare `new EventEmitter()` (kept under the name `wsEmitter` for symmetry with existing emit sites) and hands it to the SSE broadcasters at boot:
+- `services/messaging/sse-broadcaster.ts` — appointments + chair-display channels
+- `services/messaging/sse-whatsapp.ts` — WhatsApp channel (QR, client-ready, message-status, sending-progress/finished)
 
-**Three heartbeat layers** (each catches a different failure mode):
-- **TCP ping** (30 s, server-driven): terminates dead transports.
-- **`SERVER_HEARTBEAT`** (15 s, server push): drives client freshness signal — receipt timestamp is what makes the indicator honest.
-- **`HEARTBEAT_PING`** (60 s, client-driven, 30 s pong timeout): active probe; force-closes on missed pong.
+Routes/services still emit the same internal events (`wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, date)`, `CHAIR_PATIENT_LOAD`, `WHATSAPP_*`); the broadcasters translate them to SSE frames at the boundary. Add new internal events to `services/messaging/websocket-events.ts` (the filename is legacy — the constants are now in-process emitter names only, never on the wire) and wire them in the relevant broadcaster's `ensureInitialized()`.
 
-**Freshness signal**: `wsService.getFreshness()` returns `'fresh'` if a message arrived within 30 s. Uses `performance.now()` — wall-clock-immune. `wsService.markStale()` forces stale immediately (called on recovery-fetch failure so the indicator reflects the data gap).
+**Routes**:
+- `GET /sse/chair-display/:chairId` — **public** (kiosk has no session — internal-LAN assumption, matches the legacy WS posture).
+- `GET /api/sse/appointments` and `GET /api/sse/whatsapp` — mounted **after** the auth gate; a 401 closes the EventSource (browser sets `readyState=CLOSED` and stops auto-retrying).
 
-**"Live" indicator** (`public/js/components/react/appointments/ConnectionStatus.tsx`): states are **Live** | **Stale — Resyncing** | **Static** (non-today views) | **Offline** | **Reconnecting…** | **Connection Error**.
+**Transport hygiene** (each SSE handler does this — copy the pattern, don't reinvent):
+- `req.setTimeout(0); res.setTimeout(0)` — bypasses the global 30 s `requestTimeout` middleware, otherwise every stream 408s at exactly 30 s.
+- Headers: `Content-Type: text/event-stream`, `Cache-Control: no-cache, no-transform`, `Connection: keep-alive`, `X-Accel-Buffering: no`.
+- Initial frame: `retry: ${2500 + jitter}\n\n` so a server restart doesn't trigger a thundering-herd reconnect.
+- **One** module-scoped 25 s `setInterval` writes `:\n\n` comment frames to every open stream — undercuts Caddy's ~30 s idle drop and proves transport health without per-connection timers.
 
-**Client singleton**: `public/js/services/websocket.ts` (`wsService`) + multiplexer `websocket-connection-manager.ts` (`connectionManager`). **Hooks share one physical socket** — never `new WebSocket()` directly except for the kiosk (`ChairDisplay.tsx`, intentional standalone). When a hook mounts with a new client type on an already-open socket, the manager sends `register_client_type` to the server; on unmount it sends `unregister_client_type`. This keeps the server's broadcast Sets accurate without reconnecting.
+**Freshness signal**: `sseAppointments.getFreshness()` / `sseWhatsapp.getFreshness()` return `'fresh'` iff `readyState === EventSource.OPEN`. No heartbeat-arrival clock — the browser's `onopen`/`onerror` transitions are authoritative. `markStale()` sets a sticky flag for the recovery-fetch-failed case (cleared on next open).
 
-**Event constants** live in **two files that must stay in sync**: `services/messaging/websocket-events.ts` (server) and `public/js/constants/websocket-events.ts` (client). Add new events to both.
+**"Live" indicator** (`public/js/components/react/appointments/ConnectionStatus.tsx`, unchanged): **Live** | **Stale — Resyncing** | **Static** (non-today views) | **Offline** | **Reconnecting…** | **Connection Error**.
 
-**Chair-display state**: server keeps an in-memory `chairCurrentPatient` map so a kiosk reconnect replays the current patient via the existing `patient-loaded` handler — no DB write or new endpoint needed. Lost on server restart by design.
+**Client singletons**: `public/js/services/sse-appointments.ts` (`sseAppointments`) and `public/js/services/sse-whatsapp.ts` (`sseWhatsapp`). Refcount-based — hooks call `ensureConnected()` on mount and `release()` on unmount; the underlying `EventSource` is opened on first acquire and closed when refcount hits zero. **Never `new EventSource(...)` directly in app code** except the chair-display kiosk (`public/js/routes/ChairDisplay.tsx`, intentional standalone — no session, no shared listeners).
 
-**Don't bypass the manager**: a stray `new WebSocket(...)` in app code skips reconnect/freshness/type-registration.
+**Forced reconnect triggers** (built into the singletons + the kiosk):
+- `visibilitychange` → hidden ≥ 2 min then visible (`VISIBILITY_RESUME_THRESHOLD_MS` in `public/js/constants/sse-liveness.ts`): close + reopen to dodge half-dead NAT/cellular transports.
+- `pageshow` with `persisted === true`: iOS bfcache restore — the handle survives but the socket is dead.
+
+**Chair-display state** (`sse-broadcaster.ts`): server keeps an in-memory `chairCurrentPatient` map with a 12 h TTL, so a kiosk reconnect replays the current patient on connect. Each chair has a monotonic `chairEpoch` counter — an async LOAD that resolves after a later CLEAR (or another LOAD) detects the bump and skips writing stale state. Lost on server restart by design.
+
+**WhatsApp QR-viewer accounting**: every open `/api/sse/whatsapp` stream registers as a QR viewer via `messageState.registerQRViewer(viewerId)` and unregisters on close. The `messageState.activeQRViewers > 0` check still gates QR data-URL generation and on-demand WhatsApp init — don't break this on the SSE side.
+
+**Graceful shutdown**: `teardownSseBroadcaster()` and `teardownWhatsappSseBroadcaster()` (both called from `gracefulShutdown` in `index.ts`) detach emitter listeners, clear the keep-alive interval, end all open streams, and reset the module-scoped maps.
 
 ---
 
@@ -166,4 +179,4 @@ curl -c /tmp/cookies.txt -X POST http://localhost:3001/api/auth/login \
 - React Compiler (`babel-plugin-react-compiler`) is enabled — don't manually memoize unless profiling proves a need.
 - Cross-platform path handling lives in `utils/path-resolver.ts` (auto Windows/WSL conversion).
 - RTL support for Kurdish/Arabic; check `rtl-support.css` before adding directional styles.
-- Graceful shutdown chains exist for all long-lived services (WhatsApp, sync, pool, WS); don't add `process.exit()` mid-flow.
+- Graceful shutdown chains exist for all long-lived services (WhatsApp, sync, pool, SSE broadcasters); don't add `process.exit()` mid-flow.

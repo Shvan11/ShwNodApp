@@ -15,7 +15,6 @@ import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import qrcode from 'qrcode';
 import path from 'path';
-import type { EventEmitter } from 'events';
 
 // Services
 import * as database from '../../services/database/index.js';
@@ -23,11 +22,7 @@ import whatsapp from '../../services/messaging/whatsapp.js';
 import { sendImg_, sendXray_ } from '../../services/messaging/whatsapp-api.js';
 import { sendgramfile } from '../../services/messaging/telegram.js';
 import messageState from '../../services/state/messageState.js';
-import {
-  WebSocketEvents,
-  InternalEmitterEvents,
-  createStandardMessage
-} from '../../services/messaging/websocket-events.js';
+import stateEvents from '../../services/state/stateEvents.js';
 import { getReceiptData } from '../../services/templates/receipt-service.js';
 import { getAppointmentForNotification } from '../../services/database/queries/appointment-queries.js';
 
@@ -88,17 +83,6 @@ interface MessageDataResult {
 interface SendMediaResult {
   result: string;
   sentMessages?: number;
-}
-
-// WebSocket emitter will be injected to avoid circular imports
-let wsEmitter: EventEmitter | null = null;
-
-/**
- * Set the WebSocket emitter reference
- * @param emitter - WebSocket event emitter
- */
-export function setWebSocketEmitter(emitter: EventEmitter): void {
-  wsEmitter = emitter;
 }
 
 // ============================================================================
@@ -315,15 +299,6 @@ router.get(
       // Start sending process (non-blocking)
       whatsapp.send(dateparam).catch((error: Error) => {
         log.error(`Error in WhatsApp send process: ${error.message}`);
-
-        // Broadcast error to clients
-        if (wsEmitter) {
-          const message = createStandardMessage(WebSocketEvents.SYSTEM_ERROR, {
-            error: `Send process failed: ${error.message}`,
-            date: dateparam
-          });
-          wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, message);
-        }
       });
 
       // Respond immediately
@@ -851,6 +826,77 @@ router.get(
   }
 );
 
+/**
+ * Get initial WhatsApp state (replaces the WS REQUEST_WHATSAPP_INITIAL_STATE RPC).
+ * GET /initial-state (mounted at /api/wa)
+ * Returns the same payload shape the WS handler used to push, so hooks can
+ * prime themselves on mount / date-change / visibility / 30s QR-refresh.
+ * Triggers on-demand init when QR viewers are connected.
+ */
+router.get('/initial-state', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const stateDump = messageState.dump();
+    const clientStatus = whatsapp.getStatus() as {
+      state?: string;
+      active?: boolean;
+      initializing?: boolean;
+      hasClient?: boolean;
+    };
+
+    if (messageState.activeQRViewers > 0) {
+      stateEvents.emit('whatsapp_initialization_requested');
+    }
+
+    const isClientReady = stateDump.clientReady || clientStatus.active;
+    const finished = stateDump.finishedSending;
+
+    let html: string;
+    if (isClientReady) {
+      html = finished
+        ? `<p>${stateDump.sentMessages} Messages Sent!</p><p>${stateDump.failedMessages} Messages Failed!</p><p>Finished</p>`
+        : `<p>${stateDump.sentMessages} Messages Sent!</p><p>${stateDump.failedMessages} Messages Failed!</p><p>Sending...</p>`;
+    } else if (messageState.qr && messageState.activeQRViewers > 0) {
+      html = '<p>QR code ready - Please scan with WhatsApp</p>';
+    } else {
+      html = '<p>Initializing the client...</p>';
+    }
+
+    let qrDataUrl: string | null = null;
+    if (!isClientReady && messageState.qr) {
+      try {
+        qrDataUrl = await qrcode.toDataURL(messageState.qr, {
+          margin: 4,
+          scale: 6,
+          errorCorrectionLevel: 'M'
+        });
+      } catch (error) {
+        log.error('Failed to convert QR code to data URL', { error: (error as Error).message });
+        qrDataUrl = messageState.qr;
+      }
+    }
+
+    res.json({
+      success: true,
+      htmltext: html,
+      finished,
+      clientReady: isClientReady,
+      initializing: clientStatus.initializing || false,
+      clientStatus,
+      persons: messageState.persons || [],
+      qr: qrDataUrl,
+      stats: stateDump,
+      sentMessages: stateDump.sentMessages || 0,
+      failedMessages: stateDump.failedMessages || 0,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    log.error('Error building WhatsApp initial state', { error: (error as Error).message });
+    ErrorResponses.internalError(res, 'Failed to fetch initial state', {
+      error: (error as Error).message
+    });
+  }
+});
+
 // ============================================================================
 // WHATSAPP CLIENT LIFECYCLE ROUTES
 // ============================================================================
@@ -980,18 +1026,6 @@ router.get('/initialize', (_req: Request, res: Response): void => {
           'Background WhatsApp initialization failed:',
           (error as Error).message
         );
-
-        // Broadcast error to WebSocket clients if available
-        if (wsEmitter) {
-          const errorMessage = createStandardMessage(
-            WebSocketEvents.SYSTEM_ERROR,
-            {
-              error: `WhatsApp initialization failed: ${(error as Error).message}`,
-              source: 'background_initialization'
-            }
-          );
-          wsEmitter.emit(InternalEmitterEvents.BROADCAST_MESSAGE, errorMessage);
-        }
       }
     });
   } catch (error) {
