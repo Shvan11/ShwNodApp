@@ -1,8 +1,8 @@
 /**
  * CalendarHeader Component for Appointment Calendar
  *
- * Renders the calendar header with navigation, view controls, and statistics
- * Handles week navigation and view mode switching
+ * The redesigned v4 toolbar: two-line title + navigation on the left,
+ * utilisation strip + view segmented control + doctor filter on the right.
  */
 
 import DoctorFilter from './DoctorFilter';
@@ -17,7 +17,8 @@ interface CalendarStats {
 }
 
 interface CalendarHeaderProps {
-    weekDisplayText: string;
+    titleMain: string;
+    titleSub: string;
     onPreviousWeek: () => void;
     onNextWeek: () => void;
     onTodayClick: () => void;
@@ -27,12 +28,17 @@ interface CalendarHeaderProps {
     loading: boolean;
     selectedDoctorId: number | null;
     onDoctorChange: (doctorId: number | null) => void;
-    showEarlySlots: boolean;
-    onToggleEarlySlots: () => void;
 }
 
+const viewModes: Array<[ViewMode, string]> = [
+    ['day', 'Day'],
+    ['week', 'Week'],
+    ['month', 'Month']
+];
+
 const CalendarHeader = ({
-    weekDisplayText,
+    titleMain,
+    titleSub,
     onPreviousWeek,
     onNextWeek,
     onTodayClick,
@@ -41,166 +47,100 @@ const CalendarHeader = ({
     calendarStats,
     loading,
     selectedDoctorId,
-    onDoctorChange,
-    showEarlySlots,
-    onToggleEarlySlots
+    onDoctorChange
 }: CalendarHeaderProps) => {
-
-    // Context-aware button text and tooltip based on view mode
-    const getTodayButtonText = (): string => {
-        switch (viewMode) {
-            case 'day': return 'Today';
-            case 'month': return 'This Month';
-            default: return 'This Week';
-        }
-    };
-
-    const getTodayButtonTitle = (): string => {
-        switch (viewMode) {
-            case 'day': return 'Go to today';
-            case 'month': return 'Go to current month';
-            default: return 'Go to current week';
-        }
-    };
-
-    const viewModes: Array<[ViewMode, string]> = [
-        ['day', 'Day View'],
-        ['week', 'Week View'],
-        ['month', 'Month View']
-    ];
+    const utilization = calendarStats?.utilizationPercent ?? 0;
 
     return (
-        <div className="calendar-header">
-            {/* Week navigation section */}
-            <div className="calendar-navigation">
-                <button
-                    className="today-button"
-                    onClick={onTodayClick}
-                    disabled={loading}
-                    title={getTodayButtonTitle()}
-                    aria-label={getTodayButtonTitle()}
-                >
-                    {getTodayButtonText()}
-                </button>
-
-                <button
-                    className="nav-button prev-week"
-                    onClick={onPreviousWeek}
-                    disabled={loading}
-                    title="Previous Week"
-                    aria-label="Go to previous week"
-                >
-                    <i className="fas fa-chevron-left" />
-                </button>
-
-                <div className="week-display">
-                    <h2 className="week-text">{weekDisplayText}</h2>
+        <header className="cal-bar">
+            <div className="cal-bar-l">
+                <div className="cal-title">
+                    <span className="cal-title-main">{titleMain}</span>
+                    {titleSub && <span className="cal-title-sub">{titleSub}</span>}
                 </div>
-
-                <button
-                    className="nav-button next-week"
-                    onClick={onNextWeek}
-                    disabled={loading}
-                    title="Next Week"
-                    aria-label="Go to next week"
-                >
-                    <i className="fas fa-chevron-right" />
-                </button>
+                <div className="cal-nav">
+                    <button
+                        type="button"
+                        className="cal-nav-btn"
+                        onClick={onPreviousWeek}
+                        disabled={loading}
+                        aria-label="Previous"
+                        title="Previous"
+                    >
+                        ‹
+                    </button>
+                    <button
+                        type="button"
+                        className="cal-today"
+                        onClick={onTodayClick}
+                        disabled={loading}
+                        title="Go to today"
+                    >
+                        Today
+                    </button>
+                    <button
+                        type="button"
+                        className="cal-nav-btn"
+                        onClick={onNextWeek}
+                        disabled={loading}
+                        aria-label="Next"
+                        title="Next"
+                    >
+                        ›
+                    </button>
+                </div>
             </div>
 
-            {/* View mode toggle section */}
-            <div className="view-controls">
+            <div className="cal-bar-r">
+                {calendarStats && (
+                    <div
+                        className="cal-util-inline"
+                        title={`${utilization}% of available slots are booked`}
+                    >
+                        <span className="cal-util-pct">{utilization}%</span>
+                        <span className="cal-util-track">
+                            <span
+                                className="cal-util-fill"
+                                style={{ width: `${utilization}%` }}
+                            />
+                        </span>
+                        <span className="cal-util-num">
+                            <b>{calendarStats.bookedSlots}</b>/
+                            <span>{calendarStats.totalSlots}</span> slots
+                        </span>
+                    </div>
+                )}
+
+                <div className="cal-divider" />
+
                 <div
-                    className="view-mode-toggle"
+                    className="cal-seg"
                     role="tablist"
                     aria-label="Calendar view mode"
                 >
                     {viewModes.map(([mode, label]) => (
                         <button
                             key={mode}
-                            className={`view-mode-btn ${viewMode === mode ? 'active' : ''}`}
+                            type="button"
+                            className={viewMode === mode ? 'active' : ''}
                             onClick={() => onViewModeChange(mode)}
                             disabled={loading}
                             role="tab"
                             aria-selected={viewMode === mode}
-                            aria-label={label}
-                            title={label}
+                            title={`${label} View`}
                         >
-                            {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                            {label}
                         </button>
                     ))}
                 </div>
 
-                {/* Doctor filter */}
                 <DoctorFilter
                     selectedDoctorId={selectedDoctorId}
                     onDoctorChange={onDoctorChange}
                     className="header-doctor-filter"
                 />
-
-                {/* Early & Late slots toggle - only show in week/day view */}
-                {(viewMode === 'week' || viewMode === 'day') && (
-                    <button
-                        className={`early-slots-toggle ${showEarlySlots ? 'active' : ''}`}
-                        onClick={onToggleEarlySlots}
-                        disabled={loading}
-                        title={showEarlySlots ? 'Hide early & late time slots (12:00-13:30, 21:00-22:30)' : 'Show early & late time slots (12:00-13:30, 21:00-22:30)'}
-                        aria-label={showEarlySlots ? 'Hide early & late time slots' : 'Show early & late time slots'}
-                    >
-                        <i className={`fas fa-clock ${showEarlySlots ? '' : 'fa-slash'}`} />
-                        <span>{showEarlySlots ? 'Hide' : 'Show'} Early & Late Slots</span>
-                    </button>
-                )}
             </div>
-
-            {/* Calendar statistics section */}
-            {calendarStats && (
-                <div
-                    className="calendar-stats"
-                    aria-label="Calendar statistics"
-                >
-                    <div
-                        className="stat-item utilization"
-                        title={`${calendarStats.utilizationPercent}% of available slots are booked`}
-                    >
-                        <span className="stat-label">Utilization</span>
-                        <span className="stat-value">{calendarStats.utilizationPercent}%</span>
-                    </div>
-
-                    <div
-                        className="stat-item available"
-                        title={`${calendarStats.availableSlots} slots available for booking`}
-                    >
-                        <span className="stat-label">Available</span>
-                        <span className="stat-value">{calendarStats.availableSlots}</span>
-                    </div>
-
-                    <div
-                        className="stat-item booked"
-                        title={`${calendarStats.bookedSlots} slots currently booked`}
-                    >
-                        <span className="stat-label">Booked</span>
-                        <span className="stat-value">{calendarStats.bookedSlots}</span>
-                    </div>
-
-                    <div
-                        className="stat-item total"
-                        title={`${calendarStats.totalSlots} total slots in this week`}
-                    >
-                        <span className="stat-label">Total</span>
-                        <span className="stat-value">{calendarStats.totalSlots}</span>
-                    </div>
-                </div>
-            )}
-
-            {/* Loading indicator in header */}
-            {loading && (
-                <div className="header-loading">
-                    <span className="loading-text">Updating...</span>
-                    <div className="loading-spinner-small" />
-                </div>
-            )}
-        </div>
+        </header>
     );
 };
 

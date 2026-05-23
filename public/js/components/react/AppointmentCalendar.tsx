@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, type MouseEvent } from 'react';
-import CalendarGrid from './CalendarGrid';
+import CalendarGrid, { type DropTarget, type MoreMenu } from './CalendarGrid';
 import CalendarHeader from './CalendarHeader';
 import MonthlyCalendarGrid from './MonthlyCalendarGrid';
 import CalendarContextMenu from './CalendarContextMenu';
@@ -57,8 +57,7 @@ const AppointmentCalendar = ({
     initialViewMode = 'week',
     mode = 'view',
     onSlotSelect,
-    selectedSlot: externalSelectedSlot,
-    showOnlyAvailable = false
+    selectedSlot: externalSelectedSlot
 }: AppointmentCalendarProps) => {
     const toast = useToast();
 
@@ -73,11 +72,12 @@ const AppointmentCalendar = ({
     const [internalSelectedSlot, setInternalSelectedSlot] = useState<SlotData | null>(null);
     const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
     const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(null);
-    const [showEarlySlots, setShowEarlySlots] = useState(false);
-    const [extendedSlotsDefaultLoaded, setExtendedSlotsDefaultLoaded] = useState(false);
-    const [earlySlotTimes, setEarlySlotTimes] = useState<string[]>(['12:00', '12:30', '13:00', '13:30']);
-    const [lateSlotTimes, setLateSlotTimes] = useState<string[]>(['21:00', '21:30', '22:00', '22:30']);
     const [isMobile, setIsMobile] = useState(false);
+
+    // Drag-to-reschedule and "+N more" popover state
+    const [draggingId, setDraggingId] = useState<string | null>(null);
+    const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+    const [moreMenu, setMoreMenu] = useState<MoreMenu | null>(null);
 
     // Context menu and delete confirmation state
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -111,50 +111,6 @@ const AppointmentCalendar = ({
 
         return () => window.removeEventListener('resize', checkMobile);
     }, [viewMode]);
-
-    // Fetch extended slots settings on mount (default toggle + slot categories)
-    useEffect(() => {
-        if (extendedSlotsDefaultLoaded) return;
-
-        const fetchExtendedSlotsSettings = async () => {
-            try {
-                // Fetch all settings in parallel
-                const [defaultResponse, earlyResponse, lateResponse] = await Promise.all([
-                    fetch('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT'),
-                    fetch('/api/options/CALENDAR_EARLY_SLOTS'),
-                    fetch('/api/options/CALENDAR_LATE_SLOTS')
-                ]);
-
-                const [defaultData, earlyData, lateData] = await Promise.all([
-                    defaultResponse.json(),
-                    earlyResponse.json(),
-                    lateResponse.json()
-                ]);
-
-                // Set toggle default
-                if (defaultData.status === 'success' && defaultData.value !== null) {
-                    setShowEarlySlots(defaultData.value === 'true');
-                }
-
-                // Set early slots
-                if (earlyData.status === 'success' && earlyData.value) {
-                    setEarlySlotTimes(earlyData.value.split(',').filter(Boolean));
-                }
-
-                // Set late slots
-                if (lateData.status === 'success' && lateData.value) {
-                    setLateSlotTimes(lateData.value.split(',').filter(Boolean));
-                }
-            } catch (err) {
-                // Silently fail - keep defaults
-                console.error('Failed to fetch extended slots settings:', err);
-            } finally {
-                setExtendedSlotsDefaultLoaded(true);
-            }
-        };
-
-        fetchExtendedSlotsSettings();
-    }, [extendedSlotsDefaultLoaded]);
 
     // Utility functions
     // Week starts on Saturday (day 6)
@@ -224,6 +180,42 @@ const AppointmentCalendar = ({
             day: 'numeric',
             year: 'numeric'
         })}`;
+    }, [weekStart, weekEnd, currentDate, viewMode]);
+
+    // Toolbar title — main line (month + year) and sub line (context per view mode)
+    const titleMain = useMemo(
+        () => currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        [currentDate]
+    );
+
+    const titleSub = useMemo(() => {
+        if (viewMode === 'day') {
+            return currentDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+        if (viewMode === 'month') {
+            return '';
+        }
+        // ISO week number
+        const tmp = new Date(weekStart);
+        tmp.setHours(0, 0, 0, 0);
+        tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay() + 6) % 7));
+        const week1 = new Date(tmp.getFullYear(), 0, 4);
+        const weekNumber =
+            1 +
+            Math.round(
+                ((tmp.getTime() - week1.getTime()) / 86400000 -
+                    3 +
+                    ((week1.getDay() + 6) % 7)) /
+                    7
+            );
+        const fmt = (d: Date) =>
+            d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+        return `Week ${weekNumber} · ${fmt(weekStart)} – ${fmt(weekEnd)}`;
     }, [weekStart, weekEnd, currentDate, viewMode]);
 
     // API functions
@@ -331,9 +323,46 @@ const AppointmentCalendar = ({
         setSelectedDoctorId(doctorId);
     }, []);
 
-    const handleToggleEarlySlots = useCallback(() => {
-        setShowEarlySlots(prev => !prev);
-    }, []);
+    const handleReschedule = useCallback(
+        async (
+            appointmentID: number | string,
+            newDate: string,
+            newTime: string,
+            appt: CalendarAppointment
+        ) => {
+            const personID = appt.personID ?? appt.PersonID;
+            if (!personID || !appt.drID || !appt.appDetail) {
+                toast.error('Cannot reschedule: appointment is missing required details');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/appointments/${appointmentID}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        PersonID: personID,
+                        DrID: appt.drID,
+                        AppDetail: appt.appDetail,
+                        AppDate: `${newDate}T${newTime}:00`
+                    })
+                });
+
+                if (!response.ok) {
+                    const data = await response.json().catch(() => null);
+                    throw new Error(data?.error || 'Failed to reschedule appointment');
+                }
+
+                toast.success('Appointment rescheduled');
+                await fetchCalendarData(currentDate, selectedDoctorId);
+            } catch (error) {
+                toast.error(
+                    error instanceof Error ? error.message : 'Failed to reschedule appointment'
+                );
+            }
+        },
+        [currentDate, selectedDoctorId, fetchCalendarData, toast]
+    );
 
     const handleSlotClick = useCallback((slot: SlotData, event: MouseEvent<HTMLDivElement>) => {
         if (mode === 'selection') {
@@ -589,7 +618,8 @@ const AppointmentCalendar = ({
         <div className="appointment-calendar">
             {/* Calendar Header */}
             <CalendarHeader
-                weekDisplayText={weekDisplayText}
+                titleMain={titleMain}
+                titleSub={titleSub}
                 onPreviousWeek={() => navigateWeek('prev')}
                 onNextWeek={() => navigateWeek('next')}
                 onTodayClick={goToToday}
@@ -599,8 +629,6 @@ const AppointmentCalendar = ({
                 loading={loading}
                 selectedDoctorId={selectedDoctorId}
                 onDoctorChange={handleDoctorChange}
-                showEarlySlots={showEarlySlots}
-                onToggleEarlySlots={handleToggleEarlySlots}
             />
 
             {/* Calendar Grid - Show different grid based on view mode */}
@@ -620,10 +648,13 @@ const AppointmentCalendar = ({
                     onDayContextMenu={handleDayContextMenu}
                     mode={mode}
                     viewMode={viewMode}
-                    showOnlyAvailable={showOnlyAvailable}
-                    showEarlySlots={showEarlySlots}
-                    earlySlotTimes={earlySlotTimes}
-                    lateSlotTimes={lateSlotTimes}
+                    draggingId={draggingId}
+                    setDraggingId={setDraggingId}
+                    dropTarget={dropTarget}
+                    setDropTarget={setDropTarget}
+                    moreMenu={moreMenu}
+                    setMoreMenu={setMoreMenu}
+                    onReschedule={handleReschedule}
                 />
             )}
 

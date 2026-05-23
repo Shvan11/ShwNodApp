@@ -11,6 +11,8 @@ export interface CalendarAppointment {
     patientName?: string;
     appDetail?: string;
     PersonID?: number;
+    personID?: number | null;
+    drID?: number | null;
     time?: string;
 }
 

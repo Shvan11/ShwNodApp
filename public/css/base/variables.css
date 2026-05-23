@@ -424,6 +424,24 @@
     --spacing-2xl: var(--spacing-xxl);
 }
 
+/* Calendar week/day-view redesign — uniform 112px slot system.
+   Reuses --color-purple-medium (#6d67c6) and --color-teal (#20c997). */
+:root {
+    --cal-slot-h: 112px;
+    --cal-grid-time-w: 70px;
+    --cal-line: oklch(90% 0.005 260);
+    --cal-line-2: oklch(82% 0.006 260);
+    --cal-ink: oklch(22% 0.014 260);
+    --cal-ink-2: oklch(40% 0.012 260);
+    --cal-ink-3: oklch(58% 0.008 260);
+    --cal-ink-4: oklch(74% 0.006 260);
+    --cal-surface: #ffffff;
+    --cal-surface-2: oklch(97% 0.004 260);
+    --cal-hol: oklch(58% 0.13 25);
+    --cal-hol-soft: oklch(96% 0.025 25);
+    --cal-purple-ink: #4c44a8;
+}
+
 /* RTL (Right-to-Left) Support */
 [dir="rtl"] {
     direction: rtl;
