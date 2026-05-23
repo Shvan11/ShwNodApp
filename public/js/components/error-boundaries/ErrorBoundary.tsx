@@ -103,8 +103,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <button onClick={this.handleReset} className="retry-btn">
                 Try Again
               </button>
-              <button onClick={() => window.location.reload()} className="reload-btn">
-                Reload Page
+              <button onClick={() => { this.handleReset(); this.props.navigate?.('/'); }} className="reload-btn">
+                Return to Dashboard
               </button>
               <button onClick={() => this.props.navigate?.('/')} className="home-btn">
                 Go to Dashboard

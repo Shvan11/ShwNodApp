@@ -1,4 +1,5 @@
 import { useState, useEffect, ChangeEvent, MouseEvent } from 'react';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import Modal from './Modal';
 import styles from './DatabaseSettings.module.css';
 
@@ -46,6 +47,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
     const [pendingChanges, setPendingChanges] = useState<PendingChanges>({});
     const [isLoading, setIsLoading] = useState(false);
     const [isTestingConnection, setIsTestingConnection] = useState(false);
+    const confirm = useConfirm();
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const [modal, setModal] = useState<ModalState>({ show: false, title: '', message: '' });
@@ -176,11 +178,9 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                 setPendingChanges({});
 
                 if (data.requiresRestart) {
-                    // Use confirm dialog for restart
-                    const shouldRestart = window.confirm(
-                        data.message + '\n\n' +
-                        'The application must be restarted for database changes to take effect.\n\n' +
-                        'Click OK to restart now, or Cancel to restart later.'
+                    const shouldRestart = await confirm(
+                        data.message + '\n\nThe application must be restarted for database changes to take effect.\n\nRestart now?',
+                        { title: 'Restart Required', danger: true, confirmText: 'Restart Now', cancelText: 'Later' }
                     );
 
                     if (shouldRestart) {

@@ -18,7 +18,7 @@ import {
   createWhatsappSseRouter,
   teardownWhatsappSseBroadcaster,
 } from './services/messaging/sse-whatsapp.js';
-import { setupMiddleware } from './middleware/index.js';
+import { setupMiddleware, errorHandler } from './middleware/index.js';
 import apiRoutes from './routes/api/index.js';
 import webRoutes from './routes/web.js';
 import calendarRoutes from './routes/calendar.js';
@@ -48,6 +48,7 @@ import { testConnection, testConnectionWithRetry, shutdown as shutdownDatabase }
 import { createPathResolver } from './utils/path-resolver.js';
 import queueProcessor from './services/sync/queue-processor.js';
 import { startPeriodicPolling, stopPeriodicPolling } from './services/sync/reverse-sync-poller.js';
+import ResourceManager from './services/core/ResourceManager.js';
 import { log } from './utils/logger.js';
 import { requestTimeout, TIMEOUTS } from './middleware/timeout.js';
 
@@ -144,18 +145,32 @@ async function initializeApplication(): Promise<AppInitResult> {
     log.info('🔐 Setting up session management...');
     const SQLiteStoreSession = SQLiteStore(session);
 
+    // SESSION_SECRET is required — no hardcoded fallback. A weak/known secret
+    // makes session forgery trivial for anyone with source-code access.
+    const sessionSecret = process.env.SESSION_SECRET;
+    if (!sessionSecret) {
+      throw new Error(
+        'SESSION_SECRET is required. Set it in .env (recommend 32+ random bytes) before starting the server.'
+      );
+    }
+    const portalSessionSecret = process.env.PORTAL_SESSION_SECRET || sessionSecret;
+
+    const isProduction = process.env.NODE_ENV === 'production';
     const staffSession = session({
       store: new SQLiteStoreSession({
         db: 'sessions.db',
         dir: './data'
       }),
-      secret: process.env.SESSION_SECRET || 'shwan-orthodontics-secret-change-in-production',
+      secret: sessionSecret,
       resave: false,
       saveUninitialized: false,
       rolling: true, // Reset expiration on every request
       cookie: {
         httpOnly: true,
-        secure: false, // Allow HTTP for local development
+        // Secure in prod (Caddy terminates HTTPS and the loopback proxy is
+        // trusted, so express-session can read X-Forwarded-Proto correctly).
+        // Dev (NODE_ENV !== 'production') can use plain HTTP.
+        secure: isProduction,
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days default
         sameSite: 'lax',
         path: '/' // Ensure cookie is sent for all paths
@@ -180,15 +195,13 @@ async function initializeApplication(): Promise<AppInitResult> {
         db: 'portal-sessions.db',
         dir: './data'
       }),
-      secret: process.env.PORTAL_SESSION_SECRET
-        || process.env.SESSION_SECRET
-        || 'shwan-portal-secret-change-in-production',
+      secret: portalSessionSecret,
       resave: false,
       saveUninitialized: false,
       rolling: true,
       cookie: {
         httpOnly: true,
-        secure: false,
+        secure: isProduction,
         sameSite: 'lax',
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         path: '/'
@@ -206,25 +219,16 @@ async function initializeApplication(): Promise<AppInitResult> {
     app.use(requestTimeout(TIMEOUTS.DEFAULT));
     log.info(`✅ Global request timeout set to ${TIMEOUTS.DEFAULT}ms (30 seconds)`);
 
-    // Setup static files (MUST BE AFTER AUTHENTICATION to protect routes)
     log.info('📁 Setting up static file serving...');
 
     // Use path resolver for cross-platform compatibility
     const pathResolver = createPathResolver(config.fileSystem.machinePath || '');
 
-    // Custom MIME types for Dolphin Imaging files (extensions: .i10, .i12, .i13, .i20, .i21, .i22, .i23, .i24)
-    // These are JPEG images with non-standard extensions
-    app.use('/DolImgs', express.static(pathResolver('working'), {
-        setHeaders: (res, filePath) => {
-            // Check if file has Dolphin Imaging extension (.iXX)
-            if (/\.i\d+$/i.test(filePath)) {
-                res.setHeader('Content-Type', 'image/jpeg');
-            }
-        }
-    }));
-    app.use('/clinic-assets', express.static(pathResolver('clinic1'))); // Changed from /assets to avoid conflict with Vite built assets
+    // Public UI assets — no auth required
     app.use('/photoswipe', express.static('./public/photoswipe/'));
-    app.use('/data', express.static('./data')); // Serve data directory for template files
+    // NOTE: do NOT mount ./data as static — it holds sessions.db / portal-sessions.db
+    // and reverse-sync-state.json. Templates under ./data/templates are read via
+    // fs.readFile in the receipt service, never served over HTTP.
     app.use('/images', express.static('./public/images')); // Serve images directory for production mode
 
     // Set up the in-process event bus that fans real-time updates into the
@@ -270,7 +274,26 @@ async function initializeApplication(): Promise<AppInitResult> {
       });
     });
 
-    if (process.env.AUTHENTICATION_ENABLED === 'true') {
+    // Default-on: auth is enabled unless AUTHENTICATION_ENABLED is the literal
+    // string 'false'. In production, refuse to boot on any other ambiguous
+    // value to catch env typos that would otherwise silently expose the app.
+    const authEnv = process.env.AUTHENTICATION_ENABLED;
+    let authenticationEnabled: boolean;
+    if (authEnv === undefined || authEnv === 'true') {
+      authenticationEnabled = true;
+    } else if (authEnv === 'false') {
+      authenticationEnabled = false;
+    } else if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        `AUTHENTICATION_ENABLED must be 'true' or 'false', got: ${JSON.stringify(authEnv)}. ` +
+        `Refusing to start in production with ambiguous auth config.`
+      );
+    } else {
+      log.warn(`⚠️  AUTHENTICATION_ENABLED=${authEnv} — treating as enabled. Use 'false' to disable.`);
+      authenticationEnabled = true;
+    }
+
+    if (authenticationEnabled) {
       log.info('🔐 Authentication ENABLED - Protecting routes');
       const { authenticate, authenticateWeb } = await import('./middleware/auth.js');
 
@@ -280,10 +303,21 @@ async function initializeApplication(): Promise<AppInitResult> {
       // Protect web routes (redirects to /login.html)
       app.use('/', authenticateWeb);
     } else {
-      log.info('⚠️  Authentication DISABLED - All routes are public');
+      log.warn('⚠️  ⚠️  ⚠️  Authentication DISABLED - All routes are public ⚠️  ⚠️  ⚠️');
+      log.warn('   This should ONLY happen in local development. Never deploy this way.');
     }
 
     // ===== MOUNT ROUTES (AFTER AUTHENTICATION) =====
+    // PHI imaging static mounts — require auth (patient X-rays / clinic photos)
+    app.use('/DolImgs', express.static(pathResolver('working'), {
+        setHeaders: (res, filePath) => {
+            if (/\.i\d+$/i.test(filePath)) {
+                res.setHeader('Content-Type', 'image/jpeg');
+            }
+        }
+    }));
+    app.use('/clinic-assets', express.static(pathResolver('clinic1')));
+
     // Appointments + WhatsApp SSE — mounted under /api so they inherit the
     // auth gate above. Chair-display SSE is the only public SSE route (kiosk
     // has no session and matches the legacy WS posture).
@@ -304,6 +338,11 @@ async function initializeApplication(): Promise<AppInitResult> {
 
     // Final catch-all for SPA routing
     app.use('/', webRoutes);
+
+    // Global error handler — must be LAST (after every route mount). Catches
+    // anything that propagates out of a route via next(err) or an unhandled
+    // throw inside an async handler that Express turns into next(err).
+    app.use(errorHandler);
 
     // ===== ADDED: Initialize health monitoring =====
     log.info('🏥 Starting health monitoring...');
@@ -538,11 +577,19 @@ async function gracefulShutdown(signal: string): Promise<void> {
   log.info(`\n🛑 Graceful shutdown initiated by ${signal}`);
 
   try {
-    // Stop accepting new connections
+    // Stop accepting new connections; wait up to 5 s for in-flight requests.
     if (server) {
       log.info('🔌 Closing HTTP server...');
-      server.close(() => {
-        log.info('✅ HTTP server closed');
+      await new Promise<void>((resolve) => {
+        const forceExit = setTimeout(() => {
+          log.warn('⚠️  HTTP server did not close within 5 s; proceeding with shutdown');
+          resolve();
+        }, 5000);
+        server!.close(() => {
+          clearTimeout(forceExit);
+          log.info('✅ HTTP server closed');
+          resolve();
+        });
       });
     }
 
@@ -553,6 +600,11 @@ async function gracefulShutdown(signal: string): Promise<void> {
     // Stop reverse sync poller
     log.info('🔄 Stopping reverse sync poller...');
     stopPeriodicPolling();
+
+    // Stop the sync queue processor (was previously self-handling SIGTERM
+    // and racing this shutdown; now driven explicitly).
+    log.info('🛑 Stopping queue processor...');
+    queueProcessor.stop();
 
     // Clean up WhatsApp service
     if (whatsappService) {
@@ -575,9 +627,11 @@ async function gracefulShutdown(signal: string): Promise<void> {
     log.info('🗄️  Closing database connections...');
     await shutdownDatabase();
 
-    // Final resource cleanup via Resource Manager
+    // Run remaining cleanup tasks registered with ResourceManager
+    // (HealthCheck, db-pool, archform-db register themselves). These are
+    // idempotent so duplicate teardown with the direct calls above is safe.
     log.info('🧹 Final resource cleanup...');
-    // ResourceManager will handle its own cleanup via process handlers
+    await ResourceManager.gracefulShutdown(signal);
 
     log.info('✅ Graceful shutdown completed successfully');
     process.exit(0);

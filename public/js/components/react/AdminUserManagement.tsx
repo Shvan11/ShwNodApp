@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import styles from './AdminUserManagement.module.css';
 
 type UserRole = 'secretary' | 'admin';
@@ -32,6 +33,7 @@ interface Message {
  */
 export default function AdminUserManagement() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -97,7 +99,7 @@ export default function AdminUserManagement() {
   };
 
   const handleToggleActive = async (userId: number) => {
-    if (!confirm('Toggle user active status?')) return;
+    if (!await confirm('Toggle user active status?', { title: 'Toggle Status' })) return;
 
     try {
       const response = await fetch(`/api/users/${userId}/toggle`, {
@@ -148,7 +150,7 @@ export default function AdminUserManagement() {
   };
 
   const handleDeleteUser = async (userId: number, username: string) => {
-    if (!confirm(`Are you sure you want to delete user "${username}"? This cannot be undone.`)) return;
+    if (!await confirm(`Are you sure you want to delete user "${username}"? This cannot be undone.`, { title: 'Delete User', danger: true, confirmText: 'Delete' })) return;
 
     try {
       const response = await fetch(`/api/users/${userId}`, {

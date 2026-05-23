@@ -231,7 +231,7 @@ const SendMessage = () => {
         }),
         option: (provided, state) => ({
             ...provided,
-            backgroundColor: state.isSelected ? '#25D366' : state.isFocused ? '#f8f9fa' : 'white',
+            backgroundColor: state.isSelected ? 'var(--whatsapp-green)' : state.isFocused ? '#f8f9fa' : 'white',
             color: state.isSelected ? 'white' : '#333',
             padding: '10px 12px'
         }),

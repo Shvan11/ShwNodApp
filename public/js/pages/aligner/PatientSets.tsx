@@ -384,7 +384,6 @@ const PatientSets: React.FC = () => {
         try {
             const explorerUrl = `explorer:${folderPath}`;
 
-            // Create a temporary link and click it to trigger the protocol handler
             const link = document.createElement('a');
             link.href = explorerUrl;
             link.style.display = 'none';
@@ -392,41 +391,7 @@ const PatientSets: React.FC = () => {
             link.click();
             document.body.removeChild(link);
 
-            // Show success notification
-            const notification = document.createElement('div');
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: linear-gradient(135deg, #2563eb, #1d4ed8);
-                color: white;
-                padding: 1rem 1.5rem;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                z-index: 10000;
-                animation: slideIn 0.3s ease-out;
-                font-size: 0.95rem;
-                max-width: 400px;
-            `;
-            notification.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    <i class="fas fa-folder-open" style="font-size: 1.2rem;"></i>
-                    <div>
-                        <div style="font-weight: 600; margin-bottom: 0.25rem;">Opening folder in Explorer...</div>
-                        <div style="font-size: 0.85rem; opacity: 0.9;">${folderPath}</div>
-                    </div>
-                </div>
-            `;
-
-            document.body.appendChild(notification);
-
-            // Remove notification after 3 seconds
-            setTimeout(() => {
-                notification.style.animation = 'slideOut 0.3s ease-out';
-                setTimeout(() => notification.remove(), 300);
-            }, 3000);
-
-            // Also copy to clipboard as a fallback
+            toast.info(`Opening folder: ${folderPath}`);
             await copyToClipboard(folderPath);
 
         } catch (error) {

@@ -490,8 +490,9 @@ class WhatsAppService extends EventEmitter {
   }
 
   private setupCleanupHandlers(): void {
-    process.on('SIGTERM', () => this.gracefulShutdown('SIGTERM'));
-    process.on('SIGINT', () => this.gracefulShutdown('SIGINT'));
+    // Signal handling is owned by index.ts:gracefulShutdown, which calls
+    // whatsappService.gracefulShutdown() at the right point in the chain.
+    // No process.on('SIGINT'/'SIGTERM') here.
 
     stateEvents.on('qr_cleanup_required', () => {
       this.scheduleClientCleanup();

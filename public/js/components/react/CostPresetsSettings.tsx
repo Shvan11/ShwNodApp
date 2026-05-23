@@ -1,5 +1,6 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import styles from './CostPresetsSettings.module.css';
 
 type Currency = 'IQD' | 'USD' | 'EUR';
@@ -19,6 +20,7 @@ interface FormData {
 
 const CostPresetsSettings = () => {
     const toast = useToast();
+    const confirm = useConfirm();
     const [presets, setPresets] = useState<CostPreset[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeCurrency, setActiveCurrency] = useState<Currency>('IQD');
@@ -149,7 +151,7 @@ const CostPresetsSettings = () => {
 
     // Delete preset
     const handleDeletePreset = async (presetId: number) => {
-        if (!confirm('Are you sure you want to delete this preset?')) {
+        if (!await confirm('Are you sure you want to delete this preset?', { title: 'Delete Preset', danger: true, confirmText: 'Delete' })) {
             return;
         }
 

@@ -1,4 +1,6 @@
-import type { MouseEvent, ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import Modal from './Modal';
+import styles from './ConfirmDialog.module.css';
 
 interface ConfirmDialogProps {
     isOpen: boolean;
@@ -19,28 +21,20 @@ const ConfirmDialog = ({
     onCancel,
     confirmText = 'Confirm',
     cancelText = 'Cancel',
-    isDangerous = false
+    isDangerous = false,
 }: ConfirmDialogProps) => {
-    if (!isOpen) return null;
-
-    const handleOverlayClick = () => {
-        onCancel();
-    };
-
-    const handleDialogClick = (e: MouseEvent<HTMLDivElement>) => {
-        e.stopPropagation();
-    };
+    const messageContent = typeof message === 'string'
+        ? message.split('\n').filter((l) => l.trim() !== '').map((line, i) => (
+            <p key={i} className={styles.line}>{line}</p>
+        ))
+        : <div className={styles.line}>{message}</div>;
 
     return (
-        <div className="confirm-dialog-overlay" onClick={handleOverlayClick}>
-            <div className="confirm-dialog" onClick={handleDialogClick}>
-                <div className="confirm-dialog-header">
-                    <h3>{title}</h3>
-                </div>
-                <div className="confirm-dialog-body">
-                    <p>{message}</p>
-                </div>
-                <div className="confirm-dialog-footer">
+        <Modal isOpen={isOpen} onClose={onCancel} closeOnBackdropClick={false}>
+            <div className={styles.dialog}>
+                <h2 className={styles.title}>{title}</h2>
+                <div className={styles.body}>{messageContent}</div>
+                <div className={styles.actions}>
                     <button className="btn btn-secondary" onClick={onCancel}>
                         {cancelText}
                     </button>
@@ -52,7 +46,7 @@ const ConfirmDialog = ({
                     </button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 };
 

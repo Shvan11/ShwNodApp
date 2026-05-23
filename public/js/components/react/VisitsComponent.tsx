@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import styles from './VisitsComponent.module.css';
 
 interface Visit {
@@ -70,6 +71,7 @@ const highlight = (text: string | undefined, term: string, markClass: string): R
 
 const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
     const navigate = useNavigate();
+    const confirm = useConfirm();
     const [visits, setVisits] = useState<Visit[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -107,7 +109,7 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
     };
 
     const handleDeleteVisit = async (visitId: number) => {
-        if (!confirm('Are you sure you want to delete this visit? This action cannot be undone.')) return;
+        if (!await confirm('Are you sure you want to delete this visit? This action cannot be undone.', { title: 'Delete Visit', danger: true, confirmText: 'Delete' })) return;
 
         try {
             const response = await fetch('/api/deletevisitbywork', {

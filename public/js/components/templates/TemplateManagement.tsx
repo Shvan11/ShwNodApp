@@ -10,6 +10,7 @@ import TemplateCard from './TemplateCard';
 import CreateTemplateModal from './CreateTemplateModal';
 import TemplateStats from './TemplateStats';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import type { Template } from './TemplateCard';
 import type { DocumentType, TemplateSubmissionData } from './CreateTemplateModal';
 import type { TemplateStatsData } from './TemplateStats';
@@ -18,6 +19,7 @@ import type { ApiStatusResponse } from '@/types/api.types';
 function TemplateManagement() {
     const navigate = useNavigate();
     const toast = useToast();
+    const confirm = useConfirm();
 
     const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);
     const [allTemplates, setAllTemplates] = useState<Template[]>([]);
@@ -130,7 +132,7 @@ function TemplateManagement() {
     };
 
     const handleSetDefault = async (templateId: number) => {
-        if (!confirm('Set this template as the default for this document type?')) {
+        if (!await confirm('Set this template as the default for this document type?', { title: 'Set Default Template', confirmText: 'Set Default' })) {
             return;
         }
 
@@ -160,7 +162,7 @@ function TemplateManagement() {
     };
 
     const handleDeleteTemplate = async (templateId: number, templateName: string) => {
-        if (!confirm(`Are you sure you want to delete "${templateName}"?\n\nThis action cannot be undone.`)) {
+        if (!await confirm(`Are you sure you want to delete "${templateName}"?\n\nThis action cannot be undone.`, { title: 'Delete Template', danger: true, confirmText: 'Delete' })) {
             return;
         }
 

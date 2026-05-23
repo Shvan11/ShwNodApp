@@ -1,6 +1,7 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import Modal from './Modal';
 import styles from './EmployeeSettings.module.css';
 
@@ -36,6 +37,7 @@ interface EmployeeSettingsProps {
 
 const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSettingsProps) => {
     const toast = useToast();
+    const confirm = useConfirm();
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [positions, setPositions] = useState<Position[]>([]);
     const [loading, setLoading] = useState(true);
@@ -169,7 +171,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
     };
 
     const handleDelete = async (employeeId: number, employeeName: string) => {
-        if (!confirm(`Are you sure you want to delete ${employeeName}?`)) {
+        if (!await confirm(`Are you sure you want to delete ${employeeName}?`, { title: 'Delete Employee', danger: true, confirmText: 'Delete' })) {
             return;
         }
 

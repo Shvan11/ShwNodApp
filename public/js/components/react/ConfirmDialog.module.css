@@ -1,0 +1,36 @@
+.dialog {
+    padding: var(--spacing-xl);
+    min-width: 320px;
+    max-width: 460px;
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg, 0 8px 32px rgba(0, 0, 0, 0.2));
+}
+
+.title {
+    margin: 0 0 var(--spacing-md);
+    font-size: var(--font-size-xl);
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.body {
+    margin-bottom: var(--spacing-lg);
+}
+
+.line {
+    margin: 0 0 var(--spacing-xs);
+    color: var(--text-secondary);
+    line-height: 1.5;
+    font-size: var(--font-size-md);
+}
+
+.line:last-child {
+    margin-bottom: 0;
+}
+
+.actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    justify-content: flex-end;
+}

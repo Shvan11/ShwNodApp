@@ -32,6 +32,9 @@ export {
 } from './upload.js';
 export { default as upload } from './upload.js';
 
+// Re-export global error handler (register LAST in index.ts)
+export { errorHandler } from './error-handler.js';
+
 // Re-export time-based auth middleware
 export {
   requireRecordAge,
@@ -58,22 +61,16 @@ export function setupMiddleware(app: Application): void {
   // any non-localhost connection.
   app.set('trust proxy', 'loopback');
 
-  // CORS middleware
-  app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader(
-      'Access-Control-Allow-Methods',
-      'GET, POST, OPTIONS, PUT, PATCH, DELETE'
-    );
-    res.setHeader(
-      'Access-Control-Allow-Headers',
-      'X-Requested-With,content-type'
-    );
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    next();
-  });
+  // No CORS middleware — the SPA is served by the same Node process (production
+  // via Caddy reverse proxy, dev via Vite proxy), so all API calls are
+  // same-origin. The previous wildcard `Allow-Origin: *` paired with
+  // `Allow-Credentials: true` was both a misconfiguration (browsers reject
+  // that combination) and an attractive footgun for future cross-origin work.
+  // If a real cross-origin need appears, add a narrow allowlist here.
 
-  // Body parser middleware
-  app.use(express.json({ limit: '200mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '200mb' }));
+  // Body parser middleware — 10mb is plenty for the JSON payloads this app
+  // emits (templates, dental chart state, etc). File uploads go through
+  // multer (multipart/form-data) and don't need this raised.
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 }

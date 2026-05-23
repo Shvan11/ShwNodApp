@@ -1,8 +1,9 @@
 /**
  * Cost Preset API Routes
  *
- * Handles CRUD operations for estimated cost presets
- * No authentication required - these are just preset values for data entry
+ * Read endpoints are public (used to populate dropdowns during data entry).
+ * Write endpoints require an authenticated admin — they change clinic-wide
+ * billing presets and were previously reachable without a session.
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -15,6 +16,7 @@ import {
   getCostPresetCurrencies
 } from '../../services/database/queries/cost-preset-queries.js';
 import { ErrorResponses } from '../../utils/error-response.js';
+import { authenticate, authorize } from '../../middleware/auth.js';
 
 const router = Router();
 
@@ -82,7 +84,7 @@ router.get('/settings/cost-presets/currencies', async (_req: Request, res: Respo
  * Create a new cost preset
  * Body: { amount: number, currency: string, displayOrder: number }
  */
-router.post('/settings/cost-presets', async (req: Request<object, object, CostPresetBody>, res: Response): Promise<void> => {
+router.post('/settings/cost-presets', authenticate, authorize(['admin']), async (req: Request<object, object, CostPresetBody>, res: Response): Promise<void> => {
   try {
     const { amount, currency, displayOrder = 0 } = req.body;
 
@@ -120,7 +122,7 @@ router.post('/settings/cost-presets', async (req: Request<object, object, CostPr
  * Update an existing cost preset
  * Body: { amount: number, currency: string, displayOrder: number }
  */
-router.put('/settings/cost-presets/:id', async (req: Request<CostPresetParams, object, CostPresetBody>, res: Response): Promise<void> => {
+router.put('/settings/cost-presets/:id', authenticate, authorize(['admin']), async (req: Request<{ id: string }, object, CostPresetBody>, res: Response): Promise<void> => {
   try {
     const presetId = parseInt(req.params.id);
     const { amount, currency, displayOrder = 0 } = req.body;
@@ -157,7 +159,7 @@ router.put('/settings/cost-presets/:id', async (req: Request<CostPresetParams, o
  * DELETE /settings/cost-presets/:id
  * Delete a cost preset
  */
-router.delete('/settings/cost-presets/:id', async (req: Request<CostPresetParams>, res: Response): Promise<void> => {
+router.delete('/settings/cost-presets/:id', authenticate, authorize(['admin']), async (req: Request<{ id: string }>, res: Response): Promise<void> => {
   try {
     const presetId = parseInt(req.params.id);
 

@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback, memo } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent, FocusEvent } from 'react';
 import type { ApiResult, ExchangeRateResult } from '@/types/api.types';
 import styles from './PaymentModal.module.css';
 import Modal from './Modal';
 import { parseFormattedNumber } from '../../utils/formatters';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 // Types
 interface WorkData {
@@ -75,6 +76,7 @@ type EntryMode = 'amount' | 'cash';
  */
 const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const toast = useToast();
+    const confirm = useConfirm();
     const [loading, setLoading] = useState(false);
     const [exchangeRate, setExchangeRate] = useState<number | null>(null);
     const [exchangeRateError, setExchangeRateError] = useState(false);
@@ -370,33 +372,29 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
     // Calculate amount to register from cash received (reverse mode)
     // Uses same "benefit from conversion" rounding - round DOWN what patient gave
-    const calculateAmountFromCash = useCallback(() => {
+    const calculateAmountFromCash = () => {
         if (!exchangeRate) return;
 
         const actualUSD = parseFloat(String(formData.actualUSD)) || 0;
         const actualIQD = parseFloat(String(formData.actualIQD)) || 0;
         const accountCurrency = calculations.accountCurrency;
 
-        // Must have at least one currency to calculate
         if (actualUSD === 0 && actualIQD === 0) {
             setFormData(prev => ({ ...prev, amountToRegister: '' }));
             return;
         }
 
-        // Round DOWN what patient gave (business benefits from conversion)
         let amountToRegister: number;
         if (accountCurrency === 'USD') {
-            // Patient gave IQD, convert to USD - Round DOWN
             const iqdValueInUSD = Math.floor(actualIQD / exchangeRate);
             amountToRegister = actualUSD + iqdValueInUSD;
         } else {
-            // Patient gave USD, convert to IQD - Round DOWN to nearest 1000
             const usdValueInIQD = Math.floor(actualUSD * exchangeRate / 1000) * 1000;
             amountToRegister = usdValueInIQD + actualIQD;
         }
 
         setFormData(prev => ({ ...prev, amountToRegister }));
-    }, [exchangeRate, formData.actualUSD, formData.actualIQD, calculations.accountCurrency]);
+    };
 
     // Reverse mode: Calculate amount from cash when in cash entry mode
     useEffect(() => {
@@ -686,8 +684,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         }
 
         if (calculations.isShort) {
-            const confirm = window.confirm('Patient has not paid enough. Amount received is less than amount to register. Continue anyway?');
-            if (!confirm) return;
+            if (!await confirm('Patient has not paid enough. Amount received is less than amount to register. Continue anyway?', { title: 'Underpayment Warning', confirmText: 'Continue' })) return;
         }
 
         // Scenarios where change is not tracked (NULL):
@@ -1212,6 +1209,4 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     );
 };
 
-// Memoize the component to prevent unnecessary re-renders
-// Only re-renders when workData, onClose, or onSuccess change
-export default memo(PaymentModal);
+export default PaymentModal;

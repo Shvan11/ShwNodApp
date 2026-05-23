@@ -25,8 +25,8 @@ function GlobalErrorFallback() {
           </button>
           <button
             onClick={() => {
-              // Clear local storage and reload
-              localStorage.clear();
+              const appKeys = ['shwan_user_prefs', 'shwan_nav_state', 'shwan_last_route'];
+              appKeys.forEach(k => localStorage.removeItem(k));
               window.location.reload();
             }}
             className="secondary-btn"

@@ -3,6 +3,7 @@
  * CRUD operations for user accounts
  */
 import { Router, type Request, type Response } from 'express';
+import { log } from '../utils/logger.js';
 import { hashPassword } from '../middleware/auth.js';
 import { authorize } from '../middleware/auth.js';
 import { executeQuery, TYPES } from '../services/database/index.js';
@@ -78,7 +79,7 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
       users: users || []
     });
   } catch (error) {
-    console.error('Error fetching users:', error);
+    log.error('Error fetching users', { error: (error as Error).message });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch users'
@@ -156,16 +157,14 @@ router.post(
         ]
       );
 
-      console.log(
-        `✅ User created: ${username} (${role}) by ${req.session.username}`
-      );
+      log.info(`User created: ${username} (${role}) by ${req.session.username}`);
 
       res.json({
         success: true,
         message: 'User created successfully'
       });
     } catch (error) {
-      console.error('Error creating user:', error);
+      log.error('Error creating user', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: 'Failed to create user'
@@ -208,16 +207,14 @@ router.put(
         ]
       );
 
-      console.log(
-        `✅ Password reset for user ID ${userId} by ${req.session.username}`
-      );
+      log.info(`Password reset for user ID ${userId} by ${req.session.username}`);
 
       res.json({
         success: true,
         message: 'Password reset successfully'
       });
     } catch (error) {
-      console.error('Error resetting password:', error);
+      log.error('Error resetting password', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: 'Failed to reset password'
@@ -251,16 +248,14 @@ router.put(
         [['userId', TYPES.Int, parseInt(userId)]]
       );
 
-      console.log(
-        `✅ User status toggled for ID ${userId} by ${req.session.username}`
-      );
+      log.info(`User status toggled for ID ${userId} by ${req.session.username}`);
 
       res.json({
         success: true,
         message: 'User status updated'
       });
     } catch (error) {
-      console.error('Error toggling user status:', error);
+      log.error('Error toggling user status', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: 'Failed to update user status'
@@ -292,16 +287,14 @@ router.delete(
         ['userId', TYPES.Int, parseInt(userId)]
       ]);
 
-      console.log(
-        `✅ User deleted: ID ${userId} by ${req.session.username}`
-      );
+      log.info(`User deleted: ID ${userId} by ${req.session.username}`);
 
       res.json({
         success: true,
         message: 'User deleted successfully'
       });
     } catch (error) {
-      console.error('Error deleting user:', error);
+      log.error('Error deleting user', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: 'Failed to delete user'

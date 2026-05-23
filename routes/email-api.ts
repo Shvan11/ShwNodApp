@@ -4,6 +4,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
+import { log } from '../utils/logger.js';
 import emailService from '../services/email/email-service.js';
 import pdfGenerator from '../services/pdf/appointment-pdf-generator.js';
 
@@ -64,7 +65,7 @@ router.post(
         return;
       }
 
-      console.log(`Sending appointment email for ${date}`);
+      log.info(`Sending appointment email for ${date}`);
 
       // Generate PDF
       const pdfResult = await pdfGenerator.generateAppointmentPDF(date);
@@ -156,7 +157,7 @@ This email was automatically generated on ${new Date().toLocaleString()}
         messageId: emailResult.messageId
       });
     } catch (error) {
-      console.error('Failed to send appointment email:', error);
+      log.error('Failed to send appointment email', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: (error as Error).message || 'Failed to send appointment email',
@@ -190,7 +191,7 @@ router.get(
         config: config
       });
     } catch (error) {
-      console.error('Failed to get email configuration:', error);
+      log.error('Failed to get email configuration', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: (error as Error).message
@@ -228,7 +229,7 @@ router.post(
         updated: result.updated
       });
     } catch (error) {
-      console.error('Failed to update email configuration:', error);
+      log.error('Failed to update email configuration', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: (error as Error).message
@@ -253,7 +254,7 @@ router.get(
         error: result.error
       });
     } catch (error) {
-      console.error('Email test failed:', error);
+      log.error('Email test failed', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: (error as Error).message,
@@ -299,7 +300,7 @@ router.post(
         messageId: result.messageId
       });
     } catch (error) {
-      console.error('Test email failed:', error);
+      log.error('Test email failed', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: (error as Error).message,

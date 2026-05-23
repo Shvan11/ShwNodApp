@@ -1,6 +1,7 @@
 import { useState, useEffect, type ChangeEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import styles from './Diagnosis.module.css';
 
 /**
@@ -85,6 +86,7 @@ const Diagnosis = () => {
     const { personId, workId } = useParams<{ personId: string; workId: string }>();
     const navigate = useNavigate();
     const toast = useToast();
+    const confirm = useConfirm();
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -242,7 +244,7 @@ const Diagnosis = () => {
         // Show confirmation
         const confirmMessage = `Are you sure you want to reset/delete this diagnosis?\n\nWork: ${workInfo?.TypeName || 'N/A'}\nDate: ${diagnosisData.DxDate}\n\n⚠️ This action cannot be undone!`;
 
-        if (!confirm(confirmMessage)) return;
+        if (!await confirm(confirmMessage, { title: 'Delete Diagnosis', danger: true, confirmText: 'Delete' })) return;
 
         try {
             setDeleting(true);

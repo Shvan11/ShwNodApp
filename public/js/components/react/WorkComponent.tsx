@@ -7,6 +7,7 @@ import Modal from './Modal';
 import TeethSelector from './TeethSelector';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
 import {
     getWorkTypeConfig,
@@ -112,6 +113,7 @@ const WORK_STATUS: WorkStatus = {
 const WorkComponent = ({ personId }: WorkComponentProps) => {
     const navigate = useNavigate();
     const toast = useToast();
+    const confirm = useConfirm();
     const { user } = useGlobalState();
     const isAdmin = user?.role === 'admin';
     const [works, setWorks] = useState<Work[]>([]);
@@ -576,7 +578,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     };
 
     const handleDeleteDetail = async (detailId: number) => {
-        if (!confirm('Are you sure you want to delete this work detail?')) return;
+        if (!await confirm('Are you sure you want to delete this work detail?', { title: 'Delete Work Detail', danger: true, confirmText: 'Delete' })) return;
 
         try {
             const response = await fetch('/api/deleteworkdetail', {
@@ -1347,7 +1349,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                             </button>
                                                             <button
                                                                 onClick={async () => {
-                                                                    if (window.confirm(`Are you sure you want to delete this payment?\n\nAmount: ${formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}\nDate: ${formatDate(payment.Dateofpayment)}\n\nThis action cannot be undone.`)) {
+                                                                    if (await confirm(`Are you sure you want to delete this payment?\n\nAmount: ${formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}\nDate: ${formatDate(payment.Dateofpayment)}\n\nThis action cannot be undone.`, { title: 'Delete Payment', danger: true, confirmText: 'Delete' })) {
                                                                         try {
                                                                             const response = await fetch(`/api/deleteInvoice/${payment.InvoiceID}`, {
                                                                                 method: 'DELETE'

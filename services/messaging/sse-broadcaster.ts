@@ -151,7 +151,7 @@ export function createChairDisplaySseRouter(emitter: EventEmitter): Router {
     openStream(req, res);
 
     // If a previous stream is mapped, end it explicitly so its req.on('close')
-    // can't unmap THIS new connection. Mirrors utils/websocket.ts:447-450.
+    // can't unmap THIS new connection.
     const prev = chairClients.get(chairId);
     if (prev && prev !== res) {
       try { prev.end(); } catch { /* already gone */ }

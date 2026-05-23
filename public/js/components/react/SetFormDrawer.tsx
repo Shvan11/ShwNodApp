@@ -1,6 +1,7 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent, MouseEvent } from 'react';
 import { copyToClipboard } from '../../core/utils';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { formatNumber } from '../../utils/formatters';
 import type { AlignerDoctorMinimal, AlignerSet } from '../../pages/aligner/aligner.types';
 
@@ -50,6 +51,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
     folderPath
 }) => {
     const toast = useToast();
+    const confirm = useConfirm();
     const [formData, setFormData] = useState<SetFormData>({
         SetSequence: '',
         Type: '',
@@ -282,7 +284,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
     const handlePdfDelete = async (): Promise<void> => {
         if (!set?.AlignerSetID) return;
 
-        if (!confirm('Are you sure you want to delete this PDF?')) {
+        if (!await confirm('Are you sure you want to delete this PDF?', { title: 'Delete PDF', danger: true, confirmText: 'Delete' })) {
             return;
         }
 
@@ -323,39 +325,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
         const success = await copyToClipboard(folderPath);
 
         if (success) {
-            // Show success notification
-            const notification = document.createElement('div');
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: linear-gradient(135deg, #10b981, #059669);
-                color: white;
-                padding: 1rem 1.5rem;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                z-index: 10000;
-                animation: slideIn 0.3s ease-out;
-                font-size: 0.95rem;
-                max-width: 400px;
-            `;
-            notification.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    <i class="fas fa-check-circle" style="font-size: 1.2rem;"></i>
-                    <div>
-                        <div style="font-weight: 600; margin-bottom: 0.25rem;">Folder path copied!</div>
-                        <div style="font-size: 0.85rem; opacity: 0.9;">Paste it in the file dialog address bar</div>
-                    </div>
-                </div>
-            `;
-
-            document.body.appendChild(notification);
-
-            // Remove notification after 4 seconds
-            setTimeout(() => {
-                notification.style.animation = 'slideOut 0.3s ease-out';
-                setTimeout(() => notification.remove(), 300);
-            }, 4000);
+            toast.success('Folder path copied! Paste it in the file dialog address bar.');
         }
     };
 

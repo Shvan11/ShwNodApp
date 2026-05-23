@@ -42,9 +42,12 @@ router.post(
 
       const result = await verifyPin(pid, pin);
       if (!result.ok) {
+        // Collapse all non-lockout failures to a generic message to prevent
+        // account enumeration ("no such patient" vs "wrong PIN" vs "disabled").
+        const clientError = result.lockedUntil ? result.error : 'Invalid credentials';
         res.status(401).json({
           success: false,
-          error: result.error || 'Invalid credentials',
+          error: clientError,
           lockedUntil: result.lockedUntil ?? undefined,
         });
         return;

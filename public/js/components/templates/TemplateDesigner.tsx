@@ -12,6 +12,7 @@ import styles from './TemplateDesigner.module.css';
 import GrapesJSEditor from './GrapesJSEditor';
 import DesignerToolbar from './DesignerToolbar';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 interface Template {
     template_id: number | null;
@@ -24,6 +25,7 @@ function TemplateDesigner() {
     const navigate = useNavigate();
     const editorRef = useRef<GrapesJSEditorType | null>(null);
     const toast = useToast();
+    const confirm = useConfirm();
 
     const [template, setTemplate] = useState<Template | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -149,8 +151,8 @@ function TemplateDesigner() {
         }
     };
 
-    const handleBack = () => {
-        if (confirm('Are you sure you want to leave? Unsaved changes will be lost.')) {
+    const handleBack = async () => {
+        if (await confirm('Are you sure you want to leave? Unsaved changes will be lost.', { title: 'Leave Designer', confirmText: 'Leave' })) {
             navigate('/templates');
         }
     };

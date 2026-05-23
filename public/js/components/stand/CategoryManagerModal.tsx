@@ -10,6 +10,7 @@ import {
   type StandCategory,
 } from '../../hooks/useStand';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import Modal from '../react/Modal';
 import styles from './CategoryManagerModal.module.css';
 
@@ -20,6 +21,7 @@ interface CategoryManagerModalProps {
 
 export default function CategoryManagerModal({ isOpen, onClose }: CategoryManagerModalProps) {
   const toast = useToast();
+  const confirm = useConfirm();
   const { categories, refetch } = useStandCategories();
   const { createCategory, updateCategory, deleteCategory, loading } =
     useStandCategoryMutations(refetch);
@@ -64,7 +66,7 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
   };
 
   const handleDelete = async (cat: StandCategory) => {
-    if (!confirm(`Deactivate category "${cat.CategoryName}"? Existing items will keep it, but it won't appear in pickers.`)) {
+    if (!await confirm(`Deactivate category "${cat.CategoryName}"? Existing items will keep it, but it won't appear in pickers.`, { title: 'Deactivate Category' })) {
       return;
     }
     try {

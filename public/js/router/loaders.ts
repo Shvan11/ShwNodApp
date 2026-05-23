@@ -137,7 +137,7 @@ export async function apiLoader<T = unknown>(
         const age = Date.now() - timestamp;
         // Cache valid for 5 minutes
         if (age < 5 * 60 * 1000) {
-          console.log(`[Loader] Cache hit for ${cacheKey}`);
+          if (import.meta.env.DEV) console.log(`[Loader] Cache hit for ${cacheKey}`);
           return data;
         }
       } catch {
@@ -510,7 +510,7 @@ export function clearLoaderCache(): void {
       sessionStorage.removeItem(key);
     }
   });
-  console.log('[Loader] Cache cleared');
+  if (import.meta.env.DEV) console.log('[Loader] Cache cleared');
 }
 
 /**
@@ -520,7 +520,7 @@ export function clearLoaderCache(): void {
  */
 export function clearLoaderCacheKey(cacheKey: string): void {
   sessionStorage.removeItem(`loader_cache_${cacheKey}`);
-  console.log(`[Loader] Cache cleared for ${cacheKey}`);
+  if (import.meta.env.DEV) console.log(`[Loader] Cache cleared for ${cacheKey}`);
 }
 
 /**
@@ -556,7 +556,7 @@ export async function patientManagementLoader({
   const { signal } = request;
   const url = new URL(request.url);
 
-  console.log('[Loader] Pre-fetching patient management filter data');
+  if (import.meta.env.DEV) console.log('[Loader] Pre-fetching patient management filter data');
 
   try {
     // Fetch all filter data in parallel
@@ -615,7 +615,7 @@ export async function patientManagementLoader({
     let searchResults: PatientData[] | null = null;
 
     if (hasSearchParams) {
-      console.log('[Loader] Search params detected - fetching results');
+      if (import.meta.env.DEV) console.log('[Loader] Search params detected - fetching results');
 
       // Build search query from URL params
       const searchParams = new URLSearchParams();
@@ -716,7 +716,7 @@ export async function dailyAppointmentsLoader({
   const url = new URL(request.url);
   const targetDate = url.searchParams.get('date') || getToday();
 
-  console.log(`[Loader] Pre-fetching appointments for: ${targetDate}`);
+  if (import.meta.env.DEV) console.log(`[Loader] Pre-fetching appointments for: ${targetDate}`);
 
   try {
     const response = await fetch(`/api/getDailyAppointments?AppsDate=${targetDate}`, {

@@ -1,7 +1,7 @@
 // services/imaging/index.ts
 import path from 'path';
 import fs from 'fs';
-import { exec, ChildProcess } from 'child_process';
+import { execFile, ChildProcess } from 'child_process';
 import config from '../../config/config.js';
 import { QRCodetoFile } from './qrcode.js';
 import { imageSizeFromFile } from 'image-size/fromFile';
@@ -92,6 +92,20 @@ async function generateQRCode(pid: string): Promise<void> {
  * @returns Path to the processed image
  */
 async function processXrayImage(pid: string, file: string, detailsDir: string): Promise<string> {
+  // Strict allowlists on inputs that flow into filesystem paths AND a child-
+  // process invocation. Reject path separators, traversal sequences, and
+  // anything that could ever survive into a shell — we use execFile (no shell)
+  // below, but defense-in-depth.
+  if (!/^\d+$/.test(pid)) {
+    throw new Error('Invalid patient ID');
+  }
+  if (!/^[A-Za-z0-9._-]+$/.test(file)) {
+    throw new Error('Invalid X-ray file name');
+  }
+  if (detailsDir && detailsDir !== 'undefined' && !/^[A-Za-z0-9._-]+$/.test(detailsDir)) {
+    throw new Error('Invalid X-ray details directory');
+  }
+
   const pathResolver: PathResolver = createPathResolver(config.fileSystem.machinePath || '');
   const source = pathResolver(`clinic1/${pid}/OPG/${file}`);
   const dir = pathResolver(`clinic1/${pid}/OPGIMG`);
@@ -106,7 +120,8 @@ async function processXrayImage(pid: string, file: string, detailsDir: string): 
   }
 
   // Check if cs_export tool is available
-  if (!config.cs_export) {
+  const csExport = config.cs_export;
+  if (!csExport) {
     log.warn('X-ray processing tool (cs_export) not configured. Skipping conversion', { file });
     // Return the original file path or a placeholder
     if (fs.existsSync(source)) {
@@ -116,20 +131,20 @@ async function processXrayImage(pid: string, file: string, detailsDir: string): 
     }
   }
 
-  const command = constructCommand(source, destination, pid, detailsDir);
+  const args = constructArgs(source, destination, pid, detailsDir);
 
   return new Promise((resolve, reject) => {
-    const cmd: ChildProcess = exec(command);
+    const child: ChildProcess = execFile(csExport, args);
 
-    cmd.stdout?.on('data', (data: string) => log.debug('X-ray processing stdout', { data }));
-    cmd.stderr?.on('data', (data: string) => log.debug('X-ray processing stderr', { data }));
+    child.stdout?.on('data', (data: string) => log.debug('X-ray processing stdout', { data }));
+    child.stderr?.on('data', (data: string) => log.debug('X-ray processing stderr', { data }));
 
-    cmd.on('exit', (code: number | null) => {
+    child.on('exit', (code: number | null) => {
       if (code === 0) {
         log.info('X-ray processed successfully', { destination });
         resolve(destination);
       } else {
-        log.error('X-ray processing failed', { exitCode: code, file, command });
+        log.error('X-ray processing failed', { exitCode: code, file, args });
 
         // Graceful fallback - return original file if it exists
         if (fs.existsSync(source)) {
@@ -145,7 +160,7 @@ async function processXrayImage(pid: string, file: string, detailsDir: string): 
       }
     });
 
-    cmd.on('error', (error: Error) => {
+    child.on('error', (error: Error) => {
       log.error('X-ray processing command error', { error: error.message });
       // Graceful fallback - return original file if it exists
       if (fs.existsSync(source)) {
@@ -159,27 +174,23 @@ async function processXrayImage(pid: string, file: string, detailsDir: string): 
 }
 
 /**
- * Construct command for X-ray processing
- * @param source - Source file path
- * @param destination - Destination file path
- * @param pid - Patient ID
- * @param detailsDir - Details directory
- * @returns Command to execute
+ * Build argv for the cs_export invocation. Each element is passed as a
+ * separate argument to execFile, so no shell metacharacters can be injected.
  */
-function constructCommand(
+function constructArgs(
   source: string,
   destination: string,
   pid: string,
   detailsDir: string
-): string {
+): string[] {
   const pathResolver: PathResolver = createPathResolver(config.fileSystem.machinePath || '');
   const pszip = pathResolver(`clinic1/${pid}/OPG/.csi_data/.version_4.4/${detailsDir}/ps.zip`);
 
   if (detailsDir && detailsDir !== 'undefined' && fs.existsSync(pszip)) {
-    return `${config.cs_export} ${source} -o ${destination} -i ${pszip} -p`;
+    return [source, '-o', destination, '-i', pszip, '-p'];
   }
 
-  return `${config.cs_export} ${source} -o ${destination}`;
+  return [source, '-o', destination];
 }
 
 export { getImageSizes, generateQRCode, processXrayImage };

@@ -4,6 +4,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
+import { log } from '../utils/logger.js';
 import { postgresToSql, type WebhookPayload } from '../services/sync/sync-engine.js';
 import { processAllPendingSyncs } from '../services/sync/unified-sync-processor.js';
 import fs from 'fs';
@@ -32,10 +33,9 @@ router.post(
     try {
       const payload = req.body;
 
-      console.log('📥 Received Supabase webhook:', {
+      log.info('Received Supabase webhook', {
         table: payload.table,
-        type: payload.type,
-        timestamp: new Date().toISOString()
+        type: payload.type
       });
 
       // Verify webhook signature (optional but recommended)
@@ -54,7 +54,7 @@ router.post(
         res.status(500).json({ success: false, error: result.error });
       }
     } catch (error) {
-      console.error('❌ Webhook processing error:', error);
+      log.error('Webhook processing error', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: 'Internal server error processing webhook'
@@ -76,7 +76,7 @@ router.post(
     try {
       const { direction } = req.body;
 
-      console.log(`🔄 Manual sync triggered: ${direction || 'sql-to-postgres'}`);
+      log.info(`Manual sync triggered: ${direction || 'sql-to-postgres'}`);
 
       if (direction === 'sql-to-postgres' || !direction) {
         // Use new unified sync processor (queue-based)
@@ -86,7 +86,7 @@ router.post(
         res.status(400).json({ success: false, error: 'Invalid direction' });
       }
     } catch (error) {
-      console.error('❌ Manual sync error:', error);
+      log.error('Manual sync error', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: (error as Error).message
@@ -104,7 +104,7 @@ router.post(
   '/api/sync/queue-notify',
   async (_req: Request, res: Response): Promise<void> => {
     try {
-      console.log('📥 Received queue notification from SQL Server');
+      log.info('Received queue notification from SQL Server');
 
       // Import queue processor dynamically
       const queueProcessor = await import(
@@ -116,7 +116,7 @@ router.post(
 
       res.json({ success: true, message: 'Queue processing triggered' });
     } catch (error) {
-      console.error('❌ Queue notification error:', error);
+      log.error('Queue notification error', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: (error as Error).message

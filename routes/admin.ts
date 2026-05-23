@@ -3,6 +3,7 @@
  * Admin-only endpoints for configuration and management
  */
 import { Router, type Request, type Response } from 'express';
+import { log } from '../utils/logger.js';
 import driveClient from '../services/google-drive/google-drive-client.js';
 import driveUploadService from '../services/google-drive/drive-upload.js';
 
@@ -36,7 +37,7 @@ router.get(
         message: 'Visit this URL to authorize the application'
       });
     } catch (error) {
-      console.error('Error generating auth URL:', error);
+      log.error('Error generating auth URL', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: (error as Error).message
@@ -148,7 +149,7 @@ router.get(
             </html>
         `);
     } catch (error) {
-      console.error('Error in OAuth callback:', error);
+      log.error('Error in OAuth callback', { error: (error as Error).message });
       res.status(500).send(`
             <!DOCTYPE html>
             <html>
@@ -192,7 +193,7 @@ router.get(
       const result = await driveUploadService.testConnection();
       res.json(result);
     } catch (error) {
-      console.error('Error testing connection:', error);
+      log.error('Error testing connection', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         message: (error as Error).message
@@ -232,7 +233,7 @@ router.get(
           config.folderId
       });
     } catch (error) {
-      console.error('Error checking status:', error);
+      log.error('Error checking status', { error: (error as Error).message });
       res.status(500).json({
         success: false,
         error: (error as Error).message

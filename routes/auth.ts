@@ -3,11 +3,29 @@
  * Login, logout, password change endpoints
  */
 import { Router, type Request, type Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import { verifyCredentials, hashPassword } from '../middleware/auth.js';
 import { executeQuery, TYPES } from '../services/database/index.js';
 import { log } from '../utils/logger.js';
 
 const router = Router();
+
+/**
+ * Rate-limit /api/auth/login to slow brute-force attempts. 5 attempts per
+ * 15 minutes per IP — mirrors the patient-portal limiter. trust proxy is set
+ * to 'loopback' in setupMiddleware so the real client IP is read from
+ * X-Forwarded-For (Caddy).
+ */
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: 'Too many login attempts. Please try again later.',
+  },
+});
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -43,6 +61,7 @@ declare module 'express-session' {
  */
 router.post(
   '/login',
+  loginLimiter,
   async (
     req: Request<unknown, unknown, LoginBody>,
     res: Response
@@ -232,6 +251,18 @@ router.post(
       );
 
       log.info('Password changed', { username: req.session.username });
+
+      // Regenerate session ID to invalidate the old session cookie; preserve login data
+      const { userId, username, userRole, fullName } = req.session as typeof req.session & {
+        userId: number; username: string; userRole: string; fullName: string;
+      };
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => (err ? reject(err) : resolve()));
+      });
+      req.session.userId = userId;
+      req.session.username = username;
+      req.session.userRole = userRole;
+      req.session.fullName = fullName;
 
       res.json({
         success: true,

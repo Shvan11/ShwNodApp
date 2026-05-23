@@ -4,6 +4,7 @@
  */
 import { Router, type Request, type Response } from 'express';
 import path from 'path';
+import { log } from '../utils/logger.js';
 
 const router = Router();
 
@@ -29,7 +30,7 @@ function serveSingleSPA(res: Response): void {
   const spaFile = path.join(process.cwd(), './dist/index.html');
   res.sendFile(spaFile, (err) => {
     if (err) {
-      console.error('[SPA] Failed to serve index.html:', err);
+      log.error('[SPA] Failed to serve index.html', { error: (err as Error).message });
       res.status(500).send('Application failed to load. Please try again.');
     }
   });

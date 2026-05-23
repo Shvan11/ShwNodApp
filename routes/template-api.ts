@@ -4,6 +4,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
+import { log } from '../utils/logger.js';
 import * as templateQueries from '../services/database/queries/template-queries.js';
 import {
   generateReceiptHTML,
@@ -103,7 +104,7 @@ router.get(
         data: documentTypes
       });
     } catch (error) {
-      console.error('Error fetching document types:', error);
+      log.error('Error fetching document types', { error: (error as Error).message });
       res.status(500).json({
         status: 'error',
         message: 'Failed to fetch document types',
@@ -139,7 +140,7 @@ router.get(
         data: documentType
       });
     } catch (error) {
-      console.error('Error fetching document type:', error);
+      log.error('Error fetching document type', { error: (error as Error).message });
       res.status(500).json({
         status: 'error',
         message: 'Failed to fetch document type',
@@ -188,7 +189,7 @@ router.get(
         data: templates
       });
     } catch (error) {
-      console.error('Error fetching templates:', error);
+      log.error('Error fetching templates', { error: (error as Error).message });
       res.status(500).json({
         status: 'error',
         message: 'Failed to fetch templates',
@@ -224,7 +225,7 @@ router.get(
         data: template
       });
     } catch (error) {
-      console.error('Error fetching template:', error);
+      log.error('Error fetching template', { error: (error as Error).message });
       res.status(500).json({
         status: 'error',
         message: 'Failed to fetch template',
@@ -263,7 +264,7 @@ router.get(
         data: template
       });
     } catch (error) {
-      console.error('Error fetching default template:', error);
+      log.error('Error fetching default template', { error: (error as Error).message });
       res.status(500).json({
         status: 'error',
         message: 'Failed to fetch default template',
@@ -303,7 +304,7 @@ router.post(
         data: { template_id: templateId }
       });
     } catch (error) {
-      console.error('Error creating template:', error);
+      log.error('Error creating template', { error: (error as Error).message });
       res.status(500).json({
         status: 'error',
         message: 'Failed to create template',
@@ -355,7 +356,7 @@ router.put(
         message: 'Template updated successfully'
       });
     } catch (error) {
-      console.error('Error updating template:', error);
+      log.error('Error updating template', { error: (error as Error).message });
       res.status(500).json({
         status: 'error',
         message: 'Failed to update template',
@@ -382,7 +383,7 @@ router.delete(
         message: 'Template deleted successfully'
       });
     } catch (error) {
-      console.error('Error deleting template:', error);
+      log.error('Error deleting template', { error: (error as Error).message });
 
       if ((error as Error).message.includes('system template')) {
         res.status(403).json({
@@ -466,7 +467,7 @@ router.post(
         data: { file_path: filePath }
       });
     } catch (error) {
-      console.error('Error saving template HTML:', error);
+      log.error('Error saving template HTML', { error: (error as Error).message });
       res.status(500).json({
         status: 'error',
         message: 'Failed to save template',
@@ -501,7 +502,7 @@ router.get(
 
       res.send(html);
     } catch (error) {
-      console.error('Error generating receipt:', error);
+      log.error('Error generating receipt', { error: (error as Error).message });
       res.status(500).json({
         status: 'error',
         message: 'Failed to generate receipt',
@@ -520,9 +521,7 @@ router.get(
   async (req: Request<{ personId: string }>, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
-      console.log(
-        `[TEMPLATE-API] Generating no-work receipt for patient ${personId}`
-      );
+      log.info(`Generating no-work receipt for patient ${personId}`);
 
       const html = await generateNoWorkReceiptHTML(parseInt(personId));
 
@@ -534,10 +533,10 @@ router.get(
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
 
-      console.log(`[TEMPLATE-API] No-work receipt generated successfully`);
+      log.info('No-work receipt generated successfully');
       res.send(html);
     } catch (error) {
-      console.error('[TEMPLATE-API] Error generating no-work receipt:', error);
+      log.error('Error generating no-work receipt', { error: (error as Error).message });
 
       // Determine appropriate status code based on error message
       const statusCode = (error as Error).message.includes('not found')

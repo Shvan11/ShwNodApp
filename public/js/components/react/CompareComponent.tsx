@@ -1851,6 +1851,4 @@ const CompareComponent = ({ personId, phone }: Props) => {
     );
 };
 
-// Memoize to prevent unnecessary re-renders
-// Only re-renders when personId or phone props change
-export default React.memo(CompareComponent);
+export default CompareComponent;

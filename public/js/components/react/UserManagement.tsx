@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import styles from './UserManagement.module.css';
 
 interface UserInfo {
@@ -20,6 +21,7 @@ interface Message {
  */
 export default function UserManagement() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -93,7 +95,7 @@ export default function UserManagement() {
   };
 
   const handleLogout = async () => {
-    if (!confirm('Are you sure you want to logout?')) {
+    if (!await confirm('Are you sure you want to logout?', { title: 'Logout' })) {
       return;
     }
 

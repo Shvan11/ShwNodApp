@@ -296,7 +296,7 @@ router.get(
         return;
       }
 
-      // Start sending process (non-blocking)
+      // Intentional fire-and-forget — send is long-running (bulk WhatsApp); respond immediately.
       whatsapp.send(dateparam).catch((error: Error) => {
         log.error(`Error in WhatsApp send process: ${error.message}`);
       });

@@ -13,6 +13,7 @@ import { Outlet, ScrollRestoration, Location } from 'react-router-dom';
 import { GlobalStateProvider } from '../contexts/GlobalStateContext';
 import { ToastProvider } from '../contexts/ToastContext';
 import { PrintQueueProvider, usePrintQueue } from '../contexts/PrintQueueContext';
+import { ConfirmProvider } from '../contexts/ConfirmContext';
 import UniversalHeader from '../components/react/UniversalHeader';
 import PrintQueueIndicator from '../components/react/PrintQueueIndicator';
 import LabelPreviewModal from '../components/react/LabelPreviewModal';
@@ -99,11 +100,13 @@ function RootLayoutInner() {
 export function RootLayout() {
   return (
     <ToastProvider>
-      <GlobalStateProvider>
-        <PrintQueueProvider>
-          <RootLayoutInner />
-        </PrintQueueProvider>
-      </GlobalStateProvider>
+      <ConfirmProvider>
+        <GlobalStateProvider>
+          <PrintQueueProvider>
+            <RootLayoutInner />
+          </PrintQueueProvider>
+        </GlobalStateProvider>
+      </ConfirmProvider>
     </ToastProvider>
   );
 }

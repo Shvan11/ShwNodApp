@@ -868,17 +868,9 @@ class QueueProcessor {
 // Create singleton instance
 const queueProcessor = new QueueProcessor();
 
-// Handle graceful shutdown
-process.on('SIGINT', () => {
-  log.info('\n🛑 Shutting down queue processor...');
-  queueProcessor.stop();
-  process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-  log.info('\n🛑 Shutting down queue processor...');
-  queueProcessor.stop();
-  process.exit(0);
-});
+// Signal handling is owned by index.ts:gracefulShutdown, which calls
+// queueProcessor.stop() in the correct teardown order. Do NOT register
+// process.on('SIGINT'/'SIGTERM') here — duplicate handlers race the central
+// shutdown and can call process.exit before other services finish.
 
 export default queueProcessor;

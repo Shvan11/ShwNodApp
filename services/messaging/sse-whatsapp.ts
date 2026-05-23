@@ -91,16 +91,15 @@ export function createWhatsappSseRouter(emitter: EventEmitter): Router {
   ensureInitialized(emitter);
   const router = Router();
 
-  router.get('/whatsapp', (req: Request, res: Response) => {
+  router.get('/whatsapp', async (req: Request, res: Response) => {
     openStream(req, res);
 
     const viewerId = generateViewerId(req);
     whatsappClients.set(viewerId, { res, viewerId });
 
-    // Every SSE subscriber is a QR viewer — same posture as the legacy WS
-    // handler at utils/websocket.ts:319-330. Triggers QR data-URL generation
+    // Every SSE subscriber is a QR viewer. Triggers QR data-URL generation
     // and gates the on-demand init in /api/wa/initial-state.
-    void messageState.registerQRViewer(viewerId);
+    await messageState.registerQRViewer(viewerId);
     logger.websocket.debug('SSE whatsapp client connected', {
       viewerId,
       count: whatsappClients.size,

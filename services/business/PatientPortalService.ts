@@ -29,7 +29,7 @@ import { getImageSizes, type ImageDimension } from '../imaging/index.js';
 import config from '../../config/config.js';
 import { log } from '../../utils/logger.js';
 
-const BCRYPT_ROUNDS = 10;
+const BCRYPT_ROUNDS = 12;
 const LOCKOUT_MINUTES = 30;
 
 export interface PatientPortalProfile {

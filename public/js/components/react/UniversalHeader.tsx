@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
 
@@ -41,52 +41,62 @@ const UniversalHeader = () => {
     const [navigationContext, setNavigationContext] = useState<NavigationContext | null>(null);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-    // Load user info once on mount
+    const userControllerRef = useRef<AbortController | null>(null);
+    const patientControllerRef = useRef<AbortController | null>(null);
+
     useEffect(() => {
-        loadCurrentUser();
+        userControllerRef.current?.abort();
+        userControllerRef.current = new AbortController();
+        loadCurrentUser(userControllerRef.current.signal);
+        return () => userControllerRef.current?.abort();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Load patient data and setup navigation context when route changes
     useEffect(() => {
-        loadPatientData();
+        patientControllerRef.current?.abort();
+        patientControllerRef.current = new AbortController();
+        loadPatientData(patientControllerRef.current.signal);
         setupNavigationContext();
+        return () => patientControllerRef.current?.abort();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.pathname]);
 
-    const loadPatientData = () => {
+    const loadPatientData = (signal: AbortSignal) => {
         const patientCode = extractPatientCodeFromURL();
 
         if (patientCode) {
-            fetch(`/api/patients/${patientCode}/info`)
+            fetch(`/api/patients/${patientCode}/info`, { signal })
                 .then(response => response.json())
                 .then(data => {
                     if (data && data.length > 0) {
                         setCurrentPatient(data[0]);
                     }
                 })
-                .catch(error => console.error('Error loading patient data:', error));
+                .catch(error => {
+                    if (error instanceof Error && error.name !== 'AbortError') {
+                        setCurrentPatient(null);
+                    }
+                });
         }
     };
 
-    const loadCurrentUser = () => {
-        fetch('/api/auth/me')
+    const loadCurrentUser = (signal: AbortSignal) => {
+        fetch('/api/auth/me', { signal })
             .then(response => {
-                // Route loaders handle 401 redirects - if we reach here, user is authenticated
-                if (!response.ok) {
-                    console.warn('Failed to load user info:', response.status);
-                    return null;
-                }
+                if (!response.ok) return null;
                 return response.json();
             })
             .then(data => {
                 if (data && data.success && data.user) {
                     setCurrentUser(data.user);
-                    // Also set global user state for other components (e.g., WorkComponent admin checks)
                     setUser(data.user);
                 }
             })
-            .catch(error => console.error('Error loading user info:', error));
+            .catch(error => {
+                if (error instanceof Error && error.name !== 'AbortError') {
+                    // silently ignore — header degrades gracefully
+                }
+            });
     };
 
     const extractPatientCodeFromURL = (): string | null => {

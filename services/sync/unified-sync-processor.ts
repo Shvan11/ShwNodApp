@@ -53,9 +53,11 @@ interface TableWithPending {
 }
 
 /**
- * Sync handler function type
+ * Sync handler function type. Receives pre-parsed row data so a single
+ * corrupt JSON blob in SyncQueue can't poison the whole batch — the parse
+ * step in processSyncForTable handles row-level failures.
  */
-type SyncHandler = (records: PendingSyncRecord[]) => Promise<number>;
+type SyncHandler = (data: unknown[]) => Promise<number>;
 
 /**
  * Sync handlers map
@@ -132,15 +134,13 @@ async function markAsFailed(queueIds: number[], errorMessage: string): Promise<v
  * Table sync handlers
  */
 const syncHandlers: SyncHandlers = {
-  async aligner_doctors(records: PendingSyncRecord[]): Promise<number> {
-    const data = records.map((r) => JSON.parse(r.JsonData));
+  async aligner_doctors(data: unknown[]): Promise<number> {
     const { error } = await supabase.from('aligner_doctors').upsert(data, { onConflict: 'dr_id' });
     if (error) throw error;
     return data.length;
   },
 
-  async aligner_sets(records: PendingSyncRecord[]): Promise<number> {
-    const data = records.map((r) => JSON.parse(r.JsonData));
+  async aligner_sets(data: unknown[]): Promise<number> {
     const { error } = await supabase
       .from('aligner_sets')
       .upsert(data, { onConflict: 'aligner_set_id' });
@@ -148,8 +148,7 @@ const syncHandlers: SyncHandlers = {
     return data.length;
   },
 
-  async aligner_batches(records: PendingSyncRecord[]): Promise<number> {
-    const data = records.map((r) => JSON.parse(r.JsonData));
+  async aligner_batches(data: unknown[]): Promise<number> {
     const { error } = await supabase
       .from('aligner_batches')
       .upsert(data, { onConflict: 'aligner_batch_id' });
@@ -157,22 +156,19 @@ const syncHandlers: SyncHandlers = {
     return data.length;
   },
 
-  async aligner_notes(records: PendingSyncRecord[]): Promise<number> {
-    const data = records.map((r) => JSON.parse(r.JsonData));
+  async aligner_notes(data: unknown[]): Promise<number> {
     const { error } = await supabase.from('aligner_notes').upsert(data, { onConflict: 'note_id' });
     if (error) throw error;
     return data.length;
   },
 
-  async patients(records: PendingSyncRecord[]): Promise<number> {
-    const data = records.map((r) => JSON.parse(r.JsonData));
+  async patients(data: unknown[]): Promise<number> {
     const { error } = await supabase.from('patients').upsert(data, { onConflict: 'person_id' });
     if (error) throw error;
     return data.length;
   },
 
-  async work(records: PendingSyncRecord[]): Promise<number> {
-    const data = records.map((r) => JSON.parse(r.JsonData));
+  async work(data: unknown[]): Promise<number> {
     const { error } = await supabase.from('work').upsert(data, { onConflict: 'work_id' });
     if (error) throw error;
     return data.length;
@@ -201,16 +197,50 @@ async function processSyncForTable(tableName: string): Promise<TableSyncStats> {
     return { synced: 0, failed: records.length };
   }
 
+  // Parse per-row so a single corrupt JSON blob in SyncQueue doesn't poison
+  // the whole batch — the previous code did records.map(JSON.parse) inside
+  // each handler, which threw and marked every well-formed row as Failed too.
+  const parsed: unknown[] = [];
+  const okRecords: PendingSyncRecord[] = [];
+  const parseFailed: PendingSyncRecord[] = [];
+  for (const r of records) {
+    try {
+      parsed.push(JSON.parse(r.JsonData));
+      okRecords.push(r);
+    } catch (err) {
+      log.error('Sync row has invalid JSON — marking failed', {
+        queueId: r.QueueID,
+        tableName: r.TableName,
+        recordId: r.RecordID,
+        error: (err as Error).message,
+      });
+      parseFailed.push(r);
+    }
+  }
+
+  if (parseFailed.length > 0) {
+    await markAsFailed(
+      parseFailed.map((r) => r.QueueID),
+      'Invalid JSON in SyncQueue row'
+    );
+  }
+
+  if (parsed.length === 0) {
+    return { synced: 0, failed: parseFailed.length };
+  }
+
   try {
-    const synced = await handler(records);
-    const queueIds = records.map((r) => r.QueueID);
-    await markAsSynced(queueIds);
-    log.info(`✅ Synced ${synced} ${tableName} records`);
-    return { synced, failed: 0 };
+    const synced = await handler(parsed);
+    await markAsSynced(okRecords.map((r) => r.QueueID));
+    if (parseFailed.length > 0) {
+      log.info(`✅ Synced ${synced} ${tableName} records (${parseFailed.length} parse-failed)`);
+    } else {
+      log.info(`✅ Synced ${synced} ${tableName} records`);
+    }
+    return { synced, failed: parseFailed.length };
   } catch (error) {
     log.error(`❌ Error syncing ${tableName}:`, (error as Error).message);
-    const queueIds = records.map((r) => r.QueueID);
-    await markAsFailed(queueIds, (error as Error).message);
+    await markAsFailed(okRecords.map((r) => r.QueueID), (error as Error).message);
     return { synced: 0, failed: records.length };
   }
 }

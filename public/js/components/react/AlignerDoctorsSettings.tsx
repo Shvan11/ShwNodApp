@@ -1,5 +1,6 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import styles from './AlignerDoctorsSettings.module.css';
 import type { AlignerDoctor } from '../../pages/aligner/aligner.types';
 
@@ -15,6 +16,7 @@ interface AlignerDoctorsSettingsProps {
 
 const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDoctorsSettingsProps) => {
     const toast = useToast();
+    const confirm = useConfirm();
     const [doctors, setDoctors] = useState<AlignerDoctor[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -108,7 +110,7 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
     };
 
     const handleDelete = async (drID: number, doctorName: string) => {
-        if (!confirm(`Are you sure you want to delete ${doctorName}? This will affect all their aligner cases.`)) {
+        if (!await confirm(`Are you sure you want to delete ${doctorName}? This will affect all their aligner cases.`, { title: 'Delete Doctor', danger: true, confirmText: 'Delete' })) {
             return;
         }
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, ChangeEvent, FormEvent, MouseEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import type { AlignerBatch, AlignerSetForBatch } from '../../pages/aligner/aligner.types';
 
 interface BatchFormData {
@@ -50,6 +51,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
     onUndoDelivery
 }) => {
     const toast = useToast();
+    const confirm = useConfirm();
     const [formData, setFormData] = useState<BatchFormData>({
         BatchSequence: '',
         UpperAlignerCount: '',
@@ -298,12 +300,10 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
 
         let markAsLast = false;
         if (newRemainingUpper === 0 && newRemainingLower === 0 && !formData.IsLast) {
-            const confirmed = window.confirm(
-                'Both remaining upper and lower aligners will be 0. Do you want to mark this as the last batch?'
+            markAsLast = await confirm(
+                'Both remaining upper and lower aligners will be 0. Do you want to mark this as the last batch?',
+                { title: 'Mark as Last Batch', confirmText: 'Mark as Last', cancelText: 'No' }
             );
-            if (confirmed) {
-                markAsLast = true;
-            }
         }
 
         setSaving(true);

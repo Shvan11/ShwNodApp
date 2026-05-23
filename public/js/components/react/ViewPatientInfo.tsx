@@ -154,8 +154,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
         return value.replace(/[^0-9]/g, '');
     };
 
-    const loadPatientInfo = useCallback(async () => {
-        // Use validated personId from loader
+    const loadPatientInfo = useCallback(async (signal?: AbortSignal) => {
         if (!personId) {
             setLoading(false);
             return;
@@ -163,7 +162,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
 
         try {
             setLoading(true);
-            const response = await fetch(`/api/patients/${personId}/info`);
+            const response = await fetch(`/api/patients/${personId}/info`, { signal });
 
             if (!response.ok) {
                 throw new Error('Failed to load patient info');
@@ -172,27 +171,26 @@ const ViewPatientInfo = ({ personId }: Props) => {
             const data = await response.json();
             setPatientInfo(data);
         } catch (err) {
-            console.error('Error loading patient info:', err);
+            if (err instanceof Error && err.name === 'AbortError') return;
             setError(err instanceof Error ? err.message : 'Unknown error');
         } finally {
             setLoading(false);
         }
     }, [personId]);
 
-    const loadAlerts = useCallback(async () => {
-        // Use validated personId from loader
+    const loadAlerts = useCallback(async (signal?: AbortSignal) => {
         if (!personId) return;
 
         try {
             setAlertsLoading(true);
-            const response = await fetch(`/api/patients/${personId}/alerts`);
+            const response = await fetch(`/api/patients/${personId}/alerts`, { signal });
 
             if (response.ok) {
                 const data = await response.json();
                 setAlerts(data);
             }
         } catch (err) {
-            console.error('Error loading alerts:', err);
+            if (err instanceof Error && err.name === 'AbortError') return;
         } finally {
             setAlertsLoading(false);
         }
@@ -226,10 +224,12 @@ const ViewPatientInfo = ({ personId }: Props) => {
     }, []);
 
     useEffect(() => {
-        loadPatientInfo();
-        loadAlerts();
+        const controller = new AbortController();
+        loadPatientInfo(controller.signal);
+        loadAlerts(controller.signal);
         loadCostPresets();
         loadAlertTypes();
+        return () => controller.abort();
     }, [personId, loadPatientInfo, loadAlerts, loadCostPresets, loadAlertTypes]);
 
     // Handle alert modal save - refresh alerts list
@@ -337,7 +337,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
             <div className={styles.patientInfoError}>
                 <i className={`fas fa-exclamation-triangle ${styles.patientErrorIcon}`}></i>
                 <p>{error}</p>
-                <button onClick={loadPatientInfo}>Retry</button>
+                <button onClick={() => loadPatientInfo()}>Retry</button>
             </div>
         );
     }

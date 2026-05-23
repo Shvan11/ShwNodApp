@@ -301,6 +301,9 @@ const StatisticsComponent = () => {
 
         const labels = chartData.map(d => d.label);
         const grandTotals = chartData.map(d => d.grandTotal);
+        // Chart.js renders to canvas — CSS vars must be resolved to hex first.
+        const successGreen = getComputedStyle(document.documentElement)
+            .getPropertyValue('--success-green').trim() || '#22c55e';
 
         revenueTrendChartInstance.current = new Chart(ctx, {
             type: viewMode === VIEW_MODES.YEARLY ? 'bar' : 'line',
@@ -309,15 +312,15 @@ const StatisticsComponent = () => {
                 datasets: [{
                     label: 'Grand Total (USD)',
                     data: grandTotals,
-                    borderColor: 'rgb(34, 197, 94)',
+                    borderColor: successGreen,
                     backgroundColor: viewMode === VIEW_MODES.YEARLY
-                        ? 'rgba(34, 197, 94, 0.8)'
-                        : 'rgba(34, 197, 94, 0.1)',
+                        ? `${successGreen}cc`
+                        : `${successGreen}1a`,
                     tension: 0.3,
                     fill: true,
                     borderWidth: 3,
                     pointRadius: viewMode === VIEW_MODES.DAILY ? 4 : 6,
-                    pointBackgroundColor: 'rgb(34, 197, 94)',
+                    pointBackgroundColor: successGreen,
                     pointHoverRadius: 8
                 }]
             },

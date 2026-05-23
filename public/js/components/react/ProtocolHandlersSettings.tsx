@@ -25,6 +25,7 @@ import {
     type IniSection
 } from '../../core/iniParser';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -77,6 +78,7 @@ const KEY_DESCRIPTIONS: Record<string, string> = {
 
 const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsProps) => {
     const toast = useToast();
+    const confirm = useConfirm();
     const lastReportedChanges = useRef<boolean | null>(null);
 
     // Configuration state
@@ -364,7 +366,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
             return;
         }
 
-        if (!window.confirm('Are you sure you want to restore from backup? Current configuration will be overwritten.')) {
+        if (!await confirm('Are you sure you want to restore from backup? Current configuration will be overwritten.', { title: 'Restore Backup', danger: true, confirmText: 'Restore' })) {
             return;
         }
 
