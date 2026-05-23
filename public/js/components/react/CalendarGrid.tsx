@@ -1,12 +1,14 @@
 /**
  * CalendarGrid Component for Appointment Calendar
  *
- * Renders the main calendar grid with time columns and day columns
- * Handles dynamic height calculation for multiple appointments per time slot
+ * Renders the week/day grid on a uniform 112px slot system.
+ * Each 30-minute row carries a unique hue band across all days; appointment
+ * cards pack adaptively (1/2/3/4/5+) and support drag-to-reschedule plus a
+ * "+N more" popover for crowded slots.
  */
 
-import type { MouseEvent } from 'react';
-import TimeSlot from './TimeSlot';
+import { useEffect } from 'react';
+import type { Dispatch, DragEvent, MouseEvent, SetStateAction } from 'react';
 import type {
     CalendarDay,
     CalendarData,
@@ -17,6 +19,38 @@ import type {
     CalendarMode
 } from './calendar.types';
 
+/* Colour system — 14 hues stepped at the golden angle (~137.5°) so every
+   consecutive pair of 30-minute rows sits on opposite sides of the wheel. */
+const V4_TIME_TINT: Record<string, { row: string; label: string }> = {
+    '14:00': { row: 'oklch(96% 0.038 220)', label: 'oklch(86% 0.078 220)' },
+    '14:30': { row: 'oklch(96% 0.038 358)', label: 'oklch(86% 0.078 358)' },
+    '15:00': { row: 'oklch(96% 0.040 135)', label: 'oklch(86% 0.082 135)' },
+    '15:30': { row: 'oklch(96% 0.038 273)', label: 'oklch(86% 0.078 273)' },
+    '16:00': { row: 'oklch(96% 0.040 50)',  label: 'oklch(86% 0.082 50)'  },
+    '16:30': { row: 'oklch(96% 0.040 188)', label: 'oklch(86% 0.082 188)' },
+    '17:00': { row: 'oklch(96% 0.038 325)', label: 'oklch(86% 0.078 325)' },
+    '17:30': { row: 'oklch(96% 0.040 103)', label: 'oklch(86% 0.082 103)' },
+    '18:00': { row: 'oklch(96% 0.038 240)', label: 'oklch(86% 0.078 240)' },
+    '18:30': { row: 'oklch(96% 0.040 18)',  label: 'oklch(86% 0.082 18)'  },
+    '19:00': { row: 'oklch(96% 0.040 155)', label: 'oklch(86% 0.082 155)' },
+    '19:30': { row: 'oklch(96% 0.038 293)', label: 'oklch(86% 0.078 293)' },
+    '20:00': { row: 'oklch(96% 0.040 70)',  label: 'oklch(86% 0.082 70)'  },
+    '20:30': { row: 'oklch(96% 0.040 208)', label: 'oklch(86% 0.082 208)' }
+};
+const CORE_TIME_SLOTS = Object.keys(V4_TIME_TINT);
+const tintFor = (t: string) => V4_TIME_TINT[t] || V4_TIME_TINT['14:00'];
+
+export interface DropTarget {
+    date: string;
+    time: string;
+    isHoliday?: boolean;
+}
+
+export interface MoreMenu {
+    date: string;
+    time: string;
+}
+
 interface CalendarGridProps {
     calendarData: CalendarData | null;
     selectedSlot: SlotData | null;
@@ -24,179 +58,333 @@ interface CalendarGridProps {
     onDayContextMenu?: (day: CalendarDay, event: MouseEvent<HTMLDivElement>) => void;
     mode?: CalendarMode;
     viewMode?: ViewMode;
-    showOnlyAvailable?: boolean;
-    showEarlySlots?: boolean;
-    earlySlotTimes?: string[];
-    lateSlotTimes?: string[];
+    draggingId: string | null;
+    setDraggingId: Dispatch<SetStateAction<string | null>>;
+    dropTarget: DropTarget | null;
+    setDropTarget: Dispatch<SetStateAction<DropTarget | null>>;
+    moreMenu: MoreMenu | null;
+    setMoreMenu: Dispatch<SetStateAction<MoreMenu | null>>;
+    onReschedule: (
+        appointmentID: number | string,
+        newDate: string,
+        newTime: string,
+        appt: CalendarAppointment
+    ) => void;
 }
+
+const extractAppointments = (
+    slotData: CalendarSlotInfo | CalendarAppointment[] | undefined
+): CalendarAppointment[] => {
+    if (!slotData) return [];
+    if (Array.isArray(slotData)) return slotData;
+    return slotData.appointments || [];
+};
+
+const validOnly = (appts: CalendarAppointment[]): CalendarAppointment[] =>
+    appts.filter(a => a && (a.patientName || a.appointmentID));
+
+const isToday = (date: string): boolean => {
+    const today = new Date();
+    const checkDate = new Date(date);
+    return today.toDateString() === checkDate.toDateString();
+};
+
+const parseDragId = (id: string): { date: string; time: string; index: number } => {
+    const [date, time, idx] = id.split('|');
+    return { date, time, index: parseInt(idx, 10) };
+};
 
 const CalendarGrid = ({
     calendarData,
-    selectedSlot,
     onSlotClick,
     onDayContextMenu,
-    mode = 'view',
     viewMode = 'week',
-    showOnlyAvailable = false,
-    showEarlySlots = false,
-    earlySlotTimes = ['12:00', '12:30', '13:00', '13:30'],
-    lateSlotTimes = ['21:00', '21:30', '22:00', '22:30']
+    draggingId,
+    setDraggingId,
+    dropTarget,
+    setDropTarget,
+    moreMenu,
+    setMoreMenu,
+    onReschedule
 }: CalendarGridProps) => {
-    const { days = [], timeSlots = [] } = calendarData || {};
+    const { days = [] } = calendarData || {};
 
-    if (!calendarData || !days.length || !timeSlots.length) {
+    // Close the "+N more" popover on outside click or Escape.
+    useEffect(() => {
+        if (!moreMenu) return;
+        const onMouseDown = (e: globalThis.MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('.cal-popover') || target.closest('.cal-more-cell')) return;
+            setMoreMenu(null);
+        };
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setMoreMenu(null);
+        };
+        document.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('keydown', onKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', onMouseDown);
+            document.removeEventListener('keydown', onKeyDown);
+        };
+    }, [moreMenu, setMoreMenu]);
+
+    if (!calendarData || !days.length) {
         return (
-            <div className="calendar-grid loading">
+            <div className="cal-grid loading">
                 <p>Loading calendar data...</p>
             </div>
         );
     }
 
-    // Filter days for day view - show only the first day (or current day)
     const filteredDays = viewMode === 'day' ? [days[0]] : days;
+    const columnCount = filteredDays.length;
+    const gridTemplateColumns = `var(--cal-grid-time-w) repeat(${columnCount}, 1fr)`;
 
-    // Filter out early and late time slots if showEarlySlots is false
-    const extendedSlotTimes = [...earlySlotTimes, ...lateSlotTimes];
-    const filteredTimeSlots = showEarlySlots
-        ? timeSlots
-        : timeSlots.filter(slot => !extendedSlotTimes.includes(slot));
-
-    // Helper function to extract appointments from slot data
-    const extractAppointments = (slotData: CalendarSlotInfo | CalendarAppointment[] | undefined): CalendarAppointment[] => {
-        if (!slotData) return [];
-        if (Array.isArray(slotData)) return slotData;
-        return slotData.appointments || [];
+    const getSlotAppointments = (day: CalendarDay, time: string): CalendarAppointment[] => {
+        const dayAppts = day.appointments as
+            | Record<string, CalendarSlotInfo | CalendarAppointment[]>
+            | undefined;
+        return validOnly(extractAppointments(dayAppts?.[time]));
     };
 
-    // Calculate maximum valid appointments per time slot across all days
-    const getMaxValidAppointmentsForTimeSlot = (timeSlot: string): number => {
-        let maxValidAppointments = 0;
-        filteredDays.forEach(day => {
-            const dayAppts = day.appointments as Record<string, CalendarSlotInfo | CalendarAppointment[]> | undefined;
-            const slotData = dayAppts?.[timeSlot];
-            const appointmentArray = extractAppointments(slotData);
+    const buildSlotData = (
+        day: CalendarDay,
+        time: string,
+        appts: CalendarAppointment[]
+    ): SlotData => ({
+        date: day.date,
+        time,
+        dayName: day.dayName,
+        appointments: appts,
+        slotStatus: appts.length > 0 ? 'booked' : 'available',
+        appointmentID: appts.length > 0 ? appts[0].appointmentID : undefined,
+        appDetail: appts.length > 0 ? appts[0].appDetail : undefined,
+        patientName: appts.length > 0 ? appts[0].patientName : undefined
+    });
 
-            // Filter valid appointments using the same logic as TimeSlot component
-            const validAppointments = appointmentArray.filter(appointment =>
-                appointment && (appointment.patientName || appointment.appointmentID)
+    const handleLaneDragStart =
+        (dragId: string) => (e: DragEvent<HTMLElement>) => {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', dragId);
+            setDraggingId(dragId);
+        };
+
+    const handleLaneDragEnd = () => {
+        setDraggingId(null);
+        setDropTarget(null);
+    };
+
+    const onSlotDragOver =
+        (date: string, time: string, holiday: boolean) =>
+        (e: DragEvent<HTMLDivElement>) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = holiday ? 'none' : 'move';
+            setDropTarget(prev =>
+                prev && prev.date === date && prev.time === time
+                    ? prev
+                    : { date, time, isHoliday: holiday }
             );
-            if (validAppointments.length > maxValidAppointments) {
-                maxValidAppointments = validAppointments.length;
-            }
-        });
-        return maxValidAppointments;
+        };
+
+    const onSlotDrop =
+        (destDate: string, destTime: string) => (e: DragEvent<HTMLDivElement>) => {
+            e.preventDefault();
+            const id = e.dataTransfer.getData('text/plain') || draggingId;
+            handleLaneDragEnd();
+            if (!id) return;
+            const src = parseDragId(id);
+            if (src.date === destDate && src.time === destTime) return;
+
+            const srcDay = days.find(d => d.date === src.date);
+            if (!srcDay) return;
+            const appt = getSlotAppointments(srcDay, src.time)[src.index];
+            if (!appt || appt.appointmentID == null) return;
+
+            onReschedule(appt.appointmentID, destDate, destTime, appt);
+        };
+
+    const renderLane = (
+        appt: CalendarAppointment,
+        index: number,
+        day: CalendarDay,
+        time: string,
+        span2: boolean
+    ) => {
+        const dragId = `${day.date}|${time}|${index}`;
+        const isPast = new Date(`${day.date}T${time}:00`) < new Date();
+        return (
+            <div
+                key={index}
+                className={`cal-lane ${span2 ? 'span2' : ''} ${
+                    draggingId === dragId ? 'dragging' : ''
+                }`}
+                draggable={!isPast}
+                onDragStart={handleLaneDragStart(dragId)}
+                onDragEnd={handleLaneDragEnd}
+                title={`${appt.patientName || 'Scheduled'}${
+                    appt.appDetail ? ` — ${appt.appDetail}` : ''
+                }`}
+            >
+                <div className="cal-name">{appt.patientName || 'Scheduled'}</div>
+                {appt.appDetail && <div className="cal-proc">{appt.appDetail}</div>}
+            </div>
+        );
     };
 
-    // Calculate exact dynamic height for time slot based on actual CSS values
-    const getTimeSlotHeight = (timeSlot: string): number => {
-        const maxValidAppointments = getMaxValidAppointmentsForTimeSlot(timeSlot);
-        const baseHeight = 85; // MUST match --calendar-slot-min-height in CSS
+    const renderSlot = (day: CalendarDay, time: string, appts: CalendarAppointment[]) => {
+        const n = appts.length;
 
-        if (maxValidAppointments <= 1) {
-            return baseHeight;
+        if (n === 0) {
+            return <span className="cal-empty-mark">＋</span>;
         }
-
-        // EXACT calculation matching CSS values (appointment-calendar.css):
-        // - .time-slot padding: 10px (top/bottom = 20px total) [line 525]
-        // - .appointment-content.multiple padding: 2px (top/bottom = 4px total) [line 622]
-        // - .appointment-count: font 12px + padding 6px top/bottom = ~26px [lines 625-636]
-        // - Content gap: 8px (gap between count header and list) [line 620]
-        // - .appointment-item: FIXED height 40px (4px padding + 16px name + 16px detail + 4px padding) [line 656]
-        // - .appointments-list gap: 4px between items [line 642]
-        // - .appointments-list bottom padding: 8px [line 644]
-        //
-        // Formula: height = 62 + (n × 44)
-        // Where: 62 = timeSlotPadding(20) + contentPadding(4) + countHeader(26) + contentGap(8) + listBottomPadding(8) - itemGap(4)
-        //        44 = itemHeight(40) + itemGap(4)
-
-        const timeSlotPadding = 20;
-        const contentPadding = 4;
-        const countHeaderHeight = 26;
-        const contentGap = 8;
-        const itemHeight = 40; // FIXED HEIGHT - matches CSS line 656 (4+16+16+4=40px)
-        const itemGap = 4;
-        const listBottomPadding = 8;
-
-        const calculatedHeight = timeSlotPadding + contentPadding + countHeaderHeight +
-                                contentGap + (maxValidAppointments * itemHeight) +
-                                ((maxValidAppointments - 1) * itemGap) + listBottomPadding;
-
-        return calculatedHeight;
+        if (n === 1) {
+            return renderLane(appts[0], 0, day, time, true);
+        }
+        if (n === 2) {
+            return (
+                <>
+                    {renderLane(appts[0], 0, day, time, true)}
+                    {renderLane(appts[1], 1, day, time, true)}
+                </>
+            );
+        }
+        if (n === 3) {
+            return (
+                <>
+                    {renderLane(appts[0], 0, day, time, false)}
+                    {renderLane(appts[1], 1, day, time, false)}
+                    {renderLane(appts[2], 2, day, time, true)}
+                </>
+            );
+        }
+        if (n === 4) {
+            return (
+                <>
+                    {renderLane(appts[0], 0, day, time, false)}
+                    {renderLane(appts[1], 1, day, time, false)}
+                    {renderLane(appts[2], 2, day, time, false)}
+                    {renderLane(appts[3], 3, day, time, false)}
+                </>
+            );
+        }
+        // 5+
+        const overflow = n - 3;
+        const isPopOpen = !!moreMenu && moreMenu.date === day.date && moreMenu.time === time;
+        return (
+            <>
+                {renderLane(appts[0], 0, day, time, false)}
+                {renderLane(appts[1], 1, day, time, false)}
+                {renderLane(appts[2], 2, day, time, false)}
+                <button
+                    type="button"
+                    className={`cal-more-cell ${isPopOpen ? 'open' : ''}`}
+                    onClick={e => {
+                        e.stopPropagation();
+                        setMoreMenu(isPopOpen ? null : { date: day.date, time });
+                    }}
+                >
+                    <span className="cal-more-plus">+{overflow}</span>
+                    <span className="cal-more-label">more</span>
+                </button>
+            </>
+        );
     };
 
-    // Helper function to get slot status
-    const getSlotStatus = (_date: string, _time: string): 'available' | 'booked' => {
-        // All slots are available regardless of date/time
-        return 'available';
-    };
-
-    // Helper to check if date is today
-    const isToday = (date: string): boolean => {
-        const today = new Date();
-        const checkDate = new Date(date);
-        return today.toDateString() === checkDate.toDateString();
-    };
-
-    // Helper to check if day is weekend
-    const isWeekend = (dayOfWeek: number | undefined): boolean => {
-        return dayOfWeek === 6 || dayOfWeek === 7; // Saturday or Sunday
+    const renderPopover = (
+        day: CalendarDay,
+        time: string,
+        appts: CalendarAppointment[],
+        slotData: SlotData
+    ) => {
+        const hidden = appts.slice(3);
+        return (
+            <div className="cal-popover" onMouseDown={e => e.stopPropagation()}>
+                <div className="cal-popover-head">
+                    <div>
+                        <div className="cal-popover-title">
+                            {time} · {appts.length} appointments
+                        </div>
+                        <div className="cal-popover-sub">
+                            Showing the {hidden.length} hidden — drag to reschedule
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        className="cal-popover-close"
+                        onClick={() => setMoreMenu(null)}
+                        aria-label="Close"
+                    >
+                        ×
+                    </button>
+                </div>
+                <div className="cal-popover-list">
+                    {hidden.map((appt, i) => {
+                        const absIdx = 3 + i;
+                        const dragId = `${day.date}|${time}|${absIdx}`;
+                        const isPast = new Date(`${day.date}T${time}:00`) < new Date();
+                        return (
+                            <div
+                                key={absIdx}
+                                className={`cal-popover-row ${
+                                    draggingId === dragId ? 'dragging' : ''
+                                }`}
+                                draggable={!isPast}
+                                onDragStart={handleLaneDragStart(dragId)}
+                                onDragEnd={handleLaneDragEnd}
+                                onClick={e => onSlotClick(slotData, e)}
+                            >
+                                <div className="cal-popover-name">
+                                    {appt.patientName || 'Scheduled'}
+                                </div>
+                                {appt.appDetail && (
+                                    <div className="cal-popover-proc">{appt.appDetail}</div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
     };
 
     return (
         <>
-            {/* Day Headers Row - Sticky below calendar header */}
-            <div className={`calendar-day-headers ${viewMode === 'day' ? 'view-day' : ''}`}>
-                <div className="day-headers-time-label">Time</div>
+            {/* Day headers */}
+            <div className="cal-day-headers" style={{ gridTemplateColumns }}>
+                <div className="cal-time-head">
+                    <span>TIME</span>
+                </div>
                 {filteredDays.map(day => {
-                    const isHoliday = day.isHoliday || false;
-                    const dayClasses = [
-                        'day-header-cell',
-                        isToday(day.date) ? 'today' : '',
-                        isWeekend(day.dayOfWeek) ? 'weekend' : '',
-                        isHoliday ? 'holiday' : ''
-                    ].filter(Boolean).join(' ');
-
-                    // Calculate total appointments for this day
-                    const dayAppts = day.appointments as Record<string, CalendarSlotInfo | CalendarAppointment[]> | undefined;
-                    const totalAppointments = Object.values(dayAppts || {}).reduce((total, slotInfo) => {
-                        const appointments = extractAppointments(slotInfo);
-                        const validAppointments = appointments.filter(apt =>
-                            apt && (apt.patientName || apt.appointmentID)
-                        );
-                        return total + validAppointments.length;
-                    }, 0);
-
-                    // Format date as "Monday 17/11"
-                    const dateObj = new Date(day.date);
-                    const dayName = day.dayName;
-                    const dayNumber = dateObj.getDate();
-                    const month = dateObj.getMonth() + 1;
-                    const dateText = `${dayName} ${dayNumber}/${month}`;
-
-                    // Right-click handler for context menu (holiday management)
+                    const holiday = day.isHoliday || false;
+                    const total = CORE_TIME_SLOTS.reduce(
+                        (sum, t) => sum + getSlotAppointments(day, t).length,
+                        0
+                    );
+                    const dateNum = new Date(day.date).getDate();
                     const handleContextMenu = (event: MouseEvent<HTMLDivElement>) => {
                         event.preventDefault();
-                        if (onDayContextMenu) {
-                            onDayContextMenu(day, event);
-                        }
+                        onDayContextMenu?.(day, event);
                     };
-
                     return (
                         <div
                             key={day.date}
-                            className={dayClasses}
+                            className={`cal-day-head ${isToday(day.date) ? 'today' : ''} ${
+                                holiday ? 'holiday' : ''
+                            }`}
                             onContextMenu={handleContextMenu}
-                            title={isHoliday ? `Holiday: ${day.holidayName}` : undefined}
+                            title={holiday ? `Holiday: ${day.holidayName}` : undefined}
                         >
-                            <div className="day-header-date-line">{dateText}</div>
-                            {isHoliday && (
-                                <div className="day-header-holiday" title={day.holidayName || 'Holiday'}>
-                                    <i className="fas fa-calendar-times"></i>
-                                </div>
-                            )}
-                            {!isHoliday && totalAppointments > 0 && (
-                                <div className="day-header-count" title={`${totalAppointments} appointment${totalAppointments !== 1 ? 's' : ''}`}>
-                                    {totalAppointments}
+                            <div className="cal-day-row">
+                                <span className="cal-day-name">
+                                    {(day.dayName || '').slice(0, 3).toUpperCase()}
+                                </span>
+                                <span className="cal-day-num">{dateNum}</span>
+                            </div>
+                            {holiday ? (
+                                <div className="cal-day-tag holiday">Holiday</div>
+                            ) : (
+                                <div className="cal-day-tag">
+                                    {total} appt{total === 1 ? '' : 's'}
                                 </div>
                             )}
                         </div>
@@ -204,104 +392,99 @@ const CalendarGrid = ({
                 })}
             </div>
 
-            {/* Calendar Grid - Scrolling content */}
-            <div className={`calendar-grid ${viewMode === 'day' ? 'view-day' : ''}`}>
+            {/* Grid */}
+            <div
+                className={`cal-grid ${viewMode === 'day' ? 'view-day' : ''}`}
+                style={{ gridTemplateColumns }}
+            >
                 {/* Time column */}
-                <div className="time-column">
-                    {filteredTimeSlots.map(timeSlot => {
-                        const dynamicHeight = getTimeSlotHeight(timeSlot);
-
+                <div className="cal-time-col">
+                    {CORE_TIME_SLOTS.map(t => {
+                        const tint = tintFor(t);
                         return (
                             <div
-                                key={timeSlot}
-                                className="time-slot-label"
-                                style={{
-                                    minHeight: `${dynamicHeight}px`,
-                                    height: `${dynamicHeight}px`
-                                }}
+                                key={t}
+                                className="cal-time-cell"
+                                style={{ background: tint.label }}
                             >
-                                {timeSlot}
+                                <span className="cal-time-h">{t.split(':')[0]}</span>
+                                <span className="cal-time-m">:{t.split(':')[1]}</span>
                             </div>
                         );
                     })}
                 </div>
 
-            {/* Day columns */}
-            {filteredDays.map(day => {
-                const isHoliday = day.isHoliday || false;
-                const dayClasses = [
-                    'day-column',
-                    isToday(day.date) ? 'today' : '',
-                    isWeekend(day.dayOfWeek) ? 'weekend' : '',
-                    isHoliday ? 'holiday' : ''
-                ].filter(Boolean).join(' ');
-
-                // Calculate total appointments for this day
-                const dayApptsForTotal = day.appointments as Record<string, CalendarSlotInfo | CalendarAppointment[]> | undefined;
-                const totalAppointments = Object.values(dayApptsForTotal || {}).reduce((total, slotInfo) => {
-                    const appointments = extractAppointments(slotInfo);
-                    const validAppointments = appointments.filter(apt =>
-                        apt && (apt.patientName || apt.appointmentID)
-                    );
-                    return total + validAppointments.length;
-                }, 0);
-
-                return (
-                    <div key={day.date} className={dayClasses}>
-                        <div className="day-header">
-                            <div className="day-name">{day.dayName}</div>
-                            <div className="day-date">{new Date(day.date).getDate()}</div>
-                            {isHoliday && (
-                                <div className="day-holiday-badge" title={day.holidayName || 'Holiday'}>
-                                    <i className="fas fa-calendar-times"></i>
+                {/* Day columns */}
+                {filteredDays.map(day => {
+                    const holiday = day.isHoliday || false;
+                    return (
+                        <div
+                            key={day.date}
+                            className={`cal-day-col ${isToday(day.date) ? 'today' : ''} ${
+                                holiday ? 'holiday' : ''
+                            }`}
+                        >
+                            {holiday && (
+                                <div className="cal-holiday-sash">
+                                    <div className="cal-holiday-card">
+                                        <div className="cal-holiday-eyebrow">Holiday</div>
+                                        <div className="cal-holiday-name">
+                                            {day.holidayName || 'Holiday'}
+                                        </div>
+                                        <div className="cal-holiday-note">Clinic closed</div>
+                                    </div>
                                 </div>
                             )}
-                            {!isHoliday && totalAppointments > 0 && (
-                                <div className="day-appointment-count" title={`${totalAppointments} appointment${totalAppointments !== 1 ? 's' : ''}`}>
-                                    {totalAppointments}
-                                </div>
-                            )}
+                            {CORE_TIME_SLOTS.map(time => {
+                                const tint = tintFor(time);
+                                const appts = holiday
+                                    ? []
+                                    : getSlotAppointments(day, time);
+                                const slotData = buildSlotData(day, time, appts);
+                                const isDropTarget =
+                                    !!dropTarget &&
+                                    dropTarget.date === day.date &&
+                                    dropTarget.time === time;
+                                const isPopOpen =
+                                    !!moreMenu &&
+                                    moreMenu.date === day.date &&
+                                    moreMenu.time === time;
+                                return (
+                                    <div
+                                        key={time}
+                                        className={`cal-slot-wrap ${
+                                            isDropTarget ? 'drop-target' : ''
+                                        } ${
+                                            isDropTarget && holiday ? 'drop-forbidden' : ''
+                                        } ${isPopOpen ? 'pop-open' : ''}`}
+                                        style={holiday ? undefined : { background: tint.row }}
+                                        onDragOver={onSlotDragOver(day.date, time, holiday)}
+                                        onDrop={
+                                            holiday ? undefined : onSlotDrop(day.date, time)
+                                        }
+                                    >
+                                        {!holiday && (
+                                            <div
+                                                className={`cal-slot count-${
+                                                    appts.length === 0
+                                                        ? '0'
+                                                        : appts.length >= 5
+                                                          ? 'many'
+                                                          : appts.length
+                                                }`}
+                                                onClick={e => onSlotClick(slotData, e)}
+                                            >
+                                                {renderSlot(day, time, appts)}
+                                            </div>
+                                        )}
+                                        {isPopOpen &&
+                                            renderPopover(day, time, appts, slotData)}
+                                    </div>
+                                );
+                            })}
                         </div>
-
-                        {filteredTimeSlots.map(timeSlot => {
-                            const dayApptsForSlot = day.appointments as Record<string, CalendarSlotInfo | CalendarAppointment[]> | undefined;
-                            const slotInfo = dayApptsForSlot?.[timeSlot];
-
-                            // Handle both old array format and new object format
-                            const appointments = extractAppointments(slotInfo);
-                            const slotStatus = (slotInfo && !Array.isArray(slotInfo) ? slotInfo.slotStatus : undefined) || (appointments.length > 0 ? 'booked' : getSlotStatus(day.date, timeSlot));
-
-                            const uniformHeight = getTimeSlotHeight(timeSlot); // Use uniform height for all slots at this time
-                            const slotData: SlotData = {
-                                date: day.date,
-                                time: timeSlot,
-                                dayName: day.dayName,
-                                appointments: appointments,
-                                slotStatus: slotStatus,
-                                appointmentID: appointments.length > 0 ? appointments[0].appointmentID : undefined,
-                                appDetail: appointments.length > 0 ? appointments[0].appDetail : undefined,
-                                patientName: appointments.length > 0 ? appointments[0].patientName : undefined
-                            };
-
-                            return (
-                                <TimeSlot
-                                    key={`${day.date}-${timeSlot}`}
-                                    slotData={slotData}
-                                    onClick={onSlotClick}
-                                    isSelected={!!(selectedSlot &&
-                                               selectedSlot.date === day.date &&
-                                               selectedSlot.time === timeSlot)}
-                                    uniformHeight={uniformHeight}
-                                    mode={mode}
-                                    showOnlyAvailable={showOnlyAvailable}
-                                    isHoliday={isHoliday}
-                                    holidayName={day.holidayName}
-                                />
-                            );
-                        })}
-                    </div>
-                );
-            })}
+                    );
+                })}
             </div>
         </>
     );
