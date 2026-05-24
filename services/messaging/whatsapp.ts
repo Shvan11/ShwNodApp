@@ -1918,18 +1918,29 @@ class WhatsAppService extends EventEmitter {
 
   async validateSessionQuality(): Promise<SessionQuality> {
     try {
-      const fs = await import('fs');
+      // Async fs so a large/bloated Chrome profile dir doesn't block the event
+      // loop — this runs on init AND on every QR event (handleQR).
+      const fsp = (await import('fs/promises')).default;
       const path = await import('path');
+
+      const exists = async (p: string): Promise<boolean> => {
+        try {
+          await fsp.access(p);
+          return true;
+        } catch {
+          return false;
+        }
+      };
 
       const sessionPath = '.wwebjs_auth/session-client/Default';
 
-      if (!fs.default.existsSync(sessionPath)) {
+      if (!(await exists(sessionPath))) {
         logger.whatsapp.debug('Session quality: none (path does not exist)');
         return 'none';
       }
 
       try {
-        const sessionStats = fs.default.statSync(sessionPath);
+        const sessionStats = await fsp.stat(sessionPath);
         const sessionAgeMs = Date.now() - sessionStats.birthtimeMs;
 
         if (sessionAgeMs < 10000) {
@@ -1948,9 +1959,9 @@ class WhatsAppService extends EventEmitter {
         'https_web.whatsapp.com_0.indexeddb.leveldb'
       );
 
-      if (!fs.default.existsSync(indexedDBPath)) {
+      if (!(await exists(indexedDBPath))) {
         try {
-          const parentStats = fs.default.statSync(sessionPath);
+          const parentStats = await fsp.stat(sessionPath);
           const parentAgeMs = Date.now() - parentStats.mtimeMs;
 
           if (parentAgeMs < 30000) {
@@ -1968,9 +1979,9 @@ class WhatsAppService extends EventEmitter {
       }
 
       let indexedDBDataFileCount = 0;
-      if (fs.default.existsSync(indexedDBWhatsAppPath)) {
+      if (await exists(indexedDBWhatsAppPath)) {
         try {
-          const indexedDBFiles = fs.default.readdirSync(indexedDBWhatsAppPath);
+          const indexedDBFiles = await fsp.readdir(indexedDBWhatsAppPath);
           indexedDBDataFileCount = indexedDBFiles.filter((f) => f.endsWith('.ldb')).length;
 
           logger.whatsapp.debug(
@@ -1983,11 +1994,11 @@ class WhatsAppService extends EventEmitter {
           // database with "Internal error opening backing store", WA Web will
           // log out, and every restore retry hits the same wall.
           const currentPath = path.default.join(indexedDBWhatsAppPath, 'CURRENT');
-          if (fs.default.existsSync(currentPath)) {
-            const manifestName = fs.default.readFileSync(currentPath, 'utf8').trim();
+          if (await exists(currentPath)) {
+            const manifestName = (await fsp.readFile(currentPath, 'utf8')).trim();
             if (manifestName) {
               const manifestPath = path.default.join(indexedDBWhatsAppPath, manifestName);
-              if (!fs.default.existsSync(manifestPath)) {
+              if (!(await exists(manifestPath))) {
                 logger.whatsapp.warn(
                   `Session quality: corrupted (CURRENT references missing ${manifestName})`
                 );
@@ -2005,9 +2016,9 @@ class WhatsAppService extends EventEmitter {
 
       const leveldbPath = path.default.join(sessionPath, 'Local Storage/leveldb');
 
-      if (fs.default.existsSync(leveldbPath)) {
+      if (await exists(leveldbPath)) {
         try {
-          const leveldbFiles = fs.default.readdirSync(leveldbPath);
+          const leveldbFiles = await fsp.readdir(leveldbPath);
           logger.whatsapp.debug(`Local Storage contains ${leveldbFiles.length} files`);
         } catch (error) {
           logger.whatsapp.warn('Session quality: corrupted (leveldb read error)', {
@@ -2018,16 +2029,16 @@ class WhatsAppService extends EventEmitter {
       }
 
       let totalSize = 0;
-      const calculateDirSize = (dirPath: string) => {
+      const calculateDirSize = async (dirPath: string): Promise<void> => {
         try {
-          const files = fs.default.readdirSync(dirPath, { withFileTypes: true });
+          const files = await fsp.readdir(dirPath, { withFileTypes: true });
           for (const file of files) {
             const filePath = path.default.join(dirPath, file.name);
             try {
               if (file.isDirectory()) {
-                calculateDirSize(filePath);
+                await calculateDirSize(filePath);
               } else {
-                const stats = fs.default.statSync(filePath);
+                const stats = await fsp.stat(filePath);
                 totalSize += stats.size;
               }
             } catch {
@@ -2039,7 +2050,7 @@ class WhatsAppService extends EventEmitter {
         }
       };
 
-      calculateDirSize(sessionPath);
+      await calculateDirSize(sessionPath);
 
       if (totalSize > 1024 * 1024) {
         // Mature session by total size, but the WA Web auth keys live

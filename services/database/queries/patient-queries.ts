@@ -118,13 +118,6 @@ interface PatientDetails {
   DateAdded: Date | null;
 }
 
-interface PatientWithRelations extends PatientDetails {
-  GenderName: string | null;
-  AddressName: string | null;
-  ReferralSource: string | null;
-  PatientTypeName: string | null;
-}
-
 interface UpdatePatientData {
   PatientName: string;
   FirstName?: string;
@@ -582,52 +575,6 @@ export async function getPatientById(personId: number): Promise<PatientDetails |
 }
 
 /**
- * Retrieves all patients with full details.
- */
-export function getAllPatients(): Promise<PatientWithRelations[]> {
-  return executeQuery<PatientWithRelations>(
-    `SELECT p.PersonID, p.PatientName, p.FirstName, p.LastName,
-            p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
-            p.AddressID, p.ReferralSourceID, p.PatientTypeID,
-            p.Notes, p.Language, p.CountryCode,
-            g.Gender as GenderName, a.Zone as AddressName,
-            r.Referral as ReferralSource, pt.PatientType as PatientTypeName
-     FROM dbo.tblpatients p
-     LEFT JOIN dbo.tblGender g ON p.Gender = g.Gender_ID
-     LEFT JOIN dbo.tblAddress a ON p.AddressID = a.ID
-     LEFT JOIN dbo.tblReferrals r ON p.ReferralSourceID = r.ID
-     LEFT JOIN dbo.tblPatientType pt ON p.PatientTypeID = pt.ID
-     ORDER BY p.PatientName`,
-    [],
-    (columns: ColumnValue[]) => ({
-      PersonID: columns[0].value as number,
-      PatientName: columns[1].value as string,
-      FirstName: columns[2].value as string | null,
-      LastName: columns[3].value as string | null,
-      Phone: columns[4].value as string | null,
-      Phone2: columns[5].value as string | null,
-      Email: columns[6].value as string | null,
-      DateofBirth: columns[7].value as Date | null,
-      Gender: columns[8].value as number | null,
-      AddressID: columns[9].value as number | null,
-      ReferralSourceID: columns[10].value as number | null,
-      PatientTypeID: columns[11].value as number | null,
-      Notes: columns[12].value as string | null,
-      Language: columns[13].value as number | null,
-      CountryCode: columns[14].value as string | null,
-      GenderName: columns[15].value as string | null,
-      AddressName: columns[16].value as string | null,
-      ReferralSource: columns[17].value as string | null,
-      PatientTypeName: columns[18].value as string | null,
-      EstimatedCost: null,
-      Currency: null,
-      TagID: null,
-      DateAdded: null,
-    })
-  );
-}
-
-/**
  * Updates an existing patient record.
  */
 export async function updatePatient(
@@ -701,20 +648,18 @@ export async function deletePatient(personId: number): Promise<{ success: boolea
     // All child + parent rows are removed in a single transaction so a
     // mid-cascade failure rolls back fully — no FK orphans / half-deleted patient.
     await withTransaction(async (tx) => {
-      // Delete in order based on dependencies (children before parent).
-      const tables = [
-        'dbo.tblwork',
-        'dbo.tblCarriedWires',
-        'dbo.tblWaiting',
-        'dbo.tblappointments',
-        'dbo.tblscrews',
-        'dbo.tblpatients',
-      ];
-      for (const table of tables) {
-        await new sql.Request(tx)
-          .input('personId', TYPES.Int, personId)
-          .query(`DELETE FROM ${table} WHERE PersonID = @personId`);
-      }
+      // Children before parent, batched into a single round-trip. The
+      // surrounding transaction still makes it all-or-nothing.
+      await new sql.Request(tx)
+        .input('personId', TYPES.Int, personId)
+        .query(`
+          DELETE FROM dbo.tblwork WHERE PersonID = @personId;
+          DELETE FROM dbo.tblCarriedWires WHERE PersonID = @personId;
+          DELETE FROM dbo.tblWaiting WHERE PersonID = @personId;
+          DELETE FROM dbo.tblappointments WHERE PersonID = @personId;
+          DELETE FROM dbo.tblscrews WHERE PersonID = @personId;
+          DELETE FROM dbo.tblpatients WHERE PersonID = @personId;
+        `);
     });
 
     return { success: true };

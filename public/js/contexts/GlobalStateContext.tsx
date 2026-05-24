@@ -116,9 +116,20 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
   const [whatsappClientReady, setWhatsappClientReady] = useState(false);
   const [whatsappQrCode, setWhatsappQrCode] = useState<string | null>(null);
 
-  // Mirror WhatsApp client state from the shared SSE channel. Initial state
-  // is primed by the feature hooks via REST (/api/wa/initial-state); this
-  // effect only subscribes to live updates.
+  // Mirror WhatsApp client state from the shared SSE channel, AND reconcile it
+  // against the authoritative server snapshot every time the transport opens.
+  //
+  // `whatsapp_client_ready` is a one-shot event: the broadcaster fires it once
+  // when the client becomes ready and never replays it to streams that connect
+  // afterwards. A tab whose SSE stream opens *after* the client was already
+  // authenticated (server booted from a restored session, or this page loaded
+  // later) therefore never sees it, leaving `whatsappClientReady` stuck `false`
+  // even though the server is connected. That is the split brain it produced —
+  // the Send page and the per-patient SendMessage gate read this flag and show
+  // "Authentication Required" / block sending, while the Auth page (which GETs
+  // /api/wa/initial-state itself) shows connected. Reconciling from REST on
+  // every open — initial connect and every reconnect — closes the whole
+  // missed-event category for every consumer at once.
   useEffect(() => {
     const handleWhatsAppReady = (data: unknown): void => {
       const typed = data as WhatsAppReadyData | null;
@@ -132,13 +143,36 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
       if (typed.qr) setWhatsappClientReady(false);
     };
 
+    // Authoritative reconcile. On REST failure keep the last known state — the
+    // live SSE events above remain the fallback — rather than forcing `false`.
+    const reconcileFromRest = (): void => {
+      fetch('/api/wa/initial-state', { credentials: 'include' })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: { clientReady?: boolean } | null) => {
+          if (!data) return;
+          if (data.clientReady) {
+            setWhatsappClientReady(true);
+            setWhatsappQrCode(null);
+          } else {
+            setWhatsappClientReady(false);
+          }
+        })
+        .catch(() => { /* keep last known state; live events still update it */ });
+    };
+
     sseWhatsapp.on('whatsapp_client_ready', handleWhatsAppReady);
     sseWhatsapp.on('whatsapp_qr_updated', handleWhatsAppQR);
+    sseWhatsapp.on('connected', reconcileFromRest);
+
     void sseWhatsapp.ensureConnected().catch(() => { /* hook will surface errors */ });
+    // If the stream was already open before we subscribed, `connected` won't
+    // fire for us — reconcile once now to cover that path.
+    if (sseWhatsapp.getFreshness() === 'fresh') reconcileFromRest();
 
     return () => {
       sseWhatsapp.off('whatsapp_client_ready', handleWhatsAppReady);
       sseWhatsapp.off('whatsapp_qr_updated', handleWhatsAppQR);
+      sseWhatsapp.off('connected', reconcileFromRest);
       sseWhatsapp.release();
     };
   }, []);

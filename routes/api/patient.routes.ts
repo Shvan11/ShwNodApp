@@ -469,7 +469,9 @@ router.get(
         ]);
       }
 
-      // General search (phone or ID)
+      // General search (phone or ID). Honours the same nameStartsWith flag as
+      // the name fields: prefix match (index-seekable) when set, substring
+      // otherwise — substring stays the default so "last 4 digits" search works.
       if (searchQuery.trim()) {
         whereConditions.push(
           '(p.Phone LIKE @search OR p.Phone2 LIKE @search)'
@@ -477,7 +479,7 @@ router.get(
         parameters.push([
           'search',
           database.TYPES.NVarChar,
-          `%${searchQuery.trim()}%`
+          `${namePrefix}${searchQuery.trim()}%`
         ]);
       }
 
@@ -605,15 +607,12 @@ router.get(
             : 'ORDER BY p.PatientName ASC';
       }
 
-      // First, get the total count of matching patients
+      // First, get the total count of matching patients.
+      // No JOINs here: every filter references p.* directly or via EXISTS
+      // subqueries, so the 5 lookup-table joins added nothing to the count.
       const countQuery = `
             SELECT COUNT(DISTINCT p.PersonID) as totalCount
             FROM dbo.tblpatients p
-            LEFT JOIN dbo.tblGender g ON p.Gender = g.Gender_ID
-            LEFT JOIN dbo.tblAddress a ON p.AddressID = a.ID
-            LEFT JOIN dbo.tblReferrals r ON p.ReferralSourceID = r.ID
-            LEFT JOIN dbo.tblPatientType pt ON p.PatientTypeID = pt.ID
-            LEFT JOIN dbo.tblTagOptions tag ON p.TagID = tag.ID
             ${whereClause}
         `;
 

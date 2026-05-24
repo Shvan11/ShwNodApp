@@ -9,7 +9,7 @@
  * middleware file is missing. They are preserved here for future implementation.
  */
 
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, type NextFunction } from 'express';
 import { log } from '../../utils/logger.js';
 import * as database from '../../services/database/index.js';
 import multer from 'multer';
@@ -17,7 +17,28 @@ import webcephService from '../../services/webceph/webceph-service.js';
 import { ErrorResponses } from '../../utils/error-response.js';
 
 const router = Router();
-const upload = multer();
+
+// In-memory upload with a hard size cap so an oversized/abusive body can't
+// balloon RAM. X-ray/photo formats (.dcm/.pano/JPEG) sit well under 50MB;
+// raise this if a legitimately larger study is ever rejected.
+const upload = multer({ limits: { fileSize: 50 * 1024 * 1024, files: 1 } });
+
+// Wrap multer so a size-limit / upload error returns a clean 400 instead of
+// falling through to the generic 500 handler.
+const uploadImage = (req: Request, res: Response, next: NextFunction): void => {
+  upload.single('image')(req, res, (err: unknown) => {
+    if (err) {
+      const code = (err as { code?: string }).code;
+      if (code === 'LIMIT_FILE_SIZE') {
+        ErrorResponses.badRequest(res, 'Image is too large. Maximum size is 50MB.');
+        return;
+      }
+      ErrorResponses.badRequest(res, `Upload error: ${(err as Error).message}`);
+      return;
+    }
+    next();
+  });
+};
 
 /**
  * Patient data for WebCeph creation
@@ -148,7 +169,7 @@ router.post('/webceph/create-patient', async (req: Request<object, object, Creat
  * POST /webceph/upload-image
  * Form data: image (file), patientID, recordDate, targetClass
  */
-router.post('/webceph/upload-image', upload.single('image'), async (req: FileRequest, res: Response): Promise<void> => {
+router.post('/webceph/upload-image', uploadImage, async (req: FileRequest, res: Response): Promise<void> => {
   try {
     const { patientID, recordDate, targetClass } = req.body;
 

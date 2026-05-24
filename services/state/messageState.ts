@@ -488,19 +488,23 @@ class MessageStateManager {
   }
 
   /**
-   * Reset all state
+   * Reset the message-send session: send stats, per-message persons, and ack
+   * statuses. Used between send batches (restart() and the manual clear()).
+   *
+   * Deliberately does NOT touch CLIENT_STATUS or QR_STATUS. Client readiness is
+   * lifecycle state owned by the ready/disconnected handlers, and activeViewers
+   * is the live SSE QR-viewer count owned by register/unregisterQRViewer —
+   * neither is part of a send session. Clearing them here used to backfire:
+   * restart() calls reset() *after* the client has already reconnected and
+   * fired `ready`, so resetting CLIENT_STATUS flipped clientReady back to false
+   * (server reporting not-ready while actually connected) and zeroed the viewer
+   * count out from under still-open streams. restart() already clears
+   * clientReady/qr explicitly before re-init, so reset() owes them nothing.
    */
   async reset(): Promise<void> {
-    log.info('Resetting message state');
+    log.info('Resetting message-send session state');
 
     await Promise.all([
-      StateManager.atomicOperation<ClientStatus>(this.stateKeys.CLIENT_STATUS, () => ({
-        ready: false,
-        initializing: false,
-        lastActivity: Date.now(),
-        manualDisconnect: false,
-      })),
-
       StateManager.atomicOperation<MessageStats>(this.stateKeys.MESSAGE_STATS, () => ({
         sent: 0,
         failed: 0,
@@ -513,13 +517,6 @@ class MessageStateManager {
         this.stateKeys.MESSAGE_STATUSES,
         () => new Map()
       ),
-
-      StateManager.atomicOperation<QRStatus>(this.stateKeys.QR_STATUS, () => ({
-        qr: null,
-        activeViewers: 0,
-        generationActive: false,
-        lastRequested: null,
-      })),
     ]);
 
     stateEvents.emit('state_reset');
