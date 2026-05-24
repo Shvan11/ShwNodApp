@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useRef, type MouseEvent } from 'react';
 import type { CalendarDay, CalendarData, CalendarAppointment, CalendarMode } from './calendar.types';
+import { formatTime12 } from '../../utils/formatters';
 import styles from './MonthlyCalendarGrid.module.css';
 
 interface MonthlyCalendarGridProps {
@@ -30,7 +31,7 @@ const MonthlyCalendarGrid = ({
     // Close expanded panel when clicking outside
     useEffect(() => {
         const handleClickOutside = (e: globalThis.MouseEvent) => {
-            if (expandedDay && gridRef.current && !(e.target as Element).closest('.month-day-cell')) {
+            if (expandedDay && gridRef.current && !(e.target as Element).closest('[data-month-cell]')) {
                 setExpandedDay(null);
             }
         };
@@ -138,6 +139,7 @@ const MonthlyCalendarGrid = ({
                         <div
                             key={day.date}
                             className={cellClasses}
+                            data-month-cell
                             onClick={handleClick}
                             onDoubleClick={handleDoubleClick}
                             onContextMenu={handleContextMenu}
@@ -177,7 +179,7 @@ const MonthlyCalendarGrid = ({
                                         <div className={styles.expandedAppointments}>
                                             {(day.appointments as CalendarAppointment[]).slice(0, 8).map((apt, idx) => (
                                                 <div key={idx} className={styles.expandedAppointment}>
-                                                    <span className={styles.aptTime}>{apt.time || ''}</span>
+                                                    <span className={styles.aptTime}>{formatTime12(apt.time)}</span>
                                                     <span className={styles.aptName}>{apt.patientName || ''}</span>
                                                 </div>
                                             ))}

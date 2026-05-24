@@ -6,7 +6,9 @@ import CalendarContextMenu from './CalendarContextMenu';
 import CalendarDayContextMenu from './CalendarDayContextMenu';
 import HolidayQuickModal from './HolidayQuickModal';
 import Modal from './Modal';
+import CalendarLegend from './CalendarLegend';
 import { useToast } from '../../contexts/ToastContext';
+import { useAppointmentDoctors } from '../../hooks/useAppointmentDoctors';
 import type {
     ViewMode,
     CalendarMode,
@@ -23,7 +25,7 @@ import type {
 
 interface ContextMenuState {
     position: MenuPosition;
-    appointments: CalendarAppointment[];
+    appointment: CalendarAppointment;
 }
 
 interface DayContextMenuState {
@@ -60,6 +62,7 @@ const AppointmentCalendar = ({
     selectedSlot: externalSelectedSlot
 }: AppointmentCalendarProps) => {
     const toast = useToast();
+    const { byId: doctorColors, legend: doctorLegend } = useAppointmentDoctors();
 
     // State management
     const [currentDate, setCurrentDate] = useState<Date>(
@@ -364,7 +367,7 @@ const AppointmentCalendar = ({
         [currentDate, selectedDoctorId, fetchCalendarData, toast]
     );
 
-    const handleSlotClick = useCallback((slot: SlotData, event: MouseEvent<HTMLDivElement>) => {
+    const handleSlotClick = useCallback((slot: SlotData, _event: MouseEvent<HTMLDivElement>) => {
         if (mode === 'selection') {
             // In selection mode, only allow selecting available slots
             if (slot.slotStatus !== 'available') {
@@ -381,33 +384,36 @@ const AppointmentCalendar = ({
                 onSlotSelect(slot);
             }
         } else {
-            // Normal view mode - show context menu for slots with appointments
-            const validAppointments = slot.appointments?.filter(apt =>
-                apt && (apt.patientName || apt.appointmentID)
-            ) || [];
-
-            if (validAppointments.length > 0) {
-                // Check if the appointment is in the past
-                const slotDateTime = new Date(`${slot.date}T${slot.time}:00`);
-                const now = new Date();
-
-                if (slotDateTime < now) {
-                    // Show toast notification for past appointments
-                    toast.error('You cannot edit or delete past appointments');
-                    return;
-                }
-
-                // Show context menu for future appointments only
-                setContextMenu({
-                    position: { x: event.clientX, y: event.clientY },
-                    appointments: validAppointments
-                });
-            }
-
-            // Update selected slot for highlighting
+            // View mode: appointments are managed via their individual cards
+            // (handleAppointmentClick) or the "+N more" overflow popover. A bare
+            // slot click only updates highlighting — no redundant picker list.
             setInternalSelectedSlot(slot);
         }
-    }, [mode, externalSelectedSlot, onSlotSelect, toast]);
+    }, [mode, externalSelectedSlot, onSlotSelect]);
+
+    // Clicking a specific appointment card goes straight to its Edit/Delete
+    // menu — each card is individually rendered, so there's no list to pick from.
+    const handleAppointmentClick = useCallback((
+        appt: CalendarAppointment,
+        date: string,
+        time: string,
+        event: MouseEvent<HTMLDivElement>
+    ) => {
+        // Card clicks are for managing existing appointments; selection mode
+        // books empty slots, so ignore them there.
+        if (mode === 'selection') return;
+
+        // Block edits/deletes on past appointments, matching slot-click behaviour.
+        if (new Date(`${date}T${time}:00`) < new Date()) {
+            toast.error('You cannot edit or delete past appointments');
+            return;
+        }
+
+        setContextMenu({
+            position: { x: event.clientX, y: event.clientY },
+            appointment: appt
+        });
+    }, [mode, toast]);
 
     // Handler for clicking on a day in monthly view
     const handleDayClick = useCallback((day: CalendarDay) => {
@@ -631,6 +637,9 @@ const AppointmentCalendar = ({
                 onDoctorChange={handleDoctorChange}
             />
 
+            {/* Doctor colour legend (week/day views only — month cells aren't tinted) */}
+            {viewMode !== 'month' && <CalendarLegend doctors={doctorLegend} />}
+
             {/* Calendar Grid - Show different grid based on view mode */}
             {viewMode === 'month' ? (
                 <MonthlyCalendarGrid
@@ -643,8 +652,10 @@ const AppointmentCalendar = ({
             ) : (
                 <CalendarGrid
                     calendarData={calendarData}
+                    doctorColors={doctorColors}
                     selectedSlot={selectedSlot}
                     onSlotClick={handleSlotClick}
+                    onAppointmentClick={handleAppointmentClick}
                     onDayContextMenu={handleDayContextMenu}
                     mode={mode}
                     viewMode={viewMode}
@@ -662,7 +673,7 @@ const AppointmentCalendar = ({
             {contextMenu && (
                 <CalendarContextMenu
                     position={contextMenu.position}
-                    appointments={contextMenu.appointments}
+                    appointment={contextMenu.appointment}
                     onClose={handleCloseContextMenu}
                     onDelete={handleDeleteRequest}
                 />

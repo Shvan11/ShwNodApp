@@ -2,13 +2,15 @@
  * CalendarGrid Component for Appointment Calendar
  *
  * Renders the week/day grid on a uniform 112px slot system.
- * Each 30-minute row carries a unique hue band across all days; appointment
- * cards pack adaptively (1/2/3/4/5+) and support drag-to-reschedule plus a
- * "+N more" popover for crowded slots.
+ * Row tinting is switchable via TINT_MODE (neutral 'zebra' default, or the
+ * 'colorful' golden-angle hue-per-row). Appointment cards pack adaptively
+ * (1/2/3/4/5+) and support drag-to-reschedule plus a "+N more" popover for
+ * crowded slots.
  */
 
 import { useEffect } from 'react';
 import type { Dispatch, DragEvent, MouseEvent, SetStateAction } from 'react';
+import { to12Hour, formatTime12 } from '../../utils/formatters';
 import type {
     CalendarDay,
     CalendarData,
@@ -16,11 +18,26 @@ import type {
     CalendarSlotInfo,
     SlotData,
     ViewMode,
-    CalendarMode
+    CalendarMode,
+    DoctorColor
 } from './calendar.types';
 
-/* Colour system — 14 hues stepped at the golden angle (~137.5°) so every
-   consecutive pair of 30-minute rows sits on opposite sides of the wheel. */
+/* ────────────────────────────────────────────────────────────────────────
+   Row tinting — flip TINT_MODE to switch the whole grid.
+   'zebra'    : neutral alternating bands; the time-column label shares its
+                row's shade, so each 30-min row (label + every day cell) reads
+                as one horizontal unit. Easiest to trace a cell back to its
+                time across the 6-day week.
+   'colorful' : 14 golden-angle hues, one per 30-min row (the V4_TIME_TINT map
+                below). Flip back here to restore it — nothing else changes.
+   ──────────────────────────────────────────────────────────────────────── */
+type TintMode = 'zebra' | 'colorful';
+const TINT_MODE: TintMode = 'zebra';
+
+/* Colourful mode — 14 hues stepped at the golden angle (~137.5°) so every
+   consecutive pair of 30-minute rows sits on opposite sides of the wheel.
+   Also the source of truth for the slot list (CORE_TIME_SLOTS), regardless
+   of the active mode. */
 const V4_TIME_TINT: Record<string, { row: string; label: string }> = {
     '14:00': { row: 'oklch(96% 0.038 220)', label: 'oklch(86% 0.078 220)' },
     '14:30': { row: 'oklch(96% 0.038 358)', label: 'oklch(86% 0.078 358)' },
@@ -38,7 +55,24 @@ const V4_TIME_TINT: Record<string, { row: string; label: string }> = {
     '20:30': { row: 'oklch(96% 0.040 208)', label: 'oklch(86% 0.082 208)' }
 };
 const CORE_TIME_SLOTS = Object.keys(V4_TIME_TINT);
-const tintFor = (t: string) => V4_TIME_TINT[t] || V4_TIME_TINT['14:00'];
+
+/* Zebra mode — on-the-hour rows tinted, half-hour rows clear (a proper
+   every-other-row stripe, since slots strictly alternate :00 / :30). Label
+   matches row so the band reads as one unit. */
+const zebraFor = (t: string): { row: string; label: string } => {
+    const shade = t.endsWith(':00') ? 'var(--cal-zebra)' : 'transparent';
+    return { row: shade, label: shade };
+};
+
+const tintFor = (t: string): { row: string; label: string } =>
+    TINT_MODE === 'zebra' ? zebraFor(t) : (V4_TIME_TINT[t] || V4_TIME_TINT['14:00']);
+
+/* Per-doctor card tint now comes from the `doctorColors` prop — resolved from
+   the appointment-eligible doctors (tblEmployees.getAppointments) and their
+   AppointmentColor, see doctorColors.ts — so the grid, the legend, and Employee
+   Settings stay in sync. A drID absent from the map renders neutral white
+   (unassigned, or a deliberately-neutral bucket like "Clinic"). */
+const EMPTY_DOCTOR_COLORS: Map<number, DoctorColor> = new Map();
 
 export interface DropTarget {
     date: string;
@@ -55,9 +89,16 @@ interface CalendarGridProps {
     calendarData: CalendarData | null;
     selectedSlot: SlotData | null;
     onSlotClick: (slot: SlotData, event: MouseEvent<HTMLDivElement>) => void;
+    onAppointmentClick: (
+        appt: CalendarAppointment,
+        date: string,
+        time: string,
+        event: MouseEvent<HTMLDivElement>
+    ) => void;
     onDayContextMenu?: (day: CalendarDay, event: MouseEvent<HTMLDivElement>) => void;
     mode?: CalendarMode;
     viewMode?: ViewMode;
+    doctorColors?: Map<number, DoctorColor>;
     draggingId: string | null;
     setDraggingId: Dispatch<SetStateAction<string | null>>;
     dropTarget: DropTarget | null;
@@ -97,8 +138,10 @@ const parseDragId = (id: string): { date: string; time: string; index: number } 
 const CalendarGrid = ({
     calendarData,
     onSlotClick,
+    onAppointmentClick,
     onDayContextMenu,
     viewMode = 'week',
+    doctorColors = EMPTY_DOCTOR_COLORS,
     draggingId,
     setDraggingId,
     dropTarget,
@@ -130,8 +173,10 @@ const CalendarGrid = ({
 
     if (!calendarData || !days.length) {
         return (
-            <div className="cal-grid loading">
-                <p>Loading calendar data...</p>
+            <div className="cal-board">
+                <div className="cal-grid loading">
+                    <p>Loading calendar data...</p>
+                </div>
             </div>
         );
     }
@@ -212,15 +257,21 @@ const CalendarGrid = ({
     ) => {
         const dragId = `${day.date}|${time}|${index}`;
         const isPast = new Date(`${day.date}T${time}:00`) < new Date();
+        const dt = appt.drID != null ? doctorColors.get(appt.drID) : undefined;
         return (
             <div
                 key={index}
                 className={`cal-lane ${span2 ? 'span2' : ''} ${
                     draggingId === dragId ? 'dragging' : ''
                 }`}
+                style={dt ? { background: dt.fill, borderColor: dt.edge } : undefined}
                 draggable={!isPast}
                 onDragStart={handleLaneDragStart(dragId)}
                 onDragEnd={handleLaneDragEnd}
+                onClick={e => {
+                    e.stopPropagation();
+                    onAppointmentClick(appt, day.date, time, e);
+                }}
                 title={`${appt.patientName || 'Scheduled'}${
                     appt.appDetail ? ` — ${appt.appDetail}` : ''
                 }`}
@@ -293,8 +344,7 @@ const CalendarGrid = ({
     const renderPopover = (
         day: CalendarDay,
         time: string,
-        appts: CalendarAppointment[],
-        slotData: SlotData
+        appts: CalendarAppointment[]
     ) => {
         const hidden = appts.slice(3);
         return (
@@ -302,7 +352,7 @@ const CalendarGrid = ({
                 <div className="cal-popover-head">
                     <div>
                         <div className="cal-popover-title">
-                            {time} · {appts.length} appointments
+                            {formatTime12(time)} · {appts.length} appointments
                         </div>
                         <div className="cal-popover-sub">
                             Showing the {hidden.length} hidden — drag to reschedule
@@ -322,16 +372,22 @@ const CalendarGrid = ({
                         const absIdx = 3 + i;
                         const dragId = `${day.date}|${time}|${absIdx}`;
                         const isPast = new Date(`${day.date}T${time}:00`) < new Date();
+                        const dt = appt.drID != null ? doctorColors.get(appt.drID) : undefined;
                         return (
                             <div
                                 key={absIdx}
                                 className={`cal-popover-row ${
                                     draggingId === dragId ? 'dragging' : ''
                                 }`}
+                                style={dt ? { background: dt.fill, borderLeft: `3px solid ${dt.edge}` } : undefined}
                                 draggable={!isPast}
                                 onDragStart={handleLaneDragStart(dragId)}
                                 onDragEnd={handleLaneDragEnd}
-                                onClick={e => onSlotClick(slotData, e)}
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    setMoreMenu(null);
+                                    onAppointmentClick(appt, day.date, time, e);
+                                }}
                             >
                                 <div className="cal-popover-name">
                                     {appt.patientName || 'Scheduled'}
@@ -348,7 +404,7 @@ const CalendarGrid = ({
     };
 
     return (
-        <>
+        <div className="cal-board">
             {/* Day headers */}
             <div className="cal-day-headers" style={{ gridTemplateColumns }}>
                 <div className="cal-time-head">
@@ -394,21 +450,23 @@ const CalendarGrid = ({
 
             {/* Grid */}
             <div
-                className={`cal-grid ${viewMode === 'day' ? 'view-day' : ''}`}
+                className={`cal-grid tint-${TINT_MODE} ${viewMode === 'day' ? 'view-day' : ''}`}
                 style={{ gridTemplateColumns }}
             >
                 {/* Time column */}
                 <div className="cal-time-col">
                     {CORE_TIME_SLOTS.map(t => {
                         const tint = tintFor(t);
+                        const { hour, minute, meridiem } = to12Hour(t);
                         return (
                             <div
                                 key={t}
                                 className="cal-time-cell"
                                 style={{ background: tint.label }}
                             >
-                                <span className="cal-time-h">{t.split(':')[0]}</span>
-                                <span className="cal-time-m">:{t.split(':')[1]}</span>
+                                <span className="cal-time-h">{hour}</span>
+                                <span className="cal-time-m">{minute}</span>
+                                <span className="cal-time-ap">{meridiem}</span>
                             </div>
                         );
                     })}
@@ -478,7 +536,7 @@ const CalendarGrid = ({
                                             </div>
                                         )}
                                         {isPopOpen &&
-                                            renderPopover(day, time, appts, slotData)}
+                                            renderPopover(day, time, appts)}
                                     </div>
                                 );
                             })}
@@ -486,7 +544,7 @@ const CalendarGrid = ({
                     );
                 })}
             </div>
-        </>
+        </div>
     );
 };
 

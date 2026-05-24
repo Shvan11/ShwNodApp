@@ -38,6 +38,7 @@ interface Employee {
   receiveEmail: boolean;
   getAppointments: boolean;
   SortOrder: number;
+  AppointmentColor: string | null;
 }
 
 /**
@@ -60,6 +61,7 @@ interface EmployeeBody {
   receiveEmail?: boolean;
   getAppointments?: boolean;
   SortOrder?: number;
+  AppointmentColor?: string | null;
 }
 
 /**
@@ -114,7 +116,7 @@ router.get('/employees', async (req: Request<object, object, object, EmployeeQue
       : '';
 
     const query = `
-      SELECT e.ID, e.employeeName, e.Position, p.PositionName, e.Email, e.Phone, e.Percentage, e.receiveEmail, e.getAppointments, e.SortOrder
+      SELECT e.ID, e.employeeName, e.Position, p.PositionName, e.Email, e.Phone, e.Percentage, e.receiveEmail, e.getAppointments, e.SortOrder, e.AppointmentColor
       FROM tblEmployees e
       LEFT JOIN tblPositions p ON e.Position = p.ID
       ${whereClause}
@@ -134,7 +136,8 @@ router.get('/employees', async (req: Request<object, object, object, EmployeeQue
         Percentage: columns[6].value as boolean,
         receiveEmail: columns[7].value as boolean,
         getAppointments: columns[8].value as boolean,
-        SortOrder: columns[9].value as number
+        SortOrder: columns[9].value as number,
+        AppointmentColor: columns[10].value as string | null
       })
     );
 
@@ -187,7 +190,7 @@ router.get('/positions', async (_req: Request, res: Response): Promise<void> => 
  */
 router.post('/employees', async (req: Request<object, object, EmployeeBody>, res: Response): Promise<void> => {
   try {
-    const { employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments, SortOrder } = req.body;
+    const { employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments, SortOrder, AppointmentColor } = req.body;
 
     if (!employeeName || employeeName.trim() === '') {
       ErrorResponses.badRequest(res, 'Employee name is required');
@@ -216,9 +219,9 @@ router.post('/employees', async (req: Request<object, object, EmployeeBody>, res
     const insertQuery = `
       DECLARE @OutputTable TABLE (ID INT);
 
-      INSERT INTO tblEmployees (employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments, SortOrder)
+      INSERT INTO tblEmployees (employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments, SortOrder, AppointmentColor)
       OUTPUT INSERTED.ID INTO @OutputTable
-      VALUES (@name, @position, @email, @phone, @percentage, @receiveEmail, @getAppointments, @sortOrder);
+      VALUES (@name, @position, @email, @phone, @percentage, @receiveEmail, @getAppointments, @sortOrder, @appointmentColor);
 
       SELECT ID FROM @OutputTable;
     `;
@@ -233,7 +236,8 @@ router.post('/employees', async (req: Request<object, object, EmployeeBody>, res
         ['percentage', database.TYPES.Bit, Percentage ? 1 : 0],
         ['receiveEmail', database.TYPES.Bit, receiveEmail ? 1 : 0],
         ['getAppointments', database.TYPES.Bit, getAppointments ? 1 : 0],
-        ['sortOrder', database.TYPES.Int, SortOrder !== undefined ? SortOrder : 999]
+        ['sortOrder', database.TYPES.Int, SortOrder !== undefined ? SortOrder : 999],
+        ['appointmentColor', database.TYPES.NVarChar, AppointmentColor && AppointmentColor.trim() !== '' ? AppointmentColor.trim() : null]
       ],
       (columns) => columns[0].value as number
     );
@@ -259,7 +263,7 @@ router.post('/employees', async (req: Request<object, object, EmployeeBody>, res
 router.put('/employees/:id', async (req: Request<EmployeeParams, object, EmployeeBody>, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments, SortOrder } = req.body;
+    const { employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments, SortOrder, AppointmentColor } = req.body;
 
     if (!employeeName || employeeName.trim() === '') {
       ErrorResponses.badRequest(res, 'Employee name is required');
@@ -297,7 +301,8 @@ router.put('/employees/:id', async (req: Request<EmployeeParams, object, Employe
           Percentage = @percentage,
           receiveEmail = @receiveEmail,
           getAppointments = @getAppointments,
-          SortOrder = @sortOrder
+          SortOrder = @sortOrder,
+          AppointmentColor = @appointmentColor
       WHERE ID = @id
     `;
 
@@ -312,6 +317,7 @@ router.put('/employees/:id', async (req: Request<EmployeeParams, object, Employe
         ['receiveEmail', database.TYPES.Bit, receiveEmail ? 1 : 0],
         ['getAppointments', database.TYPES.Bit, getAppointments ? 1 : 0],
         ['sortOrder', database.TYPES.Int, SortOrder !== undefined ? SortOrder : 999],
+        ['appointmentColor', database.TYPES.NVarChar, AppointmentColor && AppointmentColor.trim() !== '' ? AppointmentColor.trim() : null],
         ['id', database.TYPES.Int, parseInt(id)]
       ]
     );

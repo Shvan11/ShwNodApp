@@ -1196,6 +1196,11 @@ function transformToMonthlyStructure(
   const allDays: MonthlyDayData[] = [];
 
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    // Friday (getDay() === 5) is a non-working day with no column in the 6-day
+    // Sat–Thu month grid. Skip it so each run of 6 cells maps to one Sat–Thu week
+    // and weekday columns stay aligned (otherwise every Friday shifts the rest).
+    if (d.getDay() === 5) continue;
+
     // Use local date format to avoid timezone shifts
     const dateKey = formatLocalDate(d);
 

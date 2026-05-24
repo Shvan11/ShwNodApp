@@ -3,6 +3,7 @@ import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import Modal from './Modal';
+import { resolveDoctorColor, DEFAULT_PICKER_HEX, NEUTRAL_PICKER_HEX } from './doctorColors';
 import styles from './EmployeeSettings.module.css';
 
 interface Position {
@@ -19,6 +20,7 @@ interface Employee {
     receiveEmail: boolean;
     getAppointments: boolean;
     SortOrder: number | string | null;
+    AppointmentColor: string | null;
 }
 
 interface FormData {
@@ -29,6 +31,7 @@ interface FormData {
     receiveEmail: boolean;
     getAppointments: boolean;
     SortOrder: string;
+    AppointmentColor: string;
 }
 
 interface EmployeeSettingsProps {
@@ -51,7 +54,8 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         Percentage: false,
         receiveEmail: false,
         getAppointments: false,
-        SortOrder: ''
+        SortOrder: '',
+        AppointmentColor: ''
     });
     const [activeTab, setActiveTab] = useState<'basic' | 'other'>('basic');
 
@@ -101,7 +105,8 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             Percentage: false,
             receiveEmail: false,
             getAppointments: false,
-            SortOrder: ''
+            SortOrder: '',
+            AppointmentColor: ''
         });
         setEditingId(null);
         setActiveTab('basic');
@@ -116,7 +121,8 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             Percentage: employee.Percentage || false,
             receiveEmail: employee.receiveEmail || false,
             getAppointments: employee.getAppointments || false,
-            SortOrder: String(employee.SortOrder || '')
+            SortOrder: String(employee.SortOrder || ''),
+            AppointmentColor: employee.AppointmentColor || ''
         });
         setEditingId(employee.ID);
         setActiveTab('basic');
@@ -131,7 +137,8 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             Percentage: false,
             receiveEmail: false,
             getAppointments: false,
-            SortOrder: ''
+            SortOrder: '',
+            AppointmentColor: ''
         });
         setEditingId(null);
         setShowAddForm(false);
@@ -203,9 +210,35 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         }));
     };
 
+    // Clearing the picker stores no colour, so the doctor falls back to their
+    // built-in default (or neutral) on the calendar.
+    const handleClearColor = () => {
+        setFormData(prev => ({ ...prev, AppointmentColor: '' }));
+    };
+
     const getPositionName = (positionId: number | string): string => {
         const position = positions.find(p => p.ID === Number(positionId));
         return position ? position.PositionName : 'Unknown';
+    };
+
+    // Effective calendar swatch for the table (only meaningful for doctors who
+    // can be assigned appointments).
+    const renderColorSwatch = (employee: Employee) => {
+        const color = employee.getAppointments
+            ? resolveDoctorColor({
+                  ID: employee.ID,
+                  employeeName: employee.employeeName,
+                  AppointmentColor: employee.AppointmentColor
+              })
+            : null;
+        if (!color) return <span className={styles.noEmail}>—</span>;
+        return (
+            <span
+                className={styles.colorDot}
+                style={{ background: color.fill, borderColor: color.edge }}
+                title={employee.AppointmentColor || 'Default'}
+            />
+        );
     };
 
     if (loading) {
@@ -379,6 +412,40 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                 </div>
                                             </div>
 
+                                            <div className={styles.formRow}>
+                                                <div className={styles.formGroup}>
+                                                    <label htmlFor="AppointmentColor">
+                                                        Calendar Color
+                                                        <span className={styles.fieldHelp}>
+                                                            (Shown on the appointment calendar)
+                                                        </span>
+                                                    </label>
+                                                    <div className={styles.colorField}>
+                                                        <input
+                                                            type="color"
+                                                            id="AppointmentColor"
+                                                            name="AppointmentColor"
+                                                            className={styles.colorInput}
+                                                            value={formData.AppointmentColor || (editingId != null ? DEFAULT_PICKER_HEX[editingId] : undefined) || NEUTRAL_PICKER_HEX}
+                                                            onChange={handleInputChange}
+                                                        />
+                                                        <span className={styles.colorValue}>
+                                                            {formData.AppointmentColor ? formData.AppointmentColor.toUpperCase() : 'Default'}
+                                                        </span>
+                                                        {formData.AppointmentColor && (
+                                                            <button
+                                                                type="button"
+                                                                className={styles.colorClear}
+                                                                onClick={handleClearColor}
+                                                            >
+                                                                <i className="fas fa-times"></i> Clear
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className={styles.formGroup}></div>
+                                            </div>
+
                                             <div className={styles.checkboxGroup}>
                                                 <div className={styles.checkboxItem}>
                                                     <label>
@@ -461,6 +528,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                     <th>Commission</th>
                                     <th>Email Notifications</th>
                                     <th>Appointments</th>
+                                    <th>Color</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -530,6 +598,9 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                     No
                                                 </span>
                                             )}
+                                        </td>
+                                        <td data-label="Color">
+                                            {renderColorSwatch(employee)}
                                         </td>
                                         <td data-label="Actions" className={styles.actions}>
                                             <button

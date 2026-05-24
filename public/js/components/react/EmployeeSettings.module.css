@@ -279,6 +279,60 @@
     font-weight: 500;
 }
 
+/* Calendar colour picker */
+.colorField {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+/* Override the full-width .formGroup input rule for the compact swatch input. */
+.colorField .colorInput {
+    width: 48px;
+    height: 40px;
+    padding: 2px;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.colorValue {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+}
+
+.colorClear {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: transparent;
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.colorClear:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.colorDot {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    border: 1px solid var(--gray-200);
+    vertical-align: middle;
+}
+
 /* Action buttons in modal footer */
 .btnCancel {
     background: var(--secondary-color);

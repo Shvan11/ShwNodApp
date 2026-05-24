@@ -233,6 +233,62 @@ body:has(.appointment-calendar) {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
+/* ===== Doctor colour legend ===== */
+.cal-legend {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    padding: 8px 22px;
+    background: var(--cal-surface);
+    border-bottom: 1px solid var(--cal-line);
+    flex-shrink: 0;
+}
+
+.cal-legend-title {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--cal-ink-3);
+}
+
+.cal-legend-items {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cal-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.cal-legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    border: 1px solid var(--cal-line-2);
+    background: var(--cal-surface);
+    flex-shrink: 0;
+}
+
+/* Neutral doctors (e.g. the "Clinic" bucket) — white card, dashed outline. */
+.cal-legend-swatch.neutral {
+    border-style: dashed;
+}
+
+.cal-legend-name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--cal-ink-2);
+}
+
 /* Doctor Filter */
 .appointment-calendar .doctor-filter {
     display: flex;
@@ -273,12 +329,26 @@ body:has(.appointment-calendar) {
     background: var(--surface-elevated);
 }
 
+/* ===== Board: shared scroll container for headers + grid =====
+   The day headers and the slot grid are two separate CSS grids that must stay
+   column-aligned. Scrolling them together inside one container keeps the
+   vertical scrollbar OUTSIDE both grids, so both resolve their 1fr day columns
+   against the identical inner width — no scrollbar-width drift between header
+   and body. The header is pinned with position: sticky. */
+.cal-board {
+    flex: 1;
+    overflow: auto;
+    background: var(--cal-surface);
+}
+
 /* ===== Day headers (v4) ===== */
 .cal-day-headers {
     display: grid;
     background: var(--cal-surface);
     border-bottom: 1px solid var(--cal-line);
-    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 40;
 }
 
 .cal-time-head {
@@ -373,10 +443,8 @@ body:has(.appointment-calendar) {
 
 /* ===== Grid (v4) ===== */
 .cal-grid {
-    flex: 1;
     display: grid;
     background: var(--cal-surface);
-    overflow: auto;
 }
 
 .cal-grid.loading,
@@ -404,18 +472,27 @@ body:has(.appointment-calendar) {
 }
 
 .cal-time-h {
-    font-size: 1.0625rem;
+    font-size: 1.625rem;
     font-weight: 700;
     color: var(--cal-ink);
     line-height: 1;
 }
 
 .cal-time-m {
-    font-size: 0.75rem;
+    font-size: 1.0625rem;
     color: var(--cal-ink-2);
     font-weight: 600;
     line-height: 1;
     margin-top: 2px;
+}
+
+.cal-time-ap {
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--cal-ink-3);
+    line-height: 1;
+    margin-top: 3px;
 }
 
 .cal-day-col {
@@ -435,12 +512,23 @@ body:has(.appointment-calendar) {
             color-mix(in oklch, var(--color-purple-medium) 4%, transparent), transparent 12%);
 }
 
-/* slot wrapper — fixed height, carries the per-row hour-band tint (set inline) */
+/* slot wrapper — fixed height; carries the per-row tint set inline (neutral
+   zebra band by default, or the colorful hue band when TINT_MODE='colorful') */
 .cal-slot-wrap {
     height: var(--cal-slot-h);
     border-bottom: 1px solid rgba(255, 255, 255, 0.6);
     position: relative;
     transition: background 0.12s ease, outline-color 0.12s ease;
+}
+
+/* Zebra/neutral mode: one neutral row hairline (--cal-row-line) shared by the
+   day cells AND the time column, so every 30-min row reads as a crisp, evenly
+   separated band. Bump --cal-row-line in variables.css to widen the separation.
+   Colorful mode keeps its white bevel (untouched). Holiday columns override the
+   day-cell border via equal specificity + later source order. */
+.cal-grid.tint-zebra .cal-slot-wrap,
+.cal-grid.tint-zebra .cal-time-cell {
+    border-bottom-color: var(--cal-row-line);
 }
 
 .cal-slot-wrap.drop-target {
@@ -498,9 +586,12 @@ body:has(.appointment-calendar) {
     justify-content: center;
 }
 
-/* Appointment card — plain white, no per-procedure left border */
+/* Appointment card — always bordered so it separates from neighbours and the
+   slot on any background (white grid included). Named-doctor cards override
+   background + border-color inline (see doctorTint in CalendarGrid). */
 .cal-lane {
     background: white;
+    border: 1px solid var(--cal-line);
     border-radius: 4px;
     padding: 4px 8px;
     display: flex;
@@ -509,9 +600,11 @@ body:has(.appointment-calendar) {
     gap: 1px;
     min-width: 0;
     min-height: 0;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.03);
-    cursor: grab;
-    transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.12s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    /* Click is the primary action (opens Edit/Delete); show grabbing only once
+       a press/drag actually starts. Native drag still shows the OS drag image. */
+    cursor: pointer;
+    transition: transform 0.1s ease, box-shadow 0.1s ease, border-color 0.1s ease, opacity 0.12s ease;
     overflow: hidden;
     user-select: none;
 }
@@ -532,10 +625,6 @@ body:has(.appointment-calendar) {
 
 .cal-lane.span2 {
     grid-column: 1 / -1;
-}
-
-.cal-lane[draggable="false"] {
-    cursor: pointer;
 }
 
 .cal-name {
@@ -774,7 +863,7 @@ body:has(.appointment-calendar) {
     padding: 6px 10px;
     border-radius: 5px;
     background: var(--cal-surface-2);
-    cursor: grab;
+    cursor: pointer;
     user-select: none;
     transition: background 0.12s ease;
     display: flex;
@@ -930,8 +1019,12 @@ body:has(.appointment-calendar) {
         display: none;
     }
 
-    .cal-grid {
+    .cal-board {
         overflow: visible;
+    }
+
+    .cal-day-headers {
+        position: static;
     }
 }
 
@@ -996,11 +1089,6 @@ body:has(.appointment-calendar) {
     }
 }
 
-.calendar-context-menu.appointment-list-menu {
-    min-width: 250px;
-    max-width: 350px;
-}
-
 .context-menu-header {
     padding: var(--spacing-sm) var(--spacing-md);
     font-size: var(--font-size-sm);
@@ -1049,57 +1137,10 @@ body:has(.appointment-calendar) {
     color: var(--error-red-dark);
 }
 
-.context-menu-back {
-    color: var(--text-secondary);
-}
-
-.context-menu-back:hover {
-    background-color: var(--hover-bg);
-    color: var(--primary-color);
-}
-
 .context-menu-divider {
     height: 1px;
     background-color: var(--border-color);
     margin: var(--spacing-xs) 0;
-}
-
-/* Appointment List Item in Context Menu */
-.context-menu-item.appointment-item {
-    justify-content: space-between;
-    padding: var(--spacing-md);
-}
-
-.appointment-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.appointment-name {
-    font-weight: 700;
-    font-size: var(--font-size-sm);
-    color: var(--text-primary);
-    margin-bottom: 2px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.appointment-detail-text {
-    font-size: var(--font-size-xs);
-    color: var(--text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.context-menu-item.appointment-item i.fa-chevron-right {
-    opacity: 0.4;
-    font-size: var(--font-size-sm);
-}
-
-.context-menu-item.appointment-item:hover i.fa-chevron-right {
-    opacity: 0.7;
 }
 
 /* ===== DELETE CONFIRMATION MODAL ===== */

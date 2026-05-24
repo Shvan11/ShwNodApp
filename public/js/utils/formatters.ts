@@ -63,3 +63,44 @@ export const parseMoneyInput = (value: string | number | null | undefined): numb
   const parsed = parseFormattedNumber(value);
   return parsed === '' ? 0 : parsed;
 };
+
+/**
+ * Time Formatting Utilities
+ * 12-hour clock for the calendar, with both AM and PM kept for consistency.
+ */
+
+/** 12-hour display parts, used where hour, minute and meridiem are styled separately. */
+export interface Time12Parts {
+  hour: string;              // "1"–"12"
+  minute: string;            // ":00", ":30"
+  meridiem: 'AM' | 'PM' | ''; // "" only for invalid input
+}
+
+/**
+ * Convert a 24-hour "HH:MM" string to 12-hour display parts.
+ * @param time24 - Time in 24-hour format (e.g., "14:00", "09:30")
+ * @returns hour/minute/meridiem parts ("" fields for invalid input)
+ */
+export const to12Hour = (time24: string | null | undefined): Time12Parts => {
+  if (!time24) return { hour: '', minute: '', meridiem: '' };
+  const [h = '', m = '00'] = time24.split(':');
+  const hourNum = parseInt(h, 10);
+  if (isNaN(hourNum)) return { hour: '', minute: '', meridiem: '' };
+  return {
+    hour: String(hourNum % 12 || 12),
+    minute: `:${m.padStart(2, '0')}`,
+    meridiem: hourNum < 12 ? 'AM' : 'PM'
+  };
+};
+
+/**
+ * Format a 24-hour "HH:MM" string as a single 12-hour label.
+ * e.g. "14:00" → "2:00 PM", "09:30" → "9:30 AM".
+ * @param time24 - Time in 24-hour format
+ * @returns Formatted 12-hour label ("" for invalid input)
+ */
+export const formatTime12 = (time24: string | null | undefined): string => {
+  const { hour, minute, meridiem } = to12Hour(time24);
+  if (!hour) return '';
+  return `${hour}${minute} ${meridiem}`;
+};

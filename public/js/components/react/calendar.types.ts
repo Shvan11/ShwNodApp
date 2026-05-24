@@ -5,6 +5,19 @@
 
 import type { MouseEvent } from 'react';
 
+// Per-doctor colour used for card tints and the calendar legend
+export interface DoctorColor {
+    fill: string; // soft card background
+    edge: string; // matching border / swatch edge
+}
+
+// One entry in the calendar's doctor colour legend
+export interface LegendDoctor {
+    id: number;
+    name: string;
+    color: DoctorColor | null; // null = neutral (no tint), e.g. the "Clinic" bucket
+}
+
 // Appointment displayed in calendar slots
 export interface CalendarAppointment {
     appointmentID?: number | string;
