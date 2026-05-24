@@ -10,6 +10,15 @@ interface LockInfo {
 }
 
 /**
+ * A queued lock acquirer, resolved by releaseLock via direct hand-off.
+ */
+interface LockWaiter {
+  resolve: () => void;
+  reject: (err: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+/**
  * Lock status interface
  */
 interface LockStatus {
@@ -81,9 +90,14 @@ interface StateStats {
 export class StateManager {
   private state: Map<string, unknown> = new Map();
   private locks: Map<string, LockInfo> = new Map();
+  // FIFO queue of acquirers blocked on a held key. Drained by releaseLock.
+  private lockWaiters: Map<string, LockWaiter[]> = new Map();
   private operations = 0;
-  private maxRetries = 10;
-  private retryDelay = 10; // milliseconds
+  // Safety valve: a contended acquirer waits this long before rejecting, so a
+  // never-released lock (a bug) surfaces as an error instead of a permanent hang.
+  // Generous vs. the sub-ms critical sections this guards, so normal contention
+  // never trips it.
+  private lockWaitTimeout = 30_000; // milliseconds
 
   /**
    * Get a value from state
@@ -112,7 +126,22 @@ export class StateManager {
   delete(key: string): boolean {
     // Also clean up any locks for this key
     this.locks.delete(key);
+    this.rejectWaiters(key, `State key '${key}' deleted`);
     return this.state.delete(key);
+  }
+
+  /**
+   * Reject and clear any queued lock acquirers for a key (used when the key/state
+   * goes away under them, so they fail fast instead of hanging until timeout).
+   */
+  private rejectWaiters(key: string, reason: string): void {
+    const waiters = this.lockWaiters.get(key);
+    if (!waiters) return;
+    this.lockWaiters.delete(key);
+    for (const w of waiters) {
+      clearTimeout(w.timer);
+      w.reject(new Error(reason));
+    }
   }
 
   /**
@@ -121,6 +150,9 @@ export class StateManager {
   clear(): void {
     this.state.clear();
     this.locks.clear();
+    for (const key of [...this.lockWaiters.keys()]) {
+      this.rejectWaiters(key, 'State cleared');
+    }
   }
 
   /**
@@ -141,28 +173,55 @@ export class StateManager {
    * Acquire a lock for a key
    */
   async acquireLock(key: string): Promise<void> {
-    let retries = 0;
-
-    while (this.locks.has(key) && retries < this.maxRetries) {
-      await new Promise((resolve) => setTimeout(resolve, this.retryDelay));
-      retries++;
+    // Fast path: the lock is free. has→set has no await between it, so it's an
+    // atomic critical section on the single-threaded event loop — no double-grant.
+    if (!this.locks.has(key)) {
+      this.locks.set(key, { acquired: Date.now(), operationId: ++this.operations });
+      return;
     }
 
-    if (this.locks.has(key)) {
-      throw new Error(`Failed to acquire lock for key: ${key} after ${this.maxRetries} retries`);
-    }
+    // Contended: join the FIFO queue and wait for releaseLock to hand off to us.
+    // The lock entry is transferred to us *by releaseLock* (it stays held the
+    // whole time), so we must NOT set it ourselves on resume — that's what keeps
+    // a newcomer from stealing the lock in the gap before this promise resolves.
+    const waiters = this.lockWaiters.get(key) ?? [];
+    this.lockWaiters.set(key, waiters);
+    log.debug(`Lock contended for key '${key}' — queued (depth ${waiters.length + 1})`);
 
-    this.locks.set(key, {
-      acquired: Date.now(),
-      operationId: ++this.operations,
+    await new Promise<void>((resolve, reject) => {
+      const waiter: LockWaiter = {
+        resolve,
+        reject,
+        timer: setTimeout(() => {
+          const queue = this.lockWaiters.get(key);
+          if (queue) {
+            const i = queue.indexOf(waiter);
+            if (i >= 0) queue.splice(i, 1);
+            if (queue.length === 0) this.lockWaiters.delete(key);
+          }
+          reject(new Error(`Failed to acquire lock for key: ${key} after ${this.lockWaitTimeout}ms`));
+        }, this.lockWaitTimeout),
+      };
+      waiters.push(waiter);
     });
   }
 
   /**
-   * Release a lock for a key
+   * Release a lock for a key. If acquirers are queued, hand the lock directly to
+   * the next one (the entry stays held, re-stamped) rather than freeing it — this
+   * prevents a newcomer from jumping the queue between release and resume.
    */
   releaseLock(key: string): void {
-    this.locks.delete(key);
+    const waiters = this.lockWaiters.get(key);
+    if (waiters && waiters.length > 0) {
+      const next = waiters.shift()!;
+      if (waiters.length === 0) this.lockWaiters.delete(key);
+      clearTimeout(next.timer);
+      this.locks.set(key, { acquired: Date.now(), operationId: ++this.operations });
+      next.resolve();
+    } else {
+      this.locks.delete(key);
+    }
   }
 
   /**
@@ -251,7 +310,9 @@ export class StateManager {
 
     if (expiredKeys.length > 0) {
       log.warn(`Cleaning up ${expiredKeys.length} expired locks:`, expiredKeys);
-      expiredKeys.forEach((key) => this.locks.delete(key));
+      // Force-release rather than raw-delete so any queued acquirers receive the
+      // lock (hand-off) and the queue keeps draining past a stuck holder.
+      expiredKeys.forEach((key) => this.releaseLock(key));
     }
 
     return expiredKeys.length;
@@ -296,10 +357,20 @@ export class StateManager {
       }
     }
 
-    // Estimate memory usage
+    // Estimate memory usage with a single serialization pass over the raw state,
+    // rather than JSON.stringify(getSnapshot()) which deep-clones every value via
+    // JSON.parse(JSON.stringify(...)) and then re-serializes the whole snapshot.
     try {
-      const serialized = JSON.stringify(this.getSnapshot());
-      stats.memoryUsage = Buffer.byteLength(serialized, 'utf8');
+      let bytes = 0;
+      for (const [key, value] of this.state.entries()) {
+        bytes += Buffer.byteLength(key, 'utf8');
+        try {
+          bytes += Buffer.byteLength(JSON.stringify(value) ?? 'null', 'utf8');
+        } catch {
+          // Circular / non-serializable value — skip its contribution.
+        }
+      }
+      stats.memoryUsage = bytes;
     } catch (error) {
       issues.push(`Cannot calculate memory usage: ${(error as Error).message}`);
     }

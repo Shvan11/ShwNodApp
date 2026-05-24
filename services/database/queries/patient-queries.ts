@@ -5,7 +5,7 @@ import type { ColumnValue } from '../../../types/database.types.js';
 import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import * as readline from 'node:readline';
-import { executeQuery, TYPES, SqlParam } from '../index.js';
+import { executeQuery, withTransaction, sql, TYPES, SqlParam } from '../index.js';
 import config from '../../../config/config.js';
 import { createPathResolver } from '../../../utils/path-resolver.js';
 import { log } from '../../../utils/logger.js';
@@ -302,29 +302,32 @@ async function getXrays(
       xrayName.startsWith('TASK_')
   );
 
+  // The details dir is the same for every xray of this patient, so read it ONCE
+  // up front rather than re-running pathExists + readdir inside the per-file map.
+  const parentDetailsDirPath = pathResolver(`clinic1/${pid}/opg/.csi_data/.version_4.4`);
+  const detailsSubDirs = (await pathExists(parentDetailsDirPath))
+    ? await fs.readdir(parentDetailsDirPath)
+    : [];
+
   const xrays = await Promise.all(
     xrayNames.map(async (xrayName) => {
       const xray: XrayInfo = { name: xrayName };
-      const parentDetailsDirPath = pathResolver(`clinic1/${pid}/opg/.csi_data/.version_4.4`);
 
-      if (await pathExists(parentDetailsDirPath)) {
-        const subDirs = await fs.readdir(parentDetailsDirPath);
-        for (const subDir of subDirs) {
-          if (subDir.endsWith(xrayName)) {
-            xray.detailsDirName = subDir;
-            const previewPath = pathResolver(
-              `clinic1/${pid}/opg/.csi_data/.version_4.4/${subDir}/t.png`
-            );
+      for (const subDir of detailsSubDirs) {
+        if (subDir.endsWith(xrayName)) {
+          xray.detailsDirName = subDir;
+          const previewPath = pathResolver(
+            `clinic1/${pid}/opg/.csi_data/.version_4.4/${subDir}/t.png`
+          );
 
-            if (await pathExists(previewPath)) {
-              xray.previewImagePartialPath = `/OPG/.csi_data/.version_4.4/${subDir}/t.png`;
-            }
-
-            const metaFile = pathResolver(
-              `clinic1/${pid}/opg/.csi_data/.version_4.4/${subDir}/meta`
-            );
-            xray.date = await extractDate(metaFile);
+          if (await pathExists(previewPath)) {
+            xray.previewImagePartialPath = `/OPG/.csi_data/.version_4.4/${subDir}/t.png`;
           }
+
+          const metaFile = pathResolver(
+            `clinic1/${pid}/opg/.csi_data/.version_4.4/${subDir}/meta`
+          );
+          xray.date = await extractDate(metaFile);
         }
       }
       return xray;
@@ -695,30 +698,24 @@ export async function updatePatient(
  */
 export async function deletePatient(personId: number): Promise<{ success: boolean }> {
   try {
-    // Delete in order based on dependencies
-    await executeQuery('DELETE FROM dbo.tblwork WHERE PersonID = @personId', [
-      ['personId', TYPES.Int, personId],
-    ], () => ({}));
-
-    await executeQuery('DELETE FROM dbo.tblCarriedWires WHERE PersonID = @personId', [
-      ['personId', TYPES.Int, personId],
-    ], () => ({}));
-
-    await executeQuery('DELETE FROM dbo.tblWaiting WHERE PersonID = @personId', [
-      ['personId', TYPES.Int, personId],
-    ], () => ({}));
-
-    await executeQuery('DELETE FROM dbo.tblappointments WHERE PersonID = @personId', [
-      ['personId', TYPES.Int, personId],
-    ], () => ({}));
-
-    await executeQuery('DELETE FROM dbo.tblscrews WHERE PersonID = @personId', [
-      ['personId', TYPES.Int, personId],
-    ], () => ({}));
-
-    await executeQuery('DELETE FROM dbo.tblpatients WHERE PersonID = @personId', [
-      ['personId', TYPES.Int, personId],
-    ], () => ({}));
+    // All child + parent rows are removed in a single transaction so a
+    // mid-cascade failure rolls back fully — no FK orphans / half-deleted patient.
+    await withTransaction(async (tx) => {
+      // Delete in order based on dependencies (children before parent).
+      const tables = [
+        'dbo.tblwork',
+        'dbo.tblCarriedWires',
+        'dbo.tblWaiting',
+        'dbo.tblappointments',
+        'dbo.tblscrews',
+        'dbo.tblpatients',
+      ];
+      for (const table of tables) {
+        await new sql.Request(tx)
+          .input('personId', TYPES.Int, personId)
+          .query(`DELETE FROM ${table} WHERE PersonID = @personId`);
+      }
+    });
 
     return { success: true };
   } catch (error) {

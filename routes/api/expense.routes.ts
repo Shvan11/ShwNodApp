@@ -44,6 +44,8 @@ interface ExpenseQueryParams {
   categoryId?: string;
   subcategoryId?: string;
   currency?: string;
+  limit?: string;
+  offset?: string;
 }
 
 interface ExpenseFilters {
@@ -52,6 +54,8 @@ interface ExpenseFilters {
   categoryId?: number | null;
   subcategoryId?: number | null;
   currency?: string;
+  limit?: number | null;
+  offset?: number | null;
 }
 
 interface CreateExpenseBody {
@@ -96,7 +100,9 @@ router.get(
         subcategoryId: req.query.subcategoryId
           ? parseInt(req.query.subcategoryId)
           : null,
-        currency: req.query.currency
+        currency: req.query.currency,
+        limit: req.query.limit ? parseInt(req.query.limit) : null,
+        offset: req.query.offset ? parseInt(req.query.offset) : null,
       };
 
       // Remove null/undefined filters

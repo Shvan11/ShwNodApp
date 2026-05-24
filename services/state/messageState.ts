@@ -86,43 +86,49 @@ class MessageStateManager {
   private initialized = false;
 
   constructor() {
-    // Use setTimeout to ensure StateManager is fully initialized
+    // Defer to next tick so the StateManager singleton is fully initialized,
+    // then set up event handlers only once the initial state is in place.
     setTimeout(() => {
-      this.initializeState();
-      this.setupEventHandlers();
+      this.initializeState()
+        .then(() => this.setupEventHandlers())
+        .catch((error) =>
+          log.error('Error during MessageStateManager startup:', {
+            error: error instanceof Error ? error.message : String(error),
+          })
+        );
     }, 0);
   }
 
-  private initializeState(): void {
+  private async initializeState(): Promise<void> {
     if (this.initialized) return;
 
     try {
       // Initialize all state keys using the singleton instance
-      StateManager.atomicOperation<ClientStatus>(this.stateKeys.CLIENT_STATUS, () => ({
-        ready: false,
-        initializing: false,
-        lastActivity: Date.now(),
-        manualDisconnect: false,
-      }));
-
-      StateManager.atomicOperation<MessageStats>(this.stateKeys.MESSAGE_STATS, () => ({
-        sent: 0,
-        failed: 0,
-        finished: false,
-        finishReport: false,
-      }));
-
-      StateManager.atomicOperation<Person[]>(this.stateKeys.PERSONS, () => []);
-      StateManager.atomicOperation<Map<string, number>>(
-        this.stateKeys.MESSAGE_STATUSES,
-        () => new Map()
-      );
-      StateManager.atomicOperation<QRStatus>(this.stateKeys.QR_STATUS, () => ({
-        qr: null,
-        activeViewers: 0,
-        generationActive: false,
-        lastRequested: null,
-      }));
+      await Promise.all([
+        StateManager.atomicOperation<ClientStatus>(this.stateKeys.CLIENT_STATUS, () => ({
+          ready: false,
+          initializing: false,
+          lastActivity: Date.now(),
+          manualDisconnect: false,
+        })),
+        StateManager.atomicOperation<MessageStats>(this.stateKeys.MESSAGE_STATS, () => ({
+          sent: 0,
+          failed: 0,
+          finished: false,
+          finishReport: false,
+        })),
+        StateManager.atomicOperation<Map<string, Person>>(this.stateKeys.PERSONS, () => new Map()),
+        StateManager.atomicOperation<Map<string, number>>(
+          this.stateKeys.MESSAGE_STATUSES,
+          () => new Map()
+        ),
+        StateManager.atomicOperation<QRStatus>(this.stateKeys.QR_STATUS, () => ({
+          qr: null,
+          activeViewers: 0,
+          generationActive: false,
+          lastRequested: null,
+        })),
+      ]);
 
       this.initialized = true;
       log.info('MessageStateManager initialized successfully');
@@ -170,33 +176,37 @@ class MessageStateManager {
     status: number,
     dbOperation: (() => Promise<void>) | null = null
   ): Promise<boolean> {
-    const rollbackData = {
-      messageId,
-      oldStatus: null as number | null,
-      newStatus: status,
-    };
+    // Captured *inside* the locked closure below so the monotonic compare and the
+    // write are one atomic critical section — two rapid acks for the same messageId
+    // can no longer both read a stale value and let the lower status win.
+    let applied = false;
+    let oldStatus: number | null = null;
 
     try {
-      // Get current status for rollback
-      const currentStatuses = StateManager.get<Map<string, number>>(
-        this.stateKeys.MESSAGE_STATUSES
-      );
-      rollbackData.oldStatus = currentStatuses?.get(messageId) ?? null;
-
-      // Only update if status is higher or first time
-      if (rollbackData.oldStatus !== null && rollbackData.oldStatus >= status) {
-        return false;
-      }
-
-      // Update memory state
       await StateManager.atomicOperation<Map<string, number>>(
         this.stateKeys.MESSAGE_STATUSES,
         (statuses) => {
-          const newStatuses = new Map(statuses || new Map());
-          newStatuses.set(messageId, status);
-          return newStatuses;
+          const current = statuses || new Map<string, number>();
+          oldStatus = current.get(messageId) ?? null;
+
+          // Monotonic: only advance, never regress.
+          if (oldStatus !== null && oldStatus >= status) {
+            applied = false;
+            return current; // unchanged
+          }
+
+          // Mutate in place under the lock (O(1), not O(n) clone) — safe because the
+          // closure is a synchronous critical section and all readers snapshot via
+          // Array.from(), so none can observe a half-written map.
+          current.set(messageId, status);
+          applied = true;
+          return current;
         }
       );
+
+      if (!applied) {
+        return false;
+      }
 
       // Execute database operation if provided
       if (dbOperation) {
@@ -211,14 +221,19 @@ class MessageStateManager {
 
       return true;
     } catch (error) {
-      // Rollback memory state on database failure
-      if (rollbackData.oldStatus !== null) {
+      // Rollback the in-memory bump on failure, restoring the exact prior state
+      // (delete the key if there was no status before this call).
+      if (applied) {
         await StateManager.atomicOperation<Map<string, number>>(
           this.stateKeys.MESSAGE_STATUSES,
           (statuses) => {
-            const newStatuses = new Map(statuses || new Map());
-            newStatuses.set(messageId, rollbackData.oldStatus!);
-            return newStatuses;
+            const current = statuses || new Map<string, number>();
+            if (oldStatus !== null) {
+              current.set(messageId, oldStatus);
+            } else {
+              current.delete(messageId);
+            }
+            return current;
           }
         );
       }
@@ -236,19 +251,13 @@ class MessageStateManager {
    * Update person status in persons array
    */
   async updatePersonStatus(messageId: string, status: number): Promise<void> {
-    await StateManager.atomicOperation<Person[]>(this.stateKeys.PERSONS, (persons) => {
-      const newPersons = [...(persons || [])];
-      const personIndex = newPersons.findIndex((p) => p.messageId === messageId);
-
-      if (personIndex >= 0) {
-        newPersons[personIndex] = {
-          ...newPersons[personIndex],
-          status,
-          lastUpdated: Date.now(),
-        };
-      }
-
-      return newPersons;
+    await StateManager.atomicOperation<Map<string, Person>>(this.stateKeys.PERSONS, (persons) => {
+      const current = persons || new Map<string, Person>();
+      const existing = current.get(messageId);
+      if (!existing) return current; // unknown message — unchanged
+      // O(1) in-place upsert under the lock (see updateMessageStatus for why this is safe).
+      current.set(messageId, { ...existing, status, lastUpdated: Date.now() });
+      return current;
     });
   }
 
@@ -258,33 +267,28 @@ class MessageStateManager {
   async addPerson(person: Person): Promise<boolean> {
     let wasNewMessage = false;
 
-    await StateManager.atomicOperation<Person[]>(this.stateKeys.PERSONS, (persons) => {
-      const existingPersons = persons || [];
+    await StateManager.atomicOperation<Map<string, Person>>(this.stateKeys.PERSONS, (persons) => {
+      const current = persons || new Map<string, Person>();
+      const existing = current.get(person.messageId);
 
-      // Check if this message has already been processed
-      const existingIndex = existingPersons.findIndex((p) => p.messageId === person.messageId);
-
-      if (existingIndex >= 0) {
-        // Update existing person instead of adding duplicate
-        const updatedPersons = [...existingPersons];
-        updatedPersons[existingIndex] = {
-          ...updatedPersons[existingIndex],
+      if (existing) {
+        // Update existing person instead of adding duplicate (O(1) in-place).
+        current.set(person.messageId, {
+          ...existing,
           ...person,
           lastUpdated: Date.now(),
-        };
-        return updatedPersons;
+        });
       } else {
-        // New message - add to array
+        // New message — insert. Map preserves insertion order, so the array views
+        // (persons getter / dump) keep the same ordering the array append produced.
         wasNewMessage = true;
-        return [
-          ...existingPersons,
-          {
-            ...person,
-            addedAt: Date.now(),
-            status: MessageStatus.PENDING,
-          },
-        ];
+        current.set(person.messageId, {
+          ...person,
+          addedAt: Date.now(),
+          status: MessageStatus.PENDING,
+        });
       }
+      return current;
     });
 
     // Only increment counters for new messages
@@ -478,7 +482,9 @@ class MessageStateManager {
     StateManager.atomicOperation<ClientStatus>(this.stateKeys.CLIENT_STATUS, (current) => ({
       ...(current as ClientStatus),
       manualDisconnect: value,
-    }));
+    })).catch((error) =>
+      log.error('Failed to set manualDisconnect:', { error: error instanceof Error ? error.message : String(error) })
+    );
   }
 
   /**
@@ -502,7 +508,7 @@ class MessageStateManager {
         finishReport: false,
       })),
 
-      StateManager.atomicOperation<Person[]>(this.stateKeys.PERSONS, () => []),
+      StateManager.atomicOperation<Map<string, Person>>(this.stateKeys.PERSONS, () => new Map()),
       StateManager.atomicOperation<Map<string, number>>(
         this.stateKeys.MESSAGE_STATUSES,
         () => new Map()
@@ -535,7 +541,9 @@ class MessageStateManager {
       finished: false,
       finishReport: false,
     };
-    const persons = StateManager.get<Person[]>(this.stateKeys.PERSONS) || [];
+    const personsMap =
+      StateManager.get<Map<string, Person>>(this.stateKeys.PERSONS) || new Map<string, Person>();
+    const persons = Array.from(personsMap.values());
     const messageStatuses =
       StateManager.get<Map<string, number>>(this.stateKeys.MESSAGE_STATUSES) || new Map();
     const qrStatus = StateManager.get<QRStatus>(this.stateKeys.QR_STATUS) || {
@@ -569,7 +577,8 @@ class MessageStateManager {
    * Get persons array
    */
   get persons(): Person[] {
-    return StateManager.get<Person[]>(this.stateKeys.PERSONS) || [];
+    const map = StateManager.get<Map<string, Person>>(this.stateKeys.PERSONS);
+    return map ? Array.from(map.values()) : [];
   }
 
   /**
@@ -609,7 +618,9 @@ class MessageStateManager {
       }),
       qr: null,
       generationActive: false,
-    }));
+    })).catch((error) =>
+      log.error('Failed to clean up QR code:', { error: error instanceof Error ? error.message : String(error) })
+    );
   }
 
   handleClientDisconnect(): void {
@@ -617,7 +628,9 @@ class MessageStateManager {
       ...(status || { ready: false, initializing: false, lastActivity: Date.now(), manualDisconnect: false }),
       ready: false,
       lastActivity: Date.now(),
-    }));
+    })).catch((error) =>
+      log.error('Failed to handle client disconnect:', { error: error instanceof Error ? error.message : String(error) })
+    );
   }
 
   /**

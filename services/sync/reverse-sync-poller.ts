@@ -295,7 +295,16 @@ async function pollBatchDays(sinceTimestamp: string): Promise<number> {
 /**
  * Run full poll cycle
  */
+// Guards against two polls overlapping (a slow poll + the next interval tick),
+// which could double-process the same Supabase changes. Mirrors the queue-processor.
+let isPolling = false;
+
 export async function pollForMissedChanges(): Promise<PollResult> {
+  if (isPolling) {
+    log.info('⏭️  Reverse sync already in progress - skipping overlapping poll');
+    return { notesSynced: 0, batchesSynced: 0, totalSynced: 0, skipped: true };
+  }
+
   // Check if sync is enabled
   if (!CONFIG.ENABLED) {
     log.info('⏭️  Reverse sync disabled via REVERSE_SYNC_ENABLED=false');
@@ -308,6 +317,7 @@ export async function pollForMissedChanges(): Promise<PollResult> {
     return { notesSynced: 0, batchesSynced: 0, totalSynced: 0, skipped: true };
   }
 
+  isPolling = true;
   log.info('🔄 Starting reverse sync poll (Supabase → SQL Server)');
   const startTime = Date.now();
 
@@ -345,6 +355,8 @@ export async function pollForMissedChanges(): Promise<PollResult> {
       totalSynced: 0,
       error: (error as Error).message,
     };
+  } finally {
+    isPolling = false;
   }
 }
 

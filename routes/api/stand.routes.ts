@@ -464,7 +464,7 @@ router.post(
 router.get(
   '/stand/sales',
   async (
-    req: Request<unknown, unknown, unknown, { startDate?: string; endDate?: string; cashierId?: string; personId?: string }>,
+    req: Request<unknown, unknown, unknown, { startDate?: string; endDate?: string; cashierId?: string; personId?: string; limit?: string; offset?: string }>,
     res: Response
   ): Promise<void> => {
     try {
@@ -473,6 +473,8 @@ router.get(
         endDate: req.query.endDate,
         cashierId: req.query.cashierId ? parseInt(req.query.cashierId) : undefined,
         personId: req.query.personId ? parseInt(req.query.personId) : undefined,
+        limit: req.query.limit ? parseInt(req.query.limit) : undefined,
+        offset: req.query.offset ? parseInt(req.query.offset) : undefined,
       });
       res.json(sales);
     } catch (error) {

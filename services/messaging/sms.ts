@@ -3,6 +3,7 @@ import twilio from 'twilio';
 import config from '../../config/config.js';
 import * as database from '../database/queries/messaging-queries.js';
 import { log } from '../../utils/logger.js';
+import ResourceManager from '../core/ResourceManager.js';
 
 // ===========================================
 // TYPES
@@ -56,6 +57,9 @@ interface SmsSid {
 class SmsService {
   private client: TwilioClient | null;
   private sentSmsList: SentSms[];
+  // Pending 5-min status-check timers, keyed by date — so repeated sends don't
+  // stack timers and graceful shutdown can clear them.
+  private statusCheckTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
   constructor() {
     const accountSid = config.twilio.accountSid;
@@ -69,6 +73,8 @@ class SmsService {
     }
 
     this.sentSmsList = [];
+
+    ResourceManager.register('sms-service', this, () => this.cleanup());
   }
 
   /**
@@ -106,10 +112,40 @@ class SmsService {
       await database.updateSmsIds(this.sentSmsList);
     }
 
-    // Schedule checking the status after 5 minutes
-    setTimeout(() => this.checksms(date), 300000);
+    // Schedule a status check in 5 min, replacing any pending check for the same
+    // date so repeated sends can't stack timers.
+    this.scheduleStatusCheck(date);
 
     return this.sentSmsList;
+  }
+
+  /**
+   * (Re)arm the deferred status check for a date. The handle is tracked so it can
+   * be replaced on a repeat send and cleared on graceful shutdown.
+   */
+  private scheduleStatusCheck(date: string): void {
+    const existing = this.statusCheckTimers.get(date);
+    if (existing) clearTimeout(existing);
+
+    const timer = setTimeout(() => {
+      this.statusCheckTimers.delete(date);
+      this.checksms(date).catch((error) =>
+        log.error('Deferred SMS status check failed:', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }, 300000);
+    this.statusCheckTimers.set(date, timer);
+  }
+
+  /**
+   * Cancel all pending status-check timers (graceful shutdown).
+   */
+  cleanup(): void {
+    for (const timer of this.statusCheckTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.statusCheckTimers.clear();
   }
 
   /**

@@ -21,6 +21,9 @@ interface StandSaleFilters {
   endDate?: string;
   cashierId?: number;
   personId?: number;
+  // Optional pagination. When omitted, behavior is unchanged (all matching rows).
+  limit?: number;
+  offset?: number;
 }
 
 interface StandStockMovementFilters {
@@ -670,6 +673,16 @@ export async function getStandSales(filters: StandSaleFilters = {}): Promise<Sta
 
   query += ' ORDER BY s.SaleDate DESC, s.SaleID DESC';
 
+  // Opt-in pagination (SQL Server OFFSET/FETCH requires the ORDER BY above).
+  // 1000 caps a single page so a caller can't trigger an unbounded scan.
+  if (filters.limit != null) {
+    const limit = Math.min(Math.max(Math.trunc(filters.limit), 1), 1000);
+    const offset = Math.max(Math.trunc(filters.offset ?? 0), 0);
+    query += ' OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY';
+    params.push(['offset', TYPES.Int, offset]);
+    params.push(['limit', TYPES.Int, limit]);
+  }
+
   return executeQuery<StandSaleRow>(query, params, (columns: ColumnValue[]) => ({
     SaleID: columns[0].value as number,
     SaleDate: columns[1].value as Date,
@@ -765,7 +778,7 @@ export async function voidStandSale(
   userId: number | null
 ): Promise<void> {
   return withTransaction(async (tx) => {
-    await new sql.Request(tx)
+    const voidResult = await new sql.Request(tx)
       .input('saleId', TYPES.Int, saleId)
       .input('userId', TYPES.Int, userId)
       .input('reason', TYPES.NVarChar, reason)
@@ -774,6 +787,14 @@ export async function voidStandSale(
          SET VoidedDate = SYSDATETIME(), VoidedBy = @userId, VoidReason = @reason
          WHERE SaleID = @saleId AND VoidedDate IS NULL`
       );
+
+    // Row-level guard is the only atomic defense against a concurrent/duplicate void
+    // (the caller's pre-check is TOCTOU). 0 rows ⇒ already voided — abort before
+    // restocking, else CurrentStock is credited twice and duplicate movements written.
+    const voided = Array.isArray(voidResult.rowsAffected)
+      ? voidResult.rowsAffected.reduce((a, b) => a + b, 0)
+      : voidResult.rowsAffected;
+    if (voided !== 1) throw new Error(`ALREADY_VOIDED:${saleId}`);
 
     const lineItems = await new sql.Request(tx)
       .input('saleId', TYPES.Int, saleId)

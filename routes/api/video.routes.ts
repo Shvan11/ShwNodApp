@@ -6,7 +6,7 @@
  */
 import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
-import fs from 'fs';
+import fs, { promises as fsp, type Stats } from 'fs';
 import path from 'path';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
@@ -213,14 +213,18 @@ router.get('/:id/stream', async (req: Request<VideoIdParams>, res: Response): Pr
 
     const filePath = normalizePath(video.Video);
 
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      log.error('[Videos] Video file not found:', { path: filePath });
-      ErrorResponses.notFound(res, 'Video file');
-      return;
+    // Stat the file (async, non-blocking); a missing file surfaces as ENOENT → 404.
+    let stat: Stats;
+    try {
+      stat = await fsp.stat(filePath);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        log.error('[Videos] Video file not found:', { path: filePath });
+        ErrorResponses.notFound(res, 'Video file');
+        return;
+      }
+      throw err;
     }
-
-    const stat = fs.statSync(filePath);
     const fileSize = stat.size;
     const range = req.headers.range;
     const mimeType = getMimeType(filePath);
@@ -278,15 +282,18 @@ router.get('/:id/thumbnail', async (req: Request<VideoIdParams>, res: Response):
 
     const filePath = normalizePath(video.Image);
 
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      log.warn('[Videos] Thumbnail not found:', { path: filePath });
-      // Return a 404 or default placeholder
-      ErrorResponses.notFound(res, 'Thumbnail');
-      return;
+    // Stat the file (async, non-blocking); a missing file surfaces as ENOENT → 404.
+    let stat: Stats;
+    try {
+      stat = await fsp.stat(filePath);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        log.warn('[Videos] Thumbnail not found:', { path: filePath });
+        ErrorResponses.notFound(res, 'Thumbnail');
+        return;
+      }
+      throw err;
     }
-
-    const stat = fs.statSync(filePath);
     const mimeType = getMimeType(filePath);
 
     res.writeHead(200, {
@@ -362,9 +369,11 @@ router.post(
       const { description, category, details } = req.body;
 
       if (!description) {
-        // Clean up uploaded files if validation fails
-        if (files.video?.[0]) fs.unlinkSync(files.video[0].path);
-        if (files.thumbnail?.[0]) fs.unlinkSync(files.thumbnail[0].path);
+        // Clean up uploaded files if validation fails (async, best-effort).
+        const cleanups: Promise<void>[] = [];
+        if (files.video?.[0]) cleanups.push(fsp.unlink(files.video[0].path).catch(() => {}));
+        if (files.thumbnail?.[0]) cleanups.push(fsp.unlink(files.thumbnail[0].path).catch(() => {}));
+        await Promise.all(cleanups);
         ErrorResponses.missingParameter(res, 'description');
         return;
       }
@@ -478,18 +487,22 @@ router.delete('/:id', async (req: Request<VideoIdParams>, res: Response): Promis
       return;
     }
 
-    // Delete video file
+    // Delete video file (async; ignore if already gone).
     const videoPath = normalizePath(video.Video);
-    if (fs.existsSync(videoPath)) {
-      fs.unlinkSync(videoPath);
+    try {
+      await fsp.unlink(videoPath);
       log.info('[Videos] Video file deleted', { path: videoPath });
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     }
 
-    // Delete thumbnail file
+    // Delete thumbnail file (async; ignore if already gone).
     const thumbnailPath = normalizePath(video.Image);
-    if (fs.existsSync(thumbnailPath)) {
-      fs.unlinkSync(thumbnailPath);
+    try {
+      await fsp.unlink(thumbnailPath);
       log.info('[Videos] Thumbnail file deleted', { path: thumbnailPath });
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     }
 
     // Delete database record

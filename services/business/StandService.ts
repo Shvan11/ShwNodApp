@@ -279,7 +279,17 @@ export async function validateAndVoidSale(
     throw new StandValidationError('Sale has already been voided', 'ALREADY_VOIDED', { saleId, voidedDate: sale.VoidedDate });
   }
 
-  await voidStandSale(saleId, reason, userId);
+  try {
+    await voidStandSale(saleId, reason, userId);
+  } catch (err) {
+    // The pre-check above is TOCTOU; voidStandSale's row-level guard catches a
+    // concurrent void that committed between the read and the write.
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/^ALREADY_VOIDED:/.test(msg)) {
+      throw new StandValidationError('Sale has already been voided', 'ALREADY_VOIDED', { saleId });
+    }
+    throw err;
+  }
 
   log.info(`Stand sale voided: SaleID=${saleId}, Reason="${reason}"`);
 }

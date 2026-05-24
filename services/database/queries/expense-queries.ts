@@ -11,7 +11,13 @@ interface ExpenseFilters {
   categoryId?: number;
   subcategoryId?: number;
   currency?: string;
+  // Optional pagination. When omitted, behavior is unchanged (all matching rows).
+  limit?: number;
+  offset?: number;
 }
+
+// Upper bound on a single page, so a caller can't request an unbounded scan.
+const MAX_PAGE_SIZE = 1000;
 
 interface Expense {
   ID: number;
@@ -108,6 +114,15 @@ export async function getAllExpenses(filters: ExpenseFilters = {}): Promise<Expe
   }
 
   query += ' ORDER BY e.expenseDate DESC, e.ID DESC';
+
+  // Opt-in pagination (SQL Server OFFSET/FETCH requires the ORDER BY above).
+  if (filters.limit != null) {
+    const limit = Math.min(Math.max(Math.trunc(filters.limit), 1), MAX_PAGE_SIZE);
+    const offset = Math.max(Math.trunc(filters.offset ?? 0), 0);
+    query += ' OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY';
+    params.push(['offset', TYPES.Int, offset]);
+    params.push(['limit', TYPES.Int, limit]);
+  }
 
   return executeQuery<Expense>(query, params, (columns: ColumnValue[]) => ({
     ID: columns[0].value as number,

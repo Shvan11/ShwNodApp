@@ -7,7 +7,7 @@ import { Router, type Request, type Response } from 'express';
 import { log } from '../utils/logger.js';
 import { postgresToSql, type WebhookPayload } from '../services/sync/sync-engine.js';
 import { processAllPendingSyncs } from '../services/sync/unified-sync-processor.js';
-import fs from 'fs';
+import { promises as fs } from 'fs';
 import path from 'path';
 
 const router = Router();
@@ -136,8 +136,11 @@ router.get(
       const stateFile = path.join(process.cwd(), 'data', 'sync-state.json');
 
       let state: SyncState = { lastSyncTimestamp: null };
-      if (fs.existsSync(stateFile)) {
-        state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+      try {
+        state = JSON.parse(await fs.readFile(stateFile, 'utf8'));
+      } catch (err) {
+        // No state file yet (ENOENT) → keep the default; re-throw anything else.
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
       }
 
       res.json({

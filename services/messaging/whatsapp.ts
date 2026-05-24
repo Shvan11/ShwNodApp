@@ -1136,10 +1136,31 @@ class WhatsAppService extends EventEmitter {
     }
   }
 
+  /**
+   * Broadcast a client-ready state change to SSE subscribers. Mirrors the
+   * frames restart() already emits, so the browser's `whatsappClientReady`
+   * flag stays in sync with the server — otherwise the Send button stays
+   * enabled after an organic disconnect and fires a request the server
+   * rejects with 503.
+   */
+  private broadcastReadyState(clientReady: boolean, state: string, message: string): void {
+    if (!this.wsEmitter) return;
+    try {
+      this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_CLIENT_READY, {
+        clientReady,
+        state,
+        message,
+      });
+    } catch (error) {
+      logger.whatsapp.error('Error broadcasting client-ready state', error);
+    }
+  }
+
   private async handleDisconnected(reason: string): Promise<void> {
     logger.whatsapp.warn(`Client disconnected`, { reason });
     this.clientState.setState('DISCONNECTED');
     await this.messageState.setClientReady(false);
+    this.broadcastReadyState(false, 'disconnected', `WhatsApp disconnected: ${reason}`);
 
     stateEvents.emit('client_disconnected', reason);
 
@@ -1152,6 +1173,7 @@ class WhatsAppService extends EventEmitter {
     logger.whatsapp.error('WhatsApp authentication failed', error);
     this.clientState.setState('ERROR', error);
     await this.messageState.setClientReady(false);
+    this.broadcastReadyState(false, 'auth_failure', 'WhatsApp authentication failed');
 
     if (!this.messageState.manualDisconnect && !this.clientState.destroyInProgress) {
       this.scheduleReconnect(error);

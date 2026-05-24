@@ -166,15 +166,20 @@ export async function apiLoader<T = unknown>(
 
     const data = (await response.json()) as T;
 
-    // Cache response if enabled
+    // Cache response if enabled (best-effort — a large payload can throw
+    // QuotaExceededError, which must not fail the route loader).
     if (cache && cacheKey) {
-      sessionStorage.setItem(
-        `loader_cache_${cacheKey}`,
-        JSON.stringify({
-          data,
-          timestamp: Date.now(),
-        })
-      );
+      try {
+        sessionStorage.setItem(
+          `loader_cache_${cacheKey}`,
+          JSON.stringify({
+            data,
+            timestamp: Date.now(),
+          })
+        );
+      } catch {
+        // Quota exceeded or serialization failed — skip caching this entry.
+      }
     }
 
     return data;
