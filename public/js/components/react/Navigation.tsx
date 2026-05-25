@@ -453,7 +453,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                         onMouseLeave={() => setMoreActionsExpanded(false)}
                     >
                         <div
-                            className={`sidebar-nav-item more-actions-btn ${(currentPage === 'compare' || currentPage === 'xrays') ? 'active' : ''} ${isNewPatient ? 'disabled' : ''}`}
+                            className={`sidebar-nav-item more-actions-btn ${(currentPage === 'compare' || currentPage === 'xrays' || currentPage === 'slideshow') ? 'active' : ''} ${isNewPatient ? 'disabled' : ''}`}
                             title={isNewPatient ? "Save patient first to access more actions" : "More Actions"}
                         >
                             <div className="nav-item-icon">
@@ -483,6 +483,17 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                                 <i className="fas fa-exchange-alt" />
                             </div>
                             <span className="action-item-label">Compare Photos</span>
+                        </Link>
+
+                        <Link
+                            to={`/patient/${personId}/slideshow`}
+                            className={`flyout-action-item ${currentPage === 'slideshow' ? 'active' : ''}`}
+                            onClick={() => setMoreActionsExpanded(false)}
+                        >
+                            <div className="action-item-icon">
+                                <i className="fas fa-film" />
+                            </div>
+                            <span className="action-item-label">Presentation</span>
                         </Link>
 
                         <Link

@@ -1,0 +1,218 @@
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-index-modal);
+  background: radial-gradient(ellipse at center, #0a0a0a 0%, #000 78%);
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* --- Image frame & layers --- */
+.frame {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.frameReel {
+  inset: 0 auto;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  aspect-ratio: 9 / 16;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.layer img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 32px rgba(0, 0, 0, 0.6));
+}
+
+/* Mount-triggered transitions (JS skips these entirely under reduced motion). */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes inFromRight {
+  from { opacity: 0.3; transform: translateX(8%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes inFromLeft {
+  from { opacity: 0.3; transform: translateX(-8%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes outToLeft {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-8%); }
+}
+@keyframes outToRight {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(8%); }
+}
+
+.enterFade { animation: fadeIn var(--transition-slow) var(--easing-ease-in-out) both; }
+.leaveFade { animation: fadeOut var(--transition-slow) var(--easing-ease-in-out) both; }
+.enterRight { animation: inFromRight var(--transition-slow) var(--easing-ease-in-out) both; }
+.enterLeft { animation: inFromLeft var(--transition-slow) var(--easing-ease-in-out) both; }
+.leaveLeft { animation: outToLeft var(--transition-slow) var(--easing-ease-in-out) both; }
+.leaveRight { animation: outToRight var(--transition-slow) var(--easing-ease-in-out) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .enterFade, .leaveFade, .enterRight, .enterLeft, .leaveLeft, .leaveRight {
+    animation: none;
+  }
+}
+
+/* --- Caption --- */
+.caption {
+  position: absolute;
+  left: var(--spacing-lg);
+  bottom: var(--spacing-xl);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  color: var(--color-white);
+  pointer-events: none;
+  max-width: 70%;
+}
+
+.captionMain {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+
+.captionSub {
+  font-size: var(--font-size-sm);
+  opacity: 0.8;
+}
+
+/* --- Gesture layer (transparent, between frame and chrome) --- */
+.gestureLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  touch-action: none;
+}
+
+/* --- Chrome (auto-hiding controls) --- */
+.chrome {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity var(--transition-base);
+}
+
+.chromeHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.topBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: linear-gradient(rgba(0, 0, 0, 0.55), transparent);
+  pointer-events: auto;
+}
+
+.counter {
+  color: var(--color-white);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.iconBtn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  color: var(--color-white);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.iconBtn:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.iconBtnActive {
+  background: var(--primary-color);
+}
+
+.iconBtnActive:hover {
+  background: var(--primary-hover);
+}
+
+.exitBtn:hover {
+  background: var(--error-color);
+}
+
+/* --- Progress dots --- */
+.dots {
+  position: absolute;
+  bottom: var(--spacing-lg);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  pointer-events: auto;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.4);
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.dotActive {
+  background: var(--color-white);
+  transform: scale(1.4);
+}

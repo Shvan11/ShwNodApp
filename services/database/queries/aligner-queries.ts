@@ -240,19 +240,6 @@ interface DeactivatedBatchInfo {
 }
 
 /**
- * Parsed result from marking batch as delivered
- */
-export interface MarkBatchDeliveredResult {
-  batchId: number;
-  batchSequence: number;
-  alignerSetId: number;
-  wasActivated: boolean;
-  wasAlreadyActive: boolean;
-  wasAlreadyDelivered: boolean;
-  previouslyActiveBatchSequence: number | null;
-}
-
-/**
  * Result from usp_UpdateBatchStatus stored procedure (consolidated batch operations)
  */
 interface UpdateBatchStatusRow {
@@ -1221,50 +1208,6 @@ export async function updateBatchStatus(
     rowMapper,
     resultMapper
   );
-}
-
-/**
- * Mark batch as delivered using consolidated stored procedure
- * @deprecated Use updateBatchStatus(batchId, 'DELIVER') instead
- */
-export async function markBatchAsDelivered(
-  batchId: number
-): Promise<MarkBatchDeliveredResult> {
-  const result = await updateBatchStatus(batchId, 'DELIVER');
-  // Map to legacy result format for backwards compatibility
-  return {
-    batchId: result.batchId,
-    batchSequence: result.batchSequence,
-    alignerSetId: result.setId,
-    wasActivated: result.wasActivated,
-    wasAlreadyActive: result.wasAlreadyActive,
-    wasAlreadyDelivered: result.wasAlreadyDelivered,
-    previouslyActiveBatchSequence: result.previouslyActiveBatchSequence,
-  };
-}
-
-/**
- * Mark batch as manufactured (sets ManufactureDate to today)
- * @deprecated Use updateBatchStatus(batchId, 'MANUFACTURE') instead
- */
-export async function markBatchAsManufactured(batchId: number): Promise<UpdateBatchStatusResult> {
-  return updateBatchStatus(batchId, 'MANUFACTURE');
-}
-
-/**
- * Undo manufacture - clears ManufactureDate
- * @deprecated Use updateBatchStatus(batchId, 'UNDO_MANUFACTURE') instead
- */
-export async function undoManufactureBatch(batchId: number): Promise<UpdateBatchStatusResult> {
-  return updateBatchStatus(batchId, 'UNDO_MANUFACTURE');
-}
-
-/**
- * Undo delivery - clears DeliveredToPatientDate and BatchExpiryDate
- * @deprecated Use updateBatchStatus(batchId, 'UNDO_DELIVERY') instead
- */
-export async function undoDeliverBatch(batchId: number): Promise<UpdateBatchStatusResult> {
-  return updateBatchStatus(batchId, 'UNDO_DELIVERY');
 }
 
 /**

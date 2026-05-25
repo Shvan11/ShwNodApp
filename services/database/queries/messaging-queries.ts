@@ -3,7 +3,7 @@
  * Provides functions for WhatsApp and SMS messaging database operations
  */
 import { executeStoredProcedure, TYPES } from '../index.js';
-import { logger } from '../../core/Logger.js';
+import { log } from '../../../utils/logger.js';
 
 // Type definitions
 interface CircuitBreakerStatus {
@@ -123,7 +123,7 @@ class DatabaseCircuitBreaker {
     if (this.state === 'OPEN') {
       if (this.lastFailureTime && Date.now() - this.lastFailureTime > this.timeout) {
         this.state = 'HALF_OPEN';
-        logger.message.info('Circuit breaker half-open', { operation: operationName });
+        log.info('Circuit breaker half-open', { operation: operationName });
       } else {
         throw new Error(`Circuit breaker is OPEN for ${operationName}`);
       }
@@ -141,7 +141,7 @@ class DatabaseCircuitBreaker {
 
   private onSuccess(operationName: string): void {
     if (this.state === 'HALF_OPEN') {
-      logger.message.info('Circuit breaker closed after success', { operation: operationName });
+      log.info('Circuit breaker closed after success', { operation: operationName });
     }
     this.failureCount = 0;
     this.state = 'CLOSED';
@@ -151,7 +151,7 @@ class DatabaseCircuitBreaker {
     this.failureCount++;
     this.lastFailureTime = Date.now();
 
-    logger.message.error('Circuit breaker failure threshold approaching', {
+    log.error('Circuit breaker failure threshold approaching', {
       operationName,
       failureCount: this.failureCount,
       failureThreshold: this.failureThreshold,
@@ -160,7 +160,7 @@ class DatabaseCircuitBreaker {
 
     if (this.failureCount >= this.failureThreshold) {
       this.state = 'OPEN';
-      logger.message.error('Circuit breaker opened due to threshold exceeded', { operationName });
+      log.error('Circuit breaker opened due to threshold exceeded', { operationName });
     }
   }
 
@@ -204,7 +204,7 @@ function convertAckStatus(ack: number): string {
     case 4:
       return 'PLAYED';
     default:
-      logger.message.warn('Unknown WhatsApp status code encountered', { statusCode: ack });
+      log.warn('Unknown WhatsApp status code encountered', { statusCode: ack });
       return `UNKNOWN_${ack}`;
   }
 }
@@ -219,7 +219,7 @@ export async function updateWhatsAppDeliveryStatus(
 
   return dbCircuitBreaker
     .execute(async () => {
-      logger.message.info('Starting WhatsApp delivery status update', {
+      log.info('Starting WhatsApp delivery status update', {
         messageCount: messages.length,
       });
 
@@ -235,8 +235,8 @@ export async function updateWhatsAppDeliveryStatus(
         statusGroups[status]++;
       });
 
-      logger.message.debug('WhatsApp status distribution', { statusGroups });
-      logger.message.debug('Processing message batch data', {
+      log.debug('WhatsApp status distribution', { statusGroups });
+      log.debug('Processing message batch data', {
         messages: messages.map((m) => ({
           id: m.id,
           ack: m.ack,
@@ -247,7 +247,7 @@ export async function updateWhatsAppDeliveryStatus(
       const rows = messages.map((message) => {
         const status = convertAckStatus(message.ack);
         const waMessageId = message.whatsappMessageId || '';
-        logger.message.debug('Processing individual message', {
+        log.debug('Processing individual message', {
           appointmentId: message.id,
           whatsappMessageId: waMessageId,
           status,
@@ -300,7 +300,7 @@ export async function updateWhatsAppDeliveryStatus(
         (result) => {
           if (result && result.length > 0) {
             const stats = result[0];
-            logger.message.info('WhatsApp status update completed', {
+            log.info('WhatsApp status update completed', {
               totalUpdated: stats.totalUpdated,
               readCount: stats.readCount,
               deliveredCount: stats.deliveredCount,
@@ -313,7 +313,7 @@ export async function updateWhatsAppDeliveryStatus(
       );
     }, operationName)
     .catch((error: Error) => {
-      logger.message.error('WhatsApp delivery status update failed', { operationName , error: error.message });
+      log.error('WhatsApp delivery status update failed', { operationName , error: error.message });
       return {
         success: false,
         error: error.message,
@@ -332,7 +332,7 @@ export async function getWhatsAppMessages(
 
   return dbCircuitBreaker
     .execute(async () => {
-      logger.message.debug('Retrieving WhatsApp messages', { date });
+      log.debug('Retrieving WhatsApp messages', { date });
 
       return executeStoredProcedure<WhatsAppMessage, [string[], string[], number[], string[]]>(
         'GetWhatsAppMessagesToSend',
@@ -356,7 +356,7 @@ export async function getWhatsAppMessages(
           const ids = result.map((r) => r.id || 0);
           const names = result.map((r) => r.name || '');
 
-          logger.message.debug('WhatsApp messages retrieved successfully', { messageCount: result.length, date });
+          log.debug('WhatsApp messages retrieved successfully', { messageCount: result.length, date });
 
           if (result.length > 0) {
             const timeGroups: Record<number, number> = {};
@@ -365,13 +365,13 @@ export async function getWhatsAppMessages(
               if (!timeGroups[hour]) timeGroups[hour] = 0;
               timeGroups[hour]++;
             });
-            logger.message.debug('Appointment time distribution analysis', { timeGroups });
+            log.debug('Appointment time distribution analysis', { timeGroups });
 
             const sampleCount = Math.min(3, result.length);
             for (let i = 0; i < sampleCount; i++) {
               const message = result[i].message || '';
               const msgPreview = message.length > 30 ? message.substring(0, 30) + '...' : message;
-              logger.message.debug('Sample message preview', {
+              log.debug('Sample message preview', {
                 sampleNumber: i + 1,
                 appointmentId: result[i].id,
                 appointmentTime: new Date(result[i].appTime).toLocaleTimeString(),
@@ -386,7 +386,7 @@ export async function getWhatsAppMessages(
       );
     }, operationName)
     .catch((error: Error) => {
-      logger.message.error('Failed to retrieve WhatsApp messages', { operationName , error: error.message });
+      log.error('Failed to retrieve WhatsApp messages', { operationName , error: error.message });
       return [[], [], [], []];
     });
 }
@@ -401,22 +401,22 @@ export async function updateWhatsAppStatus(
   const operationName = 'updateWhatsAppStatus';
 
   if (!appointmentIds || !appointmentIds.length) {
-    logger.message.debug('No WhatsApp messages to update');
+    log.debug('No WhatsApp messages to update');
     return { success: true, updatedCount: 0 };
   }
 
   return dbCircuitBreaker
     .execute(async () => {
-      logger.message.info('Starting WhatsApp status update', {
+      log.info('Starting WhatsApp status update', {
         messageCount: appointmentIds.length,
       });
 
       // Log sample IDs for debugging
       if (appointmentIds.length <= 5) {
-        logger.message.debug('WhatsApp appointment IDs to update', { appointmentIds });
-        logger.message.debug('WhatsApp message IDs to update', { messageIds });
+        log.debug('WhatsApp appointment IDs to update', { appointmentIds });
+        log.debug('WhatsApp message IDs to update', { messageIds });
       } else {
-        logger.message.debug('WhatsApp appointment IDs sample', {
+        log.debug('WhatsApp appointment IDs sample', {
           sampleIds: appointmentIds.slice(0, 3),
           totalCount: appointmentIds.length,
         });
@@ -465,13 +465,13 @@ export async function updateWhatsAppStatus(
         },
         (result) => {
           const updatedCount = result && result.length > 0 ? result[0].updatedCount : rows.length;
-          logger.message.info('WhatsApp status update completed successfully', { updatedCount });
+          log.info('WhatsApp status update completed successfully', { updatedCount });
           return { success: true, updatedCount };
         }
       );
     }, operationName)
     .catch((error: Error) => {
-      logger.message.error('WhatsApp status update failed', { operationName , error: error.message });
+      log.error('WhatsApp status update failed', { operationName , error: error.message });
       return {
         success: false,
         error: error.message,
@@ -491,7 +491,7 @@ export async function updateSingleMessageStatus(
 
   return dbCircuitBreaker
     .execute(async () => {
-      logger.message.info('Updating single message status', { messageId, status });
+      log.info('Updating single message status', { messageId, status });
 
       const statusText = convertAckStatus(status);
       const currentTimestamp = new Date();
@@ -535,7 +535,7 @@ export async function updateSingleMessageStatus(
 
           if (success && result && result.length > 0) {
             const appointment = result[0];
-            logger.message.info('Single message status updated successfully', {
+            log.info('Single message status updated successfully', {
               messageId,
               appointmentId: appointment.appointmentId,
               patientName: appointment.patientName,
@@ -547,13 +547,13 @@ export async function updateSingleMessageStatus(
               appointment,
             };
           } else if (success) {
-            logger.message.info('Single message status updated successfully', { messageId });
+            log.info('Single message status updated successfully', { messageId });
             return {
               success: true,
               found: true,
             };
           } else {
-            logger.message.warn('Message ID not found in database', { messageId });
+            log.warn('Message ID not found in database', { messageId });
             return {
               success: true,
               found: false,
@@ -563,7 +563,7 @@ export async function updateSingleMessageStatus(
       );
     }, operationName)
     .catch((error: Error) => {
-      logger.message.error('Single message status update failed', { operationName , error: error.message });
+      log.error('Single message status update failed', { operationName , error: error.message });
       return {
         success: false,
         error: error.message,
@@ -581,7 +581,7 @@ export async function getWhatsAppDeliveryStatus(
 
   return dbCircuitBreaker
     .execute(async () => {
-      logger.message.info('Retrieving WhatsApp delivery status', { date });
+      log.info('Retrieving WhatsApp delivery status', { date });
 
       return executeStoredProcedure<WhatsAppDeliveryMessage>(
         'ProcFetch',
@@ -593,13 +593,13 @@ export async function getWhatsAppDeliveryStatus(
           wamid: columns[2].value as string,
         }),
         (result) => {
-          logger.message.info('WhatsApp messages retrieved for status checking', { messageCount: result.length, date });
+          log.info('WhatsApp messages retrieved for status checking', { messageCount: result.length, date });
 
           if (result.length > 0) {
             const sampleCount = Math.min(5, result.length);
-            logger.message.debug('Sample messages for status check', { sampleCount, totalCount: result.length });
+            log.debug('Sample messages for status check', { sampleCount, totalCount: result.length });
             for (let i = 0; i < sampleCount; i++) {
-              logger.message.debug('Status check message sample', { appointmentId: result[i].id, messageId: result[i].wamid });
+              log.debug('Status check message sample', { appointmentId: result[i].id, messageId: result[i].wamid });
             }
           }
 
@@ -608,7 +608,7 @@ export async function getWhatsAppDeliveryStatus(
       );
     }, operationName)
     .catch((error: Error) => {
-      logger.message.error('Failed to retrieve WhatsApp delivery status', { operationName , error: error.message });
+      log.error('Failed to retrieve WhatsApp delivery status', { operationName , error: error.message });
       return [];
     });
 }
@@ -626,7 +626,7 @@ export async function batchUpdateMessageStatuses(
   }
 
   return dbCircuitBreaker.execute(async () => {
-    logger.message.info('Starting batch message status update', { updateCount: updates.length });
+    log.info('Starting batch message status update', { updateCount: updates.length });
 
     // Group updates by status for insights
     const statusGroups: Record<string, StatusUpdateMessage[]> = {};
@@ -636,7 +636,7 @@ export async function batchUpdateMessageStatuses(
       statusGroups[status].push(update);
     });
 
-    logger.message.debug('Batch update status distribution', {
+    log.debug('Batch update status distribution', {
       statusDistribution: Object.keys(statusGroups).reduce(
         (acc, status) => {
           acc[status] = statusGroups[status].length;
@@ -658,7 +658,7 @@ export async function getSmsMessages(date: Date | string): Promise<SmsMessage[]>
 
   return dbCircuitBreaker
     .execute(async () => {
-      logger.message.info('Retrieving SMS messages', { date });
+      log.info('Retrieving SMS messages', { date });
 
       return executeStoredProcedure<SmsMessage>(
         'ProcSMS',
@@ -670,7 +670,7 @@ export async function getSmsMessages(date: Date | string): Promise<SmsMessage[]>
           body: columns[2].value as string,
         }),
         (result) => {
-          logger.message.info('SMS messages retrieved successfully', {
+          log.info('SMS messages retrieved successfully', {
             messageCount: result.length,
             date,
           });
@@ -679,7 +679,7 @@ export async function getSmsMessages(date: Date | string): Promise<SmsMessage[]>
       );
     }, operationName)
     .catch((error: Error) => {
-      logger.message.error('Failed to retrieve SMS messages', { operationName , error: error.message });
+      log.error('Failed to retrieve SMS messages', { operationName , error: error.message });
       return [];
     });
 }
@@ -691,7 +691,7 @@ export async function updateSmsIds(
 
   return dbCircuitBreaker
     .execute(async () => {
-      logger.message.info('Starting SMS ID update', { messageCount: messages.length });
+      log.info('Starting SMS ID update', { messageCount: messages.length });
 
       const rows = messages.map((message) => [
         message.id, // AppointmentID
@@ -714,7 +714,7 @@ export async function updateSmsIds(
         undefined,
         undefined,
         () => {
-          logger.message.info('SMS IDs updated successfully', { updatedCount: rows.length });
+          log.info('SMS IDs updated successfully', { updatedCount: rows.length });
           return {
             success: true,
             updatedCount: rows.length,
@@ -723,7 +723,7 @@ export async function updateSmsIds(
       );
     }, operationName)
     .catch((error: Error) => {
-      logger.message.error('SMS ID update failed', { operationName , error: error.message });
+      log.error('SMS ID update failed', { operationName , error: error.message });
       return {
         success: false,
         error: error.message,
@@ -737,7 +737,7 @@ export async function getSmsIds(date: Date | string): Promise<SmsIdMessage[]> {
 
   return dbCircuitBreaker
     .execute(async () => {
-      logger.message.info('Retrieving SMS IDs for status checking', { date });
+      log.info('Retrieving SMS IDs for status checking', { date });
 
       return executeStoredProcedure<SmsIdMessage>(
         'Procgetsids',
@@ -748,13 +748,13 @@ export async function getSmsIds(date: Date | string): Promise<SmsIdMessage[]> {
           sid: columns[1].value as string,
         }),
         (result) => {
-          logger.message.info('SMS IDs retrieved for status checking', { idCount: result.length });
+          log.info('SMS IDs retrieved for status checking', { idCount: result.length });
           return result;
         }
       );
     }, operationName)
     .catch((error: Error) => {
-      logger.message.error('Failed to retrieve SMS IDs', { operationName , error: error.message });
+      log.error('Failed to retrieve SMS IDs', { operationName , error: error.message });
       return [];
     });
 }
@@ -764,7 +764,7 @@ export async function updateSmsStatus(messages: SmsStatusMessage[]): Promise<Upd
 
   return dbCircuitBreaker
     .execute(async () => {
-      logger.message.info('Starting SMS status update', { messageCount: messages.length });
+      log.info('Starting SMS status update', { messageCount: messages.length });
 
       const rows = messages.map((message) => [
         message.id, // AppointmentID
@@ -787,7 +787,7 @@ export async function updateSmsStatus(messages: SmsStatusMessage[]): Promise<Upd
         undefined,
         undefined,
         () => {
-          logger.message.info('SMS status update completed successfully', {
+          log.info('SMS status update completed successfully', {
             updatedCount: rows.length,
           });
           return {
@@ -798,7 +798,7 @@ export async function updateSmsStatus(messages: SmsStatusMessage[]): Promise<Upd
       );
     }, operationName)
     .catch((error: Error) => {
-      logger.message.error('SMS status update failed', { operationName , error: error.message });
+      log.error('SMS status update failed', { operationName , error: error.message });
       return {
         success: false,
         error: error.message,
@@ -815,7 +815,7 @@ export async function getMessageStatusByDate(date: Date | string): Promise<Messa
 
   return dbCircuitBreaker
     .execute(async () => {
-      logger.message.debug('Retrieving message status summary', { date });
+      log.debug('Retrieving message status summary', { date });
 
       interface MessageStatus {
         appointmentId: number;
@@ -874,7 +874,7 @@ export async function getMessageStatusByDate(date: Date | string): Promise<Messa
             failed: result.filter((r) => r.deliveryStatus === 'ERROR').length,
           };
 
-          logger.message.debug('Message status summary retrieved', {
+          log.debug('Message status summary retrieved', {
             date,
             total: summary.total,
             sent: summary.sent,
@@ -890,7 +890,7 @@ export async function getMessageStatusByDate(date: Date | string): Promise<Messa
       );
     }, operationName)
     .catch((error: Error) => {
-      logger.message.error('Failed to retrieve message status summary', { operationName , error: error.message });
+      log.error('Failed to retrieve message status summary', { operationName , error: error.message });
       return {
         date: date,
         error: error.message,
@@ -919,7 +919,7 @@ export function resetCircuitBreaker(): {
   newStatus: CircuitBreakerStatus;
 } {
   dbCircuitBreaker.reset();
-  logger.message.info('Database circuit breaker manually reset');
+  log.info('Database circuit breaker manually reset');
 
   return {
     success: true,

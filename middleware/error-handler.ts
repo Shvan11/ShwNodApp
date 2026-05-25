@@ -20,7 +20,6 @@ export function errorHandler(
   req: Request,
   res: Response,
   // 4 parameters required for Express to recognize this as an error handler.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction
 ): void {
   const timestamp = new Date().toISOString();

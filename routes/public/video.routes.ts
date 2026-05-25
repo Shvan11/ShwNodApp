@@ -8,6 +8,7 @@ import { Router, type Request, type Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { log } from '../../utils/logger.js';
+import { getMediaMimeType } from '../../utils/video-mime.js';
 import * as videoQueries from '../../services/database/queries/video-queries.js';
 
 const router = Router();
@@ -15,20 +16,6 @@ const router = Router();
 // Type definitions
 interface VideoIdParams {
   id: string;
-}
-
-/**
- * Get MIME type based on file extension
- */
-function getMimeType(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase();
-  const mimeTypes: Record<string, string> = {
-    '.mp4': 'video/mp4',
-    '.webm': 'video/webm',
-    '.ogg': 'video/ogg',
-    '.mov': 'video/quicktime',
-  };
-  return mimeTypes[ext] || 'application/octet-stream';
 }
 
 /**
@@ -104,16 +91,17 @@ router.get('/:id/stream', async (req: Request<VideoIdParams>, res: Response): Pr
 
     const filePath = normalizePath(video.Video);
 
-    if (!fs.existsSync(filePath)) {
+    let stat: fs.Stats;
+    try {
+      stat = await fs.promises.stat(filePath);
+    } catch {
       log.error('[Public Video] Video file not found:', { path: filePath });
       res.status(404).json({ error: 'Video file not found' });
       return;
     }
-
-    const stat = fs.statSync(filePath);
     const fileSize = stat.size;
     const range = req.headers.range;
-    const mimeType = getMimeType(filePath);
+    const mimeType = getMediaMimeType(filePath);
 
     if (range) {
       const parts = range.replace(/bytes=/, '').split('-');
@@ -166,15 +154,16 @@ router.get('/:id/download', async (req: Request<VideoIdParams>, res: Response): 
 
     const filePath = normalizePath(video.Video);
 
-    if (!fs.existsSync(filePath)) {
+    let stat: fs.Stats;
+    try {
+      stat = await fs.promises.stat(filePath);
+    } catch {
       log.error('[Public Video] Video file not found:', { path: filePath });
       res.status(404).json({ error: 'Video file not found' });
       return;
     }
-
-    const stat = fs.statSync(filePath);
     const fileName = `${video.Description.replace(/[^a-zA-Z0-9\s-]/g, '').trim()}${path.extname(filePath)}`;
-    const mimeType = getMimeType(filePath);
+    const mimeType = getMediaMimeType(filePath);
 
     res.writeHead(200, {
       'Content-Length': stat.size,

@@ -3,7 +3,8 @@
  * Manages system settings and preferences
  */
 import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery, TYPES } from '../index.js';
+import sql from 'mssql';
+import { executeQuery, withTransaction, TYPES } from '../index.js';
 import { log } from '../../../utils/logger.js';
 
 // Type definitions
@@ -106,34 +107,36 @@ export async function getOptionsByPattern(pattern: string): Promise<Option[]> {
 }
 
 /**
- * Bulk update multiple existing options in a single transaction
+ * Bulk update multiple existing options. All updates run inside a single
+ * transaction, so a SQL error on any row rolls back the whole batch (atomic) —
+ * matching this function's contract. Names that match no existing row are not
+ * errors; they're collected in `failed` without aborting the batch.
  */
 export async function bulkUpdateOptions(options: BulkUpdateOption[]): Promise<BulkUpdateResult> {
   try {
     let updatedCount = 0;
     const failed: string[] = [];
 
-    for (const option of options) {
-      try {
-        const result = await executeQuery(
-          'UPDATE tbloptions SET OptionValue = @optionValue WHERE OptionName = @optionName',
-          [
-            ['optionName', TYPES.NVarChar, option.name],
-            ['optionValue', TYPES.NVarChar, option.value],
-          ],
-          () => ({})
-        );
+    await withTransaction(async (tx) => {
+      for (const option of options) {
+        const result = await new sql.Request(tx)
+          .input('optionName', TYPES.NVarChar, option.name)
+          .input('optionValue', TYPES.NVarChar, option.value)
+          .query(
+            'UPDATE tbloptions SET OptionValue = @optionValue WHERE OptionName = @optionName'
+          );
 
-        if ((result.rowsAffected ?? 0) > 0) {
+        const affected = Array.isArray(result.rowsAffected)
+          ? result.rowsAffected.reduce((sum, n) => sum + n, 0)
+          : (result.rowsAffected ?? 0);
+
+        if (affected > 0) {
           updatedCount++;
         } else {
           failed.push(option.name);
         }
-      } catch (error) {
-        log.error('Error updating option', { optionName: option.name, error: (error as Error).message });
-        failed.push(option.name);
       }
-    }
+    });
 
     return {
       success: true,

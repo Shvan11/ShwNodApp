@@ -162,27 +162,6 @@ export async function getDocumentTypeById(typeId: number): Promise<DocumentType 
 }
 
 // ============================================================================
-// DATA FIELD DEFINITIONS (DEPRECATED - file-based templates)
-// ============================================================================
-
-/**
- * Get all data fields for a specific document type (deprecated)
- */
-export async function getDataFieldsByDocumentType(_documentTypeId: number): Promise<never[]> {
-  // File-based templates don't use DataFieldDefinitions
-  return [];
-}
-
-/**
- * Get data fields grouped by category (deprecated)
- */
-export async function getDataFieldsGrouped(
-  _documentTypeId: number
-): Promise<Record<string, never>> {
-  return {};
-}
-
-// ============================================================================
 // DOCUMENT TEMPLATES
 // ============================================================================
 

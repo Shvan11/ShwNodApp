@@ -10,7 +10,7 @@ import { Router, type Request, type Response } from 'express';
 import type { EventEmitter } from 'events';
 import { InternalEmitterEvents } from './websocket-events.js';
 import messageState from '../state/messageState.js';
-import { logger } from '../core/Logger.js';
+import { log } from '../../utils/logger.js';
 
 interface WhatsappClient {
   res: Response;
@@ -100,7 +100,7 @@ export function createWhatsappSseRouter(emitter: EventEmitter): Router {
     // Every SSE subscriber is a QR viewer. Triggers QR data-URL generation
     // and gates the on-demand init in /api/wa/initial-state.
     await messageState.registerQRViewer(viewerId);
-    logger.websocket.debug('SSE whatsapp client connected', {
+    log.debug('SSE whatsapp client connected', {
       viewerId,
       count: whatsappClients.size,
     });
@@ -108,7 +108,7 @@ export function createWhatsappSseRouter(emitter: EventEmitter): Router {
     req.on('close', () => {
       whatsappClients.delete(viewerId);
       void messageState.unregisterQRViewer(viewerId);
-      logger.websocket.debug('SSE whatsapp client disconnected', {
+      log.debug('SSE whatsapp client disconnected', {
         viewerId,
         count: whatsappClients.size,
       });

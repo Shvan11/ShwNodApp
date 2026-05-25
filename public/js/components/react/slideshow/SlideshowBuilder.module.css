@@ -1,0 +1,303 @@
+.builder {
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-sm);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  color: var(--text-color);
+}
+
+.hint {
+  margin: var(--spacing-xs) 0 0;
+  color: var(--text-light);
+  font-size: var(--font-size-sm);
+}
+
+/* Leave room so the sticky tray never hides the last session. */
+.sessions {
+  padding: 0 var(--spacing-lg) calc(var(--spacing-xxl) * 2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.state {
+  padding: var(--spacing-lg);
+  color: var(--text-light);
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+}
+
+.session {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-lg);
+  background: var(--background-light, #fff);
+  overflow: hidden;
+}
+
+.sessionHeader {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--text-color);
+}
+
+.sessionHeader:hover {
+  background: var(--background-color, #f4f4f9);
+}
+
+.chevron {
+  color: var(--text-light);
+  width: 1rem;
+  flex-shrink: 0;
+}
+
+.sessionName {
+  font-weight: 600;
+}
+
+.sessionDate {
+  color: var(--text-light);
+  font-size: var(--font-size-sm);
+}
+
+.sessionBadge {
+  margin-left: auto;
+  background: var(--primary-color);
+  color: var(--color-white);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-full);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
+}
+
+.thumb {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--color-black);
+  touch-action: manipulation;
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumb:hover {
+  transform: translateY(-2px);
+}
+
+.thumbSelected {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px var(--primary-color);
+}
+
+.thumbLabel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 2px var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-white);
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  text-align: center;
+}
+
+.orderBadge {
+  position: absolute;
+  top: var(--spacing-xs);
+  right: var(--spacing-xs);
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--primary-color);
+  color: var(--color-white);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  box-shadow: var(--shadow-md);
+}
+
+/* --- Sequence tray --- */
+.tray {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-index-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--background-light, #fff);
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.trayScroll {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  overflow-x: auto;
+  min-height: 76px;
+  padding-bottom: var(--spacing-xs);
+}
+
+.trayEmpty {
+  color: var(--text-light);
+  font-size: var(--font-size-sm);
+}
+
+.chip {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  height: 68px;
+  padding-right: var(--spacing-md);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md);
+  background: var(--background-color, #f4f4f9);
+  transition: box-shadow var(--transition-fast);
+}
+
+.chip img {
+  height: 68px;
+  width: 84px;
+  object-fit: cover;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  display: block;
+}
+
+.chipGrip {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--spacing-sm);
+  height: 100%;
+  color: var(--text-lighter, #999);
+  cursor: grab;
+  touch-action: none; /* let the grip own the gesture; tray still scrolls elsewhere */
+}
+
+.chipGrip:active {
+  cursor: grabbing;
+}
+
+.chipOrder {
+  position: absolute;
+  top: 2px;
+  left: 28px;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--primary-color);
+  color: var(--color-white);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+}
+
+.chipRemove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--color-white);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+
+.chipDragging {
+  z-index: 2;
+  opacity: 0.9;
+  box-shadow: var(--shadow-lg);
+}
+
+.chipDropTarget {
+  box-shadow: -3px 0 0 0 var(--primary-color);
+}
+
+.trayActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.clearBtn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md);
+  background: var(--background-light, #fff);
+  color: var(--text-light);
+  cursor: pointer;
+  font: inherit;
+}
+
+.playBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-xl);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--primary-color);
+  color: var(--color-white);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.playBtn:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.playBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -7,7 +7,7 @@ import * as messagingQueries from '../database/queries/messaging-queries.js';
 import { InternalEmitterEvents } from './websocket-events.js';
 import { messageSessionManager, type MessageLookupResult } from './MessageSessionManager.js';
 import { type MessageSession } from './MessageSession.js';
-import { logger } from '../core/Logger.js';
+import { log } from '../../utils/logger.js';
 import { PhoneFormatter } from '../../utils/phoneFormatter.js';
 import qrcode from 'qrcode';
 import pkg from 'whatsapp-web.js';
@@ -185,7 +185,7 @@ class ClientStateManager {
 
     const lockAge = Date.now() - this.initializationLock;
     if (lockAge > this.INITIALIZATION_TIMEOUT) {
-      logger.whatsapp.warn(`Force releasing stale lock`, { lockAge });
+      log.warn(`Force releasing stale lock`, { lockAge });
       this.forceReleaseLock();
       this.initializationLock = Date.now();
       return true;
@@ -234,7 +234,7 @@ class ClientStateManager {
           }
         });
       } catch (error) {
-        logger.whatsapp.error('Error notifying next lock waiter', error);
+        log.error('Error notifying next lock waiter', error);
       }
     }
   }
@@ -249,7 +249,7 @@ class ClientStateManager {
           waiter.reject();
         }
       } catch (error) {
-        logger.whatsapp.error('Error rejecting lock waiter', error);
+        log.error('Error rejecting lock waiter', error);
       }
     }
   }
@@ -265,7 +265,7 @@ class ClientStateManager {
     this.lastError = error;
 
     if (oldState !== newState) {
-      logger.whatsapp.info(
+      log.info(
         `State: ${oldState} → ${newState}`,
         error ? { error: error.message } : undefined
       );
@@ -308,7 +308,7 @@ class ClientStateManager {
   }
 
   cleanup(): void {
-    logger.whatsapp.debug('Cleaning up ClientStateManager');
+    log.debug('Cleaning up ClientStateManager');
 
     this.clearReconnectTimer();
     this.clearInitializationTimeout();
@@ -317,7 +317,7 @@ class ClientStateManager {
       try {
         this.initializationAbortController.abort();
       } catch (error) {
-        logger.whatsapp.error('Error aborting initialization', error);
+        log.error('Error aborting initialization', error);
       }
       this.initializationAbortController = null;
     }
@@ -333,7 +333,7 @@ class ClientStateManager {
     this.lastError = null;
     this.destroyInProgress = false;
 
-    logger.whatsapp.debug('ClientStateManager cleanup completed');
+    log.debug('ClientStateManager cleanup completed');
   }
 }
 
@@ -389,7 +389,7 @@ class EnhancedCircuitBreaker {
 
   private onSuccess(operationName: string): void {
     if (this.state === 'HALF_OPEN') {
-      logger.whatsapp.debug(`Circuit breaker healing: ${operationName}`);
+      log.debug(`Circuit breaker healing: ${operationName}`);
       this.transitionToClosed();
     } else if (this.state === 'CLOSED') {
       this.failureCount = Math.max(0, this.failureCount - 1);
@@ -400,7 +400,7 @@ class EnhancedCircuitBreaker {
     this.failureCount++;
     this.lastFailureTime = Date.now();
 
-    logger.whatsapp.warn(
+    log.warn(
       `Circuit breaker failure ${this.failureCount}/${this.failureThreshold} for ${operationName}`,
       { error: error.message }
     );
@@ -415,26 +415,26 @@ class EnhancedCircuitBreaker {
     this.failureCount = 0;
     this.halfOpenCalls = 0;
     this.lastStateChange = Date.now();
-    logger.whatsapp.info('Circuit breaker → CLOSED');
+    log.info('Circuit breaker → CLOSED');
   }
 
   private transitionToOpen(): void {
     this.state = 'OPEN';
     this.halfOpenCalls = 0;
     this.lastStateChange = Date.now();
-    logger.whatsapp.warn(`Circuit breaker → OPEN`, { failures: this.failureCount });
+    log.warn(`Circuit breaker → OPEN`, { failures: this.failureCount });
   }
 
   private transitionToHalfOpen(): void {
     this.state = 'HALF_OPEN';
     this.halfOpenCalls = 0;
     this.lastStateChange = Date.now();
-    logger.whatsapp.info('Circuit breaker → HALF_OPEN');
+    log.info('Circuit breaker → HALF_OPEN');
   }
 
   reset(): void {
     this.transitionToClosed();
-    logger.whatsapp.info('Circuit breaker manually reset');
+    log.info('Circuit breaker manually reset');
   }
 
   getStatus(): CircuitBreakerStatus {
@@ -511,7 +511,7 @@ class WhatsAppService extends EventEmitter {
 
   setEmitter(emitter: WebSocketEmitter): void {
     this.wsEmitter = emitter;
-    logger.whatsapp.debug('WebSocket emitter set');
+    log.debug('WebSocket emitter set');
   }
 
   isReady(): boolean {
@@ -536,14 +536,14 @@ class WhatsAppService extends EventEmitter {
   }
 
   private async handleViewerConnected(): Promise<void> {
-    logger.whatsapp.debug('QR viewer connected - checking session state');
+    log.debug('QR viewer connected - checking session state');
 
     if (this.clientState.isState('DISCONNECTED') && !this.clientState.client) {
-      logger.whatsapp.debug(
+      log.debug(
         'Client disconnected with no instance - will wait for explicit initialization request'
       );
     } else {
-      logger.whatsapp.debug('Skipping auto-initialization', {
+      log.debug('Skipping auto-initialization', {
         state: this.clientState.state,
         hasClient: !!this.clientState.client,
         qrViewers: this.messageState.activeQRViewers,
@@ -553,12 +553,12 @@ class WhatsAppService extends EventEmitter {
 
   async initialize(forceRestart = false): Promise<boolean> {
     if (!forceRestart && this.clientState.isState('CONNECTED')) {
-      logger.whatsapp.info('WhatsApp client already connected');
+      log.info('WhatsApp client already connected');
       return true;
     }
 
     if (!forceRestart && this.clientState.isState('INITIALIZING')) {
-      logger.whatsapp.info('WhatsApp client already initializing, waiting for completion');
+      log.info('WhatsApp client already initializing, waiting for completion');
       return this.clientState.initializationPromise as Promise<boolean>;
     }
 
@@ -567,7 +567,7 @@ class WhatsAppService extends EventEmitter {
     }
 
     try {
-      logger.whatsapp.debug('Acquiring initialization lock');
+      log.debug('Acquiring initialization lock');
       await this.clientState.acquireInitializationLock();
 
       if (
@@ -583,7 +583,7 @@ class WhatsAppService extends EventEmitter {
       const result = await this.clientState.initializationPromise;
       return result;
     } catch (error) {
-      logger.whatsapp.error('Initialization failed', error);
+      log.error('Initialization failed', error);
       throw error;
     } finally {
       this.clientState.initializationPromise = null;
@@ -592,7 +592,7 @@ class WhatsAppService extends EventEmitter {
   }
 
   private async performInitialization(forceRestart = false): Promise<boolean> {
-    logger.whatsapp.info('Starting initialization', { forceRestart });
+    log.info('Starting initialization', { forceRestart });
 
     try {
       if (forceRestart && this.clientState.client) {
@@ -603,21 +603,21 @@ class WhatsAppService extends EventEmitter {
         const sessionQuality = await this.validateSessionQuality();
 
         if (sessionQuality === 'valid') {
-          logger.whatsapp.info('Found existing session - proceeding with client creation');
+          log.info('Found existing session - proceeding with client creation');
         } else if (sessionQuality === 'corrupted') {
-          logger.whatsapp.warn(
+          log.warn(
             `Session quality: ${sessionQuality} - cleaning up corrupted session`
           );
           await this.cleanupInvalidSession();
-          logger.whatsapp.info(
+          log.info(
             'Corrupted session cleaned up - will create fresh client and show QR'
           );
         } else if (sessionQuality === 'empty') {
-          logger.whatsapp.info(
+          log.info(
             'Session is empty - will create client and let Puppeteer initialize storage'
           );
         } else {
-          logger.whatsapp.info('No existing session found - will create new client');
+          log.info('No existing session found - will create new client');
         }
       }
 
@@ -640,10 +640,10 @@ class WhatsAppService extends EventEmitter {
           this.clientState.setState('CONNECTED');
         }
         this.clientState.reconnectAttempts = 0;
-        logger.whatsapp.info('Client initialized successfully');
+        log.info('Client initialized successfully');
         return true;
       } else if (success === false) {
-        logger.whatsapp.info('Client in QR mode - waiting for scan');
+        log.info('Client in QR mode - waiting for scan');
         this.clientState.setState('INITIALIZING');
         return false;
       } else {
@@ -682,7 +682,7 @@ class WhatsAppService extends EventEmitter {
     try {
       this.removeClientEventHandlers(failedClient);
     } catch (error) {
-      logger.whatsapp.debug('Error removing handlers from failed client', error);
+      log.debug('Error removing handlers from failed client', error);
     }
 
     try {
@@ -692,17 +692,17 @@ class WhatsAppService extends EventEmitter {
           setTimeout(() => reject(new Error('Destroy timeout after init failure')), 10000)
         ),
       ]);
-      logger.whatsapp.debug('Failed client destroyed gracefully');
+      log.debug('Failed client destroyed gracefully');
       return;
     } catch (destroyError) {
-      logger.whatsapp.warn('Graceful destroy of failed client failed - force closing browser', {
+      log.warn('Graceful destroy of failed client failed - force closing browser', {
         error: (destroyError as Error).message,
       });
     }
 
     const browser = failedClient.pupBrowser;
     if (!browser) {
-      logger.whatsapp.debug('No pupBrowser on failed client - browser may not have launched');
+      log.debug('No pupBrowser on failed client - browser may not have launched');
       return;
     }
 
@@ -713,25 +713,25 @@ class WhatsAppService extends EventEmitter {
           setTimeout(() => reject(new Error('Browser close timeout')), 5000)
         ),
       ]);
-      logger.whatsapp.info('Browser force-closed after init failure');
+      log.info('Browser force-closed after init failure');
       return;
     } catch (closeError) {
-      logger.whatsapp.error('Browser close failed - killing process', closeError);
+      log.error('Browser close failed - killing process', closeError);
     }
 
     try {
       const proc = browser.process();
       if (proc) {
         proc.kill('SIGKILL');
-        logger.whatsapp.warn('Browser process killed via SIGKILL after init failure');
+        log.warn('Browser process killed via SIGKILL after init failure');
       }
     } catch (killError) {
-      logger.whatsapp.error('Failed to kill browser process after init failure', killError);
+      log.error('Failed to kill browser process after init failure', killError);
     }
   }
 
   private async createAndInitializeClient(): Promise<boolean> {
-    logger.whatsapp.info('Creating WhatsApp client');
+    log.info('Creating WhatsApp client');
 
     if (this.clientState.initializationAbortController?.signal.aborted) {
       throw new Error('Initialization aborted due to timeout');
@@ -784,7 +784,7 @@ class WhatsAppService extends EventEmitter {
     const progressInterval = setInterval(() => {
       if (!resolved) {
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        logger.whatsapp.debug(`Waiting for authentication... ${elapsed}s elapsed`);
+        log.debug(`Waiting for authentication... ${elapsed}s elapsed`);
       }
     }, 5000);
 
@@ -794,7 +794,7 @@ class WhatsAppService extends EventEmitter {
           resolved = true;
           clearInterval(progressInterval);
           const elapsed = Math.floor((Date.now() - startTime) / 1000);
-          logger.whatsapp.error('❌ Initialization timeout - no events fired', {
+          log.error('❌ Initialization timeout - no events fired', {
             elapsed: elapsed + 's',
             timeout: Math.floor(timeoutDuration / 1000) + 's',
             hasSession,
@@ -802,12 +802,12 @@ class WhatsAppService extends EventEmitter {
           });
 
           if (hasSession) {
-            logger.whatsapp.info('Cleaning up corrupted session files');
+            log.info('Cleaning up corrupted session files');
             try {
               await this.cleanupInvalidSession();
-              logger.whatsapp.info('Session cleanup complete - will retry on next attempt');
+              log.info('Session cleanup complete - will retry on next attempt');
             } catch (cleanupError) {
-              logger.whatsapp.error('Failed to cleanup session', {
+              log.error('Failed to cleanup session', {
                 error: (cleanupError as Error).message,
               });
             }
@@ -823,7 +823,7 @@ class WhatsAppService extends EventEmitter {
           clearTimeout(timeout);
           clearInterval(progressInterval);
           const elapsed = Math.floor((Date.now() - startTime) / 1000);
-          logger.whatsapp.info(`Client authenticated (${elapsed}s)`);
+          log.info(`Client authenticated (${elapsed}s)`);
           client.removeListener('qr', onQR);
           client.removeListener('auth_failure', onAuthFailure);
           client.removeListener('disconnected', onDisconnected);
@@ -833,13 +833,13 @@ class WhatsAppService extends EventEmitter {
       };
 
       const onQR = () => {
-        logger.whatsapp.info('QR code generated - waiting for scan');
+        log.info('QR code generated - waiting for scan');
         clearTimeout(timeout);
         clearInterval(progressInterval);
         setTimeout(() => {
           if (!resolved) {
             resolved = true;
-            logger.whatsapp.info('QR scan timeout - client waiting for future scan');
+            log.info('QR scan timeout - client waiting for future scan');
             client.removeListener('qr', onQR);
             client.removeListener('auth_failure', onAuthFailure);
             client.removeListener('disconnected', onDisconnected);
@@ -853,7 +853,7 @@ class WhatsAppService extends EventEmitter {
           resolved = true;
           clearTimeout(timeout);
           clearInterval(progressInterval);
-          logger.whatsapp.error('Authentication failed', { error: String(error) });
+          log.error('Authentication failed', { error: String(error) });
           client.removeListener('ready', onReady);
           client.removeListener('qr', onQR);
           client.removeListener('disconnected', onDisconnected);
@@ -867,7 +867,7 @@ class WhatsAppService extends EventEmitter {
           clearTimeout(timeout);
           clearInterval(progressInterval);
           const elapsed = Math.floor((Date.now() - startTime) / 1000);
-          logger.whatsapp.warn(`❌ onDisconnected event fired (${elapsed}s)`, {
+          log.warn(`❌ onDisconnected event fired (${elapsed}s)`, {
             reason: String(reason),
           });
           client.removeListener('ready', onReady);
@@ -894,7 +894,7 @@ class WhatsAppService extends EventEmitter {
 
       initializeCall
         .then(() => {
-          logger.whatsapp.debug('client.initialize() promise resolved');
+          log.debug('client.initialize() promise resolved');
         })
         .catch((error: Error) => {
           if (!resolved) {
@@ -919,7 +919,7 @@ class WhatsAppService extends EventEmitter {
               // best-effort
             }
 
-            logger.whatsapp.error('❌ client.initialize() promise rejected', {
+            log.error('❌ client.initialize() promise rejected', {
               error: error.message,
               stack: error.stack,
               pageState,
@@ -933,7 +933,7 @@ class WhatsAppService extends EventEmitter {
   }
 
   private async setupClientEventHandlers(client: WhatsAppClient): Promise<void> {
-    logger.whatsapp.debug('Setting up event handlers');
+    log.debug('Setting up event handlers');
 
     client.on('qr', this.eventHandlers.onQR as (...args: unknown[]) => void);
     client.on('ready', this.eventHandlers.onReady as (...args: unknown[]) => void);
@@ -943,12 +943,12 @@ class WhatsAppService extends EventEmitter {
     client.on('auth_failure', this.eventHandlers.onAuthFailure as (...args: unknown[]) => void);
     client.on('loading_screen', this.eventHandlers.onLoadingScreen as (...args: unknown[]) => void);
 
-    logger.whatsapp.debug('Event handlers registered successfully');
+    log.debug('Event handlers registered successfully');
   }
 
   private removeClientEventHandlers(client: WhatsAppClient): void {
     if (!client || !this.eventHandlers) {
-      logger.whatsapp.debug('No client or handlers to remove');
+      log.debug('No client or handlers to remove');
       return;
     }
 
@@ -976,9 +976,9 @@ class WhatsAppService extends EventEmitter {
         this.eventHandlers.onLoadingScreen as (...args: unknown[]) => void
       );
 
-      logger.whatsapp.debug('Event handlers removed successfully');
+      log.debug('Event handlers removed successfully');
     } catch (error) {
-      logger.whatsapp.error('Error removing event handlers', error);
+      log.error('Error removing event handlers', error);
     }
   }
 
@@ -986,13 +986,13 @@ class WhatsAppService extends EventEmitter {
     const sessionQuality = await this.validateSessionQuality();
 
     if (sessionQuality === 'valid') {
-      logger.whatsapp.info(
+      log.info(
         'QR received for existing session - WhatsApp may be verifying session validity'
       );
     } else if (sessionQuality === 'none') {
-      logger.whatsapp.info('QR received for fresh authentication - no existing session');
+      log.info('QR received for fresh authentication - no existing session');
     } else {
-      logger.whatsapp.debug(`QR received - session quality: ${sessionQuality}`);
+      log.debug(`QR received - session quality: ${sessionQuality}`);
     }
 
     if (this.messageState.clientReady) {
@@ -1014,7 +1014,7 @@ class WhatsAppService extends EventEmitter {
           clientReady: false,
         });
       } catch (error) {
-        logger.whatsapp.error('Failed to convert QR code to data URL:', error);
+        log.error('Failed to convert QR code to data URL:', error);
         this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_QR_UPDATED, {
           qr,
           clientReady: false,
@@ -1032,34 +1032,34 @@ class WhatsAppService extends EventEmitter {
     }
     this.clientState.authStabilizationStarted = true;
 
-    logger.whatsapp.info('Client authenticated successfully');
+    log.info('Client authenticated successfully');
 
     await this.messageState.setQR(null);
 
-    logger.whatsapp.info('Waiting 60s for session to stabilize...');
+    log.info('Waiting 60s for session to stabilize...');
 
     const SESSION_STABILIZATION_DELAY = 60000;
 
     await new Promise((resolve) => setTimeout(resolve, SESSION_STABILIZATION_DELAY));
 
     this.clientState.sessionStabilized = true;
-    logger.whatsapp.info('Session stabilized - safe to restart');
+    log.info('Session stabilized - safe to restart');
   }
 
   private async handleReady(): Promise<void> {
-    logger.whatsapp.info('Client ready');
+    log.info('Client ready');
 
     if (this.clientState.client) {
       try {
         this.clientState.browser = this.clientState.client.pupBrowser || null;
         this.clientState.page = this.clientState.client.pupPage || null;
       } catch (error) {
-        logger.whatsapp.warn('Could not store browser references', error);
+        log.warn('Could not store browser references', error);
       }
     }
 
     if (!this.clientState.sessionStabilized) {
-      logger.whatsapp.info('Session restored from existing files');
+      log.info('Session restored from existing files');
       this.clientState.sessionStabilized = true;
     }
 
@@ -1083,14 +1083,14 @@ class WhatsAppService extends EventEmitter {
     const messageInfo: MessageLookupResult | null =
       messageSessionManager.getAppointmentIdForMessage(messageId);
 
-    logger.whatsapp.debug(`Message status updated`, {
+    log.debug(`Message status updated`, {
       messageId,
       ack,
       messageInfo,
     });
 
     if (!messageInfo) {
-      logger.whatsapp.debug(
+      log.debug(
         'Message not found in any active session - may be from previous session or external message',
         {
           messageId,
@@ -1106,7 +1106,7 @@ class WhatsAppService extends EventEmitter {
       messageSessionManager.recordDeliveryStatusUpdate(messageId, String(ack));
 
       await this.messageState.updateMessageStatus(messageId, ack, async () => {
-        logger.whatsapp.debug('Updating database status', {
+        log.debug('Updating database status', {
           messageId,
           appointmentId,
           sessionDate,
@@ -1126,7 +1126,7 @@ class WhatsAppService extends EventEmitter {
         });
       }
     } catch (error) {
-      logger.whatsapp.error('Error updating message status', {
+      log.error('Error updating message status', {
         messageId,
         appointmentId,
         sessionDate,
@@ -1152,12 +1152,12 @@ class WhatsAppService extends EventEmitter {
         message,
       });
     } catch (error) {
-      logger.whatsapp.error('Error broadcasting client-ready state', error);
+      log.error('Error broadcasting client-ready state', error);
     }
   }
 
   private async handleDisconnected(reason: string): Promise<void> {
-    logger.whatsapp.warn(`Client disconnected`, { reason });
+    log.warn(`Client disconnected`, { reason });
     this.clientState.setState('DISCONNECTED');
     await this.messageState.setClientReady(false);
     this.broadcastReadyState(false, 'disconnected', `WhatsApp disconnected: ${reason}`);
@@ -1170,7 +1170,7 @@ class WhatsAppService extends EventEmitter {
   }
 
   private async handleAuthFailure(error: Error): Promise<void> {
-    logger.whatsapp.error('WhatsApp authentication failed', error);
+    log.error('WhatsApp authentication failed', error);
     this.clientState.setState('ERROR', error);
     await this.messageState.setClientReady(false);
     this.broadcastReadyState(false, 'auth_failure', 'WhatsApp authentication failed');
@@ -1181,14 +1181,14 @@ class WhatsAppService extends EventEmitter {
   }
 
   private handleLoadingScreen(percent: number, message: string): void {
-    logger.whatsapp.debug(`WhatsApp loading: ${percent}% - ${message}`);
+    log.debug(`WhatsApp loading: ${percent}% - ${message}`);
   }
 
   private scheduleReconnect(error: Error): void {
     this.clientState.reconnectAttempts++;
 
     if (this.clientState.reconnectAttempts > this.clientState.MAX_RECONNECT_ATTEMPTS) {
-      logger.whatsapp.warn(
+      log.warn(
         `Exceeded maximum reconnection attempts (${this.clientState.MAX_RECONNECT_ATTEMPTS})`
       );
       this.circuitBreaker['onFailure']('max-reconnect-attempts', error);
@@ -1203,25 +1203,25 @@ class WhatsAppService extends EventEmitter {
       ) *
       (0.75 + Math.random() * 0.5);
 
-    logger.whatsapp.info(
+    log.info(
       `Scheduling reconnection attempt ${this.clientState.reconnectAttempts} in ${Math.round(delay)}ms`
     );
 
     this.clientState.clearReconnectTimer();
     this.clientState.reconnectTimer = setTimeout(async () => {
-      logger.whatsapp.info(
+      log.info(
         `Attempting to reconnect (attempt ${this.clientState.reconnectAttempts})`
       );
       try {
         await this.initialize();
       } catch (err) {
-        logger.whatsapp.error('Error during reconnection attempt', err);
+        log.error('Error during reconnection attempt', err);
       }
     }, delay);
   }
 
   async restart(): Promise<boolean> {
-    logger.whatsapp.info('Restarting WhatsApp client - preserving authentication');
+    log.info('Restarting WhatsApp client - preserving authentication');
 
     this.messageState.manualDisconnect = true;
 
@@ -1233,18 +1233,18 @@ class WhatsAppService extends EventEmitter {
             state: 'restarting',
             message: 'Restarting WhatsApp client...',
           });
-          logger.whatsapp.debug('Broadcasted restarting state to clients');
+          log.debug('Broadcasted restarting state to clients');
         } catch (error) {
-          logger.whatsapp.error('Error broadcasting restarting state', error);
+          log.error('Error broadcasting restarting state', error);
         }
       }
 
       if (this.clientState.client) {
         try {
           await this.clientState.client.destroy();
-          logger.whatsapp.info('Client destroyed for restart - authentication preserved');
+          log.info('Client destroyed for restart - authentication preserved');
         } catch (error) {
-          logger.whatsapp.error('Error destroying client during restart', error);
+          log.error('Error destroying client during restart', error);
         }
         this.clientState.client = null;
       }
@@ -1263,9 +1263,9 @@ class WhatsAppService extends EventEmitter {
             state: 'initializing',
             message: 'Initializing WhatsApp client...',
           });
-          logger.whatsapp.debug('Broadcasted initializing state to clients');
+          log.debug('Broadcasted initializing state to clients');
         } catch (error) {
-          logger.whatsapp.error('Error broadcasting initializing state', error);
+          log.error('Error broadcasting initializing state', error);
         }
       }
 
@@ -1284,17 +1284,17 @@ class WhatsAppService extends EventEmitter {
 
   private async forceCloseBrowser(): Promise<void> {
     if (!this.clientState.browser) {
-      logger.whatsapp.debug('No browser reference to close');
+      log.debug('No browser reference to close');
       return;
     }
 
     try {
-      logger.whatsapp.warn('Force closing Puppeteer browser');
+      log.warn('Force closing Puppeteer browser');
 
       const pages = await this.clientState.browser.pages();
       await Promise.all(
         pages.map((page) =>
-          page.close().catch((err) => logger.whatsapp.error('Error closing page', err))
+          page.close().catch((err) => log.error('Error closing page', err))
         )
       );
 
@@ -1305,18 +1305,18 @@ class WhatsAppService extends EventEmitter {
         ),
       ]);
 
-      logger.whatsapp.info('Browser force closed successfully');
+      log.info('Browser force closed successfully');
     } catch (error) {
-      logger.whatsapp.error('Error force closing browser', error);
+      log.error('Error force closing browser', error);
 
       try {
         const browserProcess = this.clientState.browser?.process();
         if (browserProcess) {
           browserProcess.kill('SIGKILL');
-          logger.whatsapp.warn('Browser process killed with SIGKILL');
+          log.warn('Browser process killed with SIGKILL');
         }
       } catch (killError) {
-        logger.whatsapp.error('Could not kill browser process', killError);
+        log.error('Could not kill browser process', killError);
       }
     } finally {
       this.clientState.browser = null;
@@ -1325,20 +1325,20 @@ class WhatsAppService extends EventEmitter {
   }
 
   async destroyClient(reason = 'manual'): Promise<void> {
-    logger.whatsapp.info(`Destroying WhatsApp client (reason: ${reason})`);
+    log.info(`Destroying WhatsApp client (reason: ${reason})`);
 
     if (
       this.clientState.client &&
       !this.clientState.sessionStabilized &&
       reason === 'restart'
     ) {
-      logger.whatsapp.warn(
+      log.warn(
         '⚠️  WARNING: Session has NOT stabilized yet - session data may be incomplete!'
       );
-      logger.whatsapp.warn(
+      log.warn(
         '⚠️  Restarting before 60-second stabilization delay completes may result in session loss'
       );
-      logger.whatsapp.warn(
+      log.warn(
         '⚠️  QR code will be required on next startup if session data is incomplete'
       );
     }
@@ -1355,7 +1355,7 @@ class WhatsAppService extends EventEmitter {
           await Promise.race([
             (async () => {
               await this.clientState.client!.destroy();
-              logger.whatsapp.info(
+              log.info(
                 `WhatsApp client destroyed for ${reason} (session preserved)`
               );
             })(),
@@ -1364,7 +1364,7 @@ class WhatsAppService extends EventEmitter {
             ),
           ]);
         } catch (destroyError) {
-          logger.whatsapp.error('Graceful destroy failed, attempting force close', destroyError);
+          log.error('Graceful destroy failed, attempting force close', destroyError);
           await this.forceCloseBrowser();
         }
 
@@ -1374,7 +1374,7 @@ class WhatsAppService extends EventEmitter {
       this.clientState.setState('DISCONNECTED');
       await this.messageState.setClientReady(false);
     } catch (error) {
-      logger.whatsapp.error('Error destroying client', error);
+      log.error('Error destroying client', error);
       await this.forceCloseBrowser();
     } finally {
       this.clientState.browser = null;
@@ -1384,7 +1384,7 @@ class WhatsAppService extends EventEmitter {
   }
 
   private scheduleClientCleanup(): void {
-    logger.whatsapp.debug(
+    log.debug(
       'Automatic cleanup disabled - client will persist until manually destroyed'
     );
   }
@@ -1395,7 +1395,7 @@ class WhatsAppService extends EventEmitter {
     }
 
     return this.circuitBreaker.execute(async () => {
-      logger.whatsapp.info(`Starting message sending session for date: ${date}`);
+      log.info(`Starting message sending session for date: ${date}`);
 
       const session = messageSessionManager.startSession(date, this);
 
@@ -1403,7 +1403,7 @@ class WhatsAppService extends EventEmitter {
         const [numbers, messages, ids, names] = await getWhatsAppMessages(date);
 
         if (!numbers || numbers.length === 0) {
-          logger.whatsapp.info(`No messages to send for date ${date}`);
+          log.info(`No messages to send for date ${date}`);
           await this.messageState.setFinishedSending(true);
           this.emit('finishedSending');
 
@@ -1411,7 +1411,7 @@ class WhatsAppService extends EventEmitter {
           return;
         }
 
-        logger.whatsapp.info(
+        log.info(
           `Sending ${numbers.length} messages with session ${session.sessionId}`
         );
 
@@ -1448,7 +1448,7 @@ class WhatsAppService extends EventEmitter {
               await new Promise((resolve) => setTimeout(resolve, 2000));
             }
           } catch (error) {
-            logger.whatsapp.error(`Error sending message to ${numbers[i]}`, error);
+            log.error(`Error sending message to ${numbers[i]}`, error);
             results.push({ success: false, error: (error as Error).message });
           }
         }
@@ -1456,7 +1456,7 @@ class WhatsAppService extends EventEmitter {
         await this.messageState.setFinishedSending(true);
         this.emit('finishedSending');
 
-        logger.whatsapp.info(`Message sending finished - session remains active for status updates`, {
+        log.info(`Message sending finished - session remains active for status updates`, {
           sessionId: session.sessionId,
           date: date,
           totalResults: results.length,
@@ -1486,7 +1486,7 @@ class WhatsAppService extends EventEmitter {
     try {
       const sentMessage = await this.clientState.client!.sendMessage(chatId, message);
 
-      logger.whatsapp.debug(`Message sent to ${number} (normalized: ${cleanNumber})`);
+      log.debug(`Message sent to ${number} (normalized: ${cleanNumber})`);
 
       if (session) {
         const registered = session.registerMessage(
@@ -1496,7 +1496,7 @@ class WhatsAppService extends EventEmitter {
         );
 
         if (!registered) {
-          logger.whatsapp.warn('Failed to register message in session', {
+          log.warn('Failed to register message in session', {
             messageId: sentMessage.id.id,
             appointmentId,
             appointmentDate,
@@ -1518,9 +1518,9 @@ class WhatsAppService extends EventEmitter {
       if (appointmentId) {
         try {
           await messagingQueries.updateWhatsAppStatus([appointmentId], [sentMessage.id.id]);
-          logger.whatsapp.debug(`Marked appointment ${appointmentId} as sent in database`);
+          log.debug(`Marked appointment ${appointmentId} as sent in database`);
         } catch (dbError) {
-          logger.whatsapp.error(
+          log.error(
             `Failed to mark appointment ${appointmentId} as sent`,
             dbError
           );
@@ -1571,15 +1571,15 @@ class WhatsAppService extends EventEmitter {
     try {
       const sentMessage = await this.clientState.client!.sendMessage(chatId, message);
 
-      logger.whatsapp.debug(`Message sent to ${number} (normalized: ${cleanNumber})`);
+      log.debug(`Message sent to ${number} (normalized: ${cleanNumber})`);
 
       // Update database if appointmentId provided
       if (appointmentId) {
         try {
           await messagingQueries.updateWhatsAppStatus([appointmentId], [sentMessage.id.id]);
-          logger.whatsapp.debug(`Marked appointment ${appointmentId} as sent in database`);
+          log.debug(`Marked appointment ${appointmentId} as sent in database`);
         } catch (dbError) {
-          logger.whatsapp.error(
+          log.error(
             `Failed to mark appointment ${appointmentId} as sent`,
             dbError
           );
@@ -1620,7 +1620,7 @@ class WhatsAppService extends EventEmitter {
 
     return this.circuitBreaker.execute(async () => {
       try {
-        logger.whatsapp.info(`Generating WhatsApp report for date: ${date}`);
+        log.info(`Generating WhatsApp report for date: ${date}`);
 
         const messages = await messagingQueries.getWhatsAppDeliveryStatus(date);
 
@@ -1640,7 +1640,7 @@ class WhatsAppService extends EventEmitter {
                 });
               }
             } catch (error) {
-              logger.whatsapp.error(`Error checking message ${msg.wamid}`, error);
+              log.error(`Error checking message ${msg.wamid}`, error);
             }
           }
 
@@ -1652,47 +1652,47 @@ class WhatsAppService extends EventEmitter {
         await this.messageState.setFinishReport(true);
         this.emit('finishedSending');
 
-        logger.whatsapp.info(`Report generated for ${messages.length} messages`);
+        log.info(`Report generated for ${messages.length} messages`);
         return { success: true, messagesChecked: messages.length };
       } catch (error) {
-        logger.whatsapp.error('Error generating report', error);
+        log.error('Error generating report', error);
         throw error;
       }
     }, 'generate-report');
   }
 
   async clear(): Promise<{ success: boolean }> {
-    logger.whatsapp.info('Clearing message state');
+    log.info('Clearing message state');
     await this.messageState.reset();
     return { success: true };
   }
 
   async initializeOnDemand(): Promise<boolean> {
-    logger.whatsapp.debug('initializeOnDemand called - checking conditions');
+    log.debug('initializeOnDemand called - checking conditions');
 
     if (
       this.clientState.isState('CONNECTED') ||
       this.clientState.isState('INITIALIZING')
     ) {
-      logger.whatsapp.debug('Client already connected or initializing');
+      log.debug('Client already connected or initializing');
       return this.clientState.initializationPromise || true;
     }
 
     if (this.messageState.activeQRViewers === 0) {
-      logger.whatsapp.debug('No QR viewers, skipping initialization');
+      log.debug('No QR viewers, skipping initialization');
       return false;
     }
 
     if (this.circuitBreaker.getStatus().isOpen) {
-      logger.whatsapp.warn('Circuit breaker is open, cannot auto-initialize');
+      log.warn('Circuit breaker is open, cannot auto-initialize');
       return false;
     }
 
-    logger.whatsapp.info('Auto-initializing WhatsApp client');
+    log.info('Auto-initializing WhatsApp client');
     try {
       return await this.initialize();
     } catch (error) {
-      logger.whatsapp.error('Failed to auto-initialize', error);
+      log.error('Failed to auto-initialize', error);
       return false;
     }
   }
@@ -1711,19 +1711,19 @@ class WhatsAppService extends EventEmitter {
 
     return this.circuitBreaker.execute(async () => {
       try {
-        logger.whatsapp.debug(`Executing queued operation: ${operationName}`);
+        log.debug(`Executing queued operation: ${operationName}`);
         const result = await operation(this.clientState.client!);
-        logger.whatsapp.debug(`Queued operation completed successfully: ${operationName}`);
+        log.debug(`Queued operation completed successfully: ${operationName}`);
         return result;
       } catch (error) {
-        logger.whatsapp.error(`Queued operation failed: ${operationName}`, error);
+        log.error(`Queued operation failed: ${operationName}`, error);
         throw error;
       }
     }, operationName);
   }
 
   async gracefulShutdown(signal = 'manual'): Promise<void> {
-    logger.whatsapp.info(`Graceful shutdown initiated (${signal})`);
+    log.info(`Graceful shutdown initiated (${signal})`);
 
     try {
       this.messageState.manualDisconnect = true;
@@ -1734,9 +1734,9 @@ class WhatsAppService extends EventEmitter {
 
       await this.messageState.cleanup();
 
-      logger.whatsapp.info('Graceful shutdown completed');
+      log.info('Graceful shutdown completed');
     } catch (error) {
-      logger.whatsapp.error('Error during graceful shutdown', error);
+      log.error('Error during graceful shutdown', error);
     }
   }
 
@@ -1760,7 +1760,7 @@ class WhatsAppService extends EventEmitter {
   }
 
   async forceDestroy(): Promise<void> {
-    logger.whatsapp.warn('Force destroying WhatsApp client');
+    log.warn('Force destroying WhatsApp client');
 
     this.clientState.destroyInProgress = true;
 
@@ -1775,7 +1775,7 @@ class WhatsAppService extends EventEmitter {
         try {
           await this.clientState.client.destroy();
         } catch (error) {
-          logger.whatsapp.error('Error during force destroy', error);
+          log.error('Error during force destroy', error);
         }
         this.clientState.client = null;
       }
@@ -1793,7 +1793,7 @@ class WhatsAppService extends EventEmitter {
   }
 
   async simpleDestroy(): Promise<{ success: boolean; message?: string; error?: string }> {
-    logger.whatsapp.info(
+    log.info(
       'Destroying WhatsApp client - closing browser but preserving authentication'
     );
 
@@ -1806,11 +1806,11 @@ class WhatsAppService extends EventEmitter {
 
         try {
           await this.clientState.client.destroy();
-          logger.whatsapp.info(
+          log.info(
             'WhatsApp client destroyed successfully - authentication preserved'
           );
         } catch (error) {
-          logger.whatsapp.error('Error during destroy', error);
+          log.error('Error during destroy', error);
           await this.forceCloseBrowser();
         }
         this.clientState.client = null;
@@ -1829,7 +1829,7 @@ class WhatsAppService extends EventEmitter {
         message: 'Client destroyed - browser closed, authentication preserved',
       };
     } catch (error) {
-      logger.whatsapp.error('Error during simple destruction', error);
+      log.error('Error during simple destruction', error);
       await this.forceCloseBrowser();
       return { success: false, error: 'Destroy failed: ' + (error as Error).message };
     } finally {
@@ -1841,7 +1841,7 @@ class WhatsAppService extends EventEmitter {
   }
 
   async completeLogout(): Promise<{ success: boolean; message?: string; error?: string }> {
-    logger.whatsapp.info(
+    log.info(
       'Starting complete WhatsApp client logout with authentication cleanup'
     );
 
@@ -1854,15 +1854,15 @@ class WhatsAppService extends EventEmitter {
 
         try {
           await this.clientState.client.logout();
-          logger.whatsapp.info(
+          log.info(
             'WhatsApp client logged out successfully - authentication cleared by logout()'
           );
         } catch (error) {
-          logger.whatsapp.error('Error during logout', error);
+          log.error('Error during logout', error);
           try {
             await this.clientState.client.destroy();
           } catch (destroyError) {
-            logger.whatsapp.error('Error during destroy', destroyError);
+            log.error('Error during destroy', destroyError);
             await this.forceCloseBrowser();
           }
         }
@@ -1882,7 +1882,7 @@ class WhatsAppService extends EventEmitter {
         message: 'Client logged out - authentication completely cleared',
       };
     } catch (error) {
-      logger.whatsapp.error('Error during complete logout', error);
+      log.error('Error during complete logout', error);
       await this.forceCloseBrowser();
       return { success: false, error: 'Logout failed: ' + (error as Error).message };
     } finally {
@@ -1935,7 +1935,7 @@ class WhatsAppService extends EventEmitter {
       const sessionPath = '.wwebjs_auth/session-client/Default';
 
       if (!(await exists(sessionPath))) {
-        logger.whatsapp.debug('Session quality: none (path does not exist)');
+        log.debug('Session quality: none (path does not exist)');
         return 'none';
       }
 
@@ -1944,13 +1944,13 @@ class WhatsAppService extends EventEmitter {
         const sessionAgeMs = Date.now() - sessionStats.birthtimeMs;
 
         if (sessionAgeMs < 10000) {
-          logger.whatsapp.debug(
+          log.debug(
             `Session quality: new (session created ${Math.floor(sessionAgeMs / 1000)}s ago, assuming valid)`
           );
           return 'valid';
         }
       } catch {
-        logger.whatsapp.debug('Could not determine session age, continuing validation');
+        log.debug('Could not determine session age, continuing validation');
       }
 
       const indexedDBPath = path.default.join(sessionPath, 'IndexedDB');
@@ -1965,7 +1965,7 @@ class WhatsAppService extends EventEmitter {
           const parentAgeMs = Date.now() - parentStats.mtimeMs;
 
           if (parentAgeMs < 30000) {
-            logger.whatsapp.debug(
+            log.debug(
               `Session quality: initializing (modified ${Math.floor(parentAgeMs / 1000)}s ago, waiting for IndexedDB)`
             );
             return 'valid';
@@ -1974,7 +1974,7 @@ class WhatsAppService extends EventEmitter {
           // Can't determine age, continue
         }
 
-        logger.whatsapp.debug('Session quality: empty (IndexedDB directory missing after 30s)');
+        log.debug('Session quality: empty (IndexedDB directory missing after 30s)');
         return 'empty';
       }
 
@@ -1984,7 +1984,7 @@ class WhatsAppService extends EventEmitter {
           const indexedDBFiles = await fsp.readdir(indexedDBWhatsAppPath);
           indexedDBDataFileCount = indexedDBFiles.filter((f) => f.endsWith('.ldb')).length;
 
-          logger.whatsapp.debug(
+          log.debug(
             `IndexedDB contains ${indexedDBDataFileCount} WhatsApp data files`
           );
 
@@ -1999,7 +1999,7 @@ class WhatsAppService extends EventEmitter {
             if (manifestName) {
               const manifestPath = path.default.join(indexedDBWhatsAppPath, manifestName);
               if (!(await exists(manifestPath))) {
-                logger.whatsapp.warn(
+                log.warn(
                   `Session quality: corrupted (CURRENT references missing ${manifestName})`
                 );
                 return 'corrupted';
@@ -2007,7 +2007,7 @@ class WhatsAppService extends EventEmitter {
             }
           }
         } catch (error) {
-          logger.whatsapp.warn('Session quality: corrupted (IndexedDB read error)', {
+          log.warn('Session quality: corrupted (IndexedDB read error)', {
             error: (error as Error).message,
           });
           return 'corrupted';
@@ -2019,9 +2019,9 @@ class WhatsAppService extends EventEmitter {
       if (await exists(leveldbPath)) {
         try {
           const leveldbFiles = await fsp.readdir(leveldbPath);
-          logger.whatsapp.debug(`Local Storage contains ${leveldbFiles.length} files`);
+          log.debug(`Local Storage contains ${leveldbFiles.length} files`);
         } catch (error) {
-          logger.whatsapp.warn('Session quality: corrupted (leveldb read error)', {
+          log.warn('Session quality: corrupted (leveldb read error)', {
             error: (error as Error).message,
           });
           return 'corrupted';
@@ -2042,11 +2042,11 @@ class WhatsAppService extends EventEmitter {
                 totalSize += stats.size;
               }
             } catch {
-              logger.whatsapp.debug(`Skipping file in size calculation: ${filePath}`);
+              log.debug(`Skipping file in size calculation: ${filePath}`);
             }
           }
         } catch {
-          logger.whatsapp.debug(`Skipping directory in size calculation: ${dirPath}`);
+          log.debug(`Skipping directory in size calculation: ${dirPath}`);
         }
       };
 
@@ -2058,47 +2058,47 @@ class WhatsAppService extends EventEmitter {
         // wiped the .ldb files, the session is unrecoverable even though
         // Local Storage / cookies remain.
         if (indexedDBDataFileCount === 0) {
-          logger.whatsapp.warn(
+          log.warn(
             `Session quality: corrupted (size ${Math.floor(totalSize / 1024)}KB but 0 IndexedDB data files - auth keys gone)`
           );
           return 'corrupted';
         }
-        logger.whatsapp.info(
+        log.info(
           `Session quality: valid (size ${Math.floor(totalSize / 1024)}KB, mature session)`
         );
         return 'valid';
       }
 
       if (totalSize > 100 * 1024 && indexedDBDataFileCount >= 5) {
-        logger.whatsapp.info(
+        log.info(
           `Session quality: valid (size ${Math.floor(totalSize / 1024)}KB, ${indexedDBDataFileCount} IndexedDB files)`
         );
         return 'valid';
       }
 
       if (totalSize > 10 * 1024 && indexedDBDataFileCount > 0) {
-        logger.whatsapp.info(
+        log.info(
           `Session quality: valid (size ${Math.floor(totalSize / 1024)}KB, ${indexedDBDataFileCount} IndexedDB files, fresh session)`
         );
         return 'valid';
       }
 
       if (totalSize < 10 * 1024) {
-        logger.whatsapp.debug(`Session quality: empty (size ${totalSize} bytes < 10KB after 10s)`);
+        log.debug(`Session quality: empty (size ${totalSize} bytes < 10KB after 10s)`);
         return 'empty';
       }
 
       if (indexedDBDataFileCount === 0) {
-        logger.whatsapp.debug(`Session quality: empty (no IndexedDB data files after 10s)`);
+        log.debug(`Session quality: empty (no IndexedDB data files after 10s)`);
         return 'empty';
       }
 
-      logger.whatsapp.info(
+      log.info(
         `Session quality: valid (size ${Math.floor(totalSize / 1024)}KB, assuming valid by default)`
       );
       return 'valid';
     } catch (error) {
-      logger.whatsapp.error('Error validating session quality', {
+      log.error('Error validating session quality', {
         error: (error as Error).message,
       });
       return 'corrupted';
@@ -2115,15 +2115,15 @@ class WhatsAppService extends EventEmitter {
     const sessionPath = '.wwebjs_auth/session-client';
 
     if (!fs.default.existsSync(sessionPath)) {
-      logger.whatsapp.debug('No session directory to clean up');
+      log.debug('No session directory to clean up');
       return { success: true, reason: 'no_session' };
     }
 
-    logger.whatsapp.info('Deleting session directory without backup');
+    log.info('Deleting session directory without backup');
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        logger.whatsapp.info(`Attempting session cleanup (attempt ${attempt}/${maxRetries})`);
+        log.info(`Attempting session cleanup (attempt ${attempt}/${maxRetries})`);
 
         fs.default.rmSync(sessionPath, {
           recursive: true,
@@ -2132,20 +2132,20 @@ class WhatsAppService extends EventEmitter {
           retryDelay: 1000,
         });
 
-        logger.whatsapp.info('Session cleaned up successfully', { attempt });
+        log.info('Session cleaned up successfully', { attempt });
         return { success: true, reason: 'deleted', attempt };
       } catch (error) {
-        logger.whatsapp.error(`Session cleanup attempt ${attempt} failed`, {
+        log.error(`Session cleanup attempt ${attempt} failed`, {
           error: (error as Error).message,
           code: (error as NodeJS.ErrnoException).code,
         });
 
         if (attempt < maxRetries) {
           const delay = 1000 * Math.pow(2, attempt - 1);
-          logger.whatsapp.info(`Waiting ${delay}ms before retry...`);
+          log.info(`Waiting ${delay}ms before retry...`);
           await new Promise((resolve) => setTimeout(resolve, delay));
         } else {
-          logger.whatsapp.error('Session cleanup failed after all retries', {
+          log.error('Session cleanup failed after all retries', {
             maxRetries,
             error: (error as Error).message,
           });

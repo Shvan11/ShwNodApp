@@ -117,39 +117,6 @@ export type {
   FileUploadRequest,
 } from './api.types.js';
 
-// WebSocket types
-export type {
-  // Connection types
-  ConnectionStatus,
-  ConnectionState,
-
-  // Message types
-  WebSocketMessage,
-
-  // Event data types
-  ConnectionEstablishedData,
-  AppointmentUpdateData,
-  ChairDisplayPatientLoadedData,
-  ChairDisplayPatientClearedData,
-
-  // WhatsApp types
-  WhatsAppMessageStatusValue,
-  WhatsAppMessageStatus,
-  WhatsAppBatchStatus,
-  WhatsAppQRData,
-  WhatsAppClientState,
-  WhatsAppSessionStatus,
-
-  // Client types
-  WebSocketConfig,
-  EventHandler,
-  EventListenerMap,
-
-  // Server types
-  WSClientInfo,
-  BroadcastOptions,
-} from './websocket.types.js';
-
 // Config types
 export type {
   // Database config

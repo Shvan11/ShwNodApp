@@ -86,7 +86,15 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
             const response = await fetch('/api/employees?getAppointments=true');
             if (!response.ok) throw new Error('Failed to load employees');
             const data = await response.json();
-            setDoctors(data?.employees || []);
+            const employees: Doctor[] = data?.employees || [];
+            // "Clinic" is the most common assignment, so float it to the top of the
+            // dropdown; everyone else keeps the server's SortOrder (Array.sort is stable).
+            employees.sort((a, b) => {
+                if (a.employeeName === 'Clinic') return -1;
+                if (b.employeeName === 'Clinic') return 1;
+                return 0;
+            });
+            setDoctors(employees);
         } catch (err) {
             console.error('Error loading employees:', err);
             setError(err instanceof Error ? err.message : 'Unknown error');

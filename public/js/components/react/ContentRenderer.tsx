@@ -4,6 +4,7 @@ import XraysComponent from './XraysComponent';
 import VisitsComponent from './VisitsComponent';
 import NewVisitComponent from './NewVisitComponent';
 import CompareComponent from './CompareComponent';
+import PatientSlideshow from './slideshow/PatientSlideshow';
 import AppointmentForm from './AppointmentForm';
 import EditAppointmentForm from './EditAppointmentForm';
 import WorkComponent from './WorkComponent';
@@ -138,6 +139,13 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                     <CompareComponent
                         personId={personId}
                         phone={params.phone}
+                    />
+                );
+
+            case 'slideshow':
+                return (
+                    <PatientSlideshow
+                        personId={personId}
                     />
                 );
 

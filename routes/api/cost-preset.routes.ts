@@ -42,11 +42,14 @@ interface CostPresetBody {
 }
 
 /**
- * Route params for cost preset by ID
+ * Route params for cost preset by ID.
+ * Declared as a `type` (not `interface`) so it carries an implicit index
+ * signature and stays assignable to Express's ParamsDictionary on the
+ * multi-handler (authenticate + authorize) overload used below.
  */
-interface CostPresetParams {
+type CostPresetParams = {
   id: string;
-}
+};
 
 const VALID_CURRENCIES: Currency[] = ['IQD', 'USD', 'EUR'];
 
@@ -122,7 +125,7 @@ router.post('/settings/cost-presets', authenticate, authorize(['admin']), async 
  * Update an existing cost preset
  * Body: { amount: number, currency: string, displayOrder: number }
  */
-router.put('/settings/cost-presets/:id', authenticate, authorize(['admin']), async (req: Request<{ id: string }, object, CostPresetBody>, res: Response): Promise<void> => {
+router.put('/settings/cost-presets/:id', authenticate, authorize(['admin']), async (req: Request<CostPresetParams, object, CostPresetBody>, res: Response): Promise<void> => {
   try {
     const presetId = parseInt(req.params.id);
     const { amount, currency, displayOrder = 0 } = req.body;
@@ -159,7 +162,7 @@ router.put('/settings/cost-presets/:id', authenticate, authorize(['admin']), asy
  * DELETE /settings/cost-presets/:id
  * Delete a cost preset
  */
-router.delete('/settings/cost-presets/:id', authenticate, authorize(['admin']), async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+router.delete('/settings/cost-presets/:id', authenticate, authorize(['admin']), async (req: Request<CostPresetParams>, res: Response): Promise<void> => {
   try {
     const presetId = parseInt(req.params.id);
 

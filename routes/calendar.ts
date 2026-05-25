@@ -12,7 +12,7 @@ import {
   TYPES,
   type SqlParam
 } from '../services/database/index.js';
-import { logger } from '../services/core/Logger.js';
+import { log } from '../utils/logger.js';
 import { getHolidaysInRange } from '../services/database/queries/holiday-queries.js';
 
 const router = Router();
@@ -156,8 +156,7 @@ router.get(
       const filterMsg = doctorId
         ? ` (filtered by doctor ID: ${doctorId})`
         : '';
-      logger.info(
-        'SYS',
+      log.info(
         `📅 Fetching calendar data for week: ${weekStart} to ${weekEnd}${filterMsg}`
       );
 
@@ -172,7 +171,7 @@ router.get(
           ? parseInt(maxAppointmentsSetting[0], 10)
           : 3; // Default to 3 if not set
 
-      logger.info('SYS', `⚙️ Max appointments per slot: ${maxAppointmentsPerSlot}`);
+      log.info(`⚙️ Max appointments per slot: ${maxAppointmentsPerSlot}`);
 
       // Ensure calendar has enough future dates
       await executeStoredProcedure('ProcEnsureCalendarRange', [
@@ -229,7 +228,7 @@ router.get(
         holidayMap
       );
 
-      logger.system.info(
+      log.info(
         `✅ Calendar data retrieved: ${calendarData.length} slots, ${structuredData.days.length} days, ${holidays.length} holidays`
       );
 
@@ -244,7 +243,7 @@ router.get(
         ...structuredData
       });
     } catch (error) {
-      logger.system.error('❌ Calendar week API error:', error);
+      log.error('❌ Calendar week API error:', error);
       res.status(500).json({
         success: false,
         error: 'Failed to fetch calendar data',
@@ -284,7 +283,7 @@ router.get(
       const filterMsg = doctorId
         ? ` (filtered by doctor ID: ${doctorId})`
         : '';
-      logger.system.info(
+      log.info(
         `📅 Fetching monthly calendar data: ${gridStart} to ${gridEnd}${filterMsg}`
       );
 
@@ -299,7 +298,7 @@ router.get(
           ? parseInt(maxAppointmentsSetting[0], 10)
           : 3;
 
-      logger.info('SYS', `⚙️ Max appointments per slot: ${maxAppointmentsPerSlot}`);
+      log.info(`⚙️ Max appointments per slot: ${maxAppointmentsPerSlot}`);
 
       // Ensure calendar has enough future dates
       await executeStoredProcedure('ProcEnsureCalendarRange', [
@@ -358,7 +357,7 @@ router.get(
         holidayMap
       );
 
-      logger.system.info(
+      log.info(
         `✅ Monthly calendar data retrieved: ${monthlyData.days.length} days, ${holidays.length} holidays`
       );
 
@@ -374,7 +373,7 @@ router.get(
         ...monthlyData
       });
     } catch (error) {
-      logger.system.error('❌ Calendar month API error:', error);
+      log.error('❌ Calendar month API error:', error);
       res.status(500).json({
         success: false,
         error: 'Failed to fetch monthly calendar data',
@@ -408,7 +407,7 @@ router.get(
       const weekStart = getWeekStart(new Date(date));
       const weekEnd = getWeekEnd(weekStart);
 
-      logger.system.info(
+      log.info(
         `📊 Fetching calendar stats for week: ${weekStart} to ${weekEnd}`
       );
 
@@ -430,7 +429,7 @@ router.get(
         })
       );
 
-      logger.system.info(
+      log.info(
         `✅ Calendar stats retrieved: ${stats[0]?.utilizationPercent}% utilization`
       );
 
@@ -447,7 +446,7 @@ router.get(
         }
       });
     } catch (error) {
-      logger.system.error('❌ Calendar stats API error:', error);
+      log.error('❌ Calendar stats API error:', error);
       res.status(500).json({
         success: false,
         error: 'Failed to fetch calendar statistics',
@@ -465,7 +464,7 @@ router.get(
   '/time-slots',
   async (_req: Request, res: Response): Promise<void> => {
     try {
-      logger.system.info('🕐 Fetching time slots from tbltimes');
+      log.info('🕐 Fetching time slots from tbltimes');
 
       const timeSlots = await executeQuery<TimeSlot>(
         'SELECT TimeID, MyTime FROM tbltimes ORDER BY TimeID',
@@ -477,7 +476,7 @@ router.get(
         })
       );
 
-      logger.system.info(`✅ Retrieved ${timeSlots.length} time slots`);
+      log.info(`✅ Retrieved ${timeSlots.length} time slots`);
 
       res.json({
         success: true,
@@ -485,7 +484,7 @@ router.get(
         totalSlots: timeSlots.length
       });
     } catch (error) {
-      logger.system.error('❌ Time slots API error:', error);
+      log.error('❌ Time slots API error:', error);
       res.status(500).json({
         success: false,
         error: 'Failed to fetch time slots',
@@ -514,7 +513,7 @@ router.get(
       }
 
       const targetDate = new Date(date);
-      logger.system.info(
+      log.info(
         `📅 Fetching day appointments for: ${targetDate.toISOString().split('T')[0]}`
       );
 
@@ -533,7 +532,7 @@ router.get(
         })
       );
 
-      logger.system.info(
+      log.info(
         `✅ Retrieved ${dayAppointments.length} appointments for ${date}`
       );
 
@@ -544,7 +543,7 @@ router.get(
         totalAppointments: dayAppointments.length
       });
     } catch (error) {
-      logger.system.error('❌ Day appointments API error:', error);
+      log.error('❌ Day appointments API error:', error);
       res.status(500).json({
         success: false,
         error: 'Failed to fetch day appointments',
@@ -563,7 +562,7 @@ router.post(
   '/regenerate',
   async (_req: Request, res: Response): Promise<void> => {
     try {
-      logger.system.info('🔄 Regenerating calendar entries...');
+      log.info('🔄 Regenerating calendar entries...');
 
       const result = await executeStoredProcedure<{ DaysAdded: number }>(
         'FillCalender',
@@ -575,7 +574,7 @@ router.post(
       );
 
       const daysAdded = result[0]?.DaysAdded || 0;
-      logger.system.info(`✅ Calendar regeneration complete: ${daysAdded} entries added`);
+      log.info(`✅ Calendar regeneration complete: ${daysAdded} entries added`);
 
       res.json({
         success: true,
@@ -585,7 +584,7 @@ router.post(
           : 'Calendar is already up to date'
       });
     } catch (error) {
-      logger.system.error('❌ Calendar regeneration error:', error);
+      log.error('❌ Calendar regeneration error:', error);
       res.status(500).json({
         success: false,
         error: 'Failed to regenerate calendar',
@@ -608,7 +607,7 @@ router.post(
     try {
       const { daysAhead = 60 } = req.body;
 
-      logger.system.info(`🔄 Ensuring calendar range: ${daysAhead} days ahead`);
+      log.info(`🔄 Ensuring calendar range: ${daysAhead} days ahead`);
 
       const result = await executeStoredProcedure<{
         status: string;
@@ -625,14 +624,14 @@ router.post(
         })
       );
 
-      logger.system.info(`✅ Calendar range check completed: ${result[0]?.status}`);
+      log.info(`✅ Calendar range check completed: ${result[0]?.status}`);
 
       res.json({
         success: true,
         result: result[0] || { status: 'No update needed' }
       });
     } catch (error) {
-      logger.system.error('❌ Calendar range API error:', error);
+      log.error('❌ Calendar range API error:', error);
       res.status(500).json({
         success: false,
         error: 'Failed to ensure calendar range',
@@ -663,7 +662,7 @@ router.get(
         return;
       }
 
-      logger.system.info(`🕐 Fetching all slots with details for: ${date}`);
+      log.info(`🕐 Fetching all slots with details for: ${date}`);
 
       // Fetch max appointments per slot setting
       const maxAppointmentsSetting = await executeQuery<string>(
@@ -745,7 +744,7 @@ router.get(
         });
       }
 
-      logger.system.info(
+      log.info(
         `✅ Found ${allSlots.length} total slots, ${availableCount} available for ${date}`
       );
 
@@ -758,7 +757,7 @@ router.get(
         maxAppointmentsPerSlot
       });
     } catch (error) {
-      logger.system.error('❌ Available slots API error:', error);
+      log.error('❌ Available slots API error:', error);
       res.status(500).json({
         success: false,
         error: 'Failed to fetch available slots',
@@ -789,7 +788,7 @@ router.get(
         return;
       }
 
-      logger.system.info(
+      log.info(
         `📅 Fetching month availability: ${startDate} to ${endDate}`
       );
 
@@ -912,7 +911,7 @@ router.get(
         };
       });
 
-      logger.system.info(
+      log.info(
         `✅ Month availability calculated for ${Object.keys(availability).length} days, ${holidays.length} holidays`
       );
 
@@ -925,7 +924,7 @@ router.get(
         maxAppointmentsPerSlot
       });
     } catch (error) {
-      logger.system.error('❌ Month availability API error:', error);
+      log.error('❌ Month availability API error:', error);
       res.status(500).json({
         success: false,
         error: 'Failed to fetch month availability',

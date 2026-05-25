@@ -5,7 +5,7 @@
  * preventing cross-date contamination and ensuring data integrity.
  */
 
-import { logger } from '../core/Logger.js';
+import { log } from '../../utils/logger.js';
 
 // ===========================================
 // SESSION TYPES
@@ -159,7 +159,7 @@ export class MessageSession {
       deliveryStatusUpdates: 0,
     };
 
-    logger.whatsapp.info('MessageSession created', {
+    log.info('MessageSession created', {
       sessionId: this.sessionId,
       date: this.date,
       startTime: this.startTime.toISOString(),
@@ -206,7 +206,7 @@ export class MessageSession {
     this.status = 'EXPIRED';
 
     const age = Date.now() - this.startTime.getTime();
-    logger.whatsapp.info('MessageSession expired - no longer accepting ACKs', {
+    log.info('MessageSession expired - no longer accepting ACKs', {
       sessionId: this.sessionId,
       date: this.date,
       previousStatus,
@@ -237,7 +237,7 @@ export class MessageSession {
     this.status = 'ACTIVE';
     this.startTime = new Date();
 
-    logger.whatsapp.info('MessageSession started', {
+    log.info('MessageSession started', {
       sessionId: this.sessionId,
       date: this.date,
     });
@@ -265,7 +265,7 @@ export class MessageSession {
       const error = new Error(
         `Date mismatch: Session for ${this.date}, appointment for ${appointmentDateStr}`
       );
-      logger.whatsapp.error('MessageSession date validation failed', {
+      log.error('MessageSession date validation failed', {
         sessionId: this.sessionId,
         sessionDate: this.date,
         appointmentDate: appointmentDateStr,
@@ -277,7 +277,7 @@ export class MessageSession {
 
     // Memory leak protection: Check message limit
     if (this.messageIdToAppointmentMap.size >= this.maxMessages) {
-      logger.whatsapp.error('Session message limit reached, rejecting new message', {
+      log.error('Session message limit reached, rejecting new message', {
         sessionId: this.sessionId,
         currentMessages: this.messageIdToAppointmentMap.size,
         maxMessages: this.maxMessages,
@@ -290,7 +290,7 @@ export class MessageSession {
     // Prevent duplicate registrations
     if (this.messageIdToAppointmentMap.has(messageId)) {
       const existing = this.messageIdToAppointmentMap.get(messageId);
-      logger.whatsapp.warn('Duplicate message ID registration attempted', {
+      log.warn('Duplicate message ID registration attempted', {
         sessionId: this.sessionId,
         messageId,
         existingAppointmentId: existing?.appointmentId,
@@ -300,7 +300,7 @@ export class MessageSession {
     }
 
     if (this.processedAppointments.has(appointmentId)) {
-      logger.whatsapp.warn('Appointment already processed in this session', {
+      log.warn('Appointment already processed in this session', {
         sessionId: this.sessionId,
         appointmentId,
         existingMessageId: this.appointmentIdToMessageMap.get(appointmentId),
@@ -321,7 +321,7 @@ export class MessageSession {
     this.processedAppointments.add(appointmentId);
     this.stats.totalMessages++;
 
-    logger.whatsapp.debug('Message registered in session', {
+    log.debug('Message registered in session', {
       sessionId: this.sessionId,
       messageId,
       appointmentId,
@@ -337,7 +337,7 @@ export class MessageSession {
   getAppointmentId(messageId: string): number | null {
     // Check if session can still accept ACKs
     if (!this.canAcceptAcks()) {
-      logger.whatsapp.debug('Session cannot accept ACKs - message lookup rejected', {
+      log.debug('Session cannot accept ACKs - message lookup rejected', {
         sessionId: this.sessionId,
         messageId,
         status: this.status,
@@ -350,7 +350,7 @@ export class MessageSession {
     const mapping = this.messageIdToAppointmentMap.get(messageId);
 
     if (!mapping) {
-      logger.whatsapp.debug('Message ID not found in session', {
+      log.debug('Message ID not found in session', {
         sessionId: this.sessionId,
         messageId,
         status: this.status,
@@ -360,7 +360,7 @@ export class MessageSession {
 
     // Additional validation
     if (mapping.sessionId !== this.sessionId) {
-      logger.whatsapp.error('Session ID mismatch in mapping', {
+      log.error('Session ID mismatch in mapping', {
         sessionId: this.sessionId,
         mappingSessionId: mapping.sessionId,
         messageId,
@@ -380,7 +380,7 @@ export class MessageSession {
       mapping.sentAt = new Date();
       this.stats.sentMessages++;
 
-      logger.whatsapp.debug('Message sent recorded', {
+      log.debug('Message sent recorded', {
         sessionId: this.sessionId,
         messageId,
         appointmentId: mapping.appointmentId,
@@ -398,7 +398,7 @@ export class MessageSession {
       mapping.error = error;
       this.stats.failedMessages++;
 
-      logger.whatsapp.debug('Message failure recorded', {
+      log.debug('Message failure recorded', {
         sessionId: this.sessionId,
         messageId,
         appointmentId: mapping.appointmentId,
@@ -413,7 +413,7 @@ export class MessageSession {
   recordDeliveryStatusUpdate(messageId: string, status: string): boolean {
     // Check if session can still accept ACKs
     if (!this.canAcceptAcks()) {
-      logger.whatsapp.debug('Session cannot accept ACKs - delivery status update rejected', {
+      log.debug('Session cannot accept ACKs - delivery status update rejected', {
         sessionId: this.sessionId,
         messageId,
         status,
@@ -437,7 +437,7 @@ export class MessageSession {
 
       this.stats.deliveryStatusUpdates++;
 
-      logger.whatsapp.debug('Delivery status update recorded', {
+      log.debug('Delivery status update recorded', {
         sessionId: this.sessionId,
         messageId,
         appointmentId: mapping.appointmentId,
@@ -456,7 +456,7 @@ export class MessageSession {
    */
   complete(): void {
     if (this.status !== 'ACTIVE') {
-      logger.whatsapp.warn('Attempting to complete session in invalid status', {
+      log.warn('Attempting to complete session in invalid status', {
         sessionId: this.sessionId,
         currentStatus: this.status,
       });
@@ -467,7 +467,7 @@ export class MessageSession {
     this.endTime = new Date();
     const duration = this.endTime.getTime() - this.startTime.getTime();
 
-    logger.whatsapp.info('MessageSession completed', {
+    log.info('MessageSession completed', {
       sessionId: this.sessionId,
       date: this.date,
       duration: `${duration}ms`,
@@ -516,7 +516,7 @@ export class MessageSession {
     this.appointmentIdToMessageMap.clear();
     this.processedAppointments.clear();
 
-    logger.whatsapp.info('MessageSession cleaned up', {
+    log.info('MessageSession cleaned up', {
       sessionId: this.sessionId,
       previousStatus,
       clearedMessages: messageCount,

@@ -1,0 +1,11 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.empty {
+  padding: var(--spacing-xl);
+  color: var(--text-light);
+  text-align: center;
+}

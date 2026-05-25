@@ -301,52 +301,57 @@ router.get('/statistics/multi-year', async (req: Request<object, object, object,
       return;
     }
 
-    // Fetch data for each year by calling ProcYearlyMonthlyTotals for Jan-Dec
-    const yearlyData: YearTotal[] = [];
-
+    // Fetch each year independently, in parallel — ProcYearlyMonthlyTotals for
+    // one year doesn't depend on any other, so collapse the serial round-trips
+    // (up to 10) into a single wave. Promise.all preserves the year order.
+    const years: number[] = [];
     for (let year = startYearNum; year <= endYearNum; year++) {
-      // Get 12 months of data starting from January of this year
-      const monthlyData = await database.executeStoredProcedure<MonthlyDataRow>(
-        'ProcYearlyMonthlyTotals',
-        [
-          ['startMonth', database.TYPES.Int, 1],
-          ['startYear', database.TYPES.Int, year],
-          ['Ex', database.TYPES.Int, exRate]
-        ],
-        undefined,
-        (columns) => {
-          const row: MonthlyDataRow = {};
-          columns.forEach(column => {
-            row[column.metadata.colName] = column.value as string | number | Date | null;
-          });
-          return row;
-        }
-      );
-
-      // Filter to only include months from this year and aggregate
-      const yearMonths = monthlyData.filter(m => m.Year === year);
-      const yearTotal = yearMonths.reduce<YearTotal>((acc, month) => ({
-        Year: year,
-        SumIQD: acc.SumIQD + (month.SumIQD || 0),
-        SumUSD: acc.SumUSD + (month.SumUSD || 0),
-        ExpensesIQD: acc.ExpensesIQD + (month.ExpensesIQD || 0),
-        ExpensesUSD: acc.ExpensesUSD + (month.ExpensesUSD || 0),
-        FinalIQDSum: acc.FinalIQDSum + (month.FinalIQDSum || 0),
-        FinalUSDSum: acc.FinalUSDSum + (month.FinalUSDSum || 0),
-        GrandTotal: acc.GrandTotal + (month.GrandTotal || 0)
-      }), {
-        Year: year,
-        SumIQD: 0,
-        SumUSD: 0,
-        ExpensesIQD: 0,
-        ExpensesUSD: 0,
-        FinalIQDSum: 0,
-        FinalUSDSum: 0,
-        GrandTotal: 0
-      });
-
-      yearlyData.push(yearTotal);
+      years.push(year);
     }
+
+    const yearlyData: YearTotal[] = await Promise.all(
+      years.map(async (year) => {
+        // Get 12 months of data starting from January of this year
+        const monthlyData = await database.executeStoredProcedure<MonthlyDataRow>(
+          'ProcYearlyMonthlyTotals',
+          [
+            ['startMonth', database.TYPES.Int, 1],
+            ['startYear', database.TYPES.Int, year],
+            ['Ex', database.TYPES.Int, exRate]
+          ],
+          undefined,
+          (columns) => {
+            const row: MonthlyDataRow = {};
+            columns.forEach(column => {
+              row[column.metadata.colName] = column.value as string | number | Date | null;
+            });
+            return row;
+          }
+        );
+
+        // Filter to only include months from this year and aggregate
+        const yearMonths = monthlyData.filter(m => m.Year === year);
+        return yearMonths.reduce<YearTotal>((acc, month) => ({
+          Year: year,
+          SumIQD: acc.SumIQD + (month.SumIQD || 0),
+          SumUSD: acc.SumUSD + (month.SumUSD || 0),
+          ExpensesIQD: acc.ExpensesIQD + (month.ExpensesIQD || 0),
+          ExpensesUSD: acc.ExpensesUSD + (month.ExpensesUSD || 0),
+          FinalIQDSum: acc.FinalIQDSum + (month.FinalIQDSum || 0),
+          FinalUSDSum: acc.FinalUSDSum + (month.FinalUSDSum || 0),
+          GrandTotal: acc.GrandTotal + (month.GrandTotal || 0)
+        }), {
+          Year: year,
+          SumIQD: 0,
+          SumUSD: 0,
+          ExpensesIQD: 0,
+          ExpensesUSD: 0,
+          FinalIQDSum: 0,
+          FinalUSDSum: 0,
+          GrandTotal: 0
+        });
+      })
+    );
 
     // Calculate overall summary
     const summary = yearlyData.reduce<StatisticsSummary>((acc, year) => ({

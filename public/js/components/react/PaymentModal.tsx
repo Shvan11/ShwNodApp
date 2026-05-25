@@ -370,10 +370,10 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         }));
     };
 
-    // Calculate amount to register from cash received (reverse mode)
+    // Reverse mode: Calculate amount to register from cash received when in cash entry mode.
     // Uses same "benefit from conversion" rounding - round DOWN what patient gave
-    const calculateAmountFromCash = () => {
-        if (!exchangeRate) return;
+    useEffect(() => {
+        if (entryMode !== 'cash' || !exchangeRate) return;
 
         const actualUSD = parseFloat(String(formData.actualUSD)) || 0;
         const actualIQD = parseFloat(String(formData.actualIQD)) || 0;
@@ -394,14 +394,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         }
 
         setFormData(prev => ({ ...prev, amountToRegister }));
-    };
-
-    // Reverse mode: Calculate amount from cash when in cash entry mode
-    useEffect(() => {
-        if (entryMode === 'cash' && exchangeRate) {
-            calculateAmountFromCash();
-        }
-    }, [formData.actualUSD, formData.actualIQD, entryMode, exchangeRate, calculateAmountFromCash]);
+    }, [formData.actualUSD, formData.actualIQD, entryMode, exchangeRate, calculations.accountCurrency]);
 
     // Smart calculation for mixed payments
     const handleMixedUSDChange = (value: string) => {

@@ -8,6 +8,7 @@ import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import fs, { promises as fsp, type Stats } from 'fs';
 import path from 'path';
+import { getMediaMimeType } from '../../utils/video-mime.js';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
 import * as videoQueries from '../../services/database/queries/video-queries.js';
@@ -86,23 +87,6 @@ interface UpdateVideoBody {
   description?: string;
   category?: string;
   details?: string;
-}
-
-/**
- * Get MIME type based on file extension
- */
-function getMimeType(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase();
-  const mimeTypes: Record<string, string> = {
-    '.mp4': 'video/mp4',
-    '.webm': 'video/webm',
-    '.ogg': 'video/ogg',
-    '.mov': 'video/quicktime',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.png': 'image/png',
-  };
-  return mimeTypes[ext] || 'application/octet-stream';
 }
 
 /**
@@ -227,7 +211,7 @@ router.get('/:id/stream', async (req: Request<VideoIdParams>, res: Response): Pr
     }
     const fileSize = stat.size;
     const range = req.headers.range;
-    const mimeType = getMimeType(filePath);
+    const mimeType = getMediaMimeType(filePath);
 
     if (range) {
       // Handle range request for video seeking
@@ -294,7 +278,7 @@ router.get('/:id/thumbnail', async (req: Request<VideoIdParams>, res: Response):
       }
       throw err;
     }
-    const mimeType = getMimeType(filePath);
+    const mimeType = getMediaMimeType(filePath);
 
     res.writeHead(200, {
       'Content-Length': stat.size,

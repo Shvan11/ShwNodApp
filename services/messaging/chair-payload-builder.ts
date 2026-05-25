@@ -8,7 +8,7 @@ import { getTimePointImgs } from '../database/queries/timepoint-queries.js';
 import { getLatestVisitsSum } from '../database/queries/visit-queries.js';
 import { getActiveWork } from '../database/queries/work-queries.js';
 import { getPatientById } from '../database/queries/patient-queries.js';
-import { logger } from '../core/Logger.js';
+import { log } from '../../utils/logger.js';
 
 // Mirror of public/js/config/workTypeConfig.ts ORTHO_WORK_TYPES — visit notes
 // only show for active orthodontic work on the chair-side display.
@@ -34,7 +34,7 @@ export async function buildChairPatientPayload(
 ): Promise<ChairPatientPayload | null> {
   const personId = parseInt(pid, 10);
   if (!Number.isFinite(personId) || personId <= 0) {
-    logger.websocket.warn('Invalid personId for chair-display load', { pid });
+    log.warn('Invalid personId for chair-display load', { pid });
     return null;
   }
 
@@ -68,7 +68,7 @@ export async function buildChairPatientPayload(
       latestVisit,
     };
   } catch (error) {
-    logger.websocket.error('Error building chair-display payload', {
+    log.error('Error building chair-display payload', {
       error: (error as Error).message,
       pid,
       chairId,
@@ -83,7 +83,7 @@ async function getPatientImagesLocal(pid: string): Promise<Array<{ name: string 
     const images = await getTimePointImgs(pid, tp);
     return images.map((code: string | number) => ({ name: `${pid}0${tp}.i${code}` }));
   } catch (error) {
-    logger.websocket.error('Error getting patient images', error as Error);
+    log.error('Error getting patient images', error as Error);
     return [];
   }
 }

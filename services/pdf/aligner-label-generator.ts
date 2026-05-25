@@ -89,6 +89,19 @@ const ARABIC_FONTS: Record<string, string> = {
   noto: path.resolve(PROJECT_ROOT, 'fonts/NotoSansArabic.ttf'),
 };
 
+// Font files are fixed bundled assets, but the existence check used to run once
+// per label inside the synchronous draw loop. Memoize it so the fs syscall fires
+// at most once per font path for the life of the process.
+const fontExistsCache = new Map<string, boolean>();
+function arabicFontExists(fontPath: string): boolean {
+  let exists = fontExistsCache.get(fontPath);
+  if (exists === undefined) {
+    exists = fs.existsSync(fontPath);
+    fontExistsCache.set(fontPath, exists);
+  }
+  return exists;
+}
+
 // =============================================================================
 // CONSTANTS - OL291 Label Sheet Specifications
 // =============================================================================
@@ -272,7 +285,7 @@ class AlignerLabelGenerator {
 
         // Register Arabic font
         const fontPath = ARABIC_FONTS[config.arabicFont] || ARABIC_FONTS.cairo;
-        if (fs.existsSync(fontPath)) {
+        if (arabicFontExists(fontPath)) {
           doc.registerFont('ArabicFont', fontPath);
         }
 
@@ -368,7 +381,7 @@ class AlignerLabelGenerator {
 
     // Font selection
     const fontPath = ARABIC_FONTS[config.arabicFont] || ARABIC_FONTS.cairo;
-    const arabicFont = fs.existsSync(fontPath) ? 'ArabicFont' : 'Helvetica';
+    const arabicFont = arabicFontExists(fontPath) ? 'ArabicFont' : 'Helvetica';
 
     // 2. Draw patient name
     const patientIsArabic = hasArabic(patientName);

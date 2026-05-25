@@ -11,7 +11,7 @@ import {
   SessionDebugInfo,
   WhatsAppServiceInterface,
 } from './MessageSession.js';
-import { logger } from '../core/Logger.js';
+import { log } from '../../utils/logger.js';
 
 // ===========================================
 // MANAGER TYPES
@@ -131,7 +131,7 @@ export class MessageSessionManager {
     // Start periodic cleanup
     this.startPeriodicCleanup();
 
-    logger.whatsapp.info('MessageSessionManager initialized', {
+    log.info('MessageSessionManager initialized', {
       ackTrackingWindow: `${this.ackTrackingWindow / 1000}s`,
       cleanupInterval: `${this.cleanupInterval / 1000}s`,
       maxSessionAge: `${this.maxSessionAge / 1000}s`,
@@ -154,14 +154,14 @@ export class MessageSessionManager {
       const existingSession = this.activeSessions.get(normalizedDate)!;
 
       if (existingSession.isValid()) {
-        logger.whatsapp.debug('Reusing existing session', {
+        log.debug('Reusing existing session', {
           date: normalizedDate,
           sessionId: existingSession.sessionId,
         });
         return existingSession;
       } else {
         // Clean up invalid session
-        logger.whatsapp.warn('Cleaning up invalid session', {
+        log.warn('Cleaning up invalid session', {
           date: normalizedDate,
           sessionId: existingSession.sessionId,
           status: existingSession.status,
@@ -172,7 +172,7 @@ export class MessageSessionManager {
 
     // Memory leak protection: Check active session limit
     if (this.activeSessions.size >= this.maxActiveSessions) {
-      logger.whatsapp.warn('Maximum active sessions reached, forcing cleanup', {
+      log.warn('Maximum active sessions reached, forcing cleanup', {
         currentSessions: this.activeSessions.size,
         maxSessions: this.maxActiveSessions,
       });
@@ -184,7 +184,7 @@ export class MessageSessionManager {
         if (oldestDate) {
           const oldestSession = this.activeSessions.get(oldestDate);
           this.completeSession(oldestDate);
-          logger.whatsapp.warn('Forcibly removed oldest session to prevent memory leak', {
+          log.warn('Forcibly removed oldest session to prevent memory leak', {
             removedDate: oldestDate,
             removedSessionId: oldestSession?.sessionId,
           });
@@ -202,7 +202,7 @@ export class MessageSessionManager {
     const session = new MessageSession(normalizedDate, whatsappService, sessionOptions);
     this.activeSessions.set(normalizedDate, session);
 
-    logger.whatsapp.info('New MessageSession created', {
+    log.info('New MessageSession created', {
       date: normalizedDate,
       sessionId: session.sessionId,
       totalActiveSessions: this.activeSessions.size,
@@ -232,7 +232,7 @@ export class MessageSessionManager {
     for (const [date, session] of this.activeSessions) {
       const appointmentId = session.getAppointmentId(messageId);
       if (appointmentId) {
-        logger.whatsapp.debug('Message found in session', {
+        log.debug('Message found in session', {
           messageId,
           appointmentId,
           sessionDate: date,
@@ -246,7 +246,7 @@ export class MessageSessionManager {
       }
     }
 
-    logger.whatsapp.debug('Message not found in any active session', {
+    log.debug('Message not found in any active session', {
       messageId,
       activeSessionCount: this.activeSessions.size,
       activeDates: Array.from(this.activeSessions.keys()),
@@ -262,7 +262,7 @@ export class MessageSessionManager {
     const messageInfo = this.getAppointmentIdForMessage(messageId);
 
     if (!messageInfo) {
-      logger.whatsapp.warn('Cannot record delivery status: message not in any active session', {
+      log.warn('Cannot record delivery status: message not in any active session', {
         messageId,
         status,
       });
@@ -275,7 +275,7 @@ export class MessageSessionManager {
       return messageInfo;
     }
 
-    logger.whatsapp.warn('Cannot record delivery status: session no longer valid', {
+    log.warn('Cannot record delivery status: session no longer valid', {
       messageId,
       status,
       sessionId: messageInfo.sessionId,
@@ -292,7 +292,7 @@ export class MessageSessionManager {
 
     const session = this.activeSessions.get(normalizedDate);
     if (!session) {
-      logger.whatsapp.debug('No active session to complete', { date: normalizedDate });
+      log.debug('No active session to complete', { date: normalizedDate });
       return;
     }
 
@@ -310,7 +310,7 @@ export class MessageSessionManager {
     // Cleanup session resources
     session.cleanup();
 
-    logger.whatsapp.info('Session completed and moved to history', {
+    log.info('Session completed and moved to history', {
       date: normalizedDate,
       sessionId: session.sessionId,
       stats: session.getStats(),
@@ -326,7 +326,7 @@ export class MessageSessionManager {
   completeAllSessions(): void {
     const dates = Array.from(this.activeSessions.keys());
 
-    logger.whatsapp.info('Completing all active sessions', {
+    log.info('Completing all active sessions', {
       sessionCount: dates.length,
       dates,
     });
@@ -364,7 +364,7 @@ export class MessageSessionManager {
       this.performPeriodicCleanup();
     }, this.cleanupInterval);
 
-    logger.whatsapp.debug('Periodic cleanup started', {
+    log.debug('Periodic cleanup started', {
       interval: `${this.cleanupInterval / 1000}s`,
       maxAge: `${this.maxSessionAge / 1000}s`,
     });
@@ -398,7 +398,7 @@ export class MessageSessionManager {
 
     for (const date of sessionsToClean) {
       const session = this.activeSessions.get(date);
-      logger.whatsapp.info('Auto-completing old session', {
+      log.info('Auto-completing old session', {
         date,
         sessionId: session?.sessionId,
         age: `${Math.round((now - (session?.startTime.getTime() || 0)) / 1000)}s`,
@@ -420,7 +420,7 @@ export class MessageSessionManager {
     historyTrimmed = historyBefore - this.sessionHistory.size;
 
     if (expiredCount > 0 || cleanedCount > 0 || historyTrimmed > 0) {
-      logger.whatsapp.info('Periodic cleanup completed', {
+      log.info('Periodic cleanup completed', {
         expiredSessions: expiredCount,
         cleanedSessions: cleanedCount,
         historyTrimmed: historyTrimmed,
@@ -455,7 +455,7 @@ export class MessageSessionManager {
       this.sessionHistory.set(sessionId, stats);
     });
 
-    logger.whatsapp.debug('Session history trimmed', {
+    log.debug('Session history trimmed', {
       removed: toRemove.length,
       remaining: this.sessionHistory.size,
     });
@@ -521,7 +521,7 @@ export class MessageSessionManager {
     // Clear history
     this.sessionHistory.clear();
 
-    logger.whatsapp.info('MessageSessionManager destroyed');
+    log.info('MessageSessionManager destroyed');
   }
 }
 

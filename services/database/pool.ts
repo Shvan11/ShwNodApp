@@ -1,7 +1,7 @@
 import sql from 'mssql';
 import config from '../../config/config.js';
 import ResourceManager from '../core/ResourceManager.js';
-import { logger } from '../core/Logger.js';
+import { log } from '../../utils/logger.js';
 
 export interface PoolStats {
   totalConnections: number;
@@ -46,7 +46,7 @@ export async function getPool(): Promise<sql.ConnectionPool> {
       .then((p) => {
         pool = p;
         pool.on('error', (err: Error) => {
-          logger.database.error('Pool error', { error: err.message });
+          log.error('Pool error', { error: err.message });
         });
         return p;
       })
@@ -84,6 +84,6 @@ ResourceManager.register('database-pool', null, async () => {
     await pool.close();
     pool = null;
     connectPromise = null;
-    logger.database.info('Connection pool closed');
+    log.info('Connection pool closed');
   }
 });

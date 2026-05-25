@@ -15,7 +15,7 @@ import { Router, type Request, type Response } from 'express';
 import type { EventEmitter } from 'events';
 import { InternalEmitterEvents } from './websocket-events.js';
 import { buildChairPatientPayload, type ChairPatientPayload } from './chair-payload-builder.js';
-import { logger } from '../core/Logger.js';
+import { log } from '../../utils/logger.js';
 
 const appointmentsClients = new Set<Response>();
 const chairClients = new Map<string, Response>();
@@ -126,11 +126,11 @@ export function createAppointmentsSseRouter(emitter: EventEmitter): Router {
   router.get('/appointments', (req: Request, res: Response) => {
     openStream(req, res);
     appointmentsClients.add(res);
-    logger.websocket.debug('SSE appointments client connected', { count: appointmentsClients.size });
+    log.debug('SSE appointments client connected', { count: appointmentsClients.size });
 
     req.on('close', () => {
       appointmentsClients.delete(res);
-      logger.websocket.debug('SSE appointments client disconnected', { count: appointmentsClients.size });
+      log.debug('SSE appointments client disconnected', { count: appointmentsClients.size });
     });
   });
 
@@ -157,7 +157,7 @@ export function createChairDisplaySseRouter(emitter: EventEmitter): Router {
       try { prev.end(); } catch { /* already gone */ }
     }
     chairClients.set(chairId, res);
-    logger.websocket.debug('SSE chair-display connected', { chairId });
+    log.debug('SSE chair-display connected', { chairId });
 
     // Replay the cached payload — same UX guarantee the WS REGISTER handler provided.
     const stored = chairCurrentPatient.get(chairId);
@@ -173,7 +173,7 @@ export function createChairDisplaySseRouter(emitter: EventEmitter): Router {
       if (chairClients.get(chairId) === res) {
         chairClients.delete(chairId);
       }
-      logger.websocket.debug('SSE chair-display disconnected', { chairId });
+      log.debug('SSE chair-display disconnected', { chairId });
     });
   });
 

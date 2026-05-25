@@ -499,10 +499,12 @@ export class StateManager {
 // Create and export singleton instance
 const stateManagerInstance = new StateManager();
 
-// Set up periodic cleanup of expired locks
-setInterval(() => {
+// Set up periodic cleanup of expired locks. unref() so this module-scoped
+// timer doesn't hold the event loop open and block a clean process exit.
+const lockCleanupTimer = setInterval(() => {
   stateManagerInstance.cleanupExpiredLocks();
 }, 60000); // Every minute
+lockCleanupTimer.unref();
 
 // Export singleton as default
 export default stateManagerInstance;
