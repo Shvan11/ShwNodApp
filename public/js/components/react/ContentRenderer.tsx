@@ -1,6 +1,7 @@
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import GridComponent from './GridComponent';
 import XraysComponent from './XraysComponent';
+import FileExplorer from './files/FileExplorer';
 import VisitsComponent from './VisitsComponent';
 import NewVisitComponent from './NewVisitComponent';
 import CompareComponent from './CompareComponent';
@@ -65,6 +66,14 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                 return (
                     <XraysComponent
                         personId={personId}
+                    />
+                );
+
+            case 'files':
+                return (
+                    <FileExplorer
+                        personId={personId}
+                        subPath={wildcardPath}
                     />
                 );
 

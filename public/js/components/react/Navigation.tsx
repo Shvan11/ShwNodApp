@@ -221,6 +221,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
     // Define static navigation items (Photos removed - will be its own expandable section)
     const staticNavItems: NavItem[] = [
         { key: 'works', page: 'works', label: 'Works', icon: 'fas fa-tooth' },
+        { key: 'files', page: 'files', label: 'Files', icon: 'fas fa-folder-tree' },
         { key: 'new-appointment', page: 'new-appointment', label: 'New Appointment', icon: 'fas fa-plus-circle' },
         { key: 'appointments', page: 'appointments', label: 'Appointments', icon: 'fas fa-calendar-check' },
         { key: 'patient-info', page: 'patient-info', label: 'Patient Info', icon: 'fas fa-id-card' }
@@ -442,7 +443,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                         <div className="nav-item-icon">
                             <i className="fas fa-folder-open" />
                         </div>
-                        <span className="nav-item-label">Open Folder</span>
+                        <span className="nav-item-label">Open in Windows</span>
                     </div>
 
                     {/* More Actions Button with Flyout - ONLY this button triggers the flyout */}

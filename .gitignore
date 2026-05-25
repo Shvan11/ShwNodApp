@@ -1,3 +1,6 @@
+# File-explorer thumbnail cache (server-local, regenerable; THUMB_CACHE_DIR)
+.cache/
+
 # Logs
 logs
 *.log

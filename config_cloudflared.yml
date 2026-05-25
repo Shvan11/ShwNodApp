@@ -1,5 +1,5 @@
 tunnel: 1e3b6d94-0ce4-49a3-af8a-7ba9ef7fb79b
-credentials-file: C:\Windows\System32\config\systemprofile\.cloudflared\1e3b6d94-0ce4-49a3-af8a-7ba9ef7fb79b.json
+credentials-file: /1e3b6d94-0ce4-49a3-af8a-7ba9ef7fb79b.json
 
 ingress:
   - hostname: remote.shwan-orthodontics.com

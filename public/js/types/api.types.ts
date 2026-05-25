@@ -218,3 +218,41 @@ export interface EmailResponse {
     appointmentCount?: number;
     error?: string;
 }
+
+// =============================================================================
+// FILE EXPLORER (/api/patients/:id/files*)
+// =============================================================================
+
+/** Coarse file class that drives the explorer icon + preview strategy. */
+export type FileCategory =
+    | 'image'
+    | 'video'
+    | 'audio'
+    | 'pdf'
+    | 'text'
+    | 'office'
+    | 'archive'
+    | 'other';
+
+/** A single directory entry. `size`/`modified` are omitted in flat mode. */
+export interface FileEntry {
+    name: string;
+    /** Path relative to the patient root, web-style `/` separators. */
+    relPath: string;
+    type: 'file' | 'dir' | 'symlink';
+    size?: number;
+    /** ISO timestamp. */
+    modified?: string;
+    ext: string;
+    category: FileCategory;
+}
+
+/** GET /api/patients/:id/files → ApiResponse<FileListing>. */
+export interface FileListing {
+    /** Browsed path relative to the patient root (`''` = root). */
+    path: string;
+    parent: string | null;
+    flat: boolean;
+    truncated: boolean;
+    entries: FileEntry[];
+}

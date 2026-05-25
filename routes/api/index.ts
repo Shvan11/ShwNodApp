@@ -53,6 +53,7 @@ import costPresetRoutes from './cost-preset.routes.js';
 import holidayRoutes from './holiday.routes.js';
 import videoRoutes from './video.routes.js';
 import standRoutes from './stand.routes.js';
+import fileExplorerRoutes from './file-explorer.routes.js';
 
 // Import template routes (already modular)
 import templateRouter from '../template-api.js';
@@ -77,6 +78,7 @@ router.use('/templates', templateRouter);
 
 // Core entity routes
 router.use('/', patientRoutes);       // Patient management
+router.use('/', fileExplorerRoutes);  // Per-patient file explorer (/patients/:id/files*)
 router.use('/', appointmentRoutes);   // Appointment scheduling
 router.use('/', chairDisplayRoutes);  // Chair-side public display events
 router.use('/', paymentRoutes);       // Payments and invoices

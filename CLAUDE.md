@@ -158,6 +158,14 @@ Use `import type { … }` for type-only imports.
 
 ---
 
+## Deployment & environments
+
+- **Dev = WSL (Linux); Prod = Windows Server.** Code must run on **both**, and a future move to a Linux-based server is planned — keep everything OS-agnostic. Use `utils/path-resolver.ts` + the platform `path` module for all filesystem paths; never hardcode `/` or `\` separators or assume posix.
+- **Patient data volume** is the SMB/UNC share `\\Clinic\clinic1` (`MACHINE_PATH`; `PatientsFolder` DB option), reachable from every LAN PC but **not from phones**. It is a *separate volume* from the OS temp dir on both platforms → `fs.rename` from temp to the share throws `EXDEV`; stage temp files on the same volume. Per-file `stat`/`lstat` over the share is a network round-trip — avoid bulk stat in hot paths.
+- **Remote access**: two front doors to the same on-host Node app. On-LAN, **Caddy** reverse-proxies `local.shwan-orthodontics.com` (`Caddyfile`; see `middleware/index.ts` trust-proxy note). Off-LAN, a **cloudflared named tunnel** (`config_cloudflared.yml`) routes `remote.shwan-orthodontics.com` → `localhost:3000` through Cloudflare. `config.urls.publicUrl` defaults to the remote domain (`config/config.ts`). Tunnel credentials live outside the repo under the OS user's `.cloudflared/` dir — never commit or paste them.
+
+---
+
 ## Testing credentials
 
 ```
@@ -180,3 +188,4 @@ curl -c /tmp/cookies.txt -X POST http://localhost:3001/api/auth/login \
 - Cross-platform path handling lives in `utils/path-resolver.ts` (auto Windows/WSL conversion).
 - RTL support for Kurdish/Arabic; check `rtl-support.css` before adding directional styles.
 - Graceful shutdown chains exist for all long-lived services (WhatsApp, sync, pool, SSE broadcasters); don't add `process.exit()` mid-flow.
+- After using Playwright, delete every screenshot it left behind — clean up all leftover screenshot files before finishing.
