@@ -34,10 +34,6 @@ function getDefaultPort(): number {
 }
 
 const config: AppConfig = {
-  featureFlags: {
-    // Native Dolphin-style photo layout manager (Phase 4). Dark unless explicitly 'true'.
-    nativePhotoEditor: process.env.NATIVE_PHOTO_EDITOR_ENABLED === 'true',
-  },
   database: {
     server: process.env.DB_SERVER || '',
     database: process.env.DB_DATABASE || 'ShwanNew',

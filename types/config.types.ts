@@ -124,18 +124,9 @@ export interface UrlConfig {
 // ===========================================
 
 /**
- * Feature flags (runtime, env-driven; dark unless the env var is exactly 'true')
- */
-export interface FeatureFlagsConfig {
-  /** Native Dolphin-style photo layout manager (Phase 4). */
-  nativePhotoEditor: boolean;
-}
-
-/**
  * Complete application configuration
  */
 export interface AppConfig {
-  featureFlags: FeatureFlagsConfig;
   database: DatabaseConfig;
   telegram: TelegramConfig;
   twilio: TwilioConfig;
@@ -176,7 +167,6 @@ export interface OptionalEnvVars {
   PORT?: string;
   NODE_ENV?: Environment;
   MACHINE_PATH?: string;
-  NATIVE_PHOTO_EDITOR_ENABLED?: string;
   TELEGRAM_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;
   TWILIO_ACCOUNT_SID?: string;

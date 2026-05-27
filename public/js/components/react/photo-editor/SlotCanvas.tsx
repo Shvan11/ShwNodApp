@@ -1,8 +1,10 @@
 /**
- * One photo slot. The ACTIVE slot mounts react-easy-crop against the source
- * (pre-flipped on a canvas when flipH/flipV is set, so the crop rect comes back
- * in the same flipped space the server extracts from). INACTIVE slots render a
- * cheap CSS-transform preview; empty slots show the practice logo placeholder.
+ * One photo slot. EVERY populated slot mounts react-easy-crop against the source
+ * (pre-flipped on a canvas when flipH/flipV is set, so the crop rect comes back in
+ * the same flipped space the server extracts from) — so the cropper is the single
+ * source of truth for framing and a slot looks identical whether or not it's
+ * focused. Inactive slots render the same cropper non-interactively; empty slots
+ * show the practice logo placeholder.
  */
 import { useEffect, useRef, useState } from 'react';
 import Cropper from 'react-easy-crop';
@@ -10,6 +12,9 @@ import type { Area, Point } from 'react-easy-crop';
 import styles from './SlotCanvas.module.css';
 import type { CropArea, SlotState } from './photoEditorTypes';
 import { aspectForView, labelForView } from './photoEditorTypes';
+
+/** Inert crop handler for inactive slots (react-easy-crop requires onCropChange). */
+const noop = (): void => {};
 
 interface Props {
   personId: number;
@@ -58,11 +63,12 @@ const SlotCanvas = ({ personId, slot, active, onCropChange, onZoomChange, onCrop
     urlRef.current = null;
   };
 
-  // The active slot drives the cropper's image (flipped blob when needed). Inactive
-  // slots don't generate a blob — they use the source thumbnail + a CSS transform.
+  // Every populated slot (active OR inactive) drives a cropper, so load the image —
+  // flipped onto a blob when flipH/flipV is set — regardless of focus. Toggling
+  // `active` no longer reloads the media, so focusing a slot can't flash its image.
   useEffect(() => {
     let cancelled = false;
-    if (!active || !slot.sourceRelPath) {
+    if (!slot.sourceRelPath) {
       revoke();
       setMediaUrl(null);
       return;
@@ -90,7 +96,7 @@ const SlotCanvas = ({ personId, slot, active, onCropChange, onZoomChange, onCrop
     return () => {
       cancelled = true;
     };
-  }, [active, personId, slot.sourceRelPath, slot.flipH, slot.flipV]);
+  }, [personId, slot.sourceRelPath, slot.flipH, slot.flipV]);
 
   // Revoke any outstanding blob on unmount.
   useEffect(() => () => revoke(), []);
@@ -104,34 +110,42 @@ const SlotCanvas = ({ personId, slot, active, onCropChange, onZoomChange, onCrop
     );
   }
 
-  if (active) {
-    return (
-      <div className={styles.cropWrap}>
-        {mediaUrl && (
-          <Cropper
-            image={mediaUrl}
-            crop={slot.crop}
-            zoom={slot.zoom}
-            rotation={slot.rotation}
-            aspect={aspectForView(slot.view)}
-            restrictPosition
-            showGrid={false}
-            objectFit="cover"
-            onCropChange={onCropChange}
-            onZoomChange={onZoomChange}
-            onCropComplete={(_area: Area, areaPixels: Area) => onCropComplete(areaPixels as CropArea)}
-          />
-        )}
-      </div>
-    );
-  }
-
-  // Inactive preview: source thumbnail with the flip + rotation applied via CSS.
-  const previewUrl = `${contentUrl(personId, slot.sourceRelPath)}&thumb=480`;
-  const transform = `rotate(${slot.rotation}deg) scaleX(${slot.flipH ? -1 : 1}) scaleY(${slot.flipV ? -1 : 1})`;
+  // Active and inactive slots render the SAME controlled cropper, so framing is
+  // pixel-identical whether or not the slot is focused — no reset on blur. Only the
+  // focused slot is interactive and writes state; inactive slots set
+  // pointer-events:none so a click falls through to the cell (activating it) and a
+  // stray wheel/drag can't nudge an unfocused slot. Because the cropper container is
+  // absolutely positioned, slot content never participates in layout — the cell
+  // stays locked to its view's aspect box and can't reflow when framing changes.
   return (
-    <div className={styles.preview}>
-      <img src={previewUrl} alt={labelForView(slot.view)} className={styles.previewImg} style={{ transform }} loading="lazy" />
+    <div className={styles.cropWrap}>
+      {mediaUrl && (
+        <Cropper
+          image={mediaUrl}
+          crop={slot.crop}
+          zoom={slot.zoom}
+          rotation={slot.rotation}
+          aspect={aspectForView(slot.view)}
+          // Free framing: pan past the edges and zoom out below "cover". The
+          // server fills any uncovered slot region with white, so the render
+          // matches this preview (margins and all). minZoom < 1 enables zoom-out.
+          restrictPosition={false}
+          minZoom={0.2}
+          maxZoom={3}
+          zoomSpeed={0.25}
+          showGrid={false}
+          objectFit="cover"
+          onCropChange={active ? onCropChange : noop}
+          onZoomChange={active ? onZoomChange : undefined}
+          onCropComplete={active ? (_area: Area, areaPixels: Area) => onCropComplete(areaPixels as CropArea) : undefined}
+          style={{
+            // The cell's own border frames the crop; hide the cropper's internal
+            // outline. Inactive slots are non-interactive (clicks reach the cell).
+            cropAreaStyle: { border: 0, boxShadow: 'none' },
+            ...(active ? {} : { containerStyle: { pointerEvents: 'none' } }),
+          }}
+        />
+      )}
     </div>
   );
 };

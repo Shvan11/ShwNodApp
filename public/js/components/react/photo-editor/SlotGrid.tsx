@@ -7,7 +7,7 @@ import { useState, type DragEvent } from 'react';
 import styles from './SlotGrid.module.css';
 import SlotCanvas from './SlotCanvas';
 import SlotToolbar from './SlotToolbar';
-import { GRID_CELLS, labelForView, type PhotoViewCode } from './photoEditorTypes';
+import { GRID_CELLS, aspectForView, labelForView, type PhotoViewCode } from './photoEditorTypes';
 import type { PhotoEditorState } from './usePhotoEditorState';
 
 interface Props {
@@ -64,7 +64,7 @@ const SlotGrid = ({ personId, editor, activeView, onActivate }: Props) => {
             onDrop={(e) => handleDrop(e, view)}
           >
             <div className={styles.cellHeader}>{labelForView(view)}</div>
-            <div className={styles.cellBody}>
+            <div className={styles.cellBody} style={{ aspectRatio: aspectForView(view) }}>
               <SlotCanvas
                 personId={personId}
                 slot={slot}
@@ -78,7 +78,9 @@ const SlotGrid = ({ personId, editor, activeView, onActivate }: Props) => {
               hasImage={!!slot.sourceRelPath}
               flipH={slot.flipH}
               flipV={slot.flipV}
+              rotation={slot.rotation}
               onRotate={(d) => editor.setRotation(view, slot.rotation + d)}
+              onSetRotation={(deg) => editor.setRotation(view, deg)}
               onFlipH={() => editor.toggleFlipH(view)}
               onFlipV={() => editor.toggleFlipV(view)}
               onReset={() => editor.reset(view)}

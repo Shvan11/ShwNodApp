@@ -21,6 +21,40 @@
   font-size: 0.95rem;
 }
 
+.actions {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.actionBtn {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 6px;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+  color: var(--text-color, #111827);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.actionBtn:hover:not(:disabled) {
+  border-color: var(--primary-color, #007bff);
+  color: var(--primary-color, #007bff);
+}
+
+.actionBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.hiddenInput {
+  display: none;
+}
+
 .folderSelect {
   width: 100%;
   padding: 4px;

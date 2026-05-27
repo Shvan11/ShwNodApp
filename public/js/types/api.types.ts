@@ -100,11 +100,6 @@ export interface PaymentSaveData {
 // AUTH / USER
 // =============================================================================
 
-/** App-level feature flags (runtime, env-driven), surfaced on GET /api/auth/me. */
-export interface FeatureFlags {
-    nativePhotoEditor: boolean;
-}
-
 /** GET /api/auth/me. */
 export interface UserResponse {
     success: boolean;
@@ -113,14 +108,13 @@ export interface UserResponse {
         fullName?: string;
         role: string;
     };
-    featureFlags?: FeatureFlags;
 }
 
 // =============================================================================
-// PHOTO EDITOR (native Dolphin-style layout manager — Phase 4)
+// PHOTO EDITOR (native photo-session layout manager)
 // =============================================================================
 
-/** The 8 fixed orthodontic view codes (Dolphin layout slots). */
+/** The 8 fixed orthodontic view codes (layout slots). */
 export type PhotoViewCode = 'i10' | 'i12' | 'i13' | 'i20' | 'i21' | 'i22' | 'i23' | 'i24';
 
 /**

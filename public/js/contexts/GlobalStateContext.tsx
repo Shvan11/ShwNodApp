@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import sseWhatsapp from '../services/sse-whatsapp';
-import type { FeatureFlags } from '../types/api.types';
 
 /**
  * Patient data structure
@@ -51,9 +50,6 @@ export interface GlobalStateContextValue {
   user: UserData | null;
   setUser: React.Dispatch<React.SetStateAction<UserData | null>>;
 
-  // Feature flags (runtime, from GET /api/auth/me)
-  featureFlags: FeatureFlags;
-
   // Patient
   currentPatient: PatientData | null;
   updateCurrentPatient: (patient: PatientData | null) => void;
@@ -103,8 +99,6 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
     }
   });
 
-  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>({ nativePhotoEditor: false });
-
   useEffect(() => {
     fetch('/api/auth/me')
       .then(res => res.ok ? res.json() : null)
@@ -113,7 +107,6 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
           setUser(data.user);
           sessionStorage.setItem('currentUser', JSON.stringify(data.user));
         }
-        if (data?.featureFlags) setFeatureFlags(data.featureFlags);
       })
       .catch(() => { /* ignore */ });
   }, []);
@@ -199,7 +192,6 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
   const value: GlobalStateContextValue = {
     user,
     setUser,
-    featureFlags,
     currentPatient,
     updateCurrentPatient,
     clearCurrentPatient,

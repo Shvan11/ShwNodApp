@@ -2,6 +2,8 @@
 
 **Shwan Orthodontics Management System** — Node.js + Express + React 19 + TypeScript practice management platform for an orthodontic clinic. Patients, treatments, dental chart, aligners, appointments, multi-channel messaging (WhatsApp/SMS/Telegram), financial/expenses, document templates (GrapesJS), Stand inventory/POS, Patient Portal.
 
+> ⚠️ **This is a SANDBOX CLONE of the main app, used for testing only.** It does **not** connect to the production database — it points at a **cloned/sandbox database** (`ShwanNew_Test`) so experiments can't touch live clinic data. Changes here are for safe testing; the production app and its `ShwanNew` database are separate.
+
 ---
 
 ## Commands
@@ -98,7 +100,7 @@ SQL Server via **mssql v12** with tarn connection pooling (max 10, 30s timeouts)
 - `result.rowsAffected` is an array in mssql; the facade reduces to a single number.
 - **Date-only columns must leave the server as a `YYYY-MM-DD` string** — pool runs `useUTC: false`, so a raw `datetime` serializes via `toISOString()` to UTC and shifts midnight values back a day on the client. Use SQL `CONVERT(varchar, col, 23)` (inline queries) or `toDateOnly()` from `utils/date.ts` (stored-proc/mapper results). Never `(col as Date).toISOString().split('T')[0]`.
 
-**Connection** (see `.env` / `.mcp.json`): server `Clinic\DOLPHIN`, db `ShwanNew`, user `Staff`.
+**Connection** (see `.env` / `.mcp.json`): server `Clinic\DOLPHIN`, db `ShwanNew_Test`, user `Staff`. This is the **cloned sandbox database**, not production `ShwanNew` — see the banner at the top. Keep it that way; never repoint this clone at the live `ShwanNew` DB.
 
 Schema baseline: `migrations/init_script.sql` (UTF-8 snapshot of the full DB). Historical migrations live under `migrations/archive/` (gitignored). `migrations/postgresql/` is for the separate aligner-portal-external app, not the main DB.
 

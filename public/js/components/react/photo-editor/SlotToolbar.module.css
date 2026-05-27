@@ -1,10 +1,43 @@
 .toolbar {
   display: flex;
+  flex-direction: column;
   gap: var(--spacing-xs);
-  justify-content: center;
   padding: var(--spacing-xs);
   background: var(--background-secondary);
   border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.buttons {
+  display: flex;
+  gap: var(--spacing-xs);
+  justify-content: center;
+}
+
+.rotateRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 0 var(--spacing-xs);
+  color: var(--text-muted, #6b7280);
+  font-size: 0.72rem;
+}
+
+.slider {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--primary-color, #007bff);
+  cursor: pointer;
+}
+
+.slider:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.deg {
+  min-width: 2.6rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .btn {

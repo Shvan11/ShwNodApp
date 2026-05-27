@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import DolphinPhotoDialog from './DolphinPhotoDialog';
+import PhotoSessionDialog from './PhotoSessionDialog';
 import AlertModal from './AlertModal';
 import PortalAccessCard from './PortalAccessCard';
 import { useToast } from '../../contexts/ToastContext';
@@ -74,7 +74,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
     const [alertTypes, setAlertTypes] = useState<AlertType[]>([]);
     const [showAlertModal, setShowAlertModal] = useState(false);
     const [deletingAlertId, setDeletingAlertId] = useState<number | null>(null);
-    const [showDolphinDialog, setShowDolphinDialog] = useState(false);
+    const [showPhotoSessionDialog, setShowPhotoSessionDialog] = useState(false);
     const [editingAlert, setEditingAlert] = useState<Alert | null>(null);
 
     // Cost editing state
@@ -377,7 +377,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         Edit Patient
                     </button>
                     <button
-                        onClick={() => setShowDolphinDialog(true)}
+                        onClick={() => setShowPhotoSessionDialog(true)}
                         className="btn btn-secondary"
                     >
                         <i className={`fas fa-camera ${styles.piIconGap}`}></i>
@@ -668,12 +668,18 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 {validPersonId && <PortalAccessCard personId={validPersonId} />}
             </div>
 
-            {/* Dolphin Photo Dialog */}
-            {showDolphinDialog && validPersonId && (
-                <DolphinPhotoDialog
+            {/* New Photo Session Dialog */}
+            {showPhotoSessionDialog && validPersonId && (
+                <PhotoSessionDialog
                     personId={String(validPersonId)}
                     patientInfo={patientInfo}
-                    onClose={() => setShowDolphinDialog(false)}
+                    onClose={() => setShowPhotoSessionDialog(false)}
+                    onPrepared={({ tpCode, tpName, tpDate }) => {
+                        setShowPhotoSessionDialog(false);
+                        navigate(
+                            `/patient/${validPersonId}/photo-editor/tp${tpCode}?tpName=${encodeURIComponent(tpName)}&date=${tpDate}`
+                        );
+                    }}
                 />
             )}
 

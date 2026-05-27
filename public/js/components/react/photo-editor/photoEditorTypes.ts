@@ -31,19 +31,22 @@ export interface OutputDims {
 }
 
 /**
- * Fixed per-view output size (slot aspect at a ~1500px long edge). Facial views
- * (Profile/Rest/Smile) are portrait; intra-oral / occlusal are landscape. The
- * existing grid adapts to whatever aspect we emit (via getImageSizes).
+ * Fixed per-view output size at a ~1500px long edge. Aspect ratios are matched to
+ * real Dolphin-rendered outputs sampled from \\CLINIC\Working (40 files/view):
+ *   facial (Profile/Rest/Smile)        AR ≈ 0.866  (13:15, portrait)
+ *   intra-oral lateral + frontal       AR ≈ 1.856  (13:7,  wide landscape)
+ *   occlusal (Upper/Lower)             AR ≈ 1.444  (13:9,  landscape)
+ * The existing grid adapts to whatever aspect we emit (via getImageSizes).
  */
 export const VIEW_OUTPUT: Record<PhotoViewCode, OutputDims> = {
-  i10: { width: 1200, height: 1500 },
-  i12: { width: 1200, height: 1500 },
-  i13: { width: 1200, height: 1500 },
-  i20: { width: 1500, height: 1000 },
-  i21: { width: 1500, height: 1000 },
-  i22: { width: 1500, height: 1000 },
-  i23: { width: 1500, height: 1000 },
-  i24: { width: 1500, height: 1000 },
+  i10: { width: 1300, height: 1500 },
+  i12: { width: 1300, height: 1500 },
+  i13: { width: 1300, height: 1500 },
+  i20: { width: 1500, height: 808 },
+  i21: { width: 1500, height: 808 },
+  i22: { width: 1500, height: 808 },
+  i23: { width: 1500, height: 1038 },
+  i24: { width: 1500, height: 1038 },
 };
 
 export function aspectForView(view: PhotoViewCode): number {

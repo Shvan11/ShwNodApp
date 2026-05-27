@@ -1,24 +1,25 @@
 /**
- * Native Photo Editor routes (Phase 4 of the Dolphin-native migration).
+ * Native Photo Editor routes — the app's photo-session flow.
  *
- * Dark by default: every route sits behind `requireNativePhotoEditor` (404 when
- * NATIVE_PHOTO_EDITOR_ENABLED !== 'true'). Rides the global `/api` authenticate
- * gate; writes additionally require admin/secretary.
+ * Rides the global `/api` authenticate gate; writes additionally require
+ * admin/secretary.
  *
- *  POST /:personId/prepare  — find/create a native timepoint (+ tblwork date
- *                             conflict mirroring the Dolphin flow).
- *  POST /:personId/render   — render framed slots to working/{pid}0{tp}.iNN and
- *                             record rows in the local clone tables.
+ *  GET  /:personId/photo-dates — appointments + visits to suggest session dates.
+ *  POST /:personId/prepare     — find/create a timepoint in the local clone tables
+ *                                (+ tblwork Initial/Final date conflict/override).
+ *  POST /:personId/render      — render framed slots to working/{pid}0{tp}.iNN and
+ *                                record rows in the local clone tables.
  */
 import { Router, type Request, type Response } from 'express';
 import { authorize } from '../../middleware/auth.js';
-import { requireNativePhotoEditor } from '../../middleware/feature-flags.js';
 import { sendSuccess, ErrorResponses } from '../../utils/error-response.js';
 import {
-  getPatientForDolphin,
+  getPatientForPhotoSession,
   getExistingPhotoDate,
   updatePhotoDate,
-} from '../../services/database/queries/dolphin-queries.js';
+  getPhotoSessionAppointments,
+  getPhotoSessionVisits,
+} from '../../services/database/queries/photo-session-queries.js';
 import {
   findOrCreateNativeTimePoint,
   upsertNativeTimePointImage,
@@ -27,9 +28,6 @@ import { renderSlotToWorking } from '../../services/imaging/photo-render.service
 import { log } from '../../utils/logger.js';
 
 const router = Router();
-
-// Dark unless the flag is on — applies to every route below.
-router.use(requireNativePhotoEditor);
 
 interface PrepareBody {
   tpDescription?: string;
@@ -70,9 +68,9 @@ function toDateOnly(d: Date): string {
 
 /**
  * POST /:personId/prepare
- * Mirrors dolphin.routes `prepare-photo-import` against the LOCAL clone tables.
- * Returns the SAME raw shape as the Dolphin endpoint (success/conflict/tpCode at
- * the top level) so DolphinPhotoDialog's conflict/override UI works unchanged.
+ * Find/create a timepoint in the LOCAL clone tables, with tblwork Initial/Final
+ * date conflict detection. Returns success/conflict/tpCode at the top level so
+ * PhotoSessionDialog's conflict/override UI can consume it directly.
  */
 router.post(
   '/:personId/prepare',
@@ -96,13 +94,13 @@ router.post(
         return;
       }
 
-      const patient = await getPatientForDolphin(personId);
+      const patient = await getPatientForPhotoSession(personId);
       if (!patient) {
         ErrorResponses.notFound(res, 'Patient');
         return;
       }
 
-      // tblwork Initial/Final date conflict — same logic + shape as the Dolphin flow.
+      // tblwork Initial/Final date conflict detection + optional override.
       if (tpDescription === 'Initial' || tpDescription === 'Final') {
         const existing = await getExistingPhotoDate(personId);
         const existingDate =
@@ -219,7 +217,7 @@ router.post(
             timePointId,
             Number(personId),
             digits,
-            `${personId}0${tpCode}.I${digits}`, // Dolphin DB form (uppercase I)
+            `${personId}0${tpCode}.I${digits}`, // stored image-file form (uppercase I)
             parsedDate,
             null
           );
@@ -248,5 +246,27 @@ router.post(
     }
   }
 );
+
+/**
+ * GET /:personId/photo-dates
+ * Appointments + visits used to suggest dates in the photo-session dialog.
+ */
+router.get('/:personId/photo-dates', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { personId } = req.params;
+    if (!/^\d+$/.test(personId)) {
+      ErrorResponses.badRequest(res, 'Invalid patient id');
+      return;
+    }
+    const [appointments, visits] = await Promise.all([
+      getPhotoSessionAppointments(personId),
+      getPhotoSessionVisits(personId),
+    ]);
+    res.json({ appointments, visits });
+  } catch (err) {
+    log.error('[PhotoEditor] photo-dates failed', { error: (err as Error).message });
+    ErrorResponses.internalError(res, 'Failed to fetch photo dates', err as Error);
+  }
+});
 
 export default router;

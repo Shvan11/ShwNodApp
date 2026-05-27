@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { MouseEvent } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
-import { useGlobalState } from '../../contexts/GlobalStateContext';
-import DolphinPhotoDialog from './DolphinPhotoDialog';
+import PhotoSessionDialog from './PhotoSessionDialog';
 
 interface Timepoint {
     tpCode: string;
@@ -55,10 +54,8 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
     const [moreActionsFlyoutPosition, setMoreActionsFlyoutPosition] = useState({ bottom: 0 });
     const [patientInfo, setPatientInfo] = useState<PatientInfo | null>(null);
     const [patientsFolder, setPatientsFolder] = useState('');
-    const [showDolphinPhotoDialog, setShowDolphinPhotoDialog] = useState(false);
     const [showNativePhotoEditor, setShowNativePhotoEditor] = useState(false);
     const navigate = useNavigate();
-    const { featureFlags } = useGlobalState();
 
     // Check if this is the "new patient" form
     const isNewPatient = personId === 'new';
@@ -518,24 +515,6 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             onClick={(e) => {
                                 e.preventDefault();
                                 if (isNewPatient) return;
-
-                                window.location.href = `dolphin:${personId}?action=open`;
-                                setMoreActionsExpanded(false);
-                            }}
-                            title={isNewPatient ? "Save patient first to access Dolphin Imaging" : "Launch Dolphin Imaging with patient data"}
-                        >
-                            <div className="action-item-icon">
-                                <img src="/images/dolphin-logo@2x.png" alt="Dolphin" />
-                            </div>
-                            <span className="action-item-label">Dolphin Imaging</span>
-                        </Link>
-
-                        <Link
-                            to="#"
-                            className={`flyout-action-item ${isNewPatient ? 'disabled' : ''}`}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                if (isNewPatient) return;
                                 handleOpen3Shape();
                                 setMoreActionsExpanded(false);
                             }}
@@ -553,50 +532,22 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             onClick={(e) => {
                                 e.preventDefault();
                                 if (isNewPatient) return;
-                                setShowDolphinPhotoDialog(true);
+                                setShowNativePhotoEditor(true);
                                 setMoreActionsExpanded(false);
                             }}
-                            title={isNewPatient ? "Save patient first" : "Add photos from memory card to Dolphin Imaging"}
+                            title={isNewPatient ? "Save patient first" : "Lay out photos in the in-app editor"}
                         >
                             <div className="action-item-icon">
-                                <img src="/images/dolphin-logo@2x.png" alt="Dolphin" />
+                                <i className="fas fa-images" />
                             </div>
-                            <span className="action-item-label">Add Photos to Dolphin</span>
+                            <span className="action-item-label">Photo Layout</span>
                         </Link>
-
-                        {featureFlags.nativePhotoEditor && (
-                            <Link
-                                to="#"
-                                className={`flyout-action-item ${isNewPatient ? 'disabled' : ''}`}
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    if (isNewPatient) return;
-                                    setShowNativePhotoEditor(true);
-                                    setMoreActionsExpanded(false);
-                                }}
-                                title={isNewPatient ? "Save patient first" : "Lay out photos in the in-app editor"}
-                            >
-                                <div className="action-item-icon">
-                                    <i className="fas fa-images" />
-                                </div>
-                                <span className="action-item-label">Photo Layout (New)</span>
-                            </Link>
-                        )}
                     </div>
                 </div>
             )}
 
-            {showDolphinPhotoDialog && (
-                <DolphinPhotoDialog
-                    personId={personId}
-                    patientInfo={patientInfo}
-                    onClose={() => setShowDolphinPhotoDialog(false)}
-                />
-            )}
-
             {showNativePhotoEditor && (
-                <DolphinPhotoDialog
-                    native
+                <PhotoSessionDialog
                     personId={personId}
                     patientInfo={patientInfo}
                     onClose={() => setShowNativePhotoEditor(false)}

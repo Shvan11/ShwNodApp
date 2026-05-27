@@ -10,7 +10,7 @@
     "service:uninstall": "node utils/windows-service/cli.js uninstall",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "vite --mode development",
-    "dev:server": "cross-env NODE_ENV=development tsx watch index.ts",
+    "dev:server": "cross-env NODE_ENV=development node --import tsx --watch --watch-preserve-output index.ts",
     "build": "npm run build:client && npm run build:server",
     "prebuild:client": "npm run css:types",
     "build:client": "vite build",

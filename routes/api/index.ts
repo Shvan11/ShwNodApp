@@ -48,7 +48,6 @@ import mediaRoutes from './media.routes.js';
 import lookupRoutes from './lookup.routes.js';
 import reportsRoutes from './reports.routes.js';
 import utilityRoutes from './utility.routes.js';
-import dolphinRoutes from './dolphin.routes.js';
 import photoEditorRoutes from './photo-editor.routes.js';
 import costPresetRoutes from './cost-preset.routes.js';
 import holidayRoutes from './holiday.routes.js';
@@ -116,9 +115,8 @@ router.use('/', utilityRoutes);        // Miscellaneous utilities
 // Holiday routes
 router.use('/holidays', holidayRoutes); // Holiday management
 
-// External integrations
-router.use('/dolphin', dolphinRoutes); // Dolphin Imaging integration
-router.use('/photo-editor', photoEditorRoutes); // Native photo layout manager (flag-gated, Phase 4)
+// Photo sessions
+router.use('/photo-editor', photoEditorRoutes); // Native photo layout manager / photo sessions
 
 // Video management
 router.use('/videos', videoRoutes); // Educational videos

@@ -578,12 +578,11 @@ router.get(
         )`);
       }
 
-      // Filter by has final photos (timepoint with 'Final' in description)
+      // Filter by has final photos (local timepoint with 'Final' in description)
       if (hasFinalPhotos) {
         whereConditions.push(`EXISTS (
-                SELECT 1 FROM DolphinPlatform.dbo.Patients dp
-                INNER JOIN DolphinPlatform.dbo.TimePoints tp ON dp.PatID = tp.PatID
-                WHERE dp.patOtherID = CAST(p.PersonID AS VARCHAR(50))
+                SELECT 1 FROM dbo.tblTimePoints tp
+                WHERE tp.PersonID = p.PersonID
                 AND tp.tpDescription LIKE '%Final%'
             )`);
       }

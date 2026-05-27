@@ -1,7 +1,7 @@
 import { useState, useEffect, ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import Modal from './Modal';
-import styles from './DolphinPhotoDialog.module.css';
+import styles from './PhotoSessionDialog.module.css';
 
 interface Props {
     personId?: string;
@@ -10,9 +10,7 @@ interface Props {
         PatientName?: string;
     } | null;
     onClose: () => void;
-    /** Native mode: prepare a LOCAL timepoint and hand off to the in-app editor
-     *  instead of launching the Dolphin desktop protocol. */
-    native?: boolean;
+    /** Called once a timepoint is prepared, to hand off to the in-app editor. */
     onPrepared?: (result: { tpCode: number; tpName: string; tpDate: string }) => void;
 }
 
@@ -39,13 +37,12 @@ const TIMEPOINT_TYPES: TimepointType[] = [
 
 interface ConflictInfo {
     conflictType: string;
-    conflictSource: 'dolphin' | 'shwan';
     existingDate: string;
     requestedDate: string;
     message: string;
 }
 
-const DolphinPhotoDialog = ({ personId, patientInfo, onClose, native = false, onPrepared }: Props) => {
+const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Props) => {
     const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -53,7 +50,6 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose, native = false, on
     const [visits, setVisits] = useState<Visit[]>([]);
     const [timepointType, setTimepointType] = useState('Initial');
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
-    const [skipDolphin, setSkipDolphin] = useState(false);
     const [conflictInfo, setConflictInfo] = useState<ConflictInfo | null>(null);
 
     useEffect(() => {
@@ -64,7 +60,7 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose, native = false, on
     const loadPhotoDates = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`/api/dolphin/photo-dates/${personId}`);
+            const response = await fetch(`/api/photo-editor/${personId}/photo-dates`);
             if (!response.ok) throw new Error('Failed to load dates');
 
             const data = await response.json();
@@ -86,7 +82,6 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose, native = false, on
             return; // Invalid date
         }
 
-        // Use local date components - this matches formatDate() which uses toLocaleDateString
         const year = dateObj.getFullYear();
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
         const day = String(dateObj.getDate()).padStart(2, '0');
@@ -94,9 +89,8 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose, native = false, on
     };
 
     const handleSubmit = async (overrideDate = false) => {
-        // Validate patient has required fields
         if (!patientInfo?.FirstName && !patientInfo?.PatientName) {
-            toast.error('Patient name is required for Dolphin integration');
+            toast.error('Patient name is required');
             return;
         }
 
@@ -104,31 +98,23 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose, native = false, on
             setSubmitting(true);
             setConflictInfo(null);
 
-            const url = native
-                ? `/api/photo-editor/${personId}/prepare`
-                : '/api/dolphin/prepare-photo-import';
-            const requestBody = native
-                ? { tpDescription: timepointType, tpDate: selectedDate, overrideDate }
-                : { personId, tpDescription: timepointType, tpDate: selectedDate, skipDolphin, overrideDate };
-
-            const response = await fetch(url, {
+            const response = await fetch(`/api/photo-editor/${personId}/prepare`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
+                body: JSON.stringify({ tpDescription: timepointType, tpDate: selectedDate, overrideDate })
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || errorData.message || 'Failed to prepare photo import');
+                throw new Error(errorData.error || errorData.message || 'Failed to prepare photo session');
             }
 
             const data = await response.json();
 
-            // Check for date conflict (same shape for both flows)
+            // tblwork date conflict — offer to override the existing Initial/Final date.
             if (data.conflict) {
                 setConflictInfo({
                     conflictType: data.conflictType,
-                    conflictSource: data.conflictSource || 'shwan',
                     existingDate: data.existingDate,
                     requestedDate: data.requestedDate,
                     message: data.message
@@ -137,25 +123,12 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose, native = false, on
                 return;
             }
 
-            // Native: hand off to the in-app editor instead of the desktop protocol.
-            if (native) {
-                onPrepared?.({ tpCode: data.tpCode, tpName: timepointType, tpDate: selectedDate });
-                onClose();
-                return;
-            }
-
-            // Notify user if patient was created in Dolphin
-            if (data.patientCreated) {
-                toast.success('Patient created in Dolphin Imaging');
-            }
-
-            // Launch the protocol handler
-            window.location.href = data.protocolUrl;
-
+            // Hand off to the in-app editor.
+            onPrepared?.({ tpCode: data.tpCode, tpName: timepointType, tpDate: selectedDate });
             onClose();
         } catch (error) {
-            console.error('Error preparing photo import:', error);
-            toast.error(error instanceof Error ? error.message : 'Failed to prepare photo import');
+            console.error('Error preparing photo session:', error);
+            toast.error(error instanceof Error ? error.message : 'Failed to prepare photo session');
         } finally {
             setSubmitting(false);
         }
@@ -182,7 +155,7 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose, native = false, on
     return (
         <Modal isOpen={true} onClose={onClose} contentClassName={styles.dialog}>
                 <div className={styles.header}>
-                    <h3>{native ? 'New Photo Session' : 'Add Photos to Dolphin'}</h3>
+                    <h3>New Photo Session</h3>
                     <button className={styles.closeBtn} onClick={onClose}>
                         <i className="fas fa-times" />
                     </button>
@@ -191,49 +164,32 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose, native = false, on
                 <div className={styles.body}>
                     {/* Conflict Warning */}
                     {conflictInfo && (
-                        <div className={`${styles.conflictWarning} ${conflictInfo.conflictSource === 'dolphin' ? styles.conflictError : ''}`}>
+                        <div className={styles.conflictWarning}>
                             <div className={styles.conflictIcon}>
-                                <i className={`fas ${conflictInfo.conflictSource === 'dolphin' ? 'fa-times-circle' : 'fa-exclamation-triangle'}`} />
+                                <i className="fas fa-exclamation-triangle" />
                             </div>
                             <div className={styles.conflictContent}>
-                                <strong>{conflictInfo.conflictSource === 'dolphin' ? 'Duplicate Timepoint' : 'Date Conflict Detected'}</strong>
+                                <strong>Date Conflict Detected</strong>
                                 <p>{conflictInfo.message}</p>
-                                {conflictInfo.conflictSource === 'dolphin' ? (
-                                    <>
-                                        <p>Please choose a different date or timepoint type.</p>
-                                        <div className={styles.conflictActions}>
-                                            <button
-                                                type="button"
-                                                className="btn btn-secondary"
-                                                onClick={handleOverrideCancel}
-                                            >
-                                                OK
-                                            </button>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <p>Do you want to override the existing date?</p>
-                                        <div className={styles.conflictActions}>
-                                            <button
-                                                type="button"
-                                                className="btn btn-warning"
-                                                onClick={handleOverrideConfirm}
-                                                disabled={submitting}
-                                            >
-                                                {submitting ? 'Updating...' : 'Yes, Override'}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="btn btn-secondary"
-                                                onClick={handleOverrideCancel}
-                                                disabled={submitting}
-                                            >
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
+                                <p>Do you want to override the existing date?</p>
+                                <div className={styles.conflictActions}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-warning"
+                                        onClick={handleOverrideConfirm}
+                                        disabled={submitting}
+                                    >
+                                        {submitting ? 'Updating...' : 'Yes, Override'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={handleOverrideCancel}
+                                        disabled={submitting}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -310,20 +266,6 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose, native = false, on
                             )}
                         </>
                     )}
-
-                    {/* Skip Dolphin Checkbox (Dolphin flow only) */}
-                    {!native && (
-                        <div className={`${styles.formGroup} ${styles.checkboxGroup}`}>
-                            <label className={styles.checkboxLabel}>
-                                <input
-                                    type="checkbox"
-                                    checked={skipDolphin}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => setSkipDolphin(e.target.checked)}
-                                />
-                                <span>Just organize photos (don't launch Dolphin)</span>
-                            </label>
-                        </div>
-                    )}
                 </div>
 
                 <div className={styles.footer}>
@@ -343,9 +285,7 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose, native = false, on
                                 onClick={() => handleSubmit(false)}
                                 disabled={submitting || loading}
                             >
-                                {submitting
-                                    ? (native ? 'Opening…' : 'Preparing...')
-                                    : (native ? 'Open Editor' : 'Select Photos')}
+                                {submitting ? 'Opening…' : 'Open Editor'}
                             </button>
                         </>
                     )}
@@ -354,4 +294,4 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose, native = false, on
     );
 };
 
-export default DolphinPhotoDialog;
+export default PhotoSessionDialog;

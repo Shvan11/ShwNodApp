@@ -1,5 +1,4 @@
 .empty,
-.preview,
 .cropWrap {
   position: relative;
   width: 100%;
@@ -34,9 +33,14 @@
   background: #111;
 }
 
-.previewImg {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
+/* react-easy-crop sizes its media with cover classes that set ONE dimension to
+   100% and leave the other `auto` (aspect-preserving). The global reset
+   `img { max-width: 100%; height: auto }` leaks its `max-width` through (no cover
+   class sets it): for a wide photo in a tall ("vertical") slot the cropper forces
+   height:100% while max-width clamps the auto width — pinning BOTH dimensions to
+   the slot and stretching the image. Let the cropper own its media sizing so a
+   slot only ever crops to cover, never distorts. */
+.cropWrap :global(.reactEasyCrop_Image) {
+  max-width: none;
+  max-height: none;
 }

@@ -72,6 +72,13 @@ export async function fetchData<T = unknown>(url: string, options: FetchOptions 
     },
   };
 
+  // A FormData body must set its own multipart boundary — forcing the default
+  // application/json Content-Type makes the browser skip the boundary and the
+  // server routes the binary body through express.json() (→ PayloadTooLarge).
+  if (mergedOptions.body instanceof FormData && mergedOptions.headers) {
+    delete mergedOptions.headers['Content-Type'];
+  }
+
   try {
     const response = await fetch(url, mergedOptions);
     return await handleResponse<T>(response);

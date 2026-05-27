@@ -1,11 +1,23 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
+import { realpathSync } from 'fs'
 
 export default defineConfig(({ mode }) => {
   // Load env file based on mode (development, production, etc.)
   const env = loadEnv(mode, process.cwd(), '');
   const apiUrl = env.VITE_API_URL || 'http://localhost:3001';
+
+  // Canonicalize the project root to its real on-disk casing. On Windows the
+  // shell's cwd casing (e.g. C:\shwnodapp-dolphin) can differ from the true
+  // directory name (C:\ShwNodApp-dolphin). Vite resolves served files via the
+  // realpath (canonical) casing but compares against `config.root` with a
+  // CASE-SENSITIVE String.replace when stripping the root prefix for its
+  // html-inline-proxy cache. A mismatch breaks that strip and throws
+  // "No matching HTML proxy module found". Deriving every path from the
+  // realpath keeps root/input/aliases consistent with how Vite sees the files.
+  const projectRoot = realpathSync.native(__dirname);
+  const publicRoot = resolve(projectRoot, 'public');
 
   return {
   // Define environment variables to expose to the client
@@ -27,7 +39,7 @@ export default defineConfig(({ mode }) => {
       }
     })
   ],
-  root: 'public',
+  root: publicRoot,
   publicDir: false, // Disable - Express serves static files in production
   build: {
     outDir: '../dist',
@@ -35,9 +47,9 @@ export default defineConfig(({ mode }) => {
     rollupOptions: {
       input: {
         // Main staff-facing SPA
-        main: resolve(__dirname, 'public/index.html'),
+        main: resolve(publicRoot, 'index.html'),
         // Patient portal SPA (separate bundle, own auth, mobile-first)
-        portal: resolve(__dirname, 'public/portal.html'),
+        portal: resolve(publicRoot, 'portal.html'),
       },
       output: {
         // Optimal code splitting strategy for production
@@ -77,7 +89,7 @@ export default defineConfig(({ mode }) => {
     }
   },
   server: {
-    port: parseInt(process.env.VITE_DEV_PORT || '5173'),
+    port: parseInt(env.VITE_DEV_PORT || '5173'),
     host: true,
     open: true,
     fs: {
@@ -133,9 +145,9 @@ export default defineConfig(({ mode }) => {
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'public/js'),
-      '@components': resolve(__dirname, 'public/js/components'),
-      '@services': resolve(__dirname, 'public/js/services')
+      '@': resolve(publicRoot, 'js'),
+      '@components': resolve(publicRoot, 'js/components'),
+      '@services': resolve(publicRoot, 'js/services')
     }
   },
   optimizeDeps: {

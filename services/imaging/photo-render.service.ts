@@ -104,15 +104,18 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
     const rotW = Math.round(Math.abs(w * Math.cos(rad)) + Math.abs(h * Math.sin(rad)));
     const rotH = Math.round(Math.abs(w * Math.sin(rad)) + Math.abs(h * Math.cos(rad)));
 
-    let left: number;
-    let top: number;
-    let width: number;
-    let height: number;
+    // The requested crop rect, in rotated-image pixel space. With free panning /
+    // zoom-out the client can hand us a rect that runs past the image edges; the
+    // uncovered margins are filled with white below (matching the rotation fill),
+    // so the render is faithful to the editor preview instead of being clamped.
+    let R: { left: number; top: number; width: number; height: number };
     if (extract) {
-      left = clampInt(extract.left, 0, Math.max(0, rotW - 1));
-      top = clampInt(extract.top, 0, Math.max(0, rotH - 1));
-      width = clampInt(extract.width, 1, rotW - left);
-      height = clampInt(extract.height, 1, rotH - top);
+      R = {
+        left: Math.round(extract.left),
+        top: Math.round(extract.top),
+        width: Math.max(1, Math.round(extract.width)),
+        height: Math.max(1, Math.round(extract.height)),
+      };
     } else {
       // No crop supplied (slot never opened) → centre cover-crop to output aspect.
       const targetAspect = outW / outH;
@@ -122,25 +125,52 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
         ch = rotH;
         cw = Math.round(rotH * targetAspect);
       }
-      width = Math.max(1, Math.min(cw, rotW));
-      height = Math.max(1, Math.min(ch, rotH));
-      left = Math.round((rotW - width) / 2);
-      top = Math.round((rotH - height) / 2);
+      const width = Math.max(1, Math.min(cw, rotW));
+      const height = Math.max(1, Math.min(ch, rotH));
+      R = { left: Math.round((rotW - width) / 2), top: Math.round((rotH - height) / 2), width, height };
     }
 
+    // The part of the requested rect that actually overlaps the image.
+    const iLeft = Math.max(0, R.left);
+    const iTop = Math.max(0, R.top);
+    const iW = Math.min(rotW, R.left + R.width) - iLeft;
+    const iH = Math.min(rotH, R.top + R.height) - iTop;
+
+    const WHITE = { r: 255, g: 255, b: 255, alpha: 1 };
     let pipeline = sharp(sourceAbs, sharpOpts).autoOrient();
     if (flipV) pipeline = pipeline.flip(); // vertical flip
     if (flipH) pipeline = pipeline.flop(); // horizontal mirror
     if (rotation % 360 !== 0) {
-      pipeline = pipeline.rotate(rotation, { background: { r: 255, g: 255, b: 255, alpha: 1 } });
+      pipeline = pipeline.rotate(rotation, { background: WHITE });
     }
-    pipeline = pipeline
-      .extract({ left, top, width, height })
-      .resize(outW, outH, { fit: 'fill' })
-      .jpeg({ quality: 90, mozjpeg: true });
+
+    let out: ReturnType<typeof sharp>;
+    if (iW <= 0 || iH <= 0) {
+      // Rect lies entirely off the image → a blank white slot.
+      out = sharp({ create: { width: outW, height: outH, channels: 3, background: WHITE } });
+    } else if (iLeft === R.left && iTop === R.top && iW === R.width && iH === R.height) {
+      // Fully in-bounds (the common case) → straight extract + resize, no compositing.
+      out = pipeline.extract({ left: iLeft, top: iTop, width: iW, height: iH }).resize(outW, outH, { fit: 'fill' });
+    } else {
+      // Partly out of bounds → resize just the visible region and lay it onto a white
+      // canvas at the matching offset, so the empty margins are preserved 1:1.
+      const sx = outW / R.width;
+      const sy = outH / R.height;
+      const dx = clampInt((iLeft - R.left) * sx, 0, Math.max(0, outW - 1));
+      const dy = clampInt((iTop - R.top) * sy, 0, Math.max(0, outH - 1));
+      const dw = Math.min(Math.max(1, Math.round(iW * sx)), outW - dx);
+      const dh = Math.min(Math.max(1, Math.round(iH * sy)), outH - dy);
+      const regionBuf = await pipeline
+        .extract({ left: iLeft, top: iTop, width: iW, height: iH })
+        .resize(dw, dh, { fit: 'fill' })
+        .toBuffer();
+      out = sharp({ create: { width: outW, height: outH, channels: 3, background: WHITE } }).composite([
+        { input: regionBuf, left: dx, top: dy },
+      ]);
+    }
 
     await fs.mkdir(path.dirname(destAbs), { recursive: true });
-    await pipeline.toFile(tmpPath);
+    await out.jpeg({ quality: 90, mozjpeg: true }).toFile(tmpPath);
     await fs.rename(tmpPath, destAbs);
 
     log.info('[PhotoEditor] rendered view', { personId, tpCode, view, filename });

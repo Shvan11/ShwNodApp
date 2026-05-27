@@ -1,12 +1,11 @@
 /**
  * Native timepoint queries — WRITE to the LOCAL clone tables
- * (`dbo.tblTimePoints` / `dbo.tblTimePointImages`), NOT `DolphinPlatform`.
+ * (`dbo.tblTimePoints` / `dbo.tblTimePointImages`).
  *
- * First native write path for the cloned tables (Phase 4 of the Dolphin-native
- * migration). Gated at the route layer by the native-photo-editor flag. The main
- * app still READS timepoint tabs from Dolphin until a later read-cutover, so a
- * timepoint created here won't appear as a grid tab yet — its images still light
- * up by tpCode via the shared `working/` directory.
+ * These are the app's authoritative timepoint tables: both reads (timepoint tabs,
+ * portal, chair display — via `timepoint-queries.ts`) and writes (the photo editor)
+ * go here, so a timepoint created by the editor shows as a grid tab immediately and
+ * its images light up by tpCode via the shared `working/` directory.
  */
 import { executeQuery, withTransaction, sql, TYPES } from '../index.js';
 import { log } from '../../../utils/logger.js';
@@ -71,7 +70,7 @@ export async function findOrCreateNativeTimePoint(
  * batch — re-saving a slot updates in place instead of duplicating.
  *
  * @param imageType 2-digit view code, e.g. '10'  (the view minus the leading 'i')
- * @param imageFile  Dolphin form, e.g. '652401.I10' (uppercase I)
+ * @param imageFile  stored image-file form, e.g. '652401.I10' (uppercase I)
  */
 export async function upsertNativeTimePointImage(
   timePointId: number,

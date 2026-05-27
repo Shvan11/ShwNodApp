@@ -1,13 +1,15 @@
 /* ============================================================================
-   Clone Dolphin timepoint tables into ShwanNew  (Step 1: tables + data only)
+   Clone Dolphin reference data into ShwanNew  (tables + data only)
 
    Creates app-native copies of DolphinPlatform.dbo.TimePoints + TimePointImages
-   in ShwanNew, re-keyed on PersonID (the redundant Patients shim is dropped).
-   NO procs / triggers / app code are changed by this script.
+   (re-keyed on PersonID, the redundant Patients shim dropped) plus the
+   ImageTypes code->label dictionary. Reads DolphinPlatform READ-ONLY (SELECT
+   only); all writes target the local ShwanNew tables. NO procs / triggers /
+   app code are changed here, and DolphinPlatform is never modified.
 
-   Idempotent: re-running inserts 0 rows (guarded on the Dolphin* provenance
-   GUIDs). Run with:
-     sqlcmd -S "Clinic\DOLPHIN" -U Staff -P ortho2000 -d ShwanNew -i migrations/clone_dolphin_timepoints.sql
+   Idempotent: re-running inserts 0 timepoint rows (guarded on the Dolphin*
+   provenance GUIDs) and re-upserts the dictionary. Run with:
+     sqlcmd -S "Clinic\DOLPHIN" -U Staff -P ortho2000 -d ShwanNew_Test -i migrations/clone_dolphin_timepoints.sql
    ============================================================================ */
 
 SET ANSI_NULLS ON;
@@ -62,6 +64,18 @@ END
 ELSE PRINT 'dbo.tblTimePointImages already exists - skipping create';
 GO
 
+IF OBJECT_ID('dbo.tblImageTypes', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.tblImageTypes (
+        ImageTypeCode  char(2)          NOT NULL CONSTRAINT PK_tblImageTypes PRIMARY KEY,  -- matches tblTimePointImages.ImageType
+        Description    varchar(50)      NULL,             -- human label, e.g. 'IntraOral Center'
+        DolphinItypID  uniqueidentifier NULL             -- provenance: original ImageTypes.itypID
+    );
+    PRINT 'Created dbo.tblImageTypes';
+END
+ELSE PRINT 'dbo.tblImageTypes already exists - skipping create';
+GO
+
 /* ---------------------------------------------------------------------------
    2. Data load (cross-DB, same instance). Transactional + re-runnable.
    --------------------------------------------------------------------------- */
@@ -100,6 +114,27 @@ WHERE NOT EXISTS (SELECT 1 FROM dbo.tblTimePointImages x WHERE x.DolphinTpiID = 
 PRINT 'tblTimePointImages rows inserted this run: ' + CAST(@@ROWCOUNT AS varchar(12));
 
 COMMIT TRANSACTION;
+GO
+
+/* ---------------------------------------------------------------------------
+   2c. ImageTypes dictionary (read-only SELECT from DolphinPlatform -> local copy).
+       MERGE keeps it re-runnable. No FK is enforced from tblTimePointImages.ImageType,
+       so codes used in image data but absent from Dolphin's dictionary (e.g. 25/60)
+       simply have no description here.
+   --------------------------------------------------------------------------- */
+MERGE dbo.tblImageTypes AS t
+USING (SELECT itypCode, itypDescription, itypID
+       FROM DolphinPlatform.dbo.ImageTypes
+       WHERE itypCode IS NOT NULL AND LEN(itypCode) <= 2) AS s
+   ON t.ImageTypeCode = s.itypCode COLLATE DATABASE_DEFAULT
+WHEN MATCHED THEN
+    UPDATE SET Description = s.itypDescription, DolphinItypID = s.itypID
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (ImageTypeCode, Description, DolphinItypID)
+    VALUES (s.itypCode, s.itypDescription, s.itypID);
+
+DECLARE @itypN int = (SELECT COUNT(*) FROM dbo.tblImageTypes);
+PRINT 'tblImageTypes total rows: ' + CAST(@itypN AS varchar(12));
 GO
 
 /* ---------------------------------------------------------------------------
