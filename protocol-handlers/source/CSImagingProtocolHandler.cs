@@ -1,9 +1,11 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Web;
 using System.Windows.Forms;
+using System.Xml;
 using Microsoft.Win32;
 
 namespace CSImagingProtocolHandler
@@ -122,6 +124,11 @@ namespace CSImagingProtocolHandler
                     }
                 }
 
+                // Point CS Imaging's default export/save folder at this patient's
+                // root folder before launching, so File > Export defaults there.
+                string patientRoot = Path.GetDirectoryName(opgPath); // {PatientsFolder}\{PatientID}
+                SetExportPath(patientRoot);
+
                 // Launch TW.EXE with parameters
                 // Syntax: TW.EXE -P<opgPath> -N<PatientName> -D<PatientID> (no spaces after flags)
                 string arguments = string.Format(
@@ -149,6 +156,88 @@ namespace CSImagingProtocolHandler
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error
                 );
+            }
+        }
+
+        /// <summary>
+        /// Set CS Imaging's default export/save folder to the given patient root.
+        ///
+        /// CS Imaging persists UI state (including the last export path) to
+        /// %APPDATA%\TW\session.xml and rewrites it on exit, so we set this on
+        /// every launch rather than once. Best-effort only: any failure is
+        /// swallowed so it can never block launching the patient.
+        /// </summary>
+        private static void SetExportPath(string patientRoot)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(patientRoot))
+                {
+                    return;
+                }
+
+                // Match CS Imaging's observed "C:\" style: exactly one trailing separator.
+                // patientRoot is a UNC path (e.g. \\Clinic\clinic1\12345); backslashes are
+                // literal in XML attribute values, so no escaping is required.
+                string exportPath = patientRoot;
+                if (!exportPath.EndsWith("\\"))
+                {
+                    exportPath = exportPath + "\\";
+                }
+
+                // Resolve session.xml for the CURRENT Windows user (never hardcode the name).
+                string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                string sessionPath = Path.Combine(appData, "TW", "session.xml");
+
+                // CS Imaging creates this file on first run. If it isn't there yet, do
+                // nothing rather than fabricate a settings file we don't fully understand.
+                if (!File.Exists(sessionPath))
+                {
+                    return;
+                }
+
+                XmlDocument doc = new XmlDocument();
+                doc.PreserveWhitespace = true; // keep CS Imaging's existing formatting intact
+                doc.Load(sessionPath);
+
+                XmlNode root = doc.SelectSingleNode("/csi");
+                if (root == null)
+                {
+                    return; // not the structure we expect; leave the file untouched
+                }
+
+                // Touch ONLY <class key="export"> / <option key="path">; create if absent.
+                XmlElement exportClass = root.SelectSingleNode("class[@key='export']") as XmlElement;
+                if (exportClass == null)
+                {
+                    exportClass = doc.CreateElement("class");
+                    exportClass.SetAttribute("key", "export");
+                    root.AppendChild(exportClass);
+                }
+
+                XmlElement pathOption = exportClass.SelectSingleNode("option[@key='path']") as XmlElement;
+                if (pathOption == null)
+                {
+                    pathOption = doc.CreateElement("option");
+                    pathOption.SetAttribute("key", "path");
+                    exportClass.AppendChild(pathOption);
+                }
+
+                pathOption.SetAttribute("value", exportPath);
+
+                // Write UTF-8 WITHOUT a BOM (CS Imaging's own file has none, and a leading
+                // BOM can trip hand-rolled XML parsers). PreserveWhitespace keeps formatting.
+                XmlWriterSettings settings = new XmlWriterSettings();
+                settings.Encoding = new UTF8Encoding(false);
+                settings.OmitXmlDeclaration = false;
+                using (XmlWriter writer = XmlWriter.Create(sessionPath, settings))
+                {
+                    doc.Save(writer);
+                }
+            }
+            catch
+            {
+                // Best-effort only: a failure here must never block launching the patient.
             }
         }
 

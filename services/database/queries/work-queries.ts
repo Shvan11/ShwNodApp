@@ -3,6 +3,7 @@
  */
 import type { ColumnValue } from '../../../types/database.types.js';
 import { executeQuery, TYPES, SqlParam } from '../index.js';
+import { toDateOnly } from '../../../utils/date.js';
 
 /**
  * Work Status Constants
@@ -600,7 +601,7 @@ export async function reactivateWork(
 export async function addWorkWithInvoice(
   workData: WorkData
 ): Promise<{ workId: number; invoiceId: number }> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = toDateOnly(new Date());
   const usdReceived =
     workData.Currency === 'USD' || workData.Currency === 'EUR' ? workData.TotalRequired : 0;
   const iqdReceived = workData.Currency === 'IQD' ? workData.TotalRequired : 0;

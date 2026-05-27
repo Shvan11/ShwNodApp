@@ -3,6 +3,7 @@
  */
 import type { ColumnValue } from '../../../types/database.types.js';
 import { executeQuery, TYPES } from '../index.js';
+import { toDateOnly } from '../../../utils/date.js';
 
 // Type definitions
 interface Payment {
@@ -90,7 +91,7 @@ export function getActiveWorkForInvoice(PID: number): Promise<WorkForInvoice[]> 
  * Gets today's exchange rate only
  */
 export function getCurrentExchangeRate(): Promise<number | null> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = toDateOnly(new Date());
 
   return executeQuery<number, number | null>(
     `SELECT ExchangeRate FROM dbo.tblsms
@@ -127,7 +128,7 @@ export function addInvoice(invoiceData: InvoiceData): Promise<{ invoiceID: numbe
  * Updates the exchange rate for today's date
  */
 export function updateExchangeRate(exchangeRate: number): Promise<unknown[]> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = toDateOnly(new Date());
 
   return executeQuery(
     `IF EXISTS (SELECT 1 FROM dbo.tblsms WHERE date = @today)
@@ -199,7 +200,7 @@ export function listExchangeRates(
       ['toDate', TYPES.Date, toDate],
     ],
     (columns: ColumnValue[]) => ({
-      date: (columns[0].value as Date).toISOString().split('T')[0],
+      date: toDateOnly(columns[0].value as Date),
       exchangeRate: columns[1].value as number,
     })
   );

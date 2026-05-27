@@ -13,6 +13,7 @@
  */
 
 import { log } from '../../utils/logger.js';
+import { toDateOnly } from '../../utils/date.js';
 import * as database from '../database/index.js';
 import {
   getDailyAppointmentsOptimized,
@@ -265,7 +266,7 @@ export async function checkHolidayConflict(appDate: string): Promise<void> {
       {
         holidayId: holiday.ID,
         holidayName: holiday.HolidayName,
-        holidayDate: holiday.Holidaydate.toISOString().split('T')[0],
+        holidayDate: toDateOnly(holiday.Holidaydate),
       }
     );
   }

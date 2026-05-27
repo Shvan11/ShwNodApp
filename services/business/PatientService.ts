@@ -68,7 +68,7 @@ interface PatientInfoResult {
  */
 interface TimePointResult {
   tpCode: string;
-  tpDateTime: Date;
+  tpDateTime: string;
   tpDescription: string;
 }
 

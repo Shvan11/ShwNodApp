@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<csi>
+    <class key="toolbars">
+        <class key="acq_toolbar">
+            <class key="twain_source">
+                <option key="line_name" value="WIA-D:\"/>
+            </class>
+            <class key="group_root_tool">
+                <option key="7" value="1"/>
+            </class>
+        </class>
+        <class key="image_toolbar">
+            <class key="group_root_tool">
+                <option key="0" value="0"/>
+                <option key="1" value="0"/>
+                <option key="2" value="0"/>
+                <option key="3" value="0"/>
+            </class>
+        </class>
+        <class key="drawing_toolbar">
+            <class key="group_root_tool">
+                <option key="0" value="0"/>
+                <option key="1" value="0"/>
+                <option key="2" value="0"/>
+            </class>
+        </class>
+        <class key="share_toolbar">
+            <class key="group_root_tool">
+                <option key="0" value="0"/>
+                <option key="1" value="0"/>
+                <option key="2" value="0"/>
+            </class>
+        </class>
+        <option key="last_toolbar" value="2"/>
+    </class>
+    <class key="main_frame">
+        <option key="state" value="maximized"/>
+        <option key="rect_x" value="0"/>
+        <option key="rect_y" value="0"/>
+        <option key="rect_w" value="0"/>
+        <option key="rect_h" value="0"/>
+    </class>
+    <class key="log"/>
+    <class key="patient_list"/>
+    <class key="export">
+        <option key="path" value="C:\"/>
+        <option key="format" value="5"/>
+        <option key="mesh_format" value="0"/>
+        <option key="zip" value="false"/>
+        <option key="annotation" value="false"/>
+        <option key="show_folder" value="false"/>
+    </class>
+    <class key="color_thickness_window"/>
+    <class key="import_dialog"/>
+    <class key="slide_show">
+        <option key="interval" value="2"/>
+        <option key="auto_play" value="false"/>
+    </class>
+</csi>

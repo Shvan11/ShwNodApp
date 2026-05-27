@@ -3,11 +3,12 @@
  */
 import type { ColumnValue } from '../../../types/database.types.js';
 import { executeStoredProcedure, TYPES } from '../index.js';
+import { toDateOnly } from '../../../utils/date.js';
 
 // Type definitions
 interface TimePoint {
   tpCode: string;
-  tpDateTime: Date;
+  tpDateTime: string;
   tpDescription: string;
 }
 
@@ -21,7 +22,7 @@ export function getTimePoints(PID: string): Promise<TimePoint[]> {
     undefined,
     (columns: ColumnValue[]) => ({
       tpCode: columns[0].value as string,
-      tpDateTime: columns[1].value as Date,
+      tpDateTime: toDateOnly(columns[1].value as Date),
       tpDescription: columns[2].value as string,
     }),
     undefined

@@ -9,10 +9,11 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useToast } from '../../../contexts/ToastContext';
+import { generateId } from '../../../core/utils';
 import SlideshowBuilder from './SlideshowBuilder';
 import SlideshowPlayer from './SlideshowPlayer';
 import { labelForImageName, isLogoImage } from './photoTypes';
-import type { SlideItem, Timepoint } from './types';
+import type { SlideItem, SlidePhoto, Timepoint } from './types';
 import styles from './PatientSlideshow.module.css';
 
 interface Props {
@@ -37,7 +38,13 @@ function readSession(pid: number | null | undefined): SlideItem[] {
   try {
     const raw = sessionStorage.getItem(sessionKey(pid));
     const parsed = raw ? JSON.parse(raw) : null;
-    return Array.isArray(parsed) ? (parsed as SlideItem[]) : [];
+    if (!Array.isArray(parsed)) return [];
+    // Back-compat: legacy sessions stored a non-unique `id` and no `uid`.
+    // Drop the old id and mint a unique instance id so duplicates can't collide.
+    return parsed.map((s: Record<string, unknown>) => {
+      const { id: _legacyId, uid, ...rest } = s;
+      return { ...rest, uid: typeof uid === 'string' ? uid : generateId() } as SlideItem;
+    });
   } catch {
     return [];
   }
@@ -51,12 +58,31 @@ function writeSession(pid: number | null | undefined, items: SlideItem[]): void 
   }
 }
 
+// --- Slide/photo helpers (a slide carries one photo, or two when paired) ---
+const toPhoto = (item: SlideItem): SlidePhoto => ({
+  name: item.name,
+  url: item.url,
+  tp: item.tp,
+  tpDescription: item.tpDescription,
+  tpDate: item.tpDate,
+  label: item.label,
+});
+
+// Wrap a palette photo as a fresh slide instance (unique uid → duplicates allowed).
+const newSlide = (photo: SlidePhoto): SlideItem => ({ ...photo, uid: generateId() });
+
+const withoutSecond = (slide: SlideItem): SlideItem => {
+  const copy = { ...slide };
+  delete copy.second;
+  return copy;
+};
+
 const PatientSlideshow = ({ personId }: Props) => {
   const toast = useToast();
 
   const [timepoints, setTimepoints] = useState<Timepoint[]>([]);
   const [loadingTimepoints, setLoadingTimepoints] = useState(true);
-  const [galleries, setGalleries] = useState<Record<string, SlideItem[]>>({});
+  const [galleries, setGalleries] = useState<Record<string, SlidePhoto[]>>({});
   const [selected, setSelected] = useState<SlideItem[]>(() => readSession(personId));
   const [mode, setMode] = useState<'build' | 'play'>('build');
 
@@ -97,17 +123,16 @@ const PatientSlideshow = ({ personId }: Props) => {
     writeSession(personId, selected);
   }, [personId, selected]);
 
-  // Lazy-load a timepoint's gallery on first expand; cache filtered SlideItems.
-  const loadGallery = async (tp: Timepoint): Promise<SlideItem[]> => {
+  // Lazy-load a timepoint's gallery on first expand; cache the palette photos.
+  const loadGallery = async (tp: Timepoint): Promise<SlidePhoto[]> => {
     if (galleries[tp.tpCode]) return galleries[tp.tpCode];
     if (!personId) return [];
     const res = await fetch(`/api/patients/${personId}/gallery/${tp.tpCode}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const raw = (await res.json()) as (GalleryEntry | null)[];
-    const items: SlideItem[] = raw
+    const items: SlidePhoto[] = raw
       .filter((e): e is GalleryEntry => !!e && !isLogoImage(e.name))
       .map((e) => ({
-        id: `${tp.tpCode}:${e.name}`,
         name: e.name,
         url: `/DolImgs/${e.name}`,
         tp: tp.tpCode,
@@ -119,19 +144,67 @@ const PatientSlideshow = ({ personId }: Props) => {
     return items;
   };
 
-  const toggleSelect = (item: SlideItem) => {
-    setSelected((prev) =>
-      prev.some((s) => s.id === item.id)
-        ? prev.filter((s) => s.id !== item.id)
-        : [...prev, item],
-    );
-  };
+  // Gallery tap: append a fresh copy to the end (duplicates allowed).
+  const addToSequence = (photo: SlidePhoto) => setSelected((prev) => [...prev, newSlide(photo)]);
 
-  const removeSelect = (id: string) => setSelected((prev) => prev.filter((s) => s.id !== id));
+  // Gallery drag → gap: insert a fresh copy at a specific position.
+  const insertAt = (photo: SlidePhoto, index: number) =>
+    setSelected((prev) => {
+      const at = Math.max(0, Math.min(index, prev.length));
+      const next = prev.slice();
+      next.splice(at, 0, newSlide(photo));
+      return next;
+    });
+
+  // Gallery drag → chip: make the target slide a side-by-side pair (right-hand photo).
+  const pairPhotoOnto = (targetIndex: number, photo: SlidePhoto) =>
+    setSelected((prev) => {
+      const target = prev[targetIndex];
+      if (!target) return prev;
+      if (target.second) {
+        toast.info('That slide already has two photos');
+        return prev;
+      }
+      const next = prev.slice();
+      next[targetIndex] = { ...target, second: { ...photo } };
+      return next;
+    });
+
+  // Tray chip ✕ removes that one instance (both photos of a pair); use unpair to split.
+  const removeSelect = (uid: string) => setSelected((prev) => prev.filter((s) => s.uid !== uid));
+
+  // Chip drag → another chip: merge two single slides (target = left, dragged = right).
+  const pairSlides = (fromIndex: number, toIndex: number) =>
+    setSelected((prev) => {
+      if (fromIndex === toIndex) return prev;
+      const from = prev[fromIndex];
+      const to = prev[toIndex];
+      if (!from || !to) return prev;
+      if (from.second || to.second) {
+        toast.info('Both slides must be single to combine');
+        return prev;
+      }
+      const next = prev.slice();
+      next[toIndex] = { ...to, second: toPhoto(from) };
+      next.splice(fromIndex, 1); // remove the dragged slide from its old slot
+      return next;
+    });
+
+  // Split a paired slide back into two consecutive single slides.
+  const unpair = (index: number) => {
+    setSelected((prev) => {
+      const slide = prev[index];
+      if (!slide?.second) return prev;
+      const next = prev.slice();
+      next[index] = withoutSecond(slide);
+      next.splice(index + 1, 0, newSlide(slide.second));
+      return next;
+    });
+  };
 
   const clearSelect = () => setSelected([]);
 
-  const reorderSelect = (from: number, to: number) => {
+  const moveSlide = (from: number, to: number) => {
     setSelected((prev) => {
       if (from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
       const next = prev.slice();
@@ -162,10 +235,14 @@ const PatientSlideshow = ({ personId }: Props) => {
         galleries={galleries}
         loadGallery={loadGallery}
         selected={selected}
-        onToggle={toggleSelect}
+        onAdd={addToSequence}
+        onInsertAt={insertAt}
+        onPairPhotoOnto={pairPhotoOnto}
+        onReorder={moveSlide}
+        onPairSlides={pairSlides}
         onRemove={removeSelect}
+        onUnpair={unpair}
         onClear={clearSelect}
-        onReorder={reorderSelect}
         onPlay={play}
       />
       {mode === 'play' && selected.length > 0 && (

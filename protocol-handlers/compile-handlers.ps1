@@ -105,7 +105,7 @@ if (-not (Test-Path "source\CSImagingProtocolHandler.cs")) {
     Write-Host "ERROR: source\CSImagingProtocolHandler.cs not found!" -ForegroundColor Red
     $failedCount++
 } else {
-    & $cscPath /target:winexe /out:CSImagingProtocolHandler.exe /reference:System.Web.dll /reference:System.Windows.Forms.dll "source\CSImagingProtocolHandler.cs" 2>&1 | Out-Null
+    & $cscPath /target:winexe /out:CSImagingProtocolHandler.exe /reference:System.Web.dll /reference:System.Windows.Forms.dll /reference:System.Xml.dll "source\CSImagingProtocolHandler.cs" 2>&1 | Out-Null
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "  SUCCESS: CSImagingProtocolHandler.exe created" -ForegroundColor Green

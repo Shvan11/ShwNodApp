@@ -35,3 +35,12 @@ export function labelForImageName(fileName: string): string {
 export function isLogoImage(fileName: string): boolean {
   return /logo\.png$/i.test(fileName);
 }
+
+/**
+ * Stable identity of a photo within a patient: `${tp}:${name}`. NOT unique within
+ * a sequence — a photo may be placed more than once (each placement gets its own
+ * `SlideItem.uid`). Use this for "is this gallery photo already in the sequence?".
+ */
+export function photoId(photo: { tp: string; name: string }): string {
+  return `${photo.tp}:${photo.name}`;
+}

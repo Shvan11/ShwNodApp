@@ -96,6 +96,7 @@ SQL Server via **mssql v12** with tarn connection pooling (max 10, 30s timeouts)
 - Output params: pass `outputs: SqlOutputParam[]` (the old `beforeExec` hook is gone).
 - Non-SELECT queries return `recordset === undefined`; the facade null-checks it.
 - `result.rowsAffected` is an array in mssql; the facade reduces to a single number.
+- **Date-only columns must leave the server as a `YYYY-MM-DD` string** — pool runs `useUTC: false`, so a raw `datetime` serializes via `toISOString()` to UTC and shifts midnight values back a day on the client. Use SQL `CONVERT(varchar, col, 23)` (inline queries) or `toDateOnly()` from `utils/date.ts` (stored-proc/mapper results). Never `(col as Date).toISOString().split('T')[0]`.
 
 **Connection** (see `.env` / `.mcp.json`): server `Clinic\DOLPHIN`, db `ShwanNew`, user `Staff`.
 

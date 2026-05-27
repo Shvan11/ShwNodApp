@@ -11,7 +11,7 @@ import type { PointerEvent as ReactPointerEvent, SyntheticEvent } from 'react';
 import cn from 'classnames';
 import { useFullscreen } from './useFullscreen';
 import { useWakeLock } from './useWakeLock';
-import type { Framing, SlideItem, TransitionStyle } from './types';
+import type { Framing, SlideItem, SlidePhoto, TransitionStyle } from './types';
 import styles from './SlideshowPlayer.module.css';
 
 interface Props {
@@ -124,12 +124,12 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
   // Keyboard navigation (mouse/keyboard fallback).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') {
-        e.preventDefault();
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault(); // Space: suppress page scroll / focused-button activation
         go(1);
         revealChrome();
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
+      } else if (e.key === 'ArrowLeft' || e.key === 'Backspace') {
+        e.preventDefault(); // Backspace: suppress legacy history-back
         go(-1);
         revealChrome();
       } else if (e.key === 'Escape') {
@@ -148,6 +148,11 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
       if (i >= 0 && i < slides.length) {
         const img = new Image();
         img.src = slides[i].url;
+        const sec = slides[i].second;
+        if (sec) {
+          const img2 = new Image();
+          img2.src = sec.url;
+        }
       }
     });
   }, [safeIndex, slides]);
@@ -206,6 +211,36 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
   const leaveClass = (dir: 1 | -1) =>
     transition === 'crossfade' ? styles.leaveFade : dir > 0 ? styles.leaveLeft : styles.leaveRight;
 
+  // Per-photo label for a paired (side-by-side) slide.
+  const photoLabel = (photo: SlidePhoto) => (
+    <span className={styles.pairLabel}>
+      <span className={styles.pairLabelMain}>{photo.tpDescription || 'Photo'}</span>
+      <span className={styles.pairLabelSub}>
+        {photo.label}
+        {photo.tpDate ? ` · ${photo.tpDate}` : ''}
+      </span>
+    </span>
+  );
+
+  // A slide renders one photo, or two side-by-side when `second` is set.
+  const renderSlide = (item: SlideItem) => {
+    if (!item.second) {
+      return <img src={item.url} alt={item.label} draggable={false} onError={handleImgError} />;
+    }
+    return (
+      <div className={styles.pair}>
+        <div className={styles.pairItem}>
+          <img src={item.url} alt={item.label} draggable={false} onError={handleImgError} />
+          {showCaption && photoLabel(item)}
+        </div>
+        <div className={styles.pairItem}>
+          <img src={item.second.url} alt={item.second.label} draggable={false} onError={handleImgError} />
+          {showCaption && photoLabel(item.second)}
+        </div>
+      </div>
+    );
+  };
+
   if (!current) return null;
 
   return (
@@ -213,14 +248,14 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
       <div className={cn(styles.frame, framing === 'reel' && styles.frameReel)}>
         {outgoing && (
           <div key={`out-${outgoing.key}`} className={cn(styles.layer, leaveClass(outgoing.dir))}>
-            <img src={outgoing.item.url} alt="" draggable={false} onError={handleImgError} />
+            {renderSlide(outgoing.item)}
           </div>
         )}
         <div key={`in-${animKey}`} className={cn(styles.layer, enterClass)}>
-          <img src={current.url} alt={current.label} draggable={false} onError={handleImgError} />
+          {renderSlide(current)}
         </div>
 
-        {showCaption && (
+        {showCaption && !current.second && (
           <div className={styles.caption}>
             <span className={styles.captionMain}>{current.tpDescription || 'Photo'}</span>
             <span className={styles.captionSub}>
@@ -282,7 +317,7 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
         {slides.length > 1 && slides.length <= 15 && (
           <div className={styles.dots}>
             {slides.map((s, i) => (
-              <span key={s.id} className={cn(styles.dot, i === safeIndex && styles.dotActive)} />
+              <span key={s.uid} className={cn(styles.dot, i === safeIndex && styles.dotActive)} />
             ))}
           </div>
         )}

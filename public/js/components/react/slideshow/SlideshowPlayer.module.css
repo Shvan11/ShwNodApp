@@ -44,6 +44,72 @@
   filter: drop-shadow(0 12px 32px rgba(0, 0, 0, 0.6));
 }
 
+/* --- Side-by-side pair (two photos on one slide) --- */
+.pair {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: var(--spacing-lg);
+  width: 100%;
+  height: 100%;
+  padding: 0 var(--spacing-lg);
+}
+
+.pairItem {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Two-class specificity beats `.layer img`, so each half is capped at its column. */
+.pair .pairItem img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 32px rgba(0, 0, 0, 0.6));
+}
+
+.pairLabel {
+  position: absolute;
+  bottom: var(--spacing-sm);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  color: var(--color-white);
+  pointer-events: none;
+  text-align: center;
+  max-width: 92%;
+}
+
+.pairLabelMain {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+}
+
+.pairLabelSub {
+  font-size: var(--font-size-xs);
+  opacity: 0.8;
+}
+
+/* Reel (9:16) framing → stack the pair vertically so each photo stays large. */
+.frameReel .pair {
+  flex-direction: column;
+  padding: var(--spacing-lg) 0;
+}
+
 /* Mount-triggered transitions (JS skips these entirely under reduced motion). */
 @keyframes fadeIn {
   from { opacity: 0; }
