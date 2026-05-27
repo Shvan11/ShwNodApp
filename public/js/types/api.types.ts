@@ -100,12 +100,73 @@ export interface PaymentSaveData {
 // AUTH / USER
 // =============================================================================
 
+/** App-level feature flags (runtime, env-driven), surfaced on GET /api/auth/me. */
+export interface FeatureFlags {
+    nativePhotoEditor: boolean;
+}
+
 /** GET /api/auth/me. */
 export interface UserResponse {
     success: boolean;
     user?: {
+        username?: string;
+        fullName?: string;
         role: string;
     };
+    featureFlags?: FeatureFlags;
+}
+
+// =============================================================================
+// PHOTO EDITOR (native Dolphin-style layout manager — Phase 4)
+// =============================================================================
+
+/** The 8 fixed orthodontic view codes (Dolphin layout slots). */
+export type PhotoViewCode = 'i10' | 'i12' | 'i13' | 'i20' | 'i21' | 'i22' | 'i23' | 'i24';
+
+/**
+ * Per-slot render instruction (POST /api/photo-editor/:personId/render). The client
+ * collapses pan+zoom+crop into a single `extract` rect in the source pixel space
+ * AFTER EXIF-orient + flip + rotation; the server applies the same order with sharp.
+ */
+export interface SlotRenderSpec {
+    view: PhotoViewCode;
+    /** Path relative to clinic1/{personId}/, e.g. "Initial_01-01-2026/IMG_001.jpg". */
+    sourceRelPath: string;
+    flipH: boolean;
+    flipV: boolean;
+    rotation: number;
+    /** Omit to let the server centre-crop to the view aspect (un-opened slot). */
+    extract?: { left: number; top: number; width: number; height: number };
+    output: { width: number; height: number };
+}
+
+/** POST /api/photo-editor/:personId/prepare request body. */
+export interface PhotoPrepareRequest {
+    tpDescription: string;
+    tpDate: string;
+}
+
+/** POST /api/photo-editor/:personId/prepare response data (success or shwan-date conflict). */
+export interface PhotoPrepareResult {
+    tpCode?: number;
+    conflict?: boolean;
+    conflictSource?: 'shwan';
+    existingDate?: string;
+    requestedDate?: string;
+}
+
+/** POST /api/photo-editor/:personId/render request body. */
+export interface PhotoRenderRequest {
+    tpCode: number;
+    tpName: string;
+    tpDate: string;
+    slots: SlotRenderSpec[];
+}
+
+/** POST /api/photo-editor/:personId/render response data. */
+export interface PhotoRenderResult {
+    written: string[];
+    warnings?: string[];
 }
 
 /** POST /api/portal/login (patient portal). */

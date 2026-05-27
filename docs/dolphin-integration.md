@@ -150,3 +150,62 @@ out around the practice logo).
 X-rays are a separate flow: they live under `clinic1/{PersonID}/OPG/` (with CS
 Imaging metadata under `.csi_data/.version_4.4/`) and are converted to PNG via
 `cs_export`, not through the Dolphin timepoint mechanism above.
+
+---
+
+## 5. Local clone of timepoint tables (migration step 1)
+
+To begin owning this data natively, the two Dolphin tables the app depends on have
+been cloned into **`ShwanNew`** as clean, `PersonID`-keyed tables (the 76-column
+`Patients` shim is dropped — `patOtherID` *is* our `PersonID`):
+
+- **`dbo.tblTimePoints`** — `TimePointID` (PK), `PersonID`, `tpCode`, `tpDescription`,
+  `tpDateTime` (date-only), plus `DolphinTpID`/`DolphinPatID` provenance GUIDs.
+- **`dbo.tblTimePointImages`** — `TimePointImageID` (PK), `TimePointID` (FK, cascade),
+  `PersonID`, `ImageType` (the `char(2)` view code, e.g. `10`/`22`), `ImageFile`,
+  `ImageDate`, `Title`, plus `DolphinTpiID` provenance.
+
+Migration script: **`migrations/clone_dolphin_timepoints.sql`** (idempotent; cross-DB
+`INSERT…SELECT` that resolves `PersonID` via `patOtherID` and wires image FKs through
+the provenance GUIDs). DDL is also reflected in `migrations/init_script.sql`.
+
+> **This step is data-only.** The 6 stored procs, the `WPhoto` trigger on `tblwork`,
+> and the `patient.routes.ts` EXISTS query still run against `DolphinPlatform` — code
+> cutover to these local tables is a later step. The `Dolphin*ID` columns exist to
+> reconcile during that transition and can be dropped once cutover is verified.
+
+---
+
+## 6. Native photo editor (migration step 2 — flag-gated, dark by default)
+
+In-browser replacement for Dolphin's photo ingest. Off unless
+`NATIVE_PHOTO_EDITOR_ENABLED=true` (`config.featureFlags.nativePhotoEditor`, surfaced to
+the SPA via `GET /api/auth/me` → `GlobalStateContext`). The Dolphin flow is untouched
+while dark.
+
+**Flow:** Navigation → `DolphinPhotoDialog` (`native` mode) → `POST /api/photo-editor/:id/prepare`
+(creates a row in the **local** `tblTimePoints`; for Initial/Final mirrors the date into
+`tblwork`, reusing `getExistingPhotoDate`/`updatePhotoDate` + the conflict/override UI) →
+navigate to the `photo-editor` page. There the user drags originals from the patient's
+`{tpName}_{DD-MM-YYYY}` folder (listed via the existing `/api/patients/:id/files`) into the
+8 view slots, frames each (react-easy-crop: zoom/pan/rotate/crop + flip/mirror; occlusal
+slots default mirrored), and Saves → `POST /api/photo-editor/:id/render`.
+
+**Render (server, sharp):** per slot, `autoOrient → flip/flop → rotate → extract → resize → jpeg`,
+written atomically to `working/{PersonID}0{tpCode}.i{viewCode}` — the **same flat dir +
+naming** Dolphin uses, so the existing grid/portal light up with zero changes — plus a row
+upserted into local `tblTimePointImages` (`ImageFile` = `{PID}0{tp}.I{view}`).
+
+> Timepoint *tabs* still read from Dolphin (`ListDolphTimePoints`) until read-cutover, so a
+> native timepoint shows by tpCode but not yet as a tab. The flat `working/` dir is keyed by
+> `(pid, tpCode, view)` — keep the native flow the sole importer per patient to avoid tpCode
+> collisions.
+
+| Concern | Location |
+|---|---|
+| Routes (prepare / render)   | `routes/api/photo-editor.routes.ts` |
+| Server-side sharp render    | `services/imaging/photo-render.service.ts` |
+| Local-table writes          | `services/database/queries/native-timepoint-queries.ts` |
+| Flag route-guard            | `middleware/feature-flags.ts` |
+| Editor UI                   | `public/js/components/react/photo-editor/` |
+| Entry point                 | `DolphinPhotoDialog.tsx` (`native` mode) + `Navigation.tsx` |

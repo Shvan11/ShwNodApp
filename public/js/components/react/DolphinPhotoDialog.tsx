@@ -10,6 +10,10 @@ interface Props {
         PatientName?: string;
     } | null;
     onClose: () => void;
+    /** Native mode: prepare a LOCAL timepoint and hand off to the in-app editor
+     *  instead of launching the Dolphin desktop protocol. */
+    native?: boolean;
+    onPrepared?: (result: { tpCode: number; tpName: string; tpDate: string }) => void;
 }
 
 interface Appointment {
@@ -41,7 +45,7 @@ interface ConflictInfo {
     message: string;
 }
 
-const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
+const DolphinPhotoDialog = ({ personId, patientInfo, onClose, native = false, onPrepared }: Props) => {
     const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -100,16 +104,17 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
             setSubmitting(true);
             setConflictInfo(null);
 
-            const response = await fetch('/api/dolphin/prepare-photo-import', {
+            const url = native
+                ? `/api/photo-editor/${personId}/prepare`
+                : '/api/dolphin/prepare-photo-import';
+            const requestBody = native
+                ? { tpDescription: timepointType, tpDate: selectedDate, overrideDate }
+                : { personId, tpDescription: timepointType, tpDate: selectedDate, skipDolphin, overrideDate };
+
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    personId,
-                    tpDescription: timepointType,
-                    tpDate: selectedDate,
-                    skipDolphin,
-                    overrideDate
-                })
+                body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
@@ -119,7 +124,7 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
 
             const data = await response.json();
 
-            // Check for date conflict
+            // Check for date conflict (same shape for both flows)
             if (data.conflict) {
                 setConflictInfo({
                     conflictType: data.conflictType,
@@ -129,6 +134,13 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
                     message: data.message
                 });
                 setSubmitting(false);
+                return;
+            }
+
+            // Native: hand off to the in-app editor instead of the desktop protocol.
+            if (native) {
+                onPrepared?.({ tpCode: data.tpCode, tpName: timepointType, tpDate: selectedDate });
+                onClose();
                 return;
             }
 
@@ -170,7 +182,7 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
     return (
         <Modal isOpen={true} onClose={onClose} contentClassName={styles.dialog}>
                 <div className={styles.header}>
-                    <h3>Add Photos to Dolphin</h3>
+                    <h3>{native ? 'New Photo Session' : 'Add Photos to Dolphin'}</h3>
                     <button className={styles.closeBtn} onClick={onClose}>
                         <i className="fas fa-times" />
                     </button>
@@ -299,17 +311,19 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
                         </>
                     )}
 
-                    {/* Skip Dolphin Checkbox */}
-                    <div className={`${styles.formGroup} ${styles.checkboxGroup}`}>
-                        <label className={styles.checkboxLabel}>
-                            <input
-                                type="checkbox"
-                                checked={skipDolphin}
-                                onChange={(e: ChangeEvent<HTMLInputElement>) => setSkipDolphin(e.target.checked)}
-                            />
-                            <span>Just organize photos (don't launch Dolphin)</span>
-                        </label>
-                    </div>
+                    {/* Skip Dolphin Checkbox (Dolphin flow only) */}
+                    {!native && (
+                        <div className={`${styles.formGroup} ${styles.checkboxGroup}`}>
+                            <label className={styles.checkboxLabel}>
+                                <input
+                                    type="checkbox"
+                                    checked={skipDolphin}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => setSkipDolphin(e.target.checked)}
+                                />
+                                <span>Just organize photos (don't launch Dolphin)</span>
+                            </label>
+                        </div>
+                    )}
                 </div>
 
                 <div className={styles.footer}>
@@ -329,7 +343,9 @@ const DolphinPhotoDialog = ({ personId, patientInfo, onClose }: Props) => {
                                 onClick={() => handleSubmit(false)}
                                 disabled={submitting || loading}
                             >
-                                {submitting ? 'Preparing...' : 'Select Photos'}
+                                {submitting
+                                    ? (native ? 'Opening…' : 'Preparing...')
+                                    : (native ? 'Open Editor' : 'Select Photos')}
                             </button>
                         </>
                     )}

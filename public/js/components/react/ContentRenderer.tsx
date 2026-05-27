@@ -1,4 +1,6 @@
+import { lazy, Suspense } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useGlobalState } from '../../contexts/GlobalStateContext';
 import GridComponent from './GridComponent';
 import XraysComponent from './XraysComponent';
 import FileExplorer from './files/FileExplorer';
@@ -17,6 +19,9 @@ import AddPatientForm from './AddPatientForm';
 import Diagnosis from '../../pages/Diagnosis';
 // new-work-component.css -> NewWorkComponent.module.css
 
+// Lazy-loaded so react-easy-crop stays out of the main bundle (flag-gated feature).
+const PhotoEditor = lazy(() => import('./photo-editor/PhotoEditor'));
+
 interface ContentRendererParams {
     tpCode?: string;
     phone?: string;
@@ -34,6 +39,7 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
     const navigate = useNavigate();
     const wildcardParams = useParams<{ '*': string }>();
     const [searchParams] = useSearchParams();
+    const { featureFlags } = useGlobalState();
 
     // Extract from wildcard route
     const wildcardPath = wildcardParams['*'] || '';
@@ -265,6 +271,29 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                             navigate('/patient-management');
                         }}
                     />
+                );
+
+            case 'photo-editor':
+                if (!featureFlags.nativePhotoEditor) {
+                    return (
+                        <div className="unknown-page">
+                            <div className="error-message">
+                                <i className="fas fa-question-circle"></i>
+                                <h3>Not Available</h3>
+                                <p>The photo editor is not enabled.</p>
+                            </div>
+                        </div>
+                    );
+                }
+                return (
+                    <Suspense fallback={<div className="loading-spinner">Loading editor…</div>}>
+                        <PhotoEditor
+                            personId={personId}
+                            tpCode={tpCode ? tpCode.replace('tp', '') : ''}
+                            tpName={searchParams.get('tpName') || ''}
+                            tpDate={searchParams.get('date') || ''}
+                        />
+                    </Suspense>
                 );
 
             default:

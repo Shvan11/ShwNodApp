@@ -1,0 +1,59 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: var(--spacing-sm);
+  width: 100%;
+  height: 100%;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  border: 2px solid var(--border-color, #e5e7eb);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--background-primary);
+  cursor: pointer;
+  min-height: 0;
+  min-width: 0;
+}
+
+.cellActive {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px var(--primary-color);
+}
+
+.cellDragOver {
+  border-color: var(--success-color);
+  border-style: dashed;
+}
+
+.cellHeader {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px var(--spacing-xs);
+  background: var(--background-secondary);
+  color: var(--text-color, #374151);
+  text-align: center;
+}
+
+.cellBody {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.logoCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logoImg {
+  max-width: 70%;
+  max-height: 70%;
+  object-fit: contain;
+}

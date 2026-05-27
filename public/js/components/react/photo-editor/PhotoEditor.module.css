@@ -1,0 +1,73 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
+  min-height: 480px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  background: var(--background-primary);
+}
+
+.titleBlock {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-md);
+}
+
+.tpName {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.tpDate {
+  color: var(--text-muted, #6b7280);
+}
+
+.count {
+  color: var(--text-muted, #6b7280);
+  font-size: 0.85rem;
+}
+
+.saveBtn {
+  background: var(--primary-color);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.saveBtn:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.saveBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.gridArea {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--spacing-md);
+}
+
+.notice {
+  padding: var(--spacing-xl);
+  text-align: center;
+  color: var(--text-muted, #6b7280);
+}

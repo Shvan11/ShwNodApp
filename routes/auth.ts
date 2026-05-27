@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 import { verifyCredentials, hashPassword } from '../middleware/auth.js';
 import { executeQuery, TYPES } from '../services/database/index.js';
 import { log } from '../utils/logger.js';
+import config from '../config/config.js';
 
 const router = Router();
 
@@ -174,6 +175,9 @@ router.get('/me', (req: Request, res: Response): void => {
         username: req.session.username,
         fullName: req.session.fullName,
         role: req.session.userRole
+      },
+      featureFlags: {
+        nativePhotoEditor: config.featureFlags.nativePhotoEditor
       }
     });
   } catch (error) {

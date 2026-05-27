@@ -1,0 +1,42 @@
+.empty,
+.preview,
+.cropWrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--background-tertiary);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  color: var(--text-muted, #9ca3af);
+}
+
+.emptyLogo {
+  width: 40%;
+  max-width: 90px;
+  opacity: 0.3;
+  object-fit: contain;
+}
+
+.emptyLabel {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cropWrap {
+  background: #111;
+}
+
+.previewImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}

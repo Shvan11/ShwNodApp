@@ -97,6 +97,9 @@ ssl/
 *.p12
 *.pfx
 
+# Claude Code working directory (local agent state — never commit)
+.claude/
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
