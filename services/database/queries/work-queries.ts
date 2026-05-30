@@ -16,7 +16,8 @@
  *    Declared return interfaces are preserved (callers unchanged) — see FLAGS.
  */
 import { sql } from 'kysely';
-import { getKysely } from '../kysely.js';
+import { getKysely, withPgTransaction } from '../kysely.js';
+import { enqueueWorkIfAligner } from '../../sync/sync-queue.js';
 import { toDateOnly } from '../../../utils/date.js';
 
 /**
@@ -589,51 +590,59 @@ export async function updateWork(
     return { success: true, rowCount: 0 };
   }
 
-  const db = getKysely();
-  const result = await db
-    .updateTable('tblwork')
-    .set(updateValues as never)
-    .where('workid', '=', workId)
-    .executeTakeFirst();
+  return withPgTransaction(async (trx) => {
+    const result = await trx
+      .updateTable('tblwork')
+      .set(updateValues as never)
+      .where('workid', '=', workId)
+      .executeTakeFirst();
 
-  return { success: true, rowCount: Number(result.numUpdatedRows) };
+    await enqueueWorkIfAligner(trx, workId, 'UPDATE');
+    return { success: true, rowCount: Number(result.numUpdatedRows) };
+  });
 }
 
 export async function finishWork(workId: number): Promise<{ success: boolean; rowCount: number }> {
-  const db = getKysely();
-  const result = await db
-    .updateTable('tblwork')
-    .set({ Status: WORK_STATUS.FINISHED })
-    .where('workid', '=', workId)
-    .executeTakeFirst();
+  return withPgTransaction(async (trx) => {
+    const result = await trx
+      .updateTable('tblwork')
+      .set({ Status: WORK_STATUS.FINISHED })
+      .where('workid', '=', workId)
+      .executeTakeFirst();
 
-  return { success: true, rowCount: Number(result.numUpdatedRows) };
+    await enqueueWorkIfAligner(trx, workId, 'UPDATE');
+    return { success: true, rowCount: Number(result.numUpdatedRows) };
+  });
 }
 
 export async function discontinueWork(
   workId: number
 ): Promise<{ success: boolean; rowCount: number }> {
-  const db = getKysely();
-  const result = await db
-    .updateTable('tblwork')
-    .set({ Status: WORK_STATUS.DISCONTINUED })
-    .where('workid', '=', workId)
-    .executeTakeFirst();
+  return withPgTransaction(async (trx) => {
+    const result = await trx
+      .updateTable('tblwork')
+      .set({ Status: WORK_STATUS.DISCONTINUED })
+      .where('workid', '=', workId)
+      .executeTakeFirst();
 
-  return { success: true, rowCount: Number(result.numUpdatedRows) };
+    await enqueueWorkIfAligner(trx, workId, 'UPDATE');
+    return { success: true, rowCount: Number(result.numUpdatedRows) };
+  });
 }
 
 export async function reactivateWork(
   workId: number
 ): Promise<{ success: boolean; rowCount: number }> {
-  const db = getKysely();
-  const result = await db
-    .updateTable('tblwork')
-    .set({ Status: WORK_STATUS.ACTIVE })
-    .where('workid', '=', workId)
-    .executeTakeFirst();
+  return withPgTransaction(async (trx) => {
+    const result = await trx
+      .updateTable('tblwork')
+      .set({ Status: WORK_STATUS.ACTIVE })
+      .where('workid', '=', workId)
+      .executeTakeFirst();
 
-  return { success: true, rowCount: Number(result.numUpdatedRows) };
+    await enqueueWorkIfAligner(trx, workId, 'UPDATE');
+    return { success: true, rowCount: Number(result.numUpdatedRows) };
+  });
 }
 
 export async function addWorkWithInvoice(
@@ -1045,11 +1054,17 @@ export async function transferWork(
   const sourcePatientId = work.PersonID;
 
   // Execute the transfer - simple UPDATE since all related tables link via WorkID
-  await getKysely()
-    .updateTable('tblwork')
-    .set({ PersonID: targetPatientId })
-    .where('workid', '=', workId)
-    .execute();
+  await withPgTransaction(async (trx) => {
+    await trx
+      .updateTable('tblwork')
+      .set({ PersonID: targetPatientId })
+      .where('workid', '=', workId)
+      .execute();
+
+    // Work moved to a new owner → forward-sync the work (if aligner-tracked). The new
+    // patient is synced lazily by the queue processor's related-record bootstrap.
+    await enqueueWorkIfAligner(trx, workId, 'UPDATE');
+  });
 
   return {
     success: true,
