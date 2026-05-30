@@ -140,12 +140,12 @@ router.get(
       if (!messageData) {
         log.warn('WhatsApp message data not found', { personId, appointmentId });
         ErrorResponses.notFound(res, 'Message data', {
-          details: 'No data returned from stored procedure'
+          details: 'No message data returned'
         });
         return;
       }
 
-      // Check stored procedure result
+      // Check the message-build result code (0=ok, -1=not found, -2=invalid phone)
       if (messageData.result !== 0) {
         let errorMessage = 'Unknown error';
         if (messageData.result === -1) {
@@ -154,7 +154,7 @@ router.get(
           errorMessage = 'Invalid phone number';
         }
 
-        log.warn('WhatsApp stored procedure error', { personId, appointmentId, result: messageData.result, errorMessage });
+        log.warn('WhatsApp message build error', { personId, appointmentId, result: messageData.result, errorMessage });
         ErrorResponses.badRequest(res, 'Invalid input', {
           details: errorMessage,
           result: messageData.result

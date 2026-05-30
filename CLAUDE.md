@@ -2,7 +2,7 @@
 
 **Shwan Orthodontics Management System** — Node.js + Express + React 19 + TypeScript practice management platform for an orthodontic clinic. Patients, treatments, dental chart, aligners, appointments, multi-channel messaging (WhatsApp/SMS/Telegram), financial/expenses, document templates (GrapesJS), Stand inventory/POS, Patient Portal.
 
-> ⚠️ **This is a SANDBOX CLONE of the main app, used for testing only.** It does **not** connect to the production database — it points at a **local sandbox PostgreSQL database** (`shwan_test` on `localhost:5432`) so experiments can't touch live clinic data. Changes here are for safe testing; the production app and its database (`shwan`, port 3000) are separate.
+> ⚠️ **This is the PRODUCTION deployment.** It connects to the **live PostgreSQL database** (`shwan` on `localhost:5432`) and serves on **port 3000** — changes here touch real clinic data. (This folder was originally a sandbox clone and was later promoted to production.) The separate **sandbox/test** environment lives at `C:\ShwNodApp-dolphin` (port 3100, database `shwan_test`/`ShwanNew_Test`) — do experiments there, not here.
 
 ---
 
@@ -101,7 +101,7 @@ No inline styles (except dynamic), no `!important` (except print/a11y). For colo
 
 **Migrations**: schema is owned by **node-pg-migrate** — `migrations/pg/*.sql` (plain SQL up/down). `npm run db:migrate` / `db:migrate:down` / `db:new-migration`; regenerate `types/db.d.ts` with `npm run db:codegen` after any schema change. Kysely is the runtime query builder, **not** the DDL owner.
 
-**Connection** (see `.env`): `localhost:5432`, db `shwan_test`, role `shwan_app` (Windows service `postgresql-x64-17`). This is the **sandbox** DB; production (`shwan` on the prod host, port 3000) is separate and untouched — never repoint this clone at it.
+**Connection** (see `.env`): `localhost:5432`, db `shwan` (the **live production** database), role `shwan_app` (Windows service `postgresql-x64-18`). The separate sandbox DB is `shwan_test` under `C:\ShwNodApp-dolphin` (port 3100) — run experiments there, never against this instance.
 
 **Sessions live in PostgreSQL** (`express-session` via **`connect-pg-simple`**, wired in `index.ts`). The old `connect-sqlite3` store (`./data/sessions.db`, `./data/portal-sessions.db`) was retired — there is now a **single durable backing store**. Two tables, `staff_sessions` (cookie `shwan.sid`) and `portal_sessions` (cookie `shwan.portal`), both owned by `migrations/pg` (the store runs with `createTableIfMissing: false`, never issues DDL) and sharing the existing `pg` pool via `getPgPool()`. **The only remaining SQLite in the app is `services/archform/archform-db.ts`** — that reads the **external Archform aligner software's own SQLite file** via `better-sqlite3` (a third-party DB we integrate with, not our storage choice); it is intentionally kept and is unrelated to session/app data.
 
