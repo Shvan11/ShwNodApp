@@ -4,31 +4,6 @@
  */
 
 // ===========================================
-// TEDIOUS HELPER TYPES
-// ===========================================
-
-/**
- * Column metadata from tedious row event
- */
-export interface ColumnMetadata {
-  colName: string;
-  type: {
-    name: string;
-  };
-  nullable: boolean;
-  caseSensitive: boolean;
-}
-
-/**
- * Column value from tedious row event
- * Each column has metadata and value properties
- */
-export interface ColumnValue {
-  metadata: ColumnMetadata;
-  value: unknown;
-}
-
-// ===========================================
 // PATIENT TYPES
 // ===========================================
 

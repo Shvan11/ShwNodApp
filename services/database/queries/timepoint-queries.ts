@@ -19,7 +19,13 @@ interface TimePoint {
 }
 
 /**
- * Retrieves time points for a given patient ID, ordered by tpCode.
+ * Retrieves time points for a given patient ID, ordered chronologically by date.
+ *
+ * Ordered by `tpDateTime` (then `tpCode` as a tiebreaker) so the photo timepoint tabs
+ * render left-to-right in date order. (Historically this ordered by `tpCode`, which only
+ * *looked* chronological because codes are usually assigned in date order — but a backdated
+ * timepoint, e.g. patient 5518's tp3, would then appear out of date order.) Display order
+ * only; `tpCode` is still the identifier the callers use to fetch a timepoint's images.
  *
  * `tpCode` is an int column returned as a string (was T-SQL `CONVERT(varchar)`) to
  * preserve the existing API contract; `tpDateTime` is a PG `date`, so the centralized
@@ -35,6 +41,7 @@ export function getTimePoints(PID: string): Promise<TimePoint[]> {
       eb.ref('tpDateTime').$castTo<string>().as('tpDateTime'),
       'tpDescription',
     ])
+    .orderBy('tpDateTime')
     .orderBy('tpCode')
     .execute() as Promise<TimePoint[]>;
 }

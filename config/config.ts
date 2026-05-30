@@ -54,7 +54,10 @@ const config: AppConfig = {
       },
     },
   },
-  dbDriver: (process.env.DB_DRIVER as 'mssql' | 'pg') || 'mssql',
+  // PostgreSQL is the only runtime driver as of migration Phase 9. The flag is kept
+  // (defaulting to 'pg') for config-shape continuity; the mssql code path is gone, so
+  // setting DB_DRIVER=mssql no longer changes runtime behavior.
+  dbDriver: (process.env.DB_DRIVER as 'mssql' | 'pg') || 'pg',
   databasePg: {
     host: process.env.PG_HOST || 'localhost',
     port: parseInt(process.env.PG_PORT || '5432', 10),
