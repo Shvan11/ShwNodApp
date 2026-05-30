@@ -54,6 +54,17 @@ const config: AppConfig = {
       },
     },
   },
+  dbDriver: (process.env.DB_DRIVER as 'mssql' | 'pg') || 'mssql',
+  databasePg: {
+    host: process.env.PG_HOST || 'localhost',
+    port: parseInt(process.env.PG_PORT || '5432', 10),
+    database: process.env.PG_DATABASE || 'shwan_test',
+    user: process.env.PG_USER || 'shwan_app',
+    password: process.env.PG_PASSWORD || '',
+    max: 10,
+    connectionTimeoutMillis: 30000,
+    idleTimeoutMillis: 30000,
+  },
   telegram: {
     token: process.env.TELEGRAM_TOKEN,
     chatId: process.env.TELEGRAM_CHAT_ID

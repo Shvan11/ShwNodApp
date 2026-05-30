@@ -3,7 +3,8 @@
  * Handles receipt generation using file-based HTML templates
  */
 
-import { executeQuery, TYPES } from '../database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../database/kysely.js';
 import { getPatientNoWorkReceiptData } from '../database/queries/patient-queries.js';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -115,36 +116,45 @@ interface TemplateData {
  * @returns Receipt data
  */
 export async function getReceiptData(workId: number): Promise<ReceiptData> {
-  const query = `
+  // V_Report inlined (sub-views VTotPaid / VLastApp / V_TodayPayment) for a single work:
+  //  - TotalPaid:           SUM(tblInvoice.Amountpaid) for the work
+  //  - AppDate:             patient's latest FUTURE appointment (per-person MAX(AppDate) > now)
+  //  - Dateofpayment/Amountpaid: the work's latest payment IFF it landed today (else NULL)
+  const { rows: results } = await sql<ReceiptRow>`
         SELECT
-            v.PersonID,
-            v.PatientName,
-            v.Phone,
-            v.TotalPaid,
-            v.AppDate,
-            v.Dateofpayment,
-            v.Amountpaid,
-            v.workid,
-            v.TotalRequired,
-            v.Currency,
-            w.Discount,
-            w.DiscountDate
-        FROM dbo.V_Report v WITH (NOLOCK)
-        LEFT JOIN dbo.tblwork w WITH (NOLOCK) ON v.workid = w.workid
-        WHERE v.workid = @workId
-    `;
-
-  const results = await executeQuery<ReceiptRow>(
-    query,
-    [['workId', TYPES.Int, workId]],
-    (columns) => {
-      const row: Record<string, unknown> = {};
-      columns.forEach((col) => {
-        row[col.metadata.colName] = col.value;
-      });
-      return row as ReceiptRow;
-    }
-  );
+            w."PersonID",
+            p."PatientName",
+            p."Phone",
+            tp."TotalPaid",
+            la."AppDate",
+            today."Dateofpayment",
+            today."Amountpaid",
+            w."workid",
+            w."TotalRequired",
+            w."Currency",
+            w."Discount",
+            w."DiscountDate"
+        FROM "tblwork" w
+        JOIN "tblpatients" p ON p."PersonID" = w."PersonID"
+        LEFT JOIN (
+            SELECT "workid", SUM("Amountpaid") AS "TotalPaid"
+            FROM "tblInvoice" GROUP BY "workid"
+        ) tp ON tp."workid" = w."workid"
+        LEFT JOIN (
+            SELECT "PersonID", MAX("AppDate") AS "AppDate"
+            FROM "tblappointments" WHERE "AppDate" > LOCALTIMESTAMP GROUP BY "PersonID"
+        ) la ON la."PersonID" = w."PersonID"
+        LEFT JOIN (
+            SELECT i."workid", i."Amountpaid", i."Dateofpayment"
+            FROM "tblInvoice" i
+            JOIN (
+                SELECT "workid", MAX("Dateofpayment") AS "LastPayment"
+                FROM "tblInvoice" GROUP BY "workid"
+            ) m ON m."workid" = i."workid" AND m."LastPayment" = i."Dateofpayment"
+            WHERE m."LastPayment"::date = CURRENT_DATE
+        ) today ON today."workid" = w."workid"
+        WHERE w."workid" = ${workId}
+    `.execute(getKysely());
 
   if (results.length === 0) {
     throw new Error(`Work not found: ${workId}`);
@@ -193,23 +203,19 @@ export async function getReceiptData(workId: number): Promise<ReceiptData> {
  * @returns Template file path
  */
 async function getDefaultTemplatePath(): Promise<string> {
-  const query = `
-        SELECT template_file_path
-        FROM DocumentTemplates WITH (NOLOCK)
-        WHERE document_type_id = 1
-        AND is_default = 1
-        AND is_active = 1
-    `;
+  const { rows: results } = await sql<{ template_file_path: string | null }>`
+        SELECT "template_file_path"
+        FROM "DocumentTemplates"
+        WHERE "document_type_id" = 1
+        AND "is_default" = true
+        AND "is_active" = true
+    `.execute(getKysely());
 
-  const results = await executeQuery<string>(query, [], (columns) => {
-    return columns[0].value as string;
-  });
-
-  if (results.length === 0 || !results[0]) {
+  if (results.length === 0 || !results[0]?.template_file_path) {
     throw new Error('Default receipt template not found');
   }
 
-  return results[0];
+  return results[0].template_file_path;
 }
 
 /**
@@ -413,24 +419,20 @@ export async function generateReceiptHTML(workId: number): Promise<string> {
  * @returns Template file path
  */
 async function getNoWorkTemplatePath(): Promise<string> {
-  const query = `
-        SELECT template_file_path
-        FROM DocumentTemplates WITH (NOLOCK)
-        WHERE template_name = 'No-Work Appointment Receipt'
-        AND is_active = 1
-    `;
+  const { rows: results } = await sql<{ template_file_path: string | null }>`
+        SELECT "template_file_path"
+        FROM "DocumentTemplates"
+        WHERE "template_name" = 'No-Work Appointment Receipt'
+        AND "is_active" = true
+    `.execute(getKysely());
 
-  const results = await executeQuery<string>(query, [], (columns) => {
-    return columns[0].value as string;
-  });
-
-  if (results.length === 0 || !results[0]) {
+  if (results.length === 0 || !results[0]?.template_file_path) {
     // Fallback to default file path if not in database yet
     log.warn('[RECEIPT-SERVICE] No-work template not in database, using default path');
     return 'data/templates/shwan-orthodontics-no-work-receipt.html';
   }
 
-  return results[0];
+  return results[0].template_file_path;
 }
 
 /**

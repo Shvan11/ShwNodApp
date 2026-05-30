@@ -11,8 +11,9 @@
  */
 
 import { Router, type Request, type Response } from 'express';
+import { sql, type RawBuilder } from 'kysely';
 import { log } from '../../utils/logger.js';
-import * as database from '../../services/database/index.js';
+import { getKysely } from '../../services/database/kysely.js';
 import {
   getPatientsPhones,
   createPatient,
@@ -434,259 +435,182 @@ router.get(
             .filter((id) => !isNaN(id))
         : [];
 
-      // Build WHERE clause for search
-      const whereConditions: string[] = [];
-      const parameters: database.SqlParam[] = [];
+      const db = getKysely();
+
+      // Build WHERE conditions as composable SQL fragments. Each fragment
+      // carries its own inline bindings, so we no longer maintain a separate
+      // parameter tuple array (PG binds positionally via the sql tag).
+      const whereConditions: RawBuilder<unknown>[] = [];
 
       // Search by individual name fields
       // Use 'starts with' pattern if nameStartsWith is true, otherwise 'contains'
       const namePrefix = nameStartsWith ? '' : '%';
 
       if (patientName.trim()) {
-        whereConditions.push('p.PatientName LIKE @patientName');
-        parameters.push([
-          'patientName',
-          database.TYPES.NVarChar,
-          `${namePrefix}${patientName.trim()}%`
-        ]);
+        whereConditions.push(
+          sql`p."PatientName" LIKE ${`${namePrefix}${patientName.trim()}%`}`
+        );
       }
 
       if (firstName.trim()) {
-        whereConditions.push('p.FirstName LIKE @firstName');
-        parameters.push([
-          'firstName',
-          database.TYPES.NVarChar,
-          `${namePrefix}${firstName.trim()}%`
-        ]);
+        whereConditions.push(
+          sql`p."FirstName" LIKE ${`${namePrefix}${firstName.trim()}%`}`
+        );
       }
 
       if (lastName.trim()) {
-        whereConditions.push('p.LastName LIKE @lastName');
-        parameters.push([
-          'lastName',
-          database.TYPES.NVarChar,
-          `${namePrefix}${lastName.trim()}%`
-        ]);
+        whereConditions.push(
+          sql`p."LastName" LIKE ${`${namePrefix}${lastName.trim()}%`}`
+        );
       }
 
       // General search (phone or ID). Honours the same nameStartsWith flag as
       // the name fields: prefix match (index-seekable) when set, substring
       // otherwise — substring stays the default so "last 4 digits" search works.
       if (searchQuery.trim()) {
+        const searchPattern = `${namePrefix}${searchQuery.trim()}%`;
         whereConditions.push(
-          '(p.Phone LIKE @search OR p.Phone2 LIKE @search)'
+          sql`(p."Phone" LIKE ${searchPattern} OR p."Phone2" LIKE ${searchPattern})`
         );
-        parameters.push([
-          'search',
-          database.TYPES.NVarChar,
-          `${namePrefix}${searchQuery.trim()}%`
-        ]);
       }
 
       // Filter by work types (ANY work, past or current)
       if (workTypeIds.length > 0) {
-        const workTypePlaceholders = workTypeIds
-          .map((_, idx) => `@workType${idx}`)
-          .join(',');
-        whereConditions.push(`EXISTS (
-                SELECT 1 FROM dbo.tblwork w
-                WHERE w.PersonID = p.PersonID
-                AND w.Typeofwork IN (${workTypePlaceholders})
+        whereConditions.push(sql`EXISTS (
+                SELECT 1 FROM "tblwork" w
+                WHERE w."PersonID" = p."PersonID"
+                AND w."Typeofwork" IN (${sql.join(workTypeIds)})
             )`);
-        workTypeIds.forEach((id, idx) => {
-          parameters.push([`workType${idx}`, database.TYPES.Int, id]);
-        });
       }
 
       // Filter by keywords (check all 5 keyword columns)
       if (keywordIds.length > 0) {
-        const keywordPlaceholders = keywordIds
-          .map((_, idx) => `@keyword${idx}`)
-          .join(',');
-        whereConditions.push(`EXISTS (
-                SELECT 1 FROM dbo.tblwork w
-                WHERE w.PersonID = p.PersonID
+        const keywordList = sql.join(keywordIds);
+        whereConditions.push(sql`EXISTS (
+                SELECT 1 FROM "tblwork" w
+                WHERE w."PersonID" = p."PersonID"
                 AND (
-                    w.KeyWordID1 IN (${keywordPlaceholders})
-                    OR w.KeyWordID2 IN (${keywordPlaceholders})
-                    OR w.KeywordID3 IN (${keywordPlaceholders})
-                    OR w.KeywordID4 IN (${keywordPlaceholders})
-                    OR w.KeywordID5 IN (${keywordPlaceholders})
+                    w."KeyWordID1" IN (${keywordList})
+                    OR w."KeyWordID2" IN (${keywordList})
+                    OR w."KeywordID3" IN (${keywordList})
+                    OR w."KeywordID4" IN (${keywordList})
+                    OR w."KeywordID5" IN (${keywordList})
                 )
             )`);
-        keywordIds.forEach((id, idx) => {
-          parameters.push([`keyword${idx}`, database.TYPES.Int, id]);
-        });
       }
 
       // Filter by patient tags
       if (tagIds.length > 0) {
-        const tagPlaceholders = tagIds
-          .map((_, idx) => `@tag${idx}`)
-          .join(',');
-        whereConditions.push(`p.TagID IN (${tagPlaceholders})`);
-        tagIds.forEach((id, idx) => {
-          parameters.push([`tag${idx}`, database.TYPES.Int, id]);
-        });
+        whereConditions.push(sql`p."TagID" IN (${sql.join(tagIds)})`);
       }
 
       // Filter by patient types
       if (patientTypeIds.length > 0) {
-        const typePlaceholders = patientTypeIds
-          .map((_, idx) => `@patientType${idx}`)
-          .join(',');
-        whereConditions.push(`p.PatientTypeID IN (${typePlaceholders})`);
-        patientTypeIds.forEach((id, idx) => {
-          parameters.push([`patientType${idx}`, database.TYPES.Int, id]);
-        });
+        whereConditions.push(
+          sql`p."PatientTypeID" IN (${sql.join(patientTypeIds)})`
+        );
       }
 
       // Filter by last appointment date
       if (lastAppointmentParam) {
-        let dateCondition = '';
+        let dateCondition: RawBuilder<unknown>;
         switch (lastAppointmentParam) {
           case '1month':
-            dateCondition = 'DATEADD(MONTH, -1, GETDATE())';
+            dateCondition = sql`(LOCALTIMESTAMP - interval '1 month')`;
             break;
           case '3months':
-            dateCondition = 'DATEADD(MONTH, -3, GETDATE())';
+            dateCondition = sql`(LOCALTIMESTAMP - interval '3 months')`;
             break;
           case '6months':
-            dateCondition = 'DATEADD(MONTH, -6, GETDATE())';
+            dateCondition = sql`(LOCALTIMESTAMP - interval '6 months')`;
             break;
           case '1year':
-            dateCondition = 'DATEADD(YEAR, -1, GETDATE())';
+            dateCondition = sql`(LOCALTIMESTAMP - interval '1 year')`;
             break;
           default:
             // Custom date (ISO format)
-            dateCondition = '@lastAppDate';
-            parameters.push([
-              'lastAppDate',
-              database.TYPES.Date,
-              new Date(lastAppointmentParam)
-            ]);
+            dateCondition = sql`${lastAppointmentParam}::timestamp`;
         }
 
-        whereConditions.push(`EXISTS (
+        whereConditions.push(sql`EXISTS (
           SELECT 1 FROM (
-            SELECT PersonID, MAX(AppDate) AS LatestApp
-            FROM dbo.tblappointments
-            GROUP BY PersonID
+            SELECT "PersonID", MAX("AppDate") AS "LatestApp"
+            FROM "tblappointments"
+            GROUP BY "PersonID"
           ) la
-          WHERE la.PersonID = p.PersonID
-          AND la.LatestApp < ${dateCondition}
+          WHERE la."PersonID" = p."PersonID"
+          AND la."LatestApp" < ${dateCondition}
         )`);
       }
 
       // Filter by has final photos (local timepoint with 'Final' in description)
       if (hasFinalPhotos) {
-        whereConditions.push(`EXISTS (
-                SELECT 1 FROM dbo.tblTimePoints tp
-                WHERE tp.PersonID = p.PersonID
-                AND tp.tpDescription LIKE '%Final%'
+        whereConditions.push(sql`EXISTS (
+                SELECT 1 FROM "tblTimePoints" tp
+                WHERE tp."PersonID" = p."PersonID"
+                AND tp."tpDescription" LIKE '%Final%'
             )`);
       }
 
-      const whereClause =
-        whereConditions.length > 0
-          ? 'WHERE ' + whereConditions.join(' AND ')
-          : '';
+      const whereClause = whereConditions.length
+        ? sql`WHERE ${sql.join(whereConditions, sql` AND `)}`
+        : sql``;
 
       // Determine ORDER BY clause
-      let orderByClause = 'ORDER BY p.PatientName ASC';
+      let orderByClause: RawBuilder<unknown> = sql`ORDER BY p."PatientName" ASC`;
       if (sortBy === 'date') {
         orderByClause =
           order === 'desc'
-            ? 'ORDER BY p.DateAdded DESC'
-            : 'ORDER BY p.DateAdded ASC';
+            ? sql`ORDER BY p."DateAdded" DESC`
+            : sql`ORDER BY p."DateAdded" ASC`;
       } else {
         orderByClause =
           order === 'desc'
-            ? 'ORDER BY p.PatientName DESC'
-            : 'ORDER BY p.PatientName ASC';
+            ? sql`ORDER BY p."PatientName" DESC`
+            : sql`ORDER BY p."PatientName" ASC`;
       }
 
       // First, get the total count of matching patients.
       // No JOINs here: every filter references p.* directly or via EXISTS
       // subqueries, so the 5 lookup-table joins added nothing to the count.
-      const countQuery = `
-            SELECT COUNT(DISTINCT p.PersonID) as totalCount
-            FROM dbo.tblpatients p
+      const countResult = await sql<{ totalCount: number | string }>`
+            SELECT COUNT(DISTINCT p."PersonID") as "totalCount"
+            FROM "tblpatients" p
             ${whereClause}
-        `;
+        `.execute(db);
 
-      const countResult = await database.executeQuery<{ totalCount: number }>(
-        countQuery,
-        parameters,
-        (columns) => ({
-          totalCount: columns[0].value as number
-        })
-      );
-
-      const totalCount = countResult[0]?.totalCount || 0;
+      const totalCount = Number(countResult.rows[0]?.totalCount ?? 0);
 
       // Now get the paginated results
-      const query = `
+      const { rows: patients } = await sql<PatientSearchResult>`
             SELECT DISTINCT
-                    p.PersonID, p.PatientName, p.FirstName, p.LastName,
-                    p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
-                    p.AddressID, p.ReferralSourceID, p.PatientTypeID, p.TagID,
-                    p.Notes, p.Language, p.CountryCode,
-                    p.EstimatedCost, p.Currency, p.DateAdded,
-                    g.Gender as GenderName, a.Zone as AddressName,
-                    r.Referral as ReferralSource, pt.PatientType as PatientTypeName,
-                    tag.Tag as TagName,
+                    p."PersonID", p."PatientName", p."FirstName", p."LastName",
+                    p."Phone", p."Phone2", p."Email", p."DateofBirth", p."Gender",
+                    p."AddressID", p."ReferralSourceID", p."PatientTypeID", p."TagID",
+                    p."Notes", p."Language", p."CountryCode",
+                    p."EstimatedCost", p."Currency", p."DateAdded",
+                    g."Gender" as "GenderName", a."Zone" as "AddressName",
+                    r."Referral" as "ReferralSource", pt."PatientType" as "PatientTypeName",
+                    tag."Tag" as "TagName",
                     (
-                        SELECT STRING_AGG(wt.WorkType, ', ')
+                        SELECT STRING_AGG(wt."WorkType", ', ')
                         FROM (
-                            SELECT DISTINCT wt2.WorkType
-                            FROM dbo.tblwork w2
-                            INNER JOIN dbo.tblWorkType wt2 ON w2.Typeofwork = wt2.ID
-                            WHERE w2.PersonID = p.PersonID AND w2.Status = 1
+                            SELECT DISTINCT wt2."WorkType"
+                            FROM "tblwork" w2
+                            INNER JOIN "tblWorkType" wt2 ON w2."Typeofwork" = wt2."ID"
+                            WHERE w2."PersonID" = p."PersonID" AND w2."Status" = 1
                         ) wt
-                    ) as ActiveWorkTypes
-            FROM dbo.tblpatients p
-            LEFT JOIN dbo.tblGender g ON p.Gender = g.Gender_ID
-            LEFT JOIN dbo.tblAddress a ON p.AddressID = a.ID
-            LEFT JOIN dbo.tblReferrals r ON p.ReferralSourceID = r.ID
-            LEFT JOIN dbo.tblPatientType pt ON p.PatientTypeID = pt.ID
-            LEFT JOIN dbo.tblTagOptions tag ON p.TagID = tag.ID
+                    ) as "ActiveWorkTypes"
+            FROM "tblpatients" p
+            LEFT JOIN "tblGender" g ON p."Gender" = g."Gender_ID"
+            LEFT JOIN "tblAddress" a ON p."AddressID" = a."ID"
+            LEFT JOIN "tblReferrals" r ON p."ReferralSourceID" = r."ID"
+            LEFT JOIN "tblPatientType" pt ON p."PatientTypeID" = pt."ID"
+            LEFT JOIN "tblTagOptions" tag ON p."TagID" = tag."ID"
             ${whereClause}
             ${orderByClause}
-            OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
-        `;
-
-      const patients = await database.executeQuery<PatientSearchResult>(
-        query,
-        parameters,
-        (columns) => ({
-          PersonID: columns[0].value as number,
-          PatientName: columns[1].value as string,
-          FirstName: columns[2].value as string | null,
-          LastName: columns[3].value as string | null,
-          Phone: columns[4].value as string | null,
-          Phone2: columns[5].value as string | null,
-          Email: columns[6].value as string | null,
-          DateofBirth: columns[7].value as Date | null,
-          Gender: columns[8].value as number | null,
-          AddressID: columns[9].value as number | null,
-          ReferralSourceID: columns[10].value as number | null,
-          PatientTypeID: columns[11].value as number | null,
-          TagID: columns[12].value as number | null,
-          Notes: columns[13].value as string | null,
-          Language: columns[14].value as string | null,
-          CountryCode: columns[15].value as string | null,
-          EstimatedCost: columns[16].value as number | null,
-          Currency: columns[17].value as string | null,
-          DateAdded: columns[18].value as Date | null,
-          GenderName: columns[19].value as string | null,
-          AddressName: columns[20].value as string | null,
-          ReferralSource: columns[21].value as string | null,
-          PatientTypeName: columns[22].value as string | null,
-          TagName: columns[23].value as string | null,
-          ActiveWorkTypes: columns[24].value as string | null
-        })
-      );
+            LIMIT ${limit} OFFSET ${offset}
+        `.execute(db);
 
       const hasMore = offset + patients.length < totalCount;
 
@@ -719,14 +643,9 @@ router.get(
   '/patients/tag-options',
   async (_req: Request, res: Response): Promise<void> => {
     try {
-      const tags = await database.executeQuery<TagOption>(
-        'SELECT ID, Tag FROM dbo.tblTagOptions ORDER BY Tag',
-        [],
-        (columns) => ({
-          id: columns[0].value as number,
-          tag: columns[1].value as string
-        })
-      );
+      const { rows: tags } = await sql<TagOption>`
+        SELECT "ID" as "id", "Tag" as "tag" FROM "tblTagOptions" ORDER BY "Tag"
+      `.execute(getKysely());
       res.json(tags);
     } catch (error) {
       log.error('Error fetching tag options:', error);
@@ -748,14 +667,9 @@ router.get(
   '/patients/type-options',
   async (_req: Request, res: Response): Promise<void> => {
     try {
-      const types = await database.executeQuery<PatientTypeOption>(
-        'SELECT ID, PatientType FROM dbo.tblPatientType ORDER BY PatientType',
-        [],
-        (columns) => ({
-          id: columns[0].value as number,
-          type: columns[1].value as string
-        })
-      );
+      const { rows: types } = await sql<PatientTypeOption>`
+        SELECT "ID" as "id", "PatientType" as "type" FROM "tblPatientType" ORDER BY "PatientType"
+      `.execute(getKysely());
       res.json(types);
     } catch (error) {
       log.error('Error fetching patient type options:', error);
@@ -1035,18 +949,12 @@ router.put(
         return;
       }
 
-      const query = `
-        UPDATE dbo.tblpatients
-        SET EstimatedCost = @estimatedCost,
-            Currency = @currency
-        WHERE PersonID = @personId
-      `;
-
-      await database.executeQuery(query, [
-        ['personId', database.TYPES.Int, personId],
-        ['estimatedCost', database.TYPES.Int, estimatedCost || null],
-        ['currency', database.TYPES.NVarChar, currency || 'IQD']
-      ]);
+      await sql`
+        UPDATE "tblpatients"
+        SET "EstimatedCost" = ${estimatedCost || null},
+            "Currency" = ${currency || 'IQD'}
+        WHERE "PersonID" = ${personId}
+      `.execute(getKysely());
 
       res.json({
         success: true,

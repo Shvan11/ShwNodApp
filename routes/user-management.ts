@@ -6,7 +6,8 @@ import { Router, type Request, type Response } from 'express';
 import { log } from '../utils/logger.js';
 import { hashPassword } from '../middleware/auth.js';
 import { authorize } from '../middleware/auth.js';
-import { executeQuery, TYPES } from '../services/database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../services/database/kysely.js';
 
 const router = Router();
 
@@ -58,25 +59,17 @@ router.use(authorize(['admin']));
  */
 router.get('/', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const users = await executeQuery<UserResult>(
-      `SELECT UserID, Username, FullName, Role, IsActive, LastLogin, CreatedAt
-       FROM dbo.tblUsers
-       ORDER BY CreatedAt DESC`,
-      [],
-      (columns) => ({
-        userId: columns[0].value as number,
-        username: columns[1].value as string,
-        fullName: columns[2].value as string,
-        role: columns[3].value as string,
-        isActive: columns[4].value as boolean,
-        lastLogin: columns[5].value as Date | null,
-        createdAt: columns[6].value as Date
-      })
-    );
+    const db = getKysely();
+    const { rows } = await sql<UserResult>`
+      SELECT "UserID" AS "userId", "Username" AS "username", "FullName" AS "fullName",
+             "Role" AS "role", "IsActive" AS "isActive", "LastLogin" AS "lastLogin",
+             "CreatedAt" AS "createdAt"
+      FROM "tblUsers"
+      ORDER BY "CreatedAt" DESC`.execute(db);
 
     res.json({
       success: true,
-      users: users || []
+      users: rows
     });
   } catch (error) {
     log.error('Error fetching users', { error: (error as Error).message });
@@ -126,14 +119,13 @@ router.post(
         return;
       }
 
-      // Check if username exists
-      const existing = await executeQuery<{ userId: number }>(
-        'SELECT UserID FROM dbo.tblUsers WHERE Username = @username',
-        [['username', TYPES.NVarChar, username]],
-        (columns) => ({ userId: columns[0].value as number })
-      );
+      const db = getKysely();
 
-      if (existing && existing.length > 0) {
+      // Check if username exists
+      const { rows: existing } = await sql<{ userId: number }>`
+        SELECT "UserID" AS "userId" FROM "tblUsers" WHERE "Username" = ${username}`.execute(db);
+
+      if (existing.length > 0) {
         res.status(400).json({
           success: false,
           error: 'Username already exists'
@@ -145,17 +137,9 @@ router.post(
       const passwordHash = await hashPassword(password);
 
       // Create user
-      await executeQuery(
-        `INSERT INTO dbo.tblUsers (Username, PasswordHash, FullName, Role, CreatedBy)
-       VALUES (@username, @hash, @fullName, @role, @createdBy)`,
-        [
-          ['username', TYPES.NVarChar, username],
-          ['hash', TYPES.NVarChar, passwordHash],
-          ['fullName', TYPES.NVarChar, fullName || ''],
-          ['role', TYPES.NVarChar, role],
-          ['createdBy', TYPES.NVarChar, req.session.username]
-        ]
-      );
+      await sql`
+        INSERT INTO "tblUsers" ("Username", "PasswordHash", "FullName", "Role", "CreatedBy")
+        VALUES (${username}, ${passwordHash}, ${fullName || ''}, ${role}, ${req.session.username})`.execute(db);
 
       log.info(`User created: ${username} (${role}) by ${req.session.username}`);
 
@@ -199,13 +183,8 @@ router.put(
       const passwordHash = await hashPassword(newPassword);
 
       // Update password
-      await executeQuery(
-        'UPDATE dbo.tblUsers SET PasswordHash = @hash WHERE UserID = @userId',
-        [
-          ['hash', TYPES.NVarChar, passwordHash],
-          ['userId', TYPES.Int, parseInt(userId)]
-        ]
-      );
+      const db = getKysely();
+      await sql`UPDATE "tblUsers" SET "PasswordHash" = ${passwordHash} WHERE "UserID" = ${parseInt(userId)}`.execute(db);
 
       log.info(`Password reset for user ID ${userId} by ${req.session.username}`);
 
@@ -243,10 +222,8 @@ router.put(
       }
 
       // Toggle active status
-      await executeQuery(
-        'UPDATE dbo.tblUsers SET IsActive = CASE WHEN IsActive = 1 THEN 0 ELSE 1 END WHERE UserID = @userId',
-        [['userId', TYPES.Int, parseInt(userId)]]
-      );
+      const db = getKysely();
+      await sql`UPDATE "tblUsers" SET "IsActive" = NOT "IsActive" WHERE "UserID" = ${parseInt(userId)}`.execute(db);
 
       log.info(`User status toggled for ID ${userId} by ${req.session.username}`);
 
@@ -283,9 +260,8 @@ router.delete(
         return;
       }
 
-      await executeQuery('DELETE FROM dbo.tblUsers WHERE UserID = @userId', [
-        ['userId', TYPES.Int, parseInt(userId)]
-      ]);
+      const db = getKysely();
+      await sql`DELETE FROM "tblUsers" WHERE "UserID" = ${parseInt(userId)}`.execute(db);
 
       log.info(`User deleted: ID ${userId} by ${req.session.username}`);
 

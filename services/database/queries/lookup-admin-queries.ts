@@ -3,9 +3,23 @@
  *
  * Generic CRUD operations for lookup tables with whitelist validation.
  * Only whitelisted tables can be accessed to prevent SQL injection.
+ *
+ * Migration Phase 4: translated to typed Kysely (PostgreSQL). These functions build
+ * dynamic SQL over a *whitelisted* set of tables/columns (the static Kysely builder
+ * can't express fully-dynamic table+column names), so the bodies use the `sql`
+ * template tag with `sql.id()`-quoted identifiers (drawn only from the validated
+ * LOOKUP_TABLE_CONFIG) and bound parameters for all values — identical injection
+ * posture to the old `@p`-param T-SQL. The positional `ColumnValue` mappers are gone;
+ * rows come back as plain objects from `result.rows`.
+ *
+ * Type mapping vs. the old mssql path:
+ *  - `bit` columns are now PG `boolean`, so values are coerced to JS `true`/`false`
+ *    (was `1`/`0`).
+ *  - referential-integrity violations surface as PG SQLSTATE `23503`
+ *    (foreign_key_violation) instead of mssql error 547.
  */
-import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery, TYPES, SqlParam, TediousType } from '../index.js';
+import { sql, type RawBuilder } from 'kysely';
+import { getKysely } from '../kysely.js';
 
 // Type definitions
 interface ReferenceConfig {
@@ -245,19 +259,34 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
 };
 
 /**
- * Map SQL type string to Tedious TYPES
+ * Resolve a whitelisted config table name to its actual PostgreSQL table identifier.
+ * Every config table name matches its PG identifier 1:1 except `tblHolidays`, which
+ * was created lowercase (`tblholidays`) in the Phase-2 PG schema.
  */
-function mapSqlType(typeStr: string): TediousType {
-  const typeMap: Record<string, TediousType> = {
-    int: TYPES.Int,
-    reference: TYPES.Int,
-    varchar: TYPES.VarChar,
-    nvarchar: TYPES.NVarChar,
-    bit: TYPES.Bit,
-    uniqueidentifier: TYPES.UniqueIdentifier,
-    date: TYPES.Date,
-  };
-  return typeMap[typeStr] || TYPES.NVarChar;
+function pgTableName(configTableName: string): string {
+  return configTableName === 'tblHolidays' ? 'tblholidays' : configTableName;
+}
+
+/**
+ * Coerce an incoming form value to the JS type expected by the PG column.
+ *  - bit  → boolean (PG boolean column)
+ *  - int / reference → integer (or null on blank/NaN)
+ * Other types pass through (string/date). Mirrors the old mssql conversion rules.
+ */
+function coerceValue(col: ColumnConfig, raw: unknown): unknown {
+  if (col.type === 'bit') {
+    return raw === true || raw === 'true' || raw === 1;
+  }
+  if (
+    (col.type === 'int' || col.type === 'reference') &&
+    raw !== null &&
+    raw !== undefined &&
+    raw !== ''
+  ) {
+    const n = parseInt(raw as string, 10);
+    return Number.isNaN(n) ? null : n;
+  }
+  return raw ?? null;
 }
 
 /**
@@ -289,38 +318,39 @@ export async function getLookupItems(tableKey: string): Promise<LookupItem[]> {
     throw new Error(`Invalid lookup table: ${tableKey}`);
   }
 
-  const baseAlias = 't';
-  const selectParts: string[] = [
-    `${baseAlias}.${config.idColumn}`,
-    ...config.columns.map((c) => `${baseAlias}.${c.name}`),
+  const db = getKysely();
+  const baseAlias = sql.id('t');
+
+  // Build the SELECT list (base id + columns, plus a *_display join column per reference).
+  const selectParts: RawBuilder<unknown>[] = [
+    sql`${baseAlias}.${sql.id(config.idColumn)}`,
+    ...config.columns.map((c) => sql`${baseAlias}.${sql.id(c.name)}`),
   ];
-  const joinParts: string[] = [];
+  const joinParts: RawBuilder<unknown>[] = [];
 
   config.columns.forEach((col, idx) => {
     if (col.type === 'reference' && col.reference) {
-      const joinAlias = `r${idx}`;
+      const joinAlias = sql.id(`r${idx}`);
       joinParts.push(
-        `LEFT JOIN dbo.${col.reference.table} AS ${joinAlias} ` +
-          `ON ${joinAlias}.${col.reference.idColumn} = ${baseAlias}.${col.name}`
+        sql`LEFT JOIN ${sql.id(pgTableName(col.reference!.table))} AS ${joinAlias} ON ${joinAlias}.${sql.id(col.reference!.idColumn)} = ${baseAlias}.${sql.id(col.name)}`
       );
-      selectParts.push(`${joinAlias}.${col.reference.displayColumn} AS ${col.name}_display`);
+      selectParts.push(
+        sql`${joinAlias}.${sql.id(col.reference.displayColumn)} AS ${sql.id(`${col.name}_display`)}`
+      );
     }
   });
 
-  const query = `
-    SELECT ${selectParts.join(', ')}
-    FROM dbo.${config.tableName} AS ${baseAlias}
-    ${joinParts.join(' ')}
-    ORDER BY ${baseAlias}.${config.displayColumn}
+  const joinClause = joinParts.length ? sql.join(joinParts, sql` `) : sql``;
+
+  const query = sql<LookupItem>`
+    SELECT ${sql.join(selectParts, sql`, `)}
+    FROM ${sql.id(pgTableName(config.tableName))} AS ${baseAlias}
+    ${joinClause}
+    ORDER BY ${baseAlias}.${sql.id(config.displayColumn)}
   `;
 
-  return executeQuery<LookupItem>(query, [], (columns: ColumnValue[]) => {
-    const item: LookupItem = {};
-    columns.forEach((col) => {
-      item[col.metadata.colName] = col.value;
-    });
-    return item;
-  });
+  const result = await query.execute(db);
+  return result.rows;
 }
 
 /**
@@ -335,51 +365,28 @@ export async function createLookupItem(
     throw new Error(`Invalid lookup table: ${tableKey}`);
   }
 
-  const columnNames = config.columns.map((c) => c.name);
-  const paramNames = config.columns.map((_, i) => `@p${i}`);
+  const db = getKysely();
+  const colIds = config.columns.map((c) => sql.id(c.name));
+  const values = config.columns.map((c) => sql`${coerceValue(c, data[c.name])}`);
 
-  let query: string;
+  let query;
   if (config.idType === 'uniqueidentifier') {
-    query = `
-      INSERT INTO dbo.${config.tableName} (${config.idColumn}, ${columnNames.join(', ')})
-      OUTPUT INSERTED.${config.idColumn}
-      VALUES (NEWID(), ${paramNames.join(', ')})
+    // PG generates the uuid via gen_random_uuid() (was T-SQL NEWID()).
+    query = sql<Record<string, string | number>>`
+      INSERT INTO ${sql.id(pgTableName(config.tableName))} (${sql.id(config.idColumn)}, ${sql.join(colIds, sql`, `)})
+      VALUES (gen_random_uuid(), ${sql.join(values, sql`, `)})
+      RETURNING ${sql.id(config.idColumn)} AS id
     `;
   } else {
-    query = `
-      INSERT INTO dbo.${config.tableName} (${columnNames.join(', ')})
-      OUTPUT INSERTED.${config.idColumn}
-      VALUES (${paramNames.join(', ')})
+    query = sql<Record<string, string | number>>`
+      INSERT INTO ${sql.id(pgTableName(config.tableName))} (${sql.join(colIds, sql`, `)})
+      VALUES (${sql.join(values, sql`, `)})
+      RETURNING ${sql.id(config.idColumn)} AS id
     `;
   }
 
-  const params: SqlParam[] = config.columns.map((col, idx) => {
-    const type = mapSqlType(col.type);
-    let value: unknown = data[col.name];
-
-    // Handle type conversions
-    if (col.type === 'bit') {
-      value = value === true || value === 'true' || value === 1 ? 1 : 0;
-    } else if (
-      (col.type === 'int' || col.type === 'reference') &&
-      value !== null &&
-      value !== undefined &&
-      value !== ''
-    ) {
-      value = parseInt(value as string, 10);
-      if (isNaN(value as number)) value = null;
-    }
-
-    return [`p${idx}`, type, value ?? null];
-  });
-
-  const result = await executeQuery<string | number>(
-    query,
-    params,
-    (columns: ColumnValue[]) => columns[0].value as string | number
-  );
-
-  return result[0] ?? null;
+  const result = await query.execute(db);
+  return (result.rows[0]?.id as string | number) ?? null;
 }
 
 /**
@@ -395,37 +402,18 @@ export async function updateLookupItem(
     throw new Error(`Invalid lookup table: ${tableKey}`);
   }
 
-  const setClauses = config.columns.map((c, i) => `${c.name} = @p${i}`).join(', ');
-  const query = `
-    UPDATE dbo.${config.tableName}
-    SET ${setClauses}
-    WHERE ${config.idColumn} = @id
+  const db = getKysely();
+  const setParts = config.columns.map(
+    (c) => sql`${sql.id(c.name)} = ${coerceValue(c, data[c.name])}`
+  );
+
+  const query = sql`
+    UPDATE ${sql.id(pgTableName(config.tableName))}
+    SET ${sql.join(setParts, sql`, `)}
+    WHERE ${sql.id(config.idColumn)} = ${id}
   `;
 
-  const params: SqlParam[] = config.columns.map((col, idx) => {
-    const type = mapSqlType(col.type);
-    let value: unknown = data[col.name];
-
-    // Handle type conversions
-    if (col.type === 'bit') {
-      value = value === true || value === 'true' || value === 1 ? 1 : 0;
-    } else if (
-      (col.type === 'int' || col.type === 'reference') &&
-      value !== null &&
-      value !== undefined &&
-      value !== ''
-    ) {
-      value = parseInt(value as string, 10);
-      if (isNaN(value as number)) value = null;
-    }
-
-    return [`p${idx}`, type, value ?? null];
-  });
-
-  const idType = mapSqlType(config.idType);
-  params.push(['id', idType, id]);
-
-  await executeQuery(query, params);
+  await query.execute(db);
 }
 
 /**
@@ -437,17 +425,18 @@ export async function deleteLookupItem(tableKey: string, id: string | number): P
     throw new Error(`Invalid lookup table: ${tableKey}`);
   }
 
-  const query = `
-    DELETE FROM dbo.${config.tableName}
-    WHERE ${config.idColumn} = @id
+  const db = getKysely();
+  const query = sql`
+    DELETE FROM ${sql.id(pgTableName(config.tableName))}
+    WHERE ${sql.id(config.idColumn)} = ${id}
   `;
 
-  const idType = mapSqlType(config.idType);
   try {
-    await executeQuery(query, [['id', idType, id]]);
+    await query.execute(db);
   } catch (err) {
-    const sqlNumber = (err as { number?: number }).number;
-    if (sqlNumber === 547) {
+    // PG foreign_key_violation (was mssql error 547).
+    const sqlState = (err as { code?: string }).code;
+    if (sqlState === '23503') {
       throw new ReferentialError(
         'Cannot delete: this item is still referenced elsewhere.'
       );

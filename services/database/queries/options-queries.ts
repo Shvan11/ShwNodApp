@@ -1,10 +1,13 @@
 /**
  * Database queries for tbloptions table operations
  * Manages system settings and preferences
+ *
+ * Migration Phase 4: translated to typed Kysely (PostgreSQL). This was a facade
+ * bypasser (`withTransaction` + `new sql.Request(tx)`); the bulk path now runs on a
+ * Kysely transaction via `withPgTransaction`. `OptionName` is `citext`, so the LIKE
+ * pattern match stays case-insensitive (matches the old Arabic_CI_AS column).
  */
-import type { ColumnValue } from '../../../types/database.types.js';
-import sql from 'mssql';
-import { executeQuery, withTransaction, TYPES } from '../index.js';
+import { getKysely, withPgTransaction } from '../kysely.js';
 import { log } from '../../../utils/logger.js';
 
 // Type definitions
@@ -29,15 +32,11 @@ interface BulkUpdateResult {
  */
 export async function getAllOptions(): Promise<Option[]> {
   try {
-    const result = await executeQuery<Option>(
-      'SELECT OptionName, OptionValue FROM tbloptions ORDER BY OptionName',
-      [],
-      (columns: ColumnValue[]) => ({
-        OptionName: columns[0].value as string,
-        OptionValue: columns[1].value as string | null,
-      })
-    );
-    return result;
+    return await getKysely()
+      .selectFrom('tbloptions')
+      .select(['OptionName', 'OptionValue'])
+      .orderBy('OptionName')
+      .execute();
   } catch (error) {
     log.error('Error fetching all options', { error: (error as Error).message });
     throw error;
@@ -49,15 +48,13 @@ export async function getAllOptions(): Promise<Option[]> {
  */
 export async function getOption(optionName: string): Promise<string | null> {
   try {
-    const result = await executeQuery<{ OptionValue: string | null }>(
-      'SELECT OptionValue FROM tbloptions WHERE OptionName = @optionName',
-      [['optionName', TYPES.NVarChar, optionName]],
-      (columns: ColumnValue[]) => ({
-        OptionValue: columns[0].value as string | null,
-      })
-    );
+    const row = await getKysely()
+      .selectFrom('tbloptions')
+      .select('OptionValue')
+      .where('OptionName', '=', optionName)
+      .executeTakeFirst();
 
-    return result.length > 0 ? result[0].OptionValue : null;
+    return row ? row.OptionValue : null;
   } catch (error) {
     log.error('Error fetching option', { error: (error as Error).message });
     throw error;
@@ -69,16 +66,13 @@ export async function getOption(optionName: string): Promise<string | null> {
  */
 export async function updateOption(optionName: string, optionValue: string): Promise<boolean> {
   try {
-    const result = await executeQuery(
-      'UPDATE tbloptions SET OptionValue = @optionValue WHERE OptionName = @optionName',
-      [
-        ['optionName', TYPES.NVarChar, optionName],
-        ['optionValue', TYPES.NVarChar, optionValue],
-      ],
-      () => ({})
-    );
+    const result = await getKysely()
+      .updateTable('tbloptions')
+      .set({ OptionValue: optionValue })
+      .where('OptionName', '=', optionName)
+      .executeTakeFirst();
 
-    return (result.rowsAffected ?? 0) > 0;
+    return Number(result.numUpdatedRows) > 0;
   } catch (error) {
     log.error('Error updating option', { error: (error as Error).message });
     throw error;
@@ -90,16 +84,12 @@ export async function updateOption(optionName: string, optionValue: string): Pro
  */
 export async function getOptionsByPattern(pattern: string): Promise<Option[]> {
   try {
-    const result = await executeQuery<Option>(
-      'SELECT OptionName, OptionValue FROM tbloptions WHERE OptionName LIKE @pattern ORDER BY OptionName',
-      [['pattern', TYPES.NVarChar, pattern]],
-      (columns: ColumnValue[]) => ({
-        OptionName: columns[0].value as string,
-        OptionValue: columns[1].value as string | null,
-      })
-    );
-
-    return result;
+    return await getKysely()
+      .selectFrom('tbloptions')
+      .select(['OptionName', 'OptionValue'])
+      .where('OptionName', 'like', pattern)
+      .orderBy('OptionName')
+      .execute();
   } catch (error) {
     log.error('Error fetching options by pattern', { error: (error as Error).message });
     throw error;
@@ -117,20 +107,15 @@ export async function bulkUpdateOptions(options: BulkUpdateOption[]): Promise<Bu
     let updatedCount = 0;
     const failed: string[] = [];
 
-    await withTransaction(async (tx) => {
+    await withPgTransaction(async (trx) => {
       for (const option of options) {
-        const result = await new sql.Request(tx)
-          .input('optionName', TYPES.NVarChar, option.name)
-          .input('optionValue', TYPES.NVarChar, option.value)
-          .query(
-            'UPDATE tbloptions SET OptionValue = @optionValue WHERE OptionName = @optionName'
-          );
+        const result = await trx
+          .updateTable('tbloptions')
+          .set({ OptionValue: option.value })
+          .where('OptionName', '=', option.name)
+          .executeTakeFirst();
 
-        const affected = Array.isArray(result.rowsAffected)
-          ? result.rowsAffected.reduce((sum, n) => sum + n, 0)
-          : (result.rowsAffected ?? 0);
-
-        if (affected > 0) {
+        if (Number(result.numUpdatedRows) > 0) {
           updatedCount++;
         } else {
           failed.push(option.name);

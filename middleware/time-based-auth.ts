@@ -8,7 +8,8 @@
  */
 
 import type { Request, Response, NextFunction } from 'express';
-import { executeQuery, TYPES } from '../services/database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../services/database/kysely.js';
 import { log } from '../utils/logger.js';
 import type { ApiErrorResponse } from '../types/index.js';
 
@@ -137,11 +138,9 @@ export function requireRecordAge(options: RecordAgeOptions) {
 export async function getPatientCreationDate(req: Request): Promise<Date> {
   const { personId } = req.params;
 
-  const result = await executeQuery<RecordDateResult>(
-    'SELECT DateAdded FROM dbo.tblpatients WHERE PersonID = @personId',
-    [['personId', TYPES.Int, personId]],
-    (columns) => ({ createdAt: columns[0].value as Date })
-  );
+  const { rows: result } = await sql<RecordDateResult>`
+    SELECT "DateAdded" AS "createdAt" FROM "tblpatients" WHERE "PersonID" = ${personId}
+  `.execute(getKysely());
 
   if (!result || result.length === 0) {
     throw new Error('Patient not found');
@@ -172,11 +171,9 @@ export async function getWorkCreationDate(req: Request): Promise<Date> {
     throw new Error('Work ID not provided');
   }
 
-  const result = await executeQuery<RecordDateResult>(
-    'SELECT AdditionDate FROM dbo.tblwork WHERE WorkID = @workId',
-    [['workId', TYPES.Int, parseInt(String(workId))]],
-    (columns) => ({ createdAt: columns[0].value as Date })
-  );
+  const { rows: result } = await sql<RecordDateResult>`
+    SELECT "AdditionDate" AS "createdAt" FROM "tblwork" WHERE "workid" = ${parseInt(String(workId))}
+  `.execute(getKysely());
 
   if (!result || result.length === 0) {
     throw new Error('Work not found');
@@ -193,11 +190,9 @@ export async function getWorkCreationDate(req: Request): Promise<Date> {
 export async function getInvoiceCreationDate(req: Request): Promise<Date> {
   const { invoiceId } = req.params;
 
-  const result = await executeQuery<RecordDateResult>(
-    'SELECT Dateofpayment FROM dbo.tblInvoice WHERE InvoiceID = @invoiceId',
-    [['invoiceId', TYPES.Int, invoiceId]],
-    (columns) => ({ createdAt: columns[0].value as Date })
-  );
+  const { rows: result } = await sql<RecordDateResult>`
+    SELECT "Dateofpayment" AS "createdAt" FROM "tblInvoice" WHERE "invoiceID" = ${invoiceId}
+  `.execute(getKysely());
 
   if (!result || result.length === 0) {
     throw new Error('Invoice not found');
@@ -214,11 +209,9 @@ export async function getInvoiceCreationDate(req: Request): Promise<Date> {
 export async function getExpenseCreationDate(req: Request): Promise<Date> {
   const { id } = req.params;
 
-  const result = await executeQuery<RecordDateResult>(
-    'SELECT expenseDate FROM dbo.tblExpenses WHERE ID = @expenseId',
-    [['expenseId', TYPES.Int, id]],
-    (columns) => ({ createdAt: columns[0].value as Date })
-  );
+  const { rows: result } = await sql<RecordDateResult>`
+    SELECT "expenseDate" AS "createdAt" FROM "tblExpenses" WHERE "ID" = ${id}
+  `.execute(getKysely());
 
   if (!result || result.length === 0) {
     throw new Error('Expense not found');

@@ -1,11 +1,15 @@
 /**
  * Private-photos queries
  *
- * Rows in dbo.tblPrivatePhotos mark photos that are HIDDEN from the patient
+ * Rows in tblPrivatePhotos mark photos that are HIDDEN from the patient
  * portal. Absence of a row = visible (public by default).
+ *
+ * Migration Phase 4: translated to typed Kysely (PostgreSQL). `TimepointCode` /
+ * `ImageName` are `citext`, so the lookups/conflict key stay case-insensitive
+ * (matches the old Arabic_CI_AS columns). The T-SQL MERGE upsert became an
+ * `ON CONFLICT … DO NOTHING` against the (PersonID, TimepointCode, ImageName) PK.
  */
-import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery, TYPES } from '../index.js';
+import { getKysely } from '../kysely.js';
 
 export interface PrivatePhotoEntry {
   TimepointCode: string;
@@ -14,39 +18,26 @@ export interface PrivatePhotoEntry {
   MarkedAt: Date;
 }
 
-const mapEntry = (columns: ColumnValue[]): PrivatePhotoEntry => {
-  const r = {} as Record<string, unknown>;
-  for (const c of columns) r[c.metadata.colName] = c.value;
-  return {
-    TimepointCode: r.TimepointCode as string,
-    ImageName: r.ImageName as string,
-    MarkedBy: (r.MarkedBy as number) ?? null,
-    MarkedAt: r.MarkedAt as Date,
-  };
-};
-
 export async function listPrivateForPatient(personId: number): Promise<PrivatePhotoEntry[]> {
-  return executeQuery<PrivatePhotoEntry>(
-    `SELECT TimepointCode, ImageName, MarkedBy, MarkedAt
-     FROM dbo.tblPrivatePhotos WHERE PersonID = @PID`,
-    [['PID', TYPES.Int, personId]],
-    mapEntry
-  );
+  const db = getKysely();
+  return db
+    .selectFrom('tblPrivatePhotos')
+    .where('PersonID', '=', personId)
+    .select(['TimepointCode', 'ImageName', 'MarkedBy', 'MarkedAt'])
+    .execute();
 }
 
 export async function listPrivateForTimepoint(
   personId: number,
   tp: string
 ): Promise<PrivatePhotoEntry[]> {
-  return executeQuery<PrivatePhotoEntry>(
-    `SELECT TimepointCode, ImageName, MarkedBy, MarkedAt
-     FROM dbo.tblPrivatePhotos WHERE PersonID = @PID AND TimepointCode = @TP`,
-    [
-      ['PID', TYPES.Int, personId],
-      ['TP', TYPES.NVarChar, tp],
-    ],
-    mapEntry
-  );
+  const db = getKysely();
+  return db
+    .selectFrom('tblPrivatePhotos')
+    .where('PersonID', '=', personId)
+    .where('TimepointCode', '=', tp)
+    .select(['TimepointCode', 'ImageName', 'MarkedBy', 'MarkedAt'])
+    .execute();
 }
 
 export async function markPrivate(
@@ -55,32 +46,20 @@ export async function markPrivate(
   name: string,
   byUserId: number | null
 ): Promise<void> {
-  await executeQuery(
-    `MERGE dbo.tblPrivatePhotos AS target
-     USING (SELECT @PID AS PersonID, @TP AS TimepointCode, @Name AS ImageName) AS src
-       ON target.PersonID = src.PersonID
-      AND target.TimepointCode = src.TimepointCode
-      AND target.ImageName = src.ImageName
-     WHEN NOT MATCHED THEN
-       INSERT (PersonID, TimepointCode, ImageName, MarkedBy)
-       VALUES (@PID, @TP, @Name, @By);`,
-    [
-      ['PID', TYPES.Int, personId],
-      ['TP', TYPES.NVarChar, tp],
-      ['Name', TYPES.NVarChar, name],
-      ['By', TYPES.Int, byUserId],
-    ]
-  );
+  const db = getKysely();
+  await db
+    .insertInto('tblPrivatePhotos')
+    .values({ PersonID: personId, TimepointCode: tp, ImageName: name, MarkedBy: byUserId })
+    .onConflict((oc) => oc.columns(['PersonID', 'TimepointCode', 'ImageName']).doNothing())
+    .execute();
 }
 
 export async function markPublic(personId: number, tp: string, name: string): Promise<void> {
-  await executeQuery(
-    `DELETE FROM dbo.tblPrivatePhotos
-     WHERE PersonID = @PID AND TimepointCode = @TP AND ImageName = @Name`,
-    [
-      ['PID', TYPES.Int, personId],
-      ['TP', TYPES.NVarChar, tp],
-      ['Name', TYPES.NVarChar, name],
-    ]
-  );
+  const db = getKysely();
+  await db
+    .deleteFrom('tblPrivatePhotos')
+    .where('PersonID', '=', personId)
+    .where('TimepointCode', '=', tp)
+    .where('ImageName', '=', name)
+    .execute();
 }

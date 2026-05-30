@@ -12,7 +12,8 @@
  */
 
 import { log } from '../../utils/logger.js';
-import * as database from '../database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../database/kysely.js';
 import driveUploadService from '../google-drive/drive-upload.js';
 
 /**
@@ -97,36 +98,22 @@ export interface PdfUploadResult {
  * @throws AlignerPdfError If set not found
  */
 async function getSetInfo(setId: number): Promise<SetInfo> {
-  const setQuery = `
+  const db = getKysely();
+  const { rows: result } = await sql<SetInfo>`
         SELECT
-            s.AlignerSetID,
-            s.WorkID,
-            s.SetSequence,
-            s.DriveFileId,
-            w.PersonID,
-            p.PatientName,
-            p.FirstName,
-            p.LastName
-        FROM tblAlignerSets s
-        INNER JOIN tblWork w ON s.WorkID = w.workid
-        INNER JOIN tblPatients p ON w.PersonID = p.PersonID
-        WHERE s.AlignerSetID = @setId
-    `;
-
-  const result = await database.executeQuery<SetInfo>(
-    setQuery,
-    [['setId', database.TYPES.Int, setId]],
-    (columns) => ({
-      AlignerSetID: columns[0].value as number,
-      WorkID: columns[1].value as number,
-      SetSequence: columns[2].value as number,
-      DriveFileId: columns[3].value as string | null,
-      PersonID: columns[4].value as number,
-      PatientName: columns[5].value as string,
-      FirstName: columns[6].value as string | null,
-      LastName: columns[7].value as string | null,
-    })
-  );
+            s."AlignerSetID",
+            s."WorkID",
+            s."SetSequence",
+            s."DriveFileId",
+            w."PersonID",
+            p."PatientName",
+            p."FirstName",
+            p."LastName"
+        FROM "tblAlignerSets" s
+        INNER JOIN "tblwork" w ON s."WorkID" = w."workid"
+        INNER JOIN "tblpatients" p ON w."PersonID" = p."PersonID"
+        WHERE s."AlignerSetID" = ${setId}
+    `.execute(db);
 
   if (!result || result.length === 0) {
     throw new AlignerPdfError('Aligner set not found', 'SET_NOT_FOUND', {
@@ -168,26 +155,16 @@ async function updateDatabaseWithPdf(
   uploadResult: DriveUploadResult,
   uploaderEmail: string
 ): Promise<void> {
-  const updateQuery = `
-        UPDATE tblAlignerSets
+  const db = getKysely();
+  await sql`
+        UPDATE "tblAlignerSets"
         SET
-            SetPdfUrl = @url,
-            DriveFileId = @fileId,
-            PdfUploadedAt = GETDATE(),
-            PdfUploadedBy = @uploadedBy
-        WHERE AlignerSetID = @setId
-    `;
-
-  await database.executeQuery(
-    updateQuery,
-    [
-      ['url', database.TYPES.NVarChar, uploadResult.url],
-      ['fileId', database.TYPES.NVarChar, uploadResult.fileId],
-      ['uploadedBy', database.TYPES.NVarChar, uploaderEmail],
-      ['setId', database.TYPES.Int, setId],
-    ],
-    (columns) => ({ value: columns[0]?.value })
-  );
+            "SetPdfUrl" = ${uploadResult.url},
+            "DriveFileId" = ${uploadResult.fileId},
+            "PdfUploadedAt" = LOCALTIMESTAMP,
+            "PdfUploadedBy" = ${uploaderEmail}
+        WHERE "AlignerSetID" = ${setId}
+    `.execute(db);
 
   log.info(`Database updated with PDF info for set ${setId}`);
 }
@@ -276,21 +253,16 @@ export async function uploadPdfForSet(
  * @param setId - Aligner set ID
  */
 async function clearPdfFromDatabase(setId: number): Promise<void> {
-  const updateQuery = `
-        UPDATE tblAlignerSets
+  const db = getKysely();
+  await sql`
+        UPDATE "tblAlignerSets"
         SET
-            SetPdfUrl = NULL,
-            DriveFileId = NULL,
-            PdfUploadedAt = NULL,
-            PdfUploadedBy = NULL
-        WHERE AlignerSetID = @setId
-    `;
-
-  await database.executeQuery(
-    updateQuery,
-    [['setId', database.TYPES.Int, setId]],
-    (columns) => ({ value: columns[0]?.value })
-  );
+            "SetPdfUrl" = NULL,
+            "DriveFileId" = NULL,
+            "PdfUploadedAt" = NULL,
+            "PdfUploadedBy" = NULL
+        WHERE "AlignerSetID" = ${setId}
+    `.execute(db);
 
   log.info(`PDF metadata cleared from database for set ${setId}`);
 }
@@ -315,19 +287,12 @@ export async function deletePdfFromSet(setId: number): Promise<void> {
       DriveFileId: string | null;
     }
 
-    const setQuery = `
-            SELECT DriveFileId
-            FROM tblAlignerSets
-            WHERE AlignerSetID = @setId
-        `;
-
-    const result = await database.executeQuery<DriveFileResult>(
-      setQuery,
-      [['setId', database.TYPES.Int, setId]],
-      (columns) => ({
-        DriveFileId: columns[0].value as string | null,
-      })
-    );
+    const db = getKysely();
+    const { rows: result } = await sql<DriveFileResult>`
+            SELECT "DriveFileId"
+            FROM "tblAlignerSets"
+            WHERE "AlignerSetID" = ${setId}
+        `.execute(db);
 
     if (!result || result.length === 0) {
       throw new AlignerPdfError('Aligner set not found', 'SET_NOT_FOUND', {

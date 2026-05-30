@@ -17,7 +17,7 @@ import PDFDocument from 'pdfkit';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { executeStoredProcedure, TYPES } from '../database/index.js';
+import { getAppointmentsWithPhones } from '../database/queries/appointment-queries.js';
 import { log } from '../../utils/logger.js';
 
 // =============================================================================
@@ -367,22 +367,7 @@ class AppointmentPDFGenerator {
     }
 
     try {
-      const results = await executeStoredProcedure<AppointmentData>(
-        'ProAppsPhones',
-        [['AppsDate', TYPES.Date, date]],
-        undefined,
-        (columns) => ({
-          appointmentID: (columns[0]?.value as number) ?? null,
-          PersonID: (columns[1]?.value as number) ?? null,
-          AppDetail: (columns[2]?.value as string) ?? '',
-          AppDay: (columns[3]?.value as string) ?? '',
-          PatientType: (columns[4]?.value as string) ?? '',
-          PatientName: (columns[5]?.value as string) ?? '',
-          Phone: (columns[6]?.value as string) ?? '',
-          apptime: (columns[7]?.value as string) ?? '',
-          employeeName: (columns[8]?.value as string) ?? '',
-        })
-      );
+      const results = await getAppointmentsWithPhones(date);
 
       return (results || []) as AppointmentData[];
     } catch (error) {

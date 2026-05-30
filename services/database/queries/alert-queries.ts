@@ -1,8 +1,12 @@
 /**
  * Alert-related database queries
+ *
+ * Migration Phase 4: translated to typed Kysely (PostgreSQL). Reads/writes
+ * tblAlerts joined to tblAlertTypes. `IsActive` is a PG boolean (was a bit), so
+ * the WHERE/SET use `true`/the passed boolean directly. `CreationDate` is a PG
+ * `timestamp` → parsed to a local Date by kysely.ts.
  */
-import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery, TYPES } from '../index.js';
+import { getKysely } from '../kysely.js';
 
 // Type definitions
 interface Alert {
@@ -31,76 +35,53 @@ interface AlertData {
 /**
  * Get all alerts for a specific person.
  */
-export function getAlertsByPersonId(personId: number): Promise<Alert[]> {
-  const query = `
-    SELECT
-      al.AlertID,
-      al.PersonID,
-      al.AlertTypeID,
-      at.TypeName AS AlertTypeName,
-      al.AlertSeverity,
-      al.AlertDetails,
-      al.CreationDate,
-      al.IsActive
-    FROM
-      tblAlerts al
-    JOIN
-      tblAlertTypes at ON al.AlertTypeID = at.AlertTypeID
-    WHERE
-      al.PersonID = @personId
-      AND al.IsActive = 1
-    ORDER BY
-      al.CreationDate DESC;
-  `;
-  return executeQuery<Alert>(query, [['personId', TYPES.Int, personId]], (columns: ColumnValue[]) => ({
-    AlertID: columns[0].value as number,
-    PersonID: columns[1].value as number,
-    AlertTypeID: columns[2].value as number,
-    AlertTypeName: columns[3].value as string,
-    AlertSeverity: columns[4].value as number,
-    AlertDetails: columns[5].value as string | null,
-    CreationDate: columns[6].value as Date,
-    IsActive: columns[7].value as boolean,
-  }));
+export async function getAlertsByPersonId(personId: number): Promise<Alert[]> {
+  const db = getKysely();
+  return db
+    .selectFrom('tblAlerts as al')
+    .innerJoin('tblAlertTypes as at', 'al.AlertTypeID', 'at.AlertTypeID')
+    .where('al.PersonID', '=', personId)
+    .where('al.IsActive', '=', true)
+    .orderBy('al.CreationDate', 'desc')
+    .select([
+      'al.AlertID',
+      'al.PersonID',
+      'al.AlertTypeID',
+      'at.TypeName as AlertTypeName',
+      'al.AlertSeverity',
+      'al.AlertDetails',
+      'al.CreationDate',
+      'al.IsActive',
+    ])
+    .execute();
 }
 
 /**
  * Create a new alert for a person.
  */
 export async function createAlert(alertData: AlertData): Promise<void> {
-  const query = `
-    INSERT INTO tblAlerts (PersonID, AlertTypeID, AlertSeverity, AlertDetails)
-    VALUES (@personId, @alertTypeId, @alertSeverity, @alertDetails);
-  `;
-  await executeQuery(
-    query,
-    [
-      ['personId', TYPES.Int, alertData.PersonID],
-      ['alertTypeId', TYPES.Int, alertData.AlertTypeID],
-      ['alertSeverity', TYPES.Int, alertData.AlertSeverity],
-      ['alertDetails', TYPES.NVarChar, alertData.AlertDetails],
-    ],
-    () => ({})
-  );
+  const db = getKysely();
+  await db
+    .insertInto('tblAlerts')
+    .values({
+      PersonID: alertData.PersonID,
+      AlertTypeID: alertData.AlertTypeID,
+      AlertSeverity: alertData.AlertSeverity,
+      AlertDetails: alertData.AlertDetails,
+    })
+    .execute();
 }
 
 /**
  * Update an alert's status (activate/deactivate).
  */
 export async function setAlertStatus(alertId: number, isActive: boolean): Promise<void> {
-  const query = `
-    UPDATE tblAlerts
-    SET IsActive = @isActive
-    WHERE AlertID = @alertId;
-  `;
-  await executeQuery(
-    query,
-    [
-      ['alertId', TYPES.Int, alertId],
-      ['isActive', TYPES.Bit, isActive],
-    ],
-    () => ({})
-  );
+  const db = getKysely();
+  await db
+    .updateTable('tblAlerts')
+    .set({ IsActive: isActive })
+    .where('AlertID', '=', alertId)
+    .execute();
 }
 
 /**
@@ -112,35 +93,26 @@ export async function updateAlert(
   alertSeverity: number,
   alertDetails: string
 ): Promise<void> {
-  const query = `
-    UPDATE tblAlerts
-    SET AlertTypeID = @alertTypeId,
-        AlertSeverity = @alertSeverity,
-        AlertDetails = @alertDetails
-    WHERE AlertID = @alertId;
-  `;
-  await executeQuery(
-    query,
-    [
-      ['alertId', TYPES.Int, alertId],
-      ['alertTypeId', TYPES.Int, alertTypeId],
-      ['alertSeverity', TYPES.Int, alertSeverity],
-      ['alertDetails', TYPES.NVarChar, alertDetails],
-    ],
-    () => ({})
-  );
+  const db = getKysely();
+  await db
+    .updateTable('tblAlerts')
+    .set({
+      AlertTypeID: alertTypeId,
+      AlertSeverity: alertSeverity,
+      AlertDetails: alertDetails,
+    })
+    .where('AlertID', '=', alertId)
+    .execute();
 }
 
 /**
  * Get all alert types for dropdown lists.
  */
-export function getAlertTypes(): Promise<AlertType[]> {
-  return executeQuery<AlertType>(
-    'SELECT AlertTypeID, TypeName FROM tblAlertTypes ORDER BY TypeName',
-    [],
-    (columns: ColumnValue[]) => ({
-      AlertTypeID: columns[0].value as number,
-      TypeName: columns[1].value as string,
-    })
-  );
+export async function getAlertTypes(): Promise<AlertType[]> {
+  const db = getKysely();
+  return db
+    .selectFrom('tblAlertTypes')
+    .select(['AlertTypeID', 'TypeName'])
+    .orderBy('TypeName')
+    .execute();
 }

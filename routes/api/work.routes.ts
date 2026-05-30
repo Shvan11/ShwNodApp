@@ -16,8 +16,8 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import * as database from '../../services/database/index.js';
-import type { SqlParam } from '../../services/database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../../services/database/kysely.js';
 import {
   getWorksByPatient,
   getWorkDetails,
@@ -307,44 +307,27 @@ router.get(
         return;
       }
 
-      const query = `
+      const { rows } = await sql<WorkResult>`
             SELECT
-                w.workid,
-                w.PersonID,
-                w.TotalRequired,
-                w.Currency,
-                w.Typeofwork,
-                w.Notes,
-                w.Status,
-                w.DrID,
-                e.employeeName as DoctorName,
-                wt.WorkType as TypeName,
-                ws.StatusName
-            FROM tblwork w
-            LEFT JOIN tblEmployees e ON w.DrID = e.ID
-            LEFT JOIN tblWorkType wt ON w.Typeofwork = wt.ID
-            LEFT JOIN tblWorkStatus ws ON w.Status = ws.StatusID
-            WHERE w.workid = @WorkID
-        `;
+                w."workid",
+                w."PersonID",
+                w."TotalRequired",
+                w."Currency",
+                w."Typeofwork",
+                w."Notes",
+                w."Status",
+                w."DrID",
+                e."employeeName" as "DoctorName",
+                wt."WorkType" as "TypeName",
+                ws."StatusName"
+            FROM "tblwork" w
+            LEFT JOIN "tblEmployees" e ON w."DrID" = e."ID"
+            LEFT JOIN "tblWorkType" wt ON w."Typeofwork" = wt."ID"
+            LEFT JOIN "tblWorkStatus" ws ON w."Status" = ws."StatusID"
+            WHERE w."workid" = ${parseInt(workId)}
+        `.execute(getKysely());
 
-      const work = await database.executeQuery<WorkResult, WorkResult | null>(
-        query,
-        [['WorkID', database.TYPES.Int, parseInt(workId)]],
-        (columns) => ({
-          workid: columns[0].value as number,
-          PersonID: columns[1].value as number,
-          TotalRequired: columns[2].value as number,
-          Currency: columns[3].value as string,
-          Typeofwork: columns[4].value as number,
-          Notes: columns[5].value as string | null,
-          Status: columns[6].value as number,
-          DrID: columns[7].value as number,
-          DoctorName: columns[8].value as string | null,
-          TypeName: columns[9].value as string | null,
-          StatusName: columns[10].value as string | null
-        }),
-        (results) => (results.length > 0 ? results[0] : null)
-      );
+      const work = rows.length > 0 ? rows[0] : null;
 
       if (!work) {
         log.warn('Work not found by ID', { workId });
@@ -1356,69 +1339,65 @@ router.get(
         return;
       }
 
-      const query = `
+      const { rows } = await sql`
             SELECT
-                ID,
-                DxDate,
-                WorkID,
-                Diagnosis,
-                TreatmentPlan,
-                ChiefComplain,
-                fAnteroPosterior,
-                fVertical,
-                fTransverse,
-                fLipCompetence,
-                fNasoLabialAngle,
-                fUpperIncisorShowRest,
-                fUpperIncisorShowSmile,
-                ITeethPresent,
-                IDentalHealth,
-                ILowerCrowding,
-                ILowerIncisorInclination,
-                ICurveofSpee,
-                IUpperCrowding,
-                IUpperIncisorInclination,
-                OIncisorRelation,
-                OOverjet,
-                OOverbite,
-                OCenterlines,
-                OMolarRelation,
-                OCanineRelation,
-                OFunctionalOcclusion,
-                C_SNA,
-                C_SNB,
-                C_ANB,
-                C_SNMx,
-                C_Wits,
-                C_FMA,
-                C_MMA,
-                C_UIMX,
-                C_LIMd,
-                C_UI_LI,
-                C_LI_APo,
-                C_Ulip_E,
-                C_Llip_E,
-                C_Naso_lip,
-                C_TAFH,
-                C_UAFH,
-                C_LAFH,
-                C_PercentLAFH,
-                Appliance
-            FROM tblDiagnosis
-            WHERE WorkID = @workId
-        `;
-
-      const result = await database.executeQuery(query, [
-        ['workId', database.TYPES.Int, parseInt(workId)]
-      ]);
+                "ID",
+                "DxDate",
+                "WorkID",
+                "Diagnosis",
+                "TreatmentPlan",
+                "ChiefComplain",
+                "fAnteroPosterior",
+                "fVertical",
+                "fTransverse",
+                "fLipCompetence",
+                "fNasoLabialAngle",
+                "fUpperIncisorShowRest",
+                "fUpperIncisorShowSmile",
+                "ITeethPresent",
+                "IDentalHealth",
+                "ILowerCrowding",
+                "ILowerIncisorInclination",
+                "ICurveofSpee",
+                "IUpperCrowding",
+                "IUpperIncisorInclination",
+                "OIncisorRelation",
+                "OOverjet",
+                "OOverbite",
+                "OCenterlines",
+                "OMolarRelation",
+                "OCanineRelation",
+                "OFunctionalOcclusion",
+                "C_SNA",
+                "C_SNB",
+                "C_ANB",
+                "C_SNMx",
+                "C_Wits",
+                "C_FMA",
+                "C_MMA",
+                "C_UIMX",
+                "C_LIMd",
+                "C_UI_LI",
+                "C_LI_APo",
+                "C_Ulip_E",
+                "C_Llip_E",
+                "C_Naso_lip",
+                "C_TAFH",
+                "C_UAFH",
+                "C_LAFH",
+                "C_PercentLAFH",
+                "Appliance"
+            FROM "tblDiagnosis"
+            WHERE "WorkID" = ${parseInt(workId)}
+        `.execute(getKysely());
 
       // Return null if no diagnosis found (not an error)
-      if ((result as unknown[]).length === 0) {
+      if (rows.length === 0) {
         res.json(null);
         return;
       }
 
-      res.json((result as unknown[])[0]);
+      res.json(rows[0]);
     } catch (error) {
       log.error('Error fetching diagnosis:', error);
       sendError(res, 500, 'Failed to fetch diagnosis', error as Error);
@@ -1456,240 +1435,147 @@ router.post(
         return;
       }
 
-      // Check if diagnosis already exists for this work
-      const checkQuery = `SELECT ID FROM tblDiagnosis WHERE WorkID = @workId`;
-      const existingDiagnosis = await database.executeQuery(checkQuery, [
-        ['workId', database.TYPES.Int, parseInt(String(diagnosisData.WorkID))]
-      ]);
+      const db = getKysely();
+      const workIdNum = parseInt(String(diagnosisData.WorkID));
 
-      let query: string;
+      // Normalized column values (null for empty strings — preserves original semantics).
+      const dxDate = diagnosisData.DxDate
+        ? new Date(diagnosisData.DxDate)
+        : new Date();
+      const diagnosis = diagnosisData.Diagnosis;
+      const treatmentPlan = diagnosisData.TreatmentPlan;
+      const chiefComplain = diagnosisData.ChiefComplain || null;
+      const appliance = diagnosisData.Appliance || null;
+      // Facial Analysis
+      const fAnteroPosterior = diagnosisData.fAnteroPosterior || null;
+      const fVertical = diagnosisData.fVertical || null;
+      const fTransverse = diagnosisData.fTransverse || null;
+      const fLipCompetence = diagnosisData.fLipCompetence || null;
+      const fNasoLabialAngle = diagnosisData.fNasoLabialAngle || null;
+      const fUpperIncisorShowRest = diagnosisData.fUpperIncisorShowRest || null;
+      const fUpperIncisorShowSmile = diagnosisData.fUpperIncisorShowSmile || null;
+      // Intraoral Analysis
+      const iTeethPresent = diagnosisData.ITeethPresent || null;
+      const iDentalHealth = diagnosisData.IDentalHealth || null;
+      const iLowerCrowding = diagnosisData.ILowerCrowding || null;
+      const iLowerIncisorInclination = diagnosisData.ILowerIncisorInclination || null;
+      const iCurveofSpee = diagnosisData.ICurveofSpee || null;
+      const iUpperCrowding = diagnosisData.IUpperCrowding || null;
+      const iUpperIncisorInclination = diagnosisData.IUpperIncisorInclination || null;
+      // Occlusion Analysis
+      const oIncisorRelation = diagnosisData.OIncisorRelation || null;
+      const oOverjet = diagnosisData.OOverjet || null;
+      const oOverbite = diagnosisData.OOverbite || null;
+      const oCenterlines = diagnosisData.OCenterlines || null;
+      const oMolarRelation = diagnosisData.OMolarRelation || null;
+      const oCanineRelation = diagnosisData.OCanineRelation || null;
+      const oFunctionalOcclusion = diagnosisData.OFunctionalOcclusion || null;
+      // Cephalometric Analysis
+      const c_SNA = diagnosisData.C_SNA || null;
+      const c_SNB = diagnosisData.C_SNB || null;
+      const c_ANB = diagnosisData.C_ANB || null;
+      const c_SNMx = diagnosisData.C_SNMx || null;
+      const c_Wits = diagnosisData.C_Wits || null;
+      const c_FMA = diagnosisData.C_FMA || null;
+      const c_MMA = diagnosisData.C_MMA || null;
+      const c_UIMX = diagnosisData.C_UIMX || null;
+      const c_LIMd = diagnosisData.C_LIMd || null;
+      const c_UI_LI = diagnosisData.C_UI_LI || null;
+      const c_LI_APo = diagnosisData.C_LI_APo || null;
+      const c_Ulip_E = diagnosisData.C_Ulip_E || null;
+      const c_Llip_E = diagnosisData.C_Llip_E || null;
+      const c_Naso_lip = diagnosisData.C_Naso_lip || null;
+      const c_TAFH = diagnosisData.C_TAFH || null;
+      const c_UAFH = diagnosisData.C_UAFH || null;
+      const c_LAFH = diagnosisData.C_LAFH || null;
+      const c_PercentLAFH = diagnosisData.C_PercentLAFH || null;
+
+      // Upsert: try UPDATE first; INSERT only if no existing row was updated.
+      // (The original IF-EXISTS check at L1460 collapses into the rowCount test.)
+      const updateResult = await sql`
+                UPDATE "tblDiagnosis"
+                SET
+                    "DxDate" = ${dxDate},
+                    "Diagnosis" = ${diagnosis},
+                    "TreatmentPlan" = ${treatmentPlan},
+                    "ChiefComplain" = ${chiefComplain},
+                    "Appliance" = ${appliance},
+                    "fAnteroPosterior" = ${fAnteroPosterior},
+                    "fVertical" = ${fVertical},
+                    "fTransverse" = ${fTransverse},
+                    "fLipCompetence" = ${fLipCompetence},
+                    "fNasoLabialAngle" = ${fNasoLabialAngle},
+                    "fUpperIncisorShowRest" = ${fUpperIncisorShowRest},
+                    "fUpperIncisorShowSmile" = ${fUpperIncisorShowSmile},
+                    "ITeethPresent" = ${iTeethPresent},
+                    "IDentalHealth" = ${iDentalHealth},
+                    "ILowerCrowding" = ${iLowerCrowding},
+                    "ILowerIncisorInclination" = ${iLowerIncisorInclination},
+                    "ICurveofSpee" = ${iCurveofSpee},
+                    "IUpperCrowding" = ${iUpperCrowding},
+                    "IUpperIncisorInclination" = ${iUpperIncisorInclination},
+                    "OIncisorRelation" = ${oIncisorRelation},
+                    "OOverjet" = ${oOverjet},
+                    "OOverbite" = ${oOverbite},
+                    "OCenterlines" = ${oCenterlines},
+                    "OMolarRelation" = ${oMolarRelation},
+                    "OCanineRelation" = ${oCanineRelation},
+                    "OFunctionalOcclusion" = ${oFunctionalOcclusion},
+                    "C_SNA" = ${c_SNA},
+                    "C_SNB" = ${c_SNB},
+                    "C_ANB" = ${c_ANB},
+                    "C_SNMx" = ${c_SNMx},
+                    "C_Wits" = ${c_Wits},
+                    "C_FMA" = ${c_FMA},
+                    "C_MMA" = ${c_MMA},
+                    "C_UIMX" = ${c_UIMX},
+                    "C_LIMd" = ${c_LIMd},
+                    "C_UI_LI" = ${c_UI_LI},
+                    "C_LI_APo" = ${c_LI_APo},
+                    "C_Ulip_E" = ${c_Ulip_E},
+                    "C_Llip_E" = ${c_Llip_E},
+                    "C_Naso_lip" = ${c_Naso_lip},
+                    "C_TAFH" = ${c_TAFH},
+                    "C_UAFH" = ${c_UAFH},
+                    "C_LAFH" = ${c_LAFH},
+                    "C_PercentLAFH" = ${c_PercentLAFH}
+                WHERE "WorkID" = ${workIdNum}
+            `.execute(db);
+
       let successMessage: string;
 
-      if ((existingDiagnosis as unknown[]).length > 0) {
-        // UPDATE existing diagnosis
-        query = `
-                UPDATE tblDiagnosis
-                SET
-                    DxDate = @dxDate,
-                    Diagnosis = @diagnosis,
-                    TreatmentPlan = @treatmentPlan,
-                    ChiefComplain = @chiefComplain,
-                    Appliance = @appliance,
-                    fAnteroPosterior = @fAnteroPosterior,
-                    fVertical = @fVertical,
-                    fTransverse = @fTransverse,
-                    fLipCompetence = @fLipCompetence,
-                    fNasoLabialAngle = @fNasoLabialAngle,
-                    fUpperIncisorShowRest = @fUpperIncisorShowRest,
-                    fUpperIncisorShowSmile = @fUpperIncisorShowSmile,
-                    ITeethPresent = @iTeethPresent,
-                    IDentalHealth = @iDentalHealth,
-                    ILowerCrowding = @iLowerCrowding,
-                    ILowerIncisorInclination = @iLowerIncisorInclination,
-                    ICurveofSpee = @iCurveofSpee,
-                    IUpperCrowding = @iUpperCrowding,
-                    IUpperIncisorInclination = @iUpperIncisorInclination,
-                    OIncisorRelation = @oIncisorRelation,
-                    OOverjet = @oOverjet,
-                    OOverbite = @oOverbite,
-                    OCenterlines = @oCenterlines,
-                    OMolarRelation = @oMolarRelation,
-                    OCanineRelation = @oCanineRelation,
-                    OFunctionalOcclusion = @oFunctionalOcclusion,
-                    C_SNA = @c_SNA,
-                    C_SNB = @c_SNB,
-                    C_ANB = @c_ANB,
-                    C_SNMx = @c_SNMx,
-                    C_Wits = @c_Wits,
-                    C_FMA = @c_FMA,
-                    C_MMA = @c_MMA,
-                    C_UIMX = @c_UIMX,
-                    C_LIMd = @c_LIMd,
-                    C_UI_LI = @c_UI_LI,
-                    C_LI_APo = @c_LI_APo,
-                    C_Ulip_E = @c_Ulip_E,
-                    C_Llip_E = @c_Llip_E,
-                    C_Naso_lip = @c_Naso_lip,
-                    C_TAFH = @c_TAFH,
-                    C_UAFH = @c_UAFH,
-                    C_LAFH = @c_LAFH,
-                    C_PercentLAFH = @c_PercentLAFH
-                WHERE WorkID = @workId
-            `;
+      if (Number(updateResult.numAffectedRows ?? 0) > 0) {
         successMessage = 'Diagnosis updated successfully';
       } else {
         // INSERT new diagnosis
-        query = `
-                INSERT INTO tblDiagnosis (
-                    DxDate, WorkID, Diagnosis, TreatmentPlan, ChiefComplain, Appliance,
-                    fAnteroPosterior, fVertical, fTransverse, fLipCompetence, fNasoLabialAngle,
-                    fUpperIncisorShowRest, fUpperIncisorShowSmile,
-                    ITeethPresent, IDentalHealth, ILowerCrowding, ILowerIncisorInclination,
-                    ICurveofSpee, IUpperCrowding, IUpperIncisorInclination,
-                    OIncisorRelation, OOverjet, OOverbite, OCenterlines, OMolarRelation,
-                    OCanineRelation, OFunctionalOcclusion,
-                    C_SNA, C_SNB, C_ANB, C_SNMx, C_Wits, C_FMA, C_MMA, C_UIMX, C_LIMd,
-                    C_UI_LI, C_LI_APo, C_Ulip_E, C_Llip_E, C_Naso_lip,
-                    C_TAFH, C_UAFH, C_LAFH, C_PercentLAFH
+        await sql`
+                INSERT INTO "tblDiagnosis" (
+                    "DxDate", "WorkID", "Diagnosis", "TreatmentPlan", "ChiefComplain", "Appliance",
+                    "fAnteroPosterior", "fVertical", "fTransverse", "fLipCompetence", "fNasoLabialAngle",
+                    "fUpperIncisorShowRest", "fUpperIncisorShowSmile",
+                    "ITeethPresent", "IDentalHealth", "ILowerCrowding", "ILowerIncisorInclination",
+                    "ICurveofSpee", "IUpperCrowding", "IUpperIncisorInclination",
+                    "OIncisorRelation", "OOverjet", "OOverbite", "OCenterlines", "OMolarRelation",
+                    "OCanineRelation", "OFunctionalOcclusion",
+                    "C_SNA", "C_SNB", "C_ANB", "C_SNMx", "C_Wits", "C_FMA", "C_MMA", "C_UIMX", "C_LIMd",
+                    "C_UI_LI", "C_LI_APo", "C_Ulip_E", "C_Llip_E", "C_Naso_lip",
+                    "C_TAFH", "C_UAFH", "C_LAFH", "C_PercentLAFH"
                 )
                 VALUES (
-                    @dxDate, @workId, @diagnosis, @treatmentPlan, @chiefComplain, @appliance,
-                    @fAnteroPosterior, @fVertical, @fTransverse, @fLipCompetence, @fNasoLabialAngle,
-                    @fUpperIncisorShowRest, @fUpperIncisorShowSmile,
-                    @iTeethPresent, @iDentalHealth, @iLowerCrowding, @iLowerIncisorInclination,
-                    @iCurveofSpee, @iUpperCrowding, @iUpperIncisorInclination,
-                    @oIncisorRelation, @oOverjet, @oOverbite, @oCenterlines, @oMolarRelation,
-                    @oCanineRelation, @oFunctionalOcclusion,
-                    @c_SNA, @c_SNB, @c_ANB, @c_SNMx, @c_Wits, @c_FMA, @c_MMA, @c_UIMX, @c_LIMd,
-                    @c_UI_LI, @c_LI_APo, @c_Ulip_E, @c_Llip_E, @c_Naso_lip,
-                    @c_TAFH, @c_UAFH, @c_LAFH, @c_PercentLAFH
+                    ${dxDate}, ${workIdNum}, ${diagnosis}, ${treatmentPlan}, ${chiefComplain}, ${appliance},
+                    ${fAnteroPosterior}, ${fVertical}, ${fTransverse}, ${fLipCompetence}, ${fNasoLabialAngle},
+                    ${fUpperIncisorShowRest}, ${fUpperIncisorShowSmile},
+                    ${iTeethPresent}, ${iDentalHealth}, ${iLowerCrowding}, ${iLowerIncisorInclination},
+                    ${iCurveofSpee}, ${iUpperCrowding}, ${iUpperIncisorInclination},
+                    ${oIncisorRelation}, ${oOverjet}, ${oOverbite}, ${oCenterlines}, ${oMolarRelation},
+                    ${oCanineRelation}, ${oFunctionalOcclusion},
+                    ${c_SNA}, ${c_SNB}, ${c_ANB}, ${c_SNMx}, ${c_Wits}, ${c_FMA}, ${c_MMA}, ${c_UIMX}, ${c_LIMd},
+                    ${c_UI_LI}, ${c_LI_APo}, ${c_Ulip_E}, ${c_Llip_E}, ${c_Naso_lip},
+                    ${c_TAFH}, ${c_UAFH}, ${c_LAFH}, ${c_PercentLAFH}
                 )
-            `;
+            `.execute(db);
         successMessage = 'Diagnosis created successfully';
       }
-
-      // Build parameters - handle null/empty values
-      const params: SqlParam[] = [
-        [
-          'dxDate',
-          database.TYPES.DateTime2,
-          diagnosisData.DxDate ? new Date(diagnosisData.DxDate) : new Date()
-        ],
-        ['workId', database.TYPES.Int, parseInt(String(diagnosisData.WorkID))],
-        ['diagnosis', database.TYPES.NVarChar, diagnosisData.Diagnosis],
-        ['treatmentPlan', database.TYPES.NVarChar, diagnosisData.TreatmentPlan],
-        [
-          'chiefComplain',
-          database.TYPES.NVarChar,
-          diagnosisData.ChiefComplain || null
-        ],
-        ['appliance', database.TYPES.NVarChar, diagnosisData.Appliance || null],
-        // Facial Analysis
-        [
-          'fAnteroPosterior',
-          database.TYPES.NVarChar,
-          diagnosisData.fAnteroPosterior || null
-        ],
-        ['fVertical', database.TYPES.NVarChar, diagnosisData.fVertical || null],
-        [
-          'fTransverse',
-          database.TYPES.NVarChar,
-          diagnosisData.fTransverse || null
-        ],
-        [
-          'fLipCompetence',
-          database.TYPES.NVarChar,
-          diagnosisData.fLipCompetence || null
-        ],
-        [
-          'fNasoLabialAngle',
-          database.TYPES.NVarChar,
-          diagnosisData.fNasoLabialAngle || null
-        ],
-        [
-          'fUpperIncisorShowRest',
-          database.TYPES.NVarChar,
-          diagnosisData.fUpperIncisorShowRest || null
-        ],
-        [
-          'fUpperIncisorShowSmile',
-          database.TYPES.NVarChar,
-          diagnosisData.fUpperIncisorShowSmile || null
-        ],
-        // Intraoral Analysis
-        [
-          'iTeethPresent',
-          database.TYPES.NVarChar,
-          diagnosisData.ITeethPresent || null
-        ],
-        [
-          'iDentalHealth',
-          database.TYPES.NVarChar,
-          diagnosisData.IDentalHealth || null
-        ],
-        [
-          'iLowerCrowding',
-          database.TYPES.NVarChar,
-          diagnosisData.ILowerCrowding || null
-        ],
-        [
-          'iLowerIncisorInclination',
-          database.TYPES.NVarChar,
-          diagnosisData.ILowerIncisorInclination || null
-        ],
-        [
-          'iCurveofSpee',
-          database.TYPES.NVarChar,
-          diagnosisData.ICurveofSpee || null
-        ],
-        [
-          'iUpperCrowding',
-          database.TYPES.NVarChar,
-          diagnosisData.IUpperCrowding || null
-        ],
-        [
-          'iUpperIncisorInclination',
-          database.TYPES.NVarChar,
-          diagnosisData.IUpperIncisorInclination || null
-        ],
-        // Occlusion Analysis
-        [
-          'oIncisorRelation',
-          database.TYPES.NVarChar,
-          diagnosisData.OIncisorRelation || null
-        ],
-        ['oOverjet', database.TYPES.NVarChar, diagnosisData.OOverjet || null],
-        ['oOverbite', database.TYPES.NVarChar, diagnosisData.OOverbite || null],
-        [
-          'oCenterlines',
-          database.TYPES.NVarChar,
-          diagnosisData.OCenterlines || null
-        ],
-        [
-          'oMolarRelation',
-          database.TYPES.NVarChar,
-          diagnosisData.OMolarRelation || null
-        ],
-        [
-          'oCanineRelation',
-          database.TYPES.NVarChar,
-          diagnosisData.OCanineRelation || null
-        ],
-        [
-          'oFunctionalOcclusion',
-          database.TYPES.NVarChar,
-          diagnosisData.OFunctionalOcclusion || null
-        ],
-        // Cephalometric Analysis
-        ['c_SNA', database.TYPES.NVarChar, diagnosisData.C_SNA || null],
-        ['c_SNB', database.TYPES.NVarChar, diagnosisData.C_SNB || null],
-        ['c_ANB', database.TYPES.NVarChar, diagnosisData.C_ANB || null],
-        ['c_SNMx', database.TYPES.NVarChar, diagnosisData.C_SNMx || null],
-        ['c_Wits', database.TYPES.NVarChar, diagnosisData.C_Wits || null],
-        ['c_FMA', database.TYPES.NVarChar, diagnosisData.C_FMA || null],
-        ['c_MMA', database.TYPES.NVarChar, diagnosisData.C_MMA || null],
-        ['c_UIMX', database.TYPES.NVarChar, diagnosisData.C_UIMX || null],
-        ['c_LIMd', database.TYPES.NVarChar, diagnosisData.C_LIMd || null],
-        ['c_UI_LI', database.TYPES.NVarChar, diagnosisData.C_UI_LI || null],
-        ['c_LI_APo', database.TYPES.NVarChar, diagnosisData.C_LI_APo || null],
-        ['c_Ulip_E', database.TYPES.NVarChar, diagnosisData.C_Ulip_E || null],
-        ['c_Llip_E', database.TYPES.NVarChar, diagnosisData.C_Llip_E || null],
-        [
-          'c_Naso_lip',
-          database.TYPES.NVarChar,
-          diagnosisData.C_Naso_lip || null
-        ],
-        ['c_TAFH', database.TYPES.NVarChar, diagnosisData.C_TAFH || null],
-        ['c_UAFH', database.TYPES.NVarChar, diagnosisData.C_UAFH || null],
-        ['c_LAFH', database.TYPES.NVarChar, diagnosisData.C_LAFH || null],
-        [
-          'c_PercentLAFH',
-          database.TYPES.NVarChar,
-          diagnosisData.C_PercentLAFH || null
-        ]
-      ];
-
-      await database.executeQuery(query, params);
 
       res.json({
         success: true,
@@ -1718,11 +1604,9 @@ router.delete(
         return;
       }
 
-      const query = `DELETE FROM tblDiagnosis WHERE WorkID = @workId`;
-
-      await database.executeQuery(query, [
-        ['workId', database.TYPES.Int, parseInt(workId)]
-      ]);
+      await sql`DELETE FROM "tblDiagnosis" WHERE "WorkID" = ${parseInt(workId)}`.execute(
+        getKysely()
+      );
 
       res.json({
         success: true,

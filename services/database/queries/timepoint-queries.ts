@@ -1,12 +1,15 @@
 /**
  * TimePoint and image-related database queries.
  *
- * Reads from the LOCAL clone tables (`dbo.tblTimePoints` / `dbo.tblTimePointImages`),
+ * Reads from the LOCAL clone tables (`tblTimePoints` / `tblTimePointImages`),
  * keyed by `PersonID`. (These formerly proxied the Dolphin `ListDolphTimePoints` /
  * `ListTimePointImgs` stored procs into `DolphinPlatform`; that dependency is gone.)
+ *
+ * Migration Phase 4: translated to typed Kysely (PostgreSQL). Runs against the pg
+ * pool regardless of DB_DRIVER — the positional `ColumnValue[]` mappers are gone.
  */
-import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery, TYPES } from '../index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../kysely.js';
 
 // Type definitions
 interface TimePoint {
@@ -18,25 +21,22 @@ interface TimePoint {
 /**
  * Retrieves time points for a given patient ID, ordered by tpCode.
  *
- * tpCode is returned as a string and tpDateTime as a 'YYYY-MM-DD' string
- * (`CONVERT(..., 23)`) to preserve the existing API contract and avoid the
- * `useUTC:false` midnight shift (see CLAUDE.md date gotcha).
+ * `tpCode` is an int column returned as a string (was T-SQL `CONVERT(varchar)`) to
+ * preserve the existing API contract; `tpDateTime` is a PG `date`, so the centralized
+ * pg parser (see kysely.ts) already yields a 'YYYY-MM-DD' string — no UTC midnight shift.
  */
 export function getTimePoints(PID: string): Promise<TimePoint[]> {
-  return executeQuery<TimePoint>(
-    `SELECT CONVERT(varchar(12), tpCode) AS tpCode,
-            CONVERT(varchar(10), tpDateTime, 23) AS tpDateTime,
-            tpDescription
-       FROM dbo.tblTimePoints
-      WHERE PersonID = @id
-      ORDER BY tpCode`,
-    [['id', TYPES.Int, parseInt(PID, 10)]],
-    (columns: ColumnValue[]) => ({
-      tpCode: columns[0].value as string,
-      tpDateTime: columns[1].value as string,
-      tpDescription: columns[2].value as string,
-    })
-  );
+  const db = getKysely();
+  return db
+    .selectFrom('tblTimePoints')
+    .where('PersonID', '=', Number.parseInt(PID, 10))
+    .select((eb) => [
+      sql<string>`cast(${eb.ref('tpCode')} as varchar)`.as('tpCode'),
+      eb.ref('tpDateTime').$castTo<string>().as('tpDateTime'),
+      'tpDescription',
+    ])
+    .orderBy('tpCode')
+    .execute() as Promise<TimePoint[]>;
 }
 
 /**
@@ -44,16 +44,14 @@ export function getTimePoints(PID: string): Promise<TimePoint[]> {
  * timepoint. Callers build filenames as `{pid}0{tp}.i{code}`.
  */
 export function getTimePointImgs(pid: string, tp: string): Promise<string[]> {
-  return executeQuery<string>(
-    `SELECT RTRIM(ti.ImageType) AS ImageType
-       FROM dbo.tblTimePointImages ti
-       JOIN dbo.tblTimePoints t ON ti.TimePointID = t.TimePointID
-      WHERE t.PersonID = @pid AND t.tpCode = @tp
-      ORDER BY ti.ImageType`,
-    [
-      ['pid', TYPES.Int, parseInt(pid, 10)],
-      ['tp', TYPES.Int, parseInt(tp, 10)],
-    ],
-    (columns: ColumnValue[]) => columns[0].value as string
-  );
+  const db = getKysely();
+  return db
+    .selectFrom('tblTimePointImages as ti')
+    .innerJoin('tblTimePoints as t', 't.TimePointID', 'ti.TimePointID')
+    .where('t.PersonID', '=', Number.parseInt(pid, 10))
+    .where('t.tpCode', '=', Number.parseInt(tp, 10))
+    .orderBy('ti.ImageType')
+    .select((eb) => sql<string>`rtrim(${eb.ref('ti.ImageType')})`.as('ImageType'))
+    .execute()
+    .then((rows) => rows.map((r) => r.ImageType));
 }

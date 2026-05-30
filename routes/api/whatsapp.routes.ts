@@ -17,7 +17,7 @@ import qrcode from 'qrcode';
 import path from 'path';
 
 // Services
-import * as database from '../../services/database/index.js';
+import { getNewAppointmentMessage } from '../../services/database/queries/messaging-queries.js';
 import whatsapp from '../../services/messaging/whatsapp.js';
 import { sendImg_, sendXray_ } from '../../services/messaging/whatsapp-api.js';
 import { sendgramfile } from '../../services/messaging/telegram.js';
@@ -71,13 +71,6 @@ interface SendMedia2Body {
   file: string;
   phone: string;
   prog: 'WhatsApp' | 'Telegram';
-}
-
-interface MessageDataResult {
-  result: number;
-  phone: string | null;
-  message: string | null;
-  countryCode?: string;
 }
 
 interface SendMediaResult {
@@ -138,24 +131,11 @@ router.get(
         return;
       }
 
-      // Get message data from stored procedure
-      const messageData =
-        await database.executeStoredProcedure<MessageDataResult, MessageDataResult | null>(
-          'GetNewAppointmentMessage',
-          [
-            ['PersonID', database.TYPES.Int, parseInt(personId)],
-            ['AppointmentID', database.TYPES.Int, parseInt(appointmentId)]
-          ],
-          undefined,
-          (columns) => {
-            return {
-              result: columns[0].value as number,
-              phone: columns[1] ? (columns[1].value as string) : null,
-              message: columns[2] ? (columns[2].value as string) : null
-            };
-          },
-          (result) => (result && result.length > 0 ? result[0] : null)
-        );
+      // Build the reminder message (was the GetNewAppointmentMessage proc).
+      const messageData = await getNewAppointmentMessage(
+        parseInt(personId),
+        parseInt(appointmentId)
+      );
 
       if (!messageData) {
         log.warn('WhatsApp message data not found', { personId, appointmentId });

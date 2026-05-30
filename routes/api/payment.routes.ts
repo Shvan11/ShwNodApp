@@ -16,7 +16,8 @@
 
 import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
-import * as database from '../../services/database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../../services/database/kysely.js';
 import {
   getPayments,
   getActiveWorkForInvoice,
@@ -148,26 +149,33 @@ router.get(
         return;
       }
 
-      const result = await database.executeQuery<WorkForReceiptResult>(
-        `SELECT v.PersonID, v.PatientName, v.Phone, v.TotalPaid, v.AppDate, v.workid, v.TotalRequired, v.Currency,
-                w.Discount, w.DiscountDate
-         FROM dbo.V_Report v
-         LEFT JOIN dbo.tblwork w ON v.workid = w.workid
-         WHERE v.workid = @WorkID`,
-        [['WorkID', database.TYPES.Int, parseInt(workId)]],
-        (columns) => ({
-          PersonID: columns[0].value as number,
-          PatientName: columns[1].value as string,
-          Phone: columns[2].value as string | null,
-          TotalPaid: columns[3].value as number,
-          AppDate: columns[4].value as Date,
-          workid: columns[5].value as number,
-          TotalRequired: columns[6].value as number,
-          Currency: columns[7].value as string,
-          Discount: columns[8].value as number | null,
-          DiscountDate: columns[9].value as Date | null
-        })
-      );
+      // V_Report (and its sub-views VTotPaid / VLastApp) inlined for a single work:
+      //  - TotalPaid: SUM(tblInvoice.Amountpaid) for the work (NULL when no payments, as VTotPaid yielded)
+      //  - AppDate:   the patient's latest FUTURE appointment (VLastApp: per-person MAX(AppDate) > now)
+      const { rows: result } = await sql<WorkForReceiptResult>`
+        SELECT
+          w."PersonID",
+          p."PatientName",
+          p."Phone",
+          tp."TotalPaid",
+          la."AppDate",
+          w."workid",
+          w."TotalRequired",
+          w."Currency",
+          w."Discount",
+          w."DiscountDate"
+        FROM "tblwork" w
+        JOIN "tblpatients" p ON p."PersonID" = w."PersonID"
+        LEFT JOIN (
+          SELECT "workid", SUM("Amountpaid") AS "TotalPaid"
+          FROM "tblInvoice" GROUP BY "workid"
+        ) tp ON tp."workid" = w."workid"
+        LEFT JOIN (
+          SELECT "PersonID", MAX("AppDate") AS "AppDate"
+          FROM "tblappointments" WHERE "AppDate" > LOCALTIMESTAMP GROUP BY "PersonID"
+        ) la ON la."PersonID" = w."PersonID"
+        WHERE w."workid" = ${parseInt(workId)}
+      `.execute(getKysely());
 
       if (!result || result.length === 0) {
         ErrorResponses.notFound(res, 'Work');
@@ -493,14 +501,12 @@ router.delete(
         return;
       }
 
-      const result = await database.executeQuery(
-        'DELETE FROM dbo.tblInvoice WHERE InvoiceID = @InvoiceID',
-        [['InvoiceID', database.TYPES.Int, parseInt(invoiceId)]]
-      );
+      const result = await sql`
+        DELETE FROM "tblInvoice" WHERE "invoiceID" = ${parseInt(invoiceId)}
+      `.execute(getKysely());
+      const rowsAffected = Number(result.numAffectedRows ?? 0n);
 
-      if (
-        (result as { rowCount?: number }).rowCount === 0
-      ) {
+      if (rowsAffected === 0) {
         ErrorResponses.notFound(res, 'Invoice');
         return;
       }
@@ -508,7 +514,7 @@ router.delete(
       res.json({
         status: 'success',
         message: 'Invoice deleted successfully',
-        rowsAffected: (result as { rowCount?: number }).rowCount
+        rowsAffected
       });
     } catch (error) {
       log.error('Error deleting invoice:', error);

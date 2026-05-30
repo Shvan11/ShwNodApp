@@ -4,16 +4,18 @@
  */
 import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
-import * as database from '../../services/database/index.js';
 import { ErrorResponses } from '../../utils/error-response.js';
 import {
   calculateMonthlyStatistics,
   enrichInvoicesWithDetails,
   validateMonthYear,
   validateDate,
-  type DailyData,
-  type BaseInvoice
 } from '../../services/business/FinancialReportService.js';
+import {
+  getMonthlyGrandTotals,
+  getYearlyMonthlyTotals,
+  getDailyInvoices,
+} from '../../services/database/queries/report-queries.js';
 
 const router = Router();
 
@@ -49,21 +51,6 @@ interface MultiYearStatisticsQuery {
  */
 interface DailyInvoicesQuery {
   date?: string;
-}
-
-/**
- * Monthly data row from stored procedure
- */
-interface MonthlyDataRow {
-  Year?: number;
-  SumIQD?: number;
-  SumUSD?: number;
-  ExpensesIQD?: number;
-  ExpensesUSD?: number;
-  FinalIQDSum?: number;
-  FinalUSDSum?: number;
-  GrandTotal?: number;
-  [key: string]: string | number | Date | null | undefined;
 }
 
 /**
@@ -117,45 +104,8 @@ router.get('/statistics', async (req: Request<object, object, object, Statistics
     const { month: monthNum, year: yearNum } = validateMonthYear(month, year);
     const exRate = exchangeRate ? parseInt(exchangeRate) : 1450; // Default exchange rate
 
-    // Execute the stored procedure
-    const dailyData = await database.executeStoredProcedure<DailyData>(
-      'ProcGrandTotal',
-      [
-        ['month', database.TYPES.Int, monthNum],
-        ['year', database.TYPES.Int, yearNum],
-        ['Ex', database.TYPES.Int, exRate]
-      ],
-      undefined, // beforeExec callback
-      (columns) => {
-        // Row mapper - convert columns to DailyData object
-        const row: DailyData = {};
-        columns.forEach(column => {
-          const value = column.value;
-          const name = column.metadata.colName as keyof DailyData;
-          if (value === null || value === undefined) {
-            // Skip null/undefined values
-            return;
-          } else if (typeof value === 'number' || typeof value === 'string') {
-            (row as Record<string, unknown>)[name] = value;
-          } else if (value instanceof Date) {
-            // Format Date objects without timezone conversion
-            (row as Record<string, unknown>)[name] = `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-          } else if (typeof value === 'object' && value.constructor?.name === 'Date') {
-            // Handle Date-like objects from Tedious - format without timezone conversion
-            const d = value as Date;
-            (row as Record<string, unknown>)[name] = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-          } else if (typeof (value as { getFullYear?: () => number })?.getFullYear === 'function') {
-            // Handle objects with Date methods - format without timezone conversion
-            const d = value as Date;
-            (row as Record<string, unknown>)[name] = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-          } else {
-            // Fallback: convert to string
-            (row as Record<string, unknown>)[name] = String(value);
-          }
-        });
-        return row;
-      }
-    );
+    // Daily cash-box totals for the month (Day arrives as a 'YYYY-MM-DD' string from PG).
+    const dailyData = await getMonthlyGrandTotals(monthNum, yearNum, exRate);
 
     // Delegate calculation to service layer
     const summary = calculateMonthlyStatistics(dailyData, exRate);
@@ -201,23 +151,8 @@ router.get('/statistics/yearly', async (req: Request<object, object, object, Yea
     const { month: monthNum, year: yearNum } = validateMonthYear(startMonth, startYear);
     const exRate = exchangeRate ? parseInt(exchangeRate) : 1450;
 
-    // Execute stored procedure for 12-month period
-    const monthlyData = await database.executeStoredProcedure<MonthlyDataRow>(
-      'ProcYearlyMonthlyTotals',
-      [
-        ['startMonth', database.TYPES.Int, monthNum],
-        ['startYear', database.TYPES.Int, yearNum],
-        ['Ex', database.TYPES.Int, exRate]
-      ],
-      undefined,
-      (columns) => {
-        const row: MonthlyDataRow = {};
-        columns.forEach(column => {
-          row[column.metadata.colName] = column.value as string | number | Date | null;
-        });
-        return row;
-      }
-    );
+    // Per-month totals across the 12-month period.
+    const monthlyData = await getYearlyMonthlyTotals(monthNum, yearNum, exRate);
 
     // Calculate period summary
     const summary = monthlyData.reduce<StatisticsSummary>((acc, month) => ({
@@ -312,22 +247,7 @@ router.get('/statistics/multi-year', async (req: Request<object, object, object,
     const yearlyData: YearTotal[] = await Promise.all(
       years.map(async (year) => {
         // Get 12 months of data starting from January of this year
-        const monthlyData = await database.executeStoredProcedure<MonthlyDataRow>(
-          'ProcYearlyMonthlyTotals',
-          [
-            ['startMonth', database.TYPES.Int, 1],
-            ['startYear', database.TYPES.Int, year],
-            ['Ex', database.TYPES.Int, exRate]
-          ],
-          undefined,
-          (columns) => {
-            const row: MonthlyDataRow = {};
-            columns.forEach(column => {
-              row[column.metadata.colName] = column.value as string | number | Date | null;
-            });
-            return row;
-          }
-        );
+        const monthlyData = await getYearlyMonthlyTotals(1, year, exRate);
 
         // Filter to only include months from this year and aggregate
         const yearMonths = monthlyData.filter(m => m.Year === year);
@@ -406,51 +326,10 @@ router.get('/daily-invoices', async (req: Request<object, object, object, DailyI
     }
 
     // Delegate validation to service layer
-    const dateObj = validateDate(date);
+    validateDate(date);
 
-    // Execute the stored procedure
-    const baseInvoices = await database.executeStoredProcedure<BaseInvoice>(
-      'ProDailyInvoices',
-      [['iDate', database.TYPES.Date, dateObj]],
-      undefined,
-      (columns) => {
-        // Map columns to BaseInvoice - invoiceID is required
-        const invoiceID = columns.find(c => c.metadata.colName === 'invoiceID')?.value as number;
-        if (invoiceID === undefined || invoiceID === null) {
-          throw new Error('invoiceID is required in ProDailyInvoices result');
-        }
-        // Handle SysStartTime - stored as UTC (sysutcdatetime), send as ISO UTC string
-        // Frontend will convert to local time automatically
-        const sysStartTimeValue = columns.find(c => c.metadata.colName === 'SysStartTime')?.value;
-        let SysStartTime: string | undefined;
-        if (sysStartTimeValue instanceof Date) {
-          // Tedious interprets SQL datetime as local, but it's actually UTC
-          // Get the "local" components which are really UTC values
-          const d = sysStartTimeValue;
-          const y = d.getFullYear();
-          const mo = String(d.getMonth() + 1).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          const h = String(d.getHours()).padStart(2, '0');
-          const mi = String(d.getMinutes()).padStart(2, '0');
-          const s = String(d.getSeconds()).padStart(2, '0');
-          // Send as UTC ISO string so frontend converts to local time
-          SysStartTime = `${y}-${mo}-${day}T${h}:${mi}:${s}Z`;
-        } else {
-          SysStartTime = sysStartTimeValue as string | undefined;
-        }
-        return {
-          invoiceID,
-          workid: columns.find(c => c.metadata.colName === 'workid')?.value as number | undefined,
-          Amountpaid: columns.find(c => c.metadata.colName === 'Amountpaid')?.value as number | undefined,
-          Dateofpayment: columns.find(c => c.metadata.colName === 'Dateofpayment')?.value as Date | string | undefined,
-          PatientName: columns.find(c => c.metadata.colName === 'PatientName')?.value as string | undefined,
-          Phone: columns.find(c => c.metadata.colName === 'Phone')?.value as string | undefined,
-          SysStartTime,
-          currency: columns.find(c => c.metadata.colName === 'currency')?.value as string | undefined,
-          Change: columns.find(c => c.metadata.colName === 'Change')?.value as number | undefined
-        };
-      }
-    );
+    // Invoices paid on this date (SysStartTime already a UTC '…Z' ISO string from the query).
+    const baseInvoices = await getDailyInvoices(date);
 
     // Delegate enrichment to service layer
     const enrichedInvoices = await enrichInvoicesWithDetails(baseInvoices);

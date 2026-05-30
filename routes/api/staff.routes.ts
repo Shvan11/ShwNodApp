@@ -3,7 +3,8 @@
  * Handles doctor and operator data retrieval
  */
 import { Router, type Request, type Response } from 'express';
-import * as database from '../../services/database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../../services/database/kysely.js';
 import { ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 
@@ -23,21 +24,14 @@ interface StaffMember {
  */
 router.get('/doctors', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const query = `
-      SELECT e.ID, e.employeeName
-      FROM tblEmployees e
-      INNER JOIN tblPositions p ON e.Position = p.ID
-      WHERE p.PositionName = 'Doctor'
-      ORDER BY e.employeeName
-    `;
-    const doctors = await database.executeQuery<StaffMember>(
-      query,
-      [],
-      (columns) => ({
-        ID: columns[0].value as number,
-        employeeName: columns[1].value as string
-      })
-    );
+    const db = getKysely();
+    const { rows: doctors } = await sql<StaffMember>`
+      SELECT e."ID", e."employeeName"
+      FROM "tblEmployees" e
+      INNER JOIN "tblPositions" p ON e."Position" = p."ID"
+      WHERE p."PositionName" = 'Doctor'
+      ORDER BY e."employeeName"
+    `.execute(db);
     res.json(doctors);
   } catch (error) {
     log.error('Error fetching doctors:', error);
@@ -51,19 +45,12 @@ router.get('/doctors', async (_req: Request, res: Response): Promise<void> => {
  */
 router.get('/operators', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const query = `
-      SELECT e.ID, e.employeeName
-      FROM tblEmployees e
-      ORDER BY e.employeeName
-    `;
-    const operators = await database.executeQuery<StaffMember>(
-      query,
-      [],
-      (columns) => ({
-        ID: columns[0].value as number,
-        employeeName: columns[1].value as string
-      })
-    );
+    const db = getKysely();
+    const { rows: operators } = await sql<StaffMember>`
+      SELECT e."ID", e."employeeName"
+      FROM "tblEmployees" e
+      ORDER BY e."employeeName"
+    `.execute(db);
     res.json(operators);
   } catch (error) {
     log.error('Error fetching operators:', error);

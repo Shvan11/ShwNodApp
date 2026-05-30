@@ -1,13 +1,21 @@
 /**
  * Patient-related database queries
+ *
+ * Migration Phase 4: translated to typed Kysely (PostgreSQL). This was a facade
+ * bypasser (`withTransaction` + `new sql.Request(tx)`); the delete-cascade now runs on
+ * a Kysely transaction via `withPgTransaction`. The `V_rptNoWork` → `VLastApp` view
+ * chain (not yet recreated in PG — views are Phase 5) is inlined here as a correlated
+ * "latest future appointment" subquery. `PatientName`/`Currency`/`CountryCode` are
+ * `citext`, so the duplicate-name check stays case-insensitive (matches Arabic_CI_AS).
  */
-import type { ColumnValue } from '../../../types/database.types.js';
+import { sql } from 'kysely';
 import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import * as readline from 'node:readline';
-import { executeQuery, withTransaction, sql, TYPES, SqlParam } from '../index.js';
+import { getKysely, withPgTransaction } from '../kysely.js';
 import config from '../../../config/config.js';
 import { createPathResolver } from '../../../utils/path-resolver.js';
+import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
 
 // Type definitions
@@ -167,97 +175,115 @@ async function pathExists(path: string): Promise<boolean> {
  * Returns full patient details with all related lookup values.
  */
 export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets> {
-  const infos = await executeQuery<PatientInfo>(
-    `SELECT
-            p.PersonID,
-            p.PatientName,
-            p.FirstName,
-            p.LastName,
-            p.Phone,
-            p.Phone2,
-            p.Email,
-            CONVERT(varchar, p.DateofBirth, 23) as DateOfBirth,
-            p.Gender,
-            g.Gender as GenderDisplay,
-            a.Zone as Address,
-            r.Referral as ReferralSource,
-            pt.PatientType,
-            tag.Tag,
-            p.Notes,
-            p.Language,
-            p.CountryCode,
-            p.EstimatedCost,
-            p.Currency,
-            NULL as DolphinId,
-            CONVERT(varchar, p.DateAdded, 23) as DateAdded,
-            (SELECT COUNT(*) FROM dbo.tblAlerts WHERE PersonID = @PID AND IsActive = 1) as AlertCount,
-            w.StartDate,
-            alert.AlertID,
-            at.TypeName as AlertType,
-            alert.AlertDetails,
-            alert.AlertSeverity
-     FROM dbo.tblpatients p
-     LEFT JOIN dbo.tblGender g ON p.Gender = g.Gender_ID
-     LEFT JOIN dbo.tblAddress a ON p.AddressID = a.ID
-     LEFT JOIN dbo.tblReferrals r ON p.ReferralSourceID = r.ID
-     LEFT JOIN dbo.tblPatientType pt ON p.PatientTypeID = pt.ID
-     LEFT JOIN dbo.tblTagOptions tag ON p.TagID = tag.ID
-     LEFT OUTER JOIN (
-       SELECT PersonID, StartDate
-       FROM dbo.tblwork
-       WHERE Status = 1
-     ) w ON p.PersonID = w.PersonID
-     LEFT OUTER JOIN (
-       SELECT TOP 1 AlertID, PersonID, AlertTypeID, AlertDetails, AlertSeverity
-       FROM dbo.tblAlerts
-       WHERE PersonID = @PID AND IsActive = 1
-       ORDER BY AlertSeverity DESC, CreationDate DESC
-     ) alert ON p.PersonID = alert.PersonID
-     LEFT OUTER JOIN dbo.tblAlertTypes at ON alert.AlertTypeID = at.AlertTypeID
-     WHERE p.PersonID = @PID`,
-    [['PID', TYPES.Int, PID]],
-    (columns: ColumnValue[]) => ({
-      PersonID: columns[0].value as number,
-      PatientName: columns[1].value as string | null,
-      FirstName: columns[2].value as string | null,
-      LastName: columns[3].value as string | null,
-      Phone: columns[4].value as string | null,
-      Phone2: columns[5].value as string | null,
-      Email: columns[6].value as string | null,
-      DateOfBirth: columns[7].value as string | null,
-      Gender: columns[8].value as number | null,
-      GenderDisplay: columns[9].value as string | null,
-      Address: columns[10].value as string | null,
-      ReferralSource: columns[11].value as string | null,
-      PatientType: columns[12].value as string | null,
-      Tag: columns[13].value as string | null,
-      Notes: columns[14].value as string | null,
-      Language: columns[15].value as number | null,
-      CountryCode: columns[16].value as string | null,
-      EstimatedCost: columns[17].value as number | null,
-      Currency: columns[18].value as string | null,
-      DolphinId: columns[19].value as number | null,
-      DateAdded: columns[20].value as string | null,
-      AlertCount: columns[21].value as number,
-      StartDate: columns[22].value as Date | null,
-      // Legacy fields for backwards compatibility
-      name: columns[1].value as string | null,
-      phone: columns[4].value as string | null,
-      estimatedCost: columns[17].value as number | null,
-      currency: columns[18].value as string | null,
-      activeAlert: columns[23].value
-        ? {
-            alertId: columns[23].value as number,
-            alertType: columns[24].value as string,
-            alertDetails: columns[25].value as string,
-            alertSeverity: columns[26].value as number,
-          }
-        : null,
-    })
-  );
+  const row = await getKysely()
+    .selectFrom('tblpatients as p')
+    .leftJoin('tblGender as g', 'g.Gender_ID', 'p.Gender')
+    .leftJoin('tblAddress as a', 'a.ID', 'p.AddressID')
+    .leftJoin('tblReferrals as r', 'r.ID', 'p.ReferralSourceID')
+    .leftJoin('tblPatientType as pt', 'pt.ID', 'p.PatientTypeID')
+    .leftJoin('tblTagOptions as tag', 'tag.ID', 'p.TagID')
+    // First active work (Status=1); a patient can have several — executeTakeFirst keeps one.
+    .leftJoin(
+      (eb) => eb.selectFrom('tblwork').select(['PersonID', 'StartDate']).where('Status', '=', 1).as('w'),
+      (join) => join.onRef('w.PersonID', '=', 'p.PersonID')
+    )
+    // Most-severe active alert (was TOP 1 … ORDER BY AlertSeverity DESC, CreationDate DESC).
+    .leftJoin(
+      (eb) =>
+        eb
+          .selectFrom('tblAlerts')
+          .select(['AlertID', 'PersonID', 'AlertTypeID', 'AlertDetails', 'AlertSeverity'])
+          .where('PersonID', '=', PID)
+          .where('IsActive', '=', true)
+          .orderBy('AlertSeverity', 'desc')
+          .orderBy('CreationDate', 'desc')
+          .limit(1)
+          .as('alert'),
+      (join) => join.onRef('alert.PersonID', '=', 'p.PersonID')
+    )
+    .leftJoin('tblAlertTypes as at', 'at.AlertTypeID', 'alert.AlertTypeID')
+    .where('p.PersonID', '=', PID)
+    .select((eb) => [
+      'p.PersonID',
+      'p.PatientName',
+      'p.FirstName',
+      'p.LastName',
+      'p.Phone',
+      'p.Phone2',
+      'p.Email',
+      // DateofBirth is a PG `date` → the parser already returns 'YYYY-MM-DD' (was CONVERT(...,23)).
+      eb.ref('p.DateofBirth').$castTo<string>().as('DateOfBirth'),
+      'p.Gender',
+      'g.Gender as GenderDisplay',
+      'a.Zone as Address',
+      'r.Referral as ReferralSource',
+      'pt.PatientType',
+      'tag.Tag',
+      'p.Notes',
+      'p.Language',
+      'p.CountryCode',
+      'p.EstimatedCost',
+      'p.Currency',
+      sql<number | null>`null`.as('DolphinId'),
+      // DateAdded is a `timestamp`; force the date-only form the old CONVERT(...,23) produced.
+      sql<string | null>`to_char(${eb.ref('p.DateAdded')}, 'YYYY-MM-DD')`.as('DateAdded'),
+      eb
+        .selectFrom('tblAlerts')
+        .select((e) => e.fn.countAll<number>().as('c'))
+        .where('PersonID', '=', PID)
+        .where('IsActive', '=', true)
+        .as('AlertCount'),
+      'w.StartDate',
+      eb.ref('alert.AlertID').as('AlertID'),
+      'at.TypeName as AlertType',
+      eb.ref('alert.AlertDetails').as('AlertDetails'),
+      eb.ref('alert.AlertSeverity').as('AlertSeverity'),
+    ])
+    .executeTakeFirst();
 
   const assets = await getAssets(PID);
-  const patientInfo = infos[0] || ({} as PatientInfo);
+
+  const patientInfo: PatientInfo = row
+    ? {
+        PersonID: row.PersonID,
+        PatientName: row.PatientName,
+        FirstName: row.FirstName,
+        LastName: row.LastName,
+        Phone: row.Phone,
+        Phone2: row.Phone2,
+        Email: row.Email,
+        DateOfBirth: row.DateOfBirth,
+        Gender: row.Gender,
+        GenderDisplay: row.GenderDisplay,
+        Address: row.Address,
+        ReferralSource: row.ReferralSource,
+        PatientType: row.PatientType,
+        Tag: row.Tag,
+        Notes: row.Notes,
+        Language: row.Language,
+        CountryCode: row.CountryCode,
+        EstimatedCost: row.EstimatedCost,
+        Currency: row.Currency,
+        DolphinId: row.DolphinId,
+        DateAdded: row.DateAdded,
+        AlertCount: Number(row.AlertCount ?? 0),
+        StartDate: row.StartDate as Date | null,
+        // Legacy fields for backwards compatibility
+        name: row.PatientName,
+        phone: row.Phone,
+        estimatedCost: row.EstimatedCost,
+        currency: row.Currency,
+        activeAlert:
+          row.AlertID != null
+            ? {
+                alertId: row.AlertID,
+                alertType: row.AlertType as string,
+                alertDetails: row.AlertDetails as string,
+                alertSeverity: row.AlertSeverity as number,
+              }
+            : null,
+      }
+    : ({} as PatientInfo);
 
   return { ...patientInfo, ...assets };
 }
@@ -373,205 +399,153 @@ async function extractDate(metaFile: string): Promise<string | null> {
  * Retrieves patient names and phone numbers.
  */
 export function getPatientsPhones(): Promise<PatientPhone[]> {
-  return executeQuery<PatientPhone>(
-    'SELECT PersonID, PatientName, Phone FROM dbo.tblpatients',
-    [],
-    (columns: ColumnValue[]) => ({
-      id: columns[0].value as number,
-      name: columns[1].value as string,
-      phone: columns[2].value as string,
-    })
-  );
+  return getKysely()
+    .selectFrom('tblpatients')
+    .select(['PersonID as id', 'PatientName as name', 'Phone as phone'])
+    .execute() as Promise<PatientPhone[]>;
 }
 
 /**
  * Retrieves the active work ID for a given patient ID.
  */
 export async function getActiveWID(PID: number): Promise<number | null> {
-  const result = await executeQuery<number>(
-    'SELECT WorkID FROM dbo.tblwork WHERE PersonID = @PID AND Status = 1',
-    [['PID', TYPES.Int, PID]],
-    (columns: ColumnValue[]) => columns[0].value as number
-  );
-  return result[0] || null;
+  const row = await getKysely()
+    .selectFrom('tblwork')
+    .select('workid')
+    .where('PersonID', '=', PID)
+    .where('Status', '=', 1)
+    .executeTakeFirst();
+  return row?.workid ?? null;
 }
 
 /**
  * Creates a new patient record in the database.
  */
 export async function createPatient(patientData: PatientData): Promise<CreatePatientResult> {
-  const duplicateCheck = await executeQuery<{ personId: number; patientName: string }>(
-    'SELECT PersonID, PatientName FROM dbo.tblpatients WHERE PatientName = @patientName',
-    [['patientName', TYPES.NVarChar, patientData.patientName]],
-    (columns: ColumnValue[]) => ({
-      personId: columns[0].value as number,
-      patientName: columns[1].value as string,
-    })
-  );
+  const db = getKysely();
 
-  if (duplicateCheck && duplicateCheck.length > 0) {
+  // PatientName is citext → this duplicate check is case-insensitive (matches Arabic_CI_AS).
+  const duplicateCheck = await db
+    .selectFrom('tblpatients')
+    .select(['PersonID', 'PatientName'])
+    .where('PatientName', '=', patientData.patientName)
+    .execute();
+
+  if (duplicateCheck.length > 0) {
     const error = new Error(
       `A patient with the name "${patientData.patientName}" already exists.`
     ) as DuplicatePatientError;
     error.code = 'DUPLICATE_PATIENT_NAME';
-    error.existingPatientId = duplicateCheck[0].personId;
+    error.existingPatientId = duplicateCheck[0].PersonID;
     throw error;
   }
 
-  const query = `
-    INSERT INTO dbo.tblpatients (
-      PatientName, Phone, FirstName, LastName,
-      DateofBirth, Gender, Phone2, Email, AddressID,
-      ReferralSourceID, PatientTypeID, Notes,
-      Language, CountryCode, EstimatedCost, Currency
-    )
-    VALUES (
-      @patientName, @phone, @firstName, @lastName,
-      @dateOfBirth, @gender, @phone2, @email, @addressID,
-      @referralSourceID, @patientTypeID, @notes,
-      @language, @countryCode, @estimatedCost, @currency
-    );
-    SELECT SCOPE_IDENTITY() AS PersonID;
-  `;
+  const toInt = (v: string | number | undefined): number | null =>
+    v ? parseInt(String(v), 10) : null;
 
-  const parameters: SqlParam[] = [
-    ['patientName', TYPES.NVarChar, patientData.patientName],
-    ['phone', TYPES.NVarChar, patientData.phone || null],
-    ['firstName', TYPES.NVarChar, patientData.firstName || null],
-    ['lastName', TYPES.NVarChar, patientData.lastName || null],
-    ['dateOfBirth', TYPES.Date, patientData.dateOfBirth || null],
-    ['gender', TYPES.Int, patientData.gender ? parseInt(String(patientData.gender)) : null],
-    ['phone2', TYPES.NVarChar, patientData.phone2 || null],
-    ['email', TYPES.NChar, patientData.email || null],
-    ['addressID', TYPES.Int, patientData.addressID ? parseInt(String(patientData.addressID)) : null],
-    [
-      'referralSourceID',
-      TYPES.Int,
-      patientData.referralSourceID ? parseInt(String(patientData.referralSourceID)) : null,
-    ],
-    [
-      'patientTypeID',
-      TYPES.Int,
-      patientData.patientTypeID ? parseInt(String(patientData.patientTypeID)) : null,
-    ],
-    ['notes', TYPES.NVarChar, patientData.notes || null],
-    ['language', TYPES.TinyInt, patientData.language ? parseInt(String(patientData.language)) : 0],
-    ['countryCode', TYPES.NVarChar, patientData.countryCode || null],
-    [
-      'estimatedCost',
-      TYPES.Int,
-      patientData.estimatedCost ? parseInt(String(patientData.estimatedCost)) : null,
-    ],
-    ['currency', TYPES.NVarChar, patientData.currency || null],
-  ];
-
-  const result = await executeQuery<CreatePatientResult>(
-    query,
-    parameters,
-    (columns: ColumnValue[]) => ({
-      personId: columns[0]?.value as number,
+  const inserted = await db
+    .insertInto('tblpatients')
+    .values({
+      PatientName: patientData.patientName,
+      Phone: patientData.phone || null,
+      FirstName: patientData.firstName || null,
+      LastName: patientData.lastName || null,
+      DateofBirth: patientData.dateOfBirth ? toDateOnly(patientData.dateOfBirth) : null,
+      Gender: toInt(patientData.gender),
+      Phone2: patientData.phone2 || null,
+      Email: patientData.email || null,
+      AddressID: toInt(patientData.addressID),
+      ReferralSourceID: toInt(patientData.referralSourceID),
+      PatientTypeID: toInt(patientData.patientTypeID),
+      Notes: patientData.notes || null,
+      Language: patientData.language ? parseInt(String(patientData.language), 10) : 0,
+      CountryCode: patientData.countryCode || null,
+      EstimatedCost: toInt(patientData.estimatedCost),
+      Currency: patientData.currency || null,
     })
-  );
+    .returning('PersonID')
+    .executeTakeFirstOrThrow();
 
-  if (!result?.[0]) {
-    throw new Error('Failed to create patient: no ID returned');
-  }
-
-  return result[0];
+  return { personId: inserted.PersonID };
 }
 
 /**
  * Retrieves all referral sources for dropdown lists.
  */
 export function getReferralSources(): Promise<LookupItem[]> {
-  return executeQuery<LookupItem>(
-    'SELECT ID, Referral FROM dbo.tblReferrals ORDER BY Referral',
-    [],
-    (columns: ColumnValue[]) => ({
-      id: columns[0].value as number,
-      name: columns[1].value as string,
-    })
-  );
+  return getKysely()
+    .selectFrom('tblReferrals')
+    .select(['ID as id', 'Referral as name'])
+    .orderBy('Referral')
+    .execute() as Promise<LookupItem[]>;
 }
 
 /**
  * Retrieves all patient types for dropdown lists.
  */
 export function getPatientTypes(): Promise<LookupItem[]> {
-  return executeQuery<LookupItem>(
-    'SELECT ID, PatientType FROM dbo.tblPatientType ORDER BY PatientType',
-    [],
-    (columns: ColumnValue[]) => ({
-      id: columns[0].value as number,
-      name: columns[1].value as string,
-    })
-  );
+  return getKysely()
+    .selectFrom('tblPatientType')
+    .select(['ID as id', 'PatientType as name'])
+    .orderBy('PatientType')
+    .execute() as Promise<LookupItem[]>;
 }
 
 /**
  * Retrieves all addresses for dropdown lists.
  */
 export function getAddresses(): Promise<LookupItem[]> {
-  return executeQuery<LookupItem>(
-    'SELECT ID, Zone FROM dbo.tblAddress ORDER BY Zone',
-    [],
-    (columns: ColumnValue[]) => ({
-      id: columns[0].value as number,
-      name: columns[1].value as string,
-    })
-  );
+  return getKysely()
+    .selectFrom('tblAddress')
+    .select(['ID as id', 'Zone as name'])
+    .orderBy('Zone')
+    .execute() as Promise<LookupItem[]>;
 }
 
 /**
  * Retrieves all genders for dropdown lists.
  */
 export function getGenders(): Promise<LookupItem[]> {
-  return executeQuery<LookupItem>(
-    'SELECT Gender_ID, Gender FROM dbo.tblGender ORDER BY Gender',
-    [],
-    (columns: ColumnValue[]) => ({
-      id: columns[0].value as number,
-      name: columns[1].value as string,
-    })
-  );
+  return getKysely()
+    .selectFrom('tblGender')
+    .select(['Gender_ID as id', 'Gender as name'])
+    .orderBy('Gender')
+    .execute() as Promise<LookupItem[]>;
 }
 
 /**
  * Retrieves a single patient's full details by PersonID.
  */
 export async function getPatientById(personId: number): Promise<PatientDetails | null> {
-  const result = await executeQuery<PatientDetails>(
-    `SELECT p.PersonID, p.PatientName, p.FirstName, p.LastName,
-            p.Phone, p.Phone2, p.Email, p.DateofBirth, p.Gender,
-            p.AddressID, p.ReferralSourceID, p.PatientTypeID,
-            p.Notes, p.Language, p.CountryCode,
-            p.EstimatedCost, p.Currency, p.TagID, p.DateAdded
-     FROM dbo.tblpatients p
-     WHERE p.PersonID = @personId`,
-    [['personId', TYPES.Int, personId]],
-    (columns: ColumnValue[]) => ({
-      PersonID: columns[0].value as number,
-      PatientName: columns[1].value as string,
-      FirstName: columns[2].value as string | null,
-      LastName: columns[3].value as string | null,
-      Phone: columns[4].value as string | null,
-      Phone2: columns[5].value as string | null,
-      Email: columns[6].value as string | null,
-      DateofBirth: columns[7].value as Date | null,
-      Gender: columns[8].value as number | null,
-      AddressID: columns[9].value as number | null,
-      ReferralSourceID: columns[10].value as number | null,
-      PatientTypeID: columns[11].value as number | null,
-      Notes: columns[12].value as string | null,
-      Language: columns[13].value as number | null,
-      CountryCode: columns[14].value as string | null,
-      EstimatedCost: columns[15].value as number | null,
-      Currency: columns[16].value as string | null,
-      TagID: columns[17].value as number | null,
-      DateAdded: columns[18].value as Date | null,
-    })
-  );
-  return result[0] || null;
+  // NOTE: DateofBirth is a PG `date` so its runtime value is a 'YYYY-MM-DD' string
+  // (kysely-codegen still types it as Date — the declared PatientDetails.DateofBirth
+  // type is preserved). DateAdded is a `timestamp` → genuine Date. (Phase 6/7 review.)
+  const row = await getKysely()
+    .selectFrom('tblpatients as p')
+    .where('p.PersonID', '=', personId)
+    .select([
+      'p.PersonID',
+      'p.PatientName',
+      'p.FirstName',
+      'p.LastName',
+      'p.Phone',
+      'p.Phone2',
+      'p.Email',
+      'p.DateofBirth',
+      'p.Gender',
+      'p.AddressID',
+      'p.ReferralSourceID',
+      'p.PatientTypeID',
+      'p.Notes',
+      'p.Language',
+      'p.CountryCode',
+      'p.EstimatedCost',
+      'p.Currency',
+      'p.TagID',
+      'p.DateAdded',
+    ])
+    .executeTakeFirst();
+  return (row as PatientDetails | undefined) ?? null;
 }
 
 /**
@@ -581,62 +555,32 @@ export async function updatePatient(
   personId: number,
   patientData: UpdatePatientData
 ): Promise<{ success: boolean }> {
-  const query = `
-    UPDATE dbo.tblpatients
-    SET PatientName = @patientName,
-        FirstName = @firstName,
-        LastName = @lastName,
-        Phone = @phone,
-        Phone2 = @phone2,
-        Email = @email,
-        DateofBirth = @dateOfBirth,
-        Gender = @gender,
-        AddressID = @addressID,
-        ReferralSourceID = @referralSourceID,
-        PatientTypeID = @patientTypeID,
-        Notes = @notes,
-        Language = @language,
-        CountryCode = @countryCode,
-        EstimatedCost = @estimatedCost,
-        Currency = @currency,
-        TagID = @tagID
-    WHERE PersonID = @personId
-  `;
+  const toInt = (v: string | number | undefined): number | null =>
+    v ? parseInt(String(v), 10) : null;
 
-  const parameters: SqlParam[] = [
-    ['personId', TYPES.Int, personId],
-    ['patientName', TYPES.NVarChar, patientData.PatientName],
-    ['firstName', TYPES.NVarChar, patientData.FirstName || null],
-    ['lastName', TYPES.NVarChar, patientData.LastName || null],
-    ['phone', TYPES.NVarChar, patientData.Phone || null],
-    ['phone2', TYPES.NVarChar, patientData.Phone2 || null],
-    ['email', TYPES.NChar, patientData.Email || null],
-    ['dateOfBirth', TYPES.Date, patientData.DateofBirth || null],
-    ['gender', TYPES.Int, patientData.Gender ? parseInt(String(patientData.Gender)) : null],
-    ['addressID', TYPES.Int, patientData.AddressID ? parseInt(String(patientData.AddressID)) : null],
-    [
-      'referralSourceID',
-      TYPES.Int,
-      patientData.ReferralSourceID ? parseInt(String(patientData.ReferralSourceID)) : null,
-    ],
-    [
-      'patientTypeID',
-      TYPES.Int,
-      patientData.PatientTypeID ? parseInt(String(patientData.PatientTypeID)) : null,
-    ],
-    ['notes', TYPES.NVarChar, patientData.Notes || null],
-    ['language', TYPES.TinyInt, patientData.Language ? parseInt(String(patientData.Language)) : 0],
-    ['countryCode', TYPES.NVarChar, patientData.CountryCode || null],
-    [
-      'estimatedCost',
-      TYPES.Int,
-      patientData.EstimatedCost ? parseInt(String(patientData.EstimatedCost)) : null,
-    ],
-    ['currency', TYPES.NVarChar, patientData.Currency || null],
-    ['tagID', TYPES.Int, patientData.TagID ? parseInt(String(patientData.TagID)) : null],
-  ];
-
-  await executeQuery(query, parameters, () => ({}));
+  await getKysely()
+    .updateTable('tblpatients')
+    .set({
+      PatientName: patientData.PatientName,
+      FirstName: patientData.FirstName || null,
+      LastName: patientData.LastName || null,
+      Phone: patientData.Phone || null,
+      Phone2: patientData.Phone2 || null,
+      Email: patientData.Email || null,
+      DateofBirth: patientData.DateofBirth ? toDateOnly(patientData.DateofBirth) : null,
+      Gender: toInt(patientData.Gender),
+      AddressID: toInt(patientData.AddressID),
+      ReferralSourceID: toInt(patientData.ReferralSourceID),
+      PatientTypeID: toInt(patientData.PatientTypeID),
+      Notes: patientData.Notes || null,
+      Language: patientData.Language ? parseInt(String(patientData.Language), 10) : 0,
+      CountryCode: patientData.CountryCode || null,
+      EstimatedCost: toInt(patientData.EstimatedCost),
+      Currency: patientData.Currency || null,
+      TagID: toInt(patientData.TagID),
+    })
+    .where('PersonID', '=', personId)
+    .execute();
   return { success: true };
 }
 
@@ -647,19 +591,14 @@ export async function deletePatient(personId: number): Promise<{ success: boolea
   try {
     // All child + parent rows are removed in a single transaction so a
     // mid-cascade failure rolls back fully — no FK orphans / half-deleted patient.
-    await withTransaction(async (tx) => {
-      // Children before parent, batched into a single round-trip. The
-      // surrounding transaction still makes it all-or-nothing.
-      await new sql.Request(tx)
-        .input('personId', TYPES.Int, personId)
-        .query(`
-          DELETE FROM dbo.tblwork WHERE PersonID = @personId;
-          DELETE FROM dbo.tblCarriedWires WHERE PersonID = @personId;
-          DELETE FROM dbo.tblWaiting WHERE PersonID = @personId;
-          DELETE FROM dbo.tblappointments WHERE PersonID = @personId;
-          DELETE FROM dbo.tblscrews WHERE PersonID = @personId;
-          DELETE FROM dbo.tblpatients WHERE PersonID = @personId;
-        `);
+    // Children before parent, matching the original delete order.
+    await withPgTransaction(async (trx) => {
+      await trx.deleteFrom('tblwork').where('PersonID', '=', personId).execute();
+      await trx.deleteFrom('tblCarriedWires').where('PersonID', '=', personId).execute();
+      await trx.deleteFrom('tblWaiting').where('PersonID', '=', personId).execute();
+      await trx.deleteFrom('tblappointments').where('PersonID', '=', personId).execute();
+      await trx.deleteFrom('tblscrews').where('PersonID', '=', personId).execute();
+      await trx.deleteFrom('tblpatients').where('PersonID', '=', personId).execute();
     });
 
     return { success: true };
@@ -676,20 +615,26 @@ export async function getPatientNoWorkReceiptData(
   patientId: number
 ): Promise<NoWorkReceiptData | null> {
   try {
-    const result = await executeQuery<NoWorkReceiptData>(
-      `SELECT PersonID, PatientName, Phone, AppDate
-       FROM dbo.V_rptNoWork
-       WHERE PersonID = @patientId`,
-      [['patientId', TYPES.Int, patientId]],
-      (columns: ColumnValue[]) => ({
-        PersonID: columns[0].value as number,
-        PatientName: columns[1].value as string,
-        Phone: columns[2].value as string | null,
-        AppDate: columns[3].value as Date | null,
-      })
-    );
+    // Inlined V_rptNoWork → VLastApp: AppDate is the patient's latest FUTURE appointment
+    // (max AppDate filtered to > local now), or NULL. For a single patient this equals
+    // the view's "max-over-all-appts where that max is in the future" semantics.
+    const row = await getKysely()
+      .selectFrom('tblpatients as p')
+      .where('p.PersonID', '=', patientId)
+      .select((eb) => [
+        'p.PersonID',
+        'p.PatientName',
+        'p.Phone',
+        eb
+          .selectFrom('tblappointments as a')
+          .whereRef('a.PersonID', '=', 'p.PersonID')
+          .where('a.AppDate', '>', sql<Date>`localtimestamp`)
+          .select((e) => e.fn.max('a.AppDate').as('m'))
+          .as('AppDate'),
+      ])
+      .executeTakeFirst();
 
-    return result && result.length > 0 ? result[0] : null;
+    return (row as NoWorkReceiptData | undefined) ?? null;
   } catch (error) {
     log.error('[PATIENT-QUERIES] Error getting no-work receipt data', { patientId, error: (error as Error).message });
     throw error;
@@ -701,15 +646,15 @@ export async function getPatientNoWorkReceiptData(
  */
 export async function hasNextAppointment(patientId: number): Promise<boolean> {
   try {
-    const result = await executeQuery<{ count: number }>(
-      `SELECT COUNT(*) as count
-       FROM dbo.V_rptNoWork
-       WHERE PersonID = @patientId AND AppDate IS NOT NULL`,
-      [['patientId', TYPES.Int, patientId]],
-      (columns: ColumnValue[]) => ({ count: columns[0].value as number })
-    );
+    // Inlined V_rptNoWork: "AppDate IS NOT NULL" ⟺ the patient has a future appointment.
+    const row = await getKysely()
+      .selectFrom('tblappointments as a')
+      .where('a.PersonID', '=', patientId)
+      .where('a.AppDate', '>', sql<Date>`localtimestamp`)
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .executeTakeFirst();
 
-    return result && result.length > 0 && result[0].count > 0;
+    return Number(row?.count ?? 0) > 0;
   } catch (error) {
     log.error('[PATIENT-QUERIES] Error checking appointment', { patientId, error: (error as Error).message });
     throw error;

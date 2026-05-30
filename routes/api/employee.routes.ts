@@ -8,7 +8,14 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import * as database from '../../services/database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../../services/database/kysely.js';
+import {
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+  employeeEmailExists,
+} from '../../services/database/queries/employee-queries.js';
 import { ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 
@@ -84,62 +91,45 @@ interface EmployeeParams {
 router.get('/employees', async (req: Request<object, object, object, EmployeeQuery>, res: Response): Promise<void> => {
   try {
     const { getAppointments, receiveEmail, percentage, position } = req.query;
+    const db = getKysely();
 
-    // Build WHERE clause conditions
-    const conditions: string[] = [];
+    // Build WHERE clause conditions as composable SQL fragments
+    const conditions = [];
 
     if (getAppointments === 'true') {
-      conditions.push('e.getAppointments = 1');
+      conditions.push(sql`e."getAppointments" = true`);
     }
 
     if (receiveEmail === 'true') {
-      conditions.push('e.receiveEmail = 1');
-      conditions.push('e.Email IS NOT NULL');
-      conditions.push("e.Email != ''");
+      conditions.push(sql`e."receiveEmail" = true`);
+      conditions.push(sql`e."Email" IS NOT NULL`);
+      conditions.push(sql`e."Email" != ''`);
     }
 
     if (percentage === 'true') {
-      conditions.push('e.Percentage = 1');
+      conditions.push(sql`e."Percentage" = true`);
     }
 
     if (position) {
       // Support filtering by position name or ID
       if (isNaN(Number(position))) {
-        conditions.push(`p.PositionName = '${position.replace(/'/g, "''")}'`);
+        conditions.push(sql`p."PositionName" = ${position}`);
       } else {
-        conditions.push(`e.Position = ${parseInt(position)}`);
+        conditions.push(sql`e."Position" = ${parseInt(position)}`);
       }
     }
 
     const whereClause = conditions.length > 0
-      ? `WHERE ${conditions.join(' AND ')}`
-      : '';
+      ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
+      : sql``;
 
-    const query = `
-      SELECT e.ID, e.employeeName, e.Position, p.PositionName, e.Email, e.Phone, e.Percentage, e.receiveEmail, e.getAppointments, e.SortOrder, e.AppointmentColor
-      FROM tblEmployees e
-      LEFT JOIN tblPositions p ON e.Position = p.ID
+    const { rows: employees } = await sql<Employee>`
+      SELECT e."ID", e."employeeName", e."Position", p."PositionName", e."Email", e."Phone", e."Percentage", e."receiveEmail", e."getAppointments", e."SortOrder", e."AppointmentColor"
+      FROM "tblEmployees" e
+      LEFT JOIN "tblPositions" p ON e."Position" = p."ID"
       ${whereClause}
-      ORDER BY e.SortOrder, e.employeeName
-    `;
-
-    const employees = await database.executeQuery<Employee>(
-      query,
-      [],
-      (columns) => ({
-        ID: columns[0].value as number,
-        employeeName: columns[1].value as string,
-        Position: columns[2].value as number,
-        PositionName: columns[3].value as string | null,
-        Email: columns[4].value as string | null,
-        Phone: columns[5].value as string | null,
-        Percentage: columns[6].value as boolean,
-        receiveEmail: columns[7].value as boolean,
-        getAppointments: columns[8].value as boolean,
-        SortOrder: columns[9].value as number,
-        AppointmentColor: columns[10].value as string | null
-      })
-    );
+      ORDER BY e."SortOrder", e."employeeName"
+    `.execute(db);
 
     res.json({
       success: true,
@@ -158,20 +148,12 @@ router.get('/employees', async (req: Request<object, object, object, EmployeeQue
  */
 router.get('/positions', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const query = `
-      SELECT ID, PositionName
-      FROM tblPositions
-      ORDER BY PositionName
-    `;
-
-    const positions = await database.executeQuery<Position>(
-      query,
-      [],
-      (columns) => ({
-        ID: columns[0].value as number,
-        PositionName: columns[1].value as string
-      })
-    );
+    const db = getKysely();
+    const { rows: positions } = await sql<Position>`
+      SELECT "ID", "PositionName"
+      FROM "tblPositions"
+      ORDER BY "PositionName"
+    `.execute(db);
 
     res.json({
       success: true,
@@ -204,45 +186,23 @@ router.post('/employees', async (req: Request<object, object, EmployeeBody>, res
 
     // Check if email already exists (if provided)
     if (Email && Email.trim() !== '') {
-      const emailCheck = await database.executeQuery<number>(
-        'SELECT ID FROM tblEmployees WHERE Email = @email',
-        [['email', database.TYPES.NVarChar, Email.trim()]],
-        (columns) => columns[0].value as number
-      );
-
-      if (emailCheck && emailCheck.length > 0) {
+      if (await employeeEmailExists(Email.trim())) {
         ErrorResponses.badRequest(res, 'An employee with this email already exists');
         return;
       }
     }
 
-    const insertQuery = `
-      DECLARE @OutputTable TABLE (ID INT);
-
-      INSERT INTO tblEmployees (employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments, SortOrder, AppointmentColor)
-      OUTPUT INSERTED.ID INTO @OutputTable
-      VALUES (@name, @position, @email, @phone, @percentage, @receiveEmail, @getAppointments, @sortOrder, @appointmentColor);
-
-      SELECT ID FROM @OutputTable;
-    `;
-
-    const result = await database.executeQuery<number>(
-      insertQuery,
-      [
-        ['name', database.TYPES.NVarChar, employeeName.trim()],
-        ['position', database.TYPES.Int, Position],
-        ['email', database.TYPES.NVarChar, Email && Email.trim() !== '' ? Email.trim() : null],
-        ['phone', database.TYPES.NVarChar, Phone && Phone.trim() !== '' ? Phone.trim() : null],
-        ['percentage', database.TYPES.Bit, Percentage ? 1 : 0],
-        ['receiveEmail', database.TYPES.Bit, receiveEmail ? 1 : 0],
-        ['getAppointments', database.TYPES.Bit, getAppointments ? 1 : 0],
-        ['sortOrder', database.TYPES.Int, SortOrder !== undefined ? SortOrder : 999],
-        ['appointmentColor', database.TYPES.NVarChar, AppointmentColor && AppointmentColor.trim() !== '' ? AppointmentColor.trim() : null]
-      ],
-      (columns) => columns[0].value as number
-    );
-
-    const newID = result && result.length > 0 ? result[0] : null;
+    const newID = await createEmployee({
+      employeeName: employeeName.trim(),
+      Position,
+      Email: Email && Email.trim() !== '' ? Email.trim() : null,
+      Phone: Phone && Phone.trim() !== '' ? Phone.trim() : null,
+      Percentage: !!Percentage,
+      receiveEmail: !!receiveEmail,
+      getAppointments: !!getAppointments,
+      SortOrder: SortOrder !== undefined ? SortOrder : 999,
+      AppointmentColor: AppointmentColor && AppointmentColor.trim() !== '' ? AppointmentColor.trim() : null,
+    });
 
     res.json({
       success: true,
@@ -277,50 +237,23 @@ router.put('/employees/:id', async (req: Request<EmployeeParams, object, Employe
 
     // Check if email already exists for another employee (if provided)
     if (Email && Email.trim() !== '') {
-      const emailCheck = await database.executeQuery<number>(
-        'SELECT ID FROM tblEmployees WHERE Email = @email AND ID != @id',
-        [
-          ['email', database.TYPES.NVarChar, Email.trim()],
-          ['id', database.TYPES.Int, parseInt(id)]
-        ],
-        (columns) => columns[0].value as number
-      );
-
-      if (emailCheck && emailCheck.length > 0) {
+      if (await employeeEmailExists(Email.trim(), parseInt(id))) {
         ErrorResponses.badRequest(res, 'Another employee with this email already exists');
         return;
       }
     }
 
-    const updateQuery = `
-      UPDATE tblEmployees
-      SET employeeName = @name,
-          Position = @position,
-          Email = @email,
-          Phone = @phone,
-          Percentage = @percentage,
-          receiveEmail = @receiveEmail,
-          getAppointments = @getAppointments,
-          SortOrder = @sortOrder,
-          AppointmentColor = @appointmentColor
-      WHERE ID = @id
-    `;
-
-    await database.executeQuery(
-      updateQuery,
-      [
-        ['name', database.TYPES.NVarChar, employeeName.trim()],
-        ['position', database.TYPES.Int, Position],
-        ['email', database.TYPES.NVarChar, Email && Email.trim() !== '' ? Email.trim() : null],
-        ['phone', database.TYPES.NVarChar, Phone && Phone.trim() !== '' ? Phone.trim() : null],
-        ['percentage', database.TYPES.Bit, Percentage ? 1 : 0],
-        ['receiveEmail', database.TYPES.Bit, receiveEmail ? 1 : 0],
-        ['getAppointments', database.TYPES.Bit, getAppointments ? 1 : 0],
-        ['sortOrder', database.TYPES.Int, SortOrder !== undefined ? SortOrder : 999],
-        ['appointmentColor', database.TYPES.NVarChar, AppointmentColor && AppointmentColor.trim() !== '' ? AppointmentColor.trim() : null],
-        ['id', database.TYPES.Int, parseInt(id)]
-      ]
-    );
+    await updateEmployee(parseInt(id), {
+      employeeName: employeeName.trim(),
+      Position,
+      Email: Email && Email.trim() !== '' ? Email.trim() : null,
+      Phone: Phone && Phone.trim() !== '' ? Phone.trim() : null,
+      Percentage: !!Percentage,
+      receiveEmail: !!receiveEmail,
+      getAppointments: !!getAppointments,
+      SortOrder: SortOrder !== undefined ? SortOrder : 999,
+      AppointmentColor: AppointmentColor && AppointmentColor.trim() !== '' ? AppointmentColor.trim() : null,
+    });
 
     res.json({
       success: true,
@@ -341,12 +274,7 @@ router.delete('/employees/:id', async (req: Request<EmployeeParams>, res: Respon
   try {
     const { id } = req.params;
 
-    const deleteQuery = 'DELETE FROM tblEmployees WHERE ID = @id';
-
-    await database.executeQuery(
-      deleteQuery,
-      [['id', database.TYPES.Int, parseInt(id)]]
-    );
+    await deleteEmployee(parseInt(id));
 
     res.json({
       success: true,

@@ -6,14 +6,17 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import {
-  executeStoredProcedure,
-  executeQuery,
-  TYPES,
-  type SqlParam
-} from '../services/database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../services/database/kysely.js';
 import { log } from '../utils/logger.js';
 import { getHolidaysInRange } from '../services/database/queries/holiday-queries.js';
+import {
+  getWeeklyCalendarSlots,
+  getCalendarStats,
+  getCalendarDay,
+  ensureCalendarRange,
+  fillCalendar,
+} from '../services/database/queries/calendar-queries.js';
 
 const router = Router();
 
@@ -48,25 +51,6 @@ interface CalendarSlotData {
   personID: number | null;
   slotStatus: string;
   appointmentCount: number;
-}
-
-interface DayAppointment {
-  appointmentID: number;
-  appDetail: string;
-  drID: number;
-  patientName: string;
-  appDate: Date;
-  appTime: string;
-}
-
-interface CalendarStats {
-  weekStart: string;
-  weekEnd: string;
-  totalSlots: number;
-  availableSlots: number;
-  bookedSlots: number;
-  pastSlots: number;
-  utilizationPercent: number;
 }
 
 interface TimeSlot {
@@ -161,62 +145,33 @@ router.get(
       );
 
       // Fetch max appointments per slot setting
-      const maxAppointmentsSetting = await executeQuery<string>(
-        'SELECT OptionValue FROM tbloptions WHERE OptionName = @OptionName',
-        [['OptionName', TYPES.NVarChar, 'MaxAppointmentsPerSlot']],
-        (columns) => columns[0].value as string
-      );
+      const db = getKysely();
+      const { rows: maxAppointmentsSetting } = await sql<{ OptionValue: string | null }>`
+        SELECT "OptionValue" FROM "tbloptions" WHERE "OptionName" = ${'MaxAppointmentsPerSlot'}
+      `.execute(db);
       const maxAppointmentsPerSlot =
-        maxAppointmentsSetting.length > 0
-          ? parseInt(maxAppointmentsSetting[0], 10)
+        maxAppointmentsSetting.length > 0 && maxAppointmentsSetting[0].OptionValue != null
+          ? parseInt(maxAppointmentsSetting[0].OptionValue, 10)
           : 3; // Default to 3 if not set
 
       log.info(`⚙️ Max appointments per slot: ${maxAppointmentsPerSlot}`);
 
       // Ensure calendar has enough future dates
-      await executeStoredProcedure('ProcEnsureCalendarRange', [
-        ['DaysAhead', TYPES.Int, 60]
-      ]);
+      await ensureCalendarRange(60);
 
-      // Build stored procedure parameters
-      const params: SqlParam[] = [
-        ['StartDate', TYPES.Date, weekStart],
-        ['EndDate', TYPES.Date, weekEnd]
-      ];
-
-      // Add optional doctor filter parameter
-      if (doctorId) {
-        params.push(['DoctorID', TYPES.Int, parseInt(doctorId, 10)]);
-      }
-
-      // Fetch calendar data using optimized procedure with optional filter
-      const calendarData = await executeStoredProcedure<CalendarSlotData>(
-        'ProcWeeklyCalendarOptimized',
-        params,
-        undefined,
-        (columns) => ({
-          slotDateTime: columns[0].value as string,
-          calendarDate: columns[1].value as string,
-          dayName: columns[2].value as string,
-          dayOfWeek: columns[3].value as number,
-          appointmentID: columns[4].value as number | null,
-          appDetail: columns[5].value as string | null,
-          drID: columns[6].value as number | null,
-          patientName: columns[7].value as string | null,
-          personID: columns[8].value as number | null,
-          slotStatus: columns[9].value as string,
-          appointmentCount: columns[10].value as number
-        })
+      // Fetch calendar data using optimized query with optional doctor filter
+      const calendarData = await getWeeklyCalendarSlots(
+        weekStart,
+        weekEnd,
+        doctorId ? parseInt(doctorId, 10) : null
       );
 
       // Fetch holidays for the week
       const holidays = await getHolidaysInRange(weekStart, weekEnd);
       const holidayMap = new Map<string, Holiday>(
         holidays.map((h) => {
-          const dateStr =
-            h.Holidaydate instanceof Date
-              ? formatLocalDate(h.Holidaydate)
-              : String(h.Holidaydate).split('T')[0];
+          // Holidaydate arrives as a 'YYYY-MM-DD' string from the pg date parser.
+          const dateStr = String(h.Holidaydate).split('T')[0];
           return [dateStr, h] as [string, Holiday];
         })
       );
@@ -288,62 +243,33 @@ router.get(
       );
 
       // Fetch max appointments per slot setting
-      const maxAppointmentsSetting = await executeQuery<string>(
-        'SELECT OptionValue FROM tbloptions WHERE OptionName = @OptionName',
-        [['OptionName', TYPES.NVarChar, 'MaxAppointmentsPerSlot']],
-        (columns) => columns[0].value as string
-      );
+      const db = getKysely();
+      const { rows: maxAppointmentsSetting } = await sql<{ OptionValue: string | null }>`
+        SELECT "OptionValue" FROM "tbloptions" WHERE "OptionName" = ${'MaxAppointmentsPerSlot'}
+      `.execute(db);
       const maxAppointmentsPerSlot =
-        maxAppointmentsSetting.length > 0
-          ? parseInt(maxAppointmentsSetting[0], 10)
+        maxAppointmentsSetting.length > 0 && maxAppointmentsSetting[0].OptionValue != null
+          ? parseInt(maxAppointmentsSetting[0].OptionValue, 10)
           : 3;
 
       log.info(`⚙️ Max appointments per slot: ${maxAppointmentsPerSlot}`);
 
       // Ensure calendar has enough future dates
-      await executeStoredProcedure('ProcEnsureCalendarRange', [
-        ['DaysAhead', TYPES.Int, 90]
-      ]);
+      await ensureCalendarRange(90);
 
-      // Build stored procedure parameters
-      const params: SqlParam[] = [
-        ['StartDate', TYPES.Date, gridStart],
-        ['EndDate', TYPES.Date, gridEnd]
-      ];
-
-      // Add optional doctor filter parameter
-      if (doctorId) {
-        params.push(['DoctorID', TYPES.Int, parseInt(doctorId, 10)]);
-      }
-
-      // Fetch calendar data using optimized procedure
-      const calendarData = await executeStoredProcedure<CalendarSlotData>(
-        'ProcWeeklyCalendarOptimized',
-        params,
-        undefined,
-        (columns) => ({
-          slotDateTime: columns[0].value as string,
-          calendarDate: columns[1].value as string,
-          dayName: columns[2].value as string,
-          dayOfWeek: columns[3].value as number,
-          appointmentID: columns[4].value as number | null,
-          appDetail: columns[5].value as string | null,
-          drID: columns[6].value as number | null,
-          patientName: columns[7].value as string | null,
-          personID: columns[8].value as number | null,
-          slotStatus: columns[9].value as string,
-          appointmentCount: columns[10].value as number
-        })
+      // Fetch calendar data using optimized query with optional doctor filter
+      const calendarData = await getWeeklyCalendarSlots(
+        gridStart,
+        gridEnd,
+        doctorId ? parseInt(doctorId, 10) : null
       );
 
       // Fetch holidays for the grid range
       const holidays = await getHolidaysInRange(gridStart, gridEnd);
       const holidayMap = new Map<string, Holiday>(
         holidays.map((h) => {
-          const dateStr =
-            h.Holidaydate instanceof Date
-              ? formatLocalDate(h.Holidaydate)
-              : String(h.Holidaydate).split('T')[0];
+          // Holidaydate arrives as a 'YYYY-MM-DD' string from the pg date parser.
+          const dateStr = String(h.Holidaydate).split('T')[0];
           return [dateStr, h] as [string, Holiday];
         })
       );
@@ -411,31 +337,15 @@ router.get(
         `📊 Fetching calendar stats for week: ${weekStart} to ${weekEnd}`
       );
 
-      const stats = await executeStoredProcedure<CalendarStats>(
-        'ProcCalendarStatsOptimized',
-        [
-          ['StartDate', TYPES.Date, weekStart],
-          ['EndDate', TYPES.Date, weekEnd]
-        ],
-        undefined,
-        (columns) => ({
-          weekStart: columns[0].value as string,
-          weekEnd: columns[1].value as string,
-          totalSlots: columns[2].value as number,
-          availableSlots: columns[3].value as number,
-          bookedSlots: columns[4].value as number,
-          pastSlots: columns[5].value as number,
-          utilizationPercent: columns[6].value as number
-        })
-      );
+      const stats = await getCalendarStats(weekStart, weekEnd);
 
       log.info(
-        `✅ Calendar stats retrieved: ${stats[0]?.utilizationPercent}% utilization`
+        `✅ Calendar stats retrieved: ${stats?.utilizationPercent}% utilization`
       );
 
       res.json({
         success: true,
-        stats: stats[0] || {
+        stats: stats || {
           weekStart,
           weekEnd,
           totalSlots: 0,
@@ -466,15 +376,15 @@ router.get(
     try {
       log.info('🕐 Fetching time slots from tbltimes');
 
-      const timeSlots = await executeQuery<TimeSlot>(
-        'SELECT TimeID, MyTime FROM tbltimes ORDER BY TimeID',
-        [],
-        (columns) => ({
-          timeID: columns[0].value as number,
-          timeSlot: columns[1].value as string,
-          formattedTime: formatTimeForDisplay(columns[1].value)
-        })
-      );
+      const db = getKysely();
+      const { rows } = await sql<{ TimeID: number; MyTime: string | null }>`
+        SELECT "TimeID", "MyTime" FROM "tbltimes" ORDER BY "TimeID"
+      `.execute(db);
+      const timeSlots: TimeSlot[] = rows.map((row) => ({
+        timeID: row.TimeID,
+        timeSlot: row.MyTime as string,
+        formattedTime: formatTimeForDisplay(row.MyTime)
+      }));
 
       log.info(`✅ Retrieved ${timeSlots.length} time slots`);
 
@@ -517,20 +427,8 @@ router.get(
         `📅 Fetching day appointments for: ${targetDate.toISOString().split('T')[0]}`
       );
 
-      // Use existing ProcDay for single day compatibility
-      const dayAppointments = await executeStoredProcedure<DayAppointment>(
-        'ProcDay',
-        [['AppDate', TYPES.Date, targetDate.toISOString().split('T')[0]]],
-        undefined,
-        (columns) => ({
-          appointmentID: columns[0].value as number,
-          appDetail: columns[1].value as string,
-          drID: columns[2].value as number,
-          patientName: columns[3].value as string,
-          appDate: columns[4].value as Date,
-          appTime: columns[5].value as string
-        })
-      );
+      // Single-day appointments (was ProcDay)
+      const dayAppointments = await getCalendarDay(targetDate.toISOString().split('T')[0]);
 
       log.info(
         `✅ Retrieved ${dayAppointments.length} appointments for ${date}`
@@ -564,16 +462,9 @@ router.post(
     try {
       log.info('🔄 Regenerating calendar entries...');
 
-      const result = await executeStoredProcedure<{ DaysAdded: number }>(
-        'FillCalender',
-        [],
-        undefined,
-        (columns) => ({
-          DaysAdded: columns[0].value as number
-        })
-      );
+      const result = await fillCalendar();
 
-      const daysAdded = result[0]?.DaysAdded || 0;
+      const daysAdded = result.DaysAdded || 0;
       log.info(`✅ Calendar regeneration complete: ${daysAdded} entries added`);
 
       res.json({
@@ -609,26 +500,13 @@ router.post(
 
       log.info(`🔄 Ensuring calendar range: ${daysAhead} days ahead`);
 
-      const result = await executeStoredProcedure<{
-        status: string;
-        previousMaxDate: string;
-        newMaxDate: string;
-      }>(
-        'ProcEnsureCalendarRange',
-        [['DaysAhead', TYPES.Int, daysAhead]],
-        undefined,
-        (columns) => ({
-          status: columns[0].value as string,
-          previousMaxDate: columns[1].value as string,
-          newMaxDate: columns[2].value as string
-        })
-      );
+      const result = await ensureCalendarRange(daysAhead);
 
-      log.info(`✅ Calendar range check completed: ${result[0]?.status}`);
+      log.info(`✅ Calendar range check completed: ${result?.status}`);
 
       res.json({
         success: true,
-        result: result[0] || { status: 'No update needed' }
+        result: result || { status: 'No update needed' }
       });
     } catch (error) {
       log.error('❌ Calendar range API error:', error);
@@ -665,43 +543,20 @@ router.get(
       log.info(`🕐 Fetching all slots with details for: ${date}`);
 
       // Fetch max appointments per slot setting
-      const maxAppointmentsSetting = await executeQuery<string>(
-        'SELECT OptionValue FROM tbloptions WHERE OptionName = @OptionName',
-        [['OptionName', TYPES.NVarChar, 'MaxAppointmentsPerSlot']],
-        (columns) => columns[0].value as string
-      );
+      const db = getKysely();
+      const { rows: maxAppointmentsSetting } = await sql<{ OptionValue: string | null }>`
+        SELECT "OptionValue" FROM "tbloptions" WHERE "OptionName" = ${'MaxAppointmentsPerSlot'}
+      `.execute(db);
       const maxAppointmentsPerSlot =
-        maxAppointmentsSetting.length > 0
-          ? parseInt(maxAppointmentsSetting[0], 10)
+        maxAppointmentsSetting.length > 0 && maxAppointmentsSetting[0].OptionValue != null
+          ? parseInt(maxAppointmentsSetting[0].OptionValue, 10)
           : 3;
 
       // Ensure calendar has enough future dates
-      await executeStoredProcedure('ProcEnsureCalendarRange', [
-        ['DaysAhead', TYPES.Int, 60]
-      ]);
+      await ensureCalendarRange(60);
 
       // Fetch calendar data for the single day
-      const calendarData = await executeStoredProcedure<CalendarSlotData>(
-        'ProcWeeklyCalendarOptimized',
-        [
-          ['StartDate', TYPES.Date, date],
-          ['EndDate', TYPES.Date, date]
-        ],
-        undefined,
-        (columns) => ({
-          slotDateTime: columns[0].value as string,
-          calendarDate: columns[1].value as string,
-          dayName: columns[2].value as string,
-          dayOfWeek: columns[3].value as number,
-          appointmentID: columns[4].value as number | null,
-          appDetail: columns[5].value as string | null,
-          drID: columns[6].value as number | null,
-          patientName: columns[7].value as string | null,
-          personID: columns[8].value as number | null,
-          slotStatus: columns[9].value as string,
-          appointmentCount: columns[10].value as number
-        })
-      );
+      const calendarData = await getWeeklyCalendarSlots(date, date, null);
 
       // Transform data to get all slots with full details
       const structuredData = transformToCalendarStructure(
@@ -793,43 +648,20 @@ router.get(
       );
 
       // Fetch max appointments per slot setting
-      const maxAppointmentsSetting = await executeQuery<string>(
-        'SELECT OptionValue FROM tbloptions WHERE OptionName = @OptionName',
-        [['OptionName', TYPES.NVarChar, 'MaxAppointmentsPerSlot']],
-        (columns) => columns[0].value as string
-      );
+      const db = getKysely();
+      const { rows: maxAppointmentsSetting } = await sql<{ OptionValue: string | null }>`
+        SELECT "OptionValue" FROM "tbloptions" WHERE "OptionName" = ${'MaxAppointmentsPerSlot'}
+      `.execute(db);
       const maxAppointmentsPerSlot =
-        maxAppointmentsSetting.length > 0
-          ? parseInt(maxAppointmentsSetting[0], 10)
+        maxAppointmentsSetting.length > 0 && maxAppointmentsSetting[0].OptionValue != null
+          ? parseInt(maxAppointmentsSetting[0].OptionValue, 10)
           : 3;
 
       // Ensure calendar has enough future dates
-      await executeStoredProcedure('ProcEnsureCalendarRange', [
-        ['DaysAhead', TYPES.Int, 60]
-      ]);
+      await ensureCalendarRange(60);
 
       // Fetch calendar data for the date range
-      const calendarData = await executeStoredProcedure<CalendarSlotData>(
-        'ProcWeeklyCalendarOptimized',
-        [
-          ['StartDate', TYPES.Date, startDate],
-          ['EndDate', TYPES.Date, endDate]
-        ],
-        undefined,
-        (columns) => ({
-          slotDateTime: columns[0].value as string,
-          calendarDate: columns[1].value as string,
-          dayName: columns[2].value as string,
-          dayOfWeek: columns[3].value as number,
-          appointmentID: columns[4].value as number | null,
-          appDetail: columns[5].value as string | null,
-          drID: columns[6].value as number | null,
-          patientName: columns[7].value as string | null,
-          personID: columns[8].value as number | null,
-          slotStatus: columns[9].value as string,
-          appointmentCount: columns[10].value as number
-        })
-      );
+      const calendarData = await getWeeklyCalendarSlots(startDate, endDate, null);
 
       // Fetch holidays for the date range
       const holidays = await getHolidaysInRange(startDate, endDate);
@@ -838,10 +670,8 @@ router.get(
         { id: number; name: string; description: string | null }
       > = {};
       holidays.forEach((h) => {
-        const dateStr =
-          h.Holidaydate instanceof Date
-            ? formatLocalDate(h.Holidaydate)
-            : String(h.Holidaydate).split('T')[0];
+        // Holidaydate arrives as a 'YYYY-MM-DD' string from the pg date parser.
+        const dateStr = String(h.Holidaydate).split('T')[0];
         holidayMap[dateStr] = {
           id: h.ID,
           name: h.HolidayName,

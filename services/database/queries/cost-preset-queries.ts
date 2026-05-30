@@ -3,9 +3,13 @@
  *
  * Provides CRUD operations for managing estimated cost preset values
  * that are displayed in dropdowns for faster data entry.
+ *
+ * Migration Phase 4: translated to typed Kysely (PostgreSQL). `Amount` is a PG
+ * `numeric`; the centralized pg parser (kysely.ts) returns it as a JS number, so
+ * `$castTo<number>()` aligns the static type (kysely-codegen types numeric as string)
+ * with the runtime value without emitting a SQL cast.
  */
-import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery, TYPES, SqlParam } from '../index.js';
+import { getKysely } from '../kysely.js';
 
 // Type definitions
 interface CostPreset {
@@ -19,23 +23,16 @@ interface CostPreset {
  * Get all cost presets, optionally filtered by currency
  */
 export async function getCostPresets(currency: string | null = null): Promise<CostPreset[]> {
-  const query = currency
-    ? `SELECT PresetID, Amount, Currency, DisplayOrder
-       FROM dbo.tblEstimatedCostPresets
-       WHERE Currency = @currency
-       ORDER BY DisplayOrder, Amount`
-    : `SELECT PresetID, Amount, Currency, DisplayOrder
-       FROM dbo.tblEstimatedCostPresets
-       ORDER BY Currency, DisplayOrder, Amount`;
+  const db = getKysely();
+  let q = db
+    .selectFrom('tblEstimatedCostPresets')
+    .select((eb) => ['PresetID', eb.ref('Amount').$castTo<number>().as('Amount'), 'Currency', 'DisplayOrder']);
 
-  const parameters: SqlParam[] = currency ? [['currency', TYPES.NVarChar, currency]] : [];
+  q = currency
+    ? q.where('Currency', '=', currency).orderBy('DisplayOrder').orderBy('Amount')
+    : q.orderBy('Currency').orderBy('DisplayOrder').orderBy('Amount');
 
-  return executeQuery<CostPreset>(query, parameters, (columns: ColumnValue[]) => ({
-    PresetID: columns[0].value as number,
-    Amount: columns[1].value as number,
-    Currency: columns[2].value as string,
-    DisplayOrder: columns[3].value as number,
-  }));
+  return q.execute() as Promise<CostPreset[]>;
 }
 
 /**
@@ -46,27 +43,14 @@ export async function createCostPreset(
   currency: string,
   displayOrder = 0
 ): Promise<number> {
-  const query = `
-    INSERT INTO dbo.tblEstimatedCostPresets (Amount, Currency, DisplayOrder)
-    OUTPUT INSERTED.PresetID
-    VALUES (@amount, @currency, @displayOrder)
-  `;
+  const db = getKysely();
+  const row = await db
+    .insertInto('tblEstimatedCostPresets')
+    .values({ Amount: amount, Currency: currency, DisplayOrder: displayOrder })
+    .returning('PresetID')
+    .executeTakeFirstOrThrow();
 
-  const result = await executeQuery<number>(
-    query,
-    [
-      ['amount', TYPES.Decimal, amount],
-      ['currency', TYPES.NVarChar, currency],
-      ['displayOrder', TYPES.Int, displayOrder],
-    ],
-    (columns: ColumnValue[]) => columns[0]?.value as number
-  );
-
-  if (result?.[0] === undefined) {
-    throw new Error('Failed to create cost preset: no ID returned');
-  }
-
-  return result[0];
+  return row.PresetID;
 }
 
 /**
@@ -78,47 +62,33 @@ export async function updateCostPreset(
   currency: string,
   displayOrder: number
 ): Promise<void> {
-  const query = `
-    UPDATE dbo.tblEstimatedCostPresets
-    SET Amount = @amount,
-        Currency = @currency,
-        DisplayOrder = @displayOrder
-    WHERE PresetID = @presetId
-  `;
-
-  await executeQuery(
-    query,
-    [
-      ['presetId', TYPES.Int, presetId],
-      ['amount', TYPES.Decimal, amount],
-      ['currency', TYPES.NVarChar, currency],
-      ['displayOrder', TYPES.Int, displayOrder],
-    ],
-    () => ({})
-  );
+  const db = getKysely();
+  await db
+    .updateTable('tblEstimatedCostPresets')
+    .set({ Amount: amount, Currency: currency, DisplayOrder: displayOrder })
+    .where('PresetID', '=', presetId)
+    .execute();
 }
 
 /**
  * Delete a cost preset
  */
 export async function deleteCostPreset(presetId: number): Promise<void> {
-  const query = `
-    DELETE FROM dbo.tblEstimatedCostPresets
-    WHERE PresetID = @presetId
-  `;
-
-  await executeQuery(query, [['presetId', TYPES.Int, presetId]], () => ({}));
+  const db = getKysely();
+  await db.deleteFrom('tblEstimatedCostPresets').where('PresetID', '=', presetId).execute();
 }
 
 /**
  * Get distinct currencies that have presets
  */
 export async function getCostPresetCurrencies(): Promise<string[]> {
-  const query = `
-    SELECT DISTINCT Currency
-    FROM dbo.tblEstimatedCostPresets
-    ORDER BY Currency
-  `;
+  const db = getKysely();
+  const rows = await db
+    .selectFrom('tblEstimatedCostPresets')
+    .select('Currency')
+    .distinct()
+    .orderBy('Currency')
+    .execute();
 
-  return executeQuery<string>(query, [], (columns: ColumnValue[]) => columns[0].value as string);
+  return rows.map((r) => r.Currency);
 }

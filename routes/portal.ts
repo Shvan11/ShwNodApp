@@ -5,7 +5,8 @@
  * PersonID from req.session.patientId — NEVER from params or body.
  */
 import { Router, type Request, type Response } from 'express';
-import { executeQuery, TYPES } from '../services/database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../services/database/kysely.js';
 import { getTimePoints } from '../services/database/queries/timepoint-queries.js';
 import { getVisitsSummary } from '../services/database/queries/visit-queries.js';
 import { getPayments } from '../services/database/queries/payment-queries.js';
@@ -205,25 +206,19 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const pid = req.session.patientId!;
-      const rows = await executeQuery<NextAppointmentRow>(
-        `SELECT TOP 1
-           a.appointmentID,
-           FORMAT(a.AppDate, 'yyyy-MM-ddTHH:mm:ss') as AppDate,
-           a.AppDetail,
-           e.employeeName as DrName
-         FROM dbo.tblappointments a
-         LEFT JOIN dbo.tblEmployees e ON a.DrID = e.ID
-         WHERE a.PersonID = @PID
-           AND a.AppDate >= CAST(GETDATE() AS DATE)
-         ORDER BY a.AppDate ASC`,
-        [['PID', TYPES.Int, pid]],
-        (columns) => ({
-          appointmentID: columns[0].value as number,
-          AppDate: columns[1].value as string,
-          AppDetail: (columns[2].value as string) ?? null,
-          DrName: (columns[3].value as string) ?? null,
-        })
-      );
+      const db = getKysely();
+      const { rows } = await sql<NextAppointmentRow>`
+        SELECT
+           a."appointmentID",
+           to_char(a."AppDate", 'YYYY-MM-DD"T"HH24:MI:SS') AS "AppDate",
+           a."AppDetail",
+           e."employeeName" AS "DrName"
+         FROM "tblappointments" a
+         LEFT JOIN "tblEmployees" e ON a."DrID" = e."ID"
+         WHERE a."PersonID" = ${pid}
+           AND a."AppDate" >= CURRENT_DATE
+         ORDER BY a."AppDate" ASC
+         LIMIT 1`.execute(db);
       res.json({ success: true, appointment: rows[0] ?? null });
     } catch (error) {
       log.error('Portal /appointments/next error', { error: (error as Error).message });

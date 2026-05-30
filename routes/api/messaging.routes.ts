@@ -14,7 +14,6 @@
 
 import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
-import * as database from '../../services/database/index.js';
 import * as messagingQueries from '../../services/database/queries/messaging-queries.js';
 import { getWhatsAppMessages } from '../../services/database/queries/messaging-queries.js';
 import { ErrorResponses } from '../../utils/error-response.js';
@@ -72,18 +71,6 @@ type WhatsAppMessagesResult = [string[], string[], number[], string[]];
 
 interface BatchStatusUpdateBody {
   updates: BatchStatusUpdate[];
-}
-
-interface ResetResult {
-  resetDate: string;
-  totalAppointments: number;
-  readyForWhatsApp: number;
-  readyForSMS: number;
-  alreadySentWA: number;
-  alreadyNotified: number;
-  appointmentsReset: number;
-  smsRecordsReset: number;
-  [key: string]: string | number; // Index signature for Record<string, unknown> compatibility
 }
 
 /**
@@ -297,48 +284,9 @@ router.post(
       const { date } = req.params;
       log.info(`Resetting messaging for date: ${date}`);
 
-      // Execute the stored procedure
-      const result = await database.executeStoredProcedure<ResetResult | null, ResetResult>(
-        'ResetMessagingForDate',
-        [['ResetDate', database.TYPES.Date, date]],
-        undefined,
-        (columns) => {
-          // Map the result columns
-          if (columns.length >= 7) {
-            return {
-              resetDate: columns[0].value as string,
-              totalAppointments: columns[1].value as number,
-              readyForWhatsApp: columns[2].value as number,
-              readyForSMS: columns[3].value as number,
-              alreadySentWA: columns[4].value as number,
-              alreadyNotified: columns[5].value as number,
-              appointmentsReset: columns[6].value as number,
-              smsRecordsReset: (columns[7]?.value as number) || 0
-            };
-          }
-          return null;
-        },
-        (result) => {
-          // Filter out null values and get the first valid result
-          const validResults = result.filter((r): r is ResetResult => r !== null);
-          const resetStats: ResetResult =
-            validResults.length > 0
-              ? validResults[0]
-              : {
-                  resetDate: date,
-                  totalAppointments: 0,
-                  readyForWhatsApp: 0,
-                  readyForSMS: 0,
-                  alreadySentWA: 0,
-                  alreadyNotified: 0,
-                  appointmentsReset: 0,
-                  smsRecordsReset: 0
-                };
-
-          log.info(`Reset completed for ${date}:`, resetStats);
-          return resetStats;
-        }
-      );
+      // Reset messaging state for the date (was the ResetMessagingForDate proc).
+      const result = await messagingQueries.resetMessagingForDate(date);
+      log.info(`Reset completed for ${date}:`, result);
 
       res.json({
         success: true,

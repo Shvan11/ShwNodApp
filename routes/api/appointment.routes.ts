@@ -15,7 +15,8 @@
 
 import { Router, type Request, type Response } from 'express';
 import type { EventEmitter } from 'events';
-import * as database from '../../services/database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../../services/database/kysely.js';
 import {
   getPresentAps,
   updatePresent,
@@ -104,16 +105,11 @@ router.get(
   '/appointment-details',
   async (_req: Request, res: Response): Promise<void> => {
     try {
-      const query = `SELECT ID, Detail FROM tblDetail ORDER BY Detail`;
-      const details = await database.executeQuery<AppointmentDetail>(
-        query,
-        [],
-        (columns) => ({
-          ID: columns[0].value as number,
-          Detail: columns[1].value as string
-        })
-      );
-      res.json(details);
+      const db = getKysely();
+      const { rows } = await sql<AppointmentDetail>`
+        SELECT "ID", "Detail" FROM "tblDetail" ORDER BY "Detail"
+      `.execute(db);
+      res.json(rows);
     } catch (error) {
       log.error('Error fetching appointment details:', error);
       ErrorResponses.internalError(
@@ -454,36 +450,24 @@ router.get(
         return;
       }
 
-      const query = `
+      const db = getKysely();
+      const { rows } = await sql<AppointmentResult>`
             SELECT
-                a.appointmentID,
-                a.PersonID,
-                FORMAT(a.AppDate, 'yyyy-MM-ddTHH:mm:ss') as AppDate,
-                a.AppDetail,
-                a.DrID,
-                e.employeeName as DrName
-            FROM tblappointments a
-            LEFT JOIN tblEmployees e ON a.DrID = e.ID
-            WHERE a.PersonID = @personID
-            ORDER BY a.AppDate DESC
-        `;
-
-      const appointments = await database.executeQuery<AppointmentResult>(
-        query,
-        [['personID', database.TYPES.Int, parseInt(personId)]],
-        (columns) => ({
-          appointmentID: columns[0].value as number,
-          PersonID: columns[1].value as number,
-          AppDate: columns[2].value as string,
-          AppDetail: columns[3].value as string,
-          DrID: columns[4].value as number,
-          DrName: columns[5].value as string | null
-        })
-      );
+                a."appointmentID",
+                a."PersonID",
+                to_char(a."AppDate", 'YYYY-MM-DD"T"HH24:MI:SS') AS "AppDate",
+                a."AppDetail",
+                a."DrID",
+                e."employeeName" AS "DrName"
+            FROM "tblappointments" a
+            LEFT JOIN "tblEmployees" e ON a."DrID" = e."ID"
+            WHERE a."PersonID" = ${parseInt(personId)}
+            ORDER BY a."AppDate" DESC
+        `.execute(db);
 
       res.json({
         success: true,
-        appointments: appointments || []
+        appointments: rows || []
       });
     } catch (error) {
       log.error('Error fetching patient appointments:', error);
@@ -514,31 +498,28 @@ router.get(
         return;
       }
 
-      const query = `
+      const db = getKysely();
+      const { rows } = await sql<AppointmentResult>`
             SELECT
-                a.appointmentID,
-                a.PersonID,
-                FORMAT(a.AppDate, 'yyyy-MM-ddTHH:mm:ss') as AppDate,
-                a.AppDetail,
-                a.DrID,
-                e.employeeName as DrName
-            FROM tblappointments a
-            LEFT JOIN tblemployees e ON a.DrID = e.ID
-            WHERE a.appointmentID = @appointmentId
-        `;
+                a."appointmentID",
+                a."PersonID",
+                to_char(a."AppDate", 'YYYY-MM-DD"T"HH24:MI:SS') AS "AppDate",
+                a."AppDetail",
+                a."DrID",
+                e."employeeName" AS "DrName"
+            FROM "tblappointments" a
+            LEFT JOIN "tblEmployees" e ON a."DrID" = e."ID"
+            WHERE a."appointmentID" = ${parseInt(appointmentId)}
+        `.execute(db);
 
-      const result = await database.executeQuery<AppointmentResult>(query, [
-        ['appointmentId', database.TYPES.Int, parseInt(appointmentId)]
-      ]);
-
-      if (!result || result.length === 0) {
+      if (!rows || rows.length === 0) {
         ErrorResponses.notFound(res, 'Appointment');
         return;
       }
 
       res.json({
         success: true,
-        appointment: result[0]
+        appointment: rows[0]
       });
     } catch (error) {
       log.error('Error fetching appointment:', error);
@@ -579,23 +560,16 @@ router.put(
         return;
       }
 
-      // Use CAST to convert string to datetime2 on SQL Server side to avoid timezone conversion
-      const query = `
-            UPDATE tblappointments
-            SET PersonID = @PersonID,
-                AppDate = CAST(@AppDate AS datetime2),
-                AppDetail = @AppDetail,
-                DrID = @DrID
-            WHERE appointmentID = @appointmentId
-        `;
-
-      await database.executeQuery(query, [
-        ['appointmentId', database.TYPES.Int, parseInt(appointmentId)],
-        ['PersonID', database.TYPES.Int, PersonID],
-        ['AppDate', database.TYPES.NVarChar, AppDate], // Pass as string, SQL Server will cast
-        ['AppDetail', database.TYPES.NVarChar, AppDetail],
-        ['DrID', database.TYPES.Int, DrID]
-      ]);
+      // Cast the AppDate string to timestamp on the PG side to avoid timezone conversion
+      const db = getKysely();
+      await sql`
+            UPDATE "tblappointments"
+            SET "PersonID" = ${PersonID},
+                "AppDate" = ${AppDate}::timestamp,
+                "AppDetail" = ${AppDetail},
+                "DrID" = ${DrID}
+            WHERE "appointmentID" = ${parseInt(appointmentId)}
+        `.execute(db);
 
       res.json({
         success: true,
@@ -630,11 +604,10 @@ router.delete(
         return;
       }
 
-      const query = `DELETE FROM tblappointments WHERE appointmentID = @appointmentId`;
-
-      await database.executeQuery(query, [
-        ['appointmentId', database.TYPES.Int, parseInt(appointmentId)]
-      ]);
+      const db = getKysely();
+      await sql`
+        DELETE FROM "tblappointments" WHERE "appointmentID" = ${parseInt(appointmentId)}
+      `.execute(db);
 
       res.json({
         success: true,

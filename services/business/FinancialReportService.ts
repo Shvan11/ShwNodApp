@@ -13,7 +13,8 @@
  */
 
 import { log } from '../../utils/logger.js';
-import * as database from '../database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../database/kysely.js';
 
 /**
  * Currency amounts
@@ -168,20 +169,10 @@ interface InvoiceDetails {
  * @returns Enriched invoice with IQDReceived and USDReceived
  */
 async function enrichInvoice(invoice: BaseInvoice): Promise<EnrichedInvoice> {
-  const invoiceDetails = await database.executeQuery<InvoiceDetails>(
-    'SELECT IQDReceived, USDReceived FROM tblInvoice WHERE invoiceID = @invoiceID',
-    [['invoiceID', database.TYPES.Int, invoice.invoiceID]],
-    (columns) => {
-      const row: InvoiceDetails = {
-        IQDReceived: null,
-        USDReceived: null,
-      };
-      columns.forEach((column) => {
-        row[column.metadata.colName] = column.value as number | null;
-      });
-      return row;
-    }
-  );
+  const db = getKysely();
+  const { rows: invoiceDetails } = await sql<InvoiceDetails>`
+    SELECT "IQDReceived", "USDReceived" FROM "tblInvoice" WHERE "invoiceID" = ${invoice.invoiceID}
+  `.execute(db);
 
   return {
     ...invoice,

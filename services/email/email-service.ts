@@ -5,7 +5,8 @@
 
 import nodemailer, { Transporter, SentMessageInfo } from 'nodemailer';
 import type { SendMailOptions } from 'nodemailer';
-import { executeQuery, TYPES } from '../database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../database/kysely.js';
 import { log } from '../../utils/logger.js';
 
 // ===========================================
@@ -101,16 +102,12 @@ class EmailService {
    */
   async loadConfig(): Promise<EmailConfig> {
     try {
-      const query = `
-                SELECT OptionName, OptionValue
-                FROM tbloptions
-                WHERE OptionName LIKE 'EMAIL_%'
-            `;
-
-      const results = await executeQuery<OptionRow>(query, [], (columns) => ({
-        OptionName: columns[0].value as string,
-        OptionValue: columns[1].value as string,
-      }));
+      const db = getKysely();
+      const { rows: results } = await sql<OptionRow>`
+                SELECT "OptionName", "OptionValue"
+                FROM "tbloptions"
+                WHERE "OptionName" LIKE 'EMAIL_%'
+            `.execute(db);
 
       // Convert array to config object
       const config: EmailConfig = {};
@@ -174,20 +171,15 @@ class EmailService {
   async getEmployeeRecipients(): Promise<EmployeeRecipient[]> {
     try {
       // Query employees with receiveEmail = true and valid email addresses
-      const query = `
-                SELECT e.ID, e.employeeName, e.Email
-                FROM tblEmployees e
-                WHERE e.receiveEmail = 1
-                  AND e.Email IS NOT NULL
-                  AND e.Email != ''
-                ORDER BY e.employeeName
-            `;
-
-      const recipients = await executeQuery<EmployeeRecipient>(query, [], (columns) => ({
-        ID: columns[0].value as number,
-        employeeName: columns[1].value as string,
-        Email: columns[2].value as string,
-      }));
+      const db = getKysely();
+      const { rows: recipients } = await sql<EmployeeRecipient>`
+                SELECT e."ID", e."employeeName", e."Email"
+                FROM "tblEmployees" e
+                WHERE e."receiveEmail" = true
+                  AND e."Email" IS NOT NULL
+                  AND e."Email" != ''
+                ORDER BY e."employeeName"
+            `.execute(db);
 
       return recipients || [];
     } catch (error) {
@@ -318,25 +310,21 @@ class EmailService {
         'from_name',
       ];
 
+      const db = getKysely();
       for (const [key, value] of Object.entries(newConfig)) {
         if (validKeys.includes(key.toLowerCase())) {
           const optionName = `EMAIL_${key.toUpperCase()}`;
-          const query = `
-                        UPDATE tbloptions
-                        SET OptionValue = @value
-                        WHERE OptionName = @name;
+          const optionValue = String(value);
 
-                        IF @@ROWCOUNT = 0
-                        BEGIN
-                            INSERT INTO tbloptions (OptionName, OptionValue)
-                            VALUES (@name, @value);
-                        END
-                    `;
-
-          await executeQuery(query, [
-            ['name', TYPES.NVarChar, optionName],
-            ['value', TYPES.NVarChar, String(value)],
-          ]);
+          // Upsert: UPDATE first, INSERT only if no row matched (PG has no T-SQL MERGE).
+          const res = await sql`
+            UPDATE "tbloptions" SET "OptionValue" = ${optionValue} WHERE "OptionName" = ${optionName}
+          `.execute(db);
+          if (Number(res.numAffectedRows ?? 0n) === 0) {
+            await sql`
+              INSERT INTO "tbloptions" ("OptionName", "OptionValue") VALUES (${optionName}, ${optionValue})
+            `.execute(db);
+          }
 
           updates.push(optionName);
         }

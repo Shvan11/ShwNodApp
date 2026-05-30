@@ -5,7 +5,8 @@
 import { Router, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { verifyCredentials, hashPassword } from '../middleware/auth.js';
-import { executeQuery, TYPES } from '../services/database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../services/database/kysely.js';
 import { log } from '../utils/logger.js';
 
 const router = Router();
@@ -242,13 +243,8 @@ router.post(
       const newHash = await hashPassword(newPassword);
 
       // Update password in database
-      await executeQuery(
-        'UPDATE dbo.tblUsers SET PasswordHash = @hash WHERE UserID = @userId',
-        [
-          ['hash', TYPES.NVarChar, newHash],
-          ['userId', TYPES.Int, req.session.userId]
-        ]
-      );
+      const db = getKysely();
+      await sql`UPDATE "tblUsers" SET "PasswordHash" = ${newHash} WHERE "UserID" = ${req.session.userId}`.execute(db);
 
       log.info('Password changed', { username: req.session.username });
 

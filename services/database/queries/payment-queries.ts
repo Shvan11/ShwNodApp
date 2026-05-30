@@ -1,8 +1,19 @@
 /**
  * Payment-related database queries
+ *
+ * Migration Phase 4: translated to typed Kysely (PostgreSQL). Money columns on
+ * tblInvoice (Amountpaid, USDReceived, IQDReceived, ActualAmount, Change) are PG
+ * `integer`, so they map straight to JS numbers (no numeric cast needed). Several
+ * declared return types still say `Date` for date-only columns (Dateofpayment,
+ * StartDate); those are PG `date`, which the centralized pg parser (kysely.ts)
+ * returns as a 'YYYY-MM-DD' string. The declared types are preserved via
+ * `$castTo<Date>()` (type-only); the runtime value is now a string — see FLAGS.
+ * The IF EXISTS…UPDATE…ELSE INSERT exchange-rate upserts became ON CONFLICT against
+ * the new UQ_tblsms_date unique constraint. tblsms.date is PG `date`, so date params
+ * are wrapped as `sql<Date>` to satisfy the static type without changing emitted SQL.
  */
-import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery, TYPES } from '../index.js';
+import { sql } from 'kysely';
+import { getKysely, withPgTransaction } from '../kysely.js';
 import { toDateOnly } from '../../../utils/date.js';
 
 // Type definitions
@@ -46,141 +57,184 @@ interface PaymentRecord {
  * Retrieves payments for a given patient ID.
  */
 export function getPayments(PID: number): Promise<Payment[]> {
-  return executeQuery<Payment>(
-    `SELECT i.* FROM dbo.tblpatients p
-     INNER JOIN dbo.tblwork w ON p.PersonID = w.PersonID
-     INNER JOIN dbo.tblInvoice i ON w.workid = i.workid
-     WHERE w.Status = 1 AND p.personID = @PID`,
-    [['PID', TYPES.Int, PID]],
-    (columns: ColumnValue[]) => ({
-      Payment: columns[1].value as number,
-      Date: columns[2].value as Date,
-    })
-  );
+  const db = getKysely();
+  return db
+    .selectFrom('tblpatients as p')
+    .innerJoin('tblwork as w', 'p.PersonID', 'w.PersonID')
+    .innerJoin('tblInvoice as i', 'w.workid', 'i.workid')
+    .where('w.Status', '=', 1)
+    .where('p.PersonID', '=', PID)
+    // Original projected `i.*` then mapped columns[1]=Amountpaid, columns[2]=Dateofpayment.
+    .select((eb) => [
+      'i.Amountpaid as Payment',
+      eb.ref('i.Dateofpayment').$castTo<Date>().as('Date'),
+    ])
+    .execute() as Promise<Payment[]>;
 }
 
 /**
  * Retrieves active work details for invoice generation
  */
 export function getActiveWorkForInvoice(PID: number): Promise<WorkForInvoice[]> {
-  return executeQuery<WorkForInvoice>(
-    `SELECT w.workid, w.PersonID, w.TotalRequired, w.Currency, w.Typeofwork, w.StartDate,
-            p.PatientName, p.Phone,
-            COALESCE(SUM(i.Amountpaid), 0) as TotalPaid
-     FROM dbo.tblpatients p
-     INNER JOIN dbo.tblwork w ON p.PersonID = w.PersonID
-     LEFT JOIN dbo.tblInvoice i ON w.workid = i.workid
-     WHERE w.Status = 1 AND p.personID = @PID
-     GROUP BY w.workid, w.PersonID, w.TotalRequired, w.Currency, w.Typeofwork, w.StartDate, p.PatientName, p.Phone`,
-    [['PID', TYPES.Int, PID]],
-    (columns: ColumnValue[]) => ({
-      workid: columns[0].value as number,
-      PersonID: columns[1].value as number,
-      TotalRequired: columns[2].value as number | null,
-      Currency: columns[3].value as string | null,
-      Typeofwork: columns[4].value as number | null,
-      StartDate: columns[5].value as Date | null,
-      PatientName: columns[6].value as string,
-      Phone: columns[7].value as string | null,
-      TotalPaid: columns[8].value as number,
-    })
-  );
+  const db = getKysely();
+  return db
+    .selectFrom('tblpatients as p')
+    .innerJoin('tblwork as w', 'p.PersonID', 'w.PersonID')
+    .leftJoin('tblInvoice as i', 'w.workid', 'i.workid')
+    .where('w.Status', '=', 1)
+    .where('p.PersonID', '=', PID)
+    .groupBy([
+      'w.workid',
+      'w.PersonID',
+      'w.TotalRequired',
+      'w.Currency',
+      'w.Typeofwork',
+      'w.StartDate',
+      'p.PatientName',
+      'p.Phone',
+    ])
+    .select((eb) => [
+      'w.workid',
+      'w.PersonID',
+      'w.TotalRequired',
+      'w.Currency',
+      'w.Typeofwork',
+      eb.ref('w.StartDate').$castTo<Date>().as('StartDate'),
+      'p.PatientName',
+      'p.Phone',
+      eb.fn.coalesce(eb.fn.sum('i.Amountpaid'), sql<number>`0`).$castTo<number>().as('TotalPaid'),
+    ])
+    .execute() as Promise<WorkForInvoice[]>;
 }
 
 /**
  * Gets today's exchange rate only
  */
-export function getCurrentExchangeRate(): Promise<number | null> {
+export async function getCurrentExchangeRate(): Promise<number | null> {
   const today = toDateOnly(new Date());
+  const db = getKysely();
+  const row = await db
+    .selectFrom('tblsms')
+    .where('date', '=', sql<Date>`${today}`)
+    .where('ExchangeRate', 'is not', null)
+    .select('ExchangeRate')
+    .executeTakeFirst();
 
-  return executeQuery<number, number | null>(
-    `SELECT ExchangeRate FROM dbo.tblsms
-     WHERE date = @today AND ExchangeRate IS NOT NULL`,
-    [['today', TYPES.Date, today]],
-    (columns: ColumnValue[]) => columns[0]?.value as number,
-    (result) => (result.length > 0 ? result[0] : null)
-  );
+  return row ? row.ExchangeRate : null;
 }
 
 /**
  * Adds a new invoice record with dual-currency support
  */
-export function addInvoice(invoiceData: InvoiceData): Promise<{ invoiceID: number }[]> {
+export async function addInvoice(invoiceData: InvoiceData): Promise<{ invoiceID: number }[]> {
   const { workid, amountPaid, paymentDate, usdReceived, iqdReceived, change } = invoiceData;
 
-  return executeQuery<{ invoiceID: number }>(
-    `INSERT INTO dbo.tblInvoice (workid, Amountpaid, Dateofpayment, USDReceived, IQDReceived, Change)
-     VALUES (@workid, @amountPaid, @paymentDate, @usdReceived, @iqdReceived, @change);
-     SELECT SCOPE_IDENTITY() as invoiceID;`,
-    [
-      ['workid', TYPES.Int, workid],
-      ['amountPaid', TYPES.Int, amountPaid],
-      ['paymentDate', TYPES.Date, paymentDate],
-      ['usdReceived', TYPES.Int, usdReceived],
-      ['iqdReceived', TYPES.Int, iqdReceived],
-      ['change', TYPES.Int, change],
-    ],
-    (columns: ColumnValue[]) => ({ invoiceID: columns[0].value as number })
-  );
+  // Wrapped so the PatientType trigger (patient-type transition on the FIRST payment for a work)
+  // commits atomically with the invoice. (Note: the old function-based overpayment CHECK
+  // CK_MoreThanTotal is intentionally NOT re-enforced here — flagged for Phase 7.)
+  const invoiceID = await withPgTransaction(async (trx) => {
+    const row = await trx
+      .insertInto('tblInvoice')
+      .values({
+        workid,
+        Amountpaid: amountPaid,
+        Dateofpayment: sql<Date>`${paymentDate}`,
+        USDReceived: usdReceived,
+        IQDReceived: iqdReceived,
+        Change: change,
+      })
+      .returning('invoiceID')
+      .executeTakeFirstOrThrow();
+
+    // PatientType trigger: only on the work's first invoice.
+    const cnt = await trx
+      .selectFrom('tblInvoice')
+      .select((eb) => eb.fn.countAll<number>().as('n'))
+      .where('workid', '=', workid)
+      .executeTakeFirst();
+
+    if (Number(cnt?.n ?? 0) === 1) {
+      const work = await trx
+        .selectFrom('tblwork')
+        .select(['PersonID', 'Typeofwork'])
+        .where('workid', '=', workid)
+        .executeTakeFirst();
+      if (work) {
+        const patient = await trx
+          .selectFrom('tblpatients')
+          .select('PatientTypeID')
+          .where('PersonID', '=', work.PersonID)
+          .executeTakeFirst();
+        const typ = patient?.PatientTypeID ?? null;
+        if (typ === 3 || typ === 4 || typ === 5 || typ === 6) {
+          const newType = work.Typeofwork === 1 ? 1 : 5;
+          await trx.updateTable('tblpatients').set({ PatientTypeID: newType }).where('PersonID', '=', work.PersonID).execute();
+        }
+      }
+    }
+
+    return row.invoiceID;
+  });
+
+  return [{ invoiceID }];
 }
 
 /**
  * Updates the exchange rate for today's date
  */
-export function updateExchangeRate(exchangeRate: number): Promise<unknown[]> {
+export async function updateExchangeRate(exchangeRate: number): Promise<unknown[]> {
   const today = toDateOnly(new Date());
+  const db = getKysely();
 
-  return executeQuery(
-    `IF EXISTS (SELECT 1 FROM dbo.tblsms WHERE date = @today)
-     BEGIN
-         UPDATE dbo.tblsms SET ExchangeRate = @exchangeRate WHERE date = @today
-     END
-     ELSE
-     BEGIN
-         INSERT INTO dbo.tblsms (date, smssent, emailsent, ExchangeRate)
-         VALUES (@today, 0, 0, @exchangeRate)
-     END`,
-    [
-      ['today', TYPES.Date, today],
-      ['exchangeRate', TYPES.Int, exchangeRate],
-    ],
-    () => ({})
-  );
+  // IF EXISTS…UPDATE…ELSE INSERT → ON CONFLICT against UQ_tblsms_date.
+  await db
+    .insertInto('tblsms')
+    .values({
+      date: sql<Date>`${today}`,
+      smssent: false,
+      emailsent: false,
+      ExchangeRate: exchangeRate,
+    })
+    .onConflict((oc) => oc.column('date').doUpdateSet({ ExchangeRate: exchangeRate }))
+    .execute();
+
+  return [];
 }
 
 /**
  * Gets the exchange rate for a specific date
  */
-export function getExchangeRateForDate(date: string): Promise<number | null> {
-  return executeQuery<number, number | null>(
-    `SELECT ExchangeRate FROM dbo.tblsms
-     WHERE date = @date AND ExchangeRate IS NOT NULL`,
-    [['date', TYPES.Date, date]],
-    (columns: ColumnValue[]) => columns[0]?.value as number,
-    (result) => (result.length > 0 ? result[0] : null)
-  );
+export async function getExchangeRateForDate(date: string): Promise<number | null> {
+  const db = getKysely();
+  const row = await db
+    .selectFrom('tblsms')
+    .where('date', '=', sql<Date>`${date}`)
+    .where('ExchangeRate', 'is not', null)
+    .select('ExchangeRate')
+    .executeTakeFirst();
+
+  return row ? row.ExchangeRate : null;
 }
 
 /**
  * Updates the exchange rate for a specific date
  */
-export function updateExchangeRateForDate(date: string, exchangeRate: number): Promise<unknown[]> {
-  return executeQuery(
-    `IF EXISTS (SELECT 1 FROM dbo.tblsms WHERE date = @date)
-     BEGIN
-         UPDATE dbo.tblsms SET ExchangeRate = @exchangeRate WHERE date = @date
-     END
-     ELSE
-     BEGIN
-         INSERT INTO dbo.tblsms (date, smssent, emailsent, ExchangeRate)
-         VALUES (@date, 0, 0, @exchangeRate)
-     END`,
-    [
-      ['date', TYPES.Date, date],
-      ['exchangeRate', TYPES.Int, exchangeRate],
-    ],
-    () => ({})
-  );
+export async function updateExchangeRateForDate(date: string, exchangeRate: number): Promise<unknown[]> {
+  const db = getKysely();
+
+  // IF EXISTS…UPDATE…ELSE INSERT → ON CONFLICT against UQ_tblsms_date.
+  await db
+    .insertInto('tblsms')
+    .values({
+      date: sql<Date>`${date}`,
+      smssent: false,
+      emailsent: false,
+      ExchangeRate: exchangeRate,
+    })
+    .onConflict((oc) => oc.column('date').doUpdateSet({ ExchangeRate: exchangeRate }))
+    .execute();
+
+  return [];
 }
 
 /**
@@ -190,40 +244,37 @@ export function listExchangeRates(
   fromDate: string,
   toDate: string
 ): Promise<{ date: string; exchangeRate: number }[]> {
-  return executeQuery<{ date: string; exchangeRate: number }>(
-    `SELECT date, ExchangeRate FROM dbo.tblsms
-     WHERE ExchangeRate IS NOT NULL
-       AND date BETWEEN @fromDate AND @toDate
-     ORDER BY date DESC`,
-    [
-      ['fromDate', TYPES.Date, fromDate],
-      ['toDate', TYPES.Date, toDate],
-    ],
-    (columns: ColumnValue[]) => ({
-      date: toDateOnly(columns[0].value as Date),
-      exchangeRate: columns[1].value as number,
-    })
-  );
+  const db = getKysely();
+  return db
+    .selectFrom('tblsms')
+    .where('ExchangeRate', 'is not', null)
+    .where('date', '>=', sql<Date>`${fromDate}`)
+    .where('date', '<=', sql<Date>`${toDate}`)
+    .orderBy('date', 'desc')
+    .select((eb) => [
+      eb.ref('date').$castTo<string>().as('date'),
+      eb.ref('ExchangeRate').$castTo<number>().as('exchangeRate'),
+    ])
+    .execute() as Promise<{ date: string; exchangeRate: number }[]>;
 }
 
 /**
  * Gets payment history for a specific work
  */
 export function getPaymentHistoryByWorkId(workId: number): Promise<PaymentRecord[]> {
-  return executeQuery<PaymentRecord>(
-    `SELECT InvoiceID, workid, Amountpaid, Dateofpayment, ActualAmount, ActualCur, Change
-     FROM dbo.tblInvoice
-     WHERE workid = @workId
-     ORDER BY Dateofpayment DESC`,
-    [['workId', TYPES.Int, workId]],
-    (columns: ColumnValue[]) => ({
-      InvoiceID: columns[0].value as number,
-      workid: columns[1].value as number,
-      Amountpaid: columns[2].value as number,
-      Dateofpayment: columns[3].value as Date,
-      ActualAmount: columns[4].value as number | null,
-      ActualCur: columns[5].value as string | null,
-      Change: columns[6].value as number | null,
-    })
-  );
+  const db = getKysely();
+  return db
+    .selectFrom('tblInvoice')
+    .where('workid', '=', workId)
+    .orderBy('Dateofpayment', 'desc')
+    .select((eb) => [
+      'invoiceID as InvoiceID',
+      'workid',
+      'Amountpaid',
+      eb.ref('Dateofpayment').$castTo<Date>().as('Dateofpayment'),
+      'ActualAmount',
+      'ActualCur',
+      'Change',
+    ])
+    .execute() as Promise<PaymentRecord[]>;
 }

@@ -1,8 +1,16 @@
 /**
  * Expense-related database queries
+ *
+ * Migration Phase 4: translated to typed Kysely (PostgreSQL). `tblExpenses.Amount` is
+ * PG `integer` (maps straight to a JS number; no numeric cast). `expenseDate` is a PG
+ * `date`, which the centralized pg parser (kysely.ts) returns as a 'YYYY-MM-DD' string;
+ * the declared return types still say `Date`, preserved via `$castTo<Date>()` — the
+ * runtime value is now a string (see FLAGS). `Currency` is `citext`, so equality is
+ * already case-insensitive (matches the old Arabic_CI_AS column); we keep the trim
+ * (`LTRIM(RTRIM(...))`) via PG `btrim()` so the grouping/filtering behavior is identical.
  */
-import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery, TYPES, SqlParam } from '../index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../kysely.js';
 
 // Type definitions
 interface ExpenseFilters {
@@ -69,124 +77,89 @@ interface ExpenseTotal {
  * Retrieves all expenses with optional filtering
  */
 export async function getAllExpenses(filters: ExpenseFilters = {}): Promise<Expense[]> {
-  let query = `
-    SELECT
-      e.ID,
-      e.expenseDate,
-      e.Amount,
-      e.Currency,
-      e.Note,
-      e.CategoryID,
-      e.SubcategoryID,
-      c.CategoryName,
-      s.SubcategoryName
-    FROM dbo.tblExpenses e
-    LEFT JOIN dbo.tblExpenseCategories c ON e.CategoryID = c.CategoryID
-    LEFT JOIN dbo.tblExpenseSubcategories s ON e.SubcategoryID = s.SubcategoryID
-    WHERE 1=1
-  `;
+  const db = getKysely();
 
-  const params: SqlParam[] = [];
+  let q = db
+    .selectFrom('tblExpenses as e')
+    .leftJoin('tblExpenseCategories as c', 'e.CategoryID', 'c.CategoryID')
+    .leftJoin('tblExpenseSubcategories as s', 'e.SubcategoryID', 's.SubcategoryID')
+    .select((eb) => [
+      'e.ID',
+      eb.ref('e.expenseDate').$castTo<Date>().as('expenseDate'),
+      'e.Amount',
+      'e.Currency',
+      'e.Note',
+      'e.CategoryID',
+      'e.SubcategoryID',
+      'c.CategoryName',
+      's.SubcategoryName',
+    ]);
 
   if (filters.startDate) {
-    query += ' AND e.expenseDate >= @startDate';
-    params.push(['startDate', TYPES.Date, filters.startDate]);
+    q = q.where('e.expenseDate', '>=', sql<Date>`${filters.startDate}`);
   }
-
   if (filters.endDate) {
-    query += ' AND e.expenseDate <= @endDate';
-    params.push(['endDate', TYPES.Date, filters.endDate]);
+    q = q.where('e.expenseDate', '<=', sql<Date>`${filters.endDate}`);
   }
-
   if (filters.categoryId) {
-    query += ' AND e.CategoryID = @categoryId';
-    params.push(['categoryId', TYPES.Int, filters.categoryId]);
+    q = q.where('e.CategoryID', '=', filters.categoryId);
   }
-
   if (filters.subcategoryId) {
-    query += ' AND e.SubcategoryID = @subcategoryId';
-    params.push(['subcategoryId', TYPES.Int, filters.subcategoryId]);
+    q = q.where('e.SubcategoryID', '=', filters.subcategoryId);
   }
-
   if (filters.currency) {
-    query += ' AND LTRIM(RTRIM(e.Currency)) = @currency';
-    params.push(['currency', TYPES.NVarChar, filters.currency]);
+    // citext is case-insensitive; keep the trim to match LTRIM(RTRIM(...)).
+    q = q.where(sql<boolean>`btrim(${sql.ref('e.Currency')}) = ${filters.currency}`);
   }
 
-  query += ' ORDER BY e.expenseDate DESC, e.ID DESC';
+  q = q.orderBy('e.expenseDate', 'desc').orderBy('e.ID', 'desc');
 
-  // Opt-in pagination (SQL Server OFFSET/FETCH requires the ORDER BY above).
+  // Opt-in pagination (mirrors the old OFFSET/FETCH; requires the ORDER BY above).
   if (filters.limit != null) {
     const limit = Math.min(Math.max(Math.trunc(filters.limit), 1), MAX_PAGE_SIZE);
     const offset = Math.max(Math.trunc(filters.offset ?? 0), 0);
-    query += ' OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY';
-    params.push(['offset', TYPES.Int, offset]);
-    params.push(['limit', TYPES.Int, limit]);
+    q = q.limit(limit).offset(offset);
   }
 
-  return executeQuery<Expense>(query, params, (columns: ColumnValue[]) => ({
-    ID: columns[0].value as number,
-    expenseDate: columns[1].value as Date,
-    Amount: columns[2].value as number,
-    Currency: columns[3].value as string | null,
-    Note: columns[4].value as string | null,
-    CategoryID: columns[5].value as number | null,
-    SubcategoryID: columns[6].value as number | null,
-    CategoryName: columns[7].value as string | null,
-    SubcategoryName: columns[8].value as string | null,
-  }));
+  return q.execute() as Promise<Expense[]>;
 }
 
 /**
  * Retrieves a single expense by ID
  */
 export async function getExpenseById(id: number): Promise<Expense | null> {
-  const query = `
-    SELECT
-      e.ID,
-      e.expenseDate,
-      e.Amount,
-      e.Currency,
-      e.Note,
-      e.CategoryID,
-      e.SubcategoryID,
-      c.CategoryName,
-      s.SubcategoryName
-    FROM dbo.tblExpenses e
-    LEFT JOIN dbo.tblExpenseCategories c ON e.CategoryID = c.CategoryID
-    LEFT JOIN dbo.tblExpenseSubcategories s ON e.SubcategoryID = s.SubcategoryID
-    WHERE e.ID = @id
-  `;
+  const db = getKysely();
+  const row = await db
+    .selectFrom('tblExpenses as e')
+    .leftJoin('tblExpenseCategories as c', 'e.CategoryID', 'c.CategoryID')
+    .leftJoin('tblExpenseSubcategories as s', 'e.SubcategoryID', 's.SubcategoryID')
+    .where('e.ID', '=', id)
+    .select((eb) => [
+      'e.ID',
+      eb.ref('e.expenseDate').$castTo<Date>().as('expenseDate'),
+      'e.Amount',
+      'e.Currency',
+      'e.Note',
+      'e.CategoryID',
+      'e.SubcategoryID',
+      'c.CategoryName',
+      's.SubcategoryName',
+    ])
+    .executeTakeFirst();
 
-  const result = await executeQuery<Expense>(query, [['id', TYPES.Int, id]], (columns: ColumnValue[]) => ({
-    ID: columns[0].value as number,
-    expenseDate: columns[1].value as Date,
-    Amount: columns[2].value as number,
-    Currency: columns[3].value as string | null,
-    Note: columns[4].value as string | null,
-    CategoryID: columns[5].value as number | null,
-    SubcategoryID: columns[6].value as number | null,
-    CategoryName: columns[7].value as string | null,
-    SubcategoryName: columns[8].value as string | null,
-  }));
-
-  return result.length > 0 ? result[0] : null;
+  return (row as Expense | undefined) ?? null;
 }
 
 /**
  * Retrieves all expense categories
  */
 export async function getExpenseCategories(): Promise<ExpenseCategory[]> {
-  const query = `
-    SELECT CategoryID, CategoryName
-    FROM dbo.tblExpenseCategories
-    ORDER BY CategoryName
-  `;
-
-  return executeQuery<ExpenseCategory>(query, [], (columns: ColumnValue[]) => ({
-    CategoryID: columns[0].value as number,
-    CategoryName: columns[1].value as string,
-  }));
+  const db = getKysely();
+  return db
+    .selectFrom('tblExpenseCategories')
+    .select(['CategoryID', 'CategoryName'])
+    .orderBy('CategoryName')
+    .execute();
 }
 
 /**
@@ -195,61 +168,44 @@ export async function getExpenseCategories(): Promise<ExpenseCategory[]> {
 export async function getExpenseSubcategories(
   categoryId: number | null = null
 ): Promise<ExpenseSubcategory[]> {
-  let query = `
-    SELECT
-      s.SubcategoryID,
-      s.SubcategoryName,
-      s.CategoryID,
-      c.CategoryName
-    FROM dbo.tblExpenseSubcategories s
-    LEFT JOIN dbo.tblExpenseCategories c ON s.CategoryID = c.CategoryID
-  `;
-
-  const params: SqlParam[] = [];
+  const db = getKysely();
+  let q = db
+    .selectFrom('tblExpenseSubcategories as s')
+    .leftJoin('tblExpenseCategories as c', 's.CategoryID', 'c.CategoryID')
+    .select(['s.SubcategoryID', 's.SubcategoryName', 's.CategoryID', 'c.CategoryName']);
 
   if (categoryId) {
-    query += ' WHERE s.CategoryID = @categoryId';
-    params.push(['categoryId', TYPES.Int, categoryId]);
+    q = q.where('s.CategoryID', '=', categoryId);
   }
 
-  query += ' ORDER BY s.SubcategoryName';
+  q = q.orderBy('s.SubcategoryName');
 
-  return executeQuery<ExpenseSubcategory>(query, params, (columns: ColumnValue[]) => ({
-    SubcategoryID: columns[0].value as number,
-    SubcategoryName: columns[1].value as string,
-    CategoryID: columns[2].value as number,
-    CategoryName: columns[3].value as string | null,
-  }));
+  return q.execute() as Promise<ExpenseSubcategory[]>;
 }
 
 /**
  * Adds a new expense
  */
 export async function addExpense(expenseData: ExpenseData): Promise<{ NewID: number }> {
-  const query = `
-    INSERT INTO dbo.tblExpenses (expenseDate, Amount, Currency, Note, CategoryID, SubcategoryID)
-    VALUES (@expenseDate, @amount, @currency, @note, @categoryId, @subcategoryId);
-    SELECT SCOPE_IDENTITY() AS NewID;
-  `;
+  const db = getKysely();
+  const row = await db
+    .insertInto('tblExpenses')
+    .values({
+      expenseDate: sql<Date>`${expenseData.expenseDate}`,
+      Amount: expenseData.amount,
+      Currency: expenseData.currency || 'IQD',
+      Note: expenseData.note || null,
+      CategoryID: expenseData.categoryId || null,
+      SubcategoryID: expenseData.subcategoryId || null,
+    })
+    .returning('ID as NewID')
+    .executeTakeFirst();
 
-  const params: SqlParam[] = [
-    ['expenseDate', TYPES.Date, expenseData.expenseDate],
-    ['amount', TYPES.Int, expenseData.amount],
-    ['currency', TYPES.NChar, expenseData.currency || 'IQD'],
-    ['note', TYPES.NVarChar, expenseData.note || null],
-    ['categoryId', TYPES.Int, expenseData.categoryId || null],
-    ['subcategoryId', TYPES.Int, expenseData.subcategoryId || null],
-  ];
-
-  const result = await executeQuery<{ NewID: number }>(query, params, (columns: ColumnValue[]) => ({
-    NewID: columns[0]?.value as number,
-  }));
-
-  if (!result?.[0]) {
+  if (!row) {
     throw new Error('Failed to create expense: no ID returned');
   }
 
-  return result[0];
+  return row;
 }
 
 /**
@@ -259,29 +215,20 @@ export async function updateExpense(
   id: number,
   expenseData: ExpenseData
 ): Promise<{ success: boolean; id: number }> {
-  const query = `
-    UPDATE dbo.tblExpenses
-    SET
-      expenseDate = @expenseDate,
-      Amount = @amount,
-      Currency = @currency,
-      Note = @note,
-      CategoryID = @categoryId,
-      SubcategoryID = @subcategoryId
-    WHERE ID = @id
-  `;
+  const db = getKysely();
+  await db
+    .updateTable('tblExpenses')
+    .set({
+      expenseDate: sql<Date>`${expenseData.expenseDate}`,
+      Amount: expenseData.amount,
+      Currency: expenseData.currency || 'IQD',
+      Note: expenseData.note || null,
+      CategoryID: expenseData.categoryId || null,
+      SubcategoryID: expenseData.subcategoryId || null,
+    })
+    .where('ID', '=', id)
+    .execute();
 
-  const params: SqlParam[] = [
-    ['id', TYPES.Int, id],
-    ['expenseDate', TYPES.Date, expenseData.expenseDate],
-    ['amount', TYPES.Int, expenseData.amount],
-    ['currency', TYPES.NChar, expenseData.currency || 'IQD'],
-    ['note', TYPES.NVarChar, expenseData.note || null],
-    ['categoryId', TYPES.Int, expenseData.categoryId || null],
-    ['subcategoryId', TYPES.Int, expenseData.subcategoryId || null],
-  ];
-
-  await executeQuery(query, params, () => ({}));
   return { success: true, id };
 }
 
@@ -289,9 +236,8 @@ export async function updateExpense(
  * Deletes an expense
  */
 export async function deleteExpense(id: number): Promise<{ success: boolean; id: number }> {
-  const query = 'DELETE FROM dbo.tblExpenses WHERE ID = @id';
-
-  await executeQuery(query, [['id', TYPES.Int, id]], () => ({}));
+  const db = getKysely();
+  await db.deleteFrom('tblExpenses').where('ID', '=', id).execute();
   return { success: true, id };
 }
 
@@ -302,30 +248,22 @@ export async function getExpenseSummary(
   startDate: string,
   endDate: string
 ): Promise<ExpenseSummary[]> {
-  const query = `
-    SELECT
-      c.CategoryName,
-      LTRIM(RTRIM(e.Currency)) AS Currency,
-      COUNT(*) AS ExpenseCount,
-      SUM(e.Amount) AS TotalAmount
-    FROM dbo.tblExpenses e
-    LEFT JOIN dbo.tblExpenseCategories c ON e.CategoryID = c.CategoryID
-    WHERE e.expenseDate >= @startDate AND e.expenseDate <= @endDate
-    GROUP BY c.CategoryName, LTRIM(RTRIM(e.Currency))
-    ORDER BY c.CategoryName, LTRIM(RTRIM(e.Currency))
-  `;
-
-  const params: SqlParam[] = [
-    ['startDate', TYPES.Date, startDate],
-    ['endDate', TYPES.Date, endDate],
-  ];
-
-  return executeQuery<ExpenseSummary>(query, params, (columns: ColumnValue[]) => ({
-    CategoryName: columns[0].value as string | null,
-    Currency: columns[1].value as string,
-    ExpenseCount: columns[2].value as number,
-    TotalAmount: columns[3].value as number,
-  }));
+  const db = getKysely();
+  return db
+    .selectFrom('tblExpenses as e')
+    .leftJoin('tblExpenseCategories as c', 'e.CategoryID', 'c.CategoryID')
+    .where('e.expenseDate', '>=', sql<Date>`${startDate}`)
+    .where('e.expenseDate', '<=', sql<Date>`${endDate}`)
+    .groupBy(['c.CategoryName', sql`btrim(${sql.ref('e.Currency')})`])
+    .orderBy('c.CategoryName')
+    .orderBy(sql`btrim(${sql.ref('e.Currency')})`)
+    .select((eb) => [
+      'c.CategoryName',
+      sql<string>`btrim(${sql.ref('e.Currency')})`.as('Currency'),
+      eb.fn.countAll<number>().as('ExpenseCount'),
+      eb.fn.sum('e.Amount').$castTo<number>().as('TotalAmount'),
+    ])
+    .execute() as Promise<ExpenseSummary[]>;
 }
 
 /**
@@ -335,25 +273,17 @@ export async function getExpenseTotalsByCurrency(
   startDate: string,
   endDate: string
 ): Promise<ExpenseTotal[]> {
-  const query = `
-    SELECT
-      LTRIM(RTRIM(Currency)) AS Currency,
-      COUNT(*) AS ExpenseCount,
-      SUM(Amount) AS TotalAmount
-    FROM dbo.tblExpenses
-    WHERE expenseDate >= @startDate AND expenseDate <= @endDate
-    GROUP BY LTRIM(RTRIM(Currency))
-    ORDER BY LTRIM(RTRIM(Currency))
-  `;
-
-  const params: SqlParam[] = [
-    ['startDate', TYPES.Date, startDate],
-    ['endDate', TYPES.Date, endDate],
-  ];
-
-  return executeQuery<ExpenseTotal>(query, params, (columns: ColumnValue[]) => ({
-    Currency: columns[0].value as string,
-    ExpenseCount: columns[1].value as number,
-    TotalAmount: columns[2].value as number,
-  }));
+  const db = getKysely();
+  return db
+    .selectFrom('tblExpenses')
+    .where('expenseDate', '>=', sql<Date>`${startDate}`)
+    .where('expenseDate', '<=', sql<Date>`${endDate}`)
+    .groupBy(sql`btrim(${sql.ref('Currency')})`)
+    .orderBy(sql`btrim(${sql.ref('Currency')})`)
+    .select((eb) => [
+      sql<string>`btrim(${sql.ref('Currency')})`.as('Currency'),
+      eb.fn.countAll<number>().as('ExpenseCount'),
+      eb.fn.sum('Amount').$castTo<number>().as('TotalAmount'),
+    ])
+    .execute() as Promise<ExpenseTotal[]>;
 }

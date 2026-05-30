@@ -1,11 +1,17 @@
 /**
  * Patient portal authentication queries
  *
- * Manages the dbo.tblPatientPortalAuth table: PIN hash, enabled flag,
+ * Manages the tblPatientPortalAuth table: PIN hash, enabled flag,
  * failed-attempt lockout, and last-login tracking.
+ *
+ * Migration Phase 4: translated to typed Kysely (PostgreSQL). The MERGE upsert
+ * became `ON CONFLICT (PersonID) DO UPDATE` against the PK. Timestamp columns
+ * (`LockedUntil`, `LastLoginAt`, `CreatedAt`, `UpdatedAt`) are PG `timestamp` →
+ * parsed to local Date by kysely.ts. `SYSUTCDATETIME()` → `now() AT TIME ZONE 'UTC'`
+ * to preserve the UTC wall-clock the columns were written with.
  */
-import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery, TYPES } from '../index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../kysely.js';
 
 export interface PortalAuthRow {
   PersonID: number;
@@ -18,61 +24,57 @@ export interface PortalAuthRow {
   UpdatedAt: Date;
 }
 
-const mapAuthRow = (columns: ColumnValue[]): PortalAuthRow => {
-  const row = {} as Record<string, unknown>;
-  for (const c of columns) row[c.metadata.colName] = c.value;
-  return {
-    PersonID: row.PersonID as number,
-    PinHash: row.PinHash as string,
-    Enabled: Boolean(row.Enabled),
-    FailedAttempts: row.FailedAttempts as number,
-    LockedUntil: (row.LockedUntil as Date) ?? null,
-    LastLoginAt: (row.LastLoginAt as Date) ?? null,
-    CreatedAt: row.CreatedAt as Date,
-    UpdatedAt: row.UpdatedAt as Date,
-  };
-};
+const utcNow = sql<Date>`now() at time zone 'UTC'`;
 
 export async function getAuthRow(personId: number): Promise<PortalAuthRow | null> {
-  const rows = await executeQuery<PortalAuthRow>(
-    `SELECT PersonID, PinHash, Enabled, FailedAttempts, LockedUntil, LastLoginAt, CreatedAt, UpdatedAt
-     FROM dbo.tblPatientPortalAuth WHERE PersonID = @PID`,
-    [['PID', TYPES.Int, personId]],
-    mapAuthRow
-  );
-  return rows[0] ?? null;
+  const db = getKysely();
+  const row = await db
+    .selectFrom('tblPatientPortalAuth')
+    .where('PersonID', '=', personId)
+    .select([
+      'PersonID',
+      'PinHash',
+      'Enabled',
+      'FailedAttempts',
+      'LockedUntil',
+      'LastLoginAt',
+      'CreatedAt',
+      'UpdatedAt',
+    ])
+    .executeTakeFirst();
+
+  return row ?? null;
 }
 
 export async function upsertPin(personId: number, pinHash: string): Promise<void> {
-  await executeQuery(
-    `MERGE dbo.tblPatientPortalAuth AS target
-     USING (SELECT @PID AS PersonID) AS src
-       ON target.PersonID = src.PersonID
-     WHEN MATCHED THEN
-       UPDATE SET PinHash = @Hash,
-                  Enabled = 1,
-                  FailedAttempts = 0,
-                  LockedUntil = NULL,
-                  UpdatedAt = SYSUTCDATETIME()
-     WHEN NOT MATCHED THEN
-       INSERT (PersonID, PinHash) VALUES (@PID, @Hash);`,
-    [
-      ['PID', TYPES.Int, personId],
-      ['Hash', TYPES.NVarChar, pinHash],
-    ]
-  );
+  const db = getKysely();
+  await db
+    .insertInto('tblPatientPortalAuth')
+    .values({ PersonID: personId, PinHash: pinHash })
+    .onConflict((oc) =>
+      oc.column('PersonID').doUpdateSet({
+        PinHash: pinHash,
+        Enabled: true,
+        FailedAttempts: 0,
+        LockedUntil: null,
+        UpdatedAt: utcNow,
+      })
+    )
+    .execute();
 }
 
 export async function recordSuccessfulLogin(personId: number): Promise<void> {
-  await executeQuery(
-    `UPDATE dbo.tblPatientPortalAuth
-     SET FailedAttempts = 0,
-         LockedUntil = NULL,
-         LastLoginAt = SYSUTCDATETIME(),
-         UpdatedAt = SYSUTCDATETIME()
-     WHERE PersonID = @PID`,
-    [['PID', TYPES.Int, personId]]
-  );
+  const db = getKysely();
+  await db
+    .updateTable('tblPatientPortalAuth')
+    .set({
+      FailedAttempts: 0,
+      LockedUntil: null,
+      LastLoginAt: utcNow,
+      UpdatedAt: utcNow,
+    })
+    .where('PersonID', '=', personId)
+    .execute();
 }
 
 /**
@@ -82,27 +84,21 @@ export async function recordSuccessfulLogin(personId: number): Promise<void> {
 export async function recordFailedAttempt(
   personId: number
 ): Promise<{ failedAttempts: number; lockedUntil: Date | null }> {
-  const rows = await executeQuery<{ FailedAttempts: number; LockedUntil: Date | null }>(
-    `UPDATE dbo.tblPatientPortalAuth
-     SET FailedAttempts = FailedAttempts + 1,
-         LockedUntil = CASE
-           WHEN FailedAttempts + 1 >= 5 THEN DATEADD(MINUTE, 30, SYSUTCDATETIME())
-           ELSE LockedUntil
-         END,
-         UpdatedAt = SYSUTCDATETIME()
-     OUTPUT INSERTED.FailedAttempts, INSERTED.LockedUntil
-     WHERE PersonID = @PID`,
-    [['PID', TYPES.Int, personId]],
-    (columns) => {
-      const r = {} as Record<string, unknown>;
-      for (const c of columns) r[c.metadata.colName] = c.value;
-      return {
-        FailedAttempts: r.FailedAttempts as number,
-        LockedUntil: (r.LockedUntil as Date) ?? null,
-      };
-    }
-  );
-  const row = rows[0];
+  const db = getKysely();
+  const row = await db
+    .updateTable('tblPatientPortalAuth')
+    .set((eb) => ({
+      FailedAttempts: eb('FailedAttempts', '+', 1),
+      LockedUntil: sql<Date | null>`case
+        when ${eb.ref('FailedAttempts')} + 1 >= 5 then (now() at time zone 'UTC') + interval '30 minutes'
+        else ${eb.ref('LockedUntil')}
+      end`,
+      UpdatedAt: utcNow,
+    }))
+    .where('PersonID', '=', personId)
+    .returning(['FailedAttempts', 'LockedUntil'])
+    .executeTakeFirst();
+
   return {
     failedAttempts: row?.FailedAttempts ?? 0,
     lockedUntil: row?.LockedUntil ?? null,
@@ -110,22 +106,19 @@ export async function recordFailedAttempt(
 }
 
 export async function setEnabled(personId: number, enabled: boolean): Promise<void> {
-  await executeQuery(
-    `UPDATE dbo.tblPatientPortalAuth
-     SET Enabled = @En, UpdatedAt = SYSUTCDATETIME()
-     WHERE PersonID = @PID`,
-    [
-      ['PID', TYPES.Int, personId],
-      ['En', TYPES.Bit, enabled ? 1 : 0],
-    ]
-  );
+  const db = getKysely();
+  await db
+    .updateTable('tblPatientPortalAuth')
+    .set({ Enabled: enabled, UpdatedAt: utcNow })
+    .where('PersonID', '=', personId)
+    .execute();
 }
 
 export async function clearLockout(personId: number): Promise<void> {
-  await executeQuery(
-    `UPDATE dbo.tblPatientPortalAuth
-     SET FailedAttempts = 0, LockedUntil = NULL, UpdatedAt = SYSUTCDATETIME()
-     WHERE PersonID = @PID`,
-    [['PID', TYPES.Int, personId]]
-  );
+  const db = getKysely();
+  await db
+    .updateTable('tblPatientPortalAuth')
+    .set({ FailedAttempts: 0, LockedUntil: null, UpdatedAt: utcNow })
+    .where('PersonID', '=', personId)
+    .execute();
 }

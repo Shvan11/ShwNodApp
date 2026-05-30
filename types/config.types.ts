@@ -47,6 +47,26 @@ export interface DatabaseConfig {
   authentication: DatabaseAuth;
 }
 
+/**
+ * Active database driver. `mssql` = legacy SQL Server (default during migration);
+ * `pg` = PostgreSQL (migration target). Selected by the DB_DRIVER env var.
+ */
+export type DbDriver = 'mssql' | 'pg';
+
+/**
+ * PostgreSQL connection configuration (node-postgres pool).
+ */
+export interface PgDatabaseConfig {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password: string;
+  max: number;
+  connectionTimeoutMillis: number;
+  idleTimeoutMillis: number;
+}
+
 // ===========================================
 // SERVICE CONFIGS
 // ===========================================
@@ -128,6 +148,8 @@ export interface UrlConfig {
  */
 export interface AppConfig {
   database: DatabaseConfig;
+  dbDriver: DbDriver;
+  databasePg: PgDatabaseConfig;
   telegram: TelegramConfig;
   twilio: TwilioConfig;
   google: GoogleConfig;
@@ -164,6 +186,13 @@ export interface RequiredEnvVars {
  */
 export interface OptionalEnvVars {
   DB_DATABASE?: string;
+  DB_DRIVER?: 'mssql' | 'pg';
+  PG_HOST?: string;
+  PG_PORT?: string;
+  PG_DATABASE?: string;
+  PG_USER?: string;
+  PG_PASSWORD?: string;
+  DATABASE_URL?: string;
   PORT?: string;
   NODE_ENV?: Environment;
   MACHINE_PATH?: string;

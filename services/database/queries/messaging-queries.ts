@@ -1,8 +1,19 @@
 /**
- * Enhanced Messaging Queries Module with new infrastructure integration
- * Provides functions for WhatsApp and SMS messaging database operations
+ * Messaging queries (WhatsApp + SMS) — PostgreSQL / Kysely.
+ *
+ * Phase 5: every stored proc this module used (GetWhatsAppMessagesToSend, ProcSMS, ProcFetch,
+ * Procgetsids, GetMessageStatusByDate, UpdateWhatsAppStatus, UpdateWhatsAppDeliveryStatus,
+ * UpdateSingleMessageStatus, ProcUpdatesms1/2) is reimplemented here. The Arabic/English message
+ * building, relative-day logic, and phone normalisation the procs did in T-SQL now live in TS;
+ * the TVP-driven bulk updates (WhatsTableType / SMSStatusType) become PG `unnest($1::int[], …)`
+ * set-based updates. `getNewAppointmentMessage` (was GetNewAppointmentMessage) and
+ * `resetMessagingForDate` (was ResetMessagingForDate) are added for the route callers.
+ *
+ * The DatabaseCircuitBreaker wrapper and public function signatures are unchanged.
  */
-import { executeStoredProcedure, TYPES } from '../index.js';
+import { sql } from 'kysely';
+import { getKysely, withPgTransaction } from '../kysely.js';
+import { arabicDay } from '../../../utils/arabic-day.js';
 import { log } from '../../../utils/logger.js';
 
 // Type definitions
@@ -10,14 +21,6 @@ interface CircuitBreakerStatus {
   state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
   failureCount: number;
   lastFailureTime: number | null;
-}
-
-interface WhatsAppMessage {
-  id: number;
-  number: string;
-  name: string;
-  message: string;
-  appTime: Date;
 }
 
 interface WhatsAppDeliveryMessage {
@@ -96,6 +99,26 @@ interface SmsIdMessage {
 interface SmsStatusMessage {
   id: number;
   status: string;
+}
+
+/** Result of getNewAppointmentMessage (was the GetNewAppointmentMessage proc). */
+interface NewAppointmentMessage {
+  result: number; // 0 ok, -1 not found, -2 invalid phone
+  phone: string | null;
+  message: string | null;
+  countryCode: string | null;
+}
+
+/** Reset statistics (was the ResetMessagingForDate proc's result set). */
+interface ResetResult {
+  resetDate: string;
+  totalAppointments: number;
+  readyForWhatsApp: number;
+  readyForSMS: number;
+  alreadySentWA: number;
+  alreadyNotified: number;
+  appointmentsReset: number;
+  smsRecordsReset: number;
 }
 
 /**
@@ -185,6 +208,60 @@ class DatabaseCircuitBreaker {
 
 const dbCircuitBreaker = new DatabaseCircuitBreaker();
 
+// ── Message-building helpers (replace the T-SQL string assembly inside the procs) ──
+
+const ENGLISH_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** Parse a date-only string as LOCAL midnight (avoids the UTC-parse day-shift). */
+function parseLocalDate(value: Date | string): Date {
+  if (value instanceof Date) return value;
+  return /^\d{4}-\d{2}-\d{2}/.test(value) ? new Date(`${value.slice(0, 10)}T00:00:00`) : new Date(value);
+}
+
+/** SQL `DATENAME(dw, ...)` — English weekday name. */
+function englishDay(value: Date | string): string {
+  return ENGLISH_DAYS[parseLocalDate(value).getDay()] ?? '';
+}
+
+/** SQL `DATEDIFF(day, GETDATE(), @date)` — whole days from today (local) to the target date. */
+function daysFromToday(target: Date | string): number {
+  const t = parseLocalDate(target);
+  const now = new Date();
+  const a = Date.UTC(t.getFullYear(), t.getMonth(), t.getDate());
+  const b = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((a - b) / 86_400_000);
+}
+
+/** SQL `FORMAT(dt, 'h:mm')` / `'h:mm tt'` — 12-hour clock, no leading-zero hour. */
+function format12h(date: Date, withMeridiem = false): string {
+  const h = date.getHours();
+  const m = String(date.getMinutes()).padStart(2, '0');
+  const h12 = h % 12 || 12;
+  return withMeridiem ? `${h12}:${m} ${h < 12 ? 'AM' : 'PM'}` : `${h12}:${m}`;
+}
+
+/** SQL `FORMAT(d, 'dd/MM/yyyy')`. */
+function formatDMY(value: Date | string): string {
+  const d = parseLocalDate(value);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
+
+/** Normalise a local phone to `CountryCode + number` (no '+'), matching the procs' CASE ladder. */
+function formatPhone(phone: string, countryCode: string): string {
+  const p = phone.trim();
+  if (p.startsWith(`+${countryCode}`)) return p.slice(1);
+  if (p.startsWith(`00${countryCode}`)) return p.slice(2);
+  if (p.startsWith(countryCode)) return p;
+  if (p.startsWith('0')) return countryCode + p.slice(1);
+  return countryCode + p;
+}
+
+/** The procs' phone validation: non-empty, digits/'+' only, at least one digit. */
+function isValidPhone(phone: string | null | undefined): phone is string {
+  if (!phone) return false;
+  const p = phone.trim();
+  return p.length > 0 && /^[0-9+]+$/.test(p) && /[0-9]/.test(p);
+}
 
 /**
  * Helper function to convert WhatsApp acknowledgment status codes to text
@@ -209,8 +286,45 @@ function convertAckStatus(ack: number): string {
   }
 }
 
+/** trg_MessageStatusHistory's status-text → numeric code mapping. */
+function statusTextToCode(status: string): number {
+  switch (status) {
+    case 'ERROR': return -1;
+    case 'SERVER': return 1;
+    case 'DEVICE': return 2;
+    case 'READ': return 3;
+    case 'PLAYED': return 4;
+    default: return 0; // PENDING / unknown
+  }
+}
+
 /**
- * Enhanced updateWhatsAppDeliveryStatus with transaction management and circuit breaker
+ * Replaces trg_MessageStatusHistory: append a history row for each appointment whose DeliveredWa
+ * actually changed (new value <> old, treating old NULL as ''). Runs inside the caller's trx.
+ */
+async function insertStatusHistory(
+  trx: import('kysely').Transaction<import('../kysely.js').Database>,
+  changes: Array<{ appointmentID: number; waMessageID: string | null; delivered: string }>,
+  when: Date
+): Promise<void> {
+  if (changes.length === 0) return;
+  await trx
+    .insertInto('tblMessageStatusHistory')
+    .values(
+      changes.map((c) => ({
+        AppointmentID: c.appointmentID,
+        WaMessageID: c.waMessageID ?? '',
+        StatusCode: statusTextToCode(c.delivered),
+        StatusText: c.delivered,
+        Timestamp: when,
+      }))
+    )
+    .execute();
+}
+
+/**
+ * Enhanced updateWhatsAppDeliveryStatus with transaction management and circuit breaker.
+ * (was: UpdateWhatsAppDeliveryStatus TVP proc → set-based UPDATE … FROM unnest.)
  */
 export async function updateWhatsAppDeliveryStatus(
   messages: StatusUpdateMessage[]
@@ -219,111 +333,74 @@ export async function updateWhatsAppDeliveryStatus(
 
   return dbCircuitBreaker
     .execute(async () => {
-      log.info('Starting WhatsApp delivery status update', {
-        messageCount: messages.length,
-      });
-
       if (!messages || messages.length === 0) {
         return { success: true, updatedCount: 0 };
       }
 
-      // Group messages by status for better logging
-      const statusGroups: Record<string, number> = {};
-      messages.forEach((msg) => {
-        const status = convertAckStatus(msg.ack);
-        if (!statusGroups[status]) statusGroups[status] = 0;
-        statusGroups[status]++;
+      const ids = messages.map((m) => m.id);
+      const statuses = messages.map((m) => convertAckStatus(m.ack));
+      const wamids = messages.map((m) => m.whatsappMessageId || '');
+      const now = new Date();
+
+      const c = await withPgTransaction(async (trx) => {
+        // Old DeliveredWa per appointment (to drive the trg_MessageStatusHistory equivalent).
+        const oldRows = await trx
+          .selectFrom('tblappointments')
+          .select(['appointmentID', 'DeliveredWa'])
+          .where('appointmentID', 'in', ids)
+          .execute();
+        const oldById = new Map(oldRows.map((r) => [r.appointmentID, (r.DeliveredWa as string | null) ?? '']));
+
+        await sql`
+          UPDATE "tblappointments" AS a SET
+            "DeliveredWa" = w.delivered,
+            "WaMessageID" = w.wamid,
+            "WantNotify" = CASE WHEN w.delivered IN ('READ','DEVICE','SERVER') THEN false ELSE a."WantNotify" END,
+            "LastUpdated" = ${now}::timestamp,
+            "DeliveredTimestamp" = CASE
+              WHEN w.delivered IN ('DEVICE','SERVER') AND a."DeliveredTimestamp" IS NULL THEN ${now}::timestamp
+              ELSE a."DeliveredTimestamp" END,
+            "ReadTimestamp" = CASE
+              WHEN w.delivered = 'READ' AND a."ReadTimestamp" IS NULL THEN ${now}::timestamp
+              ELSE a."ReadTimestamp" END
+          FROM unnest(${ids}::int[], ${statuses}::text[], ${wamids}::text[]) AS w(appointmentid, delivered, wamid)
+          WHERE a."appointmentID" = w.appointmentid
+        `.execute(trx);
+
+        const changed = messages
+          .map((m) => ({ appointmentID: m.id, waMessageID: m.whatsappMessageId || '', delivered: convertAckStatus(m.ack) }))
+          .filter((m) => m.delivered !== oldById.get(m.appointmentID));
+        await insertStatusHistory(trx, changed, now);
+
+        const { rows } = await sql<{ total: number; read: number; delivered: number; server: number }>`
+          SELECT
+            COUNT(*)::int AS total,
+            COALESCE(SUM(CASE WHEN "DeliveredWa" = 'READ'   THEN 1 ELSE 0 END), 0)::int AS read,
+            COALESCE(SUM(CASE WHEN "DeliveredWa" = 'DEVICE' THEN 1 ELSE 0 END), 0)::int AS delivered,
+            COALESCE(SUM(CASE WHEN "DeliveredWa" = 'SERVER' THEN 1 ELSE 0 END), 0)::int AS server
+          FROM "tblappointments" WHERE "appointmentID" = ANY(${ids}::int[])
+        `.execute(trx);
+        return rows[0] ?? { total: messages.length, read: 0, delivered: 0, server: 0 };
       });
-
-      log.debug('WhatsApp status distribution', { statusGroups });
-      log.debug('Processing message batch data', {
-        messages: messages.map((m) => ({
-          id: m.id,
-          ack: m.ack,
-          whatsappMessageId: m.whatsappMessageId,
-        })),
-      });
-
-      const rows = messages.map((message) => {
-        const status = convertAckStatus(message.ack);
-        const waMessageId = message.whatsappMessageId || '';
-        log.debug('Processing individual message', {
-          appointmentId: message.id,
-          whatsappMessageId: waMessageId,
-          status,
-        });
-
-        return [
-          message.id, // AppointmentID
-          null, // SentWa (bit) - null for status updates
-          status, // DeliveredWa (nvarchar 50)
-          waMessageId, // WaMessageID (nvarchar 255) - store WhatsApp message ID
-          new Date(), // LastUpdated (datetime)
-          null, // SentTimestamp (datetime) - null for delivery status updates
-        ];
-      });
-
-      const tableDefinition = {
-        columns: [
-          { name: 'AppointmentID', type: TYPES.Int },
-          { name: 'SentWa', type: TYPES.Bit },
-          { name: 'DeliveredWa', type: TYPES.NVarChar(50) },
-          { name: 'WaMessageID', type: TYPES.NVarChar(255) },
-          { name: 'LastUpdated', type: TYPES.DateTime },
-          { name: 'SentTimestamp', type: TYPES.DateTime },
-        ],
-        rows: rows,
+      const stats = {
+        totalUpdated: c.total,
+        readCount: c.read,
+        deliveredCount: c.delivered,
+        serverCount: c.server,
       };
-
-      interface StatusStats {
-        totalUpdated: number;
-        readCount: number;
-        deliveredCount: number;
-        serverCount: number;
-      }
-
-      return executeStoredProcedure<StatusStats, UpdateResult>(
-        'UpdateWhatsAppDeliveryStatus',
-        [['AIDS', TYPES.TVP, tableDefinition]],
-        undefined,
-        (columns) => {
-          if (columns.length >= 4) {
-            return {
-              totalUpdated: columns[0].value as number,
-              readCount: columns[1].value as number,
-              deliveredCount: columns[2].value as number,
-              serverCount: columns[3].value as number,
-            };
-          }
-          return { totalUpdated: 0, readCount: 0, deliveredCount: 0, serverCount: 0 };
-        },
-        (result) => {
-          if (result && result.length > 0) {
-            const stats = result[0];
-            log.info('WhatsApp status update completed', {
-              totalUpdated: stats.totalUpdated,
-              readCount: stats.readCount,
-              deliveredCount: stats.deliveredCount,
-              serverCount: stats.serverCount,
-            });
-            return { success: true, updatedCount: stats.totalUpdated, stats };
-          }
-          return { success: true, updatedCount: rows.length, stats: null };
-        }
-      );
+      log.info('WhatsApp status update completed', stats);
+      return { success: true, updatedCount: stats.totalUpdated, stats };
     }, operationName)
     .catch((error: Error) => {
-      log.error('WhatsApp delivery status update failed', { operationName , error: error.message });
-      return {
-        success: false,
-        error: error.message,
-        updatedCount: 0,
-      };
+      log.error('WhatsApp delivery status update failed', { operationName, error: error.message });
+      return { success: false, error: error.message, updatedCount: 0 };
     });
 }
 
 /**
- * Enhanced getWhatsAppMessages with connection pooling and circuit breaker
+ * Enhanced getWhatsAppMessages with circuit breaker. (was: GetWhatsAppMessagesToSend)
+ * Only returns rows when the date is tomorrow or the day after (else an empty payload), then
+ * marks tblsms.smssent for that date — matching the proc.
  */
 export async function getWhatsAppMessages(
   date: Date | string
@@ -332,67 +409,74 @@ export async function getWhatsAppMessages(
 
   return dbCircuitBreaker
     .execute(async () => {
-      log.debug('Retrieving WhatsApp messages', { date });
+      const dd = daysFromToday(date);
+      if (dd !== 1 && dd !== 2) return [[], [], [], []] as [string[], string[], number[], string[]];
 
-      return executeStoredProcedure<WhatsAppMessage, [string[], string[], number[], string[]]>(
-        'GetWhatsAppMessagesToSend',
-        [['ADate', TYPES.Date, date]],
-        undefined,
-        (columns) => {
-          if (columns.length >= 5) {
-            return {
-              id: columns[0].value as number,
-              number: columns[1].value as string,
-              name: columns[2].value as string,
-              message: columns[3].value as string,
-              appTime: columns[4].value as Date,
-            };
-          }
-          return { id: 0, number: '', name: '', message: '', appTime: new Date() };
-        },
-        (result) => {
-          const numbers = result.map((r) => r.number || '');
-          const messages = result.map((r) => r.message || '');
-          const ids = result.map((r) => r.id || 0);
-          const names = result.map((r) => r.name || '');
+      const dateStr = typeof date === 'string' ? date.slice(0, 10) : parseLocalDate(date).toISOString().slice(0, 10);
+      const aDay = arabicDay(dateStr);
+      const eDay = englishDay(dateStr);
+      const aMes =
+        dd === 1
+          ? `غدا ${aDay} موعدك مع عيادة د.شوان لتقويم الاسنان الساعة`
+          : `بعد غد ${aDay} موعدك مع عيادة د.شوان لتقويم الاسنان الساعة`;
+      const eMes =
+        dd === 1
+          ? `Tomorrow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at`
+          : `The day after tomorrow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at`;
 
-          log.debug('WhatsApp messages retrieved successfully', { messageCount: result.length, date });
+      const candidates = await getKysely()
+        .selectFrom('tblappointments as a')
+        .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
+        .where('a.AppDay', '=', sql<Date>`${dateStr}::date`)
+        .where('a.WantWa', '=', true)
+        .where((eb) => eb.or([eb('a.Notified', 'is', null), eb('a.Notified', '=', false)]))
+        .where((eb) => eb.or([eb('a.SentWa', 'is', null), eb('a.SentWa', '=', false)]))
+        .where('p.Phone', 'is not', null)
+        .orderBy('a.AppTime')
+        .select([
+          'a.appointmentID as id',
+          'p.Phone as phone',
+          'p.CountryCode as countryCode',
+          'p.PatientName as patientName',
+          'p.FirstName as firstName',
+          'p.Language as language',
+          'a.AppDate as appDate',
+        ])
+        .execute();
 
-          if (result.length > 0) {
-            const timeGroups: Record<number, number> = {};
-            result.forEach((r) => {
-              const hour = new Date(r.appTime).getHours();
-              if (!timeGroups[hour]) timeGroups[hour] = 0;
-              timeGroups[hour]++;
-            });
-            log.debug('Appointment time distribution analysis', { timeGroups });
+      const numbers: string[] = [];
+      const messages: string[] = [];
+      const ids: number[] = [];
+      const names: string[] = [];
 
-            const sampleCount = Math.min(3, result.length);
-            for (let i = 0; i < sampleCount; i++) {
-              const message = result[i].message || '';
-              const msgPreview = message.length > 30 ? message.substring(0, 30) + '...' : message;
-              log.debug('Sample message preview', {
-                sampleNumber: i + 1,
-                appointmentId: result[i].id,
-                appointmentTime: new Date(result[i].appTime).toLocaleTimeString(),
-                phoneNumber: result[i].number,
-                messagePreview: msgPreview,
-              });
-            }
-          }
+      for (const r of candidates) {
+        if (!isValidPhone(r.phone)) continue;
+        const cc = r.countryCode || '964';
+        const appDate = r.appDate as unknown as Date;
+        const time = format12h(appDate);
+        const message =
+          r.language === 1
+            ? `Hello ${r.firstName || r.patientName}. ${eMes} ${time}`
+            : `السلام عليك ${r.patientName}. ${aMes} ${time}`;
+        numbers.push(formatPhone(r.phone, cc));
+        messages.push(message);
+        ids.push(r.id);
+        names.push(r.patientName || '');
+      }
 
-          return [numbers, messages, ids, names];
-        }
-      );
+      await sql`UPDATE "tblsms" SET "smssent" = true WHERE "date" = ${dateStr}::date`.execute(getKysely());
+
+      log.debug('WhatsApp messages retrieved successfully', { messageCount: ids.length, date });
+      return [numbers, messages, ids, names] as [string[], string[], number[], string[]];
     }, operationName)
     .catch((error: Error) => {
-      log.error('Failed to retrieve WhatsApp messages', { operationName , error: error.message });
-      return [[], [], [], []];
+      log.error('Failed to retrieve WhatsApp messages', { operationName, error: error.message });
+      return [[], [], [], []] as [string[], string[], number[], string[]];
     });
 }
 
 /**
- * Enhanced updateWhatsAppStatus with transaction management
+ * Enhanced updateWhatsAppStatus — mark a batch as sent. (was: UpdateWhatsAppStatus TVP proc.)
  */
 export async function updateWhatsAppStatus(
   appointmentIds: number[],
@@ -401,87 +485,34 @@ export async function updateWhatsAppStatus(
   const operationName = 'updateWhatsAppStatus';
 
   if (!appointmentIds || !appointmentIds.length) {
-    log.debug('No WhatsApp messages to update');
     return { success: true, updatedCount: 0 };
   }
 
   return dbCircuitBreaker
     .execute(async () => {
-      log.info('Starting WhatsApp status update', {
-        messageCount: appointmentIds.length,
-      });
+      const now = new Date();
+      const result = await sql`
+        UPDATE "tblappointments" AS a SET
+          "SentWa" = true,
+          "WaMessageID" = w.wamid,
+          "WantWa" = false,
+          "SentTimestamp" = ${now}::timestamp
+        FROM unnest(${appointmentIds}::int[], ${messageIds}::text[]) AS w(appointmentid, wamid)
+        WHERE a."appointmentID" = w.appointmentid
+      `.execute(getKysely());
 
-      // Log sample IDs for debugging
-      if (appointmentIds.length <= 5) {
-        log.debug('WhatsApp appointment IDs to update', { appointmentIds });
-        log.debug('WhatsApp message IDs to update', { messageIds });
-      } else {
-        log.debug('WhatsApp appointment IDs sample', {
-          sampleIds: appointmentIds.slice(0, 3),
-          totalCount: appointmentIds.length,
-        });
-      }
-
-      const rows: Array<[number, number, null, string, Date, Date]> = [];
-
-      // Create table rows for the procedure (6 columns to match WhatsTableType)
-      for (let i = 0; i < appointmentIds.length; i++) {
-        rows.push([
-          appointmentIds[i], // AppointmentID
-          1, // SentWa - Set to 1 to mark as sent
-          null, // DeliveredWa - Not updated here
-          messageIds[i], // WaMessageID - Store the message ID
-          new Date(), // LastUpdated
-          new Date(), // SentTimestamp - When message was sent
-        ]);
-      }
-
-      // Table definition (6 columns to match WhatsTableType)
-      const tableDefinition = {
-        columns: [
-          { name: 'AppointmentID', type: TYPES.Int },
-          { name: 'SentWa', type: TYPES.Bit },
-          { name: 'DeliveredWa', type: TYPES.NVarChar(50) },
-          { name: 'WaMessageID', type: TYPES.NVarChar(255) },
-          { name: 'LastUpdated', type: TYPES.DateTime },
-          { name: 'SentTimestamp', type: TYPES.DateTime },
-        ],
-        rows: rows,
-      };
-
-      interface UpdateCount {
-        updatedCount: number;
-      }
-
-      return executeStoredProcedure<UpdateCount, UpdateResult>(
-        'UpdateWhatsAppStatus',
-        [['AIDS', TYPES.TVP, tableDefinition]],
-        undefined,
-        (columns) => {
-          if (columns.length >= 1) {
-            return { updatedCount: columns[0].value as number };
-          }
-          return { updatedCount: 0 };
-        },
-        (result) => {
-          const updatedCount = result && result.length > 0 ? result[0].updatedCount : rows.length;
-          log.info('WhatsApp status update completed successfully', { updatedCount });
-          return { success: true, updatedCount };
-        }
-      );
+      const updatedCount = Number(result.numAffectedRows ?? appointmentIds.length);
+      log.info('WhatsApp status update completed successfully', { updatedCount });
+      return { success: true, updatedCount };
     }, operationName)
     .catch((error: Error) => {
-      log.error('WhatsApp status update failed', { operationName , error: error.message });
-      return {
-        success: false,
-        error: error.message,
-        updatedCount: 0,
-      };
+      log.error('WhatsApp status update failed', { operationName, error: error.message });
+      return { success: false, error: error.message, updatedCount: 0 };
     });
 }
 
 /**
- * Enhanced updateSingleMessageStatus with better error handling and transactions
+ * Enhanced updateSingleMessageStatus. (was: UpdateSingleMessageStatus proc + @Result OUTPUT.)
  */
 export async function updateSingleMessageStatus(
   messageId: string,
@@ -491,88 +522,73 @@ export async function updateSingleMessageStatus(
 
   return dbCircuitBreaker
     .execute(async () => {
-      log.info('Updating single message status', { messageId, status });
-
       const statusText = convertAckStatus(status);
-      const currentTimestamp = new Date();
+      const now = new Date();
 
-      interface AppointmentInfo {
-        appointmentId: number;
-        patientName: string;
-        phone: string;
-        status: string;
-        lastUpdated: Date;
-      }
+      return withPgTransaction(async (trx) => {
+        const existing = await trx
+          .selectFrom('tblappointments')
+          .select(['appointmentID', 'DeliveredWa'])
+          .where('WaMessageID', '=', messageId)
+          .executeTakeFirst();
 
-      return executeStoredProcedure<AppointmentInfo, SingleMessageResult>(
-        'UpdateSingleMessageStatus',
-        [
-          ['MessageId', TYPES.NVarChar, messageId],
-          ['Status', TYPES.NVarChar, statusText],
-          ['LastUpdated', TYPES.DateTime, currentTimestamp],
-        ],
-        [['Result', TYPES.Int]],
-        (columns) => {
-          if (columns.length >= 5) {
-            return {
-              appointmentId: columns[0].value as number,
-              patientName: columns[1].value as string,
-              phone: columns[2].value as string,
-              status: columns[3].value as string,
-              lastUpdated: columns[4].value as Date,
-            };
-          }
-          return {
-            appointmentId: 0,
-            patientName: '',
-            phone: '',
-            status: '',
-            lastUpdated: new Date(),
-          };
-        },
-        (result, outParams) => {
-          const success = outParams && outParams.length > 0 && outParams[0].value === 1;
-
-          if (success && result && result.length > 0) {
-            const appointment = result[0];
-            log.info('Single message status updated successfully', {
-              messageId,
-              appointmentId: appointment.appointmentId,
-              patientName: appointment.patientName,
-            });
-
-            return {
-              success: true,
-              found: true,
-              appointment,
-            };
-          } else if (success) {
-            log.info('Single message status updated successfully', { messageId });
-            return {
-              success: true,
-              found: true,
-            };
-          } else {
-            log.warn('Message ID not found in database', { messageId });
-            return {
-              success: true,
-              found: false,
-            };
-          }
+        if (!existing) {
+          log.warn('Message ID not found in database', { messageId });
+          return { success: true, found: false };
         }
-      );
+
+        const oldDelivered = (existing.DeliveredWa as string | null) ?? '';
+
+        await sql`
+          UPDATE "tblappointments" SET
+            "DeliveredWa" = ${statusText},
+            "WantNotify" = CASE WHEN ${statusText} IN ('READ','DEVICE','SERVER') THEN false ELSE "WantNotify" END,
+            "LastUpdated" = ${now}::timestamp,
+            "DeliveredTimestamp" = CASE
+              WHEN ${statusText} IN ('DEVICE','SERVER') AND "DeliveredTimestamp" IS NULL THEN ${now}::timestamp
+              ELSE "DeliveredTimestamp" END,
+            "ReadTimestamp" = CASE
+              WHEN ${statusText} = 'READ' AND "ReadTimestamp" IS NULL THEN ${now}::timestamp
+              ELSE "ReadTimestamp" END
+          WHERE "appointmentID" = ${existing.appointmentID}
+        `.execute(trx);
+
+        if (statusText !== oldDelivered) {
+          await insertStatusHistory(trx, [{ appointmentID: existing.appointmentID, waMessageID: messageId, delivered: statusText }], now);
+        }
+
+        const info = await trx
+          .selectFrom('tblappointments as a')
+          .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
+          .where('a.appointmentID', '=', existing.appointmentID)
+          .select(['a.appointmentID', 'p.PatientName', 'p.Phone', 'a.DeliveredWa', 'a.LastUpdated'])
+          .executeTakeFirst();
+
+        log.info('Single message status updated successfully', { messageId, appointmentId: existing.appointmentID });
+        return {
+          success: true,
+          found: true,
+          appointment: info
+            ? {
+                appointmentId: info.appointmentID,
+                patientName: info.PatientName,
+                phone: info.Phone ?? '',
+                status: info.DeliveredWa ?? '',
+                lastUpdated: info.LastUpdated as Date,
+              }
+            : undefined,
+        };
+      });
     }, operationName)
     .catch((error: Error) => {
-      log.error('Single message status update failed', { operationName , error: error.message });
-      return {
-        success: false,
-        error: error.message,
-      };
+      log.error('Single message status update failed', { operationName, error: error.message });
+      return { success: false, error: error.message };
     });
 }
 
 /**
- * Enhanced getWhatsAppDeliveryStatus with connection pooling
+ * Enhanced getWhatsAppDeliveryStatus — sent WA messages with a wamid for status polling.
+ * (was: ProcFetch — note it returns the `@c.us`-suffixed chat id as `number`.)
  */
 export async function getWhatsAppDeliveryStatus(
   date: Date | string
@@ -581,34 +597,24 @@ export async function getWhatsAppDeliveryStatus(
 
   return dbCircuitBreaker
     .execute(async () => {
-      log.info('Retrieving WhatsApp delivery status', { date });
+      const dateStr = typeof date === 'string' ? date.slice(0, 10) : parseLocalDate(date).toISOString().slice(0, 10);
+      const rows = await getKysely()
+        .selectFrom('tblappointments as a')
+        .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
+        .where('a.AppDay', '=', sql<Date>`${dateStr}::date`)
+        .where('a.SentWa', '=', true)
+        .select([
+          'a.appointmentID as id',
+          sql<string>`COALESCE(p."CountryCode", '964') || p."Phone" || '@c.us'`.as('number'),
+          'a.WaMessageID as wamid',
+        ])
+        .execute();
 
-      return executeStoredProcedure<WhatsAppDeliveryMessage>(
-        'ProcFetch',
-        [['ADate', TYPES.Date, date]],
-        undefined,
-        (columns) => ({
-          id: columns[0].value as number,
-          number: columns[1].value as string,
-          wamid: columns[2].value as string,
-        }),
-        (result) => {
-          log.info('WhatsApp messages retrieved for status checking', { messageCount: result.length, date });
-
-          if (result.length > 0) {
-            const sampleCount = Math.min(5, result.length);
-            log.debug('Sample messages for status check', { sampleCount, totalCount: result.length });
-            for (let i = 0; i < sampleCount; i++) {
-              log.debug('Status check message sample', { appointmentId: result[i].id, messageId: result[i].wamid });
-            }
-          }
-
-          return result;
-        }
-      );
+      log.info('WhatsApp messages retrieved for status checking', { messageCount: rows.length, date });
+      return rows.map((r) => ({ id: r.id, number: r.number, wamid: (r.wamid as string) ?? '' }));
     }, operationName)
     .catch((error: Error) => {
-      log.error('Failed to retrieve WhatsApp delivery status', { operationName , error: error.message });
+      log.error('Failed to retrieve WhatsApp delivery status', { operationName, error: error.message });
       return [];
     });
 }
@@ -627,63 +633,74 @@ export async function batchUpdateMessageStatuses(
 
   return dbCircuitBreaker.execute(async () => {
     log.info('Starting batch message status update', { updateCount: updates.length });
-
-    // Group updates by status for insights
-    const statusGroups: Record<string, StatusUpdateMessage[]> = {};
-    updates.forEach((update) => {
-      const status = convertAckStatus(update.ack);
-      if (!statusGroups[status]) statusGroups[status] = [];
-      statusGroups[status].push(update);
-    });
-
-    log.debug('Batch update status distribution', {
-      statusDistribution: Object.keys(statusGroups).reduce(
-        (acc, status) => {
-          acc[status] = statusGroups[status].length;
-          return acc;
-        },
-        {} as Record<string, number>
-      ),
-    });
-
     return updateWhatsAppDeliveryStatus(updates);
   }, operationName);
 }
 
 /**
- * Enhanced SMS functions with circuit breaker protection
+ * SMS messages to send for a date. (was: ProcSMS) Returns nothing when the date is outside
+ * [today, today+3]. Uses '+964' + raw phone, matching the proc.
  */
 export async function getSmsMessages(date: Date | string): Promise<SmsMessage[]> {
   const operationName = 'getSmsMessages';
 
   return dbCircuitBreaker
     .execute(async () => {
-      log.info('Retrieving SMS messages', { date });
+      const dd = daysFromToday(date);
+      if (dd < 0 || dd > 3) return [];
 
-      return executeStoredProcedure<SmsMessage>(
-        'ProcSMS',
-        [['ADate', TYPES.Date, date]],
-        undefined,
-        (columns) => ({
-          id: columns[0].value as number,
-          to: columns[1].value as string,
-          body: columns[2].value as string,
-        }),
-        (result) => {
-          log.info('SMS messages retrieved successfully', {
-            messageCount: result.length,
-            date,
-          });
-          return result;
+      const dateStr = typeof date === 'string' ? date.slice(0, 10) : parseLocalDate(date).toISOString().slice(0, 10);
+      const aDay = arabicDay(dateStr);
+      const eDay = englishDay(dateStr);
+      // A_Mes is only set for DD 1/2 (else NULL → Arabic message empty, as in the proc).
+      const aMes = dd === 1
+        ? `غدا ${aDay} موعدك مع عيادة د.شوان الساعة`
+        : dd === 2
+          ? `بعد غد ${aDay} موعدك مع عيادة د.شوان الساعة`
+          : null;
+      const eMes = dd === 2
+        ? `The day after tommorow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at `
+        : `Tommorow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at `;
+
+      const rows = await getKysely()
+        .selectFrom('tblappointments as a')
+        .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
+        .where('a.AppDay', '=', sql<Date>`${dateStr}::date`)
+        .where('a.WantNotify', '=', true)
+        .where((eb) => eb.or([eb('a.Notified', 'is', null), eb('a.Notified', '=', false)]))
+        .select([
+          'a.appointmentID as id',
+          'p.Phone as phone',
+          'p.PatientName as patientName',
+          'p.FirstName as firstName',
+          'p.Language as language',
+          'a.AppDate as appDate',
+        ])
+        .execute();
+
+      const out: SmsMessage[] = [];
+      for (const r of rows) {
+        const time = format12h(r.appDate as unknown as Date);
+        let body: string;
+        if (r.language === 1) {
+          body = `Hello ${r.firstName ?? ''}. ${eMes} ${time}`;
+        } else {
+          body = aMes ? `مرحبا ${r.patientName}. ${aMes} ${time}` : '';
         }
-      );
+        out.push({ id: r.id, to: `+964${r.phone ?? ''}`, body });
+      }
+      log.info('SMS messages retrieved successfully', { messageCount: out.length, date });
+      return out;
     }, operationName)
     .catch((error: Error) => {
-      log.error('Failed to retrieve SMS messages', { operationName , error: error.message });
+      log.error('Failed to retrieve SMS messages', { operationName, error: error.message });
       return [];
     });
 }
 
+/**
+ * Store Twilio SIDs + mark notified. (was: ProcUpdatesms1 TVP proc.)
+ */
 export async function updateSmsIds(
   messages: Array<{ id: number; sid: string }>
 ): Promise<UpdateResult> {
@@ -691,213 +708,242 @@ export async function updateSmsIds(
 
   return dbCircuitBreaker
     .execute(async () => {
-      log.info('Starting SMS ID update', { messageCount: messages.length });
-
-      const rows = messages.map((message) => [
-        message.id, // AppointmentID
-        null, // SMSStatus
-        message.sid, // sms_sid
-      ]);
-
-      const tableDefinition = {
-        columns: [
-          { name: 'AppointmentID', type: TYPES.Int },
-          { name: 'SMSStatus', type: TYPES.NVarChar },
-          { name: 'sms_sid', type: TYPES.NVarChar },
-        ],
-        rows: rows,
-      };
-
-      return executeStoredProcedure<unknown, UpdateResult>(
-        'ProcUpdatesms1',
-        [['status', TYPES.TVP, tableDefinition]],
-        undefined,
-        undefined,
-        () => {
-          log.info('SMS IDs updated successfully', { updatedCount: rows.length });
-          return {
-            success: true,
-            updatedCount: rows.length,
-          };
-        }
-      );
+      if (messages.length === 0) return { success: true, updatedCount: 0 };
+      const ids = messages.map((m) => m.id);
+      const sids = messages.map((m) => m.sid);
+      await sql`
+        UPDATE "tblappointments" AS a SET "sms_sid" = w.sid, "Notified" = true, "WantWa" = false
+        FROM unnest(${ids}::int[], ${sids}::text[]) AS w(appointmentid, sid)
+        WHERE a."appointmentID" = w.appointmentid
+      `.execute(getKysely());
+      log.info('SMS IDs updated successfully', { updatedCount: messages.length });
+      return { success: true, updatedCount: messages.length };
     }, operationName)
     .catch((error: Error) => {
-      log.error('SMS ID update failed', { operationName , error: error.message });
-      return {
-        success: false,
-        error: error.message,
-        updatedCount: 0,
-      };
+      log.error('SMS ID update failed', { operationName, error: error.message });
+      return { success: false, error: error.message, updatedCount: 0 };
     });
 }
 
+/**
+ * Sent SMS ids for status polling. (was: Procgetsids)
+ */
 export async function getSmsIds(date: Date | string): Promise<SmsIdMessage[]> {
   const operationName = 'getSmsIds';
 
   return dbCircuitBreaker
     .execute(async () => {
-      log.info('Retrieving SMS IDs for status checking', { date });
-
-      return executeStoredProcedure<SmsIdMessage>(
-        'Procgetsids',
-        [['ADate', TYPES.Date, date]],
-        undefined,
-        (columns) => ({
-          id: columns[0].value as number,
-          sid: columns[1].value as string,
-        }),
-        (result) => {
-          log.info('SMS IDs retrieved for status checking', { idCount: result.length });
-          return result;
-        }
-      );
+      const dateStr = typeof date === 'string' ? date.slice(0, 10) : parseLocalDate(date).toISOString().slice(0, 10);
+      const rows = await getKysely()
+        .selectFrom('tblappointments')
+        .where('AppDay', '=', sql<Date>`${dateStr}::date`)
+        .where('sms_sid', 'is not', null)
+        .select(['appointmentID as id', 'sms_sid as sid'])
+        .execute();
+      log.info('SMS IDs retrieved for status checking', { idCount: rows.length });
+      return rows.map((r) => ({ id: r.id, sid: (r.sid as string) ?? '' }));
     }, operationName)
     .catch((error: Error) => {
-      log.error('Failed to retrieve SMS IDs', { operationName , error: error.message });
+      log.error('Failed to retrieve SMS IDs', { operationName, error: error.message });
       return [];
     });
 }
 
+/**
+ * Persist SMS delivery status. (was: ProcUpdatesms2 TVP proc.)
+ */
 export async function updateSmsStatus(messages: SmsStatusMessage[]): Promise<UpdateResult> {
   const operationName = 'updateSmsStatus';
 
   return dbCircuitBreaker
     .execute(async () => {
-      log.info('Starting SMS status update', { messageCount: messages.length });
-
-      const rows = messages.map((message) => [
-        message.id, // AppointmentID
-        message.status, // SMSStatus
-        null, // sms_sid
-      ]);
-
-      const tableDefinition = {
-        columns: [
-          { name: 'AppointmentID', type: TYPES.Int },
-          { name: 'SMSStatus', type: TYPES.NVarChar },
-          { name: 'sms_sid', type: TYPES.NVarChar },
-        ],
-        rows: rows,
-      };
-
-      return executeStoredProcedure<unknown, UpdateResult>(
-        'ProcUpdatesms2',
-        [['status', TYPES.TVP, tableDefinition]],
-        undefined,
-        undefined,
-        () => {
-          log.info('SMS status update completed successfully', {
-            updatedCount: rows.length,
-          });
-          return {
-            success: true,
-            updatedCount: rows.length,
-          };
-        }
-      );
+      if (messages.length === 0) return { success: true, updatedCount: 0 };
+      const ids = messages.map((m) => m.id);
+      const statuses = messages.map((m) => m.status);
+      await sql`
+        UPDATE "tblappointments" AS a SET "SMSStatus" = w.status
+        FROM unnest(${ids}::int[], ${statuses}::text[]) AS w(appointmentid, status)
+        WHERE a."appointmentID" = w.appointmentid
+      `.execute(getKysely());
+      log.info('SMS status update completed successfully', { updatedCount: messages.length });
+      return { success: true, updatedCount: messages.length };
     }, operationName)
     .catch((error: Error) => {
-      log.error('SMS status update failed', { operationName , error: error.message });
-      return {
-        success: false,
-        error: error.message,
-        updatedCount: 0,
-      };
+      log.error('SMS status update failed', { operationName, error: error.message });
+      return { success: false, error: error.message, updatedCount: 0 };
     });
 }
 
 /**
- * Additional enhanced functions for monitoring and analytics
+ * Per-date message status list + summary. (was: GetMessageStatusByDate)
  */
 export async function getMessageStatusByDate(date: Date | string): Promise<MessageStatusResult> {
   const operationName = 'getMessageStatusByDate';
 
   return dbCircuitBreaker
     .execute(async () => {
-      log.debug('Retrieving message status summary', { date });
+      const dateStr = typeof date === 'string' ? date.slice(0, 10) : parseLocalDate(date).toISOString().slice(0, 10);
+      const rows = await getKysely()
+        .selectFrom('tblappointments as a')
+        .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
+        .where('a.AppDay', '=', sql<Date>`${dateStr}::date`)
+        .orderBy('a.AppTime')
+        .select([
+          'a.appointmentID as appointmentId',
+          'p.PatientName as patientName',
+          'p.Phone as phone',
+          'a.SentWa as sentStatus',
+          'a.DeliveredWa as deliveryStatus',
+          'a.WaMessageID as messageId',
+          'a.SentTimestamp as sentTimestamp',
+          'a.LastUpdated as lastUpdated',
+        ])
+        .execute();
 
-      interface MessageStatus {
-        appointmentId: number;
-        patientName: string;
-        phone: string;
-        sentStatus: boolean | null;
-        deliveryStatus: string | null;
-        messageId: string | null;
-        sentTimestamp: Date | null;
-        lastUpdated: Date | null;
-      }
+      const messages = rows.map((r) => ({
+        appointmentId: r.appointmentId,
+        patientName: r.patientName ?? '',
+        phone: r.phone ?? '',
+        sentStatus: r.sentStatus ?? null,
+        deliveryStatus: (r.deliveryStatus as string | null) ?? null,
+        messageId: (r.messageId as string | null) ?? null,
+        sentTimestamp: (r.sentTimestamp as Date | null) ?? null,
+        lastUpdated: (r.lastUpdated as Date | null) ?? null,
+      }));
 
-      return executeStoredProcedure<MessageStatus, MessageStatusResult>(
-        'GetMessageStatusByDate',
-        [['Date', TYPES.Date, date]],
-        undefined,
-        (columns) => {
-          if (columns.length >= 8) {
-            return {
-              appointmentId: columns[0].value as number,
-              patientName: columns[1].value as string,
-              phone: columns[2].value as string,
-              sentStatus:
-                columns[3].value === null || columns[3].value === undefined
-                  ? null
-                  : Boolean(columns[3].value),
-              deliveryStatus: columns[4].value as string | null,
-              messageId: columns[5].value as string | null,
-              sentTimestamp: columns[6].value as Date | null,
-              lastUpdated: columns[7].value as Date | null,
-            };
-          }
-          return {
-            appointmentId: 0,
-            patientName: '',
-            phone: '',
-            sentStatus: null,
-            deliveryStatus: null,
-            messageId: null,
-            sentTimestamp: null,
-            lastUpdated: null,
-          };
-        },
-        (result) => {
-          // Group by status for summary
-          const summary: MessageStatusSummary = {
-            total: result.length,
-            sent: result.filter((r) => r.sentStatus).length,
-            pending: result.filter((r) => r.sentStatus && !r.deliveryStatus).length,
-            delivered: result.filter(
-              (r) => r.deliveryStatus === 'DEVICE' || r.deliveryStatus === 'SERVER'
-            ).length,
-            read: result.filter(
-              (r) => r.deliveryStatus === 'READ' || r.deliveryStatus === 'PLAYED'
-            ).length,
-            failed: result.filter((r) => r.deliveryStatus === 'ERROR').length,
-          };
+      const summary: MessageStatusSummary = {
+        total: messages.length,
+        sent: messages.filter((r) => r.sentStatus).length,
+        pending: messages.filter((r) => r.sentStatus && !r.deliveryStatus).length,
+        delivered: messages.filter((r) => r.deliveryStatus === 'DEVICE' || r.deliveryStatus === 'SERVER').length,
+        read: messages.filter((r) => r.deliveryStatus === 'READ' || r.deliveryStatus === 'PLAYED').length,
+        failed: messages.filter((r) => r.deliveryStatus === 'ERROR').length,
+      };
 
-          log.debug('Message status summary retrieved', {
-            date,
-            total: summary.total,
-            sent: summary.sent,
-            read: summary.read,
-          });
-
-          return {
-            date: date,
-            summary: summary,
-            messages: result,
-          };
-        }
-      );
+      log.debug('Message status summary retrieved', { date, total: summary.total, sent: summary.sent, read: summary.read });
+      return { date, summary, messages };
     }, operationName)
     .catch((error: Error) => {
-      log.error('Failed to retrieve message status summary', { operationName , error: error.message });
+      log.error('Failed to retrieve message status summary', { operationName, error: error.message });
       return {
-        date: date,
+        date,
         error: error.message,
         summary: { total: 0, sent: 0, pending: 0, delivered: 0, read: 0, failed: 0 },
         messages: [],
       };
     });
+}
+
+/**
+ * Build the reminder message for a single appointment. (was: GetNewAppointmentMessage)
+ * Returns result=-1 (not found) / -2 (invalid phone) / 0 (ok), mirroring the proc's codes.
+ */
+export async function getNewAppointmentMessage(
+  personId: number,
+  appointmentId: number
+): Promise<NewAppointmentMessage | null> {
+  const row = await getKysely()
+    .selectFrom('tblpatients as p')
+    .innerJoin('tblappointments as a', 'a.PersonID', 'p.PersonID')
+    .where('p.PersonID', '=', personId)
+    .where('a.appointmentID', '=', appointmentId)
+    .select([
+      'p.PatientName as patientName',
+      'p.FirstName as firstName',
+      'p.Phone as phone',
+      'p.CountryCode as countryCode',
+      'p.Language as language',
+      'a.AppDay as appDay',
+      'a.AppDate as appDate',
+    ])
+    .executeTakeFirst();
+
+  if (!row || !row.patientName) {
+    return { result: -1, phone: null, message: null, countryCode: null };
+  }
+  if (!isValidPhone(row.phone)) {
+    return { result: -2, phone: null, message: null, countryCode: null };
+  }
+
+  const cc = row.countryCode || '964';
+  const formattedPhone = formatPhone(row.phone, cc);
+  const appDay = row.appDay as unknown as string;
+  const appDate = row.appDate as unknown as Date;
+  const dd = daysFromToday(appDay);
+  const time = format12h(appDate);
+  const timeTt = format12h(appDate, true);
+  const aDay = arabicDay(appDay);
+  const eDay = englishDay(appDay);
+
+  let message: string;
+  if (row.language === 1) {
+    if (dd === 1) {
+      message = `Hello ${row.firstName || row.patientName}. Tomorrow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at ${timeTt}`;
+    } else if (dd === 2) {
+      message = `Hello ${row.firstName || row.patientName}. The day after tomorrow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at ${timeTt}`;
+    } else {
+      message = `Hello ${row.firstName || row.patientName}. Your appointment with Dr. Shwan orthodontic clinic is on ${eDay} ${formatDMY(appDay)} at ${timeTt}`;
+    }
+  } else {
+    if (dd === 1) {
+      message = `السلام عليك ${row.patientName}. غدا ${aDay} موعدك مع عيادة د.شوان لتقويم الاسنان الساعة ${time}`;
+    } else if (dd === 2) {
+      message = `السلام عليك ${row.patientName}. بعد غد ${aDay} موعدك مع عيادة د.شوان لتقويم الاسنان الساعة ${time}`;
+    } else {
+      message = `السلام عليك ${row.patientName}. موعدك مع عيادة د.شوان لتقويم الاسنان يوم ${aDay} ${formatDMY(appDay)} الساعة ${time}`;
+    }
+  }
+
+  return { result: 0, phone: formattedPhone, message, countryCode: cc };
+}
+
+/**
+ * Reset all messaging state for a date. (was: ResetMessagingForDate, default full reset.)
+ * Deletes that date's message-status history, clears the appointments' WA/SMS/notify fields, and
+ * resets tblsms.smssent — all in one transaction.
+ */
+export async function resetMessagingForDate(date: string): Promise<ResetResult> {
+  return withPgTransaction(async (trx) => {
+    await sql`
+      DELETE FROM "tblMessageStatusHistory"
+      WHERE "AppointmentID" IN (SELECT "appointmentID" FROM "tblappointments" WHERE "AppDay" = ${date}::date)
+    `.execute(trx);
+
+    const upd = await sql`
+      UPDATE "tblappointments" SET
+        "Notified" = false, "SentWa" = false, "DeliveredWa" = NULL, "WantWa" = true,
+        "WaMessageID" = NULL, "SentTimestamp" = NULL, "LastUpdated" = NULL,
+        "DeliveredTimestamp" = NULL, "ReadTimestamp" = NULL, "WantNotify" = true
+      WHERE "AppDay" = ${date}::date
+    `.execute(trx);
+    const appointmentsReset = Number(upd.numAffectedRows ?? 0);
+
+    const smsUpd = await sql`UPDATE "tblsms" SET "smssent" = false WHERE "date" = ${date}::date`.execute(trx);
+    const smsRecordsReset = Number(smsUpd.numAffectedRows ?? 0);
+
+    const stats = await trx
+      .selectFrom('tblappointments')
+      .where('AppDay', '=', sql<Date>`${date}::date`)
+      .select((eb) => [
+        eb.fn.countAll<number>().as('total'),
+        eb.fn.sum<number>(sql`CASE WHEN "WantWa" = true THEN 1 ELSE 0 END`).as('readyWa'),
+        eb.fn.sum<number>(sql`CASE WHEN "WantNotify" = true THEN 1 ELSE 0 END`).as('readySms'),
+        eb.fn.sum<number>(sql`CASE WHEN "SentWa" = true THEN 1 ELSE 0 END`).as('sentWa'),
+        eb.fn.sum<number>(sql`CASE WHEN "Notified" = true THEN 1 ELSE 0 END`).as('notified'),
+      ])
+      .executeTakeFirst();
+
+    return {
+      resetDate: date,
+      totalAppointments: Number(stats?.total ?? 0),
+      readyForWhatsApp: Number(stats?.readyWa ?? 0),
+      readyForSMS: Number(stats?.readySms ?? 0),
+      alreadySentWA: Number(stats?.sentWa ?? 0),
+      alreadyNotified: Number(stats?.notified ?? 0),
+      appointmentsReset,
+      smsRecordsReset,
+    };
+  });
 }
 
 /**

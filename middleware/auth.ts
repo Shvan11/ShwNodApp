@@ -4,7 +4,8 @@
  */
 import bcrypt from 'bcryptjs';
 import type { Request, Response, NextFunction } from 'express';
-import { executeQuery, TYPES } from '../services/database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../services/database/kysely.js';
 import { log } from '../utils/logger.js';
 import type { AuthResult, ApiErrorResponse } from '../types/index.js';
 import type { SafeUser, UserRole } from '../types/database.types.js';
@@ -98,20 +99,12 @@ export async function verifyCredentials(
   password: string
 ): Promise<AuthResult> {
   try {
-    const users = await executeQuery<DbUser>(
-      `SELECT UserID, Username, PasswordHash, FullName, Role, IsActive
-       FROM dbo.tblUsers
-       WHERE Username = @username`,
-      [['username', TYPES.NVarChar, username]],
-      (columns) => ({
-        userId: columns[0].value as number,
-        username: columns[1].value as string,
-        passwordHash: columns[2].value as string,
-        fullName: columns[3].value as string,
-        role: columns[4].value as UserRole,
-        isActive: columns[5].value as boolean
-      })
-    );
+    const { rows: users } = await sql<DbUser>`
+      SELECT "UserID" AS "userId", "Username" AS "username", "PasswordHash" AS "passwordHash",
+             "FullName" AS "fullName", "Role" AS "role", "IsActive" AS "isActive"
+      FROM "tblUsers"
+      WHERE "Username" = ${username}
+    `.execute(getKysely());
 
     if (!users || users.length === 0) {
       return {
@@ -139,10 +132,7 @@ export async function verifyCredentials(
     }
 
     // Update last login timestamp
-    await executeQuery(
-      'UPDATE dbo.tblUsers SET LastLogin = GETDATE() WHERE UserID = @userId',
-      [['userId', TYPES.Int, user.userId]]
-    );
+    await sql`UPDATE "tblUsers" SET "LastLogin" = LOCALTIMESTAMP WHERE "UserID" = ${user.userId}`.execute(getKysely());
 
     const safeUser: SafeUser = {
       userId: user.userId,

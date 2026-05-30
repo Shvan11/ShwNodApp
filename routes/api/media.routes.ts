@@ -10,8 +10,9 @@
  */
 
 import { Router, type Request, type Response, type NextFunction } from 'express';
+import { sql } from 'kysely';
+import { getKysely } from '../../services/database/kysely.js';
 import { log } from '../../utils/logger.js';
-import * as database from '../../services/database/index.js';
 import multer from 'multer';
 import webcephService from '../../services/webceph/webceph-service.js';
 import { ErrorResponses } from '../../utils/error-response.js';
@@ -133,19 +134,14 @@ router.post('/webceph/create-patient', async (req: Request<object, object, Creat
     const result = await webcephService.createPatient(patientData);
 
     // Update local database with WebCeph information
-    const updateQuery = `
-      UPDATE tblPatients
-      SET WebCephPatientID = @webcephPatientId,
-          WebCephLink = @link,
-          WebCephCreatedAt = GETDATE()
-      WHERE PersonID = @personId
-    `;
-
-    await database.executeQuery(updateQuery, [
-      ['webcephPatientId', database.TYPES.NVarChar, result.webcephPatientId],
-      ['link', database.TYPES.NVarChar, result.link],
-      ['personId', database.TYPES.Int, personId]
-    ]);
+    const db = getKysely();
+    await sql`
+      UPDATE "tblpatients"
+      SET "WebCephPatientID" = ${result.webcephPatientId},
+          "WebCephLink" = ${result.link},
+          "WebCephCreatedAt" = LOCALTIMESTAMP
+      WHERE "PersonID" = ${personId}
+    `.execute(db);
 
     log.info(`[WebCeph] Patient created successfully for PersonID: ${personId}`);
 
@@ -242,21 +238,12 @@ router.get('/webceph/patient-link/:personId', async (req: Request<PersonIdParams
       return;
     }
 
-    const query = `
-      SELECT WebCephPatientID, WebCephLink, WebCephCreatedAt
-      FROM tblPatients
-      WHERE PersonID = @personId
-    `;
-
-    const result = await database.executeQuery<WebCephPatientLink>(
-      query,
-      [['personId', database.TYPES.Int, parseInt(personId)]],
-      (columns) => ({
-        webcephPatientId: columns[0].value as string | null,
-        link: columns[1].value as string | null,
-        createdAt: columns[2].value as Date | null
-      })
-    );
+    const db = getKysely();
+    const { rows: result } = await sql<WebCephPatientLink>`
+      SELECT "WebCephPatientID" AS "webcephPatientId", "WebCephLink" AS "link", "WebCephCreatedAt" AS "createdAt"
+      FROM "tblpatients"
+      WHERE "PersonID" = ${parseInt(personId)}
+    `.execute(db);
 
     if (!result || result.length === 0 || !result[0].webcephPatientId) {
       res.json({

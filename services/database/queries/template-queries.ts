@@ -1,9 +1,18 @@
 /**
  * Document Template System - Database Queries
  * Handles all database operations for document templates, elements, and data fields
+ *
+ * Migration Phase 4: translated to typed Kysely (PostgreSQL). The positional
+ * `ColumnValue` mappers are gone — selects return plain objects. `is_active`/
+ * `is_default`/`is_system`/`show_grid` are PG `boolean` columns now, so filters/
+ * inserts use JS booleans (was mssql bit 1/0). `created_date`/`modified_date` are PG
+ * `timestamp`, parsed to local-wall-clock `Date` by the centralized kysely.ts parser.
+ * `updateTemplate`'s dynamic partial SET clause is built with `eb`/`set()` from the
+ * provided fields, with `modified_date` stamped via `now()`.
  */
-import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery, TYPES, SqlParam } from '../index.js';
+import { sql } from 'kysely';
+import type { UpdateObject } from 'kysely';
+import { getKysely, type Database } from '../kysely.js';
 
 // Type definitions
 interface DocumentType {
@@ -96,17 +105,6 @@ interface TemplateUpdateData {
   modified_by?: string;
 }
 
-/**
- * Generic row mapper that converts columns to object
- */
-function mapRowToObject<T>(columns: ColumnValue[]): T {
-  const row: Record<string, unknown> = {};
-  columns.forEach((col) => {
-    row[col.metadata.colName] = col.value;
-  });
-  return row as T;
-}
-
 // ============================================================================
 // DOCUMENT TYPES
 // ============================================================================
@@ -115,50 +113,50 @@ function mapRowToObject<T>(columns: ColumnValue[]): T {
  * Get all document types
  */
 export async function getDocumentTypes(): Promise<DocumentType[]> {
-  const query = `
-    SELECT
-      type_id,
-      type_code,
-      type_name,
-      description,
-      icon,
-      default_paper_width,
-      default_paper_height,
-      default_orientation,
-      is_active,
-      sort_order
-    FROM DocumentTypes
-    WHERE is_active = 1
-    ORDER BY sort_order, type_name
-  `;
-  return executeQuery<DocumentType>(query, [], mapRowToObject);
+  const db = getKysely();
+  return db
+    .selectFrom('DocumentTypes')
+    .select([
+      'type_id',
+      'type_code',
+      'type_name',
+      'description',
+      'icon',
+      'default_paper_width',
+      'default_paper_height',
+      'default_orientation',
+      'is_active',
+      'sort_order',
+    ])
+    .where('is_active', '=', true)
+    .orderBy('sort_order')
+    .orderBy('type_name')
+    .execute() as Promise<DocumentType[]>;
 }
 
 /**
  * Get a specific document type by ID
  */
 export async function getDocumentTypeById(typeId: number): Promise<DocumentType | null> {
-  const query = `
-    SELECT
-      type_id,
-      type_code,
-      type_name,
-      description,
-      icon,
-      default_paper_width,
-      default_paper_height,
-      default_orientation,
-      is_active,
-      sort_order
-    FROM DocumentTypes
-    WHERE type_id = @typeId
-  `;
-  const results = await executeQuery<DocumentType>(
-    query,
-    [['typeId', TYPES.Int, typeId]],
-    mapRowToObject
-  );
-  return results[0] || null;
+  const db = getKysely();
+  const row = await db
+    .selectFrom('DocumentTypes')
+    .select([
+      'type_id',
+      'type_code',
+      'type_name',
+      'description',
+      'icon',
+      'default_paper_width',
+      'default_paper_height',
+      'default_orientation',
+      'is_active',
+      'sort_order',
+    ])
+    .where('type_id', '=', typeId)
+    .executeTakeFirst();
+
+  return (row as DocumentType | undefined) ?? null;
 }
 
 // ============================================================================
@@ -171,108 +169,97 @@ export async function getDocumentTypeById(typeId: number): Promise<DocumentType 
 export async function getDocumentTemplates(
   filters: TemplateFilters = {}
 ): Promise<DocumentTemplate[]> {
-  let query = `
-    SELECT
-      t.template_id,
-      t.template_name,
-      t.description,
-      t.document_type_id,
-      dt.type_name as document_type_name,
-      dt.type_code as document_type_code,
-      dt.icon as document_type_icon,
-      t.paper_width,
-      t.paper_height,
-      t.paper_orientation,
-      t.paper_margin_top,
-      t.paper_margin_right,
-      t.paper_margin_bottom,
-      t.paper_margin_left,
-      t.background_color,
-      t.show_grid,
-      t.grid_size,
-      t.is_default,
-      t.is_active,
-      t.is_system,
-      t.template_version,
-      t.parent_template_id,
-      t.created_by,
-      t.created_date,
-      t.modified_by,
-      t.modified_date,
-      t.last_used_date,
-      t.template_file_path
-    FROM DocumentTemplates t
-    INNER JOIN DocumentTypes dt ON t.document_type_id = dt.type_id
-    WHERE 1=1
-  `;
-
-  const params: SqlParam[] = [];
+  const db = getKysely();
+  let q = db
+    .selectFrom('DocumentTemplates as t')
+    .innerJoin('DocumentTypes as dt', 't.document_type_id', 'dt.type_id')
+    .select([
+      't.template_id',
+      't.template_name',
+      't.description',
+      't.document_type_id',
+      'dt.type_name as document_type_name',
+      'dt.type_code as document_type_code',
+      'dt.icon as document_type_icon',
+      't.paper_width',
+      't.paper_height',
+      't.paper_orientation',
+      't.paper_margin_top',
+      't.paper_margin_right',
+      't.paper_margin_bottom',
+      't.paper_margin_left',
+      't.background_color',
+      't.show_grid',
+      't.grid_size',
+      't.is_default',
+      't.is_active',
+      't.is_system',
+      't.template_version',
+      't.parent_template_id',
+      't.created_by',
+      't.created_date',
+      't.modified_by',
+      't.modified_date',
+      't.last_used_date',
+      't.template_file_path',
+    ]);
 
   if (filters.documentTypeId) {
-    query += ` AND t.document_type_id = @documentTypeId`;
-    params.push(['documentTypeId', TYPES.Int, filters.documentTypeId]);
+    q = q.where('t.document_type_id', '=', filters.documentTypeId);
   }
-
   if (filters.isActive !== undefined) {
-    query += ` AND t.is_active = @isActive`;
-    params.push(['isActive', TYPES.Bit, filters.isActive ? 1 : 0]);
+    q = q.where('t.is_active', '=', filters.isActive);
   }
-
   if (filters.isDefault !== undefined) {
-    query += ` AND t.is_default = @isDefault`;
-    params.push(['isDefault', TYPES.Bit, filters.isDefault ? 1 : 0]);
+    q = q.where('t.is_default', '=', filters.isDefault);
   }
 
-  query += ` ORDER BY t.is_default DESC, t.template_name`;
+  q = q.orderBy('t.is_default', 'desc').orderBy('t.template_name');
 
-  return executeQuery<DocumentTemplate>(query, params, mapRowToObject);
+  return q.execute() as Promise<DocumentTemplate[]>;
 }
 
 /**
  * Get a specific template by ID (without elements)
  */
 export async function getTemplateById(templateId: number): Promise<DocumentTemplate | null> {
-  const query = `
-    SELECT
-      t.template_id,
-      t.template_name,
-      t.description,
-      t.document_type_id,
-      dt.type_name as document_type_name,
-      dt.type_code as document_type_code,
-      t.template_file_path,
-      t.paper_width,
-      t.paper_height,
-      t.paper_orientation,
-      t.paper_margin_top,
-      t.paper_margin_right,
-      t.paper_margin_bottom,
-      t.paper_margin_left,
-      t.background_color,
-      t.show_grid,
-      t.grid_size,
-      t.is_default,
-      t.is_active,
-      t.is_system,
-      t.template_version,
-      t.parent_template_id,
-      t.created_by,
-      t.created_date,
-      t.modified_by,
-      t.modified_date,
-      t.last_used_date
-    FROM DocumentTemplates t
-    INNER JOIN DocumentTypes dt ON t.document_type_id = dt.type_id
-    WHERE t.template_id = @templateId
-  `;
+  const db = getKysely();
+  const row = await db
+    .selectFrom('DocumentTemplates as t')
+    .innerJoin('DocumentTypes as dt', 't.document_type_id', 'dt.type_id')
+    .select([
+      't.template_id',
+      't.template_name',
+      't.description',
+      't.document_type_id',
+      'dt.type_name as document_type_name',
+      'dt.type_code as document_type_code',
+      't.template_file_path',
+      't.paper_width',
+      't.paper_height',
+      't.paper_orientation',
+      't.paper_margin_top',
+      't.paper_margin_right',
+      't.paper_margin_bottom',
+      't.paper_margin_left',
+      't.background_color',
+      't.show_grid',
+      't.grid_size',
+      't.is_default',
+      't.is_active',
+      't.is_system',
+      't.template_version',
+      't.parent_template_id',
+      't.created_by',
+      't.created_date',
+      't.modified_by',
+      't.modified_date',
+      't.last_used_date',
+    ])
+    .where('t.template_id', '=', templateId)
+    .executeTakeFirst();
 
-  const results = await executeQuery<DocumentTemplate>(
-    query,
-    [['templateId', TYPES.Int, templateId]],
-    mapRowToObject
-  );
-
-  return results[0] || null;
+  return (row as DocumentTemplate | undefined) ?? null;
 }
 
 /**
@@ -291,119 +278,74 @@ export async function getTemplateWithElements(
 export async function getDefaultTemplate(
   documentTypeId: number
 ): Promise<DocumentTemplate | null> {
-  const query = `
-    SELECT TOP 1
-      t.template_id,
-      t.template_name,
-      t.description,
-      t.document_type_id,
-      dt.type_name as document_type_name,
-      dt.type_code as document_type_code,
-      t.template_file_path,
-      t.paper_width,
-      t.paper_height,
-      t.paper_orientation,
-      t.paper_margin_top,
-      t.paper_margin_right,
-      t.paper_margin_bottom,
-      t.paper_margin_left,
-      t.background_color,
-      t.is_default,
-      t.is_active,
-      t.is_system
-    FROM DocumentTemplates t
-    INNER JOIN DocumentTypes dt ON t.document_type_id = dt.type_id
-    WHERE t.document_type_id = @documentTypeId
-      AND t.is_active = 1
-      AND t.is_default = 1
-    ORDER BY t.template_id
-  `;
+  const db = getKysely();
+  const row = await db
+    .selectFrom('DocumentTemplates as t')
+    .innerJoin('DocumentTypes as dt', 't.document_type_id', 'dt.type_id')
+    .select([
+      't.template_id',
+      't.template_name',
+      't.description',
+      't.document_type_id',
+      'dt.type_name as document_type_name',
+      'dt.type_code as document_type_code',
+      't.template_file_path',
+      't.paper_width',
+      't.paper_height',
+      't.paper_orientation',
+      't.paper_margin_top',
+      't.paper_margin_right',
+      't.paper_margin_bottom',
+      't.paper_margin_left',
+      't.background_color',
+      't.is_default',
+      't.is_active',
+      't.is_system',
+    ])
+    .where('t.document_type_id', '=', documentTypeId)
+    .where('t.is_active', '=', true)
+    .where('t.is_default', '=', true)
+    .orderBy('t.template_id')
+    .limit(1)
+    .executeTakeFirst();
 
-  const results = await executeQuery<DocumentTemplate>(
-    query,
-    [['documentTypeId', TYPES.Int, documentTypeId]],
-    mapRowToObject
-  );
-
-  return results[0] || null;
+  return (row as DocumentTemplate | undefined) ?? null;
 }
 
 /**
  * Create a new template
  */
 export async function createTemplate(templateData: TemplateData): Promise<number> {
-  const query = `
-    INSERT INTO DocumentTemplates (
-      template_name,
-      description,
-      document_type_id,
-      paper_width,
-      paper_height,
-      paper_orientation,
-      paper_margin_top,
-      paper_margin_right,
-      paper_margin_bottom,
-      paper_margin_left,
-      background_color,
-      show_grid,
-      grid_size,
-      is_default,
-      is_active,
-      is_system,
-      created_by
-    ) VALUES (
-      @template_name,
-      @description,
-      @document_type_id,
-      @paper_width,
-      @paper_height,
-      @paper_orientation,
-      @paper_margin_top,
-      @paper_margin_right,
-      @paper_margin_bottom,
-      @paper_margin_left,
-      @background_color,
-      @show_grid,
-      @grid_size,
-      @is_default,
-      @is_active,
-      @is_system,
-      @created_by
-    );
-    SELECT SCOPE_IDENTITY() as template_id;
-  `;
+  const db = getKysely();
+  const row = await db
+    .insertInto('DocumentTemplates')
+    .values({
+      template_name: templateData.template_name,
+      description: templateData.description ?? null,
+      document_type_id: templateData.document_type_id,
+      paper_width: templateData.paper_width,
+      paper_height: templateData.paper_height,
+      paper_orientation: templateData.paper_orientation || 'portrait',
+      paper_margin_top: templateData.paper_margin_top ?? 10,
+      paper_margin_right: templateData.paper_margin_right ?? 10,
+      paper_margin_bottom: templateData.paper_margin_bottom ?? 10,
+      paper_margin_left: templateData.paper_margin_left ?? 10,
+      background_color: templateData.background_color || '#FFFFFF',
+      show_grid: templateData.show_grid ?? false,
+      grid_size: templateData.grid_size ?? 10,
+      is_default: templateData.is_default ?? false,
+      is_active: templateData.is_active !== false,
+      is_system: templateData.is_system ?? false,
+      created_by: templateData.created_by || 'system',
+    })
+    .returning('template_id')
+    .executeTakeFirst();
 
-  const params: SqlParam[] = [
-    ['template_name', TYPES.NVarChar, templateData.template_name],
-    ['description', TYPES.NVarChar, templateData.description || null],
-    ['document_type_id', TYPES.Int, templateData.document_type_id],
-    ['paper_width', TYPES.Int, templateData.paper_width],
-    ['paper_height', TYPES.Int, templateData.paper_height],
-    ['paper_orientation', TYPES.NVarChar, templateData.paper_orientation || 'portrait'],
-    ['paper_margin_top', TYPES.Int, templateData.paper_margin_top || 10],
-    ['paper_margin_right', TYPES.Int, templateData.paper_margin_right || 10],
-    ['paper_margin_bottom', TYPES.Int, templateData.paper_margin_bottom || 10],
-    ['paper_margin_left', TYPES.Int, templateData.paper_margin_left || 10],
-    ['background_color', TYPES.NVarChar, templateData.background_color || '#FFFFFF'],
-    ['show_grid', TYPES.Bit, templateData.show_grid ? 1 : 0],
-    ['grid_size', TYPES.Int, templateData.grid_size || 10],
-    ['is_default', TYPES.Bit, templateData.is_default ? 1 : 0],
-    ['is_active', TYPES.Bit, templateData.is_active !== false ? 1 : 0],
-    ['is_system', TYPES.Bit, templateData.is_system ? 1 : 0],
-    ['created_by', TYPES.NVarChar, templateData.created_by || 'system'],
-  ];
-
-  const result = await executeQuery<{ template_id: number }>(
-    query,
-    params,
-    mapRowToObject
-  );
-
-  if (!result?.[0]?.template_id) {
+  if (!row?.template_id) {
     throw new Error('Failed to create template: no ID returned');
   }
 
-  return result[0].template_id;
+  return row.template_id;
 }
 
 /**
@@ -413,70 +355,54 @@ export async function updateTemplate(
   templateId: number,
   templateData: TemplateUpdateData
 ): Promise<boolean> {
-  // Build dynamic SET clause based on provided fields
-  const setFields: string[] = [];
-  const params: SqlParam[] = [['template_id', TYPES.Int, templateId]];
+  // Build the partial SET object from only the provided fields. The whitelist of
+  // updatable columns matches the old fieldTypeMap; booleans pass through as JS
+  // booleans (PG boolean columns). modified_date is always stamped via now().
+  const updatableFields: (keyof TemplateUpdateData)[] = [
+    'template_name',
+    'description',
+    'paper_width',
+    'paper_height',
+    'paper_orientation',
+    'paper_margin_top',
+    'paper_margin_right',
+    'paper_margin_bottom',
+    'paper_margin_left',
+    'background_color',
+    'show_grid',
+    'grid_size',
+    'is_default',
+    'is_active',
+    'template_file_path',
+    'modified_by',
+  ];
 
-  // Map of field names to their SQL types
-  const fieldTypeMap: Record<
-    keyof TemplateUpdateData,
-    typeof TYPES.NVarChar | typeof TYPES.Int | typeof TYPES.Bit
-  > = {
-    template_name: TYPES.NVarChar,
-    description: TYPES.NVarChar,
-    paper_width: TYPES.Int,
-    paper_height: TYPES.Int,
-    paper_orientation: TYPES.NVarChar,
-    paper_margin_top: TYPES.Int,
-    paper_margin_right: TYPES.Int,
-    paper_margin_bottom: TYPES.Int,
-    paper_margin_left: TYPES.Int,
-    background_color: TYPES.NVarChar,
-    show_grid: TYPES.Bit,
-    grid_size: TYPES.Int,
-    is_default: TYPES.Bit,
-    is_active: TYPES.Bit,
-    template_file_path: TYPES.NVarChar,
-    modified_by: TYPES.NVarChar,
-  };
+  const updateSet: UpdateObject<Database, 'DocumentTemplates'> = {};
+  let hasFields = false;
 
-  // Add each provided field to the update
-  for (const [fieldName, sqlType] of Object.entries(fieldTypeMap)) {
-    if (Object.prototype.hasOwnProperty.call(templateData, fieldName)) {
-      setFields.push(`${fieldName} = @${fieldName}`);
-
-      let value = templateData[fieldName as keyof TemplateUpdateData];
-
-      // Handle boolean fields for SQL Server bit type
-      if (sqlType === TYPES.Bit && typeof value === 'boolean') {
-        value = value ? 1 : 0;
-      }
-
-      // Handle null values
-      if (value === null || value === undefined) {
-        value = null;
-      }
-
-      params.push([fieldName, sqlType, value as unknown]);
+  for (const field of updatableFields) {
+    if (Object.prototype.hasOwnProperty.call(templateData, field)) {
+      const value = templateData[field];
+      (updateSet as Record<string, unknown>)[field] = value ?? null;
+      hasFields = true;
     }
   }
 
-  // Always update modified_date
-  setFields.push('modified_date = GETDATE()');
-
-  // If no fields to update, return early
-  if (setFields.length === 1) {
-    // Only modified_date
+  // If no fields to update (only modified_date would change), return early — matches
+  // the old behavior of skipping the write when only the timestamp would be touched.
+  if (!hasFields) {
     return true;
   }
 
-  const query = `
-    UPDATE DocumentTemplates
-    SET ${setFields.join(',\n            ')}
-    WHERE template_id = @template_id
-  `;
+  (updateSet as Record<string, unknown>).modified_date = sql`now()`;
 
-  await executeQuery(query, params, mapRowToObject);
+  const db = getKysely();
+  await db
+    .updateTable('DocumentTemplates')
+    .set(updateSet)
+    .where('template_id', '=', templateId)
+    .execute();
+
   return true;
 }
 
@@ -490,8 +416,13 @@ export async function deleteTemplate(templateId: number): Promise<boolean> {
     throw new Error('Cannot delete system templates');
   }
 
-  const query = `DELETE FROM DocumentTemplates WHERE template_id = @template_id AND is_system = 0`;
-  await executeQuery(query, [['template_id', TYPES.Int, templateId]], mapRowToObject);
+  const db = getKysely();
+  await db
+    .deleteFrom('DocumentTemplates')
+    .where('template_id', '=', templateId)
+    .where('is_system', '=', false)
+    .execute();
+
   return true;
 }
 

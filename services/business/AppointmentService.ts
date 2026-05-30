@@ -12,12 +12,14 @@
  * encapsulating business rules and validation logic.
  */
 
+import { sql } from 'kysely';
 import { log } from '../../utils/logger.js';
 import { toDateOnly } from '../../utils/date.js';
-import * as database from '../database/index.js';
+import { getKysely } from '../database/kysely.js';
 import {
   getDailyAppointmentsOptimized,
   updatePresent,
+  createAppointment,
   type DailyAppointmentsOptimizedResult,
 } from '../database/queries/appointment-queries.js';
 import { isDateHoliday } from '../database/queries/holiday-queries.js';
@@ -183,20 +185,13 @@ function validateAppointmentRequiredFields(
  * @throws AppointmentValidationError If employee is not a doctor
  */
 export async function verifyDoctor(drID: number | string): Promise<DoctorInfo> {
-  const doctorCheck = await database.executeQuery<DoctorInfo>(
-    `
-        SELECT e.ID, e.employeeName, p.PositionName
-        FROM tblEmployees e
-        INNER JOIN tblPositions p ON e.Position = p.ID
-        WHERE e.ID = @drID AND p.PositionName = 'Doctor'
-    `,
-    [['drID', database.TYPES.Int, parseInt(String(drID))]],
-    (columns) => ({
-      ID: columns[0].value as number,
-      employeeName: columns[1].value as string,
-      PositionName: columns[2].value as string,
-    })
-  );
+  const db = getKysely();
+  const { rows: doctorCheck } = await sql<DoctorInfo>`
+        SELECT e."ID", e."employeeName", p."PositionName"
+        FROM "tblEmployees" e
+        INNER JOIN "tblPositions" p ON e."Position" = p."ID"
+        WHERE e."ID" = ${parseInt(String(drID))} AND p."PositionName" = 'Doctor'
+    `.execute(db);
 
   if (!doctorCheck || doctorCheck.length === 0) {
     throw new AppointmentValidationError(
@@ -223,20 +218,12 @@ export async function checkAppointmentConflict(
     appointmentID: number;
   }
 
-  const conflictCheck = await database.executeQuery<ConflictResult>(
-    `
-        SELECT appointmentID
-        FROM tblappointments
-        WHERE PersonID = @personID AND CAST(AppDate AS DATE) = CAST(@appDate AS DATE)
-    `,
-    [
-      ['personID', database.TYPES.Int, parseInt(String(personID))],
-      ['appDate', database.TYPES.DateTime, appDate],
-    ],
-    (columns) => ({
-      appointmentID: columns[0].value as number,
-    })
-  );
+  const db = getKysely();
+  const { rows: conflictCheck } = await sql<ConflictResult>`
+        SELECT "appointmentID"
+        FROM "tblappointments"
+        WHERE "PersonID" = ${parseInt(String(personID))} AND "AppDate"::date = ${appDate}::date
+    `.execute(db);
 
   if (conflictCheck && conflictCheck.length > 0) {
     throw new AppointmentValidationError(
@@ -314,36 +301,13 @@ export async function validateAndCreateAppointment(
   // Check for appointment conflicts
   await checkAppointmentConflict(PersonID, AppDate);
 
-  // Insert new appointment
-  const insertQuery = `
-        INSERT INTO tblappointments (
-            PersonID,
-            AppDate,
-            AppDetail,
-            DrID,
-            LastUpdated
-        ) VALUES (@personID, CAST(@appDate AS datetime2), @appDetail, @drID, GETDATE());
-        SELECT SCOPE_IDENTITY() AS appointmentID;
-    `;
-
-  interface InsertResult {
-    appointmentID: number;
-  }
-
-  const result = await database.executeQuery<InsertResult>(
-    insertQuery,
-    [
-      ['personID', database.TYPES.Int, parseInt(String(PersonID))],
-      ['appDate', database.TYPES.NVarChar, AppDate],
-      ['appDetail', database.TYPES.NVarChar, AppDetail],
-      ['drID', database.TYPES.Int, parseInt(String(DrID))],
-    ],
-    (columns) => ({
-      appointmentID: columns[0].value as number,
-    })
-  );
-
-  const newAppointmentId = result?.[0]?.appointmentID;
+  // Insert new appointment (+ AppoPatientType trigger, in createAppointment)
+  const newAppointmentId = await createAppointment({
+    PersonID: parseInt(String(PersonID)),
+    AppDate,
+    AppDetail,
+    DrID: parseInt(String(DrID)),
+  });
 
   log.info(
     `Appointment created: ID ${newAppointmentId}, Patient ${PersonID}, Doctor ${doctor.employeeName}, Date ${AppDate}`
@@ -403,24 +367,13 @@ export async function quickCheckIn(
     Dismissed: string | null;
   }
 
-  const existingAppointment = await database.executeQuery<ExistingAppointment>(
-    `
-        SELECT appointmentID, Present, Seated, Dismissed
-        FROM tblappointments
-        WHERE PersonID = @personID
-          AND CAST(AppDate AS DATE) = @today
-    `,
-    [
-      ['personID', database.TYPES.Int, parseInt(String(PersonID))],
-      ['today', database.TYPES.NVarChar, dateOnly],
-    ],
-    (columns) => ({
-      appointmentID: columns[0].value as number,
-      Present: columns[1].value as string | null,
-      Seated: columns[2].value as string | null,
-      Dismissed: columns[3].value as string | null,
-    })
-  );
+  const db = getKysely();
+  const { rows: existingAppointment } = await sql<ExistingAppointment>`
+        SELECT "appointmentID", "Present", "Seated", "Dismissed"
+        FROM "tblappointments"
+        WHERE "PersonID" = ${parseInt(String(PersonID))}
+          AND "AppDate"::date = ${dateOnly}::date
+    `.execute(db);
 
   // Scenario 1: Appointment exists and patient already checked in
   if (existingAppointment && existingAppointment.length > 0) {
@@ -489,46 +442,14 @@ export async function quickCheckIn(
     await verifyDoctor(doctorId);
   }
 
-  // Create new appointment with Present time already set
-  const insertQuery = `
-        INSERT INTO tblappointments (
-            PersonID,
-            AppDate,
-            AppDetail,
-            DrID,
-            Present,
-            LastUpdated
-        )
-        VALUES (
-            @personID,
-            CAST(@appDate AS datetime2),
-            @appDetail,
-            @drID,
-            @presentTime,
-            GETDATE()
-        );
-        SELECT SCOPE_IDENTITY() AS appointmentID;
-    `;
-
-  interface InsertResult {
-    appointmentID: number;
-  }
-
-  const result = await database.executeQuery<InsertResult>(
-    insertQuery,
-    [
-      ['personID', database.TYPES.Int, parseInt(String(PersonID))],
-      ['appDate', database.TYPES.NVarChar, dateTime],
-      ['appDetail', database.TYPES.NVarChar, detail],
-      ['drID', database.TYPES.Int, doctorId],
-      ['presentTime', database.TYPES.VarChar, presentTimeString],
-    ],
-    (columns) => ({
-      appointmentID: columns[0].value as number,
-    })
-  );
-
-  const newAppointmentId = result?.[0]?.appointmentID;
+  // Create new appointment with Present time already set (+ AppoPatientType in createAppointment)
+  const newAppointmentId = await createAppointment({
+    PersonID: parseInt(String(PersonID)),
+    AppDate: dateTime,
+    AppDetail: detail,
+    DrID: doctorId,
+    Present: presentTimeString,
+  });
 
   log.info(
     `Quick check-in: Created appointment ${newAppointmentId} for patient ${PersonID} with Present time`

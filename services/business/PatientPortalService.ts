@@ -9,8 +9,8 @@
  */
 import bcrypt from 'bcryptjs';
 import QRCode from 'qrcode';
-import type { ColumnValue } from '../../types/database.types.js';
-import { executeQuery, TYPES } from '../database/index.js';
+import { sql } from 'kysely';
+import { getKysely } from '../database/kysely.js';
 import {
   getAuthRow,
   upsertPin,
@@ -62,24 +62,11 @@ export interface PortalStatus {
  * Fetch the minimal patient profile needed for PIN defaults and portal display.
  */
 export async function getPatientProfile(personId: number): Promise<PatientPortalProfile | null> {
-  const rows = await executeQuery<PatientPortalProfile>(
-    `SELECT TOP 1 PersonID, PatientName, FirstName, LastName, Phone, DateofBirth, [Language]
-     FROM dbo.tblpatients WHERE PersonID = @PID`,
-    [['PID', TYPES.Int, personId]],
-    (columns: ColumnValue[]) => {
-      const r = {} as Record<string, unknown>;
-      for (const c of columns) r[c.metadata.colName] = c.value;
-      return {
-        PersonID: r.PersonID as number,
-        PatientName: (r.PatientName as string) ?? null,
-        FirstName: (r.FirstName as string) ?? null,
-        LastName: (r.LastName as string) ?? null,
-        Phone: (r.Phone as string) ?? null,
-        DateofBirth: (r.DateofBirth as Date) ?? null,
-        Language: (r.Language as number) ?? null,
-      };
-    }
-  );
+  const db = getKysely();
+  const { rows } = await sql<PatientPortalProfile>`
+    SELECT "PersonID", "PatientName", "FirstName", "LastName", "Phone", "DateofBirth", "Language"
+     FROM "tblpatients" WHERE "PersonID" = ${personId}
+     LIMIT 1`.execute(db);
   return rows[0] ?? null;
 }
 

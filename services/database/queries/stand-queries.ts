@@ -1,9 +1,24 @@
 /**
  * Stand / Mini-Pharmacy database queries
+ *
+ * Migration Phase 4: translated to typed Kysely (PostgreSQL). This was a facade
+ * BYPASSER (raw T-SQL via `executeQuery` + `new sql.Request(tx)` inside
+ * `withTransaction`); all reads now run on `getKysely()` and the multi-statement
+ * sale/void/restock/adjust transactions run on `withPgTransaction`. Positional
+ * `ColumnValue` mappers are gone — queries return plain objects.
+ *
+ * Type notes:
+ * - All price/cost/total/stock columns are PG `integer` → JS number (no cast).
+ * - `ExpiryDate` is PG `date` → the centralized parser (kysely.ts) returns a
+ *   `'YYYY-MM-DD'` string at runtime (codegen mistypes it as Timestamp). We cast
+ *   it to `string` on SELECT. NOTE: `StandItemRow.ExpiryDate` is declared `Date`,
+ *   but the value is now a string — the documented Phase-4 date-string behavior.
+ * - `SaleDate` / `MovementDate` / `DateAdded` / `ModifiedDate` are `timestamp` → Date.
+ * - citext columns (`ItemName`/`SKU`/`Barcode`/`MovementType`/…) make `=`/`LIKE`
+ *   case-insensitive with no app churn (matches the old Arabic_CI_AS columns).
  */
-import type { ColumnValue } from '../../../types/database.types.js';
-import { executeQuery, withTransaction, sql, TYPES } from '../index.js';
-import type { SqlParam } from '../index.js';
+import { sql } from 'kysely';
+import { getKysely, withPgTransaction } from '../kysely.js';
 
 // ============================================================================
 // TYPES
@@ -174,63 +189,68 @@ interface TopItemRow {
   TotalProfit: number;
 }
 
+// Shared SELECT shape for tblStandItems (+ joined CategoryName). Reused by every
+// item read so the column projection stays identical across functions.
+function selectStandItemColumns() {
+  return [
+    'i.ItemID',
+    'i.ItemName',
+    'i.SKU',
+    'i.Barcode',
+    'i.CategoryID',
+    'i.CostPrice',
+    'i.SellPrice',
+    'i.CurrentStock',
+    'i.ReorderLevel',
+    'i.Unit',
+    'i.Notes',
+    'i.IsActive',
+    'i.DateAdded',
+    'i.ModifiedDate',
+    'i.CreatedBy',
+    'c.CategoryName',
+  ] as const;
+}
 
 // ============================================================================
 // CATEGORIES
 // ============================================================================
 
 export async function getStandCategories(): Promise<StandCategoryRow[]> {
-  const query = `
-    SELECT CategoryID, CategoryName, IsActive
-    FROM dbo.tblStandCategories
-    WHERE IsActive = 1
-    ORDER BY CategoryName
-  `;
-
-  return executeQuery<StandCategoryRow>(query, [], (columns: ColumnValue[]) => ({
-    CategoryID: columns[0].value as number,
-    CategoryName: columns[1].value as string,
-    IsActive: columns[2].value as boolean,
-  }));
+  return getKysely()
+    .selectFrom('tblStandCategories')
+    .select(['CategoryID', 'CategoryName', 'IsActive'])
+    .where('IsActive', '=', true)
+    .orderBy('CategoryName')
+    .execute();
 }
 
 export async function addStandCategory(name: string): Promise<{ CategoryID: number }> {
-  const query = `
-    INSERT INTO dbo.tblStandCategories (CategoryName)
-    VALUES (@name);
-    SELECT SCOPE_IDENTITY() AS NewID;
-  `;
+  const row = await getKysely()
+    .insertInto('tblStandCategories')
+    .values({ CategoryName: name })
+    .returning('CategoryID')
+    .executeTakeFirstOrThrow();
 
-  const result = await executeQuery<{ NewID: number }>(
-    query,
-    [['name', TYPES.NVarChar, name]],
-    (columns: ColumnValue[]) => ({ NewID: columns[0].value as number })
-  );
-
-  if (!result?.[0]) throw new Error('Failed to create category: no ID returned');
-  return { CategoryID: result[0].NewID };
+  return { CategoryID: row.CategoryID };
 }
 
 export async function updateStandCategory(
   id: number,
   data: { categoryName?: string; isActive?: boolean }
 ): Promise<void> {
-  const sets: string[] = [];
-  const params: SqlParam[] = [['id', TYPES.Int, id]];
+  const set: { CategoryName?: string; IsActive?: boolean } = {};
 
-  if (data.categoryName !== undefined) {
-    sets.push('CategoryName = @name');
-    params.push(['name', TYPES.NVarChar, data.categoryName]);
-  }
-  if (data.isActive !== undefined) {
-    sets.push('IsActive = @isActive');
-    params.push(['isActive', TYPES.Bit, data.isActive]);
-  }
+  if (data.categoryName !== undefined) set.CategoryName = data.categoryName;
+  if (data.isActive !== undefined) set.IsActive = data.isActive;
 
-  if (sets.length === 0) return;
+  if (Object.keys(set).length === 0) return;
 
-  const query = `UPDATE dbo.tblStandCategories SET ${sets.join(', ')} WHERE CategoryID = @id`;
-  await executeQuery(query, params, () => ({}));
+  await getKysely()
+    .updateTable('tblStandCategories')
+    .set(set)
+    .where('CategoryID', '=', id)
+    .execute();
 }
 
 export async function deactivateStandCategory(id: number): Promise<void> {
@@ -242,180 +262,98 @@ export async function deactivateStandCategory(id: number): Promise<void> {
 // ============================================================================
 
 export async function getStandItems(filters: StandItemFilters = {}): Promise<StandItemRow[]> {
-  let query = `
-    SELECT
-      i.ItemID, i.ItemName, i.SKU, i.Barcode, i.CategoryID,
-      i.CostPrice, i.SellPrice, i.CurrentStock, i.ReorderLevel,
-      i.ExpiryDate, i.Unit, i.Notes, i.IsActive,
-      i.DateAdded, i.ModifiedDate, i.CreatedBy,
-      c.CategoryName
-    FROM dbo.tblStandItems i
-    LEFT JOIN dbo.tblStandCategories c ON i.CategoryID = c.CategoryID
-    WHERE 1=1
-  `;
-
-  const params: SqlParam[] = [];
+  let q = getKysely()
+    .selectFrom('tblStandItems as i')
+    .leftJoin('tblStandCategories as c', 'i.CategoryID', 'c.CategoryID')
+    .select((eb) => [
+      ...selectStandItemColumns(),
+      eb.ref('i.ExpiryDate').$castTo<string>().as('ExpiryDate'),
+    ]);
 
   if (!filters.includeInactive) {
-    query += ' AND i.IsActive = 1';
+    q = q.where('i.IsActive', '=', true);
   }
 
   if (filters.search) {
-    query += ' AND (i.ItemName LIKE @search OR i.SKU LIKE @search OR i.Barcode LIKE @search)';
-    params.push(['search', TYPES.NVarChar, `%${filters.search}%`]);
+    const pattern = `%${filters.search}%`;
+    q = q.where((eb) =>
+      eb.or([
+        eb('i.ItemName', 'like', pattern),
+        eb('i.SKU', 'like', pattern),
+        eb('i.Barcode', 'like', pattern),
+      ])
+    );
   }
 
   if (filters.categoryId) {
-    query += ' AND i.CategoryID = @categoryId';
-    params.push(['categoryId', TYPES.Int, filters.categoryId]);
+    q = q.where('i.CategoryID', '=', filters.categoryId);
   }
 
   if (filters.stockStatus === 'out-of-stock') {
-    query += ' AND i.CurrentStock = 0';
+    q = q.where('i.CurrentStock', '=', 0);
   } else if (filters.stockStatus === 'low-stock') {
-    query += ' AND i.CurrentStock > 0 AND i.CurrentStock <= i.ReorderLevel';
+    q = q
+      .where('i.CurrentStock', '>', 0)
+      .where((eb) => eb('i.CurrentStock', '<=', eb.ref('i.ReorderLevel')));
   } else if (filters.stockStatus === 'in-stock') {
-    query += ' AND i.CurrentStock > i.ReorderLevel';
+    q = q.where((eb) => eb('i.CurrentStock', '>', eb.ref('i.ReorderLevel')));
   }
 
-  query += ' ORDER BY i.ItemName';
-
-  return executeQuery<StandItemRow>(query, params, (columns: ColumnValue[]) => ({
-    ItemID: columns[0].value as number,
-    ItemName: columns[1].value as string,
-    SKU: columns[2].value as string | null,
-    Barcode: columns[3].value as string | null,
-    CategoryID: columns[4].value as number | null,
-    CostPrice: columns[5].value as number,
-    SellPrice: columns[6].value as number,
-    CurrentStock: columns[7].value as number,
-    ReorderLevel: columns[8].value as number,
-    ExpiryDate: columns[9].value as Date | null,
-    Unit: columns[10].value as string | null,
-    Notes: columns[11].value as string | null,
-    IsActive: columns[12].value as boolean,
-    DateAdded: columns[13].value as Date,
-    ModifiedDate: columns[14].value as Date | null,
-    CreatedBy: columns[15].value as number | null,
-    CategoryName: columns[16].value as string | null,
-  }));
+  return q.orderBy('i.ItemName').execute() as unknown as Promise<StandItemRow[]>;
 }
 
 export async function getStandItemById(id: number): Promise<StandItemRow | null> {
-  const query = `
-    SELECT
-      i.ItemID, i.ItemName, i.SKU, i.Barcode, i.CategoryID,
-      i.CostPrice, i.SellPrice, i.CurrentStock, i.ReorderLevel,
-      i.ExpiryDate, i.Unit, i.Notes, i.IsActive,
-      i.DateAdded, i.ModifiedDate, i.CreatedBy,
-      c.CategoryName
-    FROM dbo.tblStandItems i
-    LEFT JOIN dbo.tblStandCategories c ON i.CategoryID = c.CategoryID
-    WHERE i.ItemID = @id
-  `;
+  const row = await getKysely()
+    .selectFrom('tblStandItems as i')
+    .leftJoin('tblStandCategories as c', 'i.CategoryID', 'c.CategoryID')
+    .select((eb) => [
+      ...selectStandItemColumns(),
+      eb.ref('i.ExpiryDate').$castTo<string>().as('ExpiryDate'),
+    ])
+    .where('i.ItemID', '=', id)
+    .executeTakeFirst();
 
-  const result = await executeQuery<StandItemRow>(
-    query,
-    [['id', TYPES.Int, id]],
-    (columns: ColumnValue[]) => ({
-      ItemID: columns[0].value as number,
-      ItemName: columns[1].value as string,
-      SKU: columns[2].value as string | null,
-      Barcode: columns[3].value as string | null,
-      CategoryID: columns[4].value as number | null,
-      CostPrice: columns[5].value as number,
-      SellPrice: columns[6].value as number,
-      CurrentStock: columns[7].value as number,
-      ReorderLevel: columns[8].value as number,
-      ExpiryDate: columns[9].value as Date | null,
-      Unit: columns[10].value as string | null,
-      Notes: columns[11].value as string | null,
-      IsActive: columns[12].value as boolean,
-      DateAdded: columns[13].value as Date,
-      ModifiedDate: columns[14].value as Date | null,
-      CreatedBy: columns[15].value as number | null,
-      CategoryName: columns[16].value as string | null,
-    })
-  );
-
-  return result.length > 0 ? result[0] : null;
+  return (row as unknown as StandItemRow | undefined) ?? null;
 }
 
 export async function getStandItemByBarcode(barcode: string): Promise<StandItemRow | null> {
-  const query = `
-    SELECT
-      i.ItemID, i.ItemName, i.SKU, i.Barcode, i.CategoryID,
-      i.CostPrice, i.SellPrice, i.CurrentStock, i.ReorderLevel,
-      i.ExpiryDate, i.Unit, i.Notes, i.IsActive,
-      i.DateAdded, i.ModifiedDate, i.CreatedBy,
-      c.CategoryName
-    FROM dbo.tblStandItems i
-    LEFT JOIN dbo.tblStandCategories c ON i.CategoryID = c.CategoryID
-    WHERE i.Barcode = @barcode AND i.IsActive = 1
-  `;
+  const row = await getKysely()
+    .selectFrom('tblStandItems as i')
+    .leftJoin('tblStandCategories as c', 'i.CategoryID', 'c.CategoryID')
+    .select((eb) => [
+      ...selectStandItemColumns(),
+      eb.ref('i.ExpiryDate').$castTo<string>().as('ExpiryDate'),
+    ])
+    .where('i.Barcode', '=', barcode)
+    .where('i.IsActive', '=', true)
+    .executeTakeFirst();
 
-  const result = await executeQuery<StandItemRow>(
-    query,
-    [['barcode', TYPES.NVarChar, barcode]],
-    (columns: ColumnValue[]) => ({
-      ItemID: columns[0].value as number,
-      ItemName: columns[1].value as string,
-      SKU: columns[2].value as string | null,
-      Barcode: columns[3].value as string | null,
-      CategoryID: columns[4].value as number | null,
-      CostPrice: columns[5].value as number,
-      SellPrice: columns[6].value as number,
-      CurrentStock: columns[7].value as number,
-      ReorderLevel: columns[8].value as number,
-      ExpiryDate: columns[9].value as Date | null,
-      Unit: columns[10].value as string | null,
-      Notes: columns[11].value as string | null,
-      IsActive: columns[12].value as boolean,
-      DateAdded: columns[13].value as Date,
-      ModifiedDate: columns[14].value as Date | null,
-      CreatedBy: columns[15].value as number | null,
-      CategoryName: columns[16].value as string | null,
-    })
-  );
-
-  return result.length > 0 ? result[0] : null;
+  return (row as unknown as StandItemRow | undefined) ?? null;
 }
 
 export async function addStandItem(data: StandItemCreateData): Promise<{ ItemID: number }> {
   const initialStock = data.currentStock ?? 0;
 
-  const query = `
-    INSERT INTO dbo.tblStandItems
-      (ItemName, SKU, Barcode, CategoryID, CostPrice, SellPrice,
-       CurrentStock, ReorderLevel, ExpiryDate, Unit, Notes, CreatedBy)
-    VALUES
-      (@itemName, @sku, @barcode, @categoryId, @costPrice, @sellPrice,
-       @currentStock, @reorderLevel, @expiryDate, @unit, @notes, @createdBy);
-    SELECT SCOPE_IDENTITY() AS NewID;
-  `;
+  const row = await getKysely()
+    .insertInto('tblStandItems')
+    .values({
+      ItemName: data.itemName,
+      SKU: data.sku || null,
+      Barcode: data.barcode || null,
+      CategoryID: data.categoryId || null,
+      CostPrice: data.costPrice,
+      SellPrice: data.sellPrice,
+      CurrentStock: initialStock,
+      ReorderLevel: data.reorderLevel ?? 1,
+      ExpiryDate: data.expiryDate || null,
+      Unit: data.unit || null,
+      Notes: data.notes || null,
+      CreatedBy: data.createdBy || null,
+    })
+    .returning('ItemID')
+    .executeTakeFirstOrThrow();
 
-  const params: SqlParam[] = [
-    ['itemName', TYPES.NVarChar, data.itemName],
-    ['sku', TYPES.NVarChar, data.sku || null],
-    ['barcode', TYPES.NVarChar, data.barcode || null],
-    ['categoryId', TYPES.Int, data.categoryId || null],
-    ['costPrice', TYPES.Int, data.costPrice],
-    ['sellPrice', TYPES.Int, data.sellPrice],
-    ['currentStock', TYPES.Int, initialStock],
-    ['reorderLevel', TYPES.Int, data.reorderLevel ?? 1],
-    ['expiryDate', TYPES.Date, data.expiryDate || null],
-    ['unit', TYPES.NVarChar, data.unit || null],
-    ['notes', TYPES.NVarChar, data.notes || null],
-    ['createdBy', TYPES.Int, data.createdBy || null],
-  ];
-
-  const result = await executeQuery<{ NewID: number }>(query, params, (columns: ColumnValue[]) => ({
-    NewID: columns[0].value as number,
-  }));
-
-  if (!result?.[0]) throw new Error('Failed to create item: no ID returned');
-
-  const itemId = result[0].NewID;
+  const itemId = row.ItemID;
 
   // Insert initial stock movement if stock > 0
   if (initialStock > 0) {
@@ -434,137 +372,62 @@ export async function addStandItem(data: StandItemCreateData): Promise<{ ItemID:
 }
 
 export async function updateStandItem(id: number, data: StandItemUpdateData): Promise<void> {
-  const sets: string[] = ['ModifiedDate = SYSDATETIME()'];
-  const params: SqlParam[] = [['id', TYPES.Int, id]];
+  const set: Record<string, unknown> = { ModifiedDate: sql`localtimestamp` };
 
-  if (data.itemName !== undefined) {
-    sets.push('ItemName = @itemName');
-    params.push(['itemName', TYPES.NVarChar, data.itemName]);
-  }
-  if (data.sku !== undefined) {
-    sets.push('SKU = @sku');
-    params.push(['sku', TYPES.NVarChar, data.sku]);
-  }
-  if (data.barcode !== undefined) {
-    sets.push('Barcode = @barcode');
-    params.push(['barcode', TYPES.NVarChar, data.barcode]);
-  }
-  if (data.categoryId !== undefined) {
-    sets.push('CategoryID = @categoryId');
-    params.push(['categoryId', TYPES.Int, data.categoryId]);
-  }
-  if (data.costPrice !== undefined) {
-    sets.push('CostPrice = @costPrice');
-    params.push(['costPrice', TYPES.Int, data.costPrice]);
-  }
-  if (data.sellPrice !== undefined) {
-    sets.push('SellPrice = @sellPrice');
-    params.push(['sellPrice', TYPES.Int, data.sellPrice]);
-  }
-  if (data.reorderLevel !== undefined) {
-    sets.push('ReorderLevel = @reorderLevel');
-    params.push(['reorderLevel', TYPES.Int, data.reorderLevel]);
-  }
-  if (data.expiryDate !== undefined) {
-    sets.push('ExpiryDate = @expiryDate');
-    params.push(['expiryDate', TYPES.Date, data.expiryDate]);
-  }
-  if (data.unit !== undefined) {
-    sets.push('Unit = @unit');
-    params.push(['unit', TYPES.NVarChar, data.unit]);
-  }
-  if (data.notes !== undefined) {
-    sets.push('Notes = @notes');
-    params.push(['notes', TYPES.NVarChar, data.notes]);
-  }
+  if (data.itemName !== undefined) set.ItemName = data.itemName;
+  if (data.sku !== undefined) set.SKU = data.sku;
+  if (data.barcode !== undefined) set.Barcode = data.barcode;
+  if (data.categoryId !== undefined) set.CategoryID = data.categoryId;
+  if (data.costPrice !== undefined) set.CostPrice = data.costPrice;
+  if (data.sellPrice !== undefined) set.SellPrice = data.sellPrice;
+  if (data.reorderLevel !== undefined) set.ReorderLevel = data.reorderLevel;
+  if (data.expiryDate !== undefined) set.ExpiryDate = data.expiryDate;
+  if (data.unit !== undefined) set.Unit = data.unit;
+  if (data.notes !== undefined) set.Notes = data.notes;
 
-  const query = `UPDATE dbo.tblStandItems SET ${sets.join(', ')} WHERE ItemID = @id`;
-  await executeQuery(query, params, () => ({}));
+  await getKysely()
+    .updateTable('tblStandItems')
+    .set(set)
+    .where('ItemID', '=', id)
+    .execute();
 }
 
 export async function softDeleteStandItem(id: number): Promise<void> {
-  const query = `
-    UPDATE dbo.tblStandItems
-    SET IsActive = 0, ModifiedDate = SYSDATETIME()
-    WHERE ItemID = @id
-  `;
-  await executeQuery(query, [['id', TYPES.Int, id]], () => ({}));
+  await getKysely()
+    .updateTable('tblStandItems')
+    .set({ IsActive: false, ModifiedDate: sql`localtimestamp` })
+    .where('ItemID', '=', id)
+    .execute();
 }
 
 export async function getLowStockItems(): Promise<StandItemRow[]> {
-  const query = `
-    SELECT
-      i.ItemID, i.ItemName, i.SKU, i.Barcode, i.CategoryID,
-      i.CostPrice, i.SellPrice, i.CurrentStock, i.ReorderLevel,
-      i.ExpiryDate, i.Unit, i.Notes, i.IsActive,
-      i.DateAdded, i.ModifiedDate, i.CreatedBy,
-      c.CategoryName
-    FROM dbo.tblStandItems i
-    LEFT JOIN dbo.tblStandCategories c ON i.CategoryID = c.CategoryID
-    WHERE i.IsActive = 1 AND i.CurrentStock <= i.ReorderLevel
-    ORDER BY i.CurrentStock ASC
-  `;
-
-  return executeQuery<StandItemRow>(query, [], (columns: ColumnValue[]) => ({
-    ItemID: columns[0].value as number,
-    ItemName: columns[1].value as string,
-    SKU: columns[2].value as string | null,
-    Barcode: columns[3].value as string | null,
-    CategoryID: columns[4].value as number | null,
-    CostPrice: columns[5].value as number,
-    SellPrice: columns[6].value as number,
-    CurrentStock: columns[7].value as number,
-    ReorderLevel: columns[8].value as number,
-    ExpiryDate: columns[9].value as Date | null,
-    Unit: columns[10].value as string | null,
-    Notes: columns[11].value as string | null,
-    IsActive: columns[12].value as boolean,
-    DateAdded: columns[13].value as Date,
-    ModifiedDate: columns[14].value as Date | null,
-    CreatedBy: columns[15].value as number | null,
-    CategoryName: columns[16].value as string | null,
-  }));
+  return getKysely()
+    .selectFrom('tblStandItems as i')
+    .leftJoin('tblStandCategories as c', 'i.CategoryID', 'c.CategoryID')
+    .select((eb) => [
+      ...selectStandItemColumns(),
+      eb.ref('i.ExpiryDate').$castTo<string>().as('ExpiryDate'),
+    ])
+    .where('i.IsActive', '=', true)
+    .where((eb) => eb('i.CurrentStock', '<=', eb.ref('i.ReorderLevel')))
+    .orderBy('i.CurrentStock', 'asc')
+    .execute() as unknown as Promise<StandItemRow[]>;
 }
 
 export async function getExpiringItems(daysAhead: number = 30): Promise<StandItemRow[]> {
-  const query = `
-    SELECT
-      i.ItemID, i.ItemName, i.SKU, i.Barcode, i.CategoryID,
-      i.CostPrice, i.SellPrice, i.CurrentStock, i.ReorderLevel,
-      i.ExpiryDate, i.Unit, i.Notes, i.IsActive,
-      i.DateAdded, i.ModifiedDate, i.CreatedBy,
-      c.CategoryName
-    FROM dbo.tblStandItems i
-    LEFT JOIN dbo.tblStandCategories c ON i.CategoryID = c.CategoryID
-    WHERE i.IsActive = 1
-      AND i.ExpiryDate IS NOT NULL
-      AND i.ExpiryDate BETWEEN CAST(GETDATE() AS DATE) AND DATEADD(DAY, @days, CAST(GETDATE() AS DATE))
-    ORDER BY i.ExpiryDate ASC
-  `;
-
-  return executeQuery<StandItemRow>(
-    query,
-    [['days', TYPES.Int, daysAhead]],
-    (columns: ColumnValue[]) => ({
-      ItemID: columns[0].value as number,
-      ItemName: columns[1].value as string,
-      SKU: columns[2].value as string | null,
-      Barcode: columns[3].value as string | null,
-      CategoryID: columns[4].value as number | null,
-      CostPrice: columns[5].value as number,
-      SellPrice: columns[6].value as number,
-      CurrentStock: columns[7].value as number,
-      ReorderLevel: columns[8].value as number,
-      ExpiryDate: columns[9].value as Date | null,
-      Unit: columns[10].value as string | null,
-      Notes: columns[11].value as string | null,
-      IsActive: columns[12].value as boolean,
-      DateAdded: columns[13].value as Date,
-      ModifiedDate: columns[14].value as Date | null,
-      CreatedBy: columns[15].value as number | null,
-      CategoryName: columns[16].value as string | null,
-    })
-  );
+  return getKysely()
+    .selectFrom('tblStandItems as i')
+    .leftJoin('tblStandCategories as c', 'i.CategoryID', 'c.CategoryID')
+    .select((eb) => [
+      ...selectStandItemColumns(),
+      eb.ref('i.ExpiryDate').$castTo<string>().as('ExpiryDate'),
+    ])
+    .where('i.IsActive', '=', true)
+    .where('i.ExpiryDate', 'is not', null)
+    .where('i.ExpiryDate', '>=', sql<Date>`current_date`)
+    .where('i.ExpiryDate', '<=', sql<Date>`current_date + (${daysAhead} * interval '1 day')`)
+    .orderBy('i.ExpiryDate', 'asc')
+    .execute() as unknown as Promise<StandItemRow[]>;
 }
 
 // ============================================================================
@@ -572,67 +435,67 @@ export async function getExpiringItems(daysAhead: number = 30): Promise<StandIte
 // ============================================================================
 
 export async function createStandSaleTransaction(data: SaleCreateInput): Promise<{ SaleID: number }> {
-  return withTransaction(async (tx) => {
+  return withPgTransaction(async (trx) => {
     // 1. Insert sale header
-    const saleResult = await new sql.Request(tx)
-      .input('totalAmount', TYPES.Int, data.totalAmount)
-      .input('totalCost', TYPES.Int, data.totalCost)
-      .input('totalProfit', TYPES.Int, data.totalProfit)
-      .input('amountPaid', TYPES.Int, data.amountPaid)
-      .input('change', TYPES.Int, data.change)
-      .input('paymentMethod', TYPES.NVarChar, data.paymentMethod)
-      .input('customerNote', TYPES.NVarChar, data.customerNote || null)
-      .input('personId', TYPES.Int, data.personId || null)
-      .input('cashierId', TYPES.Int, data.cashierId || null)
-      .query<{ SaleID: number }>(
-        `INSERT INTO dbo.tblStandSales
-          (TotalAmount, TotalCost, TotalProfit, AmountPaid, Change, PaymentMethod, CustomerNote, PersonID, CashierID)
-         VALUES (@totalAmount, @totalCost, @totalProfit, @amountPaid, @change, @paymentMethod, @customerNote, @personId, @cashierId);
-         SELECT SCOPE_IDENTITY() AS SaleID;`
-      );
+    const saleRow = await trx
+      .insertInto('tblStandSales')
+      .values({
+        TotalAmount: data.totalAmount,
+        TotalCost: data.totalCost,
+        TotalProfit: data.totalProfit,
+        AmountPaid: data.amountPaid,
+        Change: data.change,
+        PaymentMethod: data.paymentMethod,
+        CustomerNote: data.customerNote || null,
+        PersonID: data.personId || null,
+        CashierID: data.cashierId || null,
+      })
+      .returning('SaleID')
+      .executeTakeFirstOrThrow();
 
-    const saleId = saleResult.recordset[0]?.SaleID as number;
-    if (!saleId) throw new Error('Failed to create sale: no ID returned');
+    const saleId = saleRow.SaleID;
 
     // 2-4. For each line item: insert sale item, decrement stock, insert movement
     for (const item of data.items) {
-      await new sql.Request(tx)
-        .input('saleId', TYPES.Int, saleId)
-        .input('itemId', TYPES.Int, item.itemId)
-        .input('qty', TYPES.Int, item.quantity)
-        .input('unitPrice', TYPES.Int, item.unitPrice)
-        .input('unitCost', TYPES.Int, item.unitCost)
-        .input('lineTotal', TYPES.Int, item.lineTotal)
-        .query(
-          `INSERT INTO dbo.tblStandSaleItems (SaleID, ItemID, Quantity, UnitPrice, UnitCost, LineTotal)
-           VALUES (@saleId, @itemId, @qty, @unitPrice, @unitCost, @lineTotal)`
-        );
+      await trx
+        .insertInto('tblStandSaleItems')
+        .values({
+          SaleID: saleId,
+          ItemID: item.itemId,
+          Quantity: item.quantity,
+          UnitPrice: item.unitPrice,
+          UnitCost: item.unitCost,
+          LineTotal: item.lineTotal,
+        })
+        .execute();
 
-      const stockResult = await new sql.Request(tx)
-        .input('qty', TYPES.Int, item.quantity)
-        .input('itemId', TYPES.Int, item.itemId)
-        .query(
-          `UPDATE dbo.tblStandItems
-           SET CurrentStock = CurrentStock - @qty, ModifiedDate = SYSDATETIME()
-           WHERE ItemID = @itemId AND CurrentStock >= @qty`
-        );
+      // Atomic stock-decrement guard: only updates when stock is sufficient.
+      // 0 rows ⇒ insufficient stock — abort the whole transaction.
+      const stockResult = await trx
+        .updateTable('tblStandItems')
+        .set((eb) => ({
+          CurrentStock: eb('CurrentStock', '-', item.quantity),
+          ModifiedDate: sql`localtimestamp`,
+        }))
+        .where('ItemID', '=', item.itemId)
+        .where('CurrentStock', '>=', item.quantity)
+        .executeTakeFirst();
 
-      const affected = Array.isArray(stockResult.rowsAffected)
-        ? stockResult.rowsAffected.reduce((a, b) => a + b, 0)
-        : stockResult.rowsAffected;
-      if (affected !== 1) throw new Error(`INSUFFICIENT_STOCK:${item.itemId}`);
+      if (Number(stockResult.numUpdatedRows) !== 1) {
+        throw new Error(`INSUFFICIENT_STOCK:${item.itemId}`);
+      }
 
-      await new sql.Request(tx)
-        .input('itemId', TYPES.Int, item.itemId)
-        .input('qty', TYPES.Int, -item.quantity)
-        .input('unitCost', TYPES.Int, item.unitCost)
-        .input('saleId', TYPES.Int, saleId)
-        .input('cashierId', TYPES.Int, data.cashierId || null)
-        .query(
-          `INSERT INTO dbo.tblStandStockMovements
-            (ItemID, MovementType, Quantity, UnitCost, RelatedSaleID, PerformedBy)
-           VALUES (@itemId, 'sale', @qty, @unitCost, @saleId, @cashierId)`
-        );
+      await trx
+        .insertInto('tblStandStockMovements')
+        .values({
+          ItemID: item.itemId,
+          MovementType: 'sale',
+          Quantity: -item.quantity,
+          UnitCost: item.unitCost,
+          RelatedSaleID: saleId,
+          PerformedBy: data.cashierId || null,
+        })
+        .execute();
     }
 
     return { SaleID: saleId };
@@ -640,136 +503,103 @@ export async function createStandSaleTransaction(data: SaleCreateInput): Promise
 }
 
 export async function getStandSales(filters: StandSaleFilters = {}): Promise<StandSaleRow[]> {
-  let query = `
-    SELECT
-      s.SaleID, s.SaleDate, s.TotalAmount, s.TotalCost, s.TotalProfit,
-      s.AmountPaid, s.Change, s.PaymentMethod, s.CustomerNote,
-      s.PersonID, s.CashierID, s.VoidedDate, s.VoidedBy, s.VoidReason,
-      p.PatientName, u.FullName AS CashierName
-    FROM dbo.tblStandSales s
-    LEFT JOIN dbo.tblpatients p ON s.PersonID = p.PersonID
-    LEFT JOIN dbo.tblUsers u ON s.CashierID = u.UserID
-    WHERE 1=1
-  `;
-
-  const params: SqlParam[] = [];
+  let q = getKysely()
+    .selectFrom('tblStandSales as s')
+    .leftJoin('tblpatients as p', 's.PersonID', 'p.PersonID')
+    .leftJoin('tblUsers as u', 's.CashierID', 'u.UserID')
+    .select([
+      's.SaleID',
+      's.SaleDate',
+      's.TotalAmount',
+      's.TotalCost',
+      's.TotalProfit',
+      's.AmountPaid',
+      's.Change',
+      's.PaymentMethod',
+      's.CustomerNote',
+      's.PersonID',
+      's.CashierID',
+      's.VoidedDate',
+      's.VoidedBy',
+      's.VoidReason',
+      'p.PatientName',
+      'u.FullName as CashierName',
+    ]);
 
   if (filters.startDate) {
-    query += ' AND CAST(s.SaleDate AS DATE) >= @startDate';
-    params.push(['startDate', TYPES.Date, filters.startDate]);
+    q = q.where(sql`cast(${sql.ref('s.SaleDate')} as date)`, '>=', sql<Date>`${filters.startDate}`);
   }
   if (filters.endDate) {
-    query += ' AND CAST(s.SaleDate AS DATE) <= @endDate';
-    params.push(['endDate', TYPES.Date, filters.endDate]);
+    q = q.where(sql`cast(${sql.ref('s.SaleDate')} as date)`, '<=', sql<Date>`${filters.endDate}`);
   }
   if (filters.cashierId) {
-    query += ' AND s.CashierID = @cashierId';
-    params.push(['cashierId', TYPES.Int, filters.cashierId]);
+    q = q.where('s.CashierID', '=', filters.cashierId);
   }
   if (filters.personId) {
-    query += ' AND s.PersonID = @personId';
-    params.push(['personId', TYPES.Int, filters.personId]);
+    q = q.where('s.PersonID', '=', filters.personId);
   }
 
-  query += ' ORDER BY s.SaleDate DESC, s.SaleID DESC';
+  q = q.orderBy('s.SaleDate', 'desc').orderBy('s.SaleID', 'desc');
 
-  // Opt-in pagination (SQL Server OFFSET/FETCH requires the ORDER BY above).
-  // 1000 caps a single page so a caller can't trigger an unbounded scan.
+  // Opt-in pagination. 1000 caps a single page so a caller can't trigger an
+  // unbounded scan.
   if (filters.limit != null) {
     const limit = Math.min(Math.max(Math.trunc(filters.limit), 1), 1000);
     const offset = Math.max(Math.trunc(filters.offset ?? 0), 0);
-    query += ' OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY';
-    params.push(['offset', TYPES.Int, offset]);
-    params.push(['limit', TYPES.Int, limit]);
+    q = q.limit(limit).offset(offset);
   }
 
-  return executeQuery<StandSaleRow>(query, params, (columns: ColumnValue[]) => ({
-    SaleID: columns[0].value as number,
-    SaleDate: columns[1].value as Date,
-    TotalAmount: columns[2].value as number,
-    TotalCost: columns[3].value as number,
-    TotalProfit: columns[4].value as number,
-    AmountPaid: columns[5].value as number,
-    Change: columns[6].value as number,
-    PaymentMethod: columns[7].value as string,
-    CustomerNote: columns[8].value as string | null,
-    PersonID: columns[9].value as number | null,
-    CashierID: columns[10].value as number | null,
-    VoidedDate: columns[11].value as Date | null,
-    VoidedBy: columns[12].value as number | null,
-    VoidReason: columns[13].value as string | null,
-    PatientName: columns[14].value as string | null,
-    CashierName: columns[15].value as string | null,
-  }));
+  return q.execute() as Promise<StandSaleRow[]>;
 }
 
 export async function getStandSaleById(id: number): Promise<(StandSaleRow & { Items: StandSaleItemRow[] }) | null> {
   // Get the sale header
-  const saleQuery = `
-    SELECT
-      s.SaleID, s.SaleDate, s.TotalAmount, s.TotalCost, s.TotalProfit,
-      s.AmountPaid, s.Change, s.PaymentMethod, s.CustomerNote,
-      s.PersonID, s.CashierID, s.VoidedDate, s.VoidedBy, s.VoidReason,
-      p.PatientName, u.FullName AS CashierName
-    FROM dbo.tblStandSales s
-    LEFT JOIN dbo.tblpatients p ON s.PersonID = p.PersonID
-    LEFT JOIN dbo.tblUsers u ON s.CashierID = u.UserID
-    WHERE s.SaleID = @id
-  `;
+  const sale = await getKysely()
+    .selectFrom('tblStandSales as s')
+    .leftJoin('tblpatients as p', 's.PersonID', 'p.PersonID')
+    .leftJoin('tblUsers as u', 's.CashierID', 'u.UserID')
+    .select([
+      's.SaleID',
+      's.SaleDate',
+      's.TotalAmount',
+      's.TotalCost',
+      's.TotalProfit',
+      's.AmountPaid',
+      's.Change',
+      's.PaymentMethod',
+      's.CustomerNote',
+      's.PersonID',
+      's.CashierID',
+      's.VoidedDate',
+      's.VoidedBy',
+      's.VoidReason',
+      'p.PatientName',
+      'u.FullName as CashierName',
+    ])
+    .where('s.SaleID', '=', id)
+    .executeTakeFirst();
 
-  const sales = await executeQuery<StandSaleRow>(
-    saleQuery,
-    [['id', TYPES.Int, id]],
-    (columns: ColumnValue[]) => ({
-      SaleID: columns[0].value as number,
-      SaleDate: columns[1].value as Date,
-      TotalAmount: columns[2].value as number,
-      TotalCost: columns[3].value as number,
-      TotalProfit: columns[4].value as number,
-      AmountPaid: columns[5].value as number,
-      Change: columns[6].value as number,
-      PaymentMethod: columns[7].value as string,
-      CustomerNote: columns[8].value as string | null,
-      PersonID: columns[9].value as number | null,
-      CashierID: columns[10].value as number | null,
-      VoidedDate: columns[11].value as Date | null,
-      VoidedBy: columns[12].value as number | null,
-      VoidReason: columns[13].value as string | null,
-      PatientName: columns[14].value as string | null,
-      CashierName: columns[15].value as string | null,
-    })
-  );
-
-  if (sales.length === 0) return null;
+  if (!sale) return null;
 
   // Get line items
-  const itemsQuery = `
-    SELECT
-      si.SaleItemID, si.SaleID, si.ItemID, si.Quantity,
-      si.UnitPrice, si.UnitCost, si.LineTotal,
-      i.ItemName
-    FROM dbo.tblStandSaleItems si
-    JOIN dbo.tblStandItems i ON si.ItemID = i.ItemID
-    WHERE si.SaleID = @id
-    ORDER BY si.SaleItemID
-  `;
+  const items = await getKysely()
+    .selectFrom('tblStandSaleItems as si')
+    .innerJoin('tblStandItems as i', 'si.ItemID', 'i.ItemID')
+    .select([
+      'si.SaleItemID',
+      'si.SaleID',
+      'si.ItemID',
+      'si.Quantity',
+      'si.UnitPrice',
+      'si.UnitCost',
+      'si.LineTotal',
+      'i.ItemName',
+    ])
+    .where('si.SaleID', '=', id)
+    .orderBy('si.SaleItemID')
+    .execute();
 
-  const items = await executeQuery<StandSaleItemRow>(
-    itemsQuery,
-    [['id', TYPES.Int, id]],
-    (columns: ColumnValue[]) => ({
-      SaleItemID: columns[0].value as number,
-      SaleID: columns[1].value as number,
-      ItemID: columns[2].value as number,
-      Quantity: columns[3].value as number,
-      UnitPrice: columns[4].value as number,
-      UnitCost: columns[5].value as number,
-      LineTotal: columns[6].value as number,
-      ItemName: columns[7].value as string,
-    })
-  );
-
-  return { ...sales[0], Items: items };
+  return { ...(sale as StandSaleRow), Items: items as StandSaleItemRow[] };
 }
 
 export async function voidStandSale(
@@ -777,53 +607,49 @@ export async function voidStandSale(
   reason: string,
   userId: number | null
 ): Promise<void> {
-  return withTransaction(async (tx) => {
-    const voidResult = await new sql.Request(tx)
-      .input('saleId', TYPES.Int, saleId)
-      .input('userId', TYPES.Int, userId)
-      .input('reason', TYPES.NVarChar, reason)
-      .query(
-        `UPDATE dbo.tblStandSales
-         SET VoidedDate = SYSDATETIME(), VoidedBy = @userId, VoidReason = @reason
-         WHERE SaleID = @saleId AND VoidedDate IS NULL`
-      );
+  return withPgTransaction(async (trx) => {
+    const voidResult = await trx
+      .updateTable('tblStandSales')
+      .set({ VoidedDate: sql`localtimestamp`, VoidedBy: userId, VoidReason: reason })
+      .where('SaleID', '=', saleId)
+      .where('VoidedDate', 'is', null)
+      .executeTakeFirst();
 
     // Row-level guard is the only atomic defense against a concurrent/duplicate void
     // (the caller's pre-check is TOCTOU). 0 rows ⇒ already voided — abort before
     // restocking, else CurrentStock is credited twice and duplicate movements written.
-    const voided = Array.isArray(voidResult.rowsAffected)
-      ? voidResult.rowsAffected.reduce((a, b) => a + b, 0)
-      : voidResult.rowsAffected;
-    if (voided !== 1) throw new Error(`ALREADY_VOIDED:${saleId}`);
+    if (Number(voidResult.numUpdatedRows) !== 1) {
+      throw new Error(`ALREADY_VOIDED:${saleId}`);
+    }
 
-    const lineItems = await new sql.Request(tx)
-      .input('saleId', TYPES.Int, saleId)
-      .query<{ ItemID: number; Quantity: number; UnitCost: number }>(
-        `SELECT ItemID, Quantity, UnitCost FROM dbo.tblStandSaleItems WHERE SaleID = @saleId`
-      );
+    const lineItems = await trx
+      .selectFrom('tblStandSaleItems')
+      .select(['ItemID', 'Quantity', 'UnitCost'])
+      .where('SaleID', '=', saleId)
+      .execute();
 
-    for (const row of lineItems.recordset) {
-      await new sql.Request(tx)
-        .input('qty', TYPES.Int, row.Quantity)
-        .input('itemId', TYPES.Int, row.ItemID)
-        .query(
-          `UPDATE dbo.tblStandItems
-           SET CurrentStock = CurrentStock + @qty, ModifiedDate = SYSDATETIME()
-           WHERE ItemID = @itemId`
-        );
+    for (const row of lineItems) {
+      await trx
+        .updateTable('tblStandItems')
+        .set((eb) => ({
+          CurrentStock: eb('CurrentStock', '+', row.Quantity),
+          ModifiedDate: sql`localtimestamp`,
+        }))
+        .where('ItemID', '=', row.ItemID)
+        .execute();
 
-      await new sql.Request(tx)
-        .input('itemId', TYPES.Int, row.ItemID)
-        .input('qty', TYPES.Int, row.Quantity)
-        .input('unitCost', TYPES.Int, row.UnitCost)
-        .input('saleId', TYPES.Int, saleId)
-        .input('reason', TYPES.NVarChar, `Void: ${reason}`)
-        .input('userId', TYPES.Int, userId)
-        .query(
-          `INSERT INTO dbo.tblStandStockMovements
-            (ItemID, MovementType, Quantity, UnitCost, RelatedSaleID, Reason, PerformedBy)
-           VALUES (@itemId, 'void', @qty, @unitCost, @saleId, @reason, @userId)`
-        );
+      await trx
+        .insertInto('tblStandStockMovements')
+        .values({
+          ItemID: row.ItemID,
+          MovementType: 'void',
+          Quantity: row.Quantity,
+          UnitCost: row.UnitCost,
+          RelatedSaleID: saleId,
+          Reason: `Void: ${reason}`,
+          PerformedBy: userId,
+        })
+        .execute();
     }
   });
 }
@@ -842,26 +668,19 @@ export async function addStockMovement(data: {
   reason?: string | null;
   performedBy?: number | null;
 }): Promise<void> {
-  const query = `
-    INSERT INTO dbo.tblStandStockMovements
-      (ItemID, MovementType, Quantity, UnitCost, TotalCost, RelatedSaleID, Reason, PerformedBy)
-    VALUES (@itemId, @movementType, @qty, @unitCost, @totalCost, @relatedSaleId, @reason, @performedBy)
-  `;
-
-  await executeQuery(
-    query,
-    [
-      ['itemId', TYPES.Int, data.itemId],
-      ['movementType', TYPES.NVarChar, data.movementType],
-      ['qty', TYPES.Int, data.quantity],
-      ['unitCost', TYPES.Int, data.unitCost ?? null],
-      ['totalCost', TYPES.Int, data.totalCost ?? null],
-      ['relatedSaleId', TYPES.Int, data.relatedSaleId ?? null],
-      ['reason', TYPES.NVarChar, data.reason ?? null],
-      ['performedBy', TYPES.Int, data.performedBy ?? null],
-    ],
-    () => ({})
-  );
+  await getKysely()
+    .insertInto('tblStandStockMovements')
+    .values({
+      ItemID: data.itemId,
+      MovementType: data.movementType,
+      Quantity: data.quantity,
+      UnitCost: data.unitCost ?? null,
+      TotalCost: data.totalCost ?? null,
+      RelatedSaleID: data.relatedSaleId ?? null,
+      Reason: data.reason ?? null,
+      PerformedBy: data.performedBy ?? null,
+    })
+    .execute();
 }
 
 export async function restockItem(
@@ -870,27 +689,27 @@ export async function restockItem(
   unitCost: number,
   userId: number | null
 ): Promise<void> {
-  return withTransaction(async (tx) => {
-    await new sql.Request(tx)
-      .input('qty', TYPES.Int, quantity)
-      .input('itemId', TYPES.Int, itemId)
-      .query(
-        `UPDATE dbo.tblStandItems
-         SET CurrentStock = CurrentStock + @qty, ModifiedDate = SYSDATETIME()
-         WHERE ItemID = @itemId`
-      );
+  return withPgTransaction(async (trx) => {
+    await trx
+      .updateTable('tblStandItems')
+      .set((eb) => ({
+        CurrentStock: eb('CurrentStock', '+', quantity),
+        ModifiedDate: sql`localtimestamp`,
+      }))
+      .where('ItemID', '=', itemId)
+      .execute();
 
-    await new sql.Request(tx)
-      .input('itemId', TYPES.Int, itemId)
-      .input('qty', TYPES.Int, quantity)
-      .input('unitCost', TYPES.Int, unitCost)
-      .input('totalCost', TYPES.Int, quantity * unitCost)
-      .input('userId', TYPES.Int, userId)
-      .query(
-        `INSERT INTO dbo.tblStandStockMovements
-          (ItemID, MovementType, Quantity, UnitCost, TotalCost, PerformedBy)
-         VALUES (@itemId, 'restock', @qty, @unitCost, @totalCost, @userId)`
-      );
+    await trx
+      .insertInto('tblStandStockMovements')
+      .values({
+        ItemID: itemId,
+        MovementType: 'restock',
+        Quantity: quantity,
+        UnitCost: unitCost,
+        TotalCost: quantity * unitCost,
+        PerformedBy: userId,
+      })
+      .execute();
   });
 }
 
@@ -900,34 +719,35 @@ export async function adjustStock(
   reason: string,
   userId: number | null
 ): Promise<void> {
-  return withTransaction(async (tx) => {
-    const result = await new sql.Request(tx)
-      .input('delta', TYPES.Int, delta)
-      .input('itemId', TYPES.Int, itemId)
-      .query(
-        `UPDATE dbo.tblStandItems
-         SET CurrentStock = CurrentStock + @delta, ModifiedDate = SYSDATETIME()
-         WHERE ItemID = @itemId AND (CurrentStock + @delta) >= 0`
-      );
+  return withPgTransaction(async (trx) => {
+    // Guard: only adjust when the result stays non-negative.
+    // 0 rows ⇒ would go negative — abort the transaction.
+    const result = await trx
+      .updateTable('tblStandItems')
+      .set((eb) => ({
+        CurrentStock: eb('CurrentStock', '+', delta),
+        ModifiedDate: sql`localtimestamp`,
+      }))
+      .where('ItemID', '=', itemId)
+      .where(sql`("CurrentStock" + ${delta})`, '>=', 0)
+      .executeTakeFirst();
 
-    const affected = Array.isArray(result.rowsAffected)
-      ? result.rowsAffected.reduce((a, b) => a + b, 0)
-      : result.rowsAffected;
-    if (affected !== 1) throw new Error('INSUFFICIENT_STOCK_FOR_ADJUSTMENT');
+    if (Number(result.numUpdatedRows) !== 1) {
+      throw new Error('INSUFFICIENT_STOCK_FOR_ADJUSTMENT');
+    }
 
     const movementType = delta < 0 ? 'waste' : 'adjustment';
 
-    await new sql.Request(tx)
-      .input('itemId', TYPES.Int, itemId)
-      .input('type', TYPES.NVarChar, movementType)
-      .input('delta', TYPES.Int, delta)
-      .input('reason', TYPES.NVarChar, reason)
-      .input('userId', TYPES.Int, userId)
-      .query(
-        `INSERT INTO dbo.tblStandStockMovements
-          (ItemID, MovementType, Quantity, Reason, PerformedBy)
-         VALUES (@itemId, @type, @delta, @reason, @userId)`
-      );
+    await trx
+      .insertInto('tblStandStockMovements')
+      .values({
+        ItemID: itemId,
+        MovementType: movementType,
+        Quantity: delta,
+        Reason: reason,
+        PerformedBy: userId,
+      })
+      .execute();
   });
 }
 
@@ -935,46 +755,37 @@ export async function getStockMovements(
   itemId: number,
   filters: StandStockMovementFilters = {}
 ): Promise<StandMovementRow[]> {
-  let query = `
-    SELECT
-      m.MovementID, m.ItemID, m.MovementType, m.Quantity,
-      m.UnitCost, m.TotalCost, m.RelatedSaleID, m.Reason,
-      m.MovementDate, m.PerformedBy, u.FullName AS PerformedByName
-    FROM dbo.tblStandStockMovements m
-    LEFT JOIN dbo.tblUsers u ON m.PerformedBy = u.UserID
-    WHERE m.ItemID = @itemId
-  `;
-
-  const params: SqlParam[] = [['itemId', TYPES.Int, itemId]];
+  let q = getKysely()
+    .selectFrom('tblStandStockMovements as m')
+    .leftJoin('tblUsers as u', 'm.PerformedBy', 'u.UserID')
+    .select([
+      'm.MovementID',
+      'm.ItemID',
+      'm.MovementType',
+      'm.Quantity',
+      'm.UnitCost',
+      'm.TotalCost',
+      'm.RelatedSaleID',
+      'm.Reason',
+      'm.MovementDate',
+      'm.PerformedBy',
+      'u.FullName as PerformedByName',
+    ])
+    .where('m.ItemID', '=', itemId);
 
   if (filters.startDate) {
-    query += ' AND CAST(m.MovementDate AS DATE) >= @startDate';
-    params.push(['startDate', TYPES.Date, filters.startDate]);
+    q = q.where(sql`cast(${sql.ref('m.MovementDate')} as date)`, '>=', sql<Date>`${filters.startDate}`);
   }
   if (filters.endDate) {
-    query += ' AND CAST(m.MovementDate AS DATE) <= @endDate';
-    params.push(['endDate', TYPES.Date, filters.endDate]);
+    q = q.where(sql`cast(${sql.ref('m.MovementDate')} as date)`, '<=', sql<Date>`${filters.endDate}`);
   }
   if (filters.movementType) {
-    query += ' AND m.MovementType = @movementType';
-    params.push(['movementType', TYPES.NVarChar, filters.movementType]);
+    q = q.where('m.MovementType', '=', filters.movementType);
   }
 
-  query += ' ORDER BY m.MovementDate DESC, m.MovementID DESC';
+  q = q.orderBy('m.MovementDate', 'desc').orderBy('m.MovementID', 'desc');
 
-  return executeQuery<StandMovementRow>(query, params, (columns: ColumnValue[]) => ({
-    MovementID: columns[0].value as number,
-    ItemID: columns[1].value as number,
-    MovementType: columns[2].value as string,
-    Quantity: columns[3].value as number,
-    UnitCost: columns[4].value as number | null,
-    TotalCost: columns[5].value as number | null,
-    RelatedSaleID: columns[6].value as number | null,
-    Reason: columns[7].value as string | null,
-    MovementDate: columns[8].value as Date,
-    PerformedBy: columns[9].value as number | null,
-    PerformedByName: columns[10].value as string | null,
-  }));
+  return q.execute() as Promise<StandMovementRow[]>;
 }
 
 // ============================================================================
@@ -982,32 +793,54 @@ export async function getStockMovements(
 // ============================================================================
 
 export async function getStandDashboardKPIs(): Promise<DashboardKPIs> {
-  const query = `
-    SELECT
-      (SELECT COUNT(*) FROM dbo.tblStandSales WHERE CAST(SaleDate AS DATE) = CAST(GETDATE() AS DATE) AND VoidedDate IS NULL) AS TodaySalesCount,
-      (SELECT ISNULL(SUM(TotalAmount), 0) FROM dbo.tblStandSales WHERE CAST(SaleDate AS DATE) = CAST(GETDATE() AS DATE) AND VoidedDate IS NULL) AS TodayRevenue,
-      (SELECT ISNULL(SUM(TotalProfit), 0) FROM dbo.tblStandSales WHERE CAST(SaleDate AS DATE) = CAST(GETDATE() AS DATE) AND VoidedDate IS NULL) AS TodayProfit,
-      (SELECT COUNT(*) FROM dbo.tblStandItems WHERE IsActive = 1 AND CurrentStock <= ReorderLevel) AS LowStockCount,
-      (SELECT COUNT(*) FROM dbo.tblStandItems WHERE IsActive = 1 AND ExpiryDate IS NOT NULL AND ExpiryDate BETWEEN CAST(GETDATE() AS DATE) AND DATEADD(DAY, 30, CAST(GETDATE() AS DATE))) AS ExpiringSoonCount,
-      (SELECT ISNULL(SUM(CurrentStock * CostPrice), 0) FROM dbo.tblStandItems WHERE IsActive = 1) AS TotalInventoryValue
-  `;
+  const db = getKysely();
 
-  const result = await executeQuery<DashboardKPIs>(query, [], (columns: ColumnValue[]) => ({
-    todaySalesCount: columns[0].value as number,
-    todayRevenue: columns[1].value as number,
-    todayProfit: columns[2].value as number,
-    lowStockCount: columns[3].value as number,
-    expiringSoonCount: columns[4].value as number,
-    totalInventoryValue: columns[5].value as number,
-  }));
+  const todayPredicate = sql<boolean>`cast("SaleDate" as date) = current_date`;
 
-  return result[0] || {
-    todaySalesCount: 0,
-    todayRevenue: 0,
-    todayProfit: 0,
-    lowStockCount: 0,
-    expiringSoonCount: 0,
-    totalInventoryValue: 0,
+  const todayStats = await db
+    .selectFrom('tblStandSales')
+    .select((eb) => [
+      eb.fn.countAll().as('TodaySalesCount'),
+      eb.fn.coalesce(eb.fn.sum('TotalAmount'), sql<number>`0`).as('TodayRevenue'),
+      eb.fn.coalesce(eb.fn.sum('TotalProfit'), sql<number>`0`).as('TodayProfit'),
+    ])
+    .where(todayPredicate)
+    .where('VoidedDate', 'is', null)
+    .executeTakeFirstOrThrow();
+
+  const lowStock = await db
+    .selectFrom('tblStandItems')
+    .select((eb) => eb.fn.countAll().as('cnt'))
+    .where('IsActive', '=', true)
+    .where((eb) => eb('CurrentStock', '<=', eb.ref('ReorderLevel')))
+    .executeTakeFirstOrThrow();
+
+  const expiring = await db
+    .selectFrom('tblStandItems')
+    .select((eb) => eb.fn.countAll().as('cnt'))
+    .where('IsActive', '=', true)
+    .where('ExpiryDate', 'is not', null)
+    .where('ExpiryDate', '>=', sql<Date>`current_date`)
+    .where('ExpiryDate', '<=', sql<Date>`current_date + interval '30 day'`)
+    .executeTakeFirstOrThrow();
+
+  const inventoryValue = await db
+    .selectFrom('tblStandItems')
+    .select((eb) =>
+      eb.fn
+        .coalesce(eb.fn.sum(sql<number>`"CurrentStock" * "CostPrice"`), sql<number>`0`)
+        .as('TotalInventoryValue')
+    )
+    .where('IsActive', '=', true)
+    .executeTakeFirstOrThrow();
+
+  return {
+    todaySalesCount: Number(todayStats.TodaySalesCount),
+    todayRevenue: Number(todayStats.TodayRevenue),
+    todayProfit: Number(todayStats.TodayProfit),
+    lowStockCount: Number(lowStock.cnt),
+    expiringSoonCount: Number(expiring.cnt),
+    totalInventoryValue: Number(inventoryValue.TotalInventoryValue),
   };
 }
 
@@ -1015,35 +848,29 @@ export async function getStandSalesSummary(
   startDate: string,
   endDate: string
 ): Promise<SalesSummaryRow[]> {
-  const query = `
-    SELECT
-      CONVERT(VARCHAR(10), SaleDate, 120) AS SaleDate,
-      COUNT(*) AS SalesCount,
-      SUM(TotalAmount) AS Revenue,
-      SUM(TotalCost) AS Cost,
-      SUM(TotalProfit) AS Profit
-    FROM dbo.tblStandSales
-    WHERE CAST(SaleDate AS DATE) >= @startDate
-      AND CAST(SaleDate AS DATE) <= @endDate
-      AND VoidedDate IS NULL
-    GROUP BY CONVERT(VARCHAR(10), SaleDate, 120)
-    ORDER BY SaleDate
-  `;
+  const rows = await getKysely()
+    .selectFrom('tblStandSales')
+    .select((eb) => [
+      sql<string>`to_char("SaleDate", 'YYYY-MM-DD')`.as('SaleDate'),
+      eb.fn.countAll().as('SalesCount'),
+      eb.fn.sum('TotalAmount').as('Revenue'),
+      eb.fn.sum('TotalCost').as('Cost'),
+      eb.fn.sum('TotalProfit').as('Profit'),
+    ])
+    .where(sql`cast("SaleDate" as date)`, '>=', sql<Date>`${startDate}`)
+    .where(sql`cast("SaleDate" as date)`, '<=', sql<Date>`${endDate}`)
+    .where('VoidedDate', 'is', null)
+    .groupBy(sql`to_char("SaleDate", 'YYYY-MM-DD')`)
+    .orderBy('SaleDate')
+    .execute();
 
-  return executeQuery<SalesSummaryRow>(
-    query,
-    [
-      ['startDate', TYPES.Date, startDate],
-      ['endDate', TYPES.Date, endDate],
-    ],
-    (columns: ColumnValue[]) => ({
-      SaleDate: columns[0].value as string,
-      SalesCount: columns[1].value as number,
-      Revenue: columns[2].value as number,
-      Cost: columns[3].value as number,
-      Profit: columns[4].value as number,
-    })
-  );
+  return rows.map((r) => ({
+    SaleDate: r.SaleDate,
+    SalesCount: Number(r.SalesCount),
+    Revenue: Number(r.Revenue),
+    Cost: Number(r.Cost),
+    Profit: Number(r.Profit),
+  }));
 }
 
 export async function getTopSellingItems(
@@ -1051,65 +878,51 @@ export async function getTopSellingItems(
   endDate: string,
   limit: number = 10
 ): Promise<TopItemRow[]> {
-  const query = `
-    SELECT TOP(@limit)
-      si.ItemID,
-      i.ItemName,
-      SUM(si.Quantity) AS TotalQuantity,
-      SUM(si.LineTotal) AS TotalRevenue,
-      SUM(si.LineTotal - (si.Quantity * si.UnitCost)) AS TotalProfit
-    FROM dbo.tblStandSaleItems si
-    JOIN dbo.tblStandItems i ON si.ItemID = i.ItemID
-    JOIN dbo.tblStandSales s ON si.SaleID = s.SaleID
-    WHERE CAST(s.SaleDate AS DATE) >= @startDate
-      AND CAST(s.SaleDate AS DATE) <= @endDate
-      AND s.VoidedDate IS NULL
-    GROUP BY si.ItemID, i.ItemName
-    ORDER BY TotalQuantity DESC
-  `;
+  const rows = await getKysely()
+    .selectFrom('tblStandSaleItems as si')
+    .innerJoin('tblStandItems as i', 'si.ItemID', 'i.ItemID')
+    .innerJoin('tblStandSales as s', 'si.SaleID', 's.SaleID')
+    .select((eb) => [
+      'si.ItemID',
+      'i.ItemName',
+      eb.fn.sum('si.Quantity').as('TotalQuantity'),
+      eb.fn.sum('si.LineTotal').as('TotalRevenue'),
+      eb.fn.sum(sql<number>`si."LineTotal" - (si."Quantity" * si."UnitCost")`).as('TotalProfit'),
+    ])
+    .where(sql`cast(${sql.ref('s.SaleDate')} as date)`, '>=', sql<Date>`${startDate}`)
+    .where(sql`cast(${sql.ref('s.SaleDate')} as date)`, '<=', sql<Date>`${endDate}`)
+    .where('s.VoidedDate', 'is', null)
+    .groupBy(['si.ItemID', 'i.ItemName'])
+    .orderBy('TotalQuantity', 'desc')
+    .limit(limit)
+    .execute();
 
-  return executeQuery<TopItemRow>(
-    query,
-    [
-      ['startDate', TYPES.Date, startDate],
-      ['endDate', TYPES.Date, endDate],
-      ['limit', TYPES.Int, limit],
-    ],
-    (columns: ColumnValue[]) => ({
-      ItemID: columns[0].value as number,
-      ItemName: columns[1].value as string,
-      TotalQuantity: columns[2].value as number,
-      TotalRevenue: columns[3].value as number,
-      TotalProfit: columns[4].value as number,
-    })
-  );
+  return rows.map((r) => ({
+    ItemID: r.ItemID,
+    ItemName: r.ItemName,
+    TotalQuantity: Number(r.TotalQuantity),
+    TotalRevenue: Number(r.TotalRevenue),
+    TotalProfit: Number(r.TotalProfit),
+  }));
 }
 
 export async function getStandPurchasesSummary(
   startDate: string,
   endDate: string
 ): Promise<{ totalPurchases: number; restockCount: number }> {
-  const query = `
-    SELECT
-      ISNULL(SUM(TotalCost), 0) AS TotalPurchases,
-      COUNT(*) AS RestockCount
-    FROM dbo.tblStandStockMovements
-    WHERE MovementType = 'restock'
-      AND CAST(MovementDate AS DATE) >= @startDate
-      AND CAST(MovementDate AS DATE) <= @endDate
-  `;
+  const row = await getKysely()
+    .selectFrom('tblStandStockMovements')
+    .select((eb) => [
+      eb.fn.coalesce(eb.fn.sum('TotalCost'), sql<number>`0`).as('TotalPurchases'),
+      eb.fn.countAll().as('RestockCount'),
+    ])
+    .where('MovementType', '=', 'restock')
+    .where(sql`cast("MovementDate" as date)`, '>=', sql<Date>`${startDate}`)
+    .where(sql`cast("MovementDate" as date)`, '<=', sql<Date>`${endDate}`)
+    .executeTakeFirstOrThrow();
 
-  const result = await executeQuery<{ totalPurchases: number; restockCount: number }>(
-    query,
-    [
-      ['startDate', TYPES.Date, startDate],
-      ['endDate', TYPES.Date, endDate],
-    ],
-    (columns: ColumnValue[]) => ({
-      totalPurchases: columns[0].value as number,
-      restockCount: columns[1].value as number,
-    })
-  );
-
-  return result[0] || { totalPurchases: 0, restockCount: 0 };
+  return {
+    totalPurchases: Number(row.TotalPurchases),
+    restockCount: Number(row.RestockCount),
+  };
 }
