@@ -1,11 +1,20 @@
 /**
- * SQL Server → PostgreSQL Queue Processor
- * Processes sync queue and pushes changes to Supabase
+ * PostgreSQL → Supabase Queue Processor
+ *
+ * Drains the local `SyncQueue` table (populated transactionally by the app-level enqueue in
+ * sync-queue.ts) and pushes each change to Supabase. Webhook-triggered with exponential-backoff
+ * retry; no polling.
+ *
+ * Phase 8 of the SQL Server → PostgreSQL migration: all data access is Kysely over the pg pool
+ * (was raw mssql `executeQuery`/`TYPES`). The enqueue leaves `JsonData` NULL, so INSERT/UPDATE
+ * items fetch the current row from PG on demand (sync-fetch.ts); DELETE items delete from
+ * Supabase by primary key directly. Gated by `config.sync.enabled` — when sync is off the
+ * processor never starts (see index.ts), so this module is inert in the sandbox.
  */
-
-import { executeQuery, TYPES } from '../database/index.js';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { getKysely } from '../database/kysely.js';
+import { fetchRecordFromPg, type SyncRecord } from './sync-fetch.js';
 import { log } from '../../utils/logger.js';
 
 dotenv.config();
@@ -14,132 +23,31 @@ dotenv.config();
 // TYPES
 // =============================================================================
 
-/**
- * Queue item from SyncQueue table
- */
+/** Queue item from SyncQueue table */
 interface QueueItem {
   QueueID: number;
   TableName: string;
   RecordID: number;
   Operation: 'INSERT' | 'UPDATE' | 'DELETE';
   JsonData: string | null;
-  CreatedAt: Date;
-  Attempts: number;
+  CreatedAt: Date | null;
+  Attempts: number | null;
   LastAttempt: Date | null;
   LastError: string | null;
-  Status: string;
+  Status: string | null;
 }
 
-/**
- * Queue statistics
- */
+/** Queue statistics */
 interface QueueStats {
-  Status: string;
+  Status: string | null;
   Count: number;
-  OldestItem: Date;
-  NewestItem: Date;
+  OldestItem: Date | null;
+  NewestItem: Date | null;
 }
 
-/**
- * Work record
- */
-interface WorkRecord {
-  work_id: number;
-  person_id: number;
-  type_of_work: string;
-  addition_date: Date;
-  start_date?: Date | null;
-  debond_date?: Date | null;
-  status?: number;
-  total_required?: number | null;
-  currency?: string | null;
-  notes?: string | null;
-  dr_id?: number | null;
-}
-
-/**
- * Patient record
- */
-interface PatientRecord {
-  person_id: number;
-  patient_name: string;
-  first_name: string;
-  last_name: string;
-  phone: string;
-  phone2?: string | null;
-  email?: string | null;
-  date_of_birth?: Date | null;
-  gender?: number | null;
-  notes?: string | null;
-  language?: string | null;
-  country_code?: string | null;
-}
-
-/**
- * Aligner set record
- */
-interface AlignerSetRecord {
-  aligner_set_id: number;
-  work_id: number;
-  aligner_dr_id: number;
-  set_sequence: number;
-  type: string;
-  upper_aligners_count: number;
-  lower_aligners_count: number;
-  remaining_upper_aligners: number;
-  remaining_lower_aligners: number;
-  creation_date: Date;
-  days: number;
-  is_active: boolean;
-  notes: string;
-  folder_path: string;
-  set_url: string;
-  set_pdf_url: string;
-  set_cost: number;
-  currency: string;
-  pdf_uploaded_at: Date | null;
-  pdf_uploaded_by: string;
-  drive_file_id: string;
-  set_video?: string | null;
-}
-
-/**
- * Aligner batch record
- */
-interface AlignerBatchRecord {
-  aligner_batch_id: number;
-  aligner_set_id: number;
-  batch_sequence: number;
-  upper_aligner_count: number;
-  lower_aligner_count: number;
-  upper_aligner_start_sequence: number;
-  upper_aligner_end_sequence: number;
-  lower_aligner_start_sequence: number;
-  lower_aligner_end_sequence: number;
-  manufacture_date: Date;
-  delivered_to_patient_date: Date | null;
-  days: number;
-  validity_period: number;
-  batch_expiry_date: Date | null;
-  notes: string;
-  is_active: boolean;
-  creation_date?: Date;
-  is_last?: boolean;
-  has_upper_template?: boolean;
-  has_lower_template?: boolean;
-}
-
-/**
- * Primary key map
- */
 interface PrimaryKeyMap {
   [tableName: string]: string;
 }
-
-/**
- * Generic record type
- */
-type SyncRecord = WorkRecord | PatientRecord | AlignerSetRecord | AlignerBatchRecord;
 
 // =============================================================================
 // SUPABASE CLIENT
@@ -170,26 +78,12 @@ class QueueProcessor {
     this.batchSize = 50;
     this.retryTimer = null;
 
-    // Exponential backoff configuration
     this.retryAttempts = 0;
     this.baseRetryInterval = 60 * 1000; // Start with 1 minute
     this.maxRetryInterval = 60 * 60 * 1000; // Cap at 1 hour
   }
 
-  /**
-   * Execute UPDATE/INSERT/DELETE queries (non-SELECT queries)
-   */
-  async executeUpdate(
-    query: string,
-    params: [string, typeof TYPES[keyof typeof TYPES], unknown][]
-  ): Promise<number> {
-    const result = await executeQuery<unknown, unknown[]>(query, params as [string, typeof TYPES[keyof typeof TYPES], unknown][], () => ({}));
-    return (result as { rowsAffected?: number }).rowsAffected ?? 0;
-  }
-
-  /**
-   * Get primary key field for each table
-   */
+  /** Get primary key field for each Supabase table */
   getPrimaryKey(tableName: string): string {
     const keys: PrimaryKeyMap = {
       aligner_doctors: 'dr_id',
@@ -204,191 +98,14 @@ class QueueProcessor {
   }
 
   /**
-   * Fetch work record from SQL Server
-   */
-  async fetchWorkFromSqlServer(workId: number): Promise<WorkRecord | null> {
-    const query = `
-            SELECT
-                workid as work_id,
-                PersonID as person_id,
-                Typeofwork as type_of_work,
-                AdditionDate as addition_date
-            FROM tblWork
-            WHERE workid = @workId
-        `;
-
-    const results = await executeQuery<WorkRecord>(
-      query,
-      [['workId', TYPES.Int, workId]],
-      (columns) => ({
-        work_id: columns[0].value as number,
-        person_id: columns[1].value as number,
-        type_of_work: columns[2].value as string,
-        addition_date: columns[3].value as Date,
-      })
-    );
-
-    return results && results.length > 0 ? results[0] : null;
-  }
-
-  /**
-   * Fetch patient record from SQL Server
-   */
-  async fetchPatientFromSqlServer(personId: number): Promise<PatientRecord | null> {
-    const query = `
-            SELECT
-                PersonID as person_id,
-                PatientName as patient_name,
-                FirstName as first_name,
-                LastName as last_name,
-                Phone as phone
-            FROM tblPatients
-            WHERE PersonID = @personId
-        `;
-
-    const results = await executeQuery<PatientRecord>(
-      query,
-      [['personId', TYPES.Int, personId]],
-      (columns) => ({
-        person_id: columns[0].value as number,
-        patient_name: columns[1].value as string,
-        first_name: columns[2].value as string,
-        last_name: columns[3].value as string,
-        phone: columns[4].value as string,
-      })
-    );
-
-    return results && results.length > 0 ? results[0] : null;
-  }
-
-  /**
-   * Fetch aligner set record from SQL Server
-   */
-  async fetchAlignerSetFromSqlServer(alignerSetId: number): Promise<AlignerSetRecord | null> {
-    const query = `
-            SELECT
-                AlignerSetID as aligner_set_id,
-                WorkID as work_id,
-                AlignerDrID as aligner_dr_id,
-                SetSequence as set_sequence,
-                Type as type,
-                UpperAlignersCount as upper_aligners_count,
-                LowerAlignersCount as lower_aligners_count,
-                RemainingUpperAligners as remaining_upper_aligners,
-                RemainingLowerAligners as remaining_lower_aligners,
-                CreationDate as creation_date,
-                Days as days,
-                IsActive as is_active,
-                Notes as notes,
-                FolderPath as folder_path,
-                SetUrl as set_url,
-                SetPdfUrl as set_pdf_url,
-                SetCost as set_cost,
-                Currency as currency,
-                PdfUploadedAt as pdf_uploaded_at,
-                PdfUploadedBy as pdf_uploaded_by,
-                DriveFileId as drive_file_id
-            FROM tblAlignerSets
-            WHERE AlignerSetID = @alignerSetId
-        `;
-
-    const results = await executeQuery<AlignerSetRecord>(
-      query,
-      [['alignerSetId', TYPES.Int, alignerSetId]],
-      (columns) => ({
-        aligner_set_id: columns[0].value as number,
-        work_id: columns[1].value as number,
-        aligner_dr_id: columns[2].value as number,
-        set_sequence: columns[3].value as number,
-        type: columns[4].value as string,
-        upper_aligners_count: columns[5].value as number,
-        lower_aligners_count: columns[6].value as number,
-        remaining_upper_aligners: columns[7].value as number,
-        remaining_lower_aligners: columns[8].value as number,
-        creation_date: columns[9].value as Date,
-        days: columns[10].value as number,
-        is_active: columns[11].value as boolean,
-        notes: columns[12].value as string,
-        folder_path: columns[13].value as string,
-        set_url: columns[14].value as string,
-        set_pdf_url: columns[15].value as string,
-        set_cost: columns[16].value as number,
-        currency: columns[17].value as string,
-        pdf_uploaded_at: columns[18].value as Date | null,
-        pdf_uploaded_by: columns[19].value as string,
-        drive_file_id: columns[20].value as string,
-      })
-    );
-
-    return results && results.length > 0 ? results[0] : null;
-  }
-
-  /**
-   * Fetch aligner batch record from SQL Server
-   * Used when sync trigger stores only IDs (optimized mode)
-   */
-  async fetchAlignerBatchFromSqlServer(batchId: number): Promise<AlignerBatchRecord | null> {
-    const query = `
-            SELECT
-                AlignerBatchID as aligner_batch_id,
-                AlignerSetID as aligner_set_id,
-                BatchSequence as batch_sequence,
-                UpperAlignerCount as upper_aligner_count,
-                LowerAlignerCount as lower_aligner_count,
-                UpperAlignerStartSequence as upper_aligner_start_sequence,
-                UpperAlignerEndSequence as upper_aligner_end_sequence,
-                LowerAlignerStartSequence as lower_aligner_start_sequence,
-                LowerAlignerEndSequence as lower_aligner_end_sequence,
-                ManufactureDate as manufacture_date,
-                DeliveredToPatientDate as delivered_to_patient_date,
-                Days as days,
-                ValidityPeriod as validity_period,
-                BatchExpiryDate as batch_expiry_date,
-                Notes as notes,
-                IsActive as is_active,
-                HasUpperTemplate as has_upper_template,
-                HasLowerTemplate as has_lower_template
-            FROM tblAlignerBatches
-            WHERE AlignerBatchID = @batchId
-        `;
-
-    const results = await executeQuery<AlignerBatchRecord>(
-      query,
-      [['batchId', TYPES.Int, batchId]],
-      (columns) => ({
-        aligner_batch_id: columns[0].value as number,
-        aligner_set_id: columns[1].value as number,
-        batch_sequence: columns[2].value as number,
-        upper_aligner_count: columns[3].value as number,
-        lower_aligner_count: columns[4].value as number,
-        upper_aligner_start_sequence: columns[5].value as number,
-        upper_aligner_end_sequence: columns[6].value as number,
-        lower_aligner_start_sequence: columns[7].value as number,
-        lower_aligner_end_sequence: columns[8].value as number,
-        manufacture_date: columns[9].value as Date,
-        delivered_to_patient_date: columns[10].value as Date | null,
-        days: columns[11].value as number,
-        validity_period: columns[12].value as number,
-        batch_expiry_date: columns[13].value as Date | null,
-        notes: columns[14].value as string,
-        is_active: columns[15].value as boolean,
-        has_upper_template: columns[16].value as boolean,
-        has_lower_template: columns[17].value as boolean,
-      })
-    );
-
-    return results && results.length > 0 ? results[0] : null;
-  }
-
-  /**
-   * Ensure related work and patient exist in Supabase (for aligner_sets)
+   * Ensure related parent records exist in Supabase before upserting a child.
+   * (aligner_sets → work → patients; aligner_batches → aligner_sets). Fetches missing
+   * parents from PG and upserts them. Non-fatal: logs and continues on failure.
    */
   async ensureRelatedRecordsExist(data: SyncRecord, tableName: string): Promise<void> {
     try {
-      // Handle aligner_sets - ensure work and patient exist
       if (tableName === 'aligner_sets' && 'work_id' in data) {
-        const workId = data.work_id as number;
-        // Check if work exists in Supabase
+        const workId = data.work_id;
         const { error: workCheckError } = await supabase
           .from('work')
           .select('work_id')
@@ -396,34 +113,21 @@ class QueueProcessor {
           .single();
 
         if (workCheckError && workCheckError.code === 'PGRST116') {
-          // Work doesn't exist - fetch from SQL Server
-          log.info(`  📥 Fetching missing work record (ID: ${workId}) from SQL Server...`);
-          const workData = await this.fetchWorkFromSqlServer(workId);
-
+          log.info(`  📥 Fetching missing work record (ID: ${workId}) from PostgreSQL...`);
+          const workData = await fetchRecordFromPg('work', workId);
           if (workData) {
-            // Ensure patient exists before syncing work
             await this.ensureRelatedRecordsExist(workData, 'work');
-
-            // Sync work to Supabase
-            const { error: workUpsertError } = await supabase
-              .from('work')
-              .upsert(workData, { onConflict: 'work_id' });
-
-            if (workUpsertError) {
-              log.error(`  ❌ Failed to sync work: ${workUpsertError.message}`);
-            } else {
-              log.info(`  ✅ Work record synced (ID: ${workId})`);
-            }
+            const { error } = await supabase.from('work').upsert(workData, { onConflict: 'work_id' });
+            if (error) log.error(`  ❌ Failed to sync work: ${error.message}`);
+            else log.info(`  ✅ Work record synced (ID: ${workId})`);
           } else {
-            log.warn(`  ⚠️  Work record not found in SQL Server (ID: ${workId})`);
+            log.warn(`  ⚠️  Work record not found in PostgreSQL (ID: ${workId})`);
           }
         }
       }
 
-      // Handle work - ensure patient exists
       if (tableName === 'work' && 'person_id' in data) {
-        const personId = data.person_id as number;
-        // Check if patient exists in Supabase
+        const personId = data.person_id;
         const { error: patientCheckError } = await supabase
           .from('patients')
           .select('person_id')
@@ -431,31 +135,22 @@ class QueueProcessor {
           .single();
 
         if (patientCheckError && patientCheckError.code === 'PGRST116') {
-          // Patient doesn't exist - fetch from SQL Server
-          log.info(`  📥 Fetching missing patient record (ID: ${personId}) from SQL Server...`);
-          const patientData = await this.fetchPatientFromSqlServer(personId);
-
+          log.info(`  📥 Fetching missing patient record (ID: ${personId}) from PostgreSQL...`);
+          const patientData = await fetchRecordFromPg('patients', personId);
           if (patientData) {
-            // Sync patient to Supabase
-            const { error: patientUpsertError } = await supabase
+            const { error } = await supabase
               .from('patients')
               .upsert(patientData, { onConflict: 'person_id' });
-
-            if (patientUpsertError) {
-              log.error(`  ❌ Failed to sync patient: ${patientUpsertError.message}`);
-            } else {
-              log.info(`  ✅ Patient record synced (ID: ${personId})`);
-            }
+            if (error) log.error(`  ❌ Failed to sync patient: ${error.message}`);
+            else log.info(`  ✅ Patient record synced (ID: ${personId})`);
           } else {
-            log.warn(`  ⚠️  Patient record not found in SQL Server (ID: ${personId})`);
+            log.warn(`  ⚠️  Patient record not found in PostgreSQL (ID: ${personId})`);
           }
         }
       }
 
-      // Handle aligner_batches - ensure aligner_set exists
       if (tableName === 'aligner_batches' && 'aligner_set_id' in data) {
-        const setId = data.aligner_set_id as number;
-        // Check if aligner_set exists in Supabase
+        const setId = data.aligner_set_id;
         const { error: setCheckError } = await supabase
           .from('aligner_sets')
           .select('aligner_set_id')
@@ -463,26 +158,17 @@ class QueueProcessor {
           .single();
 
         if (setCheckError && setCheckError.code === 'PGRST116') {
-          // Aligner set doesn't exist - fetch from SQL Server
-          log.info(`  📥 Fetching missing aligner set (ID: ${setId}) from SQL Server...`);
-          const setData = await this.fetchAlignerSetFromSqlServer(setId);
-
+          log.info(`  📥 Fetching missing aligner set (ID: ${setId}) from PostgreSQL...`);
+          const setData = await fetchRecordFromPg('aligner_sets', setId);
           if (setData) {
-            // Ensure work and patient exist before syncing set
             await this.ensureRelatedRecordsExist(setData, 'aligner_sets');
-
-            // Sync aligner set to Supabase
-            const { error: setUpsertError } = await supabase
+            const { error } = await supabase
               .from('aligner_sets')
               .upsert(setData, { onConflict: 'aligner_set_id' });
-
-            if (setUpsertError) {
-              log.error(`  ❌ Failed to sync aligner set: ${setUpsertError.message}`);
-            } else {
-              log.info(`  ✅ Aligner set synced (ID: ${setId})`);
-            }
+            if (error) log.error(`  ❌ Failed to sync aligner set: ${error.message}`);
+            else log.info(`  ✅ Aligner set synced (ID: ${setId})`);
           } else {
-            log.warn(`  ⚠️  Aligner set not found in SQL Server (ID: ${setId})`);
+            log.warn(`  ⚠️  Aligner set not found in PostgreSQL (ID: ${setId})`);
           }
         }
       }
@@ -492,203 +178,124 @@ class QueueProcessor {
     }
   }
 
-  /**
-   * Process a single queue item
-   */
+  /** Mark a queue item Synced (optionally storing the synced JSON for reference). */
+  private async markSynced(queueId: number, jsonData?: string): Promise<number> {
+    const result = await getKysely()
+      .updateTable('SyncQueue')
+      .set({
+        Status: 'Synced',
+        LastAttempt: new Date(),
+        ...(jsonData !== undefined ? { JsonData: jsonData } : {}),
+      })
+      .where('QueueID', '=', queueId)
+      .executeTakeFirst();
+    return Number(result.numUpdatedRows);
+  }
+
+  /** Process a single queue item. Returns true on success. */
   async processItem(item: QueueItem): Promise<boolean> {
     try {
-      // Handle JsonData - if NULL, fetch from SQL Server
-      let data: SyncRecord | null;
-      if (item.JsonData) {
-        // Traditional flow: JSON was pre-built by trigger
-        data = JSON.parse(item.JsonData);
-      } else {
-        // Optimized flow: Fetch data on-demand
-        log.info(`  📥 JsonData is NULL - fetching fresh data from SQL Server...`);
-
-        switch (item.TableName) {
-          case 'aligner_batches':
-            data = await this.fetchAlignerBatchFromSqlServer(item.RecordID);
-            break;
-          case 'aligner_sets':
-            data = await this.fetchAlignerSetFromSqlServer(item.RecordID);
-            break;
-          case 'work':
-            data = await this.fetchWorkFromSqlServer(item.RecordID);
-            break;
-          case 'patients':
-            data = await this.fetchPatientFromSqlServer(item.RecordID);
-            break;
-          default:
-            throw new Error(`Unknown table type: ${item.TableName}`);
-        }
-
-        if (!data) {
-          // Record no longer exists (was deleted before sync)
-          log.info(`  ⚠️  Record not found in SQL Server - marking as synced (nothing to sync)`);
-          await this.executeUpdate(
-            `
-                        UPDATE SyncQueue
-                        SET Status = 'Synced',
-                            LastAttempt = GETDATE(),
-                            LastError = 'Record not found in source table'
-                        WHERE QueueID = @id
-                    `,
-            [['id', TYPES.Int, item.QueueID]]
-          );
-          return true; // Consider as success (nothing to sync)
-        }
-      }
-
       const primaryKey = this.getPrimaryKey(item.TableName);
-      log.info(`🔄 Syncing ${item.TableName} ID ${item.RecordID} (${item.Operation})`);
 
-      // Handle different operations
-      let error;
+      // DELETE: remove from Supabase by primary key directly (the PG row is already gone).
       if (item.Operation === 'DELETE') {
-        // Delete from Supabase
-        // Cast through unknown for dynamic property access based on table's primary key
-        const dataRecord = data as unknown as Record<string, unknown>;
-        const result = await supabase
+        log.info(`🗑️  Deleting ${item.TableName} ID ${item.RecordID} from Supabase`);
+        const { error } = await supabase
           .from(item.TableName)
           .delete()
-          .eq(primaryKey, dataRecord[primaryKey]);
-        error = result.error;
-      } else {
-        // Before upserting, ensure related records exist
-        await this.ensureRelatedRecordsExist(data!, item.TableName);
-
-        // Upsert to Supabase (INSERT or UPDATE)
-        const result = await supabase.from(item.TableName).upsert(data, { onConflict: primaryKey });
-        error = result.error;
+          .eq(primaryKey, item.RecordID);
+        if (error) throw error;
+        await this.markSynced(item.QueueID);
+        return true;
       }
 
+      // INSERT/UPDATE: JsonData is NULL under the app-level enqueue → fetch current state.
+      const data: SyncRecord | null = item.JsonData
+        ? (JSON.parse(item.JsonData) as SyncRecord)
+        : await fetchRecordFromPg(item.TableName, item.RecordID);
+
+      if (!data) {
+        // Record was deleted before we got here → nothing to upsert.
+        log.info(`  ⚠️  Record not found in source - marking synced (nothing to sync)`);
+        await this.markSynced(item.QueueID);
+        return true;
+      }
+
+      log.info(`🔄 Syncing ${item.TableName} ID ${item.RecordID} (${item.Operation})`);
+      await this.ensureRelatedRecordsExist(data, item.TableName);
+
+      const { error } = await supabase
+        .from(item.TableName)
+        .upsert(data, { onConflict: primaryKey });
       if (error) throw error;
 
-      // Mark as synced and store JSON for future reference
-      log.info(`📝 Attempting to mark QueueID ${item.QueueID} as Synced...`);
-      const jsonData = JSON.stringify(data);
-      const updateResult = await this.executeUpdate(
-        `
-                UPDATE SyncQueue
-                SET Status = 'Synced',
-                    JsonData = @json,
-                    LastAttempt = GETDATE()
-                WHERE QueueID = @id
-            `,
-        [
-          ['id', TYPES.Int, item.QueueID],
-          ['json', TYPES.NVarChar, jsonData],
-        ]
-      );
-
-      log.info(`  ✅ Synced successfully (UPDATE affected ${updateResult} rows)`);
+      const updated = await this.markSynced(item.QueueID, JSON.stringify(data));
+      log.info(`  ✅ Synced successfully (UPDATE affected ${updated} rows)`);
       return true;
     } catch (error) {
       log.error(`  ❌ Sync failed: ${(error as Error).message}`);
 
-      // Increment attempts
-      const newAttempts = item.Attempts + 1;
+      const newAttempts = (item.Attempts ?? 0) + 1;
       const newStatus = newAttempts >= this.maxAttempts ? 'Failed' : 'Pending';
 
-      await this.executeUpdate(
-        `
-                UPDATE SyncQueue
-                SET Attempts = @attempts,
-                    LastAttempt = GETDATE(),
-                    LastError = @error,
-                    Status = @status
-                WHERE QueueID = @id
-            `,
-        [
-          ['id', TYPES.Int, item.QueueID],
-          ['attempts', TYPES.Int, newAttempts],
-          ['error', TYPES.NVarChar, (error as Error).message.substring(0, 500)],
-          ['status', TYPES.VarChar, newStatus],
-        ]
-      );
+      await getKysely()
+        .updateTable('SyncQueue')
+        .set({
+          Attempts: newAttempts,
+          LastAttempt: new Date(),
+          LastError: (error as Error).message.substring(0, 500),
+          Status: newStatus,
+        })
+        .where('QueueID', '=', item.QueueID)
+        .execute();
 
       if (newStatus === 'Failed') {
         log.error(`  ⚠️  Max attempts reached. Marked as FAILED.`);
       }
-
       return false;
     }
   }
 
-  /**
-   * Process the queue
-   */
+  /** Process the queue (one batch, then continue/retry as needed). */
   async processQueue(): Promise<void> {
-    if (this.isProcessing) {
-      return;
-    }
-
+    if (this.isProcessing) return;
     this.isProcessing = true;
 
     try {
-      // Get pending items
-      const query = `
-                SELECT TOP ${this.batchSize} *
-                FROM SyncQueue
-                WHERE Status = 'Pending'
-                  AND Attempts < @maxAttempts
-                ORDER BY QueueID
-            `;
+      const items = (await getKysely()
+        .selectFrom('SyncQueue')
+        .selectAll()
+        .where('Status', '=', 'Pending')
+        .where('Attempts', '<', this.maxAttempts)
+        .orderBy('QueueID')
+        .limit(this.batchSize)
+        .execute()) as QueueItem[];
 
-      const items = await executeQuery<QueueItem>(
-        query,
-        [['maxAttempts', TYPES.Int, this.maxAttempts]],
-        (columns) => ({
-          QueueID: columns[0].value as number,
-          TableName: columns[1].value as string,
-          RecordID: columns[2].value as number,
-          Operation: columns[3].value as 'INSERT' | 'UPDATE' | 'DELETE',
-          JsonData: columns[4].value as string | null,
-          CreatedAt: columns[5].value as Date,
-          Attempts: columns[6].value as number,
-          LastAttempt: columns[7].value as Date | null,
-          LastError: columns[8].value as string | null,
-          Status: columns[9].value as string,
-        })
-      );
-
-      if (items && items.length > 0) {
+      if (items.length > 0) {
         log.info(`\n📦 Processing ${items.length} items from sync queue...`);
 
         let successCount = 0;
         let failCount = 0;
-
         for (const item of items) {
           const success = await this.processItem(item);
-          if (success) {
-            successCount++;
-          } else {
-            failCount++;
-          }
+          if (success) successCount++;
+          else failCount++;
         }
-
         log.info(`✅ Batch complete: ${successCount} synced, ${failCount} failed\n`);
 
-        // If there are failed items, schedule retry with exponential backoff
         if (failCount > 0) {
           this.scheduleRetry();
         } else {
-          // All succeeded - reset retry attempts
           this.retryAttempts = 0;
-
-          // Check if there are more items to process
           const pendingCount = await this.getPendingCount();
           if (pendingCount > 0) {
             log.info(`📦 ${pendingCount} more items in queue - continuing processing...`);
-            // Process next batch immediately (recursive call)
             setImmediate(() => this.processQueue());
           } else {
             log.info('✅ Queue fully processed - all items synced\n');
           }
         }
       } else {
-        // Queue is empty - reset retry attempts
         this.retryAttempts = 0;
       }
     } catch (error) {
@@ -698,87 +305,59 @@ class QueueProcessor {
     }
   }
 
-  /**
-   * Get queue statistics
-   */
+  /** Queue statistics grouped by status. */
   async getStats(): Promise<QueueStats[]> {
     try {
-      const stats = await executeQuery<QueueStats>(
-        `
-                SELECT
-                    Status,
-                    COUNT(*) as Count,
-                    MIN(CreatedAt) as OldestItem,
-                    MAX(CreatedAt) as NewestItem
-                FROM SyncQueue
-                GROUP BY Status
-            `,
-        [],
-        (columns) => ({
-          Status: columns[0].value as string,
-          Count: columns[1].value as number,
-          OldestItem: columns[2].value as Date,
-          NewestItem: columns[3].value as Date,
-        })
-      );
-
-      return stats || [];
+      const rows = await getKysely()
+        .selectFrom('SyncQueue')
+        .select((eb) => [
+          'Status',
+          eb.fn.countAll<number>().as('Count'),
+          eb.fn.min('CreatedAt').as('OldestItem'),
+          eb.fn.max('CreatedAt').as('NewestItem'),
+        ])
+        .groupBy('Status')
+        .execute();
+      return rows.map((r) => ({
+        Status: r.Status,
+        Count: Number(r.Count),
+        OldestItem: r.OldestItem as Date | null,
+        NewestItem: r.NewestItem as Date | null,
+      }));
     } catch (error) {
       log.error('Error getting stats:', error);
       return [];
     }
   }
 
-  /**
-   * Print statistics
-   */
   async printStats(): Promise<void> {
     const stats = await this.getStats();
-
     if (stats.length === 0) {
       log.info('📊 Queue is empty');
       return;
     }
-
     log.info('\n📊 Queue Statistics:');
     log.info('═══════════════════════════════════════');
-    stats.forEach((stat) => {
-      log.info(`  ${stat.Status}: ${stat.Count} items`);
-    });
+    stats.forEach((stat) => log.info(`  ${stat.Status}: ${stat.Count} items`));
     log.info('═══════════════════════════════════════\n');
   }
 
   /**
-   * Schedule retry with exponential backoff
-   * 1st retry: 1 minute
-   * 2nd retry: 2 minutes
-   * 3rd retry: 4 minutes
-   * 4th retry: 8 minutes
-   * 5th retry: 16 minutes
-   * 6th retry: 32 minutes
-   * 7th+ retry: 60 minutes (capped)
+   * Schedule retry with exponential backoff:
+   * 1m → 2m → 4m → 8m → 16m → 32m → 60m (capped).
    */
   scheduleRetry(): void {
-    // Clear existing retry timer
-    if (this.retryTimer) {
-      clearTimeout(this.retryTimer);
-    }
+    if (this.retryTimer) clearTimeout(this.retryTimer);
 
-    // Calculate retry interval with exponential backoff
     const retryDelay = Math.min(
       this.baseRetryInterval * Math.pow(2, this.retryAttempts),
       this.maxRetryInterval
     );
-
     this.retryAttempts++;
 
-    // Schedule retry
     this.retryTimer = setTimeout(async () => {
       log.info(`🔄 Retry attempt #${this.retryAttempts}: Checking for pending items...`);
-
-      // Check if there are still pending items before processing
       const pendingCount = await this.getPendingCount();
-
       if (pendingCount > 0) {
         log.info(`📋 Found ${pendingCount} pending items, processing...`);
         await this.processQueue();
@@ -786,7 +365,6 @@ class QueueProcessor {
         log.info('✅ No pending items - retry timer cleared');
         this.retryAttempts = 0;
       }
-
       this.retryTimer = null;
     }, retryDelay);
 
@@ -795,66 +373,47 @@ class QueueProcessor {
     log.info(`⏱️  Retry #${this.retryAttempts} scheduled in ${minutes}m ${seconds}s`);
   }
 
-  /**
-   * Get count of pending items
-   */
+  /** Count of pending items still under the attempt cap. */
   async getPendingCount(): Promise<number> {
     try {
-      const result = await executeQuery<{ PendingCount: number }>(
-        `
-                SELECT COUNT(*) as PendingCount
-                FROM SyncQueue
-                WHERE Status = 'Pending'
-                  AND Attempts < @maxAttempts
-            `,
-        [['maxAttempts', TYPES.Int, this.maxAttempts]],
-        (columns) => ({
-          PendingCount: columns[0].value as number,
-        })
-      );
-
-      return result && result.length > 0 ? result[0].PendingCount : 0;
+      const row = await getKysely()
+        .selectFrom('SyncQueue')
+        .select((eb) => eb.fn.countAll<number>().as('PendingCount'))
+        .where('Status', '=', 'Pending')
+        .where('Attempts', '<', this.maxAttempts)
+        .executeTakeFirst();
+      return Number(row?.PendingCount ?? 0);
     } catch (error) {
       log.error('Error getting pending count:', error);
       return 0;
     }
   }
 
-  /**
-   * Process queue once (webhook-triggered)
-   */
+  /** Process queue once (webhook-triggered). */
   async processQueueOnce(): Promise<void> {
     if (this.isProcessing) {
       log.info('⏭️  Queue already processing, skipping...');
       return;
     }
-
-    // Reset retry attempts when webhook fires (new data = fresh start)
     this.retryAttempts = 0;
-
     await this.processQueue();
   }
 
-  /**
-   * Start the processor (webhook mode - NO polling)
-   */
+  /** Start the processor (webhook mode - NO polling). */
   start(): void {
     log.info('🚀 Queue Processor Started (Webhook-Triggered Mode)');
-    log.info('   ✅ Zero polling - waits for SQL Server notifications');
+    log.info('   ✅ Zero polling - waits for notifications');
     log.info('   ✅ Smart retry - exponential backoff for failed items');
     log.info(`   Batch size: ${this.batchSize}`);
     log.info(`   Max attempts per item: ${this.maxAttempts}`);
     log.info(`   Retry strategy: 1m → 2m → 4m → 8m → 16m → 32m → 60m`);
     log.info('═══════════════════════════════════════\n');
 
-    // NO polling timers - webhook will trigger processing
-    // Process once on startup to clear any existing queue
+    // Process once on startup to clear any existing queue.
     this.processQueue();
   }
 
-  /**
-   * Stop the processor
-   */
+  /** Stop the processor. */
   stop(): void {
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);

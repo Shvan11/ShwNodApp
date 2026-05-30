@@ -527,27 +527,33 @@ function startServer(): Promise<HTTPServer> {
       log.debug('server.listen callback fired');
       log.info(`Server listening on port: ${port}`);
 
-      // Start SQL Server → PostgreSQL sync (webhook-based, zero polling)
-      try {
-        queueProcessor.start();
-        log.info('✅ Queue processor started - Webhook-based sync enabled (SQL Server → Supabase)');
-        log.info('   Real-time: SQL Server triggers webhook on data changes');
-        log.info('   Reverse sync: Supabase webhooks handle doctor edits (see routes/sync-webhook.js)');
-      } catch (error) {
-        log.warn('⚠️  Queue processor failed to start:', { error: (error as Error).message });
-        log.info('   Sync will not be available. Check Supabase credentials.');
-      }
+      // Supabase sync (master-gated by SYNC_ENABLED). In the sandbox this whole block is
+      // skipped: no queue processor, no reverse poller — nothing reaches Supabase.
+      if (config.sync.enabled) {
+        // Forward sync: drains the local SyncQueue → Supabase (webhook-triggered, zero polling)
+        try {
+          queueProcessor.start();
+          log.info('✅ Queue processor started - Webhook-based sync enabled (PostgreSQL → Supabase)');
+          log.info('   Real-time: app-level enqueue + queue-notify webhook drive processing');
+          log.info('   Reverse sync: Supabase webhooks handle doctor edits (see routes/sync-webhook.js)');
+        } catch (error) {
+          log.warn('⚠️  Queue processor failed to start:', { error: (error as Error).message });
+          log.info('   Sync will not be available. Check Supabase credentials.');
+        }
 
-      // Start reverse sync poller (Supabase → SQL Server)
-      // Catches missed changes when server was offline + periodic hourly checks
-      try {
-        startPeriodicPolling(); // Uses env config or defaults to 60 min
-        log.info('✅ Reverse sync poller started (Supabase → SQL Server)');
-        log.info('   Startup: Catches changes missed while server was offline');
-        log.info('   Periodic: Hourly checks as fallback for webhook failures');
-      } catch (error) {
-        log.warn('⚠️  Reverse sync poller failed to start:', { error: (error as Error).message });
-        log.info('   Missed changes will not be recovered. Check Supabase configuration.');
+        // Reverse sync poller (Supabase → PostgreSQL): catches changes missed while offline
+        // + periodic hourly checks.
+        try {
+          startPeriodicPolling(); // Uses env config or defaults to 60 min
+          log.info('✅ Reverse sync poller started (Supabase → PostgreSQL)');
+          log.info('   Startup: Catches changes missed while server was offline');
+          log.info('   Periodic: Hourly checks as fallback for webhook failures');
+        } catch (error) {
+          log.warn('⚠️  Reverse sync poller failed to start:', { error: (error as Error).message });
+          log.info('   Missed changes will not be recovered. Check Supabase configuration.');
+        }
+      } else {
+        log.info('⏭️  Supabase sync disabled (SYNC_ENABLED=false) — queue processor + reverse poller not started');
       }
 
       resolve(serverInstance);
@@ -597,14 +603,14 @@ async function gracefulShutdown(signal: string): Promise<void> {
     log.info('🏥 Stopping health monitoring...');
     HealthCheck.stop();
 
-    // Stop reverse sync poller
-    log.info('🔄 Stopping reverse sync poller...');
-    stopPeriodicPolling();
-
-    // Stop the sync queue processor (was previously self-handling SIGTERM
-    // and racing this shutdown; now driven explicitly).
-    log.info('🛑 Stopping queue processor...');
-    queueProcessor.stop();
+    // Stop the sync subsystem (only started when SYNC_ENABLED — both stops are
+    // idempotent, but skip the noise when sync was never running).
+    if (config.sync.enabled) {
+      log.info('🔄 Stopping reverse sync poller...');
+      stopPeriodicPolling();
+      log.info('🛑 Stopping queue processor...');
+      queueProcessor.stop();
+    }
 
     // Clean up WhatsApp service
     if (whatsappService) {

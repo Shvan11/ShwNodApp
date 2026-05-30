@@ -13,6 +13,7 @@ import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import * as readline from 'node:readline';
 import { getKysely, withPgTransaction } from '../kysely.js';
+import { enqueuePatientIfAligner } from '../../sync/sync-queue.js';
 import config from '../../../config/config.js';
 import { createPathResolver } from '../../../utils/path-resolver.js';
 import { toDateOnly } from '../../../utils/date.js';
@@ -558,29 +559,35 @@ export async function updatePatient(
   const toInt = (v: string | number | undefined): number | null =>
     v ? parseInt(String(v), 10) : null;
 
-  await getKysely()
-    .updateTable('tblpatients')
-    .set({
-      PatientName: patientData.PatientName,
-      FirstName: patientData.FirstName || null,
-      LastName: patientData.LastName || null,
-      Phone: patientData.Phone || null,
-      Phone2: patientData.Phone2 || null,
-      Email: patientData.Email || null,
-      DateofBirth: patientData.DateofBirth ? toDateOnly(patientData.DateofBirth) : null,
-      Gender: toInt(patientData.Gender),
-      AddressID: toInt(patientData.AddressID),
-      ReferralSourceID: toInt(patientData.ReferralSourceID),
-      PatientTypeID: toInt(patientData.PatientTypeID),
-      Notes: patientData.Notes || null,
-      Language: patientData.Language ? parseInt(String(patientData.Language), 10) : 0,
-      CountryCode: patientData.CountryCode || null,
-      EstimatedCost: toInt(patientData.EstimatedCost),
-      Currency: patientData.Currency || null,
-      TagID: toInt(patientData.TagID),
-    })
-    .where('PersonID', '=', personId)
-    .execute();
+  await withPgTransaction(async (trx) => {
+    await trx
+      .updateTable('tblpatients')
+      .set({
+        PatientName: patientData.PatientName,
+        FirstName: patientData.FirstName || null,
+        LastName: patientData.LastName || null,
+        Phone: patientData.Phone || null,
+        Phone2: patientData.Phone2 || null,
+        Email: patientData.Email || null,
+        DateofBirth: patientData.DateofBirth ? toDateOnly(patientData.DateofBirth) : null,
+        Gender: toInt(patientData.Gender),
+        AddressID: toInt(patientData.AddressID),
+        ReferralSourceID: toInt(patientData.ReferralSourceID),
+        PatientTypeID: toInt(patientData.PatientTypeID),
+        Notes: patientData.Notes || null,
+        Language: patientData.Language ? parseInt(String(patientData.Language), 10) : 0,
+        CountryCode: patientData.CountryCode || null,
+        EstimatedCost: toInt(patientData.EstimatedCost),
+        Currency: patientData.Currency || null,
+        TagID: toInt(patientData.TagID),
+      })
+      .where('PersonID', '=', personId)
+      .execute();
+
+    // Forward-sync the patient demographics (only if aligner-tracked). Mirrors
+    // trg_sync_tblPatients' EXISTS(work → aligner sets) filter.
+    await enqueuePatientIfAligner(trx, personId, 'UPDATE');
+  });
   return { success: true };
 }
 

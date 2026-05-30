@@ -1,12 +1,19 @@
 /**
- * Unified Sync Processor
- * Processes SyncQueue and syncs all tables from SQL Server to Supabase
- * Replaces the old direct-query sync method with a trigger-based queue system
+ * Unified Sync Processor (manual / batch fallback)
+ *
+ * Drains the local `SyncQueue` table to Supabase, grouped by table, returning per-table stats.
+ * Reached via the manual `POST /api/sync/trigger` endpoint; the real-time path is the
+ * webhook-driven queue-processor.ts. Both share the same on-demand fetch (sync-fetch.ts).
+ *
+ * Phase 8 of the SQL Server → PostgreSQL migration: all data access is Kysely over the pg pool
+ * (was raw mssql `executeQuery`/`TYPES`). Because the app-level enqueue leaves `JsonData` NULL,
+ * INSERT/UPDATE rows fetch current state from PG; DELETE rows delete from Supabase by primary
+ * key. Inert in the sandbox (gated by `config.sync.enabled` at the call sites).
  */
-
-import { executeQuery, TYPES } from '../database/index.js';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { getKysely } from '../database/kysely.js';
+import { fetchRecordFromPg, type SyncRecord } from './sync-fetch.js';
 import { log } from '../../utils/logger.js';
 
 dotenv.config();
@@ -15,55 +22,23 @@ dotenv.config();
 // TYPES
 // =============================================================================
 
-/**
- * Pending sync record from SyncQueue
- */
 interface PendingSyncRecord {
   QueueID: number;
   TableName: string;
   RecordID: number;
   Operation: string;
-  JsonData: string;
-  CreatedAt: Date;
+  JsonData: string | null;
 }
 
-/**
- * Table sync stats
- */
 interface TableSyncStats {
   synced: number;
   failed: number;
 }
 
-/**
- * Full sync stats
- */
 interface SyncStats {
   totalSynced: number;
   totalFailed: number;
   byTable: Record<string, TableSyncStats>;
-}
-
-/**
- * Tables with pending syncs
- */
-interface TableWithPending {
-  TableName: string;
-  PendingCount: number;
-}
-
-/**
- * Sync handler function type. Receives pre-parsed row data so a single
- * corrupt JSON blob in SyncQueue can't poison the whole batch — the parse
- * step in processSyncForTable handles row-level failures.
- */
-type SyncHandler = (data: unknown[]) => Promise<number>;
-
-/**
- * Sync handlers map
- */
-interface SyncHandlers {
-  [tableName: string]: SyncHandler;
 }
 
 // =============================================================================
@@ -74,213 +49,169 @@ const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const supabase: SupabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
+const PRIMARY_KEYS: Record<string, string> = {
+  aligner_doctors: 'dr_id',
+  aligner_sets: 'aligner_set_id',
+  aligner_batches: 'aligner_batch_id',
+  aligner_notes: 'note_id',
+  patients: 'person_id',
+  work: 'work_id',
+};
+
 // =============================================================================
-// HELPER FUNCTIONS
+// HELPERS
 // =============================================================================
 
 async function getPendingSyncRecords(
   tableName: string | null = null,
-  limit: number = 1000
+  limit = 1000
 ): Promise<PendingSyncRecord[]> {
-  const sqlText = `
-    SELECT TOP ${limit}
-      QueueID,
-      TableName,
-      RecordID,
-      Operation,
-      JsonData,
-      CreatedAt
-    FROM SyncQueue
-    WHERE Status = 'Pending'
-      ${tableName ? 'AND TableName = @tableName' : ''}
-    ORDER BY CreatedAt ASC
-  `;
-  const params = tableName ? [['tableName', TYPES.NVarChar, tableName] as [string, typeof TYPES[keyof typeof TYPES], unknown]] : [];
-  return executeQuery<PendingSyncRecord>(sqlText, params, (cols) => ({
-    QueueID: cols[0].value as number,
-    TableName: cols[1].value as string,
-    RecordID: cols[2].value as number,
-    Operation: cols[3].value as string,
-    JsonData: cols[4].value as string,
-    CreatedAt: cols[5].value as Date,
-  }));
+  let q = getKysely()
+    .selectFrom('SyncQueue')
+    .select(['QueueID', 'TableName', 'RecordID', 'Operation', 'JsonData'])
+    .where('Status', '=', 'Pending');
+  if (tableName) q = q.where('TableName', '=', tableName);
+  const rows = await q.orderBy('CreatedAt', 'asc').limit(limit).execute();
+  return rows as PendingSyncRecord[];
 }
 
 async function markAsSynced(queueIds: number[]): Promise<void> {
   if (queueIds.length === 0) return;
-  const idList = queueIds.join(',');
-  await executeQuery(
-    `UPDATE SyncQueue SET Status = 'Synced', LastAttempt = GETDATE(), Attempts = ISNULL(Attempts, 0) + 1 WHERE QueueID IN (${idList})`,
-    [],
-    () => ({})
-  );
+  await getKysely()
+    .updateTable('SyncQueue')
+    .set((eb) => ({
+      Status: 'Synced',
+      LastAttempt: new Date(),
+      Attempts: eb(eb.fn.coalesce('Attempts', eb.lit(0)), '+', 1),
+    }))
+    .where('QueueID', 'in', queueIds)
+    .execute();
 }
 
 async function markAsFailed(queueIds: number[], errorMessage: string): Promise<void> {
   if (queueIds.length === 0) return;
-  const idList = queueIds.join(',');
-  await executeQuery(
-    `UPDATE SyncQueue SET Status = 'Failed', LastAttempt = GETDATE(), LastError = @error, Attempts = ISNULL(Attempts, 0) + 1 WHERE QueueID IN (${idList})`,
-    [['error', TYPES.NVarChar, errorMessage]],
-    () => ({})
-  );
+  await getKysely()
+    .updateTable('SyncQueue')
+    .set((eb) => ({
+      Status: 'Failed',
+      LastAttempt: new Date(),
+      LastError: errorMessage.substring(0, 500),
+      Attempts: eb(eb.fn.coalesce('Attempts', eb.lit(0)), '+', 1),
+    }))
+    .where('QueueID', 'in', queueIds)
+    .execute();
+}
+
+/** Resolve a queue row to its current Supabase payload (parse JsonData or fetch from PG). */
+async function resolveData(record: PendingSyncRecord): Promise<SyncRecord | null> {
+  if (record.JsonData) return JSON.parse(record.JsonData) as SyncRecord;
+  return fetchRecordFromPg(record.TableName, record.RecordID);
 }
 
 // =============================================================================
-// TABLE SYNC HANDLERS
+// SYNC PROCESSING
 // =============================================================================
 
-/**
- * Table sync handlers
- */
-const syncHandlers: SyncHandlers = {
-  async aligner_doctors(data: unknown[]): Promise<number> {
-    const { error } = await supabase.from('aligner_doctors').upsert(data, { onConflict: 'dr_id' });
-    if (error) throw error;
-    return data.length;
-  },
-
-  async aligner_sets(data: unknown[]): Promise<number> {
-    const { error } = await supabase
-      .from('aligner_sets')
-      .upsert(data, { onConflict: 'aligner_set_id' });
-    if (error) throw error;
-    return data.length;
-  },
-
-  async aligner_batches(data: unknown[]): Promise<number> {
-    const { error } = await supabase
-      .from('aligner_batches')
-      .upsert(data, { onConflict: 'aligner_batch_id' });
-    if (error) throw error;
-    return data.length;
-  },
-
-  async aligner_notes(data: unknown[]): Promise<number> {
-    const { error } = await supabase.from('aligner_notes').upsert(data, { onConflict: 'note_id' });
-    if (error) throw error;
-    return data.length;
-  },
-
-  async patients(data: unknown[]): Promise<number> {
-    const { error } = await supabase.from('patients').upsert(data, { onConflict: 'person_id' });
-    if (error) throw error;
-    return data.length;
-  },
-
-  async work(data: unknown[]): Promise<number> {
-    const { error } = await supabase.from('work').upsert(data, { onConflict: 'work_id' });
-    if (error) throw error;
-    return data.length;
-  },
-};
-
-// =============================================================================
-// SYNC PROCESSING FUNCTIONS
-// =============================================================================
-
-/**
- * Process sync queue for a specific table
- */
+/** Process all pending sync rows for one table. */
 async function processSyncForTable(tableName: string): Promise<TableSyncStats> {
   const records = await getPendingSyncRecords(tableName);
-
-  if (records.length === 0) {
-    return { synced: 0, failed: 0 };
-  }
+  if (records.length === 0) return { synced: 0, failed: 0 };
 
   log.info(`📦 Processing ${records.length} ${tableName} records`);
 
-  const handler = syncHandlers[tableName];
-  if (!handler) {
-    log.warn(`No sync handler for table: ${tableName}`);
+  const primaryKey = PRIMARY_KEYS[tableName];
+  if (!primaryKey) {
+    log.warn(`No primary key mapping for table: ${tableName}`);
     return { synced: 0, failed: records.length };
   }
 
-  // Parse per-row so a single corrupt JSON blob in SyncQueue doesn't poison
-  // the whole batch — the previous code did records.map(JSON.parse) inside
-  // each handler, which threw and marked every well-formed row as Failed too.
-  const parsed: unknown[] = [];
-  const okRecords: PendingSyncRecord[] = [];
-  const parseFailed: PendingSyncRecord[] = [];
-  for (const r of records) {
+  const deletes = records.filter((r) => r.Operation === 'DELETE');
+  const upserts = records.filter((r) => r.Operation !== 'DELETE');
+
+  let synced = 0;
+  let failed = 0;
+
+  // DELETEs: remove from Supabase by primary key.
+  if (deletes.length > 0) {
     try {
-      parsed.push(JSON.parse(r.JsonData));
-      okRecords.push(r);
-    } catch (err) {
-      log.error('Sync row has invalid JSON — marking failed', {
-        queueId: r.QueueID,
-        tableName: r.TableName,
-        recordId: r.RecordID,
-        error: (err as Error).message,
-      });
-      parseFailed.push(r);
+      const ids = deletes.map((r) => r.RecordID);
+      const { error } = await supabase.from(tableName).delete().in(primaryKey, ids);
+      if (error) throw error;
+      await markAsSynced(deletes.map((r) => r.QueueID));
+      synced += deletes.length;
+    } catch (error) {
+      log.error(`❌ Error deleting ${tableName}:`, (error as Error).message);
+      await markAsFailed(deletes.map((r) => r.QueueID), (error as Error).message);
+      failed += deletes.length;
     }
   }
 
-  if (parseFailed.length > 0) {
-    await markAsFailed(
-      parseFailed.map((r) => r.QueueID),
-      'Invalid JSON in SyncQueue row'
-    );
-  }
-
-  if (parsed.length === 0) {
-    return { synced: 0, failed: parseFailed.length };
-  }
-
-  try {
-    const synced = await handler(parsed);
-    await markAsSynced(okRecords.map((r) => r.QueueID));
-    if (parseFailed.length > 0) {
-      log.info(`✅ Synced ${synced} ${tableName} records (${parseFailed.length} parse-failed)`);
-    } else {
-      log.info(`✅ Synced ${synced} ${tableName} records`);
+  // INSERT/UPDATE: resolve each row's data (a missing source row is "nothing to sync").
+  if (upserts.length > 0) {
+    const resolved: SyncRecord[] = [];
+    const okIds: number[] = [];
+    for (const r of upserts) {
+      try {
+        const data = await resolveData(r);
+        if (data) {
+          resolved.push(data);
+          okIds.push(r.QueueID);
+        } else {
+          // Source row gone before drain → nothing to upsert; treat as synced.
+          await markAsSynced([r.QueueID]);
+          synced += 1;
+        }
+      } catch (err) {
+        log.error('Sync row could not be resolved — marking failed', {
+          queueId: r.QueueID,
+          tableName: r.TableName,
+          recordId: r.RecordID,
+          error: (err as Error).message,
+        });
+        await markAsFailed([r.QueueID], (err as Error).message);
+        failed += 1;
+      }
     }
-    return { synced, failed: parseFailed.length };
-  } catch (error) {
-    log.error(`❌ Error syncing ${tableName}:`, (error as Error).message);
-    await markAsFailed(okRecords.map((r) => r.QueueID), (error as Error).message);
-    return { synced: 0, failed: records.length };
+
+    if (resolved.length > 0) {
+      try {
+        const { error } = await supabase.from(tableName).upsert(resolved, { onConflict: primaryKey });
+        if (error) throw error;
+        await markAsSynced(okIds);
+        synced += resolved.length;
+        log.info(`✅ Synced ${resolved.length} ${tableName} records`);
+      } catch (error) {
+        log.error(`❌ Error syncing ${tableName}:`, (error as Error).message);
+        await markAsFailed(okIds, (error as Error).message);
+        failed += resolved.length;
+      }
+    }
   }
+
+  return { synced, failed };
 }
 
-/**
- * Process all pending records in sync queue
- */
+/** Process all pending records in the sync queue, across all tables. */
 export async function processAllPendingSyncs(): Promise<SyncStats> {
   log.info('🚀 Starting Unified Sync Process\n');
   log.info('==========================================');
 
-  const stats: SyncStats = {
-    totalSynced: 0,
-    totalFailed: 0,
-    byTable: {},
-  };
+  const stats: SyncStats = { totalSynced: 0, totalFailed: 0, byTable: {} };
 
   try {
-    const tablesWithPending = await executeQuery<TableWithPending>(
-      `
-      SELECT DISTINCT TableName, COUNT(*) as PendingCount
-      FROM SyncQueue
-      WHERE Status = 'Pending'
-      GROUP BY TableName
-      ORDER BY TableName
-      `,
-      [],
-      (cols) => ({
-        TableName: cols[0].value as string,
-        PendingCount: cols[1].value as number,
-      })
-    );
+    const tablesWithPending = await getKysely()
+      .selectFrom('SyncQueue')
+      .select((eb) => ['TableName', eb.fn.countAll<number>().as('PendingCount')])
+      .where('Status', '=', 'Pending')
+      .groupBy('TableName')
+      .orderBy('TableName')
+      .execute();
 
     if (tablesWithPending.length === 0) {
       log.info('ℹ️  No pending syncs');
     } else {
       log.info(`Found pending syncs for ${tablesWithPending.length} tables:\n`);
-      tablesWithPending.forEach((t) => {
-        log.info(`  - ${t.TableName}: ${t.PendingCount} records`);
-      });
+      tablesWithPending.forEach((t) => log.info(`  - ${t.TableName}: ${Number(t.PendingCount)} records`));
       log.info('');
 
       for (const { TableName } of tablesWithPending) {
@@ -296,7 +227,6 @@ export async function processAllPendingSyncs(): Promise<SyncStats> {
     log.info(`   Total Synced: ${stats.totalSynced}`);
     log.info(`   Total Failed: ${stats.totalFailed}`);
     log.info('==========================================\n');
-
     return stats;
   } catch (error) {
     log.error('❌ Sync process failed:', error);
@@ -304,5 +234,4 @@ export async function processAllPendingSyncs(): Promise<SyncStats> {
   }
 }
 
-export { processSyncForTable, syncHandlers };
-
+export { processSyncForTable };

@@ -139,6 +139,19 @@ export interface UrlConfig {
   publicUrl?: string;
 }
 
+/**
+ * Supabase-sync configuration.
+ *
+ * `enabled` is the master switch for the entire SQL/PG → Supabase sync subsystem
+ * (forward enqueue/queue-processor + reverse poller/webhook). It is OFF by default so
+ * the sandbox clone never enqueues or talks to Supabase; production sets SYNC_ENABLED=true.
+ * When false: write paths skip enqueue, processors/poller don't start, and the webhook
+ * routes short-circuit.
+ */
+export interface SyncConfig {
+  enabled: boolean;
+}
+
 // ===========================================
 // MAIN CONFIG
 // ===========================================
@@ -158,6 +171,7 @@ export interface AppConfig {
   server: ServerConfig;
   urls: UrlConfig;
   webceph: WebCephConfig;
+  sync: SyncConfig;
   cs_export?: string;
   gram_session?: string;
 }
@@ -216,10 +230,14 @@ export interface OptionalEnvVars {
   WEBCEPH_API_BASE_URL?: string;
   CS_EXPORT?: string;
   GRAM_SESSION?: string;
+  SYNC_ENABLED?: string;
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
+  SUPABASE_WEBHOOK_SECRET?: string;
   REVERSE_SYNC_ENABLED?: string;
   REVERSE_SYNC_INTERVAL_MINUTES?: string;
+  REVERSE_SYNC_LOOKBACK_HOURS?: string;
+  REVERSE_SYNC_MAX_RECORDS?: string;
 }
 
 /**
