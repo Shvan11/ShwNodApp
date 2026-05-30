@@ -1,0 +1,3 @@
+[submodule "aligner-portal-external"]
+	path = aligner-portal-external
+	url = https://github.com/Shvan11/aligner-portal-external.git
